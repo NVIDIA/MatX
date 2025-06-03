@@ -211,5 +211,17 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv) {
   (R = matvec(AdiaJ, V)).run(exec);
   print(R);
 
+  //
+  // Perform a direct solve. This is only supported for a tri-diagonal
+  // matrix in DIA-I format where the rhs is overwritten with the answer.
+  //
+  dvals.SetVals({0, -1, -1, -1, -1, -1, 4, 4, 4, 4, 4, 4, 1, 1, 1, 1, 1, 0});
+  auto AdiaI = experimental::make_tensor_dia<experimental::DIA_INDEX_I>(
+      dvals, doffsets, {6, 6});
+  auto Rhs = make_tensor<float, 2>({2, 6});
+  Rhs.SetVals({{6, 10, 14, 18, 22, 19}, {36, 34, 38, 42, 46, 37}});
+  (Rhs = solve(AdiaI, Rhs)).run(exec);
+  print(Rhs);
+
   MATX_EXIT_HANDLER();
 }

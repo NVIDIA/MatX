@@ -35,6 +35,7 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
+#include "matx/transforms/solve/solve_cusparse.h"
 #ifdef MATX_EN_CUDSS
 #include "matx/transforms/solve/solve_cudss.h"
 #endif
@@ -92,7 +93,7 @@ public:
     static_assert(!is_sparse_tensor_v<OpB>, "sparse rhs not implemented");
     if constexpr (is_sparse_tensor_v<OpA>) {
       if constexpr (OpA::Format::isDIAI() || OpA::Format::isDIAJ()) {
-        MATX_THROW(matxNotSupported, "DIA support coming soon");
+        sparse_dia_solve_impl(cuda::std::get<0>(out), a_, b_, ex);
       } else {
 #ifdef MATX_EN_CUDSS
         sparse_solve_impl(cuda::std::get<0>(out), a_, b_, ex);

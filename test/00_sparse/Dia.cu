@@ -102,7 +102,7 @@ template <typename T> static auto makeC() {
   return C;
 }
 
-template <typename T> class MatvecSparseTest : public ::testing::Test {
+template <typename T> class DiaSparseTest : public ::testing::Test {
 protected:
   using GTestType = cuda::std::tuple_element_t<0, T>;
   using GExecType = cuda::std::tuple_element_t<1, T>;
@@ -110,12 +110,14 @@ protected:
   float thresh = 0.001f;
 };
 
-template <typename T>
-class MatvecSparseTestsAll : public MatvecSparseTest<T> {};
+template <typename T> class DiaSparseTestsAll : public DiaSparseTest<T> {};
 
-TYPED_TEST_SUITE(MatvecSparseTestsAll, MatXFloatNonComplexHalfTypesCUDAExec);
+template <typename T> class DiaSolveSparseTestsAll : public DiaSparseTest<T> {};
 
-TYPED_TEST(MatvecSparseTestsAll, MatvecDIAI) {
+TYPED_TEST_SUITE(DiaSparseTestsAll, MatXFloatNonComplexHalfTypesCUDAExec);
+TYPED_TEST_SUITE(DiaSolveSparseTestsAll, MatXFloatNonHalfTypesCUDAExec);
+
+TYPED_TEST(DiaSparseTestsAll, MatvecDIAI) {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
@@ -147,7 +149,7 @@ TYPED_TEST(MatvecSparseTestsAll, MatvecDIAI) {
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(MatvecSparseTestsAll, MatvecDIAJ) {
+TYPED_TEST(DiaSparseTestsAll, MatvecDIAJ) {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
@@ -173,6 +175,56 @@ TYPED_TEST(MatvecSparseTestsAll, MatvecDIAJ) {
       ASSERT_NEAR(O(i).imag(), C(i).imag(), this->thresh);
     } else {
       ASSERT_NEAR(O(i), C(i), this->thresh);
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(DiaSolveSparseTestsAll, SolveDIAI) {
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+
+  ExecType exec{};
+
+  auto A = makeDIA<TestType, experimental::DIA_INDEX_I>();
+
+  const auto m = A.Size(0);
+
+  auto X = make_tensor<TestType, 2>({2, m});
+
+  X(0, 0) = static_cast<TestType>(3);
+  X(0, 1) = static_cast<TestType>(6);
+  X(0, 2) = static_cast<TestType>(11);
+  X(0, 3) = static_cast<TestType>(13);
+  X(1, 0) = static_cast<TestType>(30);
+  X(1, 1) = static_cast<TestType>(60);
+  X(1, 2) = static_cast<TestType>(110);
+  X(1, 3) = static_cast<TestType>(130);
+
+  // Solve.
+  (X = solve(A, X)).run(exec);
+
+  // Verify result.
+  exec.sync();
+  auto E = make_tensor<TestType>({2, 4});
+  E(0, 0) = static_cast<TestType>(1);
+  E(0, 1) = static_cast<TestType>(2);
+  E(0, 2) = static_cast<TestType>(3);
+  E(0, 3) = static_cast<TestType>(4);
+  E(1, 0) = static_cast<TestType>(10);
+  E(1, 1) = static_cast<TestType>(20);
+  E(1, 2) = static_cast<TestType>(30);
+  E(1, 3) = static_cast<TestType>(40);
+  for (index_t i = 0; i < 2; i++) {
+    for (index_t j = 0; j < 4; j++) {
+      if constexpr (is_complex_v<TestType>) {
+        ASSERT_NEAR(X(i, j).real(), E(i, j).real(), this->thresh);
+        ASSERT_NEAR(X(i, j).imag(), E(i, j).imag(), this->thresh);
+      } else {
+        ASSERT_NEAR(X(i, j), E(i, j), this->thresh);
+      }
     }
   }
 
