@@ -141,7 +141,7 @@ to construct COO, CSR, CSC, and DIA are provided::
   // offset vectors. For an m x n matrix, this format uses a linearized storage
   // where each diagonal has n entries and is accessed by index I or index J.
   // For index I, diagonals padded with zeros on the left for the lower triangular
-  // part and padded with zeros on the right for the upper triagonal part. This
+  // part and padded with zeros on the right for the upper triangular part. This
   // is vv. when using index J. This format is most efficient for matrices with
   // only a few nonzero diagonals that are close to the main diagonal.
   template <typename IDX, typename ValTensor, typename CrdTensor>
