@@ -100,12 +100,14 @@ public:
     }
     MATX_ASSERT(ret == CUDSS_STATUS_SUCCESS, matxSolverError);
 
-    // Create cuDSS handle for dense matrices B and C.
+    // Create cuDSS handle for dense matrices B and C. Since the solve()
+    // operation presents the rhs and solution matrix along rows, we
+    // can use the column-major storage here (cuDSS has no row-major yet).
     static_assert(is_tensor_view_v<TensorTypeB>);
     static_assert(is_tensor_view_v<TensorTypeC>);
     cudaDataType dtb = MatXTypeToCudaType<TB>();
     cudaDataType dtc = MatXTypeToCudaType<TC>();
-    cudssLayout_t layout = CUDSS_LAYOUT_COL_MAJOR; // no ROW-MAJOR in cuDSS yet
+    cudssLayout_t layout = CUDSS_LAYOUT_COL_MAJOR;
     ret = cudssMatrixCreateDn(&matB_, params_.m, params_.n, /*ld=*/params_.m,
                               params_.ptrB, dtb, layout);
     MATX_ASSERT(ret == CUDSS_STATUS_SUCCESS, matxSolverError);
@@ -234,8 +236,8 @@ __MATX_INLINE__ auto getSolveSupportedTensor(const Op &in,
 } // end namespace detail
 
 template <typename TensorTypeC, typename TensorTypeA, typename TensorTypeB>
-void sparse_solve_impl_trans(TensorTypeC &C, const TensorTypeA &a,
-                             const TensorTypeB &B, const cudaExecutor &exec) {
+void sparse_solve_impl(TensorTypeC &C, const TensorTypeA &a,
+                       const TensorTypeB &B, const cudaExecutor &exec) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   const auto stream = exec.getStream();
 
@@ -269,7 +271,7 @@ void sparse_solve_impl_trans(TensorTypeC &C, const TensorTypeA &a,
                 "unsupported data type");
   MATX_ASSERT( // Note: B,C transposed!
       a.Size(RANKA - 1) == b.Size(RANKB - 1) &&
-          a.Size(RANKA - 2) == b.Size(RANKB - 1) &&
+          a.Size(RANKA - 2) == c.Size(RANKC - 1) &&
           b.Size(RANKB - 2) == c.Size(RANKC - 2),
       matxInvalidSize);
   MATX_ASSERT(b.Stride(RANKB - 1) == 1 && c.Stride(RANKC - 1) == 1,
@@ -295,42 +297,6 @@ void sparse_solve_impl_trans(TensorTypeC &C, const TensorTypeA &a,
   if (!c.isSameView(C)) {
     (C = c).run(stream);
   }
-}
-
-// Since cuDSS currently only supports column-major storage of the dense
-// matrices (and CSR for the sparse matrix), the current implementation
-// tranposes B and C prior to entering a tranposed version for SOLVE. This
-// convoluted way of performing the solve step must be removed once cuDSS
-// supports MATX native row-major storage, which will clean up the copies from
-// and to memory.
-//
-// TODO: remove this when cuDSS supports row-major storage
-//
-template <typename TensorTypeC, typename TensorTypeA, typename TensorTypeB>
-void sparse_solve_impl(TensorTypeC &c, const TensorTypeA &a,
-                       const TensorTypeB &b, const cudaExecutor &exec) {
-  const auto stream = exec.getStream();
-
-  // Some copying-in hacks.
-  static_assert(TensorTypeB::Rank() == 2 && TensorTypeC::Rank() == 2);
-  using TB = typename TensorTypeB::value_type;
-  using TC = typename TensorTypeB::value_type;
-  TB *bptr;
-  matxAlloc(reinterpret_cast<void **>(&bptr),
-            sizeof(TB) * b.Size(0) * b.Size(1), MATX_ASYNC_DEVICE_MEMORY,
-            stream);
-  auto bT = make_tensor(bptr, {b.Size(1), b.Size(0)});
-  (bT = transpose(b)).run(exec);
-  TC *cptr;
-  matxAlloc(reinterpret_cast<void **>(&cptr),
-            sizeof(TC) * c.Size(0) * c.Size(1), MATX_ASYNC_DEVICE_MEMORY,
-            stream);
-  auto cT = make_tensor(cptr, {c.Size(1), c.Size(0)});
-
-  sparse_solve_impl_trans(cT, a, bT, exec);
-
-  // Some copying-back hacks.
-  (c = transpose(cT)).run(exec);
 }
 
 } // end namespace matx

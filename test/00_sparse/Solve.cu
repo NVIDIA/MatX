@@ -73,9 +73,9 @@ TYPED_TEST(SolveSparseTestsAll, SolveCSR) {
   // | 0 0 0 5 |   | 4 8 |   | 20 40 |
   //
   auto A = make_tensor<TestType>({4, 4});
-  auto X = make_tensor<TestType>({4, 2});
-  auto E = make_tensor<TestType>({4, 2});
-  auto Y = make_tensor<TestType>({4, 2});
+  auto X = make_tensor<TestType>({2, 4});
+  auto E = make_tensor<TestType>({2, 4});
+  auto Y = make_tensor<TestType>({2, 4});
   // Coeffs.
   A(0, 0) = static_cast<TestType>(1);
   A(0, 1) = static_cast<TestType>(2);
@@ -93,24 +93,24 @@ TYPED_TEST(SolveSparseTestsAll, SolveCSR) {
   A(3, 1) = static_cast<TestType>(0);
   A(3, 2) = static_cast<TestType>(0);
   A(3, 3) = static_cast<TestType>(5);
-  // Expected.
+  // Expected (along rows).
   E(0, 0) = static_cast<TestType>(1);
-  E(0, 1) = static_cast<TestType>(5);
-  E(1, 0) = static_cast<TestType>(2);
+  E(0, 1) = static_cast<TestType>(2);
+  E(0, 2) = static_cast<TestType>(3);
+  E(0, 3) = static_cast<TestType>(4);
+  E(1, 0) = static_cast<TestType>(5);
   E(1, 1) = static_cast<TestType>(6);
-  E(2, 0) = static_cast<TestType>(3);
-  E(2, 1) = static_cast<TestType>(7);
-  E(3, 0) = static_cast<TestType>(4);
-  E(3, 1) = static_cast<TestType>(8);
-  // RHS.
+  E(1, 2) = static_cast<TestType>(7);
+  E(1, 3) = static_cast<TestType>(8);
+  // RHS (along rows).
   Y(0, 0) = static_cast<TestType>(5);
-  Y(0, 1) = static_cast<TestType>(17);
-  Y(1, 0) = static_cast<TestType>(6);
+  Y(0, 1) = static_cast<TestType>(6);
+  Y(0, 2) = static_cast<TestType>(12);
+  Y(0, 3) = static_cast<TestType>(20);
+  Y(1, 0) = static_cast<TestType>(17);
   Y(1, 1) = static_cast<TestType>(18);
-  Y(2, 0) = static_cast<TestType>(12);
-  Y(2, 1) = static_cast<TestType>(28);
-  Y(3, 0) = static_cast<TestType>(20);
-  Y(3, 1) = static_cast<TestType>(40);
+  Y(1, 2) = static_cast<TestType>(28);
+  Y(1, 3) = static_cast<TestType>(40);
 
   // Convert dense A to sparse S in CSR format with int-32 indices.
   auto S =
@@ -123,8 +123,8 @@ TYPED_TEST(SolveSparseTestsAll, SolveCSR) {
 
   // Verify result.
   exec.sync();
-  for (index_t i = 0; i < 4; i++) {
-    for (index_t j = 0; j < 2; j++) {
+  for (index_t i = 0; i < 2; i++) {
+    for (index_t j = 0; j < 4; j++) {
       if constexpr (is_complex_v<TestType>) {
         ASSERT_NEAR(X(i, j).real(), E(i, j).real(), this->thresh);
         ASSERT_NEAR(X(i, j).imag(), E(i, j).imag(), this->thresh);
@@ -142,8 +142,8 @@ TYPED_TEST(SolveSparseTestsAll, SolveCSR) {
 
   // Verify result.
   exec.sync();
-  for (index_t i = 0; i < 4; i++) {
-    for (index_t j = 0; j < 2; j++) {
+  for (index_t i = 0; i < 2; i++) {
+    for (index_t j = 0; j < 4; j++) {
       if constexpr (is_complex_v<TestType>) {
         ASSERT_NEAR((X(i, j) - C5).real(), E(i, j).real(), this->thresh);
         ASSERT_NEAR((X(i, j) - C5).imag(), E(i, j).imag(), this->thresh);
