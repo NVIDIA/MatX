@@ -91,11 +91,15 @@ public:
   void Exec([[maybe_unused]] Out &&out, [[maybe_unused]] Executor &&ex) const {
     static_assert(!is_sparse_tensor_v<OpB>, "sparse rhs not implemented");
     if constexpr (is_sparse_tensor_v<OpA>) {
+      if constexpr (OpA::Format::isDIAI() || OpA::Format::isDIAJ()) {
+        MATX_THROW(matxNotSupported, "DIA support coming soon");
+      } else {
 #ifdef MATX_EN_CUDSS
-      sparse_solve_impl(cuda::std::get<0>(out), a_, b_, ex);
+        sparse_solve_impl(cuda::std::get<0>(out), a_, b_, ex);
 #else
-      MATX_THROW(matxNotSupported, "Sparse direct solver requires cuDSS");
+        MATX_THROW(matxNotSupported, "Sparse direct solver requires cuDSS");
 #endif
+      }
     } else {
       MATX_THROW(matxNotSupported,
                  "Direct solver currently only supports sparse system");
@@ -137,10 +141,13 @@ public:
 } // end namespace detail
 
 /**
- * Run a direct SOLVE (viz. X = solve(A, B) solves system AX=B for unknown X).
- *
- * Note that currently, this operation is only implemented for solving
- * a linear system with a very **sparse** matrix A.
+ * Running X = solve(A, B) solves the system A X^T = B^T for
+ * an unknown X given the rhs B. The transposition is used so
+ * that the different rhs vectors and solutions are stacked by
+ * row (another way to think about this is that X and B are
+ * presented using column-major storage). Currently, this
+ * operation is only implemented for solving a linear system
+ * with a very **sparse** matrix A in CSR or DIA format.
  *
  * @tparam OpA
  *    Data type of A tensor (sparse)

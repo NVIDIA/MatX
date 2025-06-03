@@ -152,9 +152,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv) {
   colidx.SetVals({0, 1, 1, 2, 3});
   auto Acsr = experimental::make_tensor_csr(coeffs, rowptr, colidx, {4, 4});
   print(Acsr);
-  auto X = make_tensor<float>({4, 2});
-  auto Y = make_tensor<float>({4, 2});
-  Y.SetVals({{5, 17}, {6, 18}, {12, 28}, {20, 40}});
+  auto X = make_tensor<float>({2, 4}); // solution along rows
+  auto Y = make_tensor<float>({2, 4}); // RHS along rows
+  Y.SetVals({{5, 6, 12, 20}, {17, 18, 28, 40}});
   (X = solve(Acsr, Y)).run(exec);
   print(X);
 
@@ -197,7 +197,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv) {
   auto doffsets = make_tensor<int>({3});
   dvals.SetVals({-1, -1, -1, -1, -1, 0, 4, 4, 4, 4, 4, 4, 0, 1, 1, 1, 1, 1});
   doffsets.SetVals({-1, 0, 1});
-  auto AdiaJ = experimental::make_tensor_dia<experimental::DIA_INDEX_J>(dvals, doffsets, {6, 6});
+  auto AdiaJ = experimental::make_tensor_dia<experimental::DIA_INDEX_J>(
+      dvals, doffsets, {6, 6});
   print(AdiaJ);
 
   //
