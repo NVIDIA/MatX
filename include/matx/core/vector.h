@@ -42,7 +42,7 @@ namespace detail {
 
 template <typename T, int N>
 struct alignas(sizeof(T) * N) Vector {
-  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Vector() {}
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Vector() = default;
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Vector(T v) { Fill(v); }
 
   template <typename T2, std::enable_if_t<std::is_same_v<typename T2::matx_vec, bool> && T2::width == N, bool> = true>

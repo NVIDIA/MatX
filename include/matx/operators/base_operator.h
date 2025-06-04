@@ -80,8 +80,7 @@ namespace matx
             return;
           }
 
-          printf("%d HERE \n", tp->has_capability(OperatorCapability::SUPPORTS_JIT));
-          if (tp->has_capability(OperatorCapability::SUPPORTS_JIT)) {
+          if (detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(*tp)) {
             ex.Exec(*tp);
           }
           else {
@@ -172,23 +171,6 @@ namespace matx
           return size;
         }
 
-        // Default implementation for getting an operator's intrinsic capability.
-        // Derived classes should override this to declare their specific capabilities.
-        // By default, an operator has NO specific capabilities.
-        __MATX_INLINE__ __MATX_HOST__ bool get_capability_impl(OperatorCapability cap) const {
-          // Default: this specific operator does not inherently have the requested capability.
-          return false; 
-        }
-
-        // Public interface to check if the operator (sub-expression) has a given capability.
-        // This calls the derived class's specific implementation (get_capability_impl)
-        // and combines it with the capabilities of its children based on the query type.
-        __MATX_INLINE__ __MATX_HOST__ bool has_capability(OperatorCapability cap) const {
-          // Get the capability of the current operator node itself
-          // The derived class's get_capability_impl will handle the specific logic for that operator type,
-          // including querying children if it's a composite operator.
-          return static_cast<const T*>(this)->get_capability_impl(cap);
-        }
 
         /* This must be in derived class.  Copy paste line below to derived case if it is an lvalue
            template<typename R> __MATX_INLINE__ auto operator=(const R &rhs) { return set(*reinterpret_cast<T*>(this), rhs); }

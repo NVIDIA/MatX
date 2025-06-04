@@ -73,11 +73,6 @@ namespace detail {
         return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_));
       }
 
-      template <typename Out, typename Executor>
-      void Exec(Out &&out, Executor &&ex) const {
-        chol_impl(cuda::std::get<0>(out),  a_, ex, uplo_);  
-      }
-
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
       {
         return OpA::Rank();

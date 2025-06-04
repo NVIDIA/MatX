@@ -395,6 +395,7 @@ namespace detail {
             }
             else {
               get_random(val.data[i], &states_[static_cast<int>(EPT) * GetValC<0, Is...>(cuda::std::make_tuple(indices...)) + i], fParams_.dist_);
+             // printf("%f\n", val.data[i].real());
             }
 
             val.data[i] = fParams_.alpha_ * val.data[i] + fParams_.beta_;
@@ -432,6 +433,7 @@ namespace detail {
               curandGenerateUniformDouble(gen_, &val.data[0], static_cast<int>(EPT));
             }
             else if constexpr (std::is_same_v<T, cuda::std::complex<float>>) {
+              printf("in here\n");
               curandGenerateUniform(gen_, reinterpret_cast<float*>(&val.data[0]), static_cast<int>(EPT) * 2);
             }
             else if constexpr (std::is_same_v<T, cuda::std::complex<double>>) {
@@ -489,6 +491,7 @@ namespace detail {
         }
 #endif
         if constexpr (EPT == ElementsPerThread::ONE) {
+          printf("one\n");
           return val.data[0];
         }
         else {

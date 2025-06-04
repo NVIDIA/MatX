@@ -228,14 +228,14 @@ static const char *matxOpT1JITKernelStr = "\n\
 #include \"matx.h\"\n\
 namespace matx {\n\
   namespace detail {\n\
-    template <class Op>\n\
+    template <int EPT, class Op>\n\
     __global__ void matxOpT1Kernel(Op op, matx::index_t size0) {\n\
       matx::index_t idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;\n\
-      if (idx < size0) {\n\
+      if (idx * EPT < size0) {\n\
         if constexpr (std::is_pointer_v<Op>) {\n\
-          (*op)(idx);\n\
+          (*op).template operator()<static_cast<matx::detail::ElementsPerThread>(EPT)>(idx);\n\
         } else {\n\
-          op(idx);\n\
+          op.template operator()<static_cast<matx::detail::ElementsPerThread>(EPT)>(idx);\n\
         }\n\
       }\n\
     }\n\

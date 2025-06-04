@@ -192,7 +192,7 @@ public:
 
 } // namespace detail
 
-
+#ifndef JITIFY
 /**
  * Perform a reduction
  *

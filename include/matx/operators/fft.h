@@ -44,6 +44,7 @@
 #endif
 
 #ifdef MATX_EN_MATHDX
+  #include "cuComplex.h"
   #include "matx/transforms/fft/fft_cufftdx.h"
 #endif
 
@@ -69,9 +70,10 @@ namespace matx
 
       public:
         using matxop = bool;
-        using value_type = std::conditional_t<is_complex_v<typename OpA::value_type>,
-          typename OpA::value_type,
-          typename scalar_to_complex<typename OpA::value_type>::ctype>;
+        using input_type = typename OpA::value_type;        
+        using value_type = std::conditional_t<is_complex_v<input_type>,
+          input_type,
+          typename scalar_to_complex<input_type>::ctype>;
         using matx_transform_op = bool;
         using fft_xform_op = bool;
 
@@ -139,26 +141,38 @@ namespace matx
         template <detail::ElementsPerThread EPT, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          return tmp_out_.template operator()<EPT>(indices...);
+          // cuFFTDx Doesn't support EPT == 1
+          if constexpr (EPT == detail::ElementsPerThread::ONE) {
+            return tmp_out_.template operator()<EPT>(indices...);
+          }
+          else {
+#ifdef __CUDA_ARCH__
+            __syncthreads();
+            using in_vec_type = decltype(a_.template operator()<EPT>(indices...));
+            __shared__  Vector<input_type, static_cast<int>(EPT)> thread_data[16];
+            thread_data[threadIdx.x] = a_.template operator()<EPT>(indices...);
+            __syncthreads();
+
+            using FFT = decltype(cufftdx::Block() + cufftdx::Size<16>() + cufftdx::Type<cufftdx::fft_type::c2c>() +
+                        cufftdx::Direction<cufftdx::fft_direction::forward>() + cufftdx::Precision<float>() +
+                        cufftdx::FFTsPerBlock<1>() + cufftdx::SM<800>() + cufftdx::ElementsPerThread<static_cast<int>(EPT)>());
+
+            //auto thread_data = a_.template operator()<EPT>(indices...);
+            //extern __shared__ __align__(alignof(float2)) input_type shared_mem[];
+            printf("before %d %f%+f %f%+f \n", threadIdx.x, thread_data[threadIdx.x].data[0].real(), thread_data[threadIdx.x].data[0].imag(), thread_data[threadIdx.x].data[1].real(), thread_data[threadIdx.x].data[1].imag());
+            FFT().execute(&thread_data[0]);
+            printf("after %d %f%+f %f%+f \n", threadIdx.x, thread_data[threadIdx.x].data[0].real(), thread_data[threadIdx.x].data[0].imag(), thread_data[threadIdx.x].data[1].real(), thread_data[threadIdx.x].data[1].imag());
+            return thread_data[threadIdx.x];
+#else
+            return tmp_out_.template operator()<EPT>(indices...);
+#endif
+          }
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-#ifdef __CUDA_ARCH__
-          __syncthreads();
-
-          using FFT = decltype(cufftdx::Block() + cufftdx::Size<16>() + cufftdx::Type<cufftdx::fft_type::c2c>() +
-                       cufftdx::Direction<cufftdx::fft_direction::forward>() + cufftdx::Precision<float>() +
-                       cufftdx::FFTsPerBlock<1>() + cufftdx::SM<800>() + cufftdx::ElementsPerThread<1>());
-          cufftComplex thread_data;
-          extern __shared__ __align__(alignof(float2)) cufftComplex shared_mem[];
-          thread_data = a_(indices...);
-          FFT().execute(thread_data, shared_mem);
-          return thread_data;
-#else
-          return tmp_out_.template operator()<detail::ElementsPerThread::ONE>(indices...);
-#endif
+          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -202,7 +216,7 @@ namespace matx
 //           }
 //           return false;
 //         }
-
+#ifndef JITIFY  
         __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
         template <typename Out, typename Executor>

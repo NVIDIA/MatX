@@ -38,6 +38,7 @@
 
 #include "matx/core/nvtx.h"
 #include "matx/core/dlpack.h"
+#include "matx/core/capabilities.h"
 #include "matx/core/make_tensor.h"
 #include "matx/kernels/utility.cuh"
 #include "matx/transforms/copy.h"
@@ -497,106 +498,6 @@ namespace matx
 
       return reinterpret_cast<T *>(addr);
     }
-
-    template <typename T> constexpr DLDataType TypeToDLPackType()
-    {
-      if constexpr (std::is_same_v<T, cuda::std::complex<float>> || 
-                    std::is_same_v<T, std::complex<float>>)
-        return {kDLComplex, 64, 1};
-      if constexpr (std::is_same_v<T, cuda::std::complex<double>> ||
-                    std::is_same_v<T, std::complex<double>>)
-        return {kDLComplex, 128, 1};
-      if constexpr (std::is_same_v<T, matxFp16>)
-        return {kDLFloat, 16, 1};
-      if constexpr (std::is_same_v<T, matxBf16>)
-        return {kDLBfloat, 16, 1};
-      if constexpr (std::is_same_v<T, matxFp16Complex>)
-        return {kDLComplex, 32, 1};
-      if constexpr (std::is_same_v<T, matxBf16Complex>)
-        return {kDLComplex, 32, 1}; // Wrong, but no other choice
-      if constexpr (std::is_same_v<T, float>)
-        return {kDLFloat, 32, 1};
-      if constexpr (std::is_same_v<T, double>)
-        return {kDLFloat, 64, 1};
-      if constexpr (std::is_same_v<T, int8_t>)
-        return {kDLInt, 8, 1};
-      if constexpr (std::is_same_v<T, int16_t>)
-        return {kDLInt, 16, 1};
-      if constexpr (std::is_same_v<T, int32_t>)
-        return {kDLInt, 32, 1};
-      if constexpr (std::is_same_v<T, int64_t>)
-        return {kDLInt, 64, 1};
-      if constexpr (std::is_same_v<T, uint8_t>)
-        return {kDLUInt, 8, 1};
-      if constexpr (std::is_same_v<T, uint16_t>)
-        return {kDLUInt, 16, 1};
-      if constexpr (std::is_same_v<T, uint32_t>)
-        return {kDLUInt, 32, 1};
-      if constexpr (std::is_same_v<T, uint64_t>)
-        return {kDLUInt, 64, 1};
-      if constexpr (std::is_same_v<T, bool>)
-  #if DLPACK_VERSION >= 80
-        return {kDLBool, 8, 1};
-  #else
-        return {kDLUInt, 8, 1};
-  #endif
-
-      return {kDLOpaqueHandle, 1, 1};
-    }
-
-
-  template <typename Op, typename Executor>
-  auto OpToTensor(Op &&op, [[maybe_unused]] const Executor &exec) {
-    if constexpr (is_matx_transform_op<Op>()) {
-      // We can assume that if a transform is passed to the input then PreRun has already completed
-      // on the transform and we can use the internal pointer
-      return make_tensor<typename Op::value_type>(op.Data(), Shape(op));
-    }    
-    else if constexpr (!is_tensor_view_v<Op>) {
-      if constexpr (is_cuda_executor_v<Executor>) {
-        return make_tensor<typename remove_cvref<Op>::value_type>(op.Shape(), MATX_ASYNC_DEVICE_MEMORY, exec.getStream());
-      } else {
-        return make_tensor<typename remove_cvref<Op>::value_type>(op.Shape(), MATX_HOST_MALLOC_MEMORY);
-      }
-    } else {
-      return op;
-    }
-  }
-
-  /**
-   * Get a transposed view of a tensor or operator into a user-supplied buffer
-   *
-   * @param tp
-   *   Pointer to pre-allocated memory
-   * @param a
-   *   Tensor to transpose
-   * @param exec
-   *   Executor
-   */
-  template <typename TensorType, typename Executor>
-  __MATX_INLINE__ auto
-  TransposeCopy(typename TensorType::value_type *tp, const TensorType &a, const Executor &exec)
-  {
-    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-
-    auto pa = transpose_matrix(a);
-    auto tv = make_tensor(tp, pa.Shape());
-    matx::copy(tv, pa, exec);
-    return tv;
-  }
-
-  template <typename T, typename I, int32_t R>
-  void UpdateIndices(const T& op, cuda::std::array<I, R> &idx, int res) {
-    for (int32_t r = T::Rank() - res - 1; r >= 0; r--) {
-      idx[r]++;
-      if (idx[r] == op.Size(r)) {
-        idx[r] = 0;
-      }
-      else {
-        return;
-      }
-    }
-  }
 
   }
 

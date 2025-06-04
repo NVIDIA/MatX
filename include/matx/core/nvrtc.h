@@ -34,7 +34,7 @@
 
 #include <cuda.h>
 
-//#define JITIFY_VERBOSE_ERRORS 1
+#define JITIFY_VERBOSE_ERRORS 1
 #define JITIFY_ENABLE_EMBEDDED_FILES 1
 #define JITIFY_IGNORE_NOT_TRIVIALLY_COPYABLE_ARGS 1
 #include "matx/core/jitify2.hpp"
@@ -44,7 +44,7 @@
 
 namespace matx {
 
-template <typename Op>
+template <detail::ElementsPerThread EPT, typename Op>
 auto nvrtc_compile_and_run(const std::string &src, const std::string &name, Op op, index_t size0, dim3 &blocks, dim3 &threads) {
 
   // jitify2::PreprocessedProgram preprog =
@@ -72,13 +72,15 @@ auto nvrtc_compile_and_run(const std::string &src, const std::string &name, Op o
       jitify2::PreprocessedProgram preprog = jitify2::Program(name, src)
           // Preprocess source code and load all included headers.
           ->preprocess({"-DJITIFY", 
-          "-I/repro/tmp/MatX/include", "-I/repro/tmp/MatX/include/matx/kernels", "-I/repro/tmp/MatX/build/_deps/cccl-src/lib/cmake/thrust/../../../thrust", "-I/repro/tmp/MatX/build/_deps/cccl-src/lib/cmake/libcudacxx/../../../libcudacxx/include", "-I/repro/tmp/MatX/build/_deps/cccl-src/lib/cmake/cub/../../../cub", "-I/repro/tmp/MatX/build/_deps/pybind11-src/include", "-I/usr/include/python3.10", "-I/repro/tmp/MatX/build/_deps/mathdx-src/nvidia/mathdx/25.01/include", "-I/repro/tmp/MatX/build/_deps/mathdx-src/nvidia/mathdx/25.01/external/cutlass/include", "-I/usr/local/cuda/include",
+          "-I/repro/MatX/include", "-I/repro/MatX/include/matx/kernels", "-I/repro/MatX/build/_deps/cccl-src/lib/cmake/thrust/../../../thrust", "-I/repro/MatX/build/_deps/cccl-src/lib/cmake/libcudacxx/../../../libcudacxx/include", "-I/repro/MatX/build/_deps/cccl-src/lib/cmake/cub/../../../cub", "-I/repro/MatX/build/_deps/pybind11-src/include", "-I/usr/include/python3.10", "-I/repro/MatX/build/_deps/mathdx-src/nvidia/mathdx/25.01/include", "-I/repro/MatX/build/_deps/mathdx-src/nvidia/mathdx/25.01/external/cutlass/include", "-I/usr/local/cuda/include",
           //"-no-preinclude-workarounds",
                       "-no-system-headers-workaround",
                       "-arch=sm_80","-std=c++17"});
 
-          
-      auto kernel_name = jitify2::reflection::Template("matx::detail::matxOpT1Kernel").instantiate<Op>();
+      using jitify2::reflection::Type;
+      using jitify2::reflection::NonType;
+      //auto kernel_name = jitify2::reflection::Template("matx::detail::matxOpT1Kernel").instantiate<Type<detail::ElementsPerThread>(), Op>();
+      auto kernel_name = jitify2::reflection::Template("matx::detail::matxOpT1Kernel").instantiate<NonType<int, static_cast<int>(EPT)>, Op>();
       std::cout << "kernel name: " << kernel_name << std::endl;
       if (!preprog) {
         std::cerr << preprog.error() << std::endl;

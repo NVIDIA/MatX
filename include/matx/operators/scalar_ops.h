@@ -68,7 +68,7 @@ namespace detail {
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(T1V v1) const { \
       return UnaryVecFunc(internal_##FUNC<T>, v1); \
     } \
-    using value_type = std::invoke_result_t<decltype(scalar_internal_##FUNC<T>), T>; \
+    using value_type = cuda::std::invoke_result_t<decltype(scalar_internal_##FUNC<T>), T>; \
   };
 
 // Unary operator with a custom function
@@ -88,7 +88,7 @@ namespace detail {
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(T1V v1) const { \
       return UnaryVecFunc(internal_##FUNC<T>, v1); \
     } \
-    using value_type = std::invoke_result_t<decltype(scalar_internal_##FUNC<T>), T>; \
+    using value_type = cuda::std::invoke_result_t<decltype(scalar_internal_##FUNC<T>), T>; \
   };  
 
 // Standard binary function
@@ -117,7 +117,7 @@ namespace detail {
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(T1V v1, T2V v2) const { \
       return BinVecFunc(internal_##FUNC<T1, T2>, v1, v2); \
     } \
-    using value_type = std::invoke_result_t<decltype(scalar_internal_##FUNC<T1, T2>), T1, T2>; \
+    using value_type = cuda::std::invoke_result_t<decltype(scalar_internal_##FUNC<T1, T2>), T1, T2>; \
   };
 
 #define MATX_BINARY_OP_GEN_OPERATOR(FUNC, OPNAME, OPSYM)                                       \
@@ -140,7 +140,7 @@ namespace detail {
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(const T1V &v1, const T2V &v2) const { \
       return BinVecFunc(internal_##FUNC<T1, T2>, v1, v2); \
     } \
-    using value_type = std::invoke_result_t<decltype(scalar_internal_##FUNC<T1, T2>), T1, T2>; \
+    using value_type = cuda::std::invoke_result_t<decltype(scalar_internal_##FUNC<T1, T2>), T1, T2>; \
   };
 
 // Binary operator with a custom function
@@ -160,7 +160,7 @@ namespace detail {
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(T1V v1, T2V v2) const { \
       return BinVecFunc(internal_##FUNC<T1, T2>, v1, v2); \
     } \
-    using value_type = std::invoke_result_t<decltype(scalar_internal_##FUNC<T1, T2>), T1, T2>; \
+    using value_type = cuda::std::invoke_result_t<decltype(scalar_internal_##FUNC<T1, T2>), T1, T2>; \
   };  
 
 

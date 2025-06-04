@@ -169,6 +169,7 @@
 #include <direct.h>       // For mkdir
 #include <fcntl.h>        // For open, O_RDWR etc.
 #include <io.h>           // For _sopen_s
+#include <stdlib.h>       // For _fullpath
 #include <sys/locking.h>  // For _LK_LOCK etc.
 #define JITIFY_PATH_MAX MAX_PATH
 #else
@@ -2489,7 +2490,7 @@ inline bool path_exists(const char* filename, bool* is_dir = nullptr) {
 
 inline const char* get_current_executable_path() {
   static const char* path = []() -> const char* {
-    static char buffer[JITIFY_PATH_MAX] = {};
+    static char buffer[JITIFY_PATH_MAX + 1] = {};
 #ifdef __linux__
     if (!::realpath("/proc/self/exe", buffer)) return nullptr;
 #elif defined(_WIN32) || defined(_WIN64)
@@ -5044,6 +5045,10 @@ struct IntegerLimits {
     traps             = false
   };
 };
+
+#undef JITIFY_CXX11_NOEXCEPT
+#undef JITIFY_CXX11_CONSTEXPR
+
 }  // namespace __jitify_detail
 template <typename T>
 struct numeric_limits {
@@ -5139,14 +5144,29 @@ static const char* const jitsafe_header_sstream = R"(
 #include <istream>
 )";
 
-static const char* const jitsafe_header_stdexcept = R"(
+static const char* const jitsafe_header_exception = R"(
 #pragma once
 #include <string>
 namespace std {
-struct runtime_error {
-  explicit runtime_error( const string& what_arg );
-  explicit runtime_error( const char* what_arg );
-  virtual const char* what() const;
+class exception {
+ public:
+  exception() noexcept;
+  exception(const exception& other) noexcept;
+  exception& operator=(const exception& other) noexcept;
+  virtual ~exception() {}
+  virtual const char* what() const noexcept;
+};
+}  // namespace std
+)";
+
+static const char* const jitsafe_header_stdexcept = R"(
+#pragma once
+#include <exception>
+namespace std {
+struct runtime_error : public exception {
+  explicit runtime_error(const string& what_arg);
+  explicit runtime_error(const char* what_arg);
+  const char* what() const noexcept override;
 };
 }  // namespace std
 )";
@@ -5192,6 +5212,9 @@ struct tuple_element<0, tuple<Head, Tail...>> {
 // TODO: This is incomplete.
 static const char* const jitsafe_header_type_traits = R"(
 #pragma once
+
+#include <utility>  // For std::declval
+
 #if __cplusplus >= 201103L
 namespace std {
 
@@ -5311,25 +5334,6 @@ template <class Ret, class... Args>
 struct is_function<Ret(Args...)> : true_type {};  // regular
 template <class Ret, class... Args>
 struct is_function<Ret(Args......)> : true_type {};  // variadic
-
-template <class>
-struct result_of;
-template <class F, typename... Args>
-struct result_of<F(Args...)> {
-  // TODO: This is a hack; a proper implem is quite complicated.
-  typedef typename F::result_type type;
-};
-// Note: We include this before C++17 for convenience.
-// TODO: This implementation is probably not standard-conforming.
-template <class F, class... Args>
-struct invoke_result : result_of<F(Args...)> {};
-
-#if __cplusplus >= 201402L
-template <class T>
-using result_of_t = typename result_of<T>::type;
-template <class F, class... Args>
-using invoke_result_t = typename invoke_result<F, Args...>::type;
-#endif  // __cplusplus >= 201402L
 
 template <class T> struct is_pointer                    : false_type {};
 template <class T> struct is_pointer<T*>                : true_type {};
@@ -5471,6 +5475,41 @@ struct remove_cvref {
 template <class T>
 using remove_cvref_t = typename remove_cvref<T>::type;
 #endif
+
+namespace __jitify_detail {
+// TODO: Need specialization for member function pointers.
+template <class T>
+struct invoke_impl {
+  template <class Func, class... Args>
+  static auto call(Func&& func, Args&&... args)
+      -> decltype(std::forward<Func>(func)(std::forward<Args>(args)...));
+};
+template <class Func, class... Args, class FuncDecayed = std::decay_t<Func>>
+auto invoke(Func&& func, Args&&... args)
+    -> decltype(invoke_impl<FuncDecayed>::call(std::forward<Func>(func),
+                                               std::forward<Args>(args)...));
+template <typename Void, typename, typename...>
+struct invoke_result {};
+template <typename Func, typename... Args>
+struct invoke_result<decltype(void(invoke(std::declval<Func>(),
+                                          std::declval<Args>()...))),
+                     Func, Args...> {
+  using type = decltype(invoke(std::declval<Func>(), std::declval<Args>()...));
+};
+}  // namespace __jitify_detail
+
+template<class> struct result_of;
+template <class Func, class... Args>
+struct result_of<Func(Args...)> :
+    __jitify_detail::invoke_result<void, Func, Args...> {};
+
+template <class Func, class... Args>
+struct invoke_result : __jitify_detail::invoke_result<void, Func, Args...> {};
+
+template <class T>
+using result_of_t = typename result_of<T>::type;
+template <class Func, class... Args>
+using invoke_result_t = typename invoke_result<Func, Args...>::type;
 
 template <class T, T v>
 struct integral_constant {
@@ -5679,7 +5718,6 @@ template <typename... Ts> using void_t = typename __jitify_make_void<Ts...>::typ
 
 static const char* const jitsafe_header_utility = R"(
 #pragma once
-#include <type_traits>
 
 namespace std {
 
@@ -5702,17 +5740,28 @@ pair<T1, T2> make_pair(const T1& first, const T2& second) {
 
 #if __cplusplus >= 201103L
 
+namespace __jitify_utility_detail {
+template <class T>
+struct type_identity { using type = T; };
+template <class T>
+auto add_rvalue_reference_impl(int) -> type_identity<T&&>;
+template <class T>
+auto add_rvalue_reference_impl(...) -> type_identity<T>;
+template <class T>
+struct add_rvalue_reference : decltype(add_rvalue_reference_impl<T>(0)) {};
+}  // namespace __jitify_utility_detail
+
 template <typename T>
 struct __jitify_always_false {
   static constexpr bool value = false;
 };
 template <typename T>
-typename std::add_rvalue_reference<T>::type declval() noexcept {
+typename __jitify_utility_detail::add_rvalue_reference<T>::type declval() noexcept {
   static_assert(__jitify_always_false<T>::value,
                 "declval not allowed in an evaluated context");
+}
 
 #endif  // __cplusplus >= 201103L
-}
 
 #if __cplusplus >= 201402L
 
@@ -5887,6 +5936,71 @@ int setitimer(int, const struct itimerval*, struct itimerval*);
 int utimes(const char*, const struct timeval[2]);
 )";
 
+static const char* const jitsafe_header_numeric = R"(
+#pragma once
+namespace std {
+
+#if __cplusplus >= 202002L
+#define JITIFY_CXX20_CONSTEXPR constexpr
+#else
+#define JITIFY_CXX20_CONSTEXPR
+#endif
+
+template <class InputIter, class T>
+JITIFY_CXX20_CONSTEXPR T accumulate(InputIter first, InputIter last, T init);
+
+template <class InputIter, class T, class BinaryOp>
+JITIFY_CXX20_CONSTEXPR T accumulate(
+    InputIter first, InputIter last, T init, BinaryOp op);
+
+template <class InputIter1, class InputIter2, class T>
+JITIFY_CXX20_CONSTEXPR T inner_product(
+    InputIter1 first1, InputIter1 last1, InputIter2 first2, T init);
+
+template <class InputIter1, class InputIter2, class T,
+         class BinaryOp1, class BinaryOp2>
+JITIFY_CXX20_CONSTEXPR T inner_product(
+    InputIter1 first1, InputIter1 last1, InputIter2 first2, T init,
+    BinaryOp1 op1, BinaryOp2 op2);
+
+template <class InputIter, class OutputIter>
+JITIFY_CXX20_CONSTEXPR OutputIter adjacent_difference(
+    InputIter first, InputIter last, OutputIter d_first);
+
+template <class InputIter, class OutputIter, class BinaryOp>
+JITIFY_CXX20_CONSTEXPR OutputIter adjacent_difference(
+    InputIter first, InputIter last, OutputIter d_first, BinaryOp op);
+
+template <class InputIter, class OutputIter>
+JITIFY_CXX20_CONSTEXPR OutputIter partial_sum(
+    InputIter first, InputIter last, OutputIter d_first);
+
+template <class InputIter, class OutputIter, class BinaryOp>
+JITIFY_CXX20_CONSTEXPR OutputIter partial_sum(
+    InputIter first, InputIter last, OutputIter d_first, BinaryOp op);
+
+#if __cplusplus >= 201103L
+
+template <class ForwardIter, class T>
+JITIFY_CXX20_CONSTEXPR void iota(ForwardIter first, ForwardIter last, T value);
+
+#endif  // __cplusplus >= 201103L
+
+// TODO: More functions added since C++17.
+
+#undef JITIFY_CXX20_CONSTEXPR
+
+}  // namespace std
+)";
+
+static const char* const jitsafe_header_cxxabi_h = R"(
+#pragma once
+namespace abi {
+extern "C" char* __cxa_demangle(
+    const char* mangled_name, char* output_buffer, size_t* length, int* status);
+}  // namespace abi
+)";
+
 // WAR: These need to be pre-added as a workaround for NVRTC implicitly using
 // /usr/include as an include path. The other built-in headers will be included
 // lazily as needed.
@@ -5935,6 +6049,7 @@ static const StringMap& get_jitsafe_headers_map() {
       {"mutex", jitsafe_header_mutex},
       {"ostream", jitsafe_header_ostream},
       {"sstream", jitsafe_header_sstream},
+      {"exception", jitsafe_header_exception},
       {"stdexcept", jitsafe_header_stdexcept},
       {"string", jitsafe_header_string},
       {"tuple", jitsafe_header_tuple},
@@ -5948,52 +6063,25 @@ static const StringMap& get_jitsafe_headers_map() {
       {"iomanip", jitsafe_header_iomanip},
       {"typeinfo", jitsafe_header_typeinfo},
       {"sys/time.h", jitsafe_header_sys_time},
+      {"numeric", jitsafe_header_numeric},
+      {"cxxabi.h", jitsafe_header_cxxabi_h},
   };
   return jitsafe_headers_map;
 }
 
-// Elides "/." and "/.." tokens from path. Returns empty string if illformed.
-inline std::string path_simplify(StringRef path, bool canonicalize = false) {
-#if defined _WIN32 || defined _WIN64
-  // Note that Windows supports both forward and backslash path separators.
-  const char* sep = "\\/";
+// Returns the canonical full path (resolving all symlinks, "." and ".."
+// references, and repeat slashes) for the given filename, or an empty string on
+// failure. The filename must exist and be accessible.
+// Note: "." -> current working directory.
+// Note: "" -> "".
+inline std::string get_real_path(const char* filename) {
+  char buffer[JITIFY_PATH_MAX + 1] = {};
+#if defined(_WIN32) || defined(_WIN64)
+  if (!::_fullpath(buffer, filename, JITIFY_PATH_MAX)) return "";
 #else
-  const char* sep = "/";
+  if (!::realpath(filename, buffer)) return "";
 #endif
-  const int n = (int)path.size();
-  StringVec dirs;
-  std::string seps;
-  std::string cur_dir;
-  bool after_slash = false;
-  for (int i = 0; i < n + 1; ++i) {
-    if (i == n || std::strchr(sep, path[i])) {
-      if (after_slash) continue;  // Ignore repeat slashes
-      after_slash = i < n;
-      if (cur_dir == ".." && !dirs.empty() && dirs.back() != "..") {
-        if (dirs.size() == 1 && dirs.front().empty()) {
-          return {};  // Bad path: back-traversals exceed depth of absolute path
-        }
-        dirs.pop_back();
-        seps.pop_back();
-      } else if (cur_dir != ".") {  // Ignore /./
-        dirs.push_back(cur_dir);
-        if (after_slash) {
-          seps.push_back(canonicalize ? '/' : path[i]);
-        }
-      }
-      cur_dir.clear();
-    } else {
-      after_slash = false;
-      cur_dir.push_back(path[i]);
-    }
-  }
-  std::ostringstream ss;
-  for (int i = 0; i < (int)dirs.size() - 1; ++i) {
-    ss << dirs[i] << seps[i];
-  }
-  if (!dirs.empty()) ss << dirs.back();
-  if (after_slash) ss << seps.back();
-  return ss.str();
+  return std::string(buffer);
 }
 
 // Reads a whole text file into *content. Returns false on failure.
@@ -7475,6 +7563,10 @@ inline ErrorMsg process_cuda_source(const std::string& source,
  *  angle-includes, or to use "-include" to add a completely new header.
  */
 inline std::string quote_include_name(std::string name) {
+  // Note: Preprocessing encodes the current directory as ".", so this will
+  // match that. We also wouldn't want to use get_real_path(".") anyway because
+  // it wouldn't necessarily match the current directory that was used during
+  // preprocessing.
   return IncludeName(name, ".").patched_name();
 }
 
@@ -7498,7 +7590,7 @@ HeaderLoadStatus load_header(const parser::IncludeName& include,
                              bool use_builtin_headers, std::string* full_path,
                              StringMapT* fullpath_to_source) {
   auto already_loaded = [&](const std::string& fp) {
-    return fullpath_to_source->count(fp);
+    return !fp.empty() && fullpath_to_source->count(fp);
   };
   auto newly_loaded = [&](std::string source) {
     fullpath_to_source->emplace(*full_path, std::move(source));
@@ -7508,18 +7600,21 @@ HeaderLoadStatus load_header(const parser::IncludeName& include,
   if (path_is_absolute(include.name())) {
     // Handle absolute filename.
     *full_path = include.name();
-    *full_path = path_simplify(*full_path);
+    // Try loading absolute filename via callback.
     if (already_loaded(*full_path)) return HeaderLoadStatus::kAlreadyLoaded;
-    // Try loading via callback or from the filesystem.
-    if ((header_callback && header_callback(include, &source)) ||
-        read_text_file(*full_path, &source)) {
+    if (header_callback && header_callback(include, &source)) {
+      return newly_loaded(std::move(source));
+    }
+    // Try loading absolute filename from the filesystem.
+    *full_path = get_real_path(full_path->c_str());
+    if (already_loaded(*full_path)) return HeaderLoadStatus::kAlreadyLoaded;
+    if (!full_path->empty() && read_text_file(*full_path, &source)) {
       return newly_loaded(std::move(source));
     }
     return HeaderLoadStatus::kFailed;
   }
   // Try loading via callback.
   *full_path = include.nonlocal_full_path(kJitifyCallbackHeaderPrefix);
-  *full_path = path_simplify(*full_path);
   if (already_loaded(*full_path)) return HeaderLoadStatus::kAlreadyLoaded;
   if (header_callback && header_callback(include, &source)) {
     return newly_loaded(std::move(source));
@@ -7527,25 +7622,30 @@ HeaderLoadStatus load_header(const parser::IncludeName& include,
   // Try loading from current directory.
   if (include.is_quote_include()) {
     *full_path = include.local_full_path();
-    *full_path = path_simplify(*full_path);
+    // Note: We first match with existing full paths _before_ applying
+    // get_real_path() so that extra header sources (which may not actually
+    // exist in the filesystem) are found.
     if (already_loaded(*full_path)) return HeaderLoadStatus::kAlreadyLoaded;
-    if (read_text_file(*full_path, &source)) {
+    *full_path = get_real_path(full_path->c_str());
+    if (already_loaded(*full_path)) return HeaderLoadStatus::kAlreadyLoaded;
+    if (!full_path->empty() && read_text_file(*full_path, &source)) {
       return newly_loaded(std::move(source));
     }
   }
   // Try loading from include directories.
   for (const std::string& include_path : include_paths) {
     *full_path = include.nonlocal_full_path(include_path);
-    *full_path = path_simplify(*full_path);
+    // See comment above for why we do this here.
     if (already_loaded(*full_path)) return HeaderLoadStatus::kAlreadyLoaded;
-    if (read_text_file(*full_path, &source)) {
+    *full_path = get_real_path(full_path->c_str());
+    if (already_loaded(*full_path)) return HeaderLoadStatus::kAlreadyLoaded;
+    if (!full_path->empty() && read_text_file(*full_path, &source)) {
       return newly_loaded(std::move(source));
     }
   }
   // Try loading from builtin headers.
   if (use_builtin_headers) {
     *full_path = include.nonlocal_full_path(kJitifyBuiltinHeaderPrefix);
-    *full_path = path_simplify(*full_path);
     if (already_loaded(*full_path)) return HeaderLoadStatus::kAlreadyLoaded;
     auto iter = get_jitsafe_headers_map().find(include.name());
     if (iter != get_jitsafe_headers_map().end()) {
@@ -7676,11 +7776,12 @@ inline PreprocessedProgram PreprocessedProgram::preprocess(
   StringVec include_paths;
   detail::extract_include_paths(&compiler_options, &include_paths);
   for (std::string& include_path : include_paths) {
-    include_path = detail::path_simplify(include_path, /*canonicalize=*/true);
+    include_path = detail::get_real_path(include_path.c_str());
   }
+  // Remove empty (non-existent) include paths.
+  std::remove(include_paths.begin(), include_paths.end(), std::string{});
   // Returns index of longest matching include dir, or -1 if no match.
   auto match_include_path = [&](std::string path, size_t* length) -> int {
-    path = detail::path_simplify(path, /*canonicalize=*/true);
     *length = 0;
     int matched_index = -1;
     for (int i = 0; i < (int)include_paths.size(); ++i) {
@@ -7706,6 +7807,8 @@ inline PreprocessedProgram PreprocessedProgram::preprocess(
   const ProcessFlags replace_std_flag_if_enabled =
       use_cuda_std ? ProcessFlags::kReplaceStd : ProcessFlags::kNone;
 
+  const std::string starting_dir = detail::get_real_path(".");
+
   static const char* const kJitifyEncodedIncludePath = "__jitify_I";
   // Replaces an include path prefix with an index to avoid it appearing
   // in the shipped binary.
@@ -7718,6 +7821,12 @@ inline PreprocessedProgram PreprocessedProgram::preprocess(
           kJitifyEncodedIncludePath +
           std::to_string(matched_include_path_index) + "@" +
           include.current_dir().substr(prefix_length));
+    } else {
+      // Try matching current directory and encode as ".".
+      if (detail::startswith(include.current_dir(), starting_dir)) {
+        include = include.with_current_dir(
+            "." + include.current_dir().substr(starting_dir.size()));
+      }
     }
     return include;
   };
@@ -7730,6 +7839,9 @@ inline PreprocessedProgram PreprocessedProgram::preprocess(
         const size_t end = current_dir.find("@", pos);
         const int index = std::stoi(current_dir.substr(pos, end - pos));
         current_dir = include_paths.at(index) + current_dir.substr(end + 1);
+        include = include.with_current_dir(current_dir);
+      } else if (detail::startswith(current_dir, ".")) {
+        current_dir = starting_dir + current_dir.substr(1);
         include = include.with_current_dir(current_dir);
       }
     }
@@ -7755,9 +7867,8 @@ inline PreprocessedProgram PreprocessedProgram::preprocess(
             });
       };
 
-  const std::string current_dir = ".";
   const std::string program_fullpath =
-      detail::path_join(current_dir, detail::sanitize_slashes(program_name));
+      detail::path_join(starting_dir, detail::sanitize_slashes(program_name));
   ErrorMsg err = process_cuda_source_fn(&program_source, program_fullpath,
                                         replace_std_flag_if_enabled);
   if (err) return Error(err);
@@ -7775,15 +7886,14 @@ inline PreprocessedProgram PreprocessedProgram::preprocess(
     std::string* source_ptr = &header_source.second;
     std::string fullpath = detail::path_is_absolute(name)
                                ? name
-                               : detail::path_join(current_dir, name);
-    fullpath = detail::path_simplify(fullpath);
+                               : detail::path_join(starting_dir, name);
     err = process_cuda_source_fn(
         source_ptr, fullpath,
         replace_std_flag_if_enabled | ProcessFlags::kAddUsedHeaderWarning);
     if (err) return Error(err);
     // Note: The names (keys) in header_sources will be matched:
     // a) directly, for `#include <name>` directives, and
-    // b) as if they are filenames (relative to the current exe dir if not
+    // b) as if they are filenames (relative to the current working dir if not
     //    absolute), for `#include "name"` directives. This will NOT fall back
     //    to direct matching like <> includes.
     // This allows path-based matching.

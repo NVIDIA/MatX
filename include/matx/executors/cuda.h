@@ -140,7 +140,8 @@ namespace matx
           MATX_STATIC_ASSERT((sizeof(op) + sizeof(index_t) * Op::Rank()) <= CUDA_MAX_VAL_PARAM, 
               "Parameter buffer to device is limited to 4096B. Please break up your operator statement into multiple executions to limit the size of the parameters");
 
-          const auto max_ept = detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(op);         
+          const auto max_ept = detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(op);     
+          printf("max ept %d\n", static_cast<int>(max_ept));    
 
           if constexpr (Op::Rank() == 0) {
             threads = 1;
@@ -158,6 +159,14 @@ namespace matx
               if (max_ept == detail::ElementsPerThread::ONE) {
                 detail::matxOpT1Kernel<detail::ElementsPerThread::ONE><<<blocks, threads, 0, stream_>>>(op, sizes[0]);
               } else if (max_ept == detail::ElementsPerThread::TWO) {
+                
+#ifdef MATX_EN_MATHDX
+              printf("Operator supports JIT\n");
+              nvrtc_compile_and_run<detail::ElementsPerThread::TWO>(matx::detail::matxOpT1JITKernelStr, "output.cu", op, sizes[0], blocks, threads);
+
+#else
+              detail::matxOpT1Kernel<detail::ElementsPerThread::THIRTY_TWO><<<blocks, threads, 0, stream_>>>(op, sizes[0]);
+#endif
                 detail::matxOpT1Kernel<detail::ElementsPerThread::TWO><<<blocks, threads, 0, stream_>>>(op, sizes[0]);
               } else if (max_ept == detail::ElementsPerThread::FOUR) {
                 detail::matxOpT1Kernel<detail::ElementsPerThread::FOUR><<<blocks, threads, 0, stream_>>>(op, sizes[0]);
@@ -166,14 +175,7 @@ namespace matx
               } else if (max_ept == detail::ElementsPerThread::SIXTEEN) {
                 detail::matxOpT1Kernel<detail::ElementsPerThread::SIXTEEN><<<blocks, threads, 0, stream_>>>(op, sizes[0]);
               } else if (max_ept == detail::ElementsPerThread::THIRTY_TWO) {
-                
-#ifdef MATX_EN_MATHDX
-              printf("Operator supports JIT\n");
-              nvrtc_compile_and_run(matx::detail::matxOpT1JITKernelStr, "output.cu", op, sizes[0], blocks, threads);
-
-#else
-              detail::matxOpT1Kernel<detail::ElementsPerThread::THIRTY_TWO><<<blocks, threads, 0, stream_>>>(op, sizes[0]);
-#endif                
+            
               }
             }
             else if constexpr (Op::Rank() == 2) {
