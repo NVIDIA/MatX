@@ -66,6 +66,6 @@ function(find_and_configure_gtest VERSION)
     # fix_cmake_global_defaults(GTest::gmock_main)
 endfunction()
 
-set(CUDF_MIN_VERSION_GTest 1.16.0)
+set(CUDF_MIN_VERSION_GTest 1.17.0)
 
 find_and_configure_gtest(${CUDF_MIN_VERSION_GTest})
