@@ -200,6 +200,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv) {
   auto AdiaJ = experimental::make_tensor_dia<experimental::DIA_INDEX_J>(
       dvals, doffsets, {6, 6});
   print(AdiaJ);
+  printf("DiaJ(3,3)=%f\n", AdiaJ(3, 3));
 
   //
   // Perform a direct SpMV. This is also the correct way of performing

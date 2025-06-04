@@ -222,16 +222,16 @@ auto make_tensor_dia(ValTensor &val, CrdTensor &off,
                          matxInvalidParameter, "data arrays should be rank-1");
   // Note that the DIA API typically does not involve positions.
   // However, under the formal DSL specifications, the top level
-  // compression should set up pos[0] = {0, nse}. This is done
+  // compression should set up pos[0] = {0, #diags}. This is done
   // here, using the same memory space as the other data.
   matxMemorySpace_t space = GetPointerKind(val.GetStorage().data());
   auto tp = makeDefaultNonOwningZeroStorage<POS>(2, space);
-  setVal(tp.data() + 1, static_cast<POS>(val.Size(0)), space);
+  setVal(tp.data() + 1, static_cast<POS>(off.Size(0)), space);
   // Construct DIA-I/J.
   using DIA = std::conditional_t<std::is_same_v<IDX, DIA_INDEX_I>, DIAI, DIAJ>;
   return sparse_tensor_t<VAL, CRD, POS, DIA>(
       shape, val.GetStorage(),
-      {makeDefaultNonOwningEmptyStorage<CRD>(), off.GetStorage()},
+      {off.GetStorage(), makeDefaultNonOwningEmptyStorage<CRD>()},
       {tp, makeDefaultNonOwningEmptyStorage<POS>()});
 }
 

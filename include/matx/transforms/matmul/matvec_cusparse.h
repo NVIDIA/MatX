@@ -318,8 +318,8 @@ void sparse_matvec_impl(TensorTypeC &C, const TensorTypeA &a,
     TA *AD = a.Data();
     TA *BD = b.Data();
     TA *CD = c.Data();
-    CRD *diags = a.CRDData(1);
-    uint64_t numD = a.crdSize(1);
+    CRD *diags = a.CRDData(0);
+    uint64_t numD = a.crdSize(0);
     uint64_t m = a.Size(0);
     uint64_t n = a.Size(1);
     uint32_t THREADS = static_cast<uint32_t>(std::min(m, 1024LU));

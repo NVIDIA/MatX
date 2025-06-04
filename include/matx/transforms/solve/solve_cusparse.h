@@ -159,8 +159,8 @@ void sparse_dia_solve_impl(TensorTypeC &C, const TensorTypeA &a,
       MATX_THROW(matxNotSupported, "Tridiagonal solve overwrites rhs");
     }
     using CRD = typename atype::crd_type;
-    CRD *diags = a.CRDData(1);
-    const index_t numD = a.crdSize(1);
+    CRD *diags = a.CRDData(0);
+    const index_t numD = a.crdSize(0);
     if (numD != 3 || diags[0] != -1 || diags[1] != 0 || diags[2] != 1) {
       MATX_THROW(matxNotSupported, "Only tridiagonal solve supported");
     }
