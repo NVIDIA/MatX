@@ -8,11 +8,11 @@ The implementation is based on the **Universal Sparse Tensor (UST)** type
 that uses a tensor format DSL (Domain Specific Language) to describe a vast
 space of storage formats. Although the UST type can easily define many common
 storage formats (such as dense vectors and matrices, sparse vectors, sparse
-matrices in COO, CSR, CSC, DCSR, DCSC, DIA, or BSR format, with generalizations
-for sparse tensors), it can also define many less common storage formats.
-From MatX's perspective, the advantage of using the UST type (rather than
-various specific sparse storage formats) is that the framework code only has
-to deal with a single new sparse type (and only dispatch to specific formats
+matrices in formats lik COO, CSR, CSC, DCSR, DCSC, BSR, BSC, DIA, and with
+generalizations to sparse tensors), it can also define many less common storage
+formats. From MatX's perspective, the advantage of using the UST type (rather
+than various specific sparse storage formats) is that the framework code only
+has to deal with a single new sparse type (and only dispatch to specific formats
 when required by a high performance library implementation). Also, the tensor
 format DSL can be easily extended to include even more sparse storage formats
 in the future. From the user's perspective, the UST type provides more
@@ -248,7 +248,7 @@ block format has 2 dimensions and 4 levels)::
 
   DCSC: (i, j) -> ( j : compressed, i : compressed )
 
-  DIA: (i, j) -> ( j - i : compressed, j : range )
+  DIA-J: (i, j) -> ( j - i : compressed, j : range )
 
   BSR with 2x3 blocks: ( i, j ) -> ( i floordiv 2 : dense,
                                      j floordiv 3 : compressed,
