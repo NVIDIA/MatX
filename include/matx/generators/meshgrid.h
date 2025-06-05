@@ -57,16 +57,31 @@ namespace matx
             static_assert(is_matx_op<T1>());
           }
 
-          template <typename... Is>
-            __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
-
-              cuda::std::array<index_t, Rank()> inds{indices...};
-              // get index for the axis
-              auto ind = inds[AXIS];
-              // look up value for the axis
-              auto val = get_value(t1_, ind);
-              return val;
+          template <detail::OperatorCapability Cap>
+          __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+            if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+              return ElementsPerThread::ONE;
+            } else {            
+              auto self_has_cap = detail::capability_attributes<Cap>::default_value;
+              return detail::combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(t1_));
             }
+          }
+
+          template <detail::ElementsPerThread EPT, typename... Is>
+          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const {
+
+            cuda::std::array<index_t, Rank()> inds{indices...};
+            // get index for the axis
+            auto ind = inds[AXIS];
+            // look up value for the axis
+            auto val = get_value<EPT>(t1_, ind);
+            return val;
+          }
+
+          template <typename... Is>
+          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const {
+            return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+          }
 
           __MATX_INLINE__  __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const {
             return shape_[dim];

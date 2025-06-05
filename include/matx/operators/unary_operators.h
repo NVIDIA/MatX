@@ -86,11 +86,25 @@ namespace matx
         }, idx);
     }
 
+    template <ElementsPerThread EPT, typename... Is, std::enable_if_t<std::conjunction_v<std::is_integral<Is>...>, bool> = true>
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
+    {
+      auto i1 = get_value<EPT>(in1_, indices...);
+      return op_.template operator()<EPT>(i1);
+    }
+
     template <typename... Is, std::enable_if_t<std::conjunction_v<std::is_integral<Is>...>, bool> = true>
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
     {
-      auto i1 = get_value(in1_, indices...);
-      return op_(i1);
+      return this->template operator()<detail::ElementsPerThread::ONE>(indices...);
+    }
+
+    template <OperatorCapability Cap>
+    __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+      auto self_has_cap = capability_attributes<Cap>::default_value;
+      // The scalar op_ itself has default capability (doesn't restrict input EPT)
+      // So we only care about the input operator in1_
+      return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(in1_), detail::get_operator_capability<Cap>(op_));
     }
 
     static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -369,7 +383,7 @@ namespace matx
 
 #else
   MATX_DEFINE_UNARY_OP(sqrt, detail::SqrtOp);
-  MATX_DEFINE_UNARY_OP(csqrt, detail::CsqrtOp);
+  MATX_DEFINE_UNARY_OP(csqrt, detail::CSqrtOp);
   MATX_DEFINE_UNARY_OP(rsqrt, detail::RSqrtOp);
   MATX_DEFINE_UNARY_OP(exp, detail::ExpOp);
   MATX_DEFINE_UNARY_OP(expj, detail::ExpjOp);
@@ -377,24 +391,7 @@ namespace matx
   MATX_DEFINE_UNARY_OP(log2, detail::Log2Op);
   MATX_DEFINE_UNARY_OP(log, detail::LogOp);
   MATX_DEFINE_UNARY_OP(loge, detail::LogOp);
-#if 0
   MATX_DEFINE_UNARY_OP(conj, detail::ConjOp);
-#else
-  // implementing without a macro so we can optimize conj(real)
-  template <typename I1,
-            typename = typename std::enable_if_t<is_matx_op<I1>()>>
-  [[nodiscard]] __MATX_INLINE__ auto conj(I1 i1) {
-    using I1Type = extract_value_type_t<I1>;
-    if constexpr (is_complex_v<I1Type>) {
-      using Op = detail::ConjOp<I1Type>;
-      const typename detail::base_type_t<I1> &base = i1;
-      return detail::matxUnaryOp(base, Op());
-    } else {
-      // real type conj is a no-op so return original op.
-      return i1;
-    }
-  }
-#endif
   MATX_DEFINE_UNARY_OP(abs, detail::AbsOp);
   MATX_DEFINE_UNARY_OP(abs2, detail::Abs2Op);
   MATX_DEFINE_UNARY_OP(sin, detail::SinOp);
@@ -414,24 +411,7 @@ namespace matx
   MATX_DEFINE_UNARY_OP(ceil, detail::CeilOp);
   MATX_DEFINE_UNARY_OP(round, detail::RoundOp);
   MATX_DEFINE_UNARY_OP(normcdf, detail::NormCdfOp);
-#if 0
   MATX_DEFINE_UNARY_OP(real, detail::RealOp);
-#else
-  // implementing without a macro so we can optimize away real on a real operator
-  template <typename I1,
-            typename = typename std::enable_if_t<is_matx_op<I1>()>>
-  [[nodiscard]] __MATX_INLINE__ auto real(I1 i1) {
-    using I1Type = extract_value_type_t<I1>;
-    if constexpr (is_complex_v<I1Type>) {
-      using Op = detail::RealOp<I1Type>;
-      const typename detail::base_type_t<I1> &base = i1;
-      return detail::matxUnaryOp(base, Op());
-    } else {
-      // already real just return i1
-      return i1;
-    }
-  }
-#endif
   MATX_DEFINE_UNARY_OP(imag, detail::ImagOp);
   MATX_DEFINE_UNARY_OP(operator-, detail::SubNegOp );
   MATX_DEFINE_UNARY_OP(isnan, detail::IsNanOp);

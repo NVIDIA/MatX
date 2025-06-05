@@ -97,7 +97,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   (aTensor = matx::random<double>({dimX, dimY}, matx::UNIFORM)).run(exec);
   (bTensor = matx::random<double>({dimX, dimY}, matx::UNIFORM)).run(exec);
   (complexTensor = matx::random<cuda::std::complex<double>>({2, 2}, matx::UNIFORM)).run(exec);
-  (matTensor10x10 = matx::random<double>({10, 10}, matx::UNIFORM)).run(exec);
+  (matTensor10x10 = matx::random<float>({10, 10}, matx::UNIFORM)).run(exec);
 
 #endif
 

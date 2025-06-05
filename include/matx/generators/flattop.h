@@ -33,11 +33,12 @@
 #pragma once
 
 #include "matx/generators/generator1d.h"
+#include <type_traits>
 
 namespace matx
 {
   namespace detail {
-    template <typename T> class FlatTop {
+    template <typename T> class FlatTop : public BaseOp<FlatTop<T>> {
       private:
         index_t size_;
 
@@ -48,21 +49,35 @@ namespace matx
         static constexpr T a4 = 0.006947368;  
 
       public:
-
         using value_type = T;
+        using matxop = bool;
 
         __MATX_INLINE__ std::string str() const { return "flattop"; }
 
         inline __MATX_HOST__ __MATX_DEVICE__ FlatTop(index_t size) : size_(size){};
 
-        inline __MATX_HOST__ __MATX_DEVICE__ T operator()(index_t i) const
+        template <detail::ElementsPerThread EPT>
+        inline __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
         {
-          return  a0  
-            - a1 * cuda::std::cos(2*M_PI*i / (size_ - 1))
-            + a2 * cuda::std::cos(4*M_PI*i / (size_ - 1))
-            - a3 * cuda::std::cos(6*M_PI*i / (size_ - 1))
-            + a4 * cuda::std::cos(8*M_PI*i / (size_ - 1));
+          return detail::ApplyGeneratorVecFunc<EPT, T>([this](index_t idx) {
+            return  a0  
+              - a1 * cuda::std::cos(2*M_PI*idx / (size_ - 1))
+              + a2 * cuda::std::cos(4*M_PI*idx / (size_ - 1))
+              - a3 * cuda::std::cos(6*M_PI*idx / (size_ - 1))
+              + a4 * cuda::std::cos(8*M_PI*idx / (size_ - 1));
+          }, i);
         }
+
+        inline __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
+        {
+          return this->operator()<detail::ElementsPerThread::ONE>(i);
+        }
+
+        constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size([[maybe_unused]] int dim) const
+        {
+          return size_;
+        }
+        static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return 1; }
     };
   }
 

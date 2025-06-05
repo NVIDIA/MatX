@@ -44,7 +44,7 @@ namespace matx
    */
   namespace detail {
     template <typename T1, typename T2>
-      class TopelitzOp : public BaseOp<TopelitzOp<T1, T2>>
+      class ToeplitzOp : public BaseOp<ToeplitzOp<T1, T2>>
     {
       private:
         typename detail::base_type_t<T1> op1_;
@@ -74,7 +74,7 @@ namespace matx
         return "toeplitz(" + top1 + "," + top2 + ")"; 
       }
 
-        __MATX_INLINE__ TopelitzOp(const T1 &op1, const T2 &op2) : op1_(op1), op2_(op2)
+        __MATX_INLINE__ ToeplitzOp(const T1 &op1, const T2 &op2) : op1_(op1), op2_(op2)
       {
         if constexpr (is_matx_op<T1>()) {
           static_assert(T1::Rank() == 1, "toeplitz() operator input rank must be 1");
@@ -89,28 +89,49 @@ namespace matx
         }        
       }
 
-        template <typename... Is>
+        template <ElementsPerThread EPT>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i, index_t j) const
         {
-          if (j > i) {
-            if constexpr (is_matx_op<T2>()) {
-              auto val = get_value(op2_, j - i);
+          if constexpr (EPT == ElementsPerThread::ONE) {
+            if (j > i) {
+              if constexpr (is_matx_op<T2>()) {
+                auto val = get_value<EPT>(op2_, j - i);
               return val;
+              }
+              else {
+                auto val = op2_[j - i];
+                return val;
+              }
             }
             else {
-              auto val = op2_[j - i];
-              return val;
+              if constexpr (is_matx_op<T1>()) {
+                auto val = get_value<EPT>(op1_, i - j);
+                return val;
+              }
+              else {
+                auto val = op1_[i - j];
+                return val;
+              }          
             }
+          } else {
+            return Vector<value_type, static_cast<index_t>(EPT)>{};
           }
-          else {
-            if constexpr (is_matx_op<T1>()) {
-              auto val = get_value(op1_, i - j);
-              return val;
-            }
-            else {
-              auto val = op1_[i - j];
-              return val;
-            }          
+        }
+
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i, index_t j) const
+        {
+          return this->operator()<detail::ElementsPerThread::ONE>(i, j);
+        }
+
+        template <OperatorCapability Cap>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            return ElementsPerThread::ONE;
+          } else {
+            auto self_has_cap = capability_attributes<Cap>::default_value;
+            auto op1_cap = detail::get_operator_capability<Cap>(op1_);
+            auto op2_cap = detail::get_operator_capability<Cap>(op2_);
+            return combine_capabilities<Cap>(self_has_cap, op1_cap, op2_cap);
           }
         }
 
@@ -173,11 +194,13 @@ namespace matx
   auto __MATX_INLINE__ toeplitz(const T (&c)[D])
   {
     const auto op = detail::to_array(c);
-    const auto op2 = op;
+    auto op2 = op;
     if constexpr (is_complex_v<T>) {
-      cuda::std::transform(op2.begin(), op2.end(), [](T val){ return _internal_conj(val); } );
+      cuda::std::array<T, D> r_conj = op;
+      cuda::std::transform(r_conj.begin(), r_conj.end(), r_conj.begin(), [](T val){ return _internal_conj(val); } );
+      op2 = r_conj;      
     }
-    return detail::TopelitzOp(op, op2);
+    return detail::ToeplitzOp(op, op2);
   };
 
   /**
@@ -197,10 +220,10 @@ namespace matx
   auto __MATX_INLINE__ toeplitz(const Op &c)
   {
     if constexpr (is_complex_v<typename Op::value_type>) {
-      return detail::TopelitzOp(c, conj(c));
+      return detail::ToeplitzOp(c, conj(c));
     }
     else {
-      return detail::TopelitzOp(c, c);
+      return detail::ToeplitzOp(c, c);
     }
   };  
 
@@ -228,7 +251,7 @@ namespace matx
   {
     const auto cop = detail::to_array(c);
     const auto rop = detail::to_array(r);    
-    return detail::TopelitzOp(cop, rop);
+    return detail::ToeplitzOp(cop, rop);
   };
 
   /**
@@ -253,6 +276,6 @@ namespace matx
                                                           bool> = true>
   auto __MATX_INLINE__ toeplitz(const COp &c, const ROp &r)
   {
-    return detail::TopelitzOp<COp, ROp>(c, r);
+    return detail::ToeplitzOp<COp, ROp>(c, r);
   };    
 } // end namespace matx

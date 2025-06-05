@@ -78,13 +78,16 @@ public:
    * @param idy Y position
    * @param idx X position
    */
+  template <detail::ElementsPerThread EPT>
   __device__ inline void operator()(index_t idz, index_t idy, index_t idx)
   {
-    typename I1::type xpow = xpow_(idz, idy, idx);
-    typename I2::type ba = ba_(idz, idy, idx);
-    typename I2::type norm = norm_(idz, idy, idx);
-    typename I2::type alpha = norm * (cuda::std::powf(pfa_, -1.0f / norm) - 1.f);
-    out_(idz, idy, idx) = (xpow > alpha * ba) ? 1 : 0;
+    if constexpr (EPT == detail::ElementsPerThread::ONE) {
+      typename I1::type xpow = xpow_(idz, idy, idx);
+      typename I2::type ba = ba_(idz, idy, idx);
+      typename I2::type norm = norm_(idz, idy, idx);
+      typename I2::type alpha = norm * (cuda::std::powf(pfa_, -1.0f / norm) - 1.f);
+      out_(idz, idy, idx) = (xpow > alpha * ba) ? 1 : 0;
+    }
   }
 
   /**
@@ -107,6 +110,22 @@ public:
   {
     return O::Rank();
   }
+
+  template <detail::OperatorCapability Cap>
+  __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+    if constexpr (Cap == detail::OperatorCapability::ELEMENTS_PER_THREAD) {
+      return detail::ElementsPerThread::ONE;
+    }
+    else {
+      auto self_has_cap = detail::capability_attributes<Cap>::default_value;
+      return detail::combine_capabilities<Cap>(self_has_cap, 
+        detail::get_operator_capability<Cap>(xpow_),
+        detail::get_operator_capability<Cap>(ba_),
+        detail::get_operator_capability<Cap>(norm_),
+        detail::get_operator_capability<Cap>(pfa_)
+      );
+    }
+  }       
 };
 
 /**

@@ -221,6 +221,7 @@ namespace matx {
           if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_DEFAULT) {
             fprintf(fp, "%06" MATX_INDEX_T_FMT ": ", _k);
           }
+
           PrintVal(fp, op.operator()(_k));
           if (_k == (op.Size(0)-1)) {
             if ((PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) || (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON)) {

@@ -72,13 +72,27 @@ namespace matx
           method_(method)
         {}
 
-        inline __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(index_t i) const
-        {
-          if (method_ == ChirpMethod::CHIRP_METHOD_LINEAR) {
-            return cuda::std::cos(2.0f * M_PI * (f0_ * sop_(i) + 0.5f * ((f1_ - f0_) / t1_) * sop_(i) * sop_(i)));
-          }
+        template <detail::OperatorCapability Cap>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+          auto self_has_cap = detail::capability_attributes<Cap>::default_value;
+          return detail::combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(sop_));
+        }
 
-          return 0.0; 
+        template <detail::ElementsPerThread EPT>
+        inline __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
+        {
+          return detail::ApplyGeneratorVecFunc<EPT, FreqType>([this](index_t idx) { 
+            if (method_ == ChirpMethod::CHIRP_METHOD_LINEAR) {
+              return cuda::std::cos(2.0f * M_PI * (f0_ * sop_(idx) + 0.5f * ((f1_ - f0_) / t1_) * sop_(idx) * sop_(idx)));
+            }
+
+            return 0.0; 
+          }, i);
+        }
+
+        inline __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
+        {
+          return this->operator()<detail::ElementsPerThread::ONE>(i);
         }
 
         constexpr inline __MATX_HOST__ __MATX_DEVICE__ index_t Size([[maybe_unused]] int dim) const
@@ -114,15 +128,29 @@ namespace matx
           method_(method)
         {}
 
+        template <detail::OperatorCapability Cap>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+          auto self_has_cap = detail::capability_attributes<Cap>::default_value;
+          return detail::combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(sop_));
+        }
+
+        template <detail::ElementsPerThread EPT>
         inline __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(index_t i) const
         {
-          if (method_ == ChirpMethod::CHIRP_METHOD_LINEAR) {
-            FreqType real = cuda::std::cos(2.0f * M_PI * (f0_ * sop_(i) + 0.5f * ((f1_ - f0_) / t1_) * sop_(i) * sop_(i)));
-            FreqType imag = -cuda::std::cos(2.0f * M_PI * (f0_ * sop_(i) + 0.5f * ((f1_ - f0_) / t1_) * sop_(i) * sop_(i) + 90.0/360.0));
-            return cuda::std::complex<FreqType>{real, imag};
-          }
+          return detail::ApplyGeneratorVecFunc<EPT, value_type>([this](index_t idx) { 
+            if (method_ == ChirpMethod::CHIRP_METHOD_LINEAR) {
+              FreqType real = cuda::std::cos(2.0f * M_PI * (f0_ * sop_(idx) + 0.5f * ((f1_ - f0_) / t1_) * sop_(idx) * sop_(idx)));
+              FreqType imag = -cuda::std::cos(2.0f * M_PI * (f0_ * sop_(idx) + 0.5f * ((f1_ - f0_) / t1_) * sop_(idx) * sop_(idx) + 90.0/360.0));
+              return cuda::std::complex<FreqType>{real, imag};
+            }
 
-          return cuda::std::complex<FreqType>{0, 0};
+            return cuda::std::complex<FreqType>{0, 0};
+          }, i);
+        }
+
+        inline __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(index_t i) const
+        {
+          return this->operator()<detail::ElementsPerThread::ONE>(i);
         }
 
         constexpr inline __MATX_HOST__ __MATX_DEVICE__ index_t Size([[maybe_unused]] int dim) const

@@ -48,9 +48,22 @@ namespace matx
 
 	      __MATX_INLINE__ std::string str() const { return "alternate"; }
         __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Alternating(index_t size) : size_(size) {};
-        __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T operator()(index_t i) const
+
+        template <detail::OperatorCapability Cap>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+          auto self_has_cap = detail::capability_attributes<Cap>::default_value;
+          return self_has_cap;
+        }
+
+        template <detail::ElementsPerThread EPT>
+        __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
         {
-          return (-2 * (i & 1)) + 1;
+          return detail::ApplyGeneratorVecFunc<EPT, T>([](index_t idx) { return (-2 * (idx & 1)) + 1; }, i);
+        }
+
+        __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
+        {
+          return this->operator()<detail::ElementsPerThread::ONE>(i);
         }
 
         constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size([[maybe_unused]] int dim) const

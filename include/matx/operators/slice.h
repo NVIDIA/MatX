@@ -109,7 +109,7 @@ namespace matx
           MATX_ASSERT_STR(d==Rank(), matxInvalidDim, "SliceOp: Number of dimensions without matxDropDim must equal new rank.");
         };
 
-        template <typename Op, typename... Is>
+        template <detail::ElementsPerThread EPT, typename Op, typename... Is>
         static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(
             Op&& op, 
             const decltype(starts_) &starts, 
@@ -117,42 +117,67 @@ namespace matx
             const decltype(dims_) &dims, 
             Is... indices)
         {   
-          static_assert(sizeof...(Is)==Rank());
-          static_assert((std::is_convertible_v<Is, index_t> && ... ));
-      
-          // convert variadic type to tuple so we can read/update
-          cuda::std::array<index_t, T::Rank()> ind = starts;
-          cuda::std::array<index_t, Rank()> inds{indices...};   
+          if constexpr (EPT == ElementsPerThread::ONE) {
+            static_assert(sizeof...(Is)==Rank());
+            static_assert((std::is_convertible_v<Is, index_t> && ... ));
+        
+            // convert variadic type to tuple so we can read/update
+            cuda::std::array<index_t, T::Rank()> ind = starts;
+            cuda::std::array<index_t, Rank()> inds{indices...};   
 
-          #pragma unroll            
-          for (int32_t i = 0; i < T::Rank(); i++) {
-            #pragma unroll
-            for(int32_t j = 0; j < Rank(); j++) {
-              if(dims[j] == i) {
-                if constexpr (!std::is_same_v<NoStride, StrideType>) {
-                  ind[i] = starts[j] + inds[j] * strides[i];
-                }
-                else {
-                  ind[i] = starts[j] + inds[j];
+            #pragma unroll            
+            for (int32_t i = 0; i < T::Rank(); i++) {
+              #pragma unroll
+              for(int32_t j = 0; j < Rank(); j++) {
+                if(dims[j] == i) {
+                  if constexpr (!std::is_same_v<NoStride, StrideType>) {
+                    ind[i] = starts[j] + inds[j] * strides[i];
+                  }
+                  else {
+                    ind[i] = starts[j] + inds[j];
+                  }
                 }
               }
-            }
-          }       
-              
-          return get_value(cuda::std::forward<Op>(op), ind);
+            }       
+                
+            return get_value<EPT>(cuda::std::forward<Op>(op), ind);
+          } else {
+            return Vector<value_type, static_cast<index_t>(EPT)>{};
+          }
+        }
+
+        template <detail::OperatorCapability Cap>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+          if constexpr (Cap == detail::OperatorCapability::ELEMENTS_PER_THREAD) {
+            return detail::ElementsPerThread::ONE;
+          }
+          auto self_has_cap = capability_attributes<Cap>::default_value;          
+          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
+        }        
+
+        template <detail::ElementsPerThread EPT, typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
+        {
+          return get_impl<EPT>(cuda::std::as_const(op_), starts_, strides_, dims_, indices...);
+        }
+
+        template <detail::ElementsPerThread EPT, typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
+        {
+          return get_impl<EPT>(cuda::std::forward<decltype(op_)>(op_), starts_, strides_, dims_, indices...);
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
         {
-          return get_impl(cuda::std::as_const(op_), starts_, strides_, dims_, indices...);
+          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
-          return get_impl(cuda::std::forward<decltype(op_)>(op_), starts_, strides_, dims_, indices...);
-        }
+          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+        }        
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {

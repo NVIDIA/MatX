@@ -82,6 +82,9 @@ TYPED_TEST(OperatorTestsNumericAllExecs, CloneOp)
 
     (tov = op).run(exec);
     exec.sync();
+    print(op);
+    print(tov);
+    print(tiv);
 
     for(int n = 0; n < N; n++) {
       for(int m = 0; m < M; m++) {

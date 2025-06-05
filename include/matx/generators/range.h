@@ -33,38 +33,53 @@
 #pragma once
 
 #include "matx/generators/generator1d.h"
+#include <type_traits>
 
 namespace matx
 {
   namespace detail {
-    template <class T> class Range {
+    template <class T> class Range : public BaseOp<Range<T>> {
       private:
         T first_;
         T step_;
 
       public:
         using value_type = T;
+        using matxop = bool;
 
         Range() = default;
 
         __MATX_INLINE__ std::string str() const { return "range"; }
 
-
         Range(T first, T step) : first_(first), step_(step) {}
 
-        __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ T operator()(index_t idx) const
+        template <detail::ElementsPerThread EPT>
+        __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t idx) const
         {
-          if constexpr (is_matx_half_v<T>) {
+          return detail::ApplyGeneratorVecFunc<EPT, T>([this](index_t i) {
+            if constexpr (is_matx_half_v<T>) {
 MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
-            return first_ + T(static_cast<T>((float)idx) * step_);
+              return first_ + T(static_cast<T>((float)i) * step_);
 MATX_IGNORE_WARNING_POP_GCC
-          }
-          else {
+            }
+            else {
 MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
-            return first_ + T(static_cast<T>(idx) * step_);
+              return first_ + T(static_cast<T>(i) * step_);
 MATX_IGNORE_WARNING_POP_GCC
-          }
+            }
+          }, idx);
         }
+
+        __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t idx) const
+        {
+          return this->operator()<detail::ElementsPerThread::ONE>(idx);
+        }
+
+        constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size([[maybe_unused]] int dim) const
+        {
+          return index_t(0); // Range is used with matxGenerator1D_t which provides the size
+        }
+        static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return 1; }
     };
   }
 

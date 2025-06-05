@@ -81,7 +81,7 @@ MATX_IGNORE_WARNING_POP_CLANG
 template <ThreadsMode MODE = ThreadsMode::SINGLE>
 class HostExecutor {
   public:
-    using matx_cpu = bool; ///< Type trait indicating this is a CPU executor
+    using host_executor = bool; ///< Type trait indicating this is a CPU executor
     using matx_executor = bool; ///< Type trait indicating this is an executor
 
     HostExecutor() {

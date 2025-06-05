@@ -58,23 +58,58 @@ namespace matx
         __MATX_INLINE__ std::string str() const { return "sign(" + get_type_str(op_) + ")"; }
         __MATX_INLINE__ SignOp(const T &op, value_type zval) : op_(op), zval_(zval) {};  
 
+        template <ElementsPerThread EPT, typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+        {
+          if constexpr (EPT == ElementsPerThread::ONE) {
+            auto v = get_value<EPT>(op_,indices...);
+
+            auto set_val = [this](auto vl) { 
+              if constexpr (is_complex_v<value_type> ) {
+                if ( vl == value_type(0)) {
+                  return zval_;
+                } else {
+                  return vl / abs(vl); // sign defintion for complex values
+                }
+              } else {  // real branch
+                if( vl < 0) 
+                  return value_type(-1);
+                else if ( vl > 0 ) 
+                  return value_type(1);
+                else 
+                  return zval_;
+              }
+            };
+
+            if constexpr (EPT == ElementsPerThread::ONE) {
+              return set_val(v);
+            }
+            else {
+              Vector<value_type, static_cast<int>(EPT)> ret;
+              #pragma unroll
+              for (int e = 0; e < static_cast<int>(EPT); ++e) {
+                ret.data[e] = set_val(GetVectorVal(v, e));
+              }
+              return ret;
+            }
+          } else {
+            return Vector<value_type, static_cast<index_t>(EPT)>{};
+          }
+        }
+
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
         {
-          auto v = get_value(op_,indices...);
-          if constexpr (is_complex_v<value_type> ) {
-            if ( v == value_type(0)) {
-              return zval_;
-            } else {
-              return v / abs(v); // sign defintion for complex values
-            }
-          } else {  // real branch
-            if( v < 0) 
-              return value_type(-1);
-            else if ( v > 0 ) 
-              return value_type(1);
-            else 
-              return zval_;
+          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+        }
+
+        template <OperatorCapability Cap>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            return ElementsPerThread::ONE;
+          } else {
+            auto self_has_cap = capability_attributes<Cap>::default_value;
+            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
           }
         }
 

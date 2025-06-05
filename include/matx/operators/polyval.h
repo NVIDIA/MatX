@@ -60,15 +60,25 @@ namespace matx
           MATX_STATIC_ASSERT_STR(Op::Rank() == 1, matxInvalidDim, "Input operator must be rank 1");
         };
 
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ value_type operator()(index_t idx) const
+        template <ElementsPerThread EPT>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t idx) const
         {
-          // Horner's method for computing polynomial
-          value_type ttl{coeffs_(0)};
-          for(int i = 1; i < coeffs_.Size(0); i++) {
-              ttl = ttl * get_value(op_, idx) + coeffs_(i);
-          }
+          if constexpr (EPT == ElementsPerThread::ONE) {
+            // Horner's method for computing polynomial
+            value_type ttl{get_value<EPT>(coeffs_, 0)};
+            for(int i = 1; i < coeffs_.Size(0); i++) {
+                ttl = ttl * get_value<EPT>(op_, idx) + get_value<EPT>(coeffs_, i);
+            }
 
-          return ttl;
+            return ttl;
+          } else {
+            return Vector<value_type, static_cast<index_t>(EPT)>{};
+          }
+        }
+
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t idx) const
+        {
+          return this->operator()<detail::ElementsPerThread::ONE>(idx);
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -94,6 +104,20 @@ namespace matx
         {
           if constexpr (is_matx_op<Op>()) {
             op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+        }
+
+        template <OperatorCapability Cap>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            return ElementsPerThread::ONE;
+          } else {
+            auto self_has_cap = capability_attributes<Cap>::default_value;
+            return combine_capabilities<Cap>(
+              self_has_cap,
+              detail::get_operator_capability<Cap>(op_),
+              detail::get_operator_capability<Cap>(coeffs_)
+            );
           }
         }
     };

@@ -10,7 +10,7 @@ template<class TypeParam>
 TypeParam legendre_check(int n, int m, TypeParam x) {
   if (m > n ) return 0;
 
-  TypeParam a = detail::_internal_sqrt(TypeParam(1)-x*x);
+  TypeParam a = detail::scalar_internal_sqrt(TypeParam(1)-x*x);
   // first we will move move along diagonal
 
   // initialize registers

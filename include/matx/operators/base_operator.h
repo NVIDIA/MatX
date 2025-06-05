@@ -32,11 +32,11 @@
 
 #pragma once
 
-
+#include "matx/core/vector.h"
 #include "matx/core/type_utils.h"
 #include "matx/core/nvtx.h"
 #include "matx/core/operator_utils.h"
-
+#include "matx/core/capabilities.h"
 namespace matx
 {
 

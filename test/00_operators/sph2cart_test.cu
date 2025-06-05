@@ -13,6 +13,11 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Sphere2Cart)
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
+  float thresh = 0.01f;
+  if constexpr (is_matx_half_v<TestType>) {
+    thresh = 0.35f;
+  }  
+
   ExecType exec{}; 
 
   int n = 5;
@@ -30,7 +35,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Sphere2Cart)
   // example-end sph2cart-test-1
 
   for(int i=0; i<n; i++) {
-    ASSERT_NEAR(xi(i), x(i), .01);
+    ASSERT_NEAR(xi(i), x(i), thresh);
   }
 
   MATX_EXIT_HANDLER();

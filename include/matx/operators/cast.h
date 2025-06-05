@@ -73,16 +73,26 @@ namespace matx
 	      __MATX_INLINE__ std::string str() const { return as_type_str<NewType>() + "(" + op_.str() + ")"; }
         __MATX_INLINE__ CastOp(const T &op) : op_(op){};
 
-        template <typename... Is>
+        template <ElementsPerThread EPT, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          return static_cast<NewType>(get_value(op_, indices...));
+          auto cast_func = [this](const auto &val) {
+            return static_cast<NewType>(val);   
+          };
+
+          return ApplyVecFunc<EPT, NewType>(cast_func, get_value<EPT>(op_, indices...));        
         }
 
         template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          return static_cast<NewType>(get_value(op_, indices...));
+          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+        }
+
+        template <OperatorCapability Cap>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+          auto self_has_cap = capability_attributes<Cap>::default_value;
+          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
         }
 
         template <typename ShapeType, typename Executor>
@@ -133,18 +143,34 @@ namespace matx
           }
         };
 
-        template <typename... Is>
+        template <ElementsPerThread EPT, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
         {
-          using inner_type = typename inner_op_type_t<NewType>::type;
-          return NewType(static_cast<inner_type>(real_op_(indices...)),static_cast<inner_type>(imag_op_(indices...)));
+          auto cast_func = [this](const auto &real, const auto &imag) {
+            using inner_type = typename inner_op_type_t<NewType>::type;
+            return NewType(static_cast<inner_type>(real),static_cast<inner_type>(imag));            
+          };
+
+          const auto real_val = get_value<EPT>(real_op_, indices...);
+          const auto imag_val = get_value<EPT>(imag_op_, indices...);
+
+          return ApplyVecFunc<EPT, NewType>(cast_func, real_val, imag_val);
         }
 
         template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
         {
-          using inner_type = typename inner_op_type_t<NewType>::type;
-          return NewType(static_cast<inner_type>(real_op_(indices...)),static_cast<inner_type>(imag_op_(indices...)));
+          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+        }
+
+        template <OperatorCapability Cap>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+          auto self_has_cap = capability_attributes<Cap>::default_value;
+          return combine_capabilities<Cap>(
+            self_has_cap,
+            detail::get_operator_capability<Cap>(real_op_),
+            detail::get_operator_capability<Cap>(imag_op_)
+          );
         }
 
         template <typename ShapeType, typename Executor>

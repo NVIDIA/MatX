@@ -54,12 +54,35 @@ private:
 public:
   dctOp(O out, I in, index_t N) : out_(out), in_(in), N_(N) {}
 
+  template <ElementsPerThread EPT>
   __MATX_DEVICE__ inline void operator()(index_t idx)
   {
-    out_(idx) =
-        in_(idx).real() * 2.0f * cuda::std::cos(-1 * M_PI * idx / (2.0 * N_)) -
-        in_(idx).imag() * 2.0f * cuda::std::sin(-1 * M_PI * idx / (2.0 * N_));
+    const auto in_val = get_value<EPT>(in_, idx);
+    if constexpr(EPT == ElementsPerThread::ONE) {
+      out_(idx) =
+          in_(idx).real() * 2.0f * cuda::std::cos(-1 * M_PI * idx / (2.0 * N_)) -
+          in_(idx).imag() * 2.0f * cuda::std::sin(-1 * M_PI * idx / (2.0 * N_));
+    }
   }
+
+  __MATX_DEVICE__ inline void operator()(index_t idx)
+  {
+    this->operator()<detail::ElementsPerThread::ONE>(idx);
+  }
+
+  template <OperatorCapability Cap>
+  __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+    if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+      return ElementsPerThread::ONE;
+    }
+    else {
+      auto self_has_cap = capability_attributes<Cap>::default_value;
+      return combine_capabilities<Cap>(self_has_cap, 
+        detail::get_operator_capability<Cap>(out_), 
+        detail::get_operator_capability<Cap>(in_));
+    }
+  }
+
 
   constexpr __MATX_HOST__ __MATX_DEVICE__ inline index_t Size(int i) const
   {
@@ -101,7 +124,7 @@ void dct(OutputTensor &out, const InputTensor &in,
   MATX_STATIC_ASSERT(OutputTensor::Rank() == 1, matxInvalidDim);
   index_t N = in.Size(OutputTensor::Rank() - 1);
 
-  tensor_t<cuda::std::complex<typename OutputTensor::value_type>, 1> tmp{{N + 1}};
+  tensor_t<typename OutputTensor::value_type, 1> tmp{{N + 1}};
 
   fft_impl(tmp, in, 0, FFTNorm::BACKWARD, stream);
   auto s = slice(tmp, {0}, {N});

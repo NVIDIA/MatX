@@ -76,49 +76,65 @@ namespace matx
           }
         }
 
-        template <typename Op, typename Dims, typename... Is>
+        template <ElementsPerThread EPT, typename Op, typename Dims, typename... Is>
         static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, const Dims &dims, Is... indices)
         {
-          static_assert(sizeof...(Is)==Rank());
-          static_assert((std::is_convertible_v<Is, index_t> && ... ));
+          if constexpr (EPT == ElementsPerThread::ONE) {
+            static_assert(sizeof...(Is)==Rank());
+            static_assert((std::is_convertible_v<Is, index_t> && ... ));
 
-          // convert variadic type to tuple so we can read/update
-          cuda::std::array<index_t, Rank()> inds{indices...};
+            // convert variadic type to tuple so we can read/update
+            cuda::std::array<index_t, Rank()> inds{indices...};
 MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
-          cuda::std::array<index_t, Rank()> ind;
+            cuda::std::array<index_t, Rank()> ind;
 MATX_IGNORE_WARNING_POP_GCC
 
 #if 0
     //This causes register spills but might be faster if Rank is large
 #pragma unroll
-          for(int32_t i = 0; i < Rank(); i++) {
-            ind[dims_[i]] = inds[i];
-          }
+            for(int32_t i = 0; i < Rank(); i++) {
+              ind[dims_[i]] = inds[i];
+            }
 #else
 #pragma unroll
-    // use double loop to avoid register spills
-          for(int32_t i = 0; i < Rank(); i++) {
+      // use double loop to avoid register spills
+            for(int32_t i = 0; i < Rank(); i++) {
 #pragma unroll
-            for(int32_t j = 0; j < Rank(); j++) {
-              if(dims[j] == i) {
-                ind[i] = inds[j];
+              for(int32_t j = 0; j < Rank(); j++) {
+                if(dims[j] == i) {
+                  ind[i] = inds[j];
+                }
               }
             }
-          }
 #endif
-          return get_value(cuda::std::forward<Op>(op), ind);
+            return get_value<EPT>(cuda::std::forward<Op>(op), ind);
+          } else {
+            return Vector<value_type, static_cast<index_t>(EPT)>{};
+          }
+        }
+
+        template <ElementsPerThread EPT, typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
+        {
+          return get_impl<EPT>(cuda::std::as_const(op_), dims_, indices...);
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          return get_impl(cuda::std::as_const(op_), dims_, indices...);
+          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+        }
+
+        template <ElementsPerThread EPT, typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
+        {
+          return get_impl<EPT>(cuda::std::forward<decltype(op_)>(op_), dims_, indices...);
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
-          return get_impl(cuda::std::forward<decltype(op_)>(op_), dims_, indices...);
+          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
         }
 
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int32_t dim) const
@@ -139,6 +155,16 @@ MATX_IGNORE_WARNING_POP_GCC
         {
           if constexpr (is_matx_op<T>()) {
             op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+        }
+
+        template <OperatorCapability Cap>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            return ElementsPerThread::ONE;
+          } else {
+            auto self_has_cap = capability_attributes<Cap>::default_value;
+            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
           }
         }
 

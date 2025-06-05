@@ -62,7 +62,7 @@ TEST_F(DctTests, Real1DN100)
   MATX_ENTER_HANDLER();
 
   // example-begin dct-1
-  auto out = make_tensor<float>({sig_size});
+  auto out = make_tensor<complex>({sig_size});
   // Perform a DCT from input "xv" into output "out"
   dct(out, xv);
   // example-end dct-1

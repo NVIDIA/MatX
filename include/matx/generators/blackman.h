@@ -37,25 +37,35 @@
 namespace matx
 {
   namespace detail {
-    template <typename T> class Blackman {
+    template <typename T> class Blackman : public BaseOp<Blackman<T>> {
       private:
         index_t size_;
 
       public:
         using value_type = T;
+        using matxop = bool;
 
         __MATX_INLINE__ std::string str() const { return "blackman"; }
 
         inline __MATX_HOST__ __MATX_DEVICE__ Blackman(index_t size) : size_(size){};
 
-        inline __MATX_HOST__ __MATX_DEVICE__ T operator()(index_t i) const
+        template <detail::ElementsPerThread EPT>
+        inline __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
         {
-          return T(0.42) +
-            ((T)0.5 *
-             cuda::std::cos(T(M_PI) * (1 - size_ + 2 * T(i)) / T(size_ - 1))) +
-            ((T)0.08 * cuda::std::cos(T(2 * M_PI) * (1 - size_ + 2 * T(i)) /
-              T(size_ - 1)));
+          return detail::ApplyGeneratorVecFunc<EPT, T>([this](index_t idx) { return T(.42) - T(.5) * cuda::std::cos(T(2 * M_PI) * T(idx) / T(size_ - 1))
+                    + T(.08) * cuda::std::cos(T(4 * M_PI) * T(idx) / T(size_ - 1)); }, i);
         }
+
+        inline __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
+        {
+          return this->operator()<detail::ElementsPerThread::ONE>(i);
+        }
+
+        constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size([[maybe_unused]] int dim) const
+        {
+          return size_;
+        }
+        static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return 1; }
     };
   }
 

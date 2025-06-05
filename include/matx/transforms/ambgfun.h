@@ -69,19 +69,26 @@ public:
   {
   }
 
-  __MATX_DEVICE__ inline void operator()(index_t idy, index_t idx)
+  template <ElementsPerThread EPT>
+  __MATX_DEVICE__ __MATX_INLINE__ __MATX_HOST__ void operator()(index_t idy, index_t idx)
   {
+    if constexpr (EPT == ElementsPerThread::ONE) {
+      index_t xcol = idx - (xnorm_.Size(xnorm_.Rank() - 1) - 1) + idy;
+      if (xcol >= 0 && xcol < (xnorm_.Size(xnorm_.Rank() - 1))) {
+        typename I1::type xnorm = xnorm_(xcol);
+        typename I2::type ynorm = ynorm_(idx);
 
-    index_t xcol = idx - (xnorm_.Size(xnorm_.Rank() - 1) - 1) + idy;
-    if (xcol >= 0 && xcol < (xnorm_.Size(xnorm_.Rank() - 1))) {
-      typename I1::type xnorm = xnorm_(xcol);
-      typename I2::type ynorm = ynorm_(idx);
+        out_(idy, idx) = ynorm * cuda::std::conj(xnorm);
+      }
+      else {
+        out_(idy, idx) = {0, 0};
+      }
+    }
+  }
 
-      out_(idy, idx) = ynorm * cuda::std::conj(xnorm);
-    }
-    else {
-      out_(idy, idx) = {0, 0};
-    }
+  __MATX_DEVICE__ __MATX_INLINE__ __MATX_HOST__ void operator()(index_t idy, index_t idx)
+  {
+    return out_.template operator()<ElementsPerThread::ONE>(idy, idx);
   }
 
   constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
@@ -89,10 +96,24 @@ public:
     return out_.Size(dim);
   }
 
-  static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+  static constexpr __MATX_DEVICE__ __MATX_INLINE__ __MATX_HOST__ int32_t Rank()
   {
     return O::Rank();
   }
+
+  template <OperatorCapability Cap>
+  __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+    if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+      return ElementsPerThread::ONE;
+    }
+    else {
+      auto self_has_cap = capability_attributes<Cap>::default_value;
+      return combine_capabilities<Cap>(self_has_cap, 
+            detail::get_operator_capability<Cap>(xnorm_), 
+            detail::get_operator_capability<Cap>(ynorm_),
+            detail::get_operator_capability<Cap>(out_));
+    }
+  }    
 };
 
 template <class O, class I1>
@@ -109,15 +130,36 @@ public:
       : out_(out), x_(x), fs_(fs), cut_(cut), nfreq_(nfreq)
   {
   }
+
+  template <ElementsPerThread EPT>
   __MATX_DEVICE__ inline void operator()(index_t idx)
   {
-
-    out_(idx) =
-        exp(cuda::std::complex<float>{
-            0, static_cast<float>(2.0 * M_PI *
-                                  (-fs_ / 2.0 + idx * fs_ / nfreq_) * cut_)}) *
-        x_(idx);
+    if constexpr (EPT == ElementsPerThread::ONE) {
+      out_(idx) =
+          exp(cuda::std::complex<float>{
+              0, static_cast<float>(2.0 * M_PI *
+                                    (-fs_ / 2.0 + idx * fs_ / nfreq_) * cut_)}) *
+          x_(idx);
+    }
   }
+
+  __MATX_DEVICE__ inline void operator()(index_t idx)
+  {
+    return out_.template operator()<ElementsPerThread::ONE>(idx);
+  }
+
+  template <OperatorCapability Cap>
+  __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+    if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+      return ElementsPerThread::ONE;
+    }
+    else {
+      auto self_has_cap = capability_attributes<Cap>::default_value;
+      return combine_capabilities<Cap>(self_has_cap, 
+            detail::get_operator_capability<Cap>(out_), 
+            detail::get_operator_capability<Cap>(x_));
+    }
+  }    
 
   constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
   {
@@ -141,13 +183,34 @@ public:
       : out_(out), x_(x), fs_(fs), cut_(cut)
   {
   }
+
+  template <ElementsPerThread EPT>
   __MATX_DEVICE__ inline void operator()(index_t idx)
   {
-
-    out_(idx) = exp(cuda::std::complex<float>{
-                    0, static_cast<float>(2.0 * M_PI * idx / fs_ * cut_)}) *
-                x_(idx);
+    if constexpr (EPT == ElementsPerThread::ONE) {
+      out_(idx) = exp(cuda::std::complex<float>{
+                      0, static_cast<float>(2.0 * M_PI * idx / fs_ * cut_)}) *
+                  x_(idx);
+    }
   }
+
+  __MATX_DEVICE__ inline void operator()(index_t idx)
+  {
+    return out_.template operator()<ElementsPerThread::ONE>(idx);
+  }
+
+  template <OperatorCapability Cap>
+  __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+    if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+      return ElementsPerThread::ONE;
+    }
+    else {
+      auto self_has_cap = capability_attributes<Cap>::default_value;
+      return combine_capabilities<Cap>(self_has_cap, 
+            detail::get_operator_capability<Cap>(out_), 
+            detail::get_operator_capability<Cap>(x_));
+    }
+  }    
 
   constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
   {

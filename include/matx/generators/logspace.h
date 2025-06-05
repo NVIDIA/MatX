@@ -33,16 +33,18 @@
 #pragma once
 
 #include "matx/generators/generator1d.h"
+#include <type_traits>
 
 namespace matx
 {
   namespace detail {
-    template <class T> class Logspace {
+    template <class T> class Logspace : public BaseOp<Logspace<T>> {
       private:
         Range<T> range_;
 
       public:
         using value_type = T;
+        using matxop = bool;
 
         __MATX_INLINE__ std::string str() const { return "logspace"; }
 	
@@ -68,25 +70,33 @@ namespace matx
 #endif
         }
 
-        __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ T operator()(index_t idx) const
+        template <detail::ElementsPerThread EPT>
+        __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t idx) const
         {
-          if constexpr (is_matx_half_v<T>) {
-            return static_cast<T>(
-                cuda::std::pow(10, static_cast<float>(range_(idx))));
-          }
-          else {
-            return cuda::std::pow(10, range_(idx));
-          }
+          auto range_val = range_.template operator()<EPT>(idx);
+          auto log_func = [](const auto &val) {
+            if constexpr (is_matx_half_v<T>) {
+              return static_cast<T>(
+                  cuda::std::pow(10, static_cast<float>(val)));
+            }
+            else {
+                return cuda::std::pow(10, val);
+            }
+          };
 
-          // WAR for compiler bug.
-          if constexpr (!is_matx_half_v<T>) {
-            return cuda::std::pow(10, range_(idx));
-          }
-          else {
-            return static_cast<T>(
-                cuda::std::pow(10, static_cast<float>(range_(idx))));
-          }
+          return detail::ApplyVecFunc<EPT, value_type>(log_func, range_val); 
         }
+
+        __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t idx) const
+        {
+          return this->operator()<detail::ElementsPerThread::ONE>(idx);
+        }
+
+        constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size([[maybe_unused]] int dim) const
+        {
+          return index_t(0); // Logspace is used with matxGenerator1D_t which provides the size
+        }
+        static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return 1; }
     };
   }
 
