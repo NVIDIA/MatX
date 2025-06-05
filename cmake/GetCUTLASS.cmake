@@ -31,8 +31,9 @@
 # /////////////////////////////////////////////////////////////////////////////////
 function(find_and_configure_cutlass VERSION)
     CPMFindPackage(NAME cutlass
+        VERSION         ${VERSION}
         GIT_REPOSITORY  https://github.com/NVIDIA/cutlass.git
-        GIT_TAG         a01feb9
+        GIT_TAG         v${VERSION}
         GIT_SHALLOW     TRUE
         DOWNLOAD_ONLY
         OPTIONS         "CUTLASS_ENABLE_TESTS OFF"
@@ -44,5 +45,5 @@ function(find_and_configure_cutlass VERSION)
     endif()
 endfunction()
 
-set(CUDA_MATX_MIN_VERSION_cutlass "21.08.02")
+set(CUDA_MATX_MIN_VERSION_cutlass "3.9.2")
 find_and_configure_cutlass(${CUDA_MATX_MIN_VERSION_cutlass})

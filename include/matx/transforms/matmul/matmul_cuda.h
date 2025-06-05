@@ -949,11 +949,11 @@ private:
       if constexpr (RANK > MATMUL_BATCH_RANK_THRESHOLD) {
         if constexpr (PROV == PROVIDER_TYPE_CUTLASS) {
 #ifdef MATX_ENABLE_CUTLASS
-        for (size_t iter = 0; iter < total_iter; iter++) {
+        for (size_t iter = 0; iter < total_iter; iter++) {  
           // Get pointers into A/B/C for this round
-          auto ap = cuda::std::apply([&a_adj](auto... param) { return a_adj.GetPointer(param...); }, idx);
-          auto bp = cuda::std::apply([&b_adj](auto... param) { return b_adj.GetPointer(param...); }, idx);
-          auto cp = cuda::std::apply([&c_adj](auto... param) { return c_adj.GetPointer(param...); }, idx);
+          auto ap = cuda::std::apply([&a_adj](auto... param) { return a_adj.GetPointer(param...); }, a_idx);
+          auto bp = cuda::std::apply([&b_adj](auto... param) { return b_adj.GetPointer(param...); }, b_idx);
+          auto cp = cuda::std::apply([&c_adj](auto... param) { return c_adj.GetPointer(param...); }, c_idx);
 
           typename CutlassGemm::Arguments args(
               {static_cast<int>(params_.m), static_cast<int>(params_.n),
@@ -984,7 +984,7 @@ private:
           MATX_ASSERT(status == cutlass::Status::kSuccess, matxMatMulError);
 
           // Update all but the last 2 indices
-          UpdateIndices<TensorTypeA, shape_type, TensorTypeA::Rank()>(a_adj, idx, 3);
+          UpdateIndices<TensorTypeA, shape_type, TensorTypeA::Rank()>(a_adj, a_idx, 3);
         }
 #else
           MATX_THROW(matxNotSupported, "CUTLASS not enabled!");

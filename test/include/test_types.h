@@ -72,6 +72,25 @@ template <> auto inline GenerateData<cuda::std::complex<double>>()
   return cuda::std::complex<double>(1.5, -2.5);
 }
 
+#ifdef MATX_ENABLE_CUTLASS
+template <> auto inline GenerateData<matx::quaternion<matx::matxFp16>>()
+{
+  return matx::quaternion<matx::matxFp16>(1.5, -2.5, 3.5, -4.5);
+}
+template <> auto inline GenerateData<matx::quaternion<matx::matxBf16>>()
+{
+  return matx::quaternion<matx::matxBf16>(1.5, -2.5, 3.5, -4.5);
+}
+template <> auto inline GenerateData<matx::quaternion<float>>()
+{
+  return matx::quaternion<float>(1.5, -2.5, 3.5, -4.5);
+}
+template <> auto inline GenerateData<matx::quaternion<double>>()
+{
+  return matx::quaternion<double>(1.5, -2.5, 3.5, -4.5);
+}
+#endif
+
 using ExecutorTypesAll = cuda::std::tuple<matx::cudaExecutor, matx::SingleThreadedHostExecutor, matx::AllThreadsHostExecutor, matx::SelectThreadsHostExecutor>;
 using ExecutorTypesCUDAOnly = cuda::std::tuple<matx::cudaExecutor>;
 
@@ -114,7 +133,13 @@ using MatXComplexNonHalfTuple                = cuda::std::tuple<cuda::std::compl
 using MatXNumericNonComplexTuple             = cuda::std::tuple<uint32_t, int32_t, uint64_t, int64_t, float, double>;
 using MatXComplexTuple                       = cuda::std::tuple<cuda::std::complex<float>, cuda::std::complex<double>,
                                                           matx::matxFp16Complex, matx::matxBf16Complex>;
-                                                          
+
+#ifdef MATX_ENABLE_CUTLASS
+using MatXQuaternionTuple                     = cuda::std::tuple<matx::quaternion<float>, matx::quaternion<double>>;
+#else
+using MatXQuaternionTuple                     = cuda::std::tuple<>;
+#endif
+
 using MatXAllTuple                           = cuda::std::tuple<matx::matxFp16, matx::matxBf16, bool, uint32_t, int32_t, uint64_t,
                                                       int64_t, float, double, cuda::std::complex<float>,
                                                       cuda::std::complex<double>, matx::matxFp16Complex,
@@ -161,6 +186,7 @@ using MatXFloatNonComplexNonHalfTypesAllExecs = TupleToTypes<TypedCartesianProdu
 using MatXNumericNoHalfTypesAllExecs          = TupleToTypes<TypedCartesianProduct<MatXNumericNonHalfTuple, ExecutorTypesAll>::type>::type;
 using MatXComplexNonHalfTypesAllExecs         = TupleToTypes<TypedCartesianProduct<MatXComplexNonHalfTuple, ExecutorTypesAll>::type>::type;
 using MatXComplexTypesAllExecs                = TupleToTypes<TypedCartesianProduct<MatXComplexTuple, ExecutorTypesAll>::type>::type;
+using MatXQuaternionTypesAllExecs             = TupleToTypes<TypedCartesianProduct<MatXQuaternionTuple, ExecutorTypesAll>::type>::type;
 using MatXAllTypesAllExecs                    = TupleToTypes<TypedCartesianProduct<MatXAllTuple, ExecutorTypesAll>::type>::type;
 using MatXTypesFloatNonComplexAllExecs        = TupleToTypes<TypedCartesianProduct<MatXFloatNonComplexTuple, ExecutorTypesAll>::type>::type;
 using MatXTypesFloatAllExecs                  = TupleToTypes<TypedCartesianProduct<MatXFloatTuple, ExecutorTypesAll>::type>::type;

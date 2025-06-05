@@ -59,6 +59,9 @@ template <typename TensorType>
 class OperatorTestsComplexTypesAllExecs : public ::testing::Test {};
 
 template <typename TensorType>
+class OperatorTestsQuaternionTypesAllExecs : public ::testing::Test {};
+
+template <typename TensorType>
 class OperatorTestsAllExecs : public ::testing::Test {};
 
 template <typename TensorType>
@@ -92,6 +95,7 @@ TYPED_TEST_SUITE(OperatorTestsNumericAllExecs,
 TYPED_TEST_SUITE(OperatorTestsNumericNoHalfAllExecs, MatXNumericNoHalfTypesAllExecs);          
 TYPED_TEST_SUITE(OperatorTestsComplexNonHalfTypesAllExecs, MatXComplexNonHalfTypesAllExecs);
 TYPED_TEST_SUITE(OperatorTestsComplexTypesAllExecs, MatXComplexTypesAllExecs);
+TYPED_TEST_SUITE(OperatorTestsQuaternionTypesAllExecs, MatXQuaternionTypesAllExecs);
 TYPED_TEST_SUITE(OperatorTestsAllExecs, MatXAllTypesAllExecs);
 TYPED_TEST_SUITE(OperatorTestsFloatAllExecs, MatXTypesFloatAllExecs);
 TYPED_TEST_SUITE(OperatorTestsIntegralAllExecs, MatXTypesIntegralAllExecs);
