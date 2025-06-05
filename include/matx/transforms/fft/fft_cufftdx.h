@@ -91,9 +91,7 @@ namespace matx {
 
     //auto thread_data = a_.template operator()<EPT>(indices...);
     //extern __shared__ __align__(alignof(float2)) input_type shared_mem[];
-    printf("before %d %f%+f %f%+f \n", threadIdx.x, thread_data[threadIdx.x].data[0].real(), thread_data[threadIdx.x].data[0].imag(), thread_data[threadIdx.x].data[1].real(), thread_data[threadIdx.x].data[1].imag());
     FFT().execute(&thread_data[0]);
-    printf("after %d %f%+f %f%+f \n", threadIdx.x, thread_data[threadIdx.x].data[0].real(), thread_data[threadIdx.x].data[0].imag(), thread_data[threadIdx.x].data[1].real(), thread_data[threadIdx.x].data[1].imag());
     return thread_data[threadIdx.x];  
   }
 
