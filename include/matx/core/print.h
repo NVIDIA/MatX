@@ -54,6 +54,14 @@ namespace matx {
         fprintf(fp, fmt_s.c_str(), static_cast<float>(val.real()),
               static_cast<float>(val.imag()));
       }
+      else if constexpr (is_quaternion_v<T>) {
+        const auto prec = std::to_string(PRINT_PRECISION);
+        const auto fmt_s = ("% ."s + prec + "e%+." + prec + "ei%+." + prec + "ej%+." + prec + "ek ");
+        fprintf(fp, fmt_s.c_str(), static_cast<float>(val.w()),
+              static_cast<float>(val.x()),
+              static_cast<float>(val.y()),
+              static_cast<float>(val.z()));
+      }
       else if constexpr (is_matx_half_v<T> || is_half_v<T>) {
         const auto prec = std::to_string(PRINT_PRECISION);
         const auto fmt_s = ("% ."s + prec + "e ");
@@ -130,6 +138,16 @@ namespace matx {
         return "complex<float16>";
       if constexpr (std::is_same_v<T, matxBf16Complex>)
         return "complex<bfloat16>";
+#ifdef MATX_ENABLE_CUTLASS
+      if constexpr (std::is_same_v<T, matx::quaternion<float>>)
+        return "quaternion<float>";
+      if constexpr (std::is_same_v<T, matx::quaternion<double>>)
+        return "quaternion<double>";
+      if constexpr (std::is_same_v<T, matx::quaternion<matxFp16>>)
+        return "quaternion<float16>";
+      if constexpr (std::is_same_v<T, matx::quaternion<matxBf16>>)
+        return "quaternion<bfloat16>";
+#endif
 
       return "unknown";
     }
