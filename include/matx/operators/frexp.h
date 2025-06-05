@@ -56,7 +56,7 @@ namespace detail {
 
       };
 
-      template <ElementsPerThread EPT, typename... Is>
+      template <typename CapType, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
       {
         auto get_scalar = [this](const auto &x){
@@ -113,13 +113,13 @@ namespace detail {
           }
         };
 
-        const auto val = get_value<EPT>(a_, indices...);
-        if constexpr (EPT == ElementsPerThread::ONE) {
+        const auto val = get_value<CapType>(a_, indices...);
+        if constexpr (CapType::ept == ElementsPerThread::ONE) {
           return get_scalar(val);
         } else {
-          Vector<remove_cvref_t<decltype(get_scalar(val.data[0]))>, static_cast<int>(EPT)> out;
+          Vector<remove_cvref_t<decltype(get_scalar(val.data[0]))>, CapType::ept> out;
           #pragma unroll
-          for (index_t i = 0; i < static_cast<int>(EPT); i++) {
+          for (index_t i = 0; i < CapType::ept; i++) {
             out.data[i] = get_scalar(val.data[i]);
           }
           return out;
@@ -128,7 +128,7 @@ namespace detail {
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
       {
-        return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+        return this->operator()<DefaultCapabilities>(indices...);
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()

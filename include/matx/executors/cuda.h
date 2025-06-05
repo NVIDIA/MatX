@@ -158,34 +158,34 @@ namespace matx
             
             // Helper function to execute kernel with dual path (direct kernel vs JIT)
             auto execute_with_ept = [&](auto ept_tag) -> bool {
-              constexpr auto EPT = decltype(ept_tag)::value;
+              constexpr auto EPT = decltype(ept_tag)::ept;
+              using CapType      = decltype(ept_tag);
               if (max_ept == EPT) {
                 if constexpr (Op::Rank() == 1) {
 #ifdef MATX_EN_MATHDX
                   if constexpr (EPT == detail::ElementsPerThread::TWO) {
-                    printf("Operator supports JIT\n");
-                    nvrtc_compile_and_run<EPT>(matx::detail::matxOpT1JITKernelStr, "output.cu", op, sizes[0], blocks, threads);
+                    nvrtc_compile_and_run<CapType>(matx::detail::matxOpT1JITKernelStr, "output.cu", op, sizes[0], blocks, threads);
                   } else {
-                    detail::matxOpT1Kernel<EPT><<<blocks, threads, 0, stream_>>>(op, sizes[0]);
+                    detail::matxOpT1Kernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0]);
                   }
 #else
-                  detail::matxOpT1Kernel<EPT><<<blocks, threads, 0, stream_>>>(op, sizes[0]);
+                  detail::matxOpT1Kernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0]);
 #endif
                 }
                 else if constexpr (Op::Rank() == 2) {
                   if (stride) {
 #ifdef MATX_EN_MATHDX
                     // Add JIT path for 2D stride kernels if needed
-                    detail::matxOpT2StrideKernel<EPT><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
+                    detail::matxOpT2StrideKernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
 #else
-                    detail::matxOpT2StrideKernel<EPT><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
+                    detail::matxOpT2StrideKernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
 #endif
                   } else {
 #ifdef MATX_EN_MATHDX
                     // Add JIT path for 2D kernels if needed
-                    detail::matxOpT2Kernel<EPT><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
+                    detail::matxOpT2Kernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
 #else
-                    detail::matxOpT2Kernel<EPT><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
+                    detail::matxOpT2Kernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
 #endif
                   }
                 }
@@ -193,16 +193,16 @@ namespace matx
                   if (stride) {
 #ifdef MATX_EN_MATHDX
                     // Add JIT path for 3D stride kernels if needed
-                    detail::matxOpT3StrideKernel<EPT><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
+                    detail::matxOpT3StrideKernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
 #else
-                    detail::matxOpT3StrideKernel<EPT><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
+                    detail::matxOpT3StrideKernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
 #endif
                   } else {
 #ifdef MATX_EN_MATHDX
                     // Add JIT path for 3D kernels if needed
-                    detail::matxOpT3Kernel<EPT><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
+                    detail::matxOpT3Kernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
 #else
-                    detail::matxOpT3Kernel<EPT><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
+                    detail::matxOpT3Kernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
 #endif
                   }
                 }
@@ -210,16 +210,16 @@ namespace matx
                   if (stride) {
 #ifdef MATX_EN_MATHDX
                     // Add JIT path for 4D stride kernels if needed
-                    detail::matxOpT4StrideKernel<EPT><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
+                    detail::matxOpT4StrideKernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
 #else
-                    detail::matxOpT4StrideKernel<EPT><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
+                    detail::matxOpT4StrideKernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
 #endif
                   } else {
 #ifdef MATX_EN_MATHDX
                     // Add JIT path for 4D kernels if needed
-                    detail::matxOpT4Kernel<EPT><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
+                    detail::matxOpT4Kernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
 #else
-                    detail::matxOpT4Kernel<EPT><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
+                    detail::matxOpT4Kernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
 #endif
                   }
                 }
@@ -229,12 +229,12 @@ namespace matx
             };
 
             // Helper tags for template parameter deduction
-            constexpr auto one_tag = std::integral_constant<detail::ElementsPerThread, detail::ElementsPerThread::ONE>{};
-            constexpr auto two_tag = std::integral_constant<detail::ElementsPerThread, detail::ElementsPerThread::TWO>{};
-            constexpr auto four_tag = std::integral_constant<detail::ElementsPerThread, detail::ElementsPerThread::FOUR>{};
-            constexpr auto eight_tag = std::integral_constant<detail::ElementsPerThread, detail::ElementsPerThread::EIGHT>{};
-            constexpr auto sixteen_tag = std::integral_constant<detail::ElementsPerThread, detail::ElementsPerThread::SIXTEEN>{};
-            constexpr auto thirty_two_tag = std::integral_constant<detail::ElementsPerThread, detail::ElementsPerThread::THIRTY_TWO>{};
+            constexpr auto one_tag = detail::CapabilityParams<detail::ElementsPerThread::ONE, false>{};
+            constexpr auto two_tag = detail::CapabilityParams<detail::ElementsPerThread::TWO, false>{};
+            constexpr auto four_tag = detail::CapabilityParams<detail::ElementsPerThread::FOUR, false>{};
+            constexpr auto eight_tag = detail::CapabilityParams<detail::ElementsPerThread::EIGHT, false>{};
+            constexpr auto sixteen_tag = detail::CapabilityParams<detail::ElementsPerThread::SIXTEEN, false>{};
+            constexpr auto thirty_two_tag = detail::CapabilityParams<detail::ElementsPerThread::THIRTY_TWO, false>{};
 
             // Try each EPT value in order
             if (execute_with_ept(thirty_two_tag) ||

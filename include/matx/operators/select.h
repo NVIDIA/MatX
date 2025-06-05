@@ -59,39 +59,39 @@ namespace matx
 
         __MATX_INLINE__ SelectOp(const T &op, IdxType idx) : op_(op), idx_(idx) {};  
 
-        template <ElementsPerThread EPT, typename Op, typename Idx, typename... Is>
+        template <typename CapType, typename Op, typename Idx, typename... Is>
         static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, const Idx &idx, index_t i)
         {    
-          if constexpr (EPT == ElementsPerThread::ONE) {
-            auto arrs = detail::GetIdxFromAbs(op, get_value<EPT>(idx, i));
-            return get_value<EPT>(op, arrs);          
+          if constexpr (CapType::ept == ElementsPerThread::ONE) {
+            auto arrs = detail::GetIdxFromAbs(op, get_value<CapType>(idx, i));
+            return get_value<CapType>(op, arrs);          
           } else {
-            return Vector<value_type, static_cast<index_t>(EPT)>{};
+            return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
           }
         }
 
-        template <ElementsPerThread EPT, typename... Is>
+        template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i) const 
         {
-          return get_impl<EPT>(cuda::std::as_const(op_), idx_, i);
+          return get_impl<CapType>(cuda::std::as_const(op_), idx_, i);
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i) const 
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(i);
+          return this->operator()<DefaultCapabilities>(i);
         }
 
-        template <ElementsPerThread EPT, typename... Is>
+        template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i)
         {
-          return get_impl<EPT>(cuda::std::forward<decltype(op_)>(op_), idx_, i);
+          return get_impl<CapType>(cuda::std::forward<decltype(op_)>(op_), idx_, i);
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i)
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(i);
+          return this->operator()<DefaultCapabilities>(i);
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()

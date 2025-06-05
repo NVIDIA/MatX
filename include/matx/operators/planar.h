@@ -56,28 +56,28 @@ namespace matx
           static_assert(Rank() > 0);
         };
 
-        template <ElementsPerThread EPT, typename... Is>
+        template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
         {
-          if constexpr (EPT == ElementsPerThread::ONE) {
+          if constexpr (CapType::ept == ElementsPerThread::ONE) {
             constexpr size_t rank_idx = (Rank() == 1) ? 0 : (Rank() - 2);
             cuda::std::array idx{indices...};
 
             if (idx[rank_idx] >= op_.Size(rank_idx)) {      
               idx[rank_idx] -= op_.Size(rank_idx);    
-              return get_value<EPT>(op_, idx).imag();
+              return get_value<CapType>(op_, idx).imag();
             }
 
-            return get_value<EPT>(op_, indices...).real(); 
+            return get_value<CapType>(op_, indices...).real(); 
           } else {
-            return Vector<value_type, static_cast<index_t>(EPT)>{};
+            return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
           }
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+          return this->operator()<DefaultCapabilities>(indices...);
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()

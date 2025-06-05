@@ -53,10 +53,10 @@ namespace matx
 
         Range(T first, T step) : first_(first), step_(step) {}
 
-        template <detail::ElementsPerThread EPT>
+        template <typename CapType>
         __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t idx) const
         {
-          return detail::ApplyGeneratorVecFunc<EPT, T>([this](index_t i) {
+          return detail::ApplyGeneratorVecFunc<CapType, T>([this](index_t i) {
             if constexpr (is_matx_half_v<T>) {
 MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
               return first_ + T(static_cast<T>((float)i) * step_);
@@ -72,7 +72,7 @@ MATX_IGNORE_WARNING_POP_GCC
 
         __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t idx) const
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(idx);
+          return this->operator()<DefaultCapabilities>(idx);
         }
 
         constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size([[maybe_unused]] int dim) const

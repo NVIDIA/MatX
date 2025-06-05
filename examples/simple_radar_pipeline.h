@@ -78,10 +78,10 @@ public:
    * @param idy Y position
    * @param idx X position
    */
-  template <detail::ElementsPerThread EPT>
+  template <typename CapType>
   __device__ inline void operator()(index_t idz, index_t idy, index_t idx)
   {
-    if constexpr (EPT == detail::ElementsPerThread::ONE) {
+    if constexpr (CapType::ept == detail::ElementsPerThread::ONE) {
       typename I1::type xpow = xpow_(idz, idy, idx);
       typename I2::type ba = ba_(idz, idy, idx);
       typename I2::type norm = norm_(idz, idy, idx);

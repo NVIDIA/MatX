@@ -58,11 +58,11 @@ namespace matx
         __MATX_INLINE__ std::string str() const { return "sign(" + get_type_str(op_) + ")"; }
         __MATX_INLINE__ SignOp(const T &op, value_type zval) : op_(op), zval_(zval) {};  
 
-        template <ElementsPerThread EPT, typename... Is>
+        template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
         {
-          if constexpr (EPT == ElementsPerThread::ONE) {
-            auto v = get_value<EPT>(op_,indices...);
+          if constexpr (CapType::ept == ElementsPerThread::ONE) {
+            auto v = get_value<CapType>(op_,indices...);
 
             auto set_val = [this](auto vl) { 
               if constexpr (is_complex_v<value_type> ) {
@@ -81,26 +81,26 @@ namespace matx
               }
             };
 
-            if constexpr (EPT == ElementsPerThread::ONE) {
+            if constexpr (CapType::ept == ElementsPerThread::ONE) {
               return set_val(v);
             }
             else {
-              Vector<value_type, static_cast<int>(EPT)> ret;
+              Vector<value_type, CapType::ept> ret;
               #pragma unroll
-              for (int e = 0; e < static_cast<int>(EPT); ++e) {
+              for (int e = 0; e < CapType::ept; ++e) {
                 ret.data[e] = set_val(GetVectorVal(v, e));
               }
               return ret;
             }
           } else {
-            return Vector<value_type, static_cast<index_t>(EPT)>{};
+            return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
           }
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+          return this->operator()<DefaultCapabilities>(indices...);
         }
 
         template <OperatorCapability Cap>

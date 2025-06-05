@@ -128,37 +128,37 @@ public:
 
   // Workaround for nvcc bug. It won't allow the dual if constexpr branch workaround inside of lambda
   // functions, so we have to make a separate one.
-  template <ElementsPerThread EPT, typename... Ts>
+  template <typename CapType, typename... Ts>
   __MATX_DEVICE__ __MATX_HOST__ inline auto _internal_mapply(Ts&&... args) const noexcept {
-    auto r = detail::get_value<EPT>(op_, args...);
+    auto r = detail::get_value<CapType>(op_, args...);
     out_(args...) = r;
     return r;
   }
 
-  template <ElementsPerThread EPT, typename ShapeType>
+  template <typename CapType, typename ShapeType>
   __MATX_DEVICE__ __MATX_HOST__ inline decltype(auto) operator()(cuda::std::array<ShapeType, T::Rank()> idx) const noexcept
   {
     auto res = cuda::std::apply([&](auto &&...args)  {
-        return _internal_mapply<EPT>(args...);
+        return _internal_mapply<CapType>(args...);
       }, idx
     );
 
     return res;
   }
 
-  template <ElementsPerThread EPT, typename... Is>
+  template <typename CapType, typename... Is>
   __MATX_DEVICE__ __MATX_HOST__ inline decltype(auto) operator()(Is... indices) const noexcept
   {
     //auto &&out = out_(indices...);
-    //out = detail::get_value<EPT>(op_, indices...);
-    const auto in_val = detail::get_value<EPT>(op_, indices...);
-    using out_type = decltype(out_.template operator()<EPT>(indices...));
+    //out = detail::get_value<CapType>(op_, indices...);
+    const auto in_val = detail::get_value<CapType>(op_, indices...);
+    using out_type = decltype(out_.template operator()<CapType>(indices...));
     if constexpr (!is_vector_v<decltype(in_val)> && is_vector_v<out_type>) {
-      Vector<remove_cvref_t<decltype(in_val)>, static_cast<size_t>(EPT)> vec{in_val};
-      out_.template operator()<EPT>(indices...) = vec;
+      Vector<remove_cvref_t<decltype(in_val)>, static_cast<size_t>(CapType::ept)> vec{in_val};
+      out_.template operator()<CapType>(indices...) = vec;
     }
     else {
-      out_.template operator()<EPT>(indices...) = in_val;
+      out_.template operator()<CapType>(indices...) = in_val;
     }
     return in_val;
 
@@ -168,7 +168,7 @@ public:
   template <typename... Is>
   __MATX_DEVICE__ __MATX_HOST__ inline decltype(auto) operator()(Is... indices) const noexcept  
   {
-    return (*this).template operator()<detail::ElementsPerThread::ONE>(indices...);
+    return (*this).template operator()<DefaultCapabilities>(indices...);
   }
 
   template <typename ShapeType, typename Executor>

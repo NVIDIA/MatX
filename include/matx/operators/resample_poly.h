@@ -79,14 +79,14 @@ namespace detail {
       }
 
       // Const versions
-      template <ElementsPerThread EPT, typename... Is>
+      template <typename CapType, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
-        return tmp_out_.template operator()<EPT>(indices...);
+        return tmp_out_.template operator()<CapType>(indices...);
       }
 
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
-        return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+        return this->operator()<DefaultCapabilities>(indices...);
       }
 
       template <OperatorCapability Cap>

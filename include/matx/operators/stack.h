@@ -84,47 +84,47 @@ namespace matx
         }
       }
 
-      template <ElementsPerThread EPT, int I = 0, int N>
+      template <typename CapType, int I = 0, int N>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) GetVal(index_t oidx, cuda::std::array<index_t,RANK> &indices) const {
 
         if constexpr ( I == N ) {
           const auto &op = cuda::std::get<0>(ops_);
-          return get_value<EPT>(op, indices);
+          return get_value<CapType>(op, indices);
         } else {
           if ( I < oidx ) {
             // this is not the correct operator, recurse
-            return GetVal<EPT, I+1, N>(oidx, indices);
+            return GetVal<CapType, I+1, N>(oidx, indices);
           } else {
             // this is the correct operator, return it's value
             auto &op = cuda::std::get<I>(ops_);
-            return get_value<EPT>(op, indices);
+            return get_value<CapType>(op, indices);
           }
         }
       }
 
-      template <ElementsPerThread EPT, int I = 0, int N>
+      template <typename CapType, int I = 0, int N>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) GetVal(index_t oidx, cuda::std::array<index_t,RANK> &indices) {
 
         if constexpr ( I == N ) {
           // This should never happen, but we return a fake value from the first tuple element anyways
           auto &op = cuda::std::get<0>(ops_);
-          return get_value<EPT>(op, indices);
+          return get_value<CapType>(op, indices);
         } else {
           if ( I < oidx ) {
             // this is not the correct operator, recurse
-            return GetVal<EPT, I+1, N>(oidx, indices);
+            return GetVal<CapType, I+1, N>(oidx, indices);
           } else {
             // this is the correct operator, return it's value
             auto &op = cuda::std::get<I>(ops_);
-            return get_value<EPT>(op, indices);
+            return get_value<CapType>(op, indices);
           }
         }
       }
 
-      template <ElementsPerThread EPT, typename... Is>
+      template <typename CapType, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is) const
       {
-        if constexpr (EPT == ElementsPerThread::ONE) {
+        if constexpr (CapType::ept == ElementsPerThread::ONE) {
           cuda::std::array<index_t, RANK + 1> indices = {{is...}};
           cuda::std::array<index_t, RANK> indices_o;
 
@@ -140,28 +140,28 @@ namespace matx
             indices_o[i] = indices[i+1];
           }
 
-          return GetVal<EPT, 0, sizeof...(Ts)>(oidx, indices_o);
+          return GetVal<CapType, 0, sizeof...(Ts)>(oidx, indices_o);
         } else {
-          return Vector<value_type, static_cast<index_t>(EPT)>{};
+          return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
         }
       }
 
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is) const
       {
-        return this->operator()<detail::ElementsPerThread::ONE>(is...);
+        return this->operator()<DefaultCapabilities>(is...);
       }
 
-      template <ElementsPerThread EPT, typename... Is>
+      template <typename CapType, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
       {
-        return cuda::std::as_const(*this).template operator()<EPT>(indices...);
+        return cuda::std::as_const(*this).template operator()<CapType>(indices...);
       }
 
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
       {
-        return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+        return this->operator()<DefaultCapabilities>(indices...);
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() noexcept

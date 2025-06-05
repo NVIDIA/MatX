@@ -68,10 +68,10 @@ namespace matx
         __MATX_INLINE__ UpsampleOp(const T &op, int32_t dim, index_t n) : op_(op), dim_(dim), n_(n) {
         };
 
-        template <ElementsPerThread EPT, typename... Is>
+        template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
         {
-          if constexpr (EPT == ElementsPerThread::ONE) {
+          if constexpr (CapType::ept == ElementsPerThread::ONE) {
               static_assert(sizeof...(Is)==Rank());
               static_assert((std::is_convertible_v<Is, index_t> && ... ));
 
@@ -79,19 +79,19 @@ namespace matx
               cuda::std::array<index_t, Rank()> ind{indices...};
               if ((ind[dim_] % n_) == 0) {
                 ind[dim_] /= n_;
-                return get_value<EPT>(op_, ind);
+                return get_value<CapType>(op_, ind);
               }
 
             return static_cast<typename decltype(op_)::value_type>(0);
           } else {
-            return Vector<value_type, static_cast<index_t>(EPT)>{};
+            return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
           }
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+          return this->operator()<DefaultCapabilities>(indices...);
         }
 
         template <OperatorCapability Cap>

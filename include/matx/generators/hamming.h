@@ -50,15 +50,15 @@ namespace matx
 	
         inline __MATX_HOST__ __MATX_DEVICE__ Hamming(index_t size) : size_(size){};
 
-        template <detail::ElementsPerThread EPT>
+        template <typename CapType>
         inline __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const 
         {
-          return detail::ApplyGeneratorVecFunc<EPT, T>([this](index_t idx) { return T(.54) - T(.46) * cuda::std::cos(T(2 * M_PI) * T(idx) / T(size_ - 1)); }, i);
+          return detail::ApplyGeneratorVecFunc<CapType, T>([this](index_t idx) { return T(.54) - T(.46) * cuda::std::cos(T(2 * M_PI) * T(idx) / T(size_ - 1)); }, i);
         }
 
         inline __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const 
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(i);
+          return this->operator()<DefaultCapabilities>(i);
         }
 
         constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size([[maybe_unused]] int dim) const

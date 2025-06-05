@@ -65,7 +65,7 @@ public:
   BlackScholes(O out, I1 K, I1 V, I1 S, I1 r, I1 T)
       : out_(out), V_(V), S_(S), K_(K), r_(r), T_(T)  {}
 
-  template <detail::ElementsPerThread EPT>
+  template <typename CapType>
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ void operator()(index_t idx)
   {
     auto V = V_(idx);
@@ -85,7 +85,7 @@ public:
   }
 
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__  void operator()(index_t idx) {
-    return this->operator()<detail::ElementsPerThread::ONE>(idx);
+    return this->operator()<detail::DefaultCapabilities>(idx);
   }
 
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(uint32_t i) const  { return out_.Size(i); }

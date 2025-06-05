@@ -110,7 +110,7 @@ namespace matx
           MATX_ASSERT_STR(d==Rank(), matxInvalidDim, "SliceOp: Number of dimensions without matxDropDim must equal new rank.");
         };
 
-        template <detail::ElementsPerThread EPT, typename Op, typename... Is>
+        template <typename CapType, typename Op, typename... Is>
         static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(
             Op&& op, 
             const decltype(starts_) &starts, 
@@ -118,7 +118,7 @@ namespace matx
             const decltype(dims_) &dims, 
             Is... indices)
         {   
-          if constexpr (EPT == ElementsPerThread::ONE) {
+          if constexpr (CapType::ept == ElementsPerThread::ONE) {
             static_assert(sizeof...(Is)==Rank());
             static_assert((std::is_convertible_v<Is, index_t> && ... ));
         
@@ -141,9 +141,9 @@ namespace matx
               }
             }       
                 
-            return get_value<EPT>(cuda::std::forward<Op>(op), ind);
+            return get_value<CapType>(cuda::std::forward<Op>(op), ind);
           } else {
-            return Vector<value_type, static_cast<index_t>(EPT)>{};
+            return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
           }
         }
 
@@ -156,28 +156,28 @@ namespace matx
           return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
         }        
 
-        template <detail::ElementsPerThread EPT, typename... Is>
+        template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
         {
-          return get_impl<EPT>(cuda::std::as_const(op_), starts_, strides_, dims_, indices...);
+          return get_impl<CapType>(cuda::std::as_const(op_), starts_, strides_, dims_, indices...);
         }
 
-        template <detail::ElementsPerThread EPT, typename... Is>
+        template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
-          return get_impl<EPT>(cuda::std::forward<decltype(op_)>(op_), starts_, strides_, dims_, indices...);
+          return get_impl<CapType>(cuda::std::forward<decltype(op_)>(op_), starts_, strides_, dims_, indices...);
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+          return this->operator()<DefaultCapabilities>(indices...);
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+          return this->operator()<DefaultCapabilities>(indices...);
         }        
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()

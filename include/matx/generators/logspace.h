@@ -70,10 +70,10 @@ namespace matx
 #endif
         }
 
-        template <detail::ElementsPerThread EPT>
+        template <typename CapType>
         __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t idx) const
         {
-          auto range_val = range_.template operator()<EPT>(idx);
+          auto range_val = range_.template operator()<CapType>(idx);
           auto log_func = [](const auto &val) {
             if constexpr (is_matx_half_v<T>) {
               return static_cast<T>(
@@ -84,12 +84,12 @@ namespace matx
             }
           };
 
-          return detail::ApplyVecFunc<EPT, value_type>(log_func, range_val); 
+          return detail::ApplyVecFunc<CapType, value_type>(log_func, range_val); 
         }
 
         __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t idx) const
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(idx);
+          return this->operator()<DefaultCapabilities>(idx);
         }
 
         constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size([[maybe_unused]] int dim) const

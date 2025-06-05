@@ -74,10 +74,12 @@ namespace matx
             tp->Exec(ex);
             return;
           }          
-          else if constexpr (is_matx_set_op<T>() && is_matx_transform_op<typename T::op_type>() && is_tensor_view_v<typename T::tensor_type>) {
-            // If this is a direct assignment from a transform, we can skip the async allocation and just do the assignment
-            tp->TransformExec(tp->Shape(), ex);
-            return;
+          else if constexpr (is_matx_set_op<T>()) {
+            if constexpr (is_matx_transform_op<typename T::op_type>() && is_tensor_view_v<typename T::tensor_type>) {
+              // If this is a direct assignment from a transform, we can skip the async allocation and just do the assignment
+              tp->TransformExec(tp->Shape(), ex);
+              return;
+            }
           }
 
           if (detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(*tp)) {

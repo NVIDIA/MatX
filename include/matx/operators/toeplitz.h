@@ -89,13 +89,13 @@ namespace matx
         }        
       }
 
-        template <ElementsPerThread EPT>
+        template <typename CapType>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i, index_t j) const
         {
-          if constexpr (EPT == ElementsPerThread::ONE) {
+          if constexpr (CapType::ept == ElementsPerThread::ONE) {
             if (j > i) {
               if constexpr (is_matx_op<T2>()) {
-                auto val = get_value<EPT>(op2_, j - i);
+                auto val = get_value<CapType>(op2_, j - i);
               return val;
               }
               else {
@@ -105,7 +105,7 @@ namespace matx
             }
             else {
               if constexpr (is_matx_op<T1>()) {
-                auto val = get_value<EPT>(op1_, i - j);
+                auto val = get_value<CapType>(op1_, i - j);
                 return val;
               }
               else {
@@ -114,13 +114,13 @@ namespace matx
               }          
             }
           } else {
-            return Vector<value_type, static_cast<index_t>(EPT)>{};
+            return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
           }
         }
 
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i, index_t j) const
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(i, j);
+          return this->operator()<DefaultCapabilities>(i, j);
         }
 
         template <OperatorCapability Cap>

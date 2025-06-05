@@ -60,25 +60,25 @@ namespace matx
           MATX_STATIC_ASSERT_STR(Op::Rank() == 1, matxInvalidDim, "Input operator must be rank 1");
         };
 
-        template <ElementsPerThread EPT>
+        template <typename CapType>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t idx) const
         {
-          if constexpr (EPT == ElementsPerThread::ONE) {
+          if constexpr (CapType::ept == ElementsPerThread::ONE) {
             // Horner's method for computing polynomial
-            value_type ttl{get_value<EPT>(coeffs_, 0)};
+            value_type ttl{get_value<CapType>(coeffs_, 0)};
             for(int i = 1; i < coeffs_.Size(0); i++) {
-                ttl = ttl * get_value<EPT>(op_, idx) + get_value<EPT>(coeffs_, i);
+                ttl = ttl * get_value<CapType>(op_, idx) + get_value<CapType>(coeffs_, i);
             }
 
             return ttl;
           } else {
-            return Vector<value_type, static_cast<index_t>(EPT)>{};
+            return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
           }
         }
 
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t idx) const
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(idx);
+          return this->operator()<DefaultCapabilities>(idx);
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()

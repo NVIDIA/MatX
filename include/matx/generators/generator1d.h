@@ -59,14 +59,14 @@ namespace matx
           }
         }
 
-        template <detail::ElementsPerThread EPT, typename... Is>
+        template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const {
-          return f_.template operator()<EPT>(pp_get<Dim>(indices...));
+          return f_.template operator()<CapType>(pp_get<Dim>(indices...));
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const {
-          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+          return this->operator()<DefaultCapabilities>(indices...);
         }
 
         constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const

@@ -51,18 +51,18 @@ namespace matx
       __MATX_INLINE__ std::string str() const { return  "constval"; }
       ConstVal(ShapeType &&s, T val) : s_(std::forward<ShapeType>(s)), v_(val){};
 
-      template <ElementsPerThread EPT, typename... Is>
+      template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is...) const { 
-          if constexpr (EPT == ElementsPerThread::ONE) {
+          if constexpr (CapType::ept == ElementsPerThread::ONE) {
             return v_;
           } else {
-            return Vector<value_type, static_cast<index_t>(EPT)>{v_};
+            return Vector<value_type, static_cast<index_t>(CapType::ept)>{v_};
           }
         }
 
       template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is...) const { 
-          return this->operator()<detail::ElementsPerThread::ONE>();
+          return this->operator()<DefaultCapabilities>();
         }
 
       constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const {

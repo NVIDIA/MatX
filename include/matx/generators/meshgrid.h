@@ -67,20 +67,20 @@ namespace matx
             }
           }
 
-          template <detail::ElementsPerThread EPT, typename... Is>
+          template <typename CapType, typename... Is>
           __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const {
 
             cuda::std::array<index_t, Rank()> inds{indices...};
             // get index for the axis
             auto ind = inds[AXIS];
             // look up value for the axis
-            auto val = get_value<EPT>(t1_, ind);
+            auto val = get_value<CapType>(t1_, ind);
             return val;
           }
 
           template <typename... Is>
           __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const {
-            return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+            return this->operator()<DefaultCapabilities>(indices...);
           }
 
           __MATX_INLINE__  __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const {

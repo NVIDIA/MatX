@@ -64,13 +64,13 @@ namespace matx
         MATX_ASSERT_COMPATIBLE_OP_SIZES(r);
       }
 
-        template <ElementsPerThread EPT, typename... Is>
+        template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
         {
-          if constexpr (EPT == ElementsPerThread::ONE) {
-            [[maybe_unused]] auto theta = get_value<EPT>(theta_, indices...);
-            [[maybe_unused]] auto phi = get_value<EPT>(phi_, indices...);
-            auto r = get_value<EPT>(r_, indices...);
+          if constexpr (CapType::ept == ElementsPerThread::ONE) {
+            [[maybe_unused]] auto theta = get_value<CapType>(theta_, indices...);
+            [[maybe_unused]] auto phi = get_value<CapType>(phi_, indices...);
+            auto r = get_value<CapType>(r_, indices...);
 
             if constexpr (WHICH==0) { // X
               return r * (scalar_internal_cos(phi) * scalar_internal_cos(theta));
@@ -80,14 +80,14 @@ namespace matx
               return r * scalar_internal_sin(phi);
             }
           } else {
-            return Vector<value_type, static_cast<index_t>(EPT)>{};
+            return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
           }
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+          return this->operator()<DefaultCapabilities>(indices...);
         }
 
         template <typename ShapeType, typename Executor>

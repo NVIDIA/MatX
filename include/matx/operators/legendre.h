@@ -99,10 +99,10 @@ namespace matx
           static_assert(get_rank<T2>() <= 1, "legendre op:  m must be a scalar, rank 0 or 1 operator");
         }
 
-        template <ElementsPerThread EPT, typename... Is>
+        template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
         {
-          if constexpr (EPT == ElementsPerThread::ONE) {
+          if constexpr (CapType::ept == ElementsPerThread::ONE) {
             cuda::std::array<index_t, Rank()> inds{indices...};
             cuda::std::array<index_t, T3::Rank()> xinds{};
 
@@ -140,10 +140,10 @@ namespace matx
             };
 
             auto x = get_value<ElementsPerThread::ONE>(in_, xinds);
-            if constexpr (EPT != ElementsPerThread::ONE) {
-              Vector<value_type, static_cast<int>(EPT)> ret;
+            if constexpr (CapType::ept != ElementsPerThread::ONE) {
+              Vector<value_type, CapType::ept> ret;
               #pragma unroll
-              for (int e = 0; e < static_cast<int>(EPT); ++e) {
+              for (int e = 0; e < CapType::ept; ++e) {
                 ret.data[e] = lret(GetVectorVal(n, e), GetVectorVal(m, e), GetVectorVal(x, e));
               }
 
@@ -153,14 +153,14 @@ namespace matx
               return lret(n, m, x);
             }
           } else {
-            return Vector<value_type, static_cast<int>(EPT)>{};
+            return Vector<value_type, CapType::ept>{};
           }
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+          return this->operator()<DefaultCapabilities>(indices...);
         }
 
         template <OperatorCapability Cap>

@@ -77,19 +77,19 @@ namespace matx {
   }
 
 
-  template <typename input_type, ElementsPerThread EPT, int size, typename Op, typename... Is>
+  template <typename input_type, typename CapType, int size, typename Op, typename... Is>
   __MATX_INLINE__ __MATX_DEVICE__ auto RunDxFFT(const Op &op, Is... indices) {
     __syncthreads();
 
-    __shared__  Vector<input_type, static_cast<int>(EPT)> thread_data[size];
-    thread_data[threadIdx.x] = op.template operator()<EPT>(indices...);
+    __shared__  Vector<input_type, static_cast<int>(CapType::ept)> thread_data[size];
+    thread_data[threadIdx.x] = op.template operator()<CapType>(indices...);
     __syncthreads();
 
     using FFT = decltype(cufftdx::Block() + cufftdx::Size<size>() + cufftdx::Type<cufftdx::fft_type::c2c>() +
                 cufftdx::Direction<cufftdx::fft_direction::forward>() + cufftdx::Precision<float>() +
-                cufftdx::FFTsPerBlock<1>() + cufftdx::SM<800>() + cufftdx::ElementsPerThread<static_cast<int>(EPT)>());
+                cufftdx::FFTsPerBlock<1>() + cufftdx::SM<800>() + cufftdx::ElementsPerThread<static_cast<int>(CapType::ept)>());
 
-    //auto thread_data = a_.template operator()<EPT>(indices...);
+    //auto thread_data = a_.template operator()<CapType>(indices...);
     //extern __shared__ __align__(alignof(float2)) input_type shared_mem[];
     FFT().execute(&thread_data[0]);
     return thread_data[threadIdx.x];  

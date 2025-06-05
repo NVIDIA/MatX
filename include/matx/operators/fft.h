@@ -138,34 +138,34 @@ namespace matx
           }
         }
                   
-        template <detail::ElementsPerThread EPT, typename... Is>
+        template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          // cuFFTDx Doesn't support EPT == 1
-          if constexpr (EPT == detail::ElementsPerThread::ONE || EPT == detail::ElementsPerThread::THIRTY_TWO) {
-            return tmp_out_.template operator()<EPT>(indices...);
+          // cuFFTDx Doesn't support CapType::ept == 1
+          if constexpr (CapType::ept == detail::ElementsPerThread::ONE || CapType::ept == detail::ElementsPerThread::THIRTY_TWO) {
+            return tmp_out_.template operator()<CapType>(indices...);
           }
           else {
 #if defined(__CUDA_ARCH__) && defined(__CUDACC_RTC__)
-            return detail::RunDxFFT<input_type, EPT, 16>(a_, indices...);
+            return detail::RunDxFFT<input_type, CapType, 16>(a_, indices...);
             // __syncthreads();
-            // using in_vec_type = decltype(a_.template operator()<EPT>(indices...));
+            // using in_vec_type = decltype(a_.template operator()<CapType>(indices...));
             // __shared__  Vector<input_type, static_cast<int>(EPT)> thread_data[16];
-            // thread_data[threadIdx.x] = a_.template operator()<EPT>(indices...);
+            // thread_data[threadIdx.x] = a_.template operator()<CapType>(indices...);
             // __syncthreads();
 
             // using FFT = decltype(cufftdx::Block() + cufftdx::Size<16>() + cufftdx::Type<cufftdx::fft_type::c2c>() +
             //             cufftdx::Direction<cufftdx::fft_direction::forward>() + cufftdx::Precision<float>() +
             //             cufftdx::FFTsPerBlock<1>() + cufftdx::SM<800>() + cufftdx::ElementsPerThread<static_cast<int>(EPT)>());
 
-            // //auto thread_data = a_.template operator()<EPT>(indices...);
+            // //auto thread_data = a_.template operator()<CapType>(indices...);
             // //extern __shared__ __align__(alignof(float2)) input_type shared_mem[];
             // printf("before %d %f%+f %f%+f \n", threadIdx.x, thread_data[threadIdx.x].data[0].real(), thread_data[threadIdx.x].data[0].imag(), thread_data[threadIdx.x].data[1].real(), thread_data[threadIdx.x].data[1].imag());
             // FFT().execute(&thread_data[0]);
             // printf("after %d %f%+f %f%+f \n", threadIdx.x, thread_data[threadIdx.x].data[0].real(), thread_data[threadIdx.x].data[0].imag(), thread_data[threadIdx.x].data[1].real(), thread_data[threadIdx.x].data[1].imag());
             // return thread_data[threadIdx.x];
 #else
-            return tmp_out_.template operator()<EPT>(indices...);
+            return tmp_out_.template operator()<CapType>(indices...);
 #endif
           }
         }
@@ -173,7 +173,7 @@ namespace matx
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+          return this->operator()<DefaultCapabilities>(indices...);
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -428,16 +428,16 @@ namespace matx
 
         
 
-        template <detail::ElementsPerThread EPT, typename... Is>
+        template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          return tmp_out_.template operator()<EPT>(indices...);
+          return tmp_out_.template operator()<CapType>(indices...);
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          return tmp_out_.template operator()<detail::ElementsPerThread::ONE>(indices...);
+          return tmp_out_.template operator()<DefaultCapabilities>(indices...);
         }        
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() {

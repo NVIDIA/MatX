@@ -57,36 +57,36 @@ namespace matx
           static_assert(T1::Rank() > 1, "flatten has no effect on tensors of rank 0 and 1");
         }
 
-        template <ElementsPerThread EPT, typename Is>
+        template <typename CapType, typename Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is id0) const 
         {
-          if constexpr (EPT == ElementsPerThread::ONE) {
+          if constexpr (CapType::ept == ElementsPerThread::ONE) {
             return *RandomOperatorIterator{op1_, id0};
           } else {
-            return Vector<value_type, static_cast<index_t>(EPT)>{};
+            return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
           }
         }
 
         template <typename Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is id0) const 
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(id0);
+          return this->operator()<DefaultCapabilities>(id0);
         }
 
-        template <ElementsPerThread EPT, typename Is>
+        template <typename CapType, typename Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is id0) 
         {
-          if constexpr (EPT == ElementsPerThread::ONE) {
+          if constexpr (CapType::ept == ElementsPerThread::ONE) {
             return *RandomOperatorOutputIterator{op1_, id0};
           } else {
-            return Vector<value_type, static_cast<index_t>(EPT)>{};
+            return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
           }
         }
 
         template <typename Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is id0) 
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(id0);
+          return this->operator()<DefaultCapabilities>(id0);
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()

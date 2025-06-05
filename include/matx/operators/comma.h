@@ -60,15 +60,15 @@ namespace matx
 
 	        __MATX_INLINE__ std::string str() const { return op1_.str() + ", " + op2_.str(); }
 
-          template <ElementsPerThread EPT, typename... Is>
+          template <typename CapType, typename... Is>
           __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator()(Is... indices) const {
-            get_value<EPT>(op1_, indices...);
-            return get_value<EPT>(op2_, indices...);
+            get_value<CapType>(op1_, indices...);
+            return get_value<CapType>(op2_, indices...);
           }
 
           template <typename... Is>
           __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator()(Is... indices) const {
-            return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+            return this->operator()<DefaultCapabilities>(indices...);
           }
 
           static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() noexcept

@@ -54,11 +54,11 @@ private:
 public:
   dctOp(O out, I in, index_t N) : out_(out), in_(in), N_(N) {}
 
-  template <ElementsPerThread EPT>
+  template <typename CapType>
   __MATX_DEVICE__ inline void operator()(index_t idx)
   {
-    const auto in_val = get_value<EPT>(in_, idx);
-    if constexpr(EPT == ElementsPerThread::ONE) {
+    const auto in_val = get_value<CapType>(in_, idx);
+    if constexpr(CapType::ept == ElementsPerThread::ONE) {
       out_(idx) =
           in_(idx).real() * 2.0f * cuda::std::cos(-1 * M_PI * idx / (2.0 * N_)) -
           in_(idx).imag() * 2.0f * cuda::std::sin(-1 * M_PI * idx / (2.0 * N_));
@@ -67,7 +67,7 @@ public:
 
   __MATX_DEVICE__ inline void operator()(index_t idx)
   {
-    this->operator()<detail::ElementsPerThread::ONE>(idx);
+    this->operator()<DefaultCapabilities>(idx);
   }
 
   template <OperatorCapability Cap>

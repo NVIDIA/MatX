@@ -376,13 +376,13 @@ namespace detail {
        * @tparam Is Index type
        * @param indices Index values
        */
-      template <ElementsPerThread EPT, typename... Is>
+      template <typename CapType, typename... Is>
       __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator()([[maybe_unused]] Is... indices) const
       {
-        Vector<T, static_cast<int>(EPT)> val;
+        Vector<T, static_cast<int>(CapType::ept)> val;
 #ifdef __CUDA_ARCH__
         #pragma unroll
-        for (int i = 0; i < static_cast<int>(EPT); ++i) {
+        for (int i = 0; i < static_cast<int>(CapType::ept); ++i) {
           if constexpr (
                        std::is_same_v<T, float>  ||
                        std::is_same_v<T, double> || 
@@ -394,7 +394,7 @@ namespace detail {
               get_random(val.data[i], &states_[0], fParams_.dist_);
             }
             else {
-              get_random(val.data[i], &states_[static_cast<int>(EPT) * GetValC<0, Is...>(cuda::std::make_tuple(indices...)) + i], fParams_.dist_);
+              get_random(val.data[i], &states_[static_cast<int>(CapType::ept) * GetValC<0, Is...>(cuda::std::make_tuple(indices...)) + i], fParams_.dist_);
              // printf("%f\n", val.data[i].real());
             }
 
@@ -411,7 +411,7 @@ namespace detail {
               get_randomi(val.data[i], &states_[0], iParams_.min_, iParams_.max_);
             }
             else {
-              get_randomi(val.data[i], &states_[static_cast<int>(EPT) * GetValC<0, Is...>(cuda::std::make_tuple(indices...)) + i], iParams_.min_, iParams_.max_);
+              get_randomi(val.data[i], &states_[static_cast<int>(CapType::ept) * GetValC<0, Is...>(cuda::std::make_tuple(indices...)) + i], iParams_.min_, iParams_.max_);
             }          
           }
         }
@@ -427,46 +427,45 @@ namespace detail {
           
           if (fParams_.dist_ == UNIFORM) {
             if constexpr (std::is_same_v<T, float>) {
-              curandGenerateUniform(gen_, &val.data[0], static_cast<int>(EPT));
+              curandGenerateUniform(gen_, &val.data[0], static_cast<int>(CapType::ept));
             }
             else if constexpr (std::is_same_v<T, double>) {
-              curandGenerateUniformDouble(gen_, &val.data[0], static_cast<int>(EPT));
+              curandGenerateUniformDouble(gen_, &val.data[0], static_cast<int>(CapType::ept));
             }
             else if constexpr (std::is_same_v<T, cuda::std::complex<float>>) {
-              printf("in here\n");
-              curandGenerateUniform(gen_, reinterpret_cast<float*>(&val.data[0]), static_cast<int>(EPT) * 2);
+              curandGenerateUniform(gen_, reinterpret_cast<float*>(&val.data[0]), static_cast<int>(CapType::ept) * 2);
             }
             else if constexpr (std::is_same_v<T, cuda::std::complex<double>>) {
-              curandGenerateUniformDouble(gen_, reinterpret_cast<double*>(&val.data[0]), static_cast<int>(EPT) * 2);
+              curandGenerateUniformDouble(gen_, reinterpret_cast<double*>(&val.data[0]), static_cast<int>(CapType::ept) * 2);
             }
 
             #pragma unroll
-            for (int i = 0; i < static_cast<int>(EPT); ++i) {
+            for (int i = 0; i < CapType::ept; ++i) {
               val.data[i] = fParams_.alpha_ * val.data[i] + fParams_.beta_;
             }
           }
           else if (fParams_.dist_ == NORMAL) {
             if constexpr (std::is_same_v<T, float>) {
-              curandGenerateNormal(gen_, &val.data[0], static_cast<int>(EPT), fParams_.beta_, fParams_.alpha_);
+              curandGenerateNormal(gen_, &val.data[0], static_cast<int>(CapType::ept), fParams_.beta_, fParams_.alpha_);
             }
             else if constexpr (std::is_same_v<T, double>) {
-              curandGenerateNormalDouble(gen_, &val.data[0], static_cast<int>(EPT), fParams_.beta_, fParams_.alpha_);
+              curandGenerateNormalDouble(gen_, &val.data[0], static_cast<int>(CapType::ept), fParams_.beta_, fParams_.alpha_);
             }
             else if constexpr (std::is_same_v<T, cuda::std::complex<float>>) {
-              curandGenerateNormal(gen_, reinterpret_cast<float*>(&val.data[0]), static_cast<int>(EPT) * 2, fParams_.beta_, fParams_.alpha_);
+              curandGenerateNormal(gen_, reinterpret_cast<float*>(&val.data[0]), static_cast<int>(CapType::ept) * 2, fParams_.beta_, fParams_.alpha_);
             }
             else if constexpr (std::is_same_v<T, cuda::std::complex<double>>) {
-              curandGenerateNormalDouble(gen_, reinterpret_cast<double*>(&val.data[0]), static_cast<int>(EPT) * 2, fParams_.beta_, fParams_.alpha_);
+              curandGenerateNormalDouble(gen_, reinterpret_cast<double*>(&val.data[0]), static_cast<int>(CapType::ept) * 2, fParams_.beta_, fParams_.alpha_);
             }
 
             #pragma unroll
-            for (int i = 0; i < static_cast<int>(EPT); ++i) {
+            for (int i = 0; i < static_cast<int>(CapType::ept); ++i) {
               val.data[i] = fParams_.alpha_ * val.data[i] + fParams_.beta_;
             }
           }
           else {
             #pragma unroll
-            for (int i = 0; i < static_cast<int>(EPT); ++i) {
+            for (int i = 0; i < static_cast<int>(CapType::ept); ++i) {
               val.data[i] = 0;
             }
           }
@@ -479,7 +478,7 @@ namespace detail {
                          )
         {
           #pragma unroll
-          for (int i = 0; i < static_cast<int>(EPT); ++i) {
+          for (int i = 0; i < static_cast<int>(CapType::ept); ++i) {
             float fScale;
             curandGenerateUniform(gen_, &fScale, 1);
                     
@@ -490,8 +489,7 @@ namespace detail {
           }
         }
 #endif
-        if constexpr (EPT == ElementsPerThread::ONE) {
-          printf("one\n");
+        if constexpr (CapType::ept == ElementsPerThread::ONE) {
           return val.data[0];
         }
         else {

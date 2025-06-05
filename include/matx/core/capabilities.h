@@ -209,5 +209,13 @@ namespace detail {
     }
   }
 
+  template <ElementsPerThread EPT, bool JIT>
+  struct CapabilityParams {
+    static constexpr ElementsPerThread ept = EPT;
+    static constexpr bool jit = JIT;
+  };
+
+  using DefaultCapabilities = CapabilityParams<ElementsPerThread::ONE, false>;
+
 } // namespace detail
 } // namespace matx 

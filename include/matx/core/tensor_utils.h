@@ -407,20 +407,20 @@ namespace matx
     /**
      * @brief Get the matx value object using broadcasting
      *
-     * @tparam EPT Elements Per Thread
+     * @tparam CapType Capability type
      * @tparam T type of operator
      * @tparam Is type of indices
      * @param i operator
      * @param indices indices
      * @return Value after broadcasting
      */
-    template <ElementsPerThread EPT, typename T, typename... Is, std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>
+    template <typename CapType, typename T, typename... Is, std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_matx_value(T &&i, Is... indices)
     {
       constexpr int RANK = remove_cvref_t<T>::Rank();
       if constexpr (RANK == int(sizeof...(Is)) || RANK == matxNoRank) {
         // If we're only indexing with the same number of arguments as the rank of the operator, just return operator()
-        return cuda::std::forward<T>(i).template operator()<EPT>(indices...);
+        return cuda::std::forward<T>(i).template operator()<CapType>(indices...);
       }
       else
       {
@@ -433,19 +433,19 @@ namespace matx
         auto tup = cuda::std::make_tuple(indices...);
         auto sliced_tup = select_tuple(std::forward<decltype(tup)>(tup), seq{});
         return cuda::std::apply([&](auto... args) {
-          return cuda::std::forward<T>(i).template operator()<EPT>(args...);
+          return cuda::std::forward<T>(i).template operator()<CapType>(args...);
         }, sliced_tup);
       }
     }
 
-    template <ElementsPerThread EPT, typename T, typename IdxType, size_t N>
+    template <typename CapType, typename T, typename IdxType, size_t N>
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_matx_value(T &&i, const cuda::std::array<IdxType, N> idx)
     {
       constexpr int RANK = remove_cvref_t<T>::Rank();
       if constexpr (RANK == N || RANK == matxNoRank) {
         // If we're only indexing with the same number of arguments as the rank of the operator, just return operator()
         return cuda::std::apply([&i](auto... args) -> decltype(auto) {
-          return cuda::std::forward<T>(i).template operator()<EPT>(args...);
+          return cuda::std::forward<T>(i).template operator()<CapType>(args...);
         }, idx);        
       }
       else
@@ -453,18 +453,18 @@ namespace matx
         cuda::std::array<index_t, RANK> nbc_idx; // non-broadcast indices
         cuda::std::copy(idx.begin() + (N - RANK), idx.end(), nbc_idx.begin());
         return cuda::std::apply([&i](auto... args) -> decltype(auto) {
-          return cuda::std::forward<T>(i).template operator()<EPT>(args...);
+          return cuda::std::forward<T>(i).template operator()<CapType>(args...);
         }, nbc_idx);
       }
     }    
 
 
-    template <ElementsPerThread EPT, typename T, typename... Is, std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>
+    template <typename CapType, typename T, typename... Is, std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_value(T &&i, Is... indices)
     {
       if constexpr (is_matx_op<T>())
       {
-        return get_matx_value<EPT>(cuda::std::forward<T>(i), indices...);
+        return get_matx_value<CapType>(cuda::std::forward<T>(i), indices...);
       }
       else
       {
@@ -473,12 +473,12 @@ namespace matx
     }
 
 
-    template <ElementsPerThread EPT, typename T, typename IdxType, size_t N>
+    template <typename CapType, typename T, typename IdxType, size_t N>
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_value(T &&i, const cuda::std::array<IdxType, N> idx)
     {
       if constexpr (is_matx_op<T>())
       {
-        return get_matx_value<EPT, T, IdxType, N>(cuda::std::forward<T>(i), idx);
+        return get_matx_value<CapType, T, IdxType, N>(cuda::std::forward<T>(i), idx);
       }
       else
       {

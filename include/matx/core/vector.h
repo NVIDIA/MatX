@@ -93,25 +93,6 @@ template< class T >
 inline constexpr bool is_vector_v = detail::is_vector<typename remove_cvref<T>::type>::value;
 
 
-template <typename T, int EPT, typename = void>
-struct vector_or_scalar_impl {
-  using type = Vector<T, EPT>;
-};
-
-template <typename T, int EPT>
-struct vector_or_scalar_impl<T, EPT, std::enable_if_t<is_vector_v<T> && EPT != 1>> {
-  using type = T;
-};
-
-template <typename T, int EPT>
-struct vector_or_scalar_impl<T, EPT, std::enable_if_t<!is_vector_v<T> && EPT == 1>> {
-  using type = T;
-};
-
-template <typename T, int EPT>
-using vector_or_scalar_t = typename vector_or_scalar_impl<T, EPT>::type;
-
-
 
 
 template <typename V>

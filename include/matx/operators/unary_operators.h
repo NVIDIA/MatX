@@ -87,17 +87,17 @@ namespace matx
         }, idx);
     }
 
-    template <ElementsPerThread EPT, typename... Is, std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>
+    template <typename CapType, typename... Is, std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
     {
-      auto i1 = get_value<EPT>(in1_, indices...);
-      return op_.template operator()<EPT>(i1);
+      auto i1 = get_value<CapType>(in1_, indices...);
+      return op_.template operator()<CapType>(i1);
     }
 
     template <typename... Is, std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
     {
-      return this->template operator()<detail::ElementsPerThread::ONE>(indices...);
+      return this->template operator()<DefaultCapabilities>(indices...);
     }
 
     template <OperatorCapability Cap>

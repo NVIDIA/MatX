@@ -78,7 +78,7 @@ namespace matx
           }
         }
 
-        template <detail::ElementsPerThread EPT, typename... Is>
+        template <typename CapType, typename... Is>
         __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(Is... indices) const { 
           static_assert(sizeof...(indices) == NUM_RC, "Number of indices incorrect in linspace");
           cuda::std::array idx{indices...};
@@ -95,7 +95,7 @@ namespace matx
 
         template <typename... Is>
         __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(Is... indices) const { 
-          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+          return this->operator()<DefaultCapabilities>(indices...);
         }
 
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const

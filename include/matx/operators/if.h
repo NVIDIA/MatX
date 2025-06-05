@@ -99,9 +99,9 @@ namespace matx
        * @tparam Is Index types
        * @param indices Index values
        */
-      template <ElementsPerThread EPT, typename... Is>
+      template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator()(Is... indices) const {
-          if constexpr (EPT == ElementsPerThread::ONE) {
+          if constexpr (CapType::ept == ElementsPerThread::ONE) {
             if (get_value<ElementsPerThread::ONE>(cond_, indices...)) {
               get_value<ElementsPerThread::ONE>(op_, indices...);
             }
@@ -116,7 +116,7 @@ namespace matx
        */
       template <typename... Is>
         __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator()(Is... indices) const {
-          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+          return this->operator()<DefaultCapabilities>(indices...);
         }
 
       /**

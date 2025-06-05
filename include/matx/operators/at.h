@@ -55,21 +55,21 @@ namespace matx
         __MATX_INLINE__ std::string str() const { return "at()"; }
         __MATX_INLINE__ AtOp(const Op &op, Is... is) : op_(op), idx_{is...} {};
 
-        template <ElementsPerThread EPT, typename... Is2>
+        template <typename CapType, typename... Is2>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()([[maybe_unused]] Is2... indices) const
         {
-          // Only support EPT == ONE for now
-          if constexpr (EPT == ElementsPerThread::ONE) {
-            return op_.template operator()<EPT>(idx_);
+          // Only support CapType::ept == ONE for now
+          if constexpr (CapType::ept == ElementsPerThread::ONE) {
+            return op_.template operator()<CapType>(idx_);
           } else {
-            return Vector<value_type, static_cast<size_t>(EPT)>();
+            return Vector<value_type, static_cast<size_t>(CapType::ept)>();
           }
         }
 
         template <typename... Is2>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()([[maybe_unused]] Is2... indices) const
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(idx_);
+          return this->operator()<DefaultCapabilities>(idx_);
         }
 
         template <OperatorCapability Cap>

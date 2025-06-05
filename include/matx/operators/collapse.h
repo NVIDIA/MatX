@@ -69,10 +69,10 @@ namespace matx
           }
         }
 
-        template <ElementsPerThread EPT, typename Op, typename... Is>
+        template <typename CapType, typename Op, typename... Is>
         static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, Is... indices)
         {
-          if constexpr (EPT == ElementsPerThread::ONE) {
+          if constexpr (CapType::ept == ElementsPerThread::ONE) {
             // indices coming in
             cuda::std::array<index_t, Rank()> in{indices...};  // index coming in
             cuda::std::array<index_t, T1::Rank()> out;         // index going out
@@ -92,10 +92,10 @@ namespace matx
               ind /= op.Size(d);
             }
 
-            return get_value<EPT>(cuda::std::forward<Op>(op), out);
+            return get_value<CapType>(cuda::std::forward<Op>(op), out);
           }
           else {
-            return Vector<value_type, static_cast<index_t>(EPT)>{};
+            return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
           }
         }
 
@@ -105,16 +105,16 @@ namespace matx
           return get_impl<detail::ElementsPerThread::ONE>(cuda::std::forward<Op>(op), indices...);
         }
 
-        template <ElementsPerThread EPT, typename... Is>
+        template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
         {
-          return get_impl<EPT>(cuda::std::as_const(op_), indices...);
+          return get_impl<CapType>(cuda::std::as_const(op_), indices...);
         }
 
-        template <ElementsPerThread EPT, typename... Is>
+        template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
-          return get_impl<EPT>(cuda::std::forward<decltype(op_)>(op_), indices...);
+          return get_impl<CapType>(cuda::std::forward<decltype(op_)>(op_), indices...);
         }
 
         template <typename... Is>
@@ -244,10 +244,10 @@ namespace matx
           }
         }
 
-        template <ElementsPerThread EPT, typename Op, typename... Is>
+        template <typename CapType, typename Op, typename... Is>
         static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, Is... indices)
         {      
-          if constexpr (EPT == ElementsPerThread::ONE) {
+          if constexpr (CapType::ept == ElementsPerThread::ONE) {
             // indices coming in
             cuda::std::array<index_t, Rank()> in{indices...};  // index coming in
             cuda::std::array<index_t, T1::Rank()> out;         // index going out
@@ -267,10 +267,10 @@ namespace matx
               ind /= op.Size(d);
             }
 
-            return get_value<EPT>(cuda::std::forward<Op>(op), out);
+            return get_value<CapType>(cuda::std::forward<Op>(op), out);
           }
           else {
-            return Vector<value_type, static_cast<index_t>(EPT)>{};
+            return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
           }
         }  
 
@@ -280,16 +280,16 @@ namespace matx
           return get_impl<detail::ElementsPerThread::ONE>(cuda::std::forward<Op>(op), indices...);
         }
 
-        template <ElementsPerThread EPT, typename... Is>
+        template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
         {
-          return get_impl<EPT>(cuda::std::as_const(op_), indices...);
+          return get_impl<CapType>(cuda::std::as_const(op_), indices...);
         }    
 
-        template <ElementsPerThread EPT, typename... Is>
+        template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
-          return get_impl<EPT>(cuda::std::forward<decltype(op_)>(op_), indices...);
+          return get_impl<CapType>(cuda::std::forward<decltype(op_)>(op_), indices...);
         } 
 
         template <typename... Is>

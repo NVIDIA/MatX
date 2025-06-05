@@ -55,15 +55,15 @@ namespace matx
           return self_has_cap;
         }
 
-        template <detail::ElementsPerThread EPT>
+        template <typename CapType>
         __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
         {
-          return detail::ApplyGeneratorVecFunc<EPT, T>([](index_t idx) { return (-2 * (idx & 1)) + 1; }, i);
+          return detail::ApplyGeneratorVecFunc<CapType, T>([](index_t idx) { return (-2 * (idx & 1)) + 1; }, i);
         }
 
         __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(i);
+          return this->operator()<DefaultCapabilities>(i);
         }
 
         constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size([[maybe_unused]] int dim) const

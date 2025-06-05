@@ -86,36 +86,36 @@ namespace matx
           s_[0] = stride_size;
         };
 
-        template <ElementsPerThread EPT, typename Op, typename... Is>
+        template <typename CapType, typename Op, typename... Is>
         static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, index_t i0)
         {   
-          if constexpr (EPT == ElementsPerThread::ONE) {
-            return get_value<EPT>(cuda::std::forward<Op>(op), i0);
+          if constexpr (CapType::ept == ElementsPerThread::ONE) {
+            return get_value<CapType>(cuda::std::forward<Op>(op), i0);
           } else {
-            return Vector<value_type, static_cast<index_t>(EPT)>{};
+            return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
           }
         }        
 
-        template <ElementsPerThread EPT>
+        template <typename CapType>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i0, index_t i1) const
         {
-          return get_impl<EPT>(cuda::std::as_const(op_), i0*s_[0] + i1);
+          return get_impl<CapType>(cuda::std::as_const(op_), i0*s_[0] + i1);
         }
 
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i0, index_t i1) const
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(i0, i1);
+          return this->operator()<DefaultCapabilities>(i0, i1);
         }
 
-        template <ElementsPerThread EPT>
+        template <typename CapType>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i0, index_t i1)
         {
-          return get_impl<EPT>(cuda::std::forward<decltype(op_)>(op_), i0*s_[0] + i1);
+          return get_impl<CapType>(cuda::std::forward<decltype(op_)>(op_), i0*s_[0] + i1);
         }
 
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i0, index_t i1)
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(i0, i1);
+          return this->operator()<DefaultCapabilities>(i0, i1);
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()

@@ -44,7 +44,7 @@
 
 namespace matx {
 
-template <detail::ElementsPerThread EPT, typename Op>
+template <typename CapType, typename Op>
 auto nvrtc_compile_and_run(const std::string &src, const std::string &name, Op op, index_t size0, dim3 &blocks, dim3 &threads) {
 
   // jitify2::PreprocessedProgram preprog =
@@ -83,7 +83,7 @@ auto nvrtc_compile_and_run(const std::string &src, const std::string &name, Op o
       using jitify2::reflection::Type;
       using jitify2::reflection::NonType;
       //auto kernel_name = jitify2::reflection::Template("matx::detail::matxOpT1Kernel").instantiate<Type<detail::ElementsPerThread>(), Op>();
-      auto kernel_name = jitify2::reflection::Template("matx::detail::matxOpT1Kernel").instantiate(EPT, Type<Op>());
+      auto kernel_name = jitify2::reflection::Template("matx::detail::matxOpT1Kernel").instantiate<CapType, Op>();
       std::cout << "kernel name: " << kernel_name << std::endl;
       if (!preprog) {
         std::cerr << preprog.error() << std::endl;

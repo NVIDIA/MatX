@@ -118,25 +118,25 @@ namespace matx
         }
       }
 
-      template <detail::ElementsPerThread EPT, typename... Is, std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>
+      template <typename CapType, typename... Is, std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>
       __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ decltype(auto) operator()(Is... indices) const
       {
-        auto i1 = get_value<EPT>(in1_, indices...);
-        auto i2 = get_value<EPT>(in2_, indices...);
-        return op_.template operator()<EPT>(i1, i2);
+        auto i1 = get_value<CapType>(in1_, indices...);
+        auto i2 = get_value<CapType>(in2_, indices...);
+        return op_.template operator()<CapType>(i1, i2);
       }
 
       template <typename... Is, std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>
       __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ decltype(auto) operator()(Is... indices) const
       {
-        return this->template operator()<detail::ElementsPerThread::ONE>(indices...);
+        return this->template operator()<DefaultCapabilities>(indices...);
       }      
 
-      template <ElementsPerThread EPT, typename ArrayType, std::enable_if_t<is_std_array_v<ArrayType>, bool> = true>
+      template <typename CapType, typename ArrayType, std::enable_if_t<is_std_array_v<ArrayType>, bool> = true>
       __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(const ArrayType &idx) const noexcept
       {
         return cuda::std::apply([&](auto &&...args)  {
-            return this->operator()<EPT>(args...);
+            return this->operator()<CapType>(args...);
           }, idx);
       }
 

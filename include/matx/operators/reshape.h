@@ -79,10 +79,10 @@ namespace matx
           MATX_ASSERT_STR(size == TotalSize(op_), matxInvalidSize, "ReshapeOp: TotalSize of reshape must match");
         };
 
-        template <ElementsPerThread EPT, typename Op, typename... Is>
+        template <typename CapType, typename Op, typename... Is>
         static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, const decltype(sizes_) &sizes, Is... indices)
         {   
-          if constexpr (EPT == ElementsPerThread::ONE) {
+          if constexpr (CapType::ept == ElementsPerThread::ONE) {
             cuda::std::array<index_t, Rank()> inds{indices...};
             cuda::std::array<index_t, T::Rank()> ninds;
 
@@ -103,34 +103,34 @@ namespace matx
               idx /= op.Size(i);
             }   
 
-            return get_value<EPT>(cuda::std::forward<Op>(op), ninds);       
+            return get_value<CapType>(cuda::std::forward<Op>(op), ninds);       
           } else {
-            return Vector<value_type, static_cast<index_t>(EPT)>{};
+            return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
           }
         }
 
-        template <ElementsPerThread EPT, typename... Is>
+        template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
         {
-          return get_impl<EPT>(cuda::std::as_const(op_), sizes_, indices...);
+          return get_impl<CapType>(cuda::std::as_const(op_), sizes_, indices...);
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+          return this->operator()<DefaultCapabilities>(indices...);
         }
 
-        template <ElementsPerThread EPT, typename... Is>
+        template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
-          return get_impl<EPT>(cuda::std::forward<decltype(op_)>(op_), sizes_, indices...);
+          return get_impl<CapType>(cuda::std::forward<decltype(op_)>(op_), sizes_, indices...);
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+          return this->operator()<DefaultCapabilities>(indices...);
         }
 
         template <OperatorCapability Cap>

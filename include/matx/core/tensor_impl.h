@@ -897,7 +897,7 @@ MATX_IGNORE_WARNING_POP_GCC
     template <typename... Is>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T* GetPointer(Is... indices) const noexcept
     {
-      return data_.ldata_ + GetValC<detail::ElementsPerThread::ONE, 0, Is...>(cuda::std::make_tuple(indices...));
+      return data_.ldata_ + GetValC<detail::DefaultCapabilities, 0, Is...>(cuda::std::make_tuple(indices...));
     }
 
     // Locates position of an element at given indices, or returns -1 when not
@@ -994,15 +994,15 @@ MATX_IGNORE_WARNING_POP_GCC
       return desc_.IsContiguous();
     }
 
-    template <detail::ElementsPerThread EPT, int I = 0, typename ...Is>
+    template <typename CapType, int I = 0, typename ...Is>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type GetVal([[maybe_unused]] cuda::std::tuple<Is...> tup)  {
       if constexpr (I < sizeof...(Is)) {
 MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
-        if constexpr (EPT != detail::ElementsPerThread::ONE && I == sizeof...(Is) - 1) {
-          return GetVal<EPT, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(this->desc_.Stride(I) * static_cast<index_t>(EPT));
+        if constexpr (CapType::ept != detail::ElementsPerThread::ONE && I == sizeof...(Is) - 1) {
+          return GetVal<CapType, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(this->desc_.Stride(I) * static_cast<index_t>(CapType::ept));
         }
         else {
-          return GetVal<EPT, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(this->desc_.Stride(I));
+          return GetVal<CapType, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(this->desc_.Stride(I));
         }
 MATX_IGNORE_WARNING_POP_GCC
       }
@@ -1011,15 +1011,15 @@ MATX_IGNORE_WARNING_POP_GCC
       }
     }
 
-    template <detail::ElementsPerThread EPT, int I = 0, typename ...Is>
+    template <typename CapType, int I = 0, typename ...Is>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type GetValC([[maybe_unused]] const cuda::std::tuple<Is...> tup) const {
       if constexpr (I < sizeof...(Is)) {
 MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
-        if constexpr (EPT != detail::ElementsPerThread::ONE && I == sizeof...(Is) - 1) {
-          return GetValC<EPT, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(this->desc_.Stride(I) * static_cast<index_t>(EPT));
+        if constexpr (CapType::ept != detail::ElementsPerThread::ONE && I == sizeof...(Is) - 1) {
+          return GetValC<CapType, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(this->desc_.Stride(I) * static_cast<index_t>(CapType::ept));
         }
         else {
-          return GetValC<EPT, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(this->desc_.Stride(I));
+          return GetValC<CapType, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(this->desc_.Stride(I));
         }
 MATX_IGNORE_WARNING_POP_GCC
       }
@@ -1037,7 +1037,7 @@ MATX_IGNORE_WARNING_POP_GCC
      * @returns value at given index
      *
      */
-    template <detail::ElementsPerThread EPT, int M = RANK, typename... Is>
+    template <typename CapType, int M = RANK, typename... Is>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) const noexcept
     {
       static_assert(sizeof...(Is) == M, "Number of indices of operator() must match rank of tensor");
@@ -1045,14 +1045,14 @@ MATX_IGNORE_WARNING_POP_GCC
 #ifndef NDEBUG
         assert(data_.ldata_ != nullptr);
 #endif
-        constexpr int EPT_int = static_cast<int>(EPT);
-        if constexpr (EPT == detail::ElementsPerThread::ONE) {
-          return data_.ldata_[GetValC<EPT, 0, Is...>(cuda::std::make_tuple(indices...))];
+        constexpr int EPT_int = static_cast<int>(CapType::ept);
+        if constexpr (CapType::ept == detail::ElementsPerThread::ONE) {
+          return data_.ldata_[GetValC<CapType, 0, Is...>(cuda::std::make_tuple(indices...))];
         } else if constexpr (EPT_int * sizeof(T) <= MAX_VEC_WIDTH_BYTES ) {
-          return *reinterpret_cast<detail::Vector<T, EPT_int>*>(data_.ldata_ + GetValC<EPT, 0, Is...>(cuda::std::make_tuple(indices...)));
+          return *reinterpret_cast<detail::Vector<T, EPT_int>*>(data_.ldata_ + GetValC<CapType, 0, Is...>(cuda::std::make_tuple(indices...)));
         } else {
           detail::Vector<T, EPT_int> vec;
-          vec.load<EPT_int>(data_.ldata_ + GetValC<EPT, 0, Is...>(cuda::std::make_tuple(indices...)));
+          vec.load<EPT_int>(data_.ldata_ + GetValC<CapType, 0, Is...>(cuda::std::make_tuple(indices...)));
           return vec;
         }
       }
@@ -1064,7 +1064,7 @@ MATX_IGNORE_WARNING_POP_GCC
     template <int M = RANK, typename... Is>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) const noexcept
     {
-      return this->template operator()<detail::ElementsPerThread::ONE>(indices...);
+      return this->template operator()<DefaultCapabilities>(indices...);
     }    
 
     /**
@@ -1076,7 +1076,7 @@ MATX_IGNORE_WARNING_POP_GCC
      * @returns value at given index
      *
      */
-    template <detail::ElementsPerThread EPT, int M = RANK, typename... Is,
+    template <typename CapType, int M = RANK, typename... Is,
       std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) noexcept
     {
@@ -1085,14 +1085,14 @@ MATX_IGNORE_WARNING_POP_GCC
 #ifndef NDEBUG
         assert(data_.ldata_ != nullptr);
 #endif
-        constexpr int EPT_int = static_cast<int>(EPT);
-        if constexpr (EPT == detail::ElementsPerThread::ONE) {
-          return data_.ldata_[GetVal<EPT, 0, Is...>(cuda::std::make_tuple(indices...))];
+        constexpr int EPT_int = static_cast<int>(CapType::ept);
+        if constexpr (CapType::ept == detail::ElementsPerThread::ONE) {
+          return data_.ldata_[GetVal<CapType, 0, Is...>(cuda::std::make_tuple(indices...))];
         } else if constexpr (EPT_int * sizeof(T) <= MAX_VEC_WIDTH_BYTES ) {
-          return *reinterpret_cast<detail::Vector<T, EPT_int>*>(data_.ldata_ + GetVal<EPT, 0, Is...>(cuda::std::make_tuple(indices...)));
+          return *reinterpret_cast<detail::Vector<T, EPT_int>*>(data_.ldata_ + GetVal<CapType, 0, Is...>(cuda::std::make_tuple(indices...)));
         } else {
           detail::Vector<T, EPT_int> vec;
-          vec.load<EPT_int>(data_.ldata_ + GetVal<EPT, 0, Is...>(cuda::std::make_tuple(indices...)));
+          vec.load<EPT_int>(data_.ldata_ + GetVal<CapType, 0, Is...>(cuda::std::make_tuple(indices...)));
           return vec;
         }
       }
@@ -1105,14 +1105,14 @@ MATX_IGNORE_WARNING_POP_GCC
       std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) noexcept
     {
-      return this->template operator()<detail::ElementsPerThread::ONE>(indices...);
+      return this->template operator()<DefaultCapabilities>(indices...);
     }
 
-    template <ElementsPerThread EPT>
+    template <typename CapType>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(const cuda::std::array<index_t, RANK> &idx) const noexcept
     {
       return cuda::std::apply([&](auto &&...args) -> T {
-          return this->operator()<EPT>(args...);
+          return this->operator()<CapType>(args...);
         }, idx);
     }
 
@@ -1122,11 +1122,11 @@ MATX_IGNORE_WARNING_POP_GCC
      * @returns value in tensor
      *
      */
-    template <ElementsPerThread EPT>
+    template <typename CapType>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__  decltype(auto) operator()(const cuda::std::array<index_t, RANK> &idx) noexcept
     {
       return cuda::std::apply([&](auto &&...args) -> T& {
-          return this->operator()<EPT>(args...);
+          return this->operator()<CapType>(args...);
         }, idx);
     }    
 
@@ -1139,7 +1139,7 @@ MATX_IGNORE_WARNING_POP_GCC
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(const cuda::std::array<index_t, RANK> &idx) const noexcept
     {
       return cuda::std::apply([&](auto &&...args) -> T {
-          return this->operator()<detail::ElementsPerThread::ONE>(args...);
+          return this->operator()<DefaultCapabilities>(args...);
         }, idx);
     }
 
@@ -1152,7 +1152,7 @@ MATX_IGNORE_WARNING_POP_GCC
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__  decltype(auto) operator()(const cuda::std::array<index_t, RANK> &idx) noexcept
     {
       return cuda::std::apply([&](auto &&...args) -> T& {
-          return this->operator()<detail::ElementsPerThread::ONE>(args...);
+          return this->operator()<DefaultCapabilities>(args...);
         }, idx);
     }
 

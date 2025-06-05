@@ -62,10 +62,10 @@ public:
   {
   }
 
-  template <ElementsPerThread EPT>
+  template <typename CapType>
   __MATX_DEVICE__ __MATX_INLINE__ __MATX_HOST__ void operator()(index_t idy, index_t idx)
   {
-    if constexpr (EPT == ElementsPerThread::ONE) {
+    if constexpr (CapType::ept == ElementsPerThread::ONE) {
       index_t xcol = idx - (xnorm_.Size(xnorm_.Rank() - 1) - 1) + idy;
       if (xcol >= 0 && xcol < (xnorm_.Size(xnorm_.Rank() - 1))) {
         typename I1::type xnorm = xnorm_(xcol);
@@ -124,10 +124,10 @@ public:
   {
   }
 
-  template <ElementsPerThread EPT>
+  template <typename CapType>
   __MATX_DEVICE__ inline void operator()(index_t idx)
   {
-    if constexpr (EPT == ElementsPerThread::ONE) {
+    if constexpr (CapType::ept == ElementsPerThread::ONE) {
       out_(idx) =
           exp(cuda::std::complex<float>{
               0, static_cast<float>(2.0 * M_PI *
@@ -177,10 +177,10 @@ public:
   {
   }
 
-  template <ElementsPerThread EPT>
+  template <typename CapType>
   __MATX_DEVICE__ inline void operator()(index_t idx)
   {
-    if constexpr (EPT == ElementsPerThread::ONE) {
+    if constexpr (CapType::ept == ElementsPerThread::ONE) {
       out_(idx) = exp(cuda::std::complex<float>{
                       0, static_cast<float>(2.0 * M_PI * idx / fs_ * cut_)}) *
                   x_(idx);
