@@ -161,13 +161,12 @@ namespace matx
               } else if (max_ept == detail::ElementsPerThread::TWO) {
                 
 #ifdef MATX_EN_MATHDX
-              printf("Operator supports JIT\n");
-              nvrtc_compile_and_run<detail::ElementsPerThread::TWO>(matx::detail::matxOpT1JITKernelStr, "output.cu", op, sizes[0], blocks, threads);
+                printf("Operator supports JIT\n");
+                nvrtc_compile_and_run<detail::ElementsPerThread::TWO>(matx::detail::matxOpT1JITKernelStr, "output.cu", op, sizes[0], blocks, threads);
 
 #else
-              detail::matxOpT1Kernel<detail::ElementsPerThread::THIRTY_TWO><<<blocks, threads, 0, stream_>>>(op, sizes[0]);
-#endif
                 detail::matxOpT1Kernel<detail::ElementsPerThread::TWO><<<blocks, threads, 0, stream_>>>(op, sizes[0]);
+#endif
               } else if (max_ept == detail::ElementsPerThread::FOUR) {
                 detail::matxOpT1Kernel<detail::ElementsPerThread::FOUR><<<blocks, threads, 0, stream_>>>(op, sizes[0]);
               } else if (max_ept == detail::ElementsPerThread::EIGHT) {
@@ -175,7 +174,7 @@ namespace matx
               } else if (max_ept == detail::ElementsPerThread::SIXTEEN) {
                 detail::matxOpT1Kernel<detail::ElementsPerThread::SIXTEEN><<<blocks, threads, 0, stream_>>>(op, sizes[0]);
               } else if (max_ept == detail::ElementsPerThread::THIRTY_TWO) {
-            
+                detail::matxOpT1Kernel<detail::ElementsPerThread::THIRTY_TWO><<<blocks, threads, 0, stream_>>>(op, sizes[0]);
               }
             }
             else if constexpr (Op::Rank() == 2) {

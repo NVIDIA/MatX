@@ -81,6 +81,7 @@ namespace matx
           }
 
           if (detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(*tp)) {
+            printf("exec\n");
             ex.Exec(*tp);
           }
           else {

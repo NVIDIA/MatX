@@ -43,6 +43,7 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cassert>
 #include <climits>
 #include <initializer_list>
@@ -119,6 +120,24 @@
 #define JITIFY_IGNORE_NOT_TRIVIALLY_COPYABLE_ARGS 0
 #endif
 
+// Nvcc support is disabled by default.
+#ifndef JITIFY_ENABLE_NVCC
+#define JITIFY_ENABLE_NVCC 0
+#endif
+
+// Context-independent module loading is enabled by default with CUDA 12.0+.
+#ifndef JITIFY_USE_CONTEXT_INDEPENDENT_LOADING
+#if CUDA_VERSION >= 12000
+#define JITIFY_USE_CONTEXT_INDEPENDENT_LOADING 1
+#else
+#define JITIFY_USE_CONTEXT_INDEPENDENT_LOADING 0
+#endif
+#endif
+
+#if JITIFY_USE_CONTEXT_INDEPENDENT_LOADING && CUDA_VERSION < 12000
+#error JITIFY_USE_CONTEXT_INDEPENDENT_LOADING=1 requires CUDA 12.0+
+#endif
+
 #if CUDA_VERSION >= 11040 && JITIFY_USE_LIBCUFILT
 #include <nv_decode.h>  // For __cu_demangle (requires linking with libcufilt.a)
 #endif
@@ -137,6 +156,10 @@
 #include <type_traits>
 #include <unordered_set>
 
+#if __cplusplus >= 201703L
+#include <filesystem>
+#endif
+
 #if JITIFY_THREAD_SAFE
 #include <mutex>
 #define JITIFY_IF_THREAD_SAFE(x) x
@@ -151,11 +174,15 @@
 #endif
 
 #ifdef __linux__
-#include <cxxabi.h>             // For abi::__cxa_demangle
-#include <dirent.h>             // For struct dirent, opendir etc.
-#include <dlfcn.h>              // For ::dlopen, ::dlsym etc.
-#include <fcntl.h>              // For open
+#include <cxxabi.h>  // For abi::__cxa_demangle
+#include <dirent.h>  // For struct dirent, opendir etc.
+#include <dlfcn.h>   // For ::dlopen, ::dlsym etc.
+#include <fcntl.h>   // For open
+#if __cplusplus < 201703L
+#include <ftw.h>  // For ::nftw
+#endif
 #include <linux/limits.h>       // For PATH_MAX
+#include <pwd.h>                // For getpwuid
 #include <sys/stat.h>           // For stat
 #include <sys/types.h>          // For DIR etc.
 #include <unistd.h>             // For close
@@ -168,7 +195,10 @@
 #include <dbghelp.h>      // For UndecorateSymbolName
 #include <direct.h>       // For mkdir
 #include <fcntl.h>        // For open, O_RDWR etc.
+#include <fileapi.h>      // For GetTempPath2A
 #include <io.h>           // For _sopen_s
+#include <process.h>      // For _getpid
+#include <shlobj_core.h>  // For SHGetFolderPathA
 #include <stdlib.h>       // For _fullpath
 #include <sys/locking.h>  // For _LK_LOCK etc.
 #define JITIFY_PATH_MAX MAX_PATH
@@ -885,17 +915,34 @@ struct NonType {};
 // Forward declaration.
 template <typename T>
 inline std::string reflect(const T& value);
+template <typename T>
+inline std::string reflect();
 
 namespace detail {
 
+template <typename T, typename Enable = void>
+struct ValueStringImpl {
+  static std::string value(const T& x) { return std::to_string(x); }
+};
+
+template <typename T>
+struct ValueStringImpl<
+    T, typename std::enable_if<std::is_same<T, bool>::value>::type> {
+  static std::string value(const T& x) { return x ? "true" : "false"; }
+};
+
+template <typename T>
+struct ValueStringImpl<T,
+                       typename std::enable_if<std::is_enum<T>::value>::type> {
+  static std::string value(const T& x) {
+    using UnderlyingT = typename std::underlying_type<T>::type;
+    return ValueStringImpl<UnderlyingT>::value(static_cast<UnderlyingT>(x));
+  }
+};
+
 template <typename T>
 inline std::string value_string(const T& x) {
-  return std::to_string(x);
-}
-
-template <>
-inline std::string value_string<bool>(const bool& x) {
-  return x ? "true" : "false";
+  return ValueStringImpl<T>::value(x);
 }
 
 // Returns the demangled name corresponding to the given typeinfo structure.
@@ -1647,6 +1694,24 @@ class LibCuda
                              unsigned int, unsigned int, unsigned int,
                              unsigned int, unsigned int, unsigned int, CUstream,
                              void**, void**)
+#if CUDA_VERSION >= 11080
+  JITIFY_DEFINE_CUDA_WRAPPER(LaunchKernelEx, CUresult, const CUlaunchConfig*,
+                             CUfunction, void**, void**)
+#endif
+#if CUDA_VERSION >= 12000
+  JITIFY_DEFINE_CUDA_WRAPPER(LibraryLoadData, CUresult, CUlibrary*, const void*,
+                             CUjit_option*, void**, unsigned int,
+                             CUlibraryOption*, void**, unsigned int)
+  JITIFY_DEFINE_CUDA_WRAPPER(LibraryUnload, CUresult, CUlibrary)
+  JITIFY_DEFINE_CUDA_WRAPPER(LibraryGetKernel, CUresult, CUkernel*, CUlibrary,
+                             const char*)
+  JITIFY_DEFINE_CUDA_WRAPPER(LibraryGetGlobal, CUresult, CUdeviceptr*, size_t*,
+                             CUlibrary, const char*)
+  JITIFY_DEFINE_CUDA_WRAPPER(KernelSetAttribute, CUresult, CUfunction_attribute,
+                             int, CUkernel, CUdevice)
+  JITIFY_DEFINE_CUDA_WRAPPER(KernelGetAttribute, CUresult, int*,
+                             CUfunction_attribute, CUkernel, CUdevice)
+#endif
 #undef JITIFY_DEFINE_CUDA_WRAPPER
 #undef JITIFY_STR
 #undef JITIFY_STR_IMPL
@@ -1874,13 +1939,32 @@ inline LibNvJitLink& nvjitlink() {
 
 class Kernel;
 
+#if JITIFY_USE_CONTEXT_INDEPENDENT_LOADING
+using CudaModule = CUlibrary;
+#else
+using CudaModule = CUmodule;
+#endif
+
 struct CudaModuleDestructor {
-  void operator()(CUmodule module) const {
-    if (module) cuda().ModuleUnload()(module);
+  void operator()(CudaModule module) const {
+    if (module) {
+      // Note: If this call fails with "Failed to find dynamic symbol
+      // cuLibraryUnload", it probably means the cuda() singleton was already
+      // destructed, which means it was constructed _after_ a static loaded
+      // program. ProgramCache explicitly calls cuda() in its constructor to
+      // avoid this problem, but there is a small chance that users could run
+      // into it if, e.g., they use a non-trivial static wrapper around a cache.
+      // This only seems to occur in non-optimized builds (e.g., not using -O3).
+#if JITIFY_USE_CONTEXT_INDEPENDENT_LOADING
+      cuda().LibraryUnload()(module);
+#else
+      cuda().ModuleUnload()(module);
+#endif
+    }
   }
 };
-using UniqueCudaModule =
-    std::unique_ptr<std::remove_pointer<CUmodule>::type, CudaModuleDestructor>;
+using UniqueCudaModule = std::unique_ptr<std::remove_pointer<CudaModule>::type,
+                                         CudaModuleDestructor>;
 
 /*! An object containing a CUDA module that has been loaded into a CUDA context,
  *    along with other metadata.
@@ -1920,7 +2004,7 @@ class LoadedProgramData {
       : data_(new Data{std::move(module), std::move(lowered_name_map)}) {}
 
   /*! Get the CUDA module of the loaded program. */
-  CUmodule module() const { return data_->module.get(); }
+  CudaModule module() const { return data_->module.get(); }
   /*! Get the map of name expressions to lowered (mangled) symbol names. */
   const StringMap& lowered_name_map() const { return data_->lowered_name_map; }
 
@@ -1948,8 +2032,13 @@ class LoadedProgramData {
       symbol_name = iter->second;  // Replace name with lowered name.
     }
     if (!cuda()) JITIFY_THROW_OR_RETURN(cuda().error());
+#if JITIFY_USE_CONTEXT_INDEPENDENT_LOADING
+    JITIFY_THROW_OR_RETURN_IF_CUDA_ERROR(
+        cuda().LibraryGetGlobal()(ptr, size, module(), symbol_name.c_str()));
+#else
     JITIFY_THROW_OR_RETURN_IF_CUDA_ERROR(
         cuda().ModuleGetGlobal()(ptr, size, module(), symbol_name.c_str()));
+#endif
     return {};
   }
 
@@ -2041,6 +2130,12 @@ struct Dim3 {
   constexpr Dim3(const V3& v3) : x(v3.x), y(v3.y), z(v3.z) {}
 };
 
+#if JITIFY_USE_CONTEXT_INDEPENDENT_LOADING
+using CudaFunction = CUkernel;
+#else
+using CudaFunction = CUfunction;
+#endif
+
 /*! An object containing a loaded CUDA kernel and associated metadata.
  */
 class KernelData {
@@ -2048,19 +2143,19 @@ class KernelData {
   // needing to outlive the kernel object. The program uses a shared_ptr
   // internally, so this is cheap.
   LoadedProgramData program_;
-  CUfunction function_ = nullptr;
+  CudaFunction function_ = nullptr;
   std::string lowered_name_;
 
  public:
   KernelData() = default;
-  KernelData(LoadedProgramData program, CUfunction function,
+  KernelData(LoadedProgramData program, CudaFunction function,
              std::string lowered_name = {})
       : program_(std::move(program)),
         function_(function),
         lowered_name_(std::move(lowered_name)) {}
 
   /*! Get the CUDA function object of the kernel. */
-  CUfunction function() const { return function_; }
+  CudaFunction function() const { return function_; }
   /*! Get the lowered (mangled) name of the kernel. */
   const std::string& lowered_name() const { return lowered_name_; }
   /*! Get the program that contains the kernel. */
@@ -2069,27 +2164,53 @@ class KernelData {
   /*! Set an attribute of the kernel.
    *  \param attribute The attribute identifier.
    *  \param value The value to set.
+   *  \param device The device on which to set the attribute. Only used when
+   *    JITIFY_USE_CONTEXT_INDEPENDENT_LOADING=1. Defaults to the current
+   *    context's device.
    *  \return An empty string on success, otherwise an error message.
    *  \warning Though this is a const method, it results in a change of state
    *    that may affect shared references to the kernel. Care should be taken
    *    when using this from multiple threads.
    */
-  ErrorMsg set_attribute(CUfunction_attribute attribute, int value) const {
+  ErrorMsg set_attribute(CUfunction_attribute attribute, int value,
+                         CUdevice device = -1) const {
     if (!cuda()) JITIFY_THROW_OR_RETURN(cuda().error());
+#if JITIFY_USE_CONTEXT_INDEPENDENT_LOADING
+    if (device == -1) {
+      JITIFY_THROW_OR_RETURN_IF_CUDA_ERROR(cuda().CtxGetDevice()(&device));
+    }
+    JITIFY_THROW_OR_RETURN_IF_CUDA_ERROR(
+        cuda().KernelSetAttribute()(attribute, value, function_, device));
+#else
+    (void)device;
     JITIFY_THROW_OR_RETURN_IF_CUDA_ERROR(
         cuda().FuncSetAttribute()(function_, attribute, value));
+#endif
     return {};
   }
 
   /*! Get an attribute of the kernel.
    *  \param attribute The attribute identifier.
    *  \param value Pointer to where the result value should be written.
+   *  \param device The device from which to get the attribute. Only used when
+   *    JITIFY_USE_CONTEXT_INDEPENDENT_LOADING=1. Defaults to the current
+   *    context's device.
    *  \return An empty string on success, otherwise an error message.
    */
-  ErrorMsg get_attribute(CUfunction_attribute attribute, int* value) const {
+  ErrorMsg get_attribute(CUfunction_attribute attribute, int* value,
+                         CUdevice device = -1) const {
     if (!cuda()) JITIFY_THROW_OR_RETURN(cuda().error());
+#if JITIFY_USE_CONTEXT_INDEPENDENT_LOADING
+    if (device == -1) {
+      JITIFY_THROW_OR_RETURN_IF_CUDA_ERROR(cuda().CtxGetDevice()(&device));
+    }
+    JITIFY_THROW_OR_RETURN_IF_CUDA_ERROR(
+        cuda().KernelGetAttribute()(value, attribute, function_, device));
+#else
+    (void)device;
     JITIFY_THROW_OR_RETURN_IF_CUDA_ERROR(
         cuda().FuncGetAttribute()(value, attribute, function_));
+#endif
     return {};
   }
 
@@ -2146,10 +2267,15 @@ inline Kernel Kernel::get_kernel(LoadedProgramData program, std::string name) {
   if (iter != program.lowered_name_map().end()) {
     name = iter->second;  // Replace name with lowered name.
   }
-  CUfunction function;
+  CudaFunction function;
   if (!cuda()) return Error(cuda().error());
+#if JITIFY_USE_CONTEXT_INDEPENDENT_LOADING
+  CUresult ret =
+      cuda().LibraryGetKernel()(&function, program.module(), name.c_str());
+#else
   CUresult ret =
       cuda().ModuleGetFunction()(&function, program.module(), name.c_str());
+#endif
   if (ret != CUDA_SUCCESS) {
     return Error("get_kernel with name=\"" + name +
                  "\" failed: " + detail::get_cuda_error_string(ret));
@@ -2187,17 +2313,30 @@ class ConfiguredKernelData {
   Dim3 block_;
   unsigned int shared_memory_bytes_ = 0;
   CUstream stream_ = 0;
+#if CUDA_VERSION >= 11080
+  std::vector<CUlaunchAttribute> attrs_;
+#endif
 
  public:
   ConfiguredKernelData() = default;
   ConfiguredKernelData(KernelData kernel, Dim3 grid, Dim3 block,
-                       unsigned int shared_memory_bytes = 0,
-                       CUstream stream = 0)
+                       unsigned int shared_memory_bytes = 0, CUstream stream = 0
+#if CUDA_VERSION >= 11080
+                       ,
+                       std::vector<CUlaunchAttribute> attrs = {}
+#endif
+                       )
       : kernel_(std::move(kernel)),
         grid_(std::move(grid)),
         block_(std::move(block)),
         shared_memory_bytes_(shared_memory_bytes),
-        stream_(stream) {}
+        stream_(stream)
+#if CUDA_VERSION >= 11080
+        ,
+        attrs_(std::move(attrs))
+#endif
+  {
+  }
 
   /*! Get the underlying kernel object. */
   const KernelData& kernel() const { return kernel_; }
@@ -2209,6 +2348,43 @@ class ConfiguredKernelData {
   unsigned int shared_memory_bytes() const { return shared_memory_bytes_; }
   /*! Get the configured CUDA stream. */
   CUstream stream() const { return stream_; }
+
+#if CUDA_VERSION >= 11080
+  /*! Get the configured launch attributes. */
+  const std::vector<CUlaunchAttribute>& attrs() const { return attrs_; }
+
+  /*! Convenience method to return a copy with an additional launch attribute.
+   */
+  ConfiguredKernel with_attribute(CUlaunchAttribute extra_attr) const;
+
+  /*! Convenience method to return a copy with the given cluster dimensions. */
+  ConfiguredKernel with_cluster(Dim3 cluster) const;
+
+  /*! Convenience method to return a copy with cooperative enabled/disabled. */
+  ConfiguredKernel with_cooperative(bool enabled) const;
+
+  // TODO: May be useful to add convenience methods for other launch attributes
+  // too.
+
+  /*! Conversion to CUlaunchConfig structure.
+   *  \warning The returned structure must not outlive *this, because it holds a
+   *    non-owning pointer to the launch attrs data owned by *this.
+   */
+  CUlaunchConfig as_CUlaunchConfig() const {
+    CUlaunchConfig config = {};
+    config.gridDimX = grid_.x;
+    config.gridDimY = grid_.y;
+    config.gridDimZ = grid_.z;
+    config.blockDimX = block_.x;
+    config.blockDimY = block_.y;
+    config.blockDimZ = block_.z;
+    config.sharedMemBytes = shared_memory_bytes_;
+    config.hStream = stream_;
+    config.attrs = const_cast<CUlaunchAttribute*>(attrs_.data());
+    config.numAttrs = static_cast<unsigned int>(attrs_.size());
+    return config;
+  }
+#endif  // CUDA_VERSION >= 11080
 
   // overload below. E.g., passing void*const* silently fails.
   /*! Launch the configured kernel.
@@ -2235,9 +2411,23 @@ class ConfiguredKernelData {
    */
   ErrorMsg launch_raw(void** arg_ptrs) const {
     if (!cuda()) JITIFY_THROW_OR_RETURN(cuda().error());
-    JITIFY_THROW_OR_RETURN_IF_CUDA_ERROR(cuda().LaunchKernel()(
-        kernel_.function(), grid_.x, grid_.y, grid_.z, block_.x, block_.y,
-        block_.z, shared_memory_bytes_, stream_, arg_ptrs, nullptr));
+#if CUDA_VERSION >= 11080
+    const CUlaunchConfig config = as_CUlaunchConfig();
+    if (cuda().LaunchKernelEx()) {
+      JITIFY_THROW_OR_RETURN_IF_CUDA_ERROR(cuda().LaunchKernelEx()(
+          &config, (CUfunction)kernel_.function(), arg_ptrs, nullptr));
+    } else {
+      if (attrs_.size() != 0) {
+        JITIFY_THROW_OR_RETURN("Launch attributes require at least CUDA 11.8");
+      }
+#endif
+      JITIFY_THROW_OR_RETURN_IF_CUDA_ERROR(cuda().LaunchKernel()(
+          (CUfunction)kernel_.function(), grid_.x, grid_.y, grid_.z, block_.x,
+          block_.y, block_.z, shared_memory_bytes_, stream_, arg_ptrs,
+          nullptr));
+#if CUDA_VERSION >= 11080
+    }
+#endif
     return {};
   }
 
@@ -2247,6 +2437,38 @@ class ConfiguredKernelData {
    */
   ErrorMsg launch_raw(const std::vector<void*>& arg_ptrs) const {
     return launch_raw(const_cast<void**>(arg_ptrs.data()));
+  }
+
+  /*! Launch the configured kernel.
+   *  \param args_buf Packed buffer of kernel arguments. Note that the format of
+   *    this is kernel-specific and may not follow standard alignment/padding
+   *    rules.
+   *  \param args_buf_size Size in bytes of `args_buf`.
+   *  \return An empty string on success, otherwise an error message.
+   */
+  ErrorMsg launch_buffer(const void* args_buf, size_t args_buf_size) const {
+    void* extra[] = {
+        CU_LAUNCH_PARAM_BUFFER_POINTER, const_cast<void*>(args_buf),
+        CU_LAUNCH_PARAM_BUFFER_SIZE,
+        const_cast<void*>(static_cast<const void*>(&args_buf_size)),
+        CU_LAUNCH_PARAM_END};
+#if CUDA_VERSION >= 11080
+    const CUlaunchConfig config = as_CUlaunchConfig();
+    if (cuda().LaunchKernelEx()) {
+      JITIFY_THROW_OR_RETURN_IF_CUDA_ERROR(cuda().LaunchKernelEx()(
+          &config, (CUfunction)kernel_.function(), nullptr, extra));
+    } else {
+      if (attrs_.size() != 0) {
+        JITIFY_THROW_OR_RETURN("Launch attributes require at least CUDA 11.8");
+      }
+#endif
+      JITIFY_THROW_OR_RETURN_IF_CUDA_ERROR(cuda().LaunchKernel()(
+          (CUfunction)kernel_.function(), grid_.x, grid_.y, grid_.z, block_.x,
+          block_.y, block_.z, shared_memory_bytes_, stream_, nullptr, extra));
+#if CUDA_VERSION >= 11080
+    }
+#endif
+    return {};
   }
 
   /*! Launch the configured kernel.
@@ -2318,8 +2540,8 @@ inline ConfiguredKernel ConfiguredKernel::configure_1d_max_occupancy(
   int grid, block;
   if (!cuda()) return Error(cuda().error());
   CUresult ret = cuda().OccupancyMaxPotentialBlockSizeWithFlags()(
-      &grid, &block, kernel.function(), shared_memory_bytes_callback,
-      shared_memory_bytes, max_block_size, flags);
+      &grid, &block, (CUfunction)kernel.function(),
+      shared_memory_bytes_callback, shared_memory_bytes, max_block_size, flags);
   if (ret != CUDA_SUCCESS) {
     return Error("Configure failed: " + detail::get_cuda_error_string(ret));
   }
@@ -2329,6 +2551,33 @@ inline ConfiguredKernel ConfiguredKernel::configure_1d_max_occupancy(
   return ConfiguredKernel(std::move(kernel), grid, block, shared_memory_bytes,
                           stream);
 }
+
+#if CUDA_VERSION >= 11080
+inline ConfiguredKernel ConfiguredKernelData::with_attribute(
+    CUlaunchAttribute extra_attr) const {
+  auto new_attrs = attrs_;
+  new_attrs.push_back(extra_attr);
+  return ConfiguredKernel(kernel_, grid_, block_, shared_memory_bytes_, stream_,
+                          std::move(new_attrs));
+}
+
+inline ConfiguredKernel ConfiguredKernelData::with_cluster(Dim3 cluster) const {
+  CUlaunchAttribute attr = {};
+  attr.id = CU_LAUNCH_ATTRIBUTE_CLUSTER_DIMENSION;
+  attr.value.clusterDim.x = cluster.x;
+  attr.value.clusterDim.y = cluster.y;
+  attr.value.clusterDim.z = cluster.z;
+  return with_attribute(attr);
+}
+
+inline ConfiguredKernel ConfiguredKernelData::with_cooperative(
+    bool enabled) const {
+  CUlaunchAttribute attr = {};
+  attr.id = CU_LAUNCH_ATTRIBUTE_COOPERATIVE;
+  attr.value.cooperative = enabled;
+  return with_attribute(attr);
+}
+#endif  // CUDA_VERSION >= 11080
 
 class LoadedProgram
     : public detail::FallibleObjectBase<LoadedProgram, LoadedProgramData> {
@@ -2345,9 +2594,17 @@ class LoadedProgram
 inline LoadedProgram LoadedProgram::load(StringRef cubin,
                                          StringMap lowered_name_map) {
   JITIFY_NVTX_FUNC_RANGE();
-  CUmodule module;
+  CudaModule module;
   if (!cuda()) return Error(cuda().error());
+#if JITIFY_USE_CONTEXT_INDEPENDENT_LOADING
+  CUresult ret = cuda().LibraryLoadData()(
+      &module, cubin.data(), /*jitOptions=*/nullptr,
+      /*jitOptionsValues=*/nullptr, /*numJitOptions=*/0,
+      /*libraryOptions=*/nullptr, /*libraryOptionValues=*/nullptr,
+      /*numLibraryOptions=*/0);
+#else
   CUresult ret = cuda().ModuleLoadData()(&module, cubin.data());
+#endif
   if (ret != CUDA_SUCCESS) {
     return Error("Loading failed: " + detail::get_cuda_error_string(ret));
   }
@@ -3038,6 +3295,20 @@ class CompiledProgramData
   }
 };
 
+/*! An object used for cancelling an ongoing compilation. */
+class Canceller {
+  std::atomic_bool cancelled_;
+
+ public:
+  Canceller() : cancelled_(false) {}
+
+  /*! Check if the cancel has been triggered. */
+  bool cancelled() const { return cancelled_.load(std::memory_order_relaxed); }
+
+  /*! Trigger the cancel. */
+  void cancel() { cancelled_.store(true, std::memory_order_relaxed); }
+};
+
 class CompiledProgram
     : public detail::FallibleObjectBase<CompiledProgram, CompiledProgramData> {
   friend class detail::FallibleObjectBase<CompiledProgram, CompiledProgramData>;
@@ -3053,7 +3324,8 @@ class CompiledProgram
                                  const StringMap& header_sources = {},
                                  const StringVec& name_expressions = {},
                                  OptionsVec compiler_options = {},
-                                 OptionsVec linker_options = {});
+                                 OptionsVec linker_options = {},
+                                 const Canceller* canceller = nullptr);
 
   /*! \see PreprocessedProgramData::compile */
   static CompiledProgram compile(const std::string& name,
@@ -3061,9 +3333,11 @@ class CompiledProgram
                                  const StringMap& header_sources = {},
                                  const std::string& name_expression = {},
                                  OptionsVec compiler_options = {},
-                                 OptionsVec linker_options = {}) {
+                                 OptionsVec linker_options = {},
+                                 const Canceller* canceller = nullptr) {
     return compile(name, source, header_sources, StringVec({name_expression}),
-                   std::move(compiler_options), std::move(linker_options));
+                   std::move(compiler_options), std::move(linker_options),
+                   canceller);
   }
 };
 
@@ -3271,6 +3545,34 @@ class LibNvrtc
   JITIFY_DEFINE_NVRTC_WRAPPER(GetProgramLogSize, nvrtcResult, nvrtcProgram,
                               size_t*)
   JITIFY_DEFINE_NVRTC_WRAPPER(Version, nvrtcResult, int*, int*)
+#if JITIFY_LINK_NVRTC_STATIC && CUDA_VERSION < 12080
+  detail::function_type<nvrtcResult, nvrtcProgram, int (*)(void*, void*),
+                        void*>*
+  SetFlowCallback() {
+    return nullptr;
+  }
+  detail::function_type<nvrtcResult, nvrtcProgram>* GetPCHCreateStatus() {
+    return nullptr;
+  }
+  detail::function_type<nvrtcResult, size_t*>* GetPCHHeapSize() {
+    return nullptr;
+  }
+  detail::function_type<nvrtcResult, size_t>* SetPCHHeapSize() {
+    return nullptr;
+  }
+  detail::function_type<nvrtcResult, nvrtcProgram, size_t*>*
+  GetPCHHeapSizeRequired() {
+    return nullptr;
+  }
+#else
+  JITIFY_DEFINE_NVRTC_WRAPPER(SetFlowCallback, nvrtcResult, nvrtcProgram,
+                              int (*)(void*, void*), void*)
+  JITIFY_DEFINE_NVRTC_WRAPPER(GetPCHCreateStatus, nvrtcResult, nvrtcProgram)
+  JITIFY_DEFINE_NVRTC_WRAPPER(GetPCHHeapSize, nvrtcResult, size_t*)
+  JITIFY_DEFINE_NVRTC_WRAPPER(SetPCHHeapSize, nvrtcResult, size_t)
+  JITIFY_DEFINE_NVRTC_WRAPPER(GetPCHHeapSizeRequired, nvrtcResult, nvrtcProgram,
+                              size_t*)
+#endif
 #undef JITIFY_DEFINE_NVRTC_WRAPPER
 #undef JITIFY_STR_IMPL
 #undef JITIFY_STR
@@ -3694,18 +3996,485 @@ inline void find_lowered_global_variables(StringRef ptx,
 
 inline bool ptx_remove_unused_globals(std::string* ptx);  // Defined below
 
+inline std::string get_errno_string() {
+  char error_buf[256];
+  const char* error_str = error_buf;
+#if defined _WIN32 || defined _WIN64
+  ::strerror_s(error_buf, sizeof(error_buf), errno);
+#else
+  // See here for why this is necessary:
+  // http://www.club.cc.cmu.edu/~cmccabe/blog_strerror.html
+#if !((_POSIX_C_SOURCE >= 200112L || _XOPEN_SOURCE >= 600) && !_GNU_SOURCE)
+  error_str =
+#endif
+      ::strerror_r(errno, error_buf, sizeof(error_buf));
+#endif
+  return error_str;
+}
+
+#if defined _WIN32 || defined _WIN64
+using mode_t = int;
+// These are not actually used.
+static constexpr const mode_t kDefaultDirectoryMode = 0;
+static constexpr const mode_t kDefaultFileMode = 0;
+#else
+static constexpr const mode_t kDefaultDirectoryMode =
+    S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
+static constexpr const mode_t kDefaultFileMode =
+    S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
+#endif
+
+// Returns false on error. Returns true on success or if path already exists.
+inline bool make_directory(const char* path,
+                           mode_t mode = kDefaultDirectoryMode) {
+  bool is_dir;
+  if (path_exists(path, &is_dir)) return is_dir;
+#if defined _WIN32 || defined _WIN64
+  return ::_mkdir(path) == 0 || errno == EEXIST;
+#else
+  return ::mkdir(path, mode) == 0 || errno == EEXIST;
+#endif
+}
+
+inline bool make_directories(std::string path,
+                             mode_t mode = kDefaultDirectoryMode) {
+#if defined _WIN32 || defined _WIN64
+  // Note that Windows supports both forward and backslash path separators.
+  const char* sep = "\\/";
+#else
+  const char* sep = "/";
+#endif
+  // This is based on https://stackoverflow.com/a/675193/7228843
+  char* p = &path[0];
+  char* s;
+  while ((s = std::strpbrk(p, sep))) {
+    if (s != p) {
+      // Neither root nor double slash in path.
+      *s = '\0';
+      if (!make_directory(path.c_str(), mode)) return false;
+      *s = sep[0];
+    }
+    p = s + 1;
+  }
+  return make_directory(path.c_str(), mode);
+}
+
+#if JITIFY_ENABLE_NVCC
+// Note: Only captures standard output. If standard error is needed, use 2>&1.
+inline int run_system_command(const char* command,
+                              std::string* output = nullptr,
+                              std::string* failure = nullptr) {
+#ifdef _MSC_VER
+#define JITIFY_POPEN _popen
+#define JITIFY_PCLOSE _pclose
+#else
+#define JITIFY_POPEN popen
+#define JITIFY_PCLOSE pclose
+#endif
+  FILE* pipe = JITIFY_POPEN(command, "r");
+  if (!pipe) return -1;
+  if (output) {
+    output->clear();
+    std::array<char, 128> buffer;
+    while (fgets(buffer.data(), buffer.size(), pipe)) {
+      *output += buffer.data();
+    }
+  }
+  const int result = JITIFY_PCLOSE(pipe);
+  if (result == -1 && failure) {
+    *failure = get_errno_string();
+  }
+  return result;
+}
+#endif  // JITIFY_ENABLE_NVCC
+
+inline const char* guess_cuda_home() {
+  static const char* const cuda_home = [] {
+    const char* env_jitify_cuda_home = std::getenv("JITIFY_CUDA_HOME");
+    if (env_jitify_cuda_home) return env_jitify_cuda_home;
+    const char* env_cuda_home = std::getenv("CUDA_HOME");
+    if (env_cuda_home) return env_cuda_home;
+    // Guess the default location.
+#if defined _WIN32 || defined _WIN64
+    return "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA";
+#else
+    return "/usr/local/cuda";
+#endif
+  }();
+  return cuda_home;
+};
+
+#if JITIFY_ENABLE_NVCC
+class Nvcc {
+  std::string nvcc_path_;
+
+  static bool is_valid_nvcc(std::string nvcc_path) {
+    return run_system_command((nvcc_path + " --version").c_str());
+  }
+
+  static std::string find_nvcc_path() {
+#if defined(_WIN32) || defined(_WIN64)
+    const std::string extension = ".exe";
+#else
+    const std::string extension = "";
+#endif
+    const char* env_nvcc = std::getenv("JITIFY_NVCC");
+    if (env_nvcc && is_valid_nvcc(env_nvcc)) return env_nvcc;
+    std::string nvcc_path = "nvcc" + extension;
+    if (is_valid_nvcc(nvcc_path)) return nvcc_path;
+    const char* cuda_home = guess_cuda_home();
+    nvcc_path =
+        detail::path_join(detail::path_join(cuda_home, "bin"), nvcc_path);
+    if (is_valid_nvcc(nvcc_path)) return nvcc_path;
+    return "";
+  }
+
+ public:
+  explicit Nvcc(std::string _nvcc_path = "")
+      : nvcc_path_(_nvcc_path.empty() ? find_nvcc_path() : _nvcc_path) {}
+
+  explicit operator bool() const { return !nvcc_path_.empty(); }
+
+  int operator()(const OptionsVec& options, std::string* output = nullptr,
+                 std::string* failure = nullptr) const {
+    // Note: We redirect stderr to stdout so that we capture it too.
+    const std::string command =
+        detail::string_concat(nvcc_path_, " ", options, " ", "2>&1");
+    return run_system_command(command.c_str(), output, failure);
+  }
+};
+
+inline Nvcc& default_nvcc() {
+  static Nvcc default_nvcc_;
+  return default_nvcc_;
+}
+
+// Forward declarations.
+bool read_text_file(const std::string& fullpath, std::string* content);
+bool read_binary_file(const std::string& fullpath, std::string* content);
+
+#endif  // JITIFY_ENABLE_NVCC
+
+// Creates a unique temporary directory and returns its path. Returns empty
+// string on failure.
+inline std::string make_temp_dir() {
+#if defined(_WIN32) || defined(_WIN64)
+  static std::atomic_uint32_t counter = 0;
+  const uint32_t id = counter.fetch_add(1, std::memory_order_relaxed);
+  const uint64_t uid = ((uint64_t)_getpid() << 32) | id;
+  char tmpdir[JITIFY_PATH_MAX + 1];
+  // Note: tmpdir is guaranteed to end with a '\'.
+  if (!GetTempPath2A(sizeof(tmpdir), tmpdir)) return "";
+  std::string path = tmpdir + "__jitify_" + std::to_string(uid);
+  if (::_mkdir(path.c_str()) != 0) return "";
+  return path;
+#else
+  char template_buf[] = "/tmp/__jitify_XXXXXX";
+  if (!::mkdtemp(template_buf)) return "";
+  return template_buf;
+#endif
+}
+
+#if __cplusplus < 201703L && (!defined(_WIN32) && !defined(_WIN64))
+inline int delete_file_visitor(const char* path, const struct stat* sbuf,
+                               int type, struct FTW* ftwb) {
+  (void)sbuf;
+  (void)type;
+  (void)ftwb;
+  return std::remove(path);
+}
+#endif
+
+inline bool remove_all(const std::string& path) {
+#if __cplusplus >= 201703L
+  std::error_code ec;
+  return std::filesystem::remove_all(path, ec) !=
+         static_cast<std::uintmax_t>(-1);
+#else  // __cplusplus < 201703L
+#if defined(_WIN32) || defined(_WIN64)
+  // TODO: Implement this if anyone cares about it.
+  return false;
+#else   // not Windows
+  int flags = FTW_DEPTH;
+  const bool follow_symlinks = false;
+  const bool include_mount_points = false;
+  if (!follow_symlinks) flags |= FTW_PHYS;
+  if (!include_mount_points) flags |= FTW_MOUNT;
+  const int max_depth = 20;
+  return ::nftw(path.c_str(), delete_file_visitor, max_depth, flags) == 0;
+#endif  // not Windows
+#endif  // __cplusplus < 201703L
+}
+
+class TempDirectory {
+  std::string path_;
+
+ public:
+  TempDirectory() : path_(make_temp_dir()) {}
+  ~TempDirectory() {
+    if (path_.empty()) return;
+    std::error_code ec;
+    if (!remove_all(path_.c_str())) {
+      std::cerr << "Jitify warning: Failed to delete temp directory: " << path_
+                << std::endl;
+    }
+  }
+  TempDirectory(const TempDirectory&) = delete;
+  TempDirectory& operator=(const TempDirectory&) = delete;
+  TempDirectory(TempDirectory&& tmp) : path_(std::move(tmp.path_)) {
+    tmp.path_.clear();
+  }
+  TempDirectory& operator=(TempDirectory&& tmp) {
+    path_ = std::move(tmp.path_);
+    tmp.path_.clear();
+    return *this;
+  }
+
+  explicit operator bool() const { return !path_.empty(); }
+  std::string error() const {
+    if (*this) return "";
+    return get_errno_string();
+  }
+  const std::string& path() const { return path_; }
+};
+
+#if JITIFY_ENABLE_NVCC
+
+// Forward declaration.
+static bool is_jitsafe_header(const std::string&);
+
+class NvccProgram {
+  std::string source_;
+  std::string name_;
+  StringMap header_sources_;
+  StringVec name_expressions_;
+  std::string log_;
+  std::string ptx_;
+  std::string cubin_;
+  std::string nvvm_;
+  StringMap lowered_name_map_;
+
+ public:
+  NvccProgram(std::string _source, std::string _name, StringMap _header_sources)
+      : source_(std::move(_source)),
+        name_(std::move(_name)),
+        header_sources_(std::move(_header_sources)) {}
+
+  void add_name_expression(std::string expression) {
+    name_expressions_.push_back(std::move(expression));
+  }
+
+  nvrtcResult compile(const Nvcc& nvcc, OptionsVec options,
+                      std::string* error = nullptr) {
+    if (error) *error = "";
+    if (!nvcc) {
+      if (error) *error = "nvcc not found";
+      return NVRTC_ERROR_PROGRAM_CREATION_FAILURE;
+    }
+
+    TempDirectory tmp_dir;
+    if (!tmp_dir) {
+      if (error) *error = "Failed to make temp directory: " + tmp_dir.error();
+      return NVRTC_ERROR_PROGRAM_CREATION_FAILURE;
+    }
+
+    const std::string tmp_include_dir = path_join(tmp_dir.path(), "include");
+
+    for (auto const& name_header : header_sources_) {
+      const std::string& name = name_header.first;
+      const std::string& header = name_header.second;
+      // Do not use Jitify's builtin headers when using nvcc, as they will
+      // conflict with the host compiler's standard library headers.
+      if (is_jitsafe_header(name)) continue;
+      const std::string name_base = path_base(name);
+      const std::string path_base = path_join(tmp_include_dir, name_base);
+      if (!make_directories(path_base)) {
+        if (error) *error = "Failed to make directories: " + path_base;
+        return NVRTC_ERROR_PROGRAM_CREATION_FAILURE;
+      }
+      const std::string path = path_join(tmp_include_dir, name);
+      std::ofstream file(path);
+      if (!file) {
+        if (error) *error = "Failed to create file: " + path;
+        return NVRTC_ERROR_PROGRAM_CREATION_FAILURE;
+      }
+      file.imbue(std::locale::classic());
+      file << header;
+      if (!file) {
+        if (error) *error = "Failed to write to file: " + path;
+        return NVRTC_ERROR_PROGRAM_CREATION_FAILURE;
+      }
+    }
+    // Note: This ensures the cuda toolkit headers are found before any that
+    // were embedded during preprocessing (which probably won't work with nvcc).
+    options.emplace_back(
+        "-I", detail::path_join(detail::guess_cuda_home(), "include"));
+    options.emplace_back("-I", tmp_include_dir);
+
+    static const char* const kJitifyExpressionPrefix = "__jitify_expression";
+
+    // Force expression instantiations by adding dummy references.
+    std::string name_expressions_source = "\n";
+    for (int i = 0; i < (int)name_expressions_.size(); ++i) {
+      name_expressions_source += std::string("__device__ void* ") +
+                                 kJitifyExpressionPrefix + std::to_string(i) +
+                                 " = (void*)" + name_expressions_[i] + ";\n";
+    }
+    std::string source = source_ + name_expressions_source;
+
+    const std::string tmp_source_name = path_join(tmp_dir.path(), "source");
+    const std::string tmp_source_file = tmp_source_name + ".cu";
+    const std::string tmp_ptx_file = tmp_source_name + ".ptx";
+    const std::string tmp_cubin_file = tmp_source_name + ".cubin";
+    const std::string tmp_ltoir_file = tmp_source_name + ".ltoir";
+
+    {
+      std::ofstream source_file(tmp_source_file);
+      if (!source_file) {
+        if (error) *error = "Failed to create file: " + tmp_source_file;
+        return NVRTC_ERROR_PROGRAM_CREATION_FAILURE;
+      }
+      source_file.imbue(std::locale::classic());
+      source_file << source;
+    }
+    auto infer_nvcc_error_type = [&] {
+      return (log_.find(": error:") != std::string::npos ||
+              log_.find(": fatal error:") != std::string::npos)
+                 ? NVRTC_ERROR_COMPILATION
+                 : NVRTC_ERROR_INVALID_OPTION;
+    };
+
+    if (!options.find({"--dlink-time-opt, -dlto"}).empty()) {
+      options.emplace_back("-ltoir", "");
+      options.emplace_back(tmp_source_file, "");
+      if (nvcc(options, &log_, error)) return infer_nvcc_error_type();
+      if (!read_binary_file(tmp_ltoir_file, &nvvm_)) {
+        if (error) *error = "Failed to read binary file: " + tmp_ltoir_file;
+        return NVRTC_ERROR_PROGRAM_CREATION_FAILURE;
+      }
+      return NVRTC_SUCCESS;
+    }
+
+    options.emplace_back("-ptx", "");
+    options.emplace_back(tmp_source_file, "");
+    options.emplace_back("-o", tmp_ptx_file);
+    if (nvcc(options, &log_, error)) return infer_nvcc_error_type();
+    options.pop_back();  // Remove -o option
+    options.pop_back();  // Remove source file
+    options.pop_back();  // Remove -ptx
+    if (!read_text_file(tmp_ptx_file, &ptx_)) {
+      if (error) *error = "Failed to read text file: " + tmp_ptx_file;
+      return NVRTC_ERROR_PROGRAM_CREATION_FAILURE;
+    }
+
+    // Extract mangled expression instantiations from PTX.
+    lowered_name_map_.clear();
+    for (int i = 0; i < (int)name_expressions_.size(); ++i) {
+      const std::string key =
+          kJitifyExpressionPrefix + std::to_string(i) + " = ";
+      size_t beg = ptx_.find(key);
+      if (beg == std::string::npos) {
+        if (error) {
+          *error = "Failed to find mangled name in PTX for expression: " +
+                   name_expressions_[i];
+        }
+        return NVRTC_ERROR_PROGRAM_CREATION_FAILURE;
+      }
+      beg += key.size();
+      const size_t end = ptx_.find(";", beg);
+      if (end == std::string::npos) {
+        if (error) *error = "Failed to parse mangled name expression in PTX";
+        return NVRTC_ERROR_PROGRAM_CREATION_FAILURE;
+      }
+      lowered_name_map_.emplace(name_expressions_[i],
+                                ptx_.substr(beg, end - beg));
+    }
+
+    bool is_virtual_arch;
+    if (!parse_arch_flag(options, &is_virtual_arch, error)) {
+      return NVRTC_ERROR_INVALID_OPTION;
+    }
+    if (!is_virtual_arch) {
+      options.emplace_back("-cubin", "");
+      options.emplace_back(tmp_ptx_file, "");
+      options.emplace_back("-o", tmp_cubin_file);
+      if (nvcc(options, &log_, error)) {
+        return NVRTC_ERROR_PROGRAM_CREATION_FAILURE;
+      }
+      if (!read_binary_file(tmp_cubin_file, &cubin_)) {
+        if (error) *error = "Failed to read binary file: " + tmp_cubin_file;
+        return NVRTC_ERROR_PROGRAM_CREATION_FAILURE;
+      }
+    }
+
+    return NVRTC_SUCCESS;
+  }
+
+  const std::string& log() const { return log_; }
+  const std::string& ptx() const { return ptx_; }
+  const std::string& cubin() const { return cubin_; }
+  const std::string& lto_ir() const { return nvvm_; }
+  const StringMap& lowered_name_map() const { return lowered_name_map_; }
+};
+
+inline nvrtcResult compile_program_nvcc(
+    const std::string& nvcc_path, const std::string& name,
+    const std::string& source, const StringMap& header_sources,
+    const OptionsVec& options, std::string* error = nullptr,
+    std::string* log = nullptr, std::string* ptx = nullptr,
+    std::string* cubin = nullptr, std::string* nvvm = nullptr,
+    const StringVec& name_expressions = {},
+    StringMap* lowered_name_map = nullptr, bool remove_unused_globals = false) {
+  NvccProgram program(source, name, header_sources);
+
+  for (const std::string& name_expression : name_expressions) {
+    program.add_name_expression(name_expression);
+  }
+
+  Nvcc nvcc = nvcc_path.empty() ? default_nvcc() : Nvcc(nvcc_path);
+  nvrtcResult result = program.compile(nvcc, options, error);
+  if (log) *log = program.log();
+  if (result != NVRTC_SUCCESS) return result;
+
+  if (ptx) {
+    *ptx = program.ptx();
+    if (remove_unused_globals) {
+      ptx_remove_unused_globals(ptx);  // Ignores errors from this
+    }
+  }
+  if (cubin) *cubin = program.cubin();
+  if (nvvm) *nvvm = program.lto_ir();
+  if (lowered_name_map) *lowered_name_map = program.lowered_name_map();
+
+  if (ptx && lowered_name_map) {
+    // Automatically add global variables to lowered_name_map. This avoids
+    // needing to specify them explicitly in name_expressions. Note that this
+    // does not support template variables.
+    find_lowered_global_variables(*ptx, lowered_name_map);
+  }
+
+  return NVRTC_SUCCESS;
+}
+#endif  // JITIFY_ENABLE_NVCC
+
+inline int cancel_flow_callback(void* payload, void*) {
+  auto canceller = static_cast<const Canceller*>(payload);
+  return canceller->cancelled();
+}
+
 // Sets *error on failure if provided.
 // Sets *log if provided.
 // Sets *ptx on success if provided.
 // Adds one entry to *lowered_name_map for each entry in name_expressions as
 //   well as any global definitions found in the generated PTX.
-inline nvrtcResult compile_program(
+inline nvrtcResult compile_program_nvrtc(
     const std::string& name, const std::string& source,
     const StringMap& header_sources, const OptionsVec& options,
     std::string* error = nullptr, std::string* log = nullptr,
     std::string* ptx = nullptr, std::string* cubin = nullptr,
     std::string* nvvm = nullptr, const StringVec& name_expressions = {},
-    StringMap* lowered_name_map = nullptr, bool remove_unused_globals = false) {
+    StringMap* lowered_name_map = nullptr, bool remove_unused_globals = false,
+    const Canceller* canceller = nullptr, bool pch_auto_resize = true) {
   if (!nvrtc()) {
     if (error) *error = nvrtc().error();
     return NVRTC_ERROR_PROGRAM_CREATION_FAILURE;
@@ -3721,6 +4490,7 @@ inline nvrtcResult compile_program(
     header_sources_c.push_back(name_source.second.c_str());
   }
 
+  bool pch_verbose = true;
   std::vector<const char*> options_c;
   options_c.reserve(options.size());
   for (const Option& option : options) {
@@ -3732,6 +4502,10 @@ inline nvrtcResult compile_program(
       }
     }
     options_c.push_back(option.key_and_value().c_str());
+    if ((option.key() == "--pch-verbose" || option.key() == "-pch-verbose") &&
+        option.value() == "false") {
+      pch_verbose = false;
+    }
   }
 
 #define JITIFY_CHECK_NVRTC(call)                                      \
@@ -3761,6 +4535,13 @@ inline nvrtcResult compile_program(
         nvrtc().AddNameExpression()(nvrtc_program, name_expression.c_str()));
   }
 
+  // nvrtcSetFlowCallback is only supported with NVRTC >= 12.8.
+  if (canceller && nvrtc().SetFlowCallback()) {
+    JITIFY_CHECK_NVRTC(nvrtc().SetFlowCallback()(
+        nvrtc_program, cancel_flow_callback,
+        const_cast<void*>(static_cast<const void*>(canceller))));
+  }
+
   nvrtcResult ret = nvrtc().CompileProgram()(
       nvrtc_program, (int)options_c.size(), options_c.data());
   if (log) {
@@ -3772,6 +4553,32 @@ inline nvrtcResult compile_program(
     JITIFY_CHECK_NVRTC(nvrtc().GetProgramLog()(nvrtc_program, &(*log)[0]));
   }
   JITIFY_CHECK_NVRTC(ret);
+
+  // Automatically resize the global NVRTC PCH heap if it is exhausted.
+  if (pch_auto_resize && nvrtc().GetPCHCreateStatus()) {
+    const nvrtcResult pch_status = nvrtc().GetPCHCreateStatus()(nvrtc_program);
+    if (pch_status == NVRTC_ERROR_PCH_CREATE_HEAP_EXHAUSTED) {
+      size_t required_heap_size;
+      JITIFY_CHECK_NVRTC(
+          nvrtc().GetPCHHeapSizeRequired()(nvrtc_program, &required_heap_size));
+      // This is effectively doing an atomic max on the PCH heap size.
+      JITIFY_IF_THREAD_SAFE(static std::mutex mutex;
+                            std::lock_guard<std::mutex> lock(mutex);)
+      size_t heap_size;
+      JITIFY_CHECK_NVRTC(nvrtc().GetPCHHeapSize()(&heap_size));
+      if (required_heap_size > heap_size) {
+        JITIFY_CHECK_NVRTC(nvrtc().SetPCHHeapSize()(required_heap_size));
+        if (pch_verbose && log) {
+          *log += "\nJitify: Automatically resizing PCH heap from " +
+                  std::to_string(heap_size) + " to " +
+                  std::to_string(required_heap_size) + " bytes.";
+        }
+      }
+      // Note: We don't re-run the compilation here, so PCH generation will only
+      // succeed on the next compilation of the program.
+    }
+  }
+
   if (ptx) {
     size_t ptx_size;
     JITIFY_CHECK_NVRTC(nvrtc().GetPTXSize()(nvrtc_program, &ptx_size));
@@ -3823,6 +4630,91 @@ inline nvrtcResult compile_program(
 
 #undef JITIFY_CHECK_NVRTC
   return NVRTC_SUCCESS;
+}
+
+inline const TempDirectory& get_temp_pch_dir() {
+  // Note: This is static because the temp dir for PCH files must persist
+  // for the lifetime of the process in order to be re-used in subsequent
+  // compilations.
+  static TempDirectory tmp_pch_dir;
+  return tmp_pch_dir;
+}
+
+inline nvrtcResult compile_program(
+    const std::string& name, const std::string& source,
+    const StringMap& header_sources, const OptionsVec& options,
+    std::string* error = nullptr, std::string* log = nullptr,
+    std::string* ptx = nullptr, std::string* cubin = nullptr,
+    std::string* nvvm = nullptr, const StringVec& name_expressions = {},
+    StringMap* lowered_name_map = nullptr, bool remove_unused_globals = false,
+    const Canceller* canceller = nullptr) {
+  OptionsVec options_modified = options;
+  if (options_modified.pop({"-nvcc", "--nvcc"})) {
+#if JITIFY_ENABLE_NVCC
+    std::string nvcc_path = "";
+    const std::vector<int> nvcc_path_idxs =
+        options_modified.find({"-nvcc-path", "--nvcc-path"}, 1);
+    if (!nvcc_path_idxs.empty()) {
+      nvcc_path = options_modified[nvcc_path_idxs[0]].value();
+    }
+    // These flags aren't supported (or needed) by nvcc.
+    options_modified.pop(
+        {"--device-as-default-execution-space", "-default-device"});
+    options_modified.pop({"--no-source-include", "-no-source-include"});
+    options_modified.pop({"--minimal", "-minimal"});
+    options_modified.pop({"--device-int128", "-device-int128"});
+    options_modified.pop({"--device-float128", "-device-float128"});
+    options_modified.pop({"--builtin-move-forward", "-builtin-move-forward"});
+    options_modified.pop(
+        {"--builtin-initializer-list", "-builtin-initializer-list"});
+    options_modified.pop({"--pch", "-pch"});
+    options_modified.pop({"--pch-dir", "-pch-dir"});
+    options_modified.pop({"--create-pch", "-create-pch"});
+    options_modified.pop({"--use-pch", "-use-pch"});
+    options_modified.pop({"--pch-verbose", "-pch-verbose"});
+    options_modified.pop({"--pch-messages", "-pch-messages"});
+    options_modified.pop(
+        {"--instantiate-templates-in-pch", "-instantiate-templates-in-pch"});
+    options_modified.pop({"--no-pch-auto-resize", "-no-pch-auto-resize"});
+    // The jitify_preinclude.h WAR is not needed with nvcc.
+    for (int idx : options_modified.find({"-include"})) {
+      if (options_modified[idx].value() == "jitify_preinclude.h") {
+        options_modified.erase(idx);
+        break;
+      }
+    }
+    // Note: canceller is not supported with nvcc.
+    return compile_program_nvcc(nvcc_path, name, source, header_sources,
+                                options_modified, error, log, ptx, cubin, nvvm,
+                                name_expressions, lowered_name_map,
+                                remove_unused_globals);
+#else  // !JITIFY_ENABLE_NVCC
+    if (error) *error = "Nvcc support is not enabled";
+    return NVRTC_ERROR_PROGRAM_CREATION_FAILURE;
+#endif
+  } else {
+    if (!nvrtc()) {
+      if (error) *error = nvrtc().error();
+      return NVRTC_ERROR_PROGRAM_CREATION_FAILURE;
+    }
+    if (nvrtc().get_version() >= 12080 && nvrtc().get_version() <= 12090 &&
+        options_modified.find({"--pch", "-pch"}).size() &&
+        !options_modified.find({"--pch-dir", "-pch-dir"}).size()) {
+      // If no PCH dir is specified, we add one automatically to avoid PCH files
+      // being saved to the current working directory.
+      // Note: If the temp pch dir fails to be created, we don't apply the
+      // workaround and instead just let nvrtc do its default behavior.
+      if (get_temp_pch_dir()) {
+        options_modified.emplace_back("-pch-dir", get_temp_pch_dir().path());
+      }
+    }
+    const bool pch_auto_resize = !static_cast<bool>(
+        options_modified.pop({"--no-pch-auto-resize", "-no-pch-auto-resize"}));
+    return compile_program_nvrtc(name, source, header_sources, options_modified,
+                                 error, log, ptx, cubin, nvvm, name_expressions,
+                                 lowered_name_map, remove_unused_globals,
+                                 canceller, pch_auto_resize);
+  }
 }
 
 inline StringVec split_string(std::string str, long maxsplit = -1,
@@ -3974,13 +4866,81 @@ inline ErrorMsg make_compilation_error_msg(const std::string& compile_error,
 
 }  // namespace detail
 
+/*! Returns the CUDA Toolkit include directory, or an empty string if not found.
+ * \note This reads the JITIFY_CUDA_HOME or CUDA_HOME environment variable, or
+ * falls back to a platform-specific heuristic if that is not set.
+ */
+inline const std::string& get_cuda_include_dir() {
+  static const std::string cuda_include_dir = []() -> std::string {
+    const std::string path =
+        detail::path_join(detail::guess_cuda_home(), "include");
+    bool is_dir;
+    if (!detail::path_exists(path.c_str(), &is_dir) || !is_dir) return "";
+    return path;
+  }();
+  return cuda_include_dir;
+}
+
+namespace detail {
+
+inline const std::string& guess_user_cache_dir() {
+  static const std::string user_cache_dir = []() -> std::string {
+#if defined(_WIN32) || defined(_WIN64)
+    char tmpdir[JITIFY_PATH_MAX + 1];
+    if (SHGetFolderPathA(0, CSIDL_APPDATA, NULL, SHGFP_TYPE_CURRENT, tmpdir) !=
+        S_OK) {
+      return "";
+    }
+    return tmpdir;
+#else
+    const char* env_cache = std::getenv("XDG_CACHE_HOME");
+    if (env_cache && env_cache[0] != '\0') return env_cache;
+    const char* env_home = std::getenv("HOME");
+    if (env_home && env_home[0] != '\0') return path_join(env_home, ".cache");
+    // Note: getpwuid is not thread-safe, but we don't need it to be because we
+    // only call it inside a static initializer.
+    struct passwd* pw = ::getpwuid(::getuid());
+    if (!pw) return "";
+    const char* home_dir = pw->pw_dir;
+    return path_join(home_dir, ".cache");
+#endif
+  }();
+  return user_cache_dir;
+}
+
+}  // namespace detail
+
+/*! Returns the current user's appdata or .cache directory, or an empty string
+ *  if the directory could not be found.
+ * \param subdir Optional sub-directory to add to the returned path. Note that
+ *   this directory is not automatically created. Note also that if the
+ *   unsuffixed cache directory could not be found, an empty string is returned
+ *   regardless of the value of subdir.
+ */
+inline std::string get_user_cache_dir(StringRef subdir = "") {
+  static const std::string user_cache_dir = []() -> std::string {
+    const std::string& path = detail::guess_user_cache_dir();
+    bool is_dir;
+    if (!detail::path_exists(path.c_str(), &is_dir) || !is_dir) return "";
+    return path;
+  }();
+  return (user_cache_dir.empty() || subdir.empty())
+             ? user_cache_dir
+             : detail::path_join(user_cache_dir, subdir);
+}
+
 inline CompiledProgram CompiledProgram::compile(
     const std::string& name, const std::string& source,
     const StringMap& header_sources, const StringVec& name_expressions,
-    OptionsVec compiler_options, OptionsVec linker_options) {
+    OptionsVec compiler_options, OptionsVec linker_options,
+    const Canceller* canceller) {
   JITIFY_NVTX_FUNC_RANGE();
   if (!compiler_options) return Error("Failed to parse compiler options");
   if (!linker_options) return Error("Failed to parse linker options");
+  if (!nvrtc()) return Error(nvrtc().error());
+  if (canceller && !nvrtc().SetFlowCallback()) {
+    return Error("Compilation cancellation requires NVRTC >= 12.8");
+  }
   std::string error;
   if (!detail::process_architecture_flags(&compiler_options, &linker_options,
                                           &error)) {
@@ -3995,7 +4955,7 @@ inline CompiledProgram CompiledProgram::compile(
   if (detail::compile_program(name, source, header_sources, compiler_options,
                               &error, &log, &ptx, &cubin, &nvvm,
                               name_expressions, &lowered_name_map,
-                              should_remove_unused_globals)) {
+                              should_remove_unused_globals, canceller)) {
     std::vector<std::string> header_names;
     header_names.reserve(header_sources.size());
     for (const auto& item : header_sources) {
@@ -4147,13 +5107,18 @@ class PreprocessedProgramData
    *    in the preprocessed program, replacing them if names match.
    *  \param extra_compiler_options List of additional compiler options.
    *  \param extra_linker_options List of additional linker options.
+   *  \param canceller If provided, this object can be used to cancel the
+   *    compilation from another thread before the function has returned.
+   *    If compilation is cancelled before completion, an error is returned.
+   *    The pointer must remain valid until the function has returned.
    *  \return A CompiledProgram object that contains either a valid
    *    CompiledProgramData object or an error state.
    */
   CompiledProgram compile(const StringVec& name_expressions = {},
                           const StringMap& extra_header_sources = {},
                           OptionsVec extra_compiler_options = {},
-                          OptionsVec extra_linker_options = {}) const {
+                          OptionsVec extra_linker_options = {},
+                          const Canceller* canceller = nullptr) const {
     StringMap combined_header_sources;
     const StringMap& combined_header_sources_ref = detail::merge(
         header_sources_, extra_header_sources, &combined_header_sources);
@@ -4163,9 +5128,10 @@ class PreprocessedProgramData
     extra_linker_options.insert(extra_linker_options.begin(),
                                 remaining_linker_options_.begin(),
                                 remaining_linker_options_.end());
-    return CompiledProgram::compile(
-        name_, source_, combined_header_sources_ref, name_expressions,
-        std::move(extra_compiler_options), std::move(extra_linker_options));
+    return CompiledProgram::compile(name_, source_, combined_header_sources_ref,
+                                    name_expressions,
+                                    std::move(extra_compiler_options),
+                                    std::move(extra_linker_options), canceller);
   }
 
   /*! Compile the program to PTX (and maybe CUBIN).
@@ -4176,20 +5142,25 @@ class PreprocessedProgramData
    *    in the preprocessed program, replacing them if names match.
    *  \param extra_compiler_options List of additional compiler options.
    *  \param extra_linker_options List of additional linker options.
+   *  \param canceller If provided, this object can be used to cancel the
+   *    compilation from another thread before the function has returned.
+   *    If compilation is cancelled before completion, an error is returned.
+   *    The pointer must remain valid until the function has returned.
    *  \return A CompiledProgram object that contains either a valid
    *    CompiledProgramData object or an error state.
    */
   CompiledProgram compile(const std::string& name_expression,
                           const StringMap& extra_header_sources = {},
                           OptionsVec extra_compiler_options = {},
-                          OptionsVec extra_linker_options = {}) const {
+                          OptionsVec extra_linker_options = {},
+                          const Canceller* canceller = nullptr) const {
     // Allow name_expression="" to be passed instead of name_expression={}
     // (which is ambiguous with the overload above that takes a StringVec).
     StringVec name_expressions =
         name_expression.empty() ? StringVec() : StringVec({name_expression});
     return compile(name_expressions, extra_header_sources,
                    std::move(extra_compiler_options),
-                   std::move(extra_linker_options));
+                   std::move(extra_linker_options), canceller);
   }
 
   /*! Compile, link, and load the preprocessed program.
@@ -4200,10 +5171,12 @@ class PreprocessedProgramData
   LoadedProgram load(const StringVec& name_expressions = {},
                      const StringMap& extra_header_sources = {},
                      OptionsVec extra_compiler_options = {},
-                     OptionsVec extra_linker_options = {}) const {
-    CompiledProgram compiled = compile(name_expressions, extra_header_sources,
-                                       std::move(extra_compiler_options),
-                                       std::move(extra_linker_options));
+                     OptionsVec extra_linker_options = {},
+                     const Canceller* canceller = nullptr) const {
+    CompiledProgram compiled =
+        compile(name_expressions, extra_header_sources,
+                std::move(extra_compiler_options),
+                std::move(extra_linker_options), canceller);
     if (!compiled) return LoadedProgram::Error(compiled.error());
     LinkedProgram linked = compiled->link();
     if (!linked) return LoadedProgram::Error(linked.error());
@@ -4218,11 +5191,13 @@ class PreprocessedProgramData
   Kernel get_kernel(std::string name, StringVec other_name_expressions = {},
                     const StringMap& extra_header_sources = {},
                     OptionsVec extra_compiler_options = {},
-                    OptionsVec extra_linker_options = {}) const {
+                    OptionsVec extra_linker_options = {},
+                    const Canceller* canceller = nullptr) const {
     other_name_expressions.push_back(name);
-    CompiledProgram compiled = compile(
-        other_name_expressions, extra_header_sources,
-        std::move(extra_compiler_options), std::move(extra_linker_options));
+    CompiledProgram compiled =
+        compile(other_name_expressions, extra_header_sources,
+                std::move(extra_compiler_options),
+                std::move(extra_linker_options), canceller);
     if (!compiled) return Kernel::Error(compiled.error());
     LinkedProgram linked = compiled->link();
     if (!linked) return Kernel::Error(linked.error());
@@ -6013,6 +6988,63 @@ static const std::unordered_set<std::string>& get_workaround_system_headers() {
   return workaround_system_header_names;
 }
 
+#if JITIFY_ENABLE_NVCC
+// Note: Using this function instead of get_jitsafe_headers_map.count() avoids
+// the header source strings being included in the binary.
+static bool is_jitsafe_header(const std::string& name) {
+  static const std::unordered_set<std::string> jitsafe_headers_set = {
+      "jitify_preinclude.h",
+      "assert.h",
+      "cassert",
+      "float.h",
+      "cfloat",
+      "limits.h",
+      "climits",
+      "math.h",
+      "cmath",
+      "stddef.h",
+      "cstddef",
+      "stdint.h",
+      "cstdint",
+      "stdio.h",
+      "cstdio",
+      "stdlib.h",
+      "cstdlib",
+      "string.h",
+      "cstring",
+      "stdarg.h",
+      "cstdarg",
+      "time.h",
+      "ctime",
+      "algorithm",
+      "array",
+      "complex",
+      "initializer_list",
+      "iostream",
+      "istream",
+      "iterator",
+      "limits",
+      "mutex",
+      "ostream",
+      "sstream",
+      "stdexcept",
+      "string",
+      "tuple",
+      "utility",
+      "type_traits",
+      "vector",
+      "memory.h",
+      "functional",
+      "map",
+      "stack",
+      "iomanip",
+      "typeinfo",
+      "sys/time.h",
+  };
+  return jitsafe_headers_set.count(name);
+}
+#endif  // JITIFY_ENABLE_NVCC
+
 static const StringMap& get_jitsafe_headers_map() {
   static const StringMap jitsafe_headers_map = {
       {"jitify_preinclude.h", jitsafe_header_preinclude_h},
@@ -6084,9 +7116,10 @@ inline std::string get_real_path(const char* filename) {
   return std::string(buffer);
 }
 
-// Reads a whole text file into *content. Returns false on failure.
-inline bool read_text_file(const std::string& fullpath, std::string* content) {
-  FILE* file = ::fopen(fullpath.c_str(), "r");
+// Reads a whole [text] file into *content. Returns false on failure.
+inline bool read_file(const std::string& fullpath, std::string* content,
+                      bool binary) {
+  FILE* file = ::fopen(fullpath.c_str(), binary ? "rb" : "r");
   if (!file) return false;
   std::unique_ptr<FILE, std::integral_constant<decltype(::fclose)*, ::fclose>>
       unique_file(file);
@@ -6108,6 +7141,15 @@ inline bool read_text_file(const std::string& fullpath, std::string* content) {
   }
   content->resize(bytes_read);
   return true;
+}
+
+inline bool read_text_file(const std::string& fullpath, std::string* content) {
+  return read_file(fullpath, content, false);
+}
+
+inline bool read_binary_file(const std::string& fullpath,
+                             std::string* content) {
+  return read_file(fullpath, content, true);
 }
 
 inline void extract_include_paths(OptionsVec* options,
@@ -7517,7 +8559,11 @@ inline ErrorMsg process_cuda_source(const std::string& source,
   // Insert "#line 1" at the beginning of the file so that line numbering is
   // not messed up by subsequent line insertions at the beginning.
   // Note: Reverse order due to insertion at the beginning.
-  insert_directive(&tokens, tokens.begin(), "line", Token(Tt::kNumber, "1"));
+  if ((flags & (ProcessFlags::kAddUsedHeaderWarning |
+                ProcessFlags::kReplacePragmaOnce)) &&
+      !(flags & ProcessFlags::kMinify)) {
+    insert_directive(&tokens, tokens.begin(), "line", Token(Tt::kNumber, "1"));
+  }
   if (flags & ProcessFlags::kAddUsedHeaderWarning) {
     // Insert a guarded #warning that we can use to see if this header was
     // actually included during compilation.
@@ -7773,6 +8819,15 @@ inline PreprocessedProgram PreprocessedProgram::preprocess(
   bool should_remove_unused_globals = static_cast<bool>(compiler_options.pop(
       {"-remove-unused-globals", "--remove-unused-globals"}));
 
+  // These are re-added to the remaining options below; we don't use nvcc
+  // for preprocessing.
+  Option use_nvcc = compiler_options.pop({"-nvcc", "--nvcc"});
+  Option nvcc_path = compiler_options.pop({"-nvcc-path", "--nvcc-path"});
+
+  // These are re-added to the remaining options below; we don't use PCH
+  // for preprocessing.
+  Option use_pch = compiler_options.pop({"-pch", "--pch"});
+
   StringVec include_paths;
   detail::extract_include_paths(&compiler_options, &include_paths);
   for (std::string& include_path : include_paths) {
@@ -7802,8 +8857,10 @@ inline PreprocessedProgram PreprocessedProgram::preprocess(
   std::unordered_map<std::string, detail::StringOrRef> fullpath_to_source;
   std::queue<IncludeName> include_queue;
   ProcessFlags process_flags = ProcessFlags::kNone;
-  if (replace_pragma_once) process_flags |= ProcessFlags::kReplacePragmaOnce;
   if (minify) process_flags |= ProcessFlags::kMinify;
+  const ProcessFlags replace_pragma_once_if_enabled =
+      replace_pragma_once ? ProcessFlags::kReplacePragmaOnce
+                          : ProcessFlags::kNone;
   const ProcessFlags replace_std_flag_if_enabled =
       use_cuda_std ? ProcessFlags::kReplaceStd : ProcessFlags::kNone;
 
@@ -7869,9 +8926,13 @@ inline PreprocessedProgram PreprocessedProgram::preprocess(
 
   const std::string program_fullpath =
       detail::path_join(starting_dir, detail::sanitize_slashes(program_name));
+  // Note: We must ensure we don't add a #line directive to the program source,
+  // because it would break PCH (this restriction does not apply to headers).
   ErrorMsg err = process_cuda_source_fn(&program_source, program_fullpath,
                                         replace_std_flag_if_enabled);
   if (err) return Error(err);
+  // Note: I think this is equivalent to the new NVRTC flag
+  // -fdevice-syntax-only (i.e., run the frontend only, no backend codegen).
   static const char* const early_stop_code = R"(
 #ifdef JITIFY_PREPROCESS_ONLY
 #include <__JITIFY_STOP_COMPILATION>
@@ -7887,9 +8948,10 @@ inline PreprocessedProgram PreprocessedProgram::preprocess(
     std::string fullpath = detail::path_is_absolute(name)
                                ? name
                                : detail::path_join(starting_dir, name);
-    err = process_cuda_source_fn(
-        source_ptr, fullpath,
-        replace_std_flag_if_enabled | ProcessFlags::kAddUsedHeaderWarning);
+    err = process_cuda_source_fn(source_ptr, fullpath,
+                                 replace_std_flag_if_enabled |
+                                     replace_pragma_once_if_enabled |
+                                     ProcessFlags::kAddUsedHeaderWarning);
     if (err) return Error(err);
     // Note: The names (keys) in header_sources will be matched:
     // a) directly, for `#include <name>` directives, and
@@ -7933,7 +8995,8 @@ inline PreprocessedProgram PreprocessedProgram::preprocess(
         // WAR for CUB header that is full of host-only code.
         header_source = "";
       } else {
-        ProcessFlags extra_flags = ProcessFlags::kAddUsedHeaderWarning;
+        ProcessFlags extra_flags = replace_pragma_once_if_enabled |
+                                   ProcessFlags::kAddUsedHeaderWarning;
         const bool is_jitify_preinclude =
             include_name.name() == "jitify_preinclude.h";
         const bool is_builtin_header =
@@ -8066,7 +9129,7 @@ inline PreprocessedProgram PreprocessedProgram::preprocess(
     compiler_options.push_back(Option("-DJITIFY_PREPROCESS_ONLY"));
     compiler_options.push_back(Option("-DJITIFY_USED_HEADER_WARNINGS"));
     std::string compile_error;
-    // Note: This should always fail, because we inserted an #error directive.
+    // Note: This should always fail, because of __JITIFY_STOP_COMPILATION.
     const nvrtcResult compile_result =
         detail::compile_program(program_name, program_source, header_sources,
                                 compiler_options, &compile_error, &compile_log);
@@ -8131,6 +9194,11 @@ inline PreprocessedProgram PreprocessedProgram::preprocess(
   if (disable_warnings) {
     compiler_options.push_back(Option("-w"));
   }
+  // Re-add -nvcc flags if they were provided.
+  if (use_nvcc) compiler_options.emplace_back(std::move(use_nvcc));
+  if (nvcc_path) compiler_options.emplace_back(std::move(nvcc_path));
+  // Re-add -pch flags if they were provided.
+  if (use_pch) compiler_options.emplace_back(std::move(use_pch));
   // Re-add the -remove-unused-globals flag if it was provided.
   if (should_remove_unused_globals) {
     compiler_options.push_back(Option("-remove-unused-globals"));
@@ -8219,18 +9287,6 @@ class Program : public detail::FallibleObjectBase<Program, ProgramData> {
 
 namespace detail {
 
-#if defined _WIN32 || defined _WIN64
-using mode_t = int;
-// These are not actually used.
-static constexpr const mode_t kDefaultDirectoryMode = 0;
-static constexpr const mode_t kDefaultFileMode = 0;
-#else
-static constexpr const mode_t kDefaultDirectoryMode =
-    S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
-static constexpr const mode_t kDefaultFileMode =
-    S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
-#endif
-
 // Opens a file, creating it if necessary.
 class NewFile {
  private:
@@ -8239,21 +9295,9 @@ class NewFile {
   std::string error_ = "Success";
 
   std::string get_error_msg(bool success, const std::string& operation) const {
-    char error_buf[256];
-    const char* error_str = error_buf;
-#if defined _WIN32 || defined _WIN64
-    ::strerror_s(error_buf, sizeof(error_buf), errno);
-#else
-    // See here for why this is necessary:
-    // http://www.club.cc.cmu.edu/~cmccabe/blog_strerror.html
-#if !((_POSIX_C_SOURCE >= 200112L || _XOPEN_SOURCE >= 600) && !_GNU_SOURCE)
-    error_str =
-#endif
-        ::strerror_r(errno, error_buf, sizeof(error_buf));
-#endif
     return success ? "Success"
                    : "Failed to " + operation + " " + filename_ + ": (" +
-                         std::to_string(errno) + ") " + error_str;
+                         std::to_string(errno) + ") " + get_errno_string();
   }
 
  public:
@@ -8402,41 +9446,6 @@ class FileLock {
     }
   }
 };
-
-// Returns false on error. Returns true on success or if path already exists.
-inline bool make_directory(const char* path,
-                           mode_t mode = kDefaultDirectoryMode) {
-  bool is_dir;
-  if (path_exists(path, &is_dir)) return is_dir;
-#if defined _WIN32 || defined _WIN64
-  return ::_mkdir(path) == 0 || errno == EEXIST;
-#else
-  return ::mkdir(path, mode) == 0 || errno == EEXIST;
-#endif
-}
-
-inline bool make_directories(std::string path,
-                             mode_t mode = kDefaultDirectoryMode) {
-#if defined _WIN32 || defined _WIN64
-  // Note that Windows supports both forward and backslash path separators.
-  const char* sep = "\\/";
-#else
-  const char* sep = "/";
-#endif
-  // This is based on https://stackoverflow.com/a/675193/7228843
-  char* p = &path[0];
-  char* s;
-  while ((s = std::strpbrk(p, sep))) {
-    if (s != p) {
-      // Neither root nor double slash in path.
-      *s = '\0';
-      if (!make_directory(path.c_str(), mode)) return false;
-      *s = sep[0];
-    }
-    p = s + 1;
-  }
-  return make_directory(path.c_str(), mode);
-}
 
 // Calls func(const char* filename) for each file in path (not recursively).
 // Stops early if the call returns false. Returns false on error.
@@ -8982,7 +9991,8 @@ class ProgramCache {
   LinkedProgram build_linked_program(const StringVec& name_expressions,
                                      const StringMap& extra_header_sources,
                                      OptionsVec extra_compiler_options,
-                                     OptionsVec extra_linker_options) const {
+                                     OptionsVec extra_linker_options,
+                                     const Canceller* canceller) const {
     StringMap tmp_all_header_sources;
     const StringMap& all_header_sources =
         merge_header_sources(extra_header_sources, &tmp_all_header_sources);
@@ -8992,7 +10002,7 @@ class ProgramCache {
 
     auto compiled = CompiledProgram::compile(
         preprog_.name(), preprog_.source(), all_header_sources,
-        name_expressions, std::move(all_compiler_options));
+        name_expressions, std::move(all_compiler_options), {}, canceller);
     if (!compiled) return LinkedProgram::Error(compiled.error());
     return compiled->link(std::move(all_linker_options));
   }
@@ -9009,7 +10019,8 @@ class ProgramCache {
    *    should be added to the preprocessed program. If provided, the pointed-to
    *    object must exist for the lifetime of this class.
    *  \param file_cache_path (optional) Path in which to store cached linked
-   *    programs. If not specified, file caching is not used.
+   *    programs. If not specified, file caching is not used. The directory is
+   *    automatically created if it does not exist.
    *  \param max_files (optional) The maximum number of linked programs to keep
    *    in the file cache. Defaults to the same value as \p max_in_mem.
    *  \param hash (optional) The object to use to compute hashes of cache keys.
@@ -9035,7 +10046,11 @@ class ProgramCache {
                     /*file_prefix=*/preprog_.name() + ".", file_suffix),
         hash_(hash),
         equal_(equal),
-        to_filename_(to_filename) {}
+        to_filename_(to_filename) {
+    // Ensure the libcuda singleton is constructed before the ProgramCache, so
+    // that it will be destructed _after_ any static ProgramCache instances are.
+    cuda();
+  }
 
   /*! Get or build a LoadedProgram object from the cache.
    *
@@ -9053,6 +10068,10 @@ class ProgramCache {
    *    in the preprocessed program, replacing them if names match.
    *  \param extra_compiler_options List of additional compiler options.
    *  \param extra_linker_options List of additional linker options.
+   *  \param canceller If provided, this object can be used to cancel the
+   *    compilation from another thread before the function has returned.
+   *    If compilation is cancelled before completion, an error is returned.
+   *    The pointer must remain valid until the function has returned.
    *  \return A LoadedProgram object that contains either a valid
    *    LoadedProgramData object or an error state.
    *  \see get_kernel
@@ -9061,7 +10080,8 @@ class ProgramCache {
                             const StringVec& name_expressions,
                             const StringMap& extra_header_sources = {},
                             OptionsVec extra_compiler_options = {},
-                            OptionsVec extra_linker_options = {}) {
+                            OptionsVec extra_linker_options = {},
+                            const Canceller* canceller = nullptr) {
     JITIFY_NVTX_FUNC_RANGE();
     // Add the current CUDA context to the key, as modules are context-specific.
     CUcontext context;
@@ -9135,7 +10155,7 @@ class ProgramCache {
           [&] {
             return build_linked_program(name_expressions, extra_header_sources,
                                         extra_compiler_options,
-                                        extra_linker_options);
+                                        extra_linker_options, canceller);
           },
           [&](const LinkedProgram& _linked, std::ostream& ostream) {
             if (_linked) _linked->serialize(ostream);
@@ -9170,12 +10190,14 @@ class ProgramCache {
   LoadedProgram get_program(const StringVec& name_expressions,
                             const StringMap& extra_header_sources = {},
                             OptionsVec extra_compiler_options = {},
-                            OptionsVec extra_linker_options = {}) {
+                            OptionsVec extra_linker_options = {},
+                            const Canceller* canceller = nullptr) {
     return get_program(
         detail::AutoKey(name_expressions, extra_header_sources,
                         extra_compiler_options, extra_linker_options),
         name_expressions, extra_header_sources,
-        std::move(extra_compiler_options), std::move(extra_linker_options));
+        std::move(extra_compiler_options), std::move(extra_linker_options),
+        canceller);
   }
 
   /*! Get or build a Kernel object from the cache.
@@ -9196,6 +10218,10 @@ class ProgramCache {
    *    in the preprocessed program, replacing them if names match.
    *  \param extra_compiler_options List of additional compiler options.
    *  \param extra_linker_options List of additional linker options.
+   *  \param canceller If provided, this object can be used to cancel the
+   *    compilation from another thread before the function has returned.
+   *    If compilation is cancelled before completion, an error is returned.
+   *    The pointer must remain valid until the function has returned.
    *  \return A Kernel object that contains either a valid KernelData object or
    *    an error state.
    *  \see get_program
@@ -9204,11 +10230,13 @@ class ProgramCache {
                     StringVec other_name_expressions = {},
                     const StringMap& extra_header_sources = {},
                     OptionsVec extra_compiler_options = {},
-                    OptionsVec extra_linker_options = {}) {
+                    OptionsVec extra_linker_options = {},
+                    const Canceller* canceller = nullptr) {
     other_name_expressions.push_back(name);
-    LoadedProgram program = get_program(
-        key, other_name_expressions, extra_header_sources,
-        std::move(extra_compiler_options), std::move(extra_linker_options));
+    LoadedProgram program =
+        get_program(key, other_name_expressions, extra_header_sources,
+                    std::move(extra_compiler_options),
+                    std::move(extra_linker_options), canceller);
     if (!program) return Kernel::Error(program.error());
     return Kernel::get_kernel(std::move(*program), std::move(name));
   }
@@ -9224,13 +10252,15 @@ class ProgramCache {
   Kernel get_kernel(std::string name, StringVec other_name_expressions = {},
                     const StringMap& extra_header_sources = {},
                     OptionsVec extra_compiler_options = {},
-                    OptionsVec extra_linker_options = {}) {
+                    OptionsVec extra_linker_options = {},
+                    const Canceller* canceller = nullptr) {
     other_name_expressions.push_back(name);
     LoadedProgram program = get_program(
         detail::AutoKey(other_name_expressions, extra_header_sources,
                         extra_compiler_options, extra_linker_options),
         other_name_expressions, extra_header_sources,
-        std::move(extra_compiler_options), std::move(extra_linker_options));
+        std::move(extra_compiler_options), std::move(extra_linker_options),
+        canceller);
     if (!program) return Kernel::Error(program.error());
     return Kernel::get_kernel(std::move(*program), std::move(name));
   }
