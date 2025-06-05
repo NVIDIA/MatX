@@ -35,7 +35,7 @@
 #if defined(__CUDA_ARCH__) && __CUDA_ARCH__ < 600
 #error "MatX requires CUDA compute capability 6.0 or newer."
 #endif
-#ifndef JITIFY  
+#ifndef __CUDACC_RTC__  
 #include <cuda_runtime_api.h>
 #endif
 #endif

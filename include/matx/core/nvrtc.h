@@ -71,7 +71,7 @@ auto nvrtc_compile_and_run(const std::string &src, const std::string &name, Op o
 
       jitify2::PreprocessedProgram preprog = jitify2::Program(name, src)
           // Preprocess source code and load all included headers.
-          ->preprocess({"-DJITIFY", "-DMATX_EN_MATHDX",
+          ->preprocess({"-DMATX_EN_MATHDX",
           "-I/repro/MatX/include", "-I/repro/MatX/include/matx/kernels", "-I/repro/MatX/build/_deps/cccl-src/lib/cmake/thrust/../../../thrust", 
           "-I/repro/MatX/build/_deps/cccl-src/lib/cmake/libcudacxx/../../../libcudacxx/include", "-I/repro/MatX/build/_deps/cccl-src/lib/cmake/cub/../../../cub", 
           "-I/repro/MatX/build/_deps/pybind11-src/include", "-I/usr/include/python3.10", "-I/repro/MatX/build/_deps/mathdx-src/nvidia/mathdx/25.01/include", 

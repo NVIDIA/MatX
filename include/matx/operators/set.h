@@ -73,7 +73,7 @@ public:
   using op_type = Op;
   using matx_setop = bool;
 
-#ifndef JITIFY
+#ifndef __CUDACC_RTC__
   __MATX_INLINE__ const std::string str() const {
     return get_type_str(out_) + "=" + get_type_str(op_);
   }

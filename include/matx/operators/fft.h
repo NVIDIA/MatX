@@ -36,7 +36,7 @@
 #include "matx/operators/base_operator.h"
 #include "matx/core/operator_options.h"
 
-#ifndef JITIFY
+#ifndef __CUDACC_RTC__
   #include "matx/transforms/fft/fft_cuda.h"
   #ifdef MATX_EN_CPU_FFT
     #include "matx/transforms/fft/fft_fftw.h"
@@ -199,7 +199,7 @@ namespace matx
         }
 
 
-// #ifndef JITIFY  
+// #ifndef __CUDACC_RTC__  
 //         __MATX_INLINE__ __MATX_HOST__ bool get_capability_impl(OperatorCapability cap) const {
 //           // 1. Determine if the binary operation ITSELF intrinsically has this capability.
 //           if (cap == OperatorCapability::SUPPORTS_JIT) {
@@ -217,7 +217,7 @@ namespace matx
 //           }
 //           return false;
 //         }
-#ifndef JITIFY  
+#ifndef __CUDACC_RTC__  
         __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
         template <typename Out, typename Executor>
@@ -271,7 +271,7 @@ namespace matx
     };
   }
 
-#ifndef JITIFY
+#ifndef __CUDACC_RTC__
   /**
    * Run a 1D FFT with a cached plan
    *
@@ -447,7 +447,7 @@ namespace matx
           return out_dims_[dim];
         }
 
-#ifndef JITIFY
+#ifndef __CUDACC_RTC__
         __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
         template <typename Out, typename Executor>
@@ -508,7 +508,7 @@ namespace matx
     };    
   }
 
-#ifndef JITIFY
+#ifndef __CUDACC_RTC__
 /**
  * Run a 2D FFT with a cached plan
  *

@@ -562,7 +562,7 @@ __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t operator-(const RandomOper
   return a.offset_ - b.offset_;
 }    
 
-#ifndef JITIFY
+#ifndef __CUDACC_RTC__
 
 template <typename Op>
 auto  __MATX_INLINE__ __MATX_HOST__  cbegin(Op &&op) {

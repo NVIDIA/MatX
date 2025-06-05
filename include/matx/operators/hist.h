@@ -35,7 +35,7 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
-#ifndef JITIFY
+#ifndef __CUDACC_RTC__
 #include "matx/transforms/cub.h"
 #endif
 
@@ -100,7 +100,7 @@ namespace detail {
         return OpA::Rank();
       }
 
-#ifndef JITIFY
+#ifndef __CUDACC_RTC__
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
         static_assert(is_cuda_executor_v<Executor>, "hist() only supports the CUDA executor currently"); 

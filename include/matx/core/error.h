@@ -32,7 +32,7 @@
 
 #pragma once
 
-#ifndef JITIFY
+#ifndef __CUDACC_RTC__
 
 #include <cstdio>
 #include <exception>
@@ -115,7 +115,7 @@ namespace matx
     return "Unknown";
   }
 
-#ifndef JITIFY
+#ifndef __CUDACC_RTC__
   namespace detail {
   struct matxException : public std::exception
   {

@@ -35,7 +35,7 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
-#ifndef JITIFY
+#ifndef __CUDACC_RTC__
 #include "matx/transforms/cub.h"
 #endif
 
@@ -89,7 +89,7 @@ namespace detail {
         return 1;
       }
 
-#ifndef JITIFY
+#ifndef __CUDACC_RTC__
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
         trace_impl(cuda::std::get<0>(out), a_, ex);

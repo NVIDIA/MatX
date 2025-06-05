@@ -36,7 +36,7 @@
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
 #include "matx/core/operator_options.h"
-#ifndef JITIFY
+#ifndef __CUDACC_RTC__
   #include "matx/transforms/chol/chol_cuda.h"
   #ifdef MATX_EN_CPU_SOLVER
     #include "matx/transforms/chol/chol_lapack.h"
@@ -78,7 +78,7 @@ namespace detail {
         return OpA::Rank();
       }
 
-#ifndef JITIFY
+#ifndef __CUDACC_RTC__
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
         chol_impl(cuda::std::get<0>(out),  a_, ex, uplo_);  

@@ -35,7 +35,7 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
-#ifndef JITIFY
+#ifndef __CUDACC_RTC__
   #include "matx/transforms/svd/svd_cuda.h"
   #ifdef MATX_EN_CPU_SOLVER
     #include "matx/transforms/svd/svd_lapack.h"
@@ -72,7 +72,7 @@ namespace detail {
         return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_));
       }
 
-#ifndef JITIFY
+#ifndef __CUDACC_RTC__
       // TODO: Handle SVDMode::NONE case better to not require U & VT
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {

@@ -42,7 +42,7 @@
 #include "matx/core/type_utils.h"
 #include "matx/core/utils.h"
 #include <cuda/std/complex>
-#ifndef JITIFY
+#ifndef __CUDACC_RTC__
 #include "matx/core/cache.h"
 #include "matx/core/nvtx.h"
 #include "matx/transforms/cub.h"
@@ -192,7 +192,7 @@ public:
 
 } // namespace detail
 
-#ifndef JITIFY
+#ifndef __CUDACC_RTC__
 /**
  * Perform a reduction
  *

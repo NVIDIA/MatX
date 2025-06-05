@@ -35,7 +35,7 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
-#ifndef JITIFY
+#ifndef __CUDACC_RTC__
 #include "matx/transforms/cub.h"
 #endif
 
@@ -95,7 +95,7 @@ namespace detail {
         return out_dims_[dim];
       }
       
-#ifndef JITIFY
+#ifndef __CUDACC_RTC__
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
         argsort_impl(cuda::std::get<0>(out), a_, dir_, ex);

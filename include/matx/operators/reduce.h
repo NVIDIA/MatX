@@ -35,7 +35,7 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
-#ifndef JITIFY
+#ifndef __CUDACC_RTC__
 #include "matx/transforms/reduce.h"
 #endif
 

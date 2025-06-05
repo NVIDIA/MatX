@@ -35,7 +35,7 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
-#ifndef JITIFY
+#ifndef __CUDACC_RTC__
 #include "matx/transforms/resample_poly.h"
 #endif
 
@@ -108,7 +108,7 @@ namespace detail {
       }
 
 
-#ifndef JITIFY
+#ifndef __CUDACC_RTC__
       __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
       template <typename Out, typename Executor>

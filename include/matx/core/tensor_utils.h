@@ -46,7 +46,7 @@
 namespace matx
 {
 
-#ifndef JITIFY
+#ifndef __CUDACC_RTC__
   static constexpr bool PRINT_ON_DEVICE = false;      ///< print() uses printf on device
   inline unsigned int PRINT_PRECISION = 4;            ///< control PrintVal()'s precision
 

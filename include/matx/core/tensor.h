@@ -32,7 +32,7 @@
 
 #pragma once
 
-//#ifndef JITIFY
+//#ifndef __CUDACC_RTC__
 
 #include <cstdint>
 #include <iomanip>
@@ -77,7 +77,7 @@ template <typename T,
           typename Storage = DefaultStorage<T>,
           typename Desc = DefaultDescriptor<RANK>>
 class tensor_t : public detail::tensor_impl_t<T,RANK,Desc> {
-#ifndef JITIFY  
+#ifndef __CUDACC_RTC__  
 public:
   // Type specifier for reflection on class
   using type = T; ///< Type of traits

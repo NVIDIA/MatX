@@ -852,14 +852,14 @@ inline constexpr bool is_sparse_tensor_v = detail::is_sparse_tensor<typename rem
 namespace detail {
 // Helpers for extracting types in the aliases
   template <typename> struct is_std_tuple: std::false_type {};
-#ifndef JITIFY
+#ifndef __CUDACC_RTC__
   template <typename ...T> struct is_std_tuple<std::tuple<T...>>: std::true_type {};
 #endif
   template <typename ...T> struct is_std_tuple<cuda::std::tuple<T...>>: std::true_type {};
 
   template<typename T> struct is_std_array : std::false_type {};
   template<typename T, size_t N> struct is_std_array<cuda::std::array<T, N>> : std::true_type {};
-#ifndef JITIFY  
+#ifndef __CUDACC_RTC__  
   template<typename T, size_t N> struct is_std_array<std::array<T, N>> : std::true_type {};
 #endif
   template <typename T> inline constexpr bool is_std_array_v = detail::is_std_array<remove_cvref_t<T>>::value;

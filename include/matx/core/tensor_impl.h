@@ -258,7 +258,7 @@ MATX_IGNORE_WARNING_POP_GCC
     {
     }
 
-#ifndef JITIFY
+#ifndef __CUDACC_RTC__
     __MATX_HOST__ void Shallow(const self_type &rhs) noexcept
     {
       data_.ldata_ = rhs.Data();
@@ -1251,7 +1251,7 @@ MATX_IGNORE_WARNING_POP_GCC
       return desc_.Size(Rank() - 1);
     }
 
-#ifndef JITIFY
+#ifndef __CUDACC_RTC__
     __MATX_INLINE__ __MATX_HOST__  auto Bytes() const noexcept
     {
       return TotalSize() * sizeof(*data_.ldata_);

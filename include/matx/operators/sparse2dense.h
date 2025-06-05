@@ -35,7 +35,7 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
-#ifndef JITIFY
+#ifndef __CUDACC_RTC__
 #include "matx/transforms/convert/sparse2dense_cusparse.h"
 #endif
 
@@ -95,7 +95,7 @@ public:
     return out_dims_[dim];
   }
 
-#ifndef JITIFY
+#ifndef __CUDACC_RTC__
   __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
   template <typename Out, typename Executor>

@@ -35,7 +35,7 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
-#ifndef JITIFY
+#ifndef __CUDACC_RTC__
   #include "matx/transforms/qr/qr_cuda.h"
   #ifdef MATX_EN_CPU_SOLVER
     #include "matx/transforms/qr/qr_lapack.h"
@@ -70,7 +70,7 @@ namespace detail {
         return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_));
       }
 
-#ifndef JITIFY
+#ifndef __CUDACC_RTC__
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
         static_assert(is_cuda_executor_v<Executor>, "qr() only supports the CUDA executor currently");

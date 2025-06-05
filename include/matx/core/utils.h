@@ -46,7 +46,7 @@ constexpr int VOLTA_CC = 7;
 constexpr int PASCAL_CC = 6;
 
 namespace detail {
-#ifndef JITIFY
+#ifndef __CUDACC_RTC__
   
 __MATX_INLINE__ int GetDeviceAttr(cudaDeviceAttr attr) {
     int val;

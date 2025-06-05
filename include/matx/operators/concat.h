@@ -265,7 +265,7 @@ namespace matx
     }; // end class ConcatOp
   } // end namespace detail
 
-#ifndef JITIFY
+#ifndef __CUDACC_RTC__
   /**
    * @brief ConcatOp multiple operators along a dimension
    *

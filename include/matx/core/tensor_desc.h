@@ -147,7 +147,7 @@ public:
   template <int M = RANK>
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ tensor_desc_t(const index_t (&shape)[M])
   {
-    #ifndef JITIFY
+    #ifndef __CUDACC_RTC__
     // Construct a new cuda::std::array. Slower, but saves duplication
     cuda::std::array<index_t, M> tshape;
     cuda::std::move(cuda::std::begin(shape), cuda::std::end(shape), tshape.begin());

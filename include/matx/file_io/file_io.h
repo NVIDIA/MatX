@@ -32,7 +32,7 @@
 
 #pragma once
 
-#ifndef JITIFY
+#ifndef __CUDACC_RTC__
 #include <cstdio>
 #include <filesystem>
 #include <shared_mutex>

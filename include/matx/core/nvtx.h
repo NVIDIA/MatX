@@ -31,7 +31,7 @@
 /////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#ifndef JITIFY
+#ifndef __CUDACC_RTC__
 #include <functional>
 #include <map>
 #include <mutex>
