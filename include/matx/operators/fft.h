@@ -137,6 +137,10 @@ namespace matx
             }
           }
         }
+
+        __MATX_INLINE__ std::string get_capability_str() const {
+          return "  constexpr static int fft_size = " + std::to_string(fft_size_) + ";\n";
+        }
                   
         template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
@@ -147,7 +151,7 @@ namespace matx
           }
           else {
 #if defined(__CUDA_ARCH__) && defined(__CUDACC_RTC__)
-            return detail::RunDxFFT<input_type, CapType, 16>(a_, indices...);
+            return detail::RunDxFFT<input_type, CapType>(a_, indices...);
             // __syncthreads();
             // using in_vec_type = decltype(a_.template operator()<CapType>(indices...));
             // __shared__  Vector<input_type, static_cast<int>(EPT)> thread_data[16];
@@ -189,6 +193,13 @@ namespace matx
         template <OperatorCapability Cap>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
           if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+            return combine_capabilities<Cap>(true, detail::get_operator_capability<Cap>(a_));
+          }
+          else if constexpr (Cap == OperatorCapability::JIT_CAP_QUERY) {
+            auto self_cap = get_capability_str();
+            return combine_capabilities<Cap>(self_cap, detail::get_operator_capability<Cap>(a_));
+          }
+          else if constexpr (Cap == OperatorCapability::FFT_DX_JIT) {
             return combine_capabilities<Cap>(true, detail::get_operator_capability<Cap>(a_));
           }
           else {

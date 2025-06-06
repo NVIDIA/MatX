@@ -156,71 +156,33 @@ namespace matx
 
             bool stride = detail::get_grid_dims<Op::Rank()>(blocks, threads, sizes, static_cast<int>(max_ept), 256);
             
-            // Helper function to execute kernel with dual path (direct kernel vs JIT)
-            auto execute_with_ept = [&](auto ept_tag) -> bool {
+            // Helper function to execute kernel without JIT
+            auto execute_without_jit = [&](auto ept_tag) -> bool {
               constexpr auto EPT = decltype(ept_tag)::ept;
               using CapType      = decltype(ept_tag);
               if (max_ept == EPT) {
                 if constexpr (Op::Rank() == 1) {
-#ifdef MATX_EN_MATHDX
-                  if constexpr (EPT == detail::ElementsPerThread::TWO) {
-                    nvrtc_compile_and_run<CapType>(matx::detail::matxOpT1JITKernelStr, "output.cu", op, sizes[0], blocks, threads);
-                  } else {
-                    detail::matxOpT1Kernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0]);
-                  }
-#else
                   detail::matxOpT1Kernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0]);
-#endif
                 }
                 else if constexpr (Op::Rank() == 2) {
                   if (stride) {
-#ifdef MATX_EN_MATHDX
-                    // Add JIT path for 2D stride kernels if needed
                     detail::matxOpT2StrideKernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
-#else
-                    detail::matxOpT2StrideKernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
-#endif
                   } else {
-#ifdef MATX_EN_MATHDX
-                    // Add JIT path for 2D kernels if needed
                     detail::matxOpT2Kernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
-#else
-                    detail::matxOpT2Kernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
-#endif
                   }
                 }
                 else if constexpr (Op::Rank() == 3) {
                   if (stride) {
-#ifdef MATX_EN_MATHDX
-                    // Add JIT path for 3D stride kernels if needed
                     detail::matxOpT3StrideKernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
-#else
-                    detail::matxOpT3StrideKernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
-#endif
                   } else {
-#ifdef MATX_EN_MATHDX
-                    // Add JIT path for 3D kernels if needed
                     detail::matxOpT3Kernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
-#else
-                    detail::matxOpT3Kernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
-#endif
                   }
                 }
                 else if constexpr (Op::Rank() == 4) {
                   if (stride) {
-#ifdef MATX_EN_MATHDX
-                    // Add JIT path for 4D stride kernels if needed
                     detail::matxOpT4StrideKernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
-#else
-                    detail::matxOpT4StrideKernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
-#endif
                   } else {
-#ifdef MATX_EN_MATHDX
-                    // Add JIT path for 4D kernels if needed
                     detail::matxOpT4Kernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
-#else
-                    detail::matxOpT4Kernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
-#endif
                   }
                 }
                 return true;
@@ -228,27 +190,35 @@ namespace matx
               return false;
             };
 
-            // Helper tags for template parameter deduction
-            constexpr auto one_tag = detail::CapabilityParams<detail::ElementsPerThread::ONE, false>{};
-            constexpr auto two_tag = detail::CapabilityParams<detail::ElementsPerThread::TWO, false>{};
-            constexpr auto four_tag = detail::CapabilityParams<detail::ElementsPerThread::FOUR, false>{};
-            constexpr auto eight_tag = detail::CapabilityParams<detail::ElementsPerThread::EIGHT, false>{};
-            constexpr auto sixteen_tag = detail::CapabilityParams<detail::ElementsPerThread::SIXTEEN, false>{};
-            constexpr auto thirty_two_tag = detail::CapabilityParams<detail::ElementsPerThread::THIRTY_TWO, false>{};
 
-            // Try each EPT value in order
-            if (execute_with_ept(thirty_two_tag) ||
-                execute_with_ept(sixteen_tag) ||
-                execute_with_ept(eight_tag) ||
-                execute_with_ept(four_tag) ||
-                execute_with_ept(two_tag) ||
-                execute_with_ept(one_tag)) {
-              // Successfully executed
+            const bool use_jit = detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op);
+            if (!use_jit) {
+              // Helper tags for template parameter deduction
+              constexpr auto one_tag = detail::CapabilityParams<detail::ElementsPerThread::ONE, false>{};
+              constexpr auto two_tag = detail::CapabilityParams<detail::ElementsPerThread::TWO, false>{};
+              constexpr auto four_tag = detail::CapabilityParams<detail::ElementsPerThread::FOUR, false>{};
+              constexpr auto eight_tag = detail::CapabilityParams<detail::ElementsPerThread::EIGHT, false>{};
+              constexpr auto sixteen_tag = detail::CapabilityParams<detail::ElementsPerThread::SIXTEEN, false>{};
+              constexpr auto thirty_two_tag = detail::CapabilityParams<detail::ElementsPerThread::THIRTY_TWO, false>{};
+
+              if constexpr (Op::Rank() <= 4) {
+                if ((execute_without_jit(thirty_two_tag) ||
+                          execute_without_jit(sixteen_tag) ||
+                          execute_without_jit(eight_tag) ||
+                          execute_without_jit(four_tag) ||
+                          execute_without_jit(two_tag) ||
+                          execute_without_jit(one_tag)) == false) {
+                  MATX_THROW(matxInvalidParameter, "No kernel found for this operator");
+                }
+              }
+              else {
+                index_t dims = cuda::std::accumulate(cuda::std::begin(sizes) + 1, cuda::std::end(sizes), 1, cuda::std::multiplies<index_t>());
+                detail::matxOpTDKernel<<<blocks, threads, 0, stream_>>>(op, sizes, dims);
+              }
             }
-            else if constexpr (Op::Rank() > 4) {
-              index_t dims = cuda::std::accumulate(cuda::std::begin(sizes) + 1, cuda::std::end(sizes), 1, cuda::std::multiplies<index_t>());
-              detail::matxOpTDKernel<<<blocks, threads, 0, stream_>>>(op, sizes, dims);
-            } 
+            else {
+              detail::nvrtc_compile_and_run("output.cu", op, sizes, blocks, threads, static_cast<detail::ElementsPerThread>(max_ept), stride);
+            }
           }
 #else
           MATX_ASSERT_STR(false, matxInvalidParameter, "Cannot call device executor using host compiler");

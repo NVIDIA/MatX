@@ -60,6 +60,8 @@ namespace detail {
     NONE,
     SUPPORTS_JIT,                 // Can this operation be JIT-compiled?
     ELEMENTS_PER_THREAD,          // How many elements per thread?
+    JIT_CAP_QUERY,  // Result is the concatenation of the capabilities of the operator and its children.
+    FFT_DX_JIT, // Can this operation be JIT-compiled for cuFFTDx?
     // Add more capabilities as needed
   };
 
@@ -70,7 +72,31 @@ namespace detail {
     AND_QUERY,  // Result is true only if ALL relevant operators in the expression have the capability.
             // The operator itself AND its children.
     MIN_QUERY,  // Result is the minimum of the capabilities of the operator and its children.
+    STR_CAT_QUERY,  // Result is the concatenation of the capabilities of the operator and its children.
   };
+  
+
+#if !defined(__CUDACC_RTC__)
+  template <ElementsPerThread EPT, bool JIT>
+  struct CapabilityParams {
+    static constexpr ElementsPerThread ept = EPT;
+    static constexpr bool jit = JIT;
+
+    // For JIT there will be other capabilties patched in with a string
+  };  
+
+  using DefaultCapabilities = CapabilityParams<ElementsPerThread::ONE, false>;  
+  
+  // C++17-compatible trait to detect scoped enums
+  template<typename T, typename = void>
+  struct is_scoped_enum : std::false_type {};
+
+  template<typename T>
+  struct is_scoped_enum<T, std::enable_if_t<cuda::std::is_enum_v<T>>> 
+      : cuda::std::bool_constant<!cuda::std::is_convertible_v<T, cuda::std::underlying_type_t<T>>> {};
+
+  template<typename T>
+  constexpr bool is_scoped_enum_v = is_scoped_enum<T>::value;
 
   // Trait to get default values and identities based on capability
   template <OperatorCapability Cap>
@@ -85,11 +111,26 @@ namespace detail {
   };
 
   template <>
+  struct capability_attributes<OperatorCapability::FFT_DX_JIT> {
+    using type = bool;
+    static constexpr bool default_value = false;
+    static constexpr bool or_identity = true;
+    static constexpr bool and_identity = false;
+  };  
+
+  template <>
   struct capability_attributes<OperatorCapability::ELEMENTS_PER_THREAD> {
     using type = ElementsPerThread;
     static constexpr ElementsPerThread default_value = ElementsPerThread::MAX; // Example: 1 element per thread by default
     static constexpr ElementsPerThread min_identity = ElementsPerThread::MAX;
   };
+
+  template <>
+  struct capability_attributes<OperatorCapability::JIT_CAP_QUERY> {
+    using type = std::string;
+    static inline const std::string default_value = "";
+    static inline const std::string min_identity = "";
+  };  
 
   // Helper to safely get capability from an operator.
   // OperandType is likely base_type_t<ActualOpType> or a raw scalar/functor type.
@@ -112,6 +153,8 @@ namespace detail {
         return CapabilityQueryType::OR_QUERY; // If any sub-operator supports JIT, the expression might be JIT-able.
       case OperatorCapability::ELEMENTS_PER_THREAD:
         return CapabilityQueryType::MIN_QUERY; // The expression should use the minimum elements per thread of its children.
+      case OperatorCapability::JIT_CAP_QUERY:
+        return CapabilityQueryType::STR_CAT_QUERY; // The expression should use the concatenation of the capabilities of its children.
       default:
         // Default to OR_QUERY or handle as an error/assertion if a capability isn't mapped.
         return CapabilityQueryType::OR_QUERY; 
@@ -141,7 +184,7 @@ namespace detail {
         children_aggregated_val = (query_type == CapabilityQueryType::AND_QUERY) ?
                                   capability_attributes<Cap>::and_identity :
                                   capability_attributes<Cap>::or_identity;
-      } else if constexpr (std::is_same_v<CapType, int>) {
+      } else if constexpr (std::is_same_v<CapType, int> || is_scoped_enum_v<CapType>) {
         if (query_type == CapabilityQueryType::MIN_QUERY) {
           children_aggregated_val = capability_attributes<Cap>::min_identity;
         } else {
@@ -149,9 +192,11 @@ namespace detail {
           // This path needs clear definition if other query types are used for int.
           children_aggregated_val = capability_attributes<Cap>::default_value; // Fallback
         }
+      } else if constexpr (std::is_same_v<CapType, std::string>) {
+        children_aggregated_val = capability_attributes<Cap>::default_value;
       } else {
         // Fallback for other types, should be defined in capability_attributes
-        children_aggregated_val = capability_attributes<Cap>::default_value;
+        children_aggregated_val = capability_attributes<Cap>::default_value; // Fallback
       }
     } else { // One or more children
       if constexpr (std::is_same_v<CapType, bool>) {
@@ -162,7 +207,7 @@ namespace detail {
               children_aggregated_val = capability_attributes<Cap>::and_identity;
               ((children_aggregated_val = children_aggregated_val && child_vals), ...);
           }
-      } else if constexpr (std::is_same_v<CapType, int> || std::is_same_v<std::underlying_type_t<CapType>, int>) {
+      } else if constexpr (std::is_same_v<CapType, int> || is_scoped_enum_v<CapType>) {
           if (query_type == CapabilityQueryType::MIN_QUERY) {
               children_aggregated_val = capability_attributes<Cap>::min_identity;
               // C++17 way to apply cuda::std::min over a parameter pack
@@ -174,6 +219,13 @@ namespace detail {
               // Not implemented for other query types.
               MATX_ASSERT_STR(false, matxInvalidParameter, "Not implemented for other query types.");
           }
+      } else if constexpr (std::is_same_v<CapType, std::string>) {
+        if (query_type == CapabilityQueryType::STR_CAT_QUERY) {
+          children_aggregated_val = capability_attributes<Cap>::default_value;
+          ((children_aggregated_val += child_vals), ...);
+        } else {
+          children_aggregated_val = capability_attributes<Cap>::default_value;
+        }
       } else {
           // Not implemented for other types.
           MATX_ASSERT_STR(false, matxInvalidParameter, "Not implemented for other types.");
@@ -196,9 +248,16 @@ namespace detail {
             }
             return self_val && children_aggregated_val;
         }
-    } else if constexpr (std::is_same_v<CapType, int> || std::is_same_v<std::underlying_type_t<CapType>, int>) {
+    } else if constexpr (std::is_same_v<CapType, int> || is_scoped_enum_v<CapType>) {
         if (query_type == CapabilityQueryType::MIN_QUERY) {
             return static_cast<CapType>(cuda::std::min(static_cast<int>(self_val), static_cast<int>(children_aggregated_val)));
+        } else {
+            MATX_ASSERT_STR(false, matxInvalidParameter, "Not implemented for other query types.");
+            return self_val;
+        }
+    } else if constexpr (std::is_same_v<CapType, std::string>) {
+        if (query_type == CapabilityQueryType::STR_CAT_QUERY) {
+            return self_val + children_aggregated_val;
         } else {
             MATX_ASSERT_STR(false, matxInvalidParameter, "Not implemented for other query types.");
             return self_val;
@@ -209,13 +268,7 @@ namespace detail {
     }
   }
 
-  template <ElementsPerThread EPT, bool JIT>
-  struct CapabilityParams {
-    static constexpr ElementsPerThread ept = EPT;
-    static constexpr bool jit = JIT;
-  };
-
-  using DefaultCapabilities = CapabilityParams<ElementsPerThread::ONE, false>;
+#endif
 
 } // namespace detail
 } // namespace matx 

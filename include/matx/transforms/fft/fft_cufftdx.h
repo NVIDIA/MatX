@@ -51,49 +51,27 @@ namespace matx {
             if (arch_cc == 80 || arch_cc == 87 || arch_cc == 90) return (fft_size <= 16384);
       }
 
-      // } else { // is_r2c_c2r_folded_mode
-      //     if (!is_power_of_two(fft_size)) return false;
-
-      //     switch (precision) {
-      //         case Precision::HALF:
-      //             if (arch_cc == 75) return (fft_size >= 4 && fft_size <= 8192);
-      //             if (arch_cc == 70 || arch_cc == 72 || arch_cc == 86 || arch_cc == 89) return (fft_size >= 4 && fft_size <= 32768);
-      //             if (arch_cc == 80 || arch_cc == 87 || arch_cc == 90) return (fft_size >= 2 && fft_size <= 65536);
-      //             break;
-      //         case Precision::FLOAT:
-      //             if (arch_cc == 75) return (fft_size >= 2 && fft_size <= 8192);
-      //             if (arch_cc == 70 || arch_cc == 72 || arch_cc == 86 || arch_cc == 89) return (fft_size >= 2 && fft_size <= 32768);
-      //             if (arch_cc == 80 || arch_cc == 87 || arch_cc == 90) return (fft_size >= 2 && fft_size <= 65536);
-      //             break;
-      //         case Precision::DOUBLE:
-      //             if (arch_cc == 75) return (fft_size >= 2 && fft_size <= 4096);
-      //             if (arch_cc == 70 || arch_cc == 72 || arch_cc == 86 || arch_cc == 89) return (fft_size >= 2 && fft_size <= 16384);
-      //             if (arch_cc == 80 || arch_cc == 87 || arch_cc == 90) return (fft_size >= 2 && fft_size <= 32768);
-      //             break;
-      //     }
-      // }
 
       return false; // Default if architecture or specific configuration not explicitly supported by table logic
   }
 
-
-  template <typename input_type, typename CapType, int size, typename Op, typename... Is>
+#ifdef __CUDA_ARCH__
+  template <typename input_type, typename CapType, typename Op, typename... Is>
   __MATX_INLINE__ __MATX_DEVICE__ auto RunDxFFT(const Op &op, Is... indices) {
     __syncthreads();
 
-    __shared__  Vector<input_type, static_cast<int>(CapType::ept)> thread_data[size];
+    __shared__  Vector<input_type, static_cast<int>(CapType::ept)> thread_data[CapType::fft_size];
     thread_data[threadIdx.x] = op.template operator()<CapType>(indices...);
     __syncthreads();
 
-    using FFT = decltype(cufftdx::Block() + cufftdx::Size<size>() + cufftdx::Type<cufftdx::fft_type::c2c>() +
-                cufftdx::Direction<cufftdx::fft_direction::forward>() + cufftdx::Precision<float>() +
-                cufftdx::FFTsPerBlock<1>() + cufftdx::SM<800>() + cufftdx::ElementsPerThread<static_cast<int>(CapType::ept)>());
+    using FFT = decltype(cufftdx::Block() + cufftdx::Size<CapType::fft_size>() + cufftdx::Type<cufftdx::fft_type::c2c>() +
+                cufftdx::Direction<cufftdx::fft_direction::forward>() + cufftdx::Precision<typename input_type::value_type>() +
+                cufftdx::FFTsPerBlock<1>() + cufftdx::SM<__CUDA_ARCH__>() + cufftdx::ElementsPerThread<static_cast<int>(CapType::ept)>());
 
-    //auto thread_data = a_.template operator()<CapType>(indices...);
-    //extern __shared__ __align__(alignof(float2)) input_type shared_mem[];
     FFT().execute(&thread_data[0]);
     return thread_data[threadIdx.x];  
   }
+#endif
 
   } // namespace detail
 } // namespace matx
