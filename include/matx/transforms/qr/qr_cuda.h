@@ -157,13 +157,13 @@ namespace detail {
         auto x = slice<RANK-1>(R, xSliceB, xSliceE);
 
         // operator which zeros out values above current index in matrix
-        (xz = (index(x.Rank()-1) >= i) * x).run(stream);
+        (xz = as_type<typename inner_op_type_t<ATypeS>::type >(index(x.Rank()-1) >= i) * x).run(stream);
 
         // compute L2 norm without sqrt. 
         (N = sum(abs2(xz))).run(stream);
         //(N = sqrt(N)).run(stream);  // sqrt folded into next op
 
-        (v = xz + (index(v.Rank()-1) == i) * sign(xz) * sqrt(nc)).run(stream); 
+        (v = xz + as_type<typename inner_op_type_t<ATypeS>::type >(index(v.Rank()-1) == i) * sign(xz) * sqrt(nc)).run(stream); 
 
         auto r = x;  // alias column of R happens to be the same as x
 
@@ -654,7 +654,7 @@ public:
 
     for (int i = 0; i < std::min(params.m, params.n); i++){
       rSliceB[RANK-2] = i;
-      (slice<RANK-1>(out_r, rSliceB, rSliceE) = (index(RANK-2) >= i)*slice<RANK-1>(out, rSliceB, rSliceE)).run(exec);
+      (slice<RANK-1>(out_r, rSliceB, rSliceE) = as_type<typename OutTensor_t::value_type>(index(RANK-2) >= i)*slice<RANK-1>(out, rSliceB, rSliceE)).run(exec);
     }
 
     // Intentionally looping AGAIN, so we can reuse h_info and d_info without 

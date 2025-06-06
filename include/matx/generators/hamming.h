@@ -115,6 +115,7 @@ namespace matx
   template <int Dim, int RANK, typename T = float>
     inline auto hamming(const index_t (&s)[RANK])
     {
-      return hamming<Dim>(detail::to_array(s));
+      const auto shape = detail::to_array(s);
+      return hamming<Dim, decltype(shape), T>(std::forward<decltype(shape)>(shape));
     }
 } // end namespace matx

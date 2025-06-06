@@ -334,7 +334,7 @@ public:
 
     auto xf = tpcView.Permute({0, 2, 1});
 
-    (xc = xc * hamming<1>({numChannels, numPulses - (cancelMask.Size(0) - 1),
+    (xc = xc * hamming<1, xc.Rank(), typename ComplexType::value_type>({numChannels, numPulses - (cancelMask.Size(0) - 1),
                           numCompressedSamples}))
         .run(exec);
     (xf = fft(xf)).run(exec);
