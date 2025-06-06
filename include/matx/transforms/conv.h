@@ -281,28 +281,42 @@ inline void conv1d_impl_internal(OutputType &o, const In1Type &i1, const In2Type
   const typename detail::base_type_t<In1Type> &in1_base = i1;
   const typename detail::base_type_t<In2Type> &in2_base = i2;
 
-  if (i1.Size(Rank-1) < i2.Size(Rank-1)) {
-    if (method == MATX_C_METHOD_DIRECT) {
-      if constexpr (detail::CheckDirect1DConvSupport<Executor>()) {
-        detail::matxDirectConv1DInternal(o_base, in2_base, in1_base, mode, exec);
-      } else {
-        MATX_THROW(matxNotSupported, "direct conv1d() only supports the CUDA executor currently");
-      }
+  // Helper lambda to handle direct convolution with consistent error handling
+  auto handle_direct_conv = [&](const auto &signal_base, const auto &filter_base) {
+    if constexpr (detail::CheckDirect1DConvSupport<Executor>()) {
+      detail::matxDirectConv1DInternal(o_base, signal_base, filter_base, mode, exec);
+    } else {
+      MATX_THROW(matxNotSupported, "direct conv1d() only supports the CUDA executor currently");
+    }
+  };
+
+  // Helper lambda to handle FFT or auto-switch logic
+  auto handle_fft_or_auto = [&](const auto &signal_base, const auto &filter_base, const auto &signal, const auto &filter) {
+    // Switch to direct if both inputs are real-valued
+    if constexpr (!is_complex_v<typename In1Type::value_type> && !is_complex_v<typename In2Type::value_type>) {
+      handle_direct_conv(signal_base, filter_base);
     }
     else {
-      detail::matxFFTConv1DInternal(o_base, i2, i1, mode, exec);
+      detail::matxFFTConv1DInternal(o_base, signal, filter, mode, exec);
+    }
+  };
+
+  if (i1.Size(Rank-1) < i2.Size(Rank-1)) {
+    // i2 is the signal, i1 is the filter
+    if (method == MATX_C_METHOD_DIRECT) {
+      handle_direct_conv(in2_base, in1_base);
+    }
+    else {
+      handle_fft_or_auto(in2_base, in1_base, i2, i1);
     }
   }
   else {
+    // i1 is the signal, i2 is the filter
     if (method == MATX_C_METHOD_DIRECT) {
-      if constexpr (detail::CheckDirect1DConvSupport<Executor>()) {
-        detail::matxDirectConv1DInternal(o_base, in1_base, in2_base, mode, exec);
-      } else {
-        MATX_THROW(matxNotSupported, "direct conv1d() only supports the CUDA executor currently");
-      }
+      handle_direct_conv(in1_base, in2_base);
     }
     else {
-      detail::matxFFTConv1DInternal(o_base, i1, i2, mode, exec);
+      handle_fft_or_auto(in1_base, in2_base, i1, i2);
     }
   }
 }
