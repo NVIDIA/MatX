@@ -418,10 +418,56 @@ static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto scalar_internal_isinf(
 MATX_UNARY_OP_GEN_NOFUNC(isinf, IsInf);
 
 
+
+template <typename T1, typename T2>
+static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto scalar_internal_mul(T1 v1, T2 v2) {
+  if constexpr (is_complex_v<T1> && std::is_arithmetic_v<T2>) {
+    if constexpr (is_complex_half_v<T1>) {
+      return (T1){v1.real() * static_cast<typename T1::value_type>(
+                                  static_cast<float>(v2)),
+                  v1.imag() * static_cast<typename T1::value_type>(
+                                  static_cast<float>(v2))};
+    }
+    else {
+      return (T1){v1.real() * static_cast<typename T1::value_type>(v2),
+                  v1.imag() * static_cast<typename T1::value_type>(v2)};
+    }
+  }
+  else if constexpr (is_complex_v<T2> && std::is_arithmetic_v<T1>) {
+    if constexpr (is_complex_half_v<T2>) {
+      return (T2){static_cast<typename T2::value_type>(static_cast<float>(v1)) * v2.real(),
+                  static_cast<typename T2::value_type>(static_cast<float>(v1)) * v2.imag()};
+    }
+    else {
+      return (T2){static_cast<typename T2::value_type>(v1) * v2.real(),
+                  static_cast<typename T2::value_type>(v1) * v2.imag()};
+    }
+  }
+  else {
+    return v1 * v2;
+  }
+}
+template <typename T1, typename T2, matx::detail::ElementsPerThread EPT = matx::detail::ElementsPerThread::ONE>
+static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto internal_mul(T1 v1, T2 v2) {
+  if constexpr (is_vector_v<T1> || is_vector_v<T2>) {   
+    return BinVecFunc(scalar_internal_mul<typename T1::value_type, typename T2::value_type>, v1, v2);
+  }
+  else {
+    return scalar_internal_mul(v1, v2);   
+  }
+}
+template <typename T1, typename T2> struct MulOp {
+  static __MATX_INLINE__ std::string str(const std::string &in1, const std::string &in2) { return std::string("mul") + "(" + in1 + "," + in2 + ")"; }
+  template <matx::detail::ElementsPerThread EPT, typename T1V, typename T2V>
+  __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(const T1V &v1, const T2V &v2) const {
+    return BinVecFunc(internal_mul<T1, T2>, v1, v2);
+  }
+  using value_type = std::invoke_result_t<decltype(scalar_internal_mul<T1, T2>), T1, T2>;
+};
+
 // Binary Operators
 MATX_BINARY_OP_GEN_OPERATOR(add, Add, +);
 MATX_BINARY_OP_GEN_OPERATOR(sub, Sub, -);
-MATX_BINARY_OP_GEN_OPERATOR(mul, Mul, *);
 MATX_BINARY_OP_GEN_OPERATOR(div, Div, /);
 MATX_BINARY_OP_GEN_OPERATOR(mod, Mod, %);
 
