@@ -157,13 +157,13 @@ namespace detail {
         auto x = slice<RANK-1>(R, xSliceB, xSliceE);
 
         // operator which zeros out values above current index in matrix
-        (xz = (index(x.Rank()-1) >= i) * x).run(stream);
+        (xz = as_type<typename inner_op_type_t<ATypeS>::type >(index(x.Rank()-1) >= i) * x).run(stream);
 
         // compute L2 norm without sqrt. 
         (N = sum(abs2(xz))).run(stream);
         //(N = sqrt(N)).run(stream);  // sqrt folded into next op
 
-        (v = xz + (index(v.Rank()-1) == i) * sign(xz) * sqrt(nc)).run(stream); 
+        (v = xz + as_type<typename inner_op_type_t<ATypeS>::type >(index(v.Rank()-1) == i) * sign(xz) * sqrt(nc)).run(stream); 
 
         auto r = x;  // alias column of R happens to be the same as x
 
