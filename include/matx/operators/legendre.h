@@ -129,7 +129,7 @@ namespace matx
               }
             }
 
-            auto lret = [this](auto ln, auto lm, auto lx) {
+            auto lret = [](auto ln, auto lm, auto lx) {
               if constexpr (is_complex_half_v<value_type>) {
                 return static_cast<value_type>(legendre(ln, lm, cuda::std::complex<float>(lx)));
               } else if constexpr (is_matx_half_v<value_type>) {

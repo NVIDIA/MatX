@@ -76,7 +76,7 @@ namespace matx
         template <ElementsPerThread EPT, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          auto cast_func = [this](const auto &val) {
+          auto cast_func = [](const auto &val) {
             return static_cast<NewType>(val);   
           };
 
@@ -146,7 +146,7 @@ namespace matx
         template <ElementsPerThread EPT, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
         {
-          auto cast_func = [this](const auto &real, const auto &imag) {
+          auto cast_func = [](const auto &real, const auto &imag) {
             using inner_type = typename inner_op_type_t<NewType>::type;
             return NewType(static_cast<inner_type>(real),static_cast<inner_type>(imag));            
           };
