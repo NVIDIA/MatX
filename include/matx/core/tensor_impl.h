@@ -1049,7 +1049,7 @@ MATX_IGNORE_WARNING_POP_GCC
           return *reinterpret_cast<detail::Vector<T, EPT_int>*>(data_.ldata_ + GetValC<EPT, 0, Is...>(cuda::std::make_tuple(indices...)));
         } else {
           detail::Vector<T, EPT_int> vec;
-          vec.load<EPT_int>(data_.ldata_ + GetValC<EPT, 0, Is...>(cuda::std::make_tuple(indices...)));
+          vec.template load<EPT_int>(data_.ldata_ + GetValC<EPT, 0, Is...>(cuda::std::make_tuple(indices...)));
           return vec;
         }
       }
@@ -1089,7 +1089,7 @@ MATX_IGNORE_WARNING_POP_GCC
           return *reinterpret_cast<detail::Vector<T, EPT_int>*>(data_.ldata_ + GetVal<EPT, 0, Is...>(cuda::std::make_tuple(indices...)));
         } else {
           detail::Vector<T, EPT_int> vec;
-          vec.load<EPT_int>(data_.ldata_ + GetVal<EPT, 0, Is...>(cuda::std::make_tuple(indices...)));
+          vec.template load<EPT_int>(data_.ldata_ + GetVal<EPT, 0, Is...>(cuda::std::make_tuple(indices...)));
           return vec;
         }
       }
