@@ -269,7 +269,7 @@ public:
     // Apply a Hamming window to the waveform to suppress sidelobes. Other
     // windows could be used as well (e.g., Taylor windows). Ultimately, it is
     // just an element-wise weighting by a pre-computed window function.
-    (waveformPart = waveformPart * hamming<0>({waveformLength})).run(exec);
+    (waveformPart = waveformPart * hamming<0, waveformPart.Rank(), typename ComplexType::value_type>({waveformLength})).run(exec);
 
     // compute L2 norm
     (norms = sum(abs2(waveformPart))).run(exec);
