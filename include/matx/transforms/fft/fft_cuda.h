@@ -67,7 +67,6 @@
         case CUFFT_UNALIGNED_DATA: fft_str = "cuFFT: Input or output data is not aligned"; break; \
         case CUFFT_INCOMPLETE_PARAMETER_LIST: fft_str = "cuFFT: Missing parameters in call"; break; \
         case CUFFT_INVALID_DEVICE: fft_str = "cuFFT: Execution of a plan was on different GPU than plan creation"; break; \
-        case CUFFT_PARSE_ERROR: fft_str = "cuFFT: Internal plan database error"; break; \
         case CUFFT_NO_WORKSPACE: fft_str = "cuFFT: No workspace has been provided prior to plan execution"; break; \
         case CUFFT_NOT_IMPLEMENTED: fft_str = "cuFFT: Function does not implement functionality for parameters"; break; \
         case CUFFT_LICENSE_ERROR: fft_str = "cuFFT: Used in previous versions"; break; \
