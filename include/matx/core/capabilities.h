@@ -61,7 +61,6 @@ namespace detail {
     SUPPORTS_JIT,                 // Can this operation be JIT-compiled?
     ELEMENTS_PER_THREAD,          // How many elements per thread?
     JIT_CAP_QUERY,  // Result is the concatenation of the capabilities of the operator and its children.
-    FFT_DX_JIT, // Can this operation be JIT-compiled for cuFFTDx?
     // Add more capabilities as needed
   };
 
@@ -105,18 +104,10 @@ namespace detail {
   template <>
   struct capability_attributes<OperatorCapability::SUPPORTS_JIT> {
     using type = bool;
-    static constexpr bool default_value = true;
+    static constexpr bool default_value = false;
     static constexpr bool or_identity = false;
     static constexpr bool and_identity = true;
   };
-
-  template <>
-  struct capability_attributes<OperatorCapability::FFT_DX_JIT> {
-    using type = bool;
-    static constexpr bool default_value = false;
-    static constexpr bool or_identity = true;
-    static constexpr bool and_identity = false;
-  };  
 
   template <>
   struct capability_attributes<OperatorCapability::ELEMENTS_PER_THREAD> {
@@ -202,7 +193,7 @@ namespace detail {
       if constexpr (std::is_same_v<CapType, bool>) {
           if (query_type == CapabilityQueryType::OR_QUERY) {
               children_aggregated_val = capability_attributes<Cap>::or_identity;
-              ((children_aggregated_val = children_aggregated_val || child_vals), ...);
+              ((children_aggregated_val = children_aggregated_val || child_vals), ...);     
           } else { // AND_QUERY
               children_aggregated_val = capability_attributes<Cap>::and_identity;
               ((children_aggregated_val = children_aggregated_val && child_vals), ...);
@@ -240,6 +231,7 @@ namespace detail {
             if (children_aggregated_val == capability_attributes<Cap>::or_identity) {
                 return self_val; // self_val || false = self_val
             }
+
             return self_val || children_aggregated_val;
         } else { // AND_QUERY
             // self_val && and_identity

@@ -60,13 +60,16 @@ namespace matx
         PermDims perm_;
         FFTDirection direction_;
         FFTNorm norm_;
+#if defined(MATX_EN_MATHDX) && !defined(__CUDACC_RTC__)
+        cuFFTDxHelper<typename OpA::value_type> cufftdx_helper_;
+#endif        
         cuda::std::array<index_t, OpA::Rank()> out_dims_;
         using ttype = std::conditional_t<is_complex_v<typename OpA::value_type>, 
                                           typename OpA::value_type, 
                                           typename scalar_to_complex<typename OpA::value_type>::ctype>;
         // This should be tensor_impl_t, but need to work around issues with temp types returned in fft
         mutable ::matx::detail::tensor_impl_t<ttype, OpA::Rank()> tmp_out_;
-        mutable ttype *ptr = nullptr;                                           
+        mutable ttype *ptr = nullptr;    
 
       public:
         using matxop = bool;
@@ -136,6 +139,13 @@ namespace matx
               fft_size_ = a.Size(a.Rank()-1);
             }
           }
+
+#if defined(MATX_EN_MATHDX) && !defined(__CUDACC_RTC__)
+          detail::FFTDirection dir = std::is_same_v<FFTDirection, detail::fft_t> ? 
+                                             detail::FFTDirection::FORWARD : 
+                                             detail::FFTDirection::BACKWARD;
+          cufftdx_helper_ = cuFFTDxHelper<typename OpA::value_type>(fft_size_, FFTType::C2C, dir);
+#endif
         }
 
         __MATX_INLINE__ std::string get_capability_str() const {
@@ -152,22 +162,6 @@ namespace matx
           else {
 #if defined(__CUDA_ARCH__) && defined(__CUDACC_RTC__)
             return detail::RunDxFFT<input_type, CapType>(a_, indices...);
-            // __syncthreads();
-            // using in_vec_type = decltype(a_.template operator()<CapType>(indices...));
-            // __shared__  Vector<input_type, static_cast<int>(EPT)> thread_data[16];
-            // thread_data[threadIdx.x] = a_.template operator()<CapType>(indices...);
-            // __syncthreads();
-
-            // using FFT = decltype(cufftdx::Block() + cufftdx::Size<16>() + cufftdx::Type<cufftdx::fft_type::c2c>() +
-            //             cufftdx::Direction<cufftdx::fft_direction::forward>() + cufftdx::Precision<float>() +
-            //             cufftdx::FFTsPerBlock<1>() + cufftdx::SM<800>() + cufftdx::ElementsPerThread<static_cast<int>(EPT)>());
-
-            // //auto thread_data = a_.template operator()<CapType>(indices...);
-            // //extern __shared__ __align__(alignof(float2)) input_type shared_mem[];
-            // printf("before %d %f%+f %f%+f \n", threadIdx.x, thread_data[threadIdx.x].data[0].real(), thread_data[threadIdx.x].data[0].imag(), thread_data[threadIdx.x].data[1].real(), thread_data[threadIdx.x].data[1].imag());
-            // FFT().execute(&thread_data[0]);
-            // printf("after %d %f%+f %f%+f \n", threadIdx.x, thread_data[threadIdx.x].data[0].real(), thread_data[threadIdx.x].data[0].imag(), thread_data[threadIdx.x].data[1].real(), thread_data[threadIdx.x].data[1].imag());
-            // return thread_data[threadIdx.x];
 #else
             return tmp_out_.template operator()<CapType>(indices...);
 #endif
@@ -192,15 +186,29 @@ namespace matx
 
         template <OperatorCapability Cap>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
-          if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
-            return combine_capabilities<Cap>(true, detail::get_operator_capability<Cap>(a_));
+          if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {            
+#ifdef MATX_EN_MATHDX
+            bool supported = cufftdx_helper_.IsSupported();
+#else
+            bool supported = false;
+#endif
+            return combine_capabilities<Cap>(supported, detail::get_operator_capability<Cap>(a_));      
           }
           else if constexpr (Cap == OperatorCapability::JIT_CAP_QUERY) {
             auto self_cap = get_capability_str();
             return combine_capabilities<Cap>(self_cap, detail::get_operator_capability<Cap>(a_));
           }
-          else if constexpr (Cap == OperatorCapability::FFT_DX_JIT) {
-            return combine_capabilities<Cap>(true, detail::get_operator_capability<Cap>(a_));
+          else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+#ifdef MATX_EN_MATHDX
+            if (cufftdx_helper_.IsSupported()) {
+              return combine_capabilities<Cap>(cufftdx_helper_.GetMaxEPT(), detail::get_operator_capability<Cap>(a_));
+            }
+            else {
+              return combine_capabilities<Cap>(capability_attributes<Cap>::default_value, detail::get_operator_capability<Cap>(a_));
+            }
+#else
+            return combine_capabilities<Cap>(capability_attributes<Cap>::default_value, detail::get_operator_capability<Cap>(a_));
+#endif
           }
           else {
             // 1. Determine if the binary operation ITSELF intrinsically has this capability.

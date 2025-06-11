@@ -142,8 +142,8 @@ auto nvrtc_compile_and_run(const std::string &name, Op op, const SizeArray &sa, 
       ->preprocess({"-DMATX_EN_MATHDX",
       "-I/repro/MatX/include", "-I/repro/MatX/include/matx/kernels", "-I/repro/MatX/build/_deps/cccl-src/lib/cmake/thrust/../../../thrust", 
       "-I/repro/MatX/build/_deps/cccl-src/lib/cmake/libcudacxx/../../../libcudacxx/include", "-I/repro/MatX/build/_deps/cccl-src/lib/cmake/cub/../../../cub", 
-      "-I/repro/MatX/build/_deps/pybind11-src/include", "-I/usr/include/python3.10", "-I/repro/MatX/build/_deps/mathdx-src/nvidia/mathdx/25.01/include", 
-      "-I/repro/MatX/build/_deps/mathdx-src/nvidia/mathdx/25.01/external/cutlass/include", "-I/usr/local/cuda/include",
+      "-I/repro/MatX/build/_deps/pybind11-src/include", "-I/usr/include/python3.10", "-I/repro/MatX/build/_deps/mathdx-src/nvidia/mathdx/25.06/include", 
+      "-I/repro/MatX/build/_deps/mathdx-src/nvidia/mathdx/25.06/external/cutlass/include", "-I/usr/local/cuda/include",
 
                   "-no-system-headers-workaround",
                   "-arch=sm_80","-std=c++17"});

@@ -192,6 +192,7 @@ namespace matx
 
 
             const bool use_jit = detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op);
+              printf("use_jit %d\n", use_jit);            
             if (!use_jit) {
               // Helper tags for template parameter deduction
               constexpr auto one_tag = detail::CapabilityParams<detail::ElementsPerThread::ONE, false>{};

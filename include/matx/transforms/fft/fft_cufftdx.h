@@ -1,6 +1,19 @@
 #pragma once
 
 #include "matx/core/operator_options.h"
+#include "matx/core/capabilities.h"
+#ifndef __CUDACC_RTC__
+#include <libcufftdx.h>
+#endif
+
+#define LIBMATHDX_CHECK(ans)                                                                                           \
+  do {                                                                                                               \
+    commondxStatusType result = (ans);                                                                             \
+    if (result != commondxStatusType::COMMONDX_SUCCESS) {                                                          \
+      MATX_THROW(matxCufftError, "cuFFTDx failed");                                                                                       \
+    }                                                                                                              \
+  } while (0)
+
 
 namespace matx {
   namespace detail {
@@ -70,6 +83,173 @@ namespace matx {
 
     FFT().execute(&thread_data[0]);
     return thread_data[threadIdx.x];  
+  }
+#endif
+
+#ifndef __CUDACC_RTC__
+  template <typename InputType>
+  class cuFFTDxHelper {
+    public:
+      cuFFTDxHelper() = default;
+      cuFFTDxHelper(index_t fft_size, FFTType fft_type, FFTDirection direction) {
+        LIBMATHDX_CHECK(cufftdxCreateDescriptor(&h_));
+        // CUFFTDX_API_LMEM means the function will be of signature:
+        //     void(value_type*, value_type*)
+        //   with the first argument being local memory ("registers"), with each thread holding "EPT" elements
+        //   and the second being a pointer to a shared memory scratch buffer
+        // CUFFTDX_API_SMEM would mean that the function will be of signature:
+        //     void(value_type*)
+        //   and takes a shared memory pointer with all the elements laid out in natural order
+        LIBMATHDX_CHECK(cufftdxSetOperatorInt64(h_, CUFFTDX_OPERATOR_API, cufftdxApi::CUFFTDX_API_SMEM));
+        // COMMONDX_EXECUTION_BLOCK means multiple threads in a block participate in the FFT
+        // COMMONDX_EXECUTION_THREAD would mean that each thread computes a single FFT
+        LIBMATHDX_CHECK(
+            cufftdxSetOperatorInt64(h_, CUFFTDX_OPERATOR_EXECUTION, commondxExecution::COMMONDX_EXECUTION_BLOCK));
+
+        // FFT size
+        LIBMATHDX_CHECK(cufftdxSetOperatorInt64(h_, CUFFTDX_OPERATOR_SIZE, fft_size));
+        // CUFFTDX_TYPE_C2C means complex-to-complex FFT type
+        // CUFFTDX_TYPE_R2C means real-to-complex FFT type
+        // CUFFTDX_TYPE_C2R means complex-to-real FFT type
+        cufftdxType cufftdx_type;
+        if (fft_type == FFTType::C2C) {
+          cufftdx_type = cufftdxType::CUFFTDX_TYPE_C2C;
+        } else if (fft_type == FFTType::C2R) {
+          cufftdx_type = cufftdxType::CUFFTDX_TYPE_C2R;
+        } else if (fft_type == FFTType::R2C) {
+          cufftdx_type = cufftdxType::CUFFTDX_TYPE_R2C;
+        } else {
+          MATX_THROW(matxInvalidParameter, "Unsupported FFT type for cuFFTDx");
+        }
+
+        LIBMATHDX_CHECK(cufftdxSetOperatorInt64(h_, CUFFTDX_OPERATOR_TYPE, cufftdx_type));
+
+        cufftdxDirection cufftdx_direction;
+        if (direction == FFTDirection::FORWARD) {
+          cufftdx_direction = cufftdxDirection::CUFFTDX_DIRECTION_FORWARD;
+        } else {
+          cufftdx_direction = cufftdxDirection::CUFFTDX_DIRECTION_INVERSE;
+        }
+        LIBMATHDX_CHECK(cufftdxSetOperatorInt64(h_, CUFFTDX_OPERATOR_DIRECTION, cufftdx_direction));
+        // COMMONDX_PRECISION_F16 for half precision
+        // COMMONDX_PRECISION_F32 for single precision
+        // COMMONDX_PRECISION_F64 for double precision
+        if constexpr (cuda::std::is_same_v<InputType, matxBf16Complex> || cuda::std::is_same_v<InputType, matxFp16Complex> || 
+                      cuda::std::is_same_v<InputType, matxBf16> || cuda::std::is_same_v<InputType, matxFp16>) {
+          LIBMATHDX_CHECK(cufftdxSetOperatorInt64(h_, CUFFTDX_OPERATOR_PRECISION, commondxPrecision::COMMONDX_PRECISION_F16));
+        } else if constexpr (cuda::std::is_same_v<InputType, cuda::std::complex<float>> || cuda::std::is_same_v<InputType, float>) {
+          LIBMATHDX_CHECK(cufftdxSetOperatorInt64(h_, CUFFTDX_OPERATOR_PRECISION, commondxPrecision::COMMONDX_PRECISION_F32));
+        } else if constexpr (cuda::std::is_same_v<InputType, cuda::std::complex<double>> || cuda::std::is_same_v<InputType, double>) {
+          LIBMATHDX_CHECK(cufftdxSetOperatorInt64(h_, CUFFTDX_OPERATOR_PRECISION, commondxPrecision::COMMONDX_PRECISION_F64));
+        } else {
+          MATX_THROW(matxInvalidParameter, "Unsupported input type for cuFFTDx");
+        }
+
+        int major = 0;
+        int minor = 0;
+        int device;
+        cudaGetDevice(&device);            
+        cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device);
+        cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device);
+        int cc = major * 100 + minor;
+    
+        // Compute capability to target
+        LIBMATHDX_CHECK(cufftdxSetOperatorInt64(h_, CUFFTDX_OPERATOR_SM, cc));
+
+        // COMMONDX_OPTION_SYMBOL_NAME indicates the required name for the device function.
+        LIBMATHDX_CHECK(cufftdxSetOptionStr(h_, commondxOption::COMMONDX_OPTION_SYMBOL_NAME, "my_fft"));    
+      }
+
+      bool IsSupported() const {
+        int valid = -1;
+        LIBMATHDX_CHECK(cufftdxHasImplementation(h_, &valid));
+        return static_cast<bool>(valid);
+      }
+
+
+      ElementsPerThread GetMaxEPT() const {
+        // ElementsPerThread type is needed for EPT capability, but cuFFTDx uses long long int for EPTs
+        cufftdxKnobType_t knobs = CUFFTDX_KNOB_ELEMENTS_PER_THREAD;
+        size_t num_epts = 0;
+        LIBMATHDX_CHECK(cufftdxGetKnobInt64Size(h_, 1, &knobs, &num_epts));
+        std::vector<long long int> epts(num_epts, 0);
+        LIBMATHDX_CHECK(cufftdxGetKnobInt64s(h_, 1, &knobs, epts.size(), epts.data()));      
+        return static_cast<ElementsPerThread>(*std::max_element(epts.begin(), epts.end()));
+      }
+
+    private:
+      std::vector<long long int> valid_epts_;
+      cufftdxDescriptor h_;
+  };
+
+
+  template <typename InputType>
+  bool IsDxBlockFFTSupported(int arch_cc, index_t fft_size, FFTType fft_type, FFTDirection direction) {
+    cufftdxDescriptor h{0};
+
+    LIBMATHDX_CHECK(cufftdxCreateDescriptor(&h));
+    // CUFFTDX_API_LMEM means the function will be of signature:
+    //     void(value_type*, value_type*)
+    //   with the first argument being local memory ("registers"), with each thread holding "EPT" elements
+    //   and the second being a pointer to a shared memory scratch buffer
+    // CUFFTDX_API_SMEM would mean that the function will be of signature:
+    //     void(value_type*)
+    //   and takes a shared memory pointer with all the elements laid out in natural order
+    LIBMATHDX_CHECK(cufftdxSetOperatorInt64(h, CUFFTDX_OPERATOR_API, cufftdxApi::CUFFTDX_API_SMEM));
+    // COMMONDX_EXECUTION_BLOCK means multiple threads in a block participate in the FFT
+    // COMMONDX_EXECUTION_THREAD would mean that each thread computes a single FFT
+    LIBMATHDX_CHECK(
+        cufftdxSetOperatorInt64(h, CUFFTDX_OPERATOR_EXECUTION, commondxExecution::COMMONDX_EXECUTION_BLOCK));
+
+    // FFT size
+    LIBMATHDX_CHECK(cufftdxSetOperatorInt64(h, CUFFTDX_OPERATOR_SIZE, fft_size));
+    // CUFFTDX_TYPE_C2C means complex-to-complex FFT type
+    // CUFFTDX_TYPE_R2C means real-to-complex FFT type
+    // CUFFTDX_TYPE_C2R means complex-to-real FFT type
+    cufftdxType cufftdx_type;
+    if (fft_type == FFTType::C2C) {
+      cufftdx_type = cufftdxType::CUFFTDX_TYPE_C2C;
+    } else if (fft_type == FFTType::C2R) {
+      cufftdx_type = cufftdxType::CUFFTDX_TYPE_C2R;
+    } else if (fft_type == FFTType::R2C) {
+      cufftdx_type = cufftdxType::CUFFTDX_TYPE_R2C;
+    } else {
+      return false;
+    }
+
+    LIBMATHDX_CHECK(cufftdxSetOperatorInt64(h, CUFFTDX_OPERATOR_TYPE, cufftdx_type));
+
+    cufftdxDirection cufftdx_direction;
+    if (direction == FFTDirection::FORWARD) {
+      cufftdx_direction = cufftdxDirection::CUFFTDX_DIRECTION_FORWARD;
+    } else {
+      cufftdx_direction = cufftdxDirection::CUFFTDX_DIRECTION_INVERSE;
+    }
+    LIBMATHDX_CHECK(cufftdxSetOperatorInt64(h, CUFFTDX_OPERATOR_DIRECTION, cufftdx_direction));
+    // COMMONDX_PRECISION_F16 for half precision
+    // COMMONDX_PRECISION_F32 for single precision
+    // COMMONDX_PRECISION_F64 for double precision
+    if constexpr (cuda::std::is_same_v<InputType, matxBf16Complex> || cuda::std::is_same_v<InputType, matxFp16Complex> || 
+                  cuda::std::is_same_v<InputType, matxBf16> || cuda::std::is_same_v<InputType, matxFp16>) {
+      LIBMATHDX_CHECK(cufftdxSetOperatorInt64(h, CUFFTDX_OPERATOR_PRECISION, commondxPrecision::COMMONDX_PRECISION_F16));
+    } else if constexpr (cuda::std::is_same_v<InputType, cuda::std::complex<float>> || cuda::std::is_same_v<InputType, float>) {
+      LIBMATHDX_CHECK(cufftdxSetOperatorInt64(h, CUFFTDX_OPERATOR_PRECISION, commondxPrecision::COMMONDX_PRECISION_F32));
+    } else if constexpr (cuda::std::is_same_v<InputType, cuda::std::complex<double>> || cuda::std::is_same_v<InputType, double>) {
+      LIBMATHDX_CHECK(cufftdxSetOperatorInt64(h, CUFFTDX_OPERATOR_PRECISION, commondxPrecision::COMMONDX_PRECISION_F64));
+    } else {
+      return false;
+    }
+    
+    // Compute capability to target
+    LIBMATHDX_CHECK(cufftdxSetOperatorInt64(h, CUFFTDX_OPERATOR_SM, arch_cc));
+
+    // COMMONDX_OPTION_SYMBOL_NAME indicates the required name for the device function.
+    LIBMATHDX_CHECK(cufftdxSetOptionStr(h, commondxOption::COMMONDX_OPTION_SYMBOL_NAME, "my_fft"));    
+
+    int valid = -1;
+    LIBMATHDX_CHECK(cufftdxHasImplementation(h, &valid));
+
+    return static_cast<bool>(valid);
   }
 #endif
 

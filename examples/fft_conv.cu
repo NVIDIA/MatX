@@ -41,23 +41,23 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 {
   MATX_ENTER_HANDLER();
   using complex = cuda::std::complex<float>;
-  auto a = make_tensor<complex>({16});
-  auto b = make_tensor<complex>({16});
-  auto c = make_tensor<complex>({16});
-  auto d = make_tensor<complex>({16});
+  auto a = make_tensor<complex>({1048576});
+  auto b = make_tensor<complex>({1048576});
+  auto c = make_tensor<complex>({1048576});
+  auto d = make_tensor<complex>({1048576});
   // (a = random<complex>(a.Shape(), UNIFORM)).run();
   // (b = random<complex>(b.Shape(), UNIFORM)).run();
   // (c = random<complex>(c.Shape(), UNIFORM)).run();
   a.SetVals({{1,3},{-2,1},{4,-1},{0,2},{-3,0},{1,-4},{2,3},{-1,-2},{3,1},{0,-3},{-2,4},{1,0},{-4,2},{2,-1},{0,1},{-1,3}});
   b.SetVals({{1,3},{-2,1},{4,-1},{0,2},{-3,0},{1,-4},{2,3},{-1,-2},{3,1},{0,-3},{-2,4},{1,0},{-4,2},{2,-1},{0,1},{-1,3}});
   c.SetVals({{1,3},{-2,1},{4,-1},{0,2},{-3,0},{1,-4},{2,3},{-1,-2},{3,1},{0,-3},{-2,4},{1,0},{-4,2},{2,-1},{0,1},{-1,3}});
-  print(a);
-  print(b);
-  print(c);
+  // print(a);
+  // print(b);
+  // print(c);
   (d = a+ fft(b*c)).run();
   //(d = a + b*c).run();
   //(d = fft(a)).run();
-  print(d);
+  //print(d);
   // using complex = cuda::std::complex<float>;
   // cudaExecutor exec{};
 
