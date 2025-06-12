@@ -44,6 +44,13 @@ template <typename T, int N>
 struct alignas(sizeof(T) * N) Vector {
   __MATX_INLINE__  Vector() = default;
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Vector(T v) { Fill(v); }
+  // Copy constructor
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Vector(const Vector<T, N>& other) {
+    #pragma unroll
+    for (int i = 0; i < N; i++) {   
+      data[i] = other.data[i];
+    }
+  }
 
   template <typename T2, std::enable_if_t<std::is_same_v<typename T2::matx_vec, bool> && T2::width == N, bool> = true>
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Vector& operator=(const T2& v) {

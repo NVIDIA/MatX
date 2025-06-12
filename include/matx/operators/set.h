@@ -151,6 +151,7 @@ public:
   {
     //auto &&out = out_(indices...);
     //out = detail::get_value<CapType>(op_, indices...);
+
     const auto in_val = detail::get_value<CapType>(op_, indices...);
     using out_type = decltype(out_.template operator()<CapType>(indices...));
     if constexpr (!is_vector_v<decltype(in_val)> && is_vector_v<out_type>) {

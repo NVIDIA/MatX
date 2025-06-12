@@ -38,6 +38,7 @@
 #include <limits>
 #include <algorithm>
 #include <cuda/std/__algorithm/min.h>
+#include <cuda/std/__algorithm/max.h>
 
 namespace matx {
 
@@ -61,6 +62,7 @@ namespace detail {
     SUPPORTS_JIT,                 // Can this operation be JIT-compiled?
     ELEMENTS_PER_THREAD,          // How many elements per thread?
     JIT_CAP_QUERY,  // Result is the concatenation of the capabilities of the operator and its children.
+    DYN_SHM_SIZE,   // Result is the dynamic shared memory size required for the operator.
     // Add more capabilities as needed
   };
 
@@ -71,6 +73,7 @@ namespace detail {
     AND_QUERY,  // Result is true only if ALL relevant operators in the expression have the capability.
             // The operator itself AND its children.
     MIN_QUERY,  // Result is the minimum of the capabilities of the operator and its children.
+    MAX_QUERY,  // Result is the maximum of the capabilities of the operator and its children.
     STR_CAT_QUERY,  // Result is the concatenation of the capabilities of the operator and its children.
   };
   
@@ -114,6 +117,7 @@ namespace detail {
     using type = ElementsPerThread;
     static constexpr ElementsPerThread default_value = ElementsPerThread::MAX; // Example: 1 element per thread by default
     static constexpr ElementsPerThread min_identity = ElementsPerThread::MAX;
+    static constexpr ElementsPerThread max_identity = ElementsPerThread::ONE;
   };
 
   template <>
@@ -122,6 +126,14 @@ namespace detail {
     static inline const std::string default_value = "";
     static inline const std::string min_identity = "";
   };  
+
+  template <>
+  struct capability_attributes<OperatorCapability::DYN_SHM_SIZE> {
+    using type = int;
+    static constexpr int default_value = 0;
+    static constexpr int min_identity = std::numeric_limits<int>::max();
+    static constexpr int max_identity = 0;
+  };    
 
   // Helper to safely get capability from an operator.
   // OperandType is likely base_type_t<ActualOpType> or a raw scalar/functor type.
@@ -146,6 +158,8 @@ namespace detail {
         return CapabilityQueryType::MIN_QUERY; // The expression should use the minimum elements per thread of its children.
       case OperatorCapability::JIT_CAP_QUERY:
         return CapabilityQueryType::STR_CAT_QUERY; // The expression should use the concatenation of the capabilities of its children.
+      case OperatorCapability::DYN_SHM_SIZE:
+        return CapabilityQueryType::MAX_QUERY; // The expression should use the maximum dynamic shared memory size of its children.
       default:
         // Default to OR_QUERY or handle as an error/assertion if a capability isn't mapped.
         return CapabilityQueryType::OR_QUERY; 
@@ -178,8 +192,10 @@ namespace detail {
       } else if constexpr (std::is_same_v<CapType, int> || is_scoped_enum_v<CapType>) {
         if (query_type == CapabilityQueryType::MIN_QUERY) {
           children_aggregated_val = capability_attributes<Cap>::min_identity;
+        } else if (query_type == CapabilityQueryType::MAX_QUERY) {
+          children_aggregated_val = capability_attributes<Cap>::max_identity;
         } else {
-          // Default identity for int if not MIN_QUERY (e.g. if it was SUM_QUERY, identity would be 0)
+          // Default identity for int if not MIN_QUERY or MAX_QUERY (e.g. if it was SUM_QUERY, identity would be 0)
           // This path needs clear definition if other query types are used for int.
           children_aggregated_val = capability_attributes<Cap>::default_value; // Fallback
         }
@@ -205,6 +221,13 @@ namespace detail {
               cuda::std::initializer_list<CapType> values = {child_vals...};
               for (CapType val : values) {
                   children_aggregated_val = static_cast<CapType>(cuda::std::min(static_cast<int>(children_aggregated_val), static_cast<int>(val)));
+              }
+          } else if (query_type == CapabilityQueryType::MAX_QUERY) {
+              children_aggregated_val = capability_attributes<Cap>::max_identity;
+              // C++17 way to apply cuda::std::max over a parameter pack
+              cuda::std::initializer_list<CapType> values = {child_vals...};
+              for (CapType val : values) {
+                  children_aggregated_val = static_cast<CapType>(cuda::std::max(static_cast<int>(children_aggregated_val), static_cast<int>(val)));
               }
           } else {
               // Not implemented for other query types.
@@ -243,6 +266,8 @@ namespace detail {
     } else if constexpr (std::is_same_v<CapType, int> || is_scoped_enum_v<CapType>) {
         if (query_type == CapabilityQueryType::MIN_QUERY) {
             return static_cast<CapType>(cuda::std::min(static_cast<int>(self_val), static_cast<int>(children_aggregated_val)));
+        } else if (query_type == CapabilityQueryType::MAX_QUERY) {
+            return static_cast<CapType>(cuda::std::max(static_cast<int>(self_val), static_cast<int>(children_aggregated_val)));
         } else {
             MATX_ASSERT_STR(false, matxInvalidParameter, "Not implemented for other query types.");
             return self_val;

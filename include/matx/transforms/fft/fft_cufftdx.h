@@ -73,15 +73,31 @@ namespace matx {
   __MATX_INLINE__ __MATX_DEVICE__ auto RunDxFFT(const Op &op, Is... indices) {
     __syncthreads();
 
-    __shared__  Vector<input_type, static_cast<int>(CapType::ept)> thread_data[CapType::fft_size];
+    extern __shared__  Vector<input_type, static_cast<int>(CapType::ept)> thread_data[];
+
     thread_data[threadIdx.x] = op.template operator()<CapType>(indices...);
     __syncthreads();
 
-    using FFT = decltype(cufftdx::Block() + cufftdx::Size<CapType::fft_size>() + cufftdx::Type<cufftdx::fft_type::c2c>() +
-                cufftdx::Direction<cufftdx::fft_direction::forward>() + cufftdx::Precision<typename input_type::value_type>() +
-                cufftdx::FFTsPerBlock<1>() + cufftdx::SM<__CUDA_ARCH__>() + cufftdx::ElementsPerThread<static_cast<int>(CapType::ept)>());
-
-    FFT().execute(&thread_data[0]);
+    if constexpr (CapType::fft_forward) {
+      using FFT = decltype(cufftdx::Block() + cufftdx::Size<CapType::fft_size>() + cufftdx::Type<cufftdx::fft_type::c2c>() +
+                  cufftdx::Direction<cufftdx::fft_direction::forward>() + cufftdx::Precision<typename input_type::value_type>() +
+                  cufftdx::FFTsPerBlock<1>() + cufftdx::SM<__CUDA_ARCH__>() + cufftdx::ElementsPerThread<static_cast<int>(CapType::ept)>());
+      
+      FFT().execute(&thread_data[0]);
+    }
+    else { // IFFT
+      using FFT = decltype(cufftdx::Block() + cufftdx::Size<CapType::fft_size>() + cufftdx::Type<cufftdx::fft_type::c2c>() +
+                  cufftdx::Direction<cufftdx::fft_direction::inverse>() + cufftdx::Precision<typename input_type::value_type>() +
+                  cufftdx::FFTsPerBlock<1>() + cufftdx::SM<__CUDA_ARCH__>() + cufftdx::ElementsPerThread<static_cast<int>(CapType::ept)>());
+      
+      FFT().execute(&thread_data[0]);
+      // IFFTs get normalized to match Python
+      #pragma unroll
+      for (int i = 0; i < static_cast<int>(CapType::ept); i++) {
+        thread_data[threadIdx.x].data[i] = thread_data[threadIdx.x].data[i] / static_cast<typename input_type::value_type>(CapType::fft_size);
+      }
+    }
+printf("%d %f %f\n", threadIdx.x, thread_data[threadIdx.x].data[0].real(), thread_data[threadIdx.x].data[0].imag());    
     return thread_data[threadIdx.x];  
   }
 #endif
@@ -166,6 +182,12 @@ namespace matx {
         return static_cast<bool>(valid);
       }
 
+      int GetShmRequired() const {
+        long long int shared_memory_size = 0;
+        LIBMATHDX_CHECK(cufftdxGetTraitInt64(h_, CUFFTDX_TRAIT_SHARED_MEMORY_SIZE, &shared_memory_size));      
+        return static_cast<int>(shared_memory_size);
+      }
+
 
       ElementsPerThread GetMaxEPT() const {
         // ElementsPerThread type is needed for EPT capability, but cuFFTDx uses long long int for EPTs
@@ -174,6 +196,7 @@ namespace matx {
         LIBMATHDX_CHECK(cufftdxGetKnobInt64Size(h_, 1, &knobs, &num_epts));
         std::vector<long long int> epts(num_epts, 0);
         LIBMATHDX_CHECK(cufftdxGetKnobInt64s(h_, 1, &knobs, epts.size(), epts.data()));      
+
         return static_cast<ElementsPerThread>(*std::max_element(epts.begin(), epts.end()));
       }
 

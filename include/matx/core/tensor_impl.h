@@ -1088,12 +1088,8 @@ MATX_IGNORE_WARNING_POP_GCC
         constexpr int EPT_int = static_cast<int>(CapType::ept);
         if constexpr (CapType::ept == detail::ElementsPerThread::ONE) {
           return data_.ldata_[GetVal<CapType, 0, Is...>(cuda::std::make_tuple(indices...))];
-        } else if constexpr (EPT_int * sizeof(T) <= MAX_VEC_WIDTH_BYTES ) {
-          return *reinterpret_cast<detail::Vector<T, EPT_int>*>(data_.ldata_ + GetVal<CapType, 0, Is...>(cuda::std::make_tuple(indices...)));
         } else {
-          detail::Vector<T, EPT_int> vec;
-          vec.load<EPT_int>(data_.ldata_ + GetVal<CapType, 0, Is...>(cuda::std::make_tuple(indices...)));
-          return vec;
+          return *reinterpret_cast<detail::Vector<T, EPT_int>*>(data_.ldata_ + GetVal<CapType, 0, Is...>(cuda::std::make_tuple(indices...)));
         }
       }
       else {
@@ -1176,15 +1172,15 @@ MATX_IGNORE_WARNING_POP_GCC
           return detail::ElementsPerThread::ONE;
         }
 
-        int width = MAX_VEC_WIDTH_BYTES / sizeof(T);
-        while (width > 1) {
+        int width = 32;
+        do  {
           if (((Lsize() % width) == 0) &&                                       // Last dim is a multiple of vector load size
             ((reinterpret_cast<uintptr_t>(data_.ldata_) % (sizeof(T) * width)) == 0)) {
             break;
           }
 
           width /= 2;
-        }
+        } while (width > 1);
 
         return static_cast<detail::ElementsPerThread>(width);
       }

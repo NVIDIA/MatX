@@ -132,7 +132,7 @@ std::string build_rtc_string(const Op &op, ElementsPerThread EPT, bool JIT) {
 
 
 template <typename Op, typename SizeArray>
-auto nvrtc_compile_and_run(const std::string &name, Op op, const SizeArray &sa, dim3 &blocks, dim3 &threads, ElementsPerThread ept, bool stride) {
+auto nvrtc_compile_and_run(const std::string &name, Op op, const SizeArray &sa, dim3 &blocks, dim3 &threads, ElementsPerThread ept, bool stride, int dynamic_shmem_size) {
 
   const auto kernel_name_str = get_kernel_name(op, stride);
   const auto capability_params_str = build_rtc_string(op, ept, false);
@@ -147,9 +147,13 @@ auto nvrtc_compile_and_run(const std::string &name, Op op, const SizeArray &sa, 
 
                   "-no-system-headers-workaround",
                   "-arch=sm_80","-std=c++17"});
-
+printf("blocks: %d %d %d\n", blocks.x, blocks.y, blocks.z);
+printf("threads: %d %d %d\n", threads.x, threads.y, threads.z);
   using jitify2::reflection::Type;
   using jitify2::reflection::NonType;
+// cudaFuncSetAttribute(kernel_name_str, cudaFuncAttributeMaxDynamicSharedMemorySize,
+//                          cufftdx_helper_.GetShmRequired());
+
   //auto kernel_name = jitify2::reflection::Template("matx::detail::matxOpT1Kernel").instantiate<Type<detail::ElementsPerThread>(), Op>();
   auto kernel_name = jitify2::reflection::Template(kernel_name_str).instantiate<Op>();
   std::cout << "kernel name: " << kernel_name << std::endl;
@@ -159,12 +163,27 @@ auto nvrtc_compile_and_run(const std::string &name, Op op, const SizeArray &sa, 
   } else {
     jitify2::PreprocessedProgramData preprog_data = *preprog;
     jitify2::CompiledProgram compiled = preprog->compile(kernel_name);
-    printf("Compiled program\n");
-    compiled->link()
-    ->load()
-    ->get_kernel(kernel_name)
-    ->configure(blocks, threads)
-    ->launch(op, sa[0]);
+
+    auto program = compiled->link()->load();
+    printf("program done\n");
+    auto kernel = program->get_kernel(kernel_name);
+    
+    // Get the current static shared memory size for the device
+    int device;
+    cudaGetDevice(&device);
+    int static_shared_size;
+    cudaDeviceGetAttribute(&static_shared_size, cudaDevAttrMaxSharedMemoryPerBlock, device);
+    printf("Device %d static shared memory size: %d bytes\n", device, static_shared_size);
+    
+    // Need to set dynamic shared memory size if it is greater than the static shared memory size
+    if (dynamic_shmem_size > static_shared_size) {
+      printf("dynamic_shmem_size %d\n", dynamic_shmem_size);
+      kernel->set_attribute(CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, dynamic_shmem_size);
+    }
+    
+    
+    kernel->configure(blocks, threads, dynamic_shmem_size)
+          ->launch(op, sa[0]);
   }
 }
 

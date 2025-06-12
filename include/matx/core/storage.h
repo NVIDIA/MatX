@@ -636,9 +636,17 @@ namespace matx
 };
 
 #else
+  /* These classes are part of the type that's passed to the kernel, but they're unused once in the kernel. Create
+     stub types so NVRTC compiles */
   namespace matx {
   template <typename T>
   class basic_storage {};
+
+  template <typename T>
+  struct matx_allocator { };
+
+  template <typename T, typename Allocator>
+  class raw_pointer_buffer  {};
   template <typename T>
   using DefaultStorage = basic_storage<T>;
 }

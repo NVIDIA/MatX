@@ -149,14 +149,15 @@ namespace matx
         }
 
         __MATX_INLINE__ std::string get_capability_str() const {
-          return "  constexpr static int fft_size = " + std::to_string(fft_size_) + ";\n";
+          return "  constexpr static int fft_size = " + std::to_string(fft_size_) + ";\n"
+                 "  constexpr static bool fft_forward = " + std::to_string(static_cast<bool>(std::is_same_v<FFTDirection, detail::fft_t>)) + ";\n";         
         }
                   
         template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
           // cuFFTDx Doesn't support CapType::ept == 1
-          if constexpr (CapType::ept == detail::ElementsPerThread::ONE || CapType::ept == detail::ElementsPerThread::THIRTY_TWO) {
+          if constexpr (CapType::ept == detail::ElementsPerThread::ONE) {
             return tmp_out_.template operator()<CapType>(indices...);
           }
           else {
@@ -209,6 +210,9 @@ namespace matx
 #else
             return combine_capabilities<Cap>(capability_attributes<Cap>::default_value, detail::get_operator_capability<Cap>(a_));
 #endif
+          }
+          else if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
+            return combine_capabilities<Cap>(cufftdx_helper_.GetShmRequired(), detail::get_operator_capability<Cap>(a_));
           }
           else {
             // 1. Determine if the binary operation ITSELF intrinsically has this capability.

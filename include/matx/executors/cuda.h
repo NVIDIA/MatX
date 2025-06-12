@@ -154,7 +154,7 @@ namespace matx
               sizes[i] = op.Size(i);
             }        
 
-            bool stride = detail::get_grid_dims<Op::Rank()>(blocks, threads, sizes, static_cast<int>(max_ept), 256);
+            bool stride = detail::get_grid_dims<Op::Rank()>(blocks, threads, sizes, static_cast<int>(max_ept), 1024);
             
             // Helper function to execute kernel without JIT
             auto execute_without_jit = [&](auto ept_tag) -> bool {
@@ -218,7 +218,9 @@ namespace matx
               }
             }
             else {
-              detail::nvrtc_compile_and_run("output.cu", op, sizes, blocks, threads, static_cast<detail::ElementsPerThread>(max_ept), stride);
+              int shm_size = detail::get_operator_capability<detail::OperatorCapability::DYN_SHM_SIZE>(op);
+              printf("shm_size %d\n", shm_size);
+              detail::nvrtc_compile_and_run("output.cu", op, sizes, blocks, threads, static_cast<detail::ElementsPerThread>(max_ept), stride, shm_size);
             }
           }
 #else
