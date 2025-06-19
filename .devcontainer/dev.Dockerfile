@@ -1,5 +1,5 @@
 # Use the base image
-FROM ghcr.io/nvidia/matx/production:latest
+FROM gitlab-master.nvidia.com:5005/devtech-compute/sigx-group/container/build:ubuntu-22.04.12.9-amd64
 
 ARG REMOTE_USER
 ARG REMOTE_UID

@@ -41,10 +41,10 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 {
   MATX_ENTER_HANDLER();
   using complex = cuda::std::complex<float>;
-  auto a = make_tensor<complex>({1024});
-  auto b = make_tensor<complex>({1024});
-  auto c = make_tensor<complex>({1024});
-  auto d = make_tensor<complex>({1024});
+  auto a = make_tensor<complex>({32});
+  auto b = make_tensor<complex>({32});
+  auto c = make_tensor<complex>({32});
+  auto d = make_tensor<complex>({32});
 
   (a = random<complex>(a.Shape(), UNIFORM)).run();
   (b = random<complex>(b.Shape(), UNIFORM)).run();
@@ -54,11 +54,15 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   // a.SetVals({{1,3},{-2,1},{4,-1},{0,2},{-3,0},{1,-4},{2,3},{-1,-2},{3,1},{0,-3},{-2,4},{1,0},{-4,2},{2,-1},{0,1},{-1,3}});
   // b.SetVals({{1,3},{-2,1},{4,-1},{0,2},{-3,0},{1,-4},{2,3},{-1,-2},{3,1},{0,-3},{-2,4},{1,0},{-4,2},{2,-1},{0,1},{-1,3}});
   // c.SetVals({{1,3},{-2,1},{4,-1},{0,2},{-3,0},{1,-4},{2,3},{-1,-2},{3,1},{0,-3},{-2,4},{1,0},{-4,2},{2,-1},{0,1},{-1,3}});
+
   print(a);
   print(b);
   print(c);
+    (d = fft(a) + fft(b) + fft(c)).run();
   //
- (d = a + ifft(b*c)).run();
+  // for (int i = 0; i < 10; i++) {
+  //   (d = a + fft(b*c)).run();
+  // }
 
   cudaDeviceSynchronize();
   //(d = a + b*c).run();

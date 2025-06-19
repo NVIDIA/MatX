@@ -151,7 +151,6 @@
 #include <map>
 #include <memory>
 #include <queue>
-#include <regex>
 #include <thread>
 #include <type_traits>
 #include <unordered_set>
@@ -1502,12 +1501,25 @@ inline std::string sha256(const char* data, size_t size) {
 
 inline std::string sha256(StringRef s) { return sha256(s.data(), s.size()); }
 
+inline std::string replace_all(StringRef str, StringRef from, StringRef to) {
+  if (from.empty()) return std::string{str};
+  std::string result;
+  result.reserve(str.length());  // Assume similar lengths
+  size_t old_pos = 0;
+  size_t pos;
+  while ((pos = str.find(from, old_pos)) != std::string::npos) {
+    result.append(str.substr(old_pos, pos - old_pos));
+    result.append(to);
+    old_pos = pos + from.length();
+  }
+  result.append(str.substr(old_pos));
+  return result;
+}
+
 // Normalizes an unmangled CUDA symbol name to match what cu++filt produces.
 inline std::string normalize_cuda_symbol_name(const std::string& symbol_name) {
   // Convert "(anonymous namespace)" (c++filt) to "<unnamed>" (cu++filt).
-  static const std::regex re_anonymous_namespace(R"(\(anonymous namespace\))",
-                                                 std::regex::optimize);
-  return std::regex_replace(symbol_name, re_anonymous_namespace, "<unnamed>");
+  return replace_all(symbol_name, "(anonymous namespace)", "<unnamed>");
 }
 
 template <typename ResultType, typename... Args>

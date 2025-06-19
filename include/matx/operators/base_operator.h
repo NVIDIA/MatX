@@ -52,8 +52,13 @@ namespace matx
       public:
         using matxop = bool;  ///< Is a MatX custom operator
         using value_type = T; ///< Value type for type traits
-
+        //static constexpr uint64_t unique_id_ = detail::fnv1a_64(detail::get_type_name<T>());
 	      __MATX_INLINE__ std::string str() const { return "BaseOp"; }
+
+        // BaseOp() {
+        //   printf("id: %lu %s\n", id, std::string(detail::get_type_name<T>()).c_str());
+        // }
+
 
         /**
          * @brief Launch work in an arbitrary executor

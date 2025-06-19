@@ -19,7 +19,8 @@ set(examples
     svd_power
     qr
     black_scholes
-    print_styles)
+    print_styles
+    unique_operator_ids_example)
 
 
 

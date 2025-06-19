@@ -225,6 +225,7 @@ __global__ void matxOpTDKernel(Op op, const cuda::std::array<index_t, Op::Rank()
 
 #ifdef MATX_EN_MATHDX
 static const char *matxKernelStr = "\n\
+#include <matx.h>\n\
 namespace matx {\n\
   namespace detail {\n\
     template <class Op>\n\
@@ -234,7 +235,6 @@ namespace matx {\n\
         if constexpr (std::is_pointer_v<Op>) {\n\
           (*op).template operator()<CurrentCapabilities>(idx);\n\
         } else {\n\
-          printf(\"calling from thread %d\\n\", threadIdx.x);\n\
           op.template operator()<CurrentCapabilities>(idx);\n\
         }\n\
       }\n\

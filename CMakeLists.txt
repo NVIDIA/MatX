@@ -96,9 +96,9 @@ if (MATX_BUILD_DOCS)
     add_subdirectory(docs_input)
 endif()
 
-# MatX requires C++17 to build. Enforce on all libraries pulled in as well
-set(CMAKE_CXX_STANDARD 17)
-set(CUDA_CXX_STANDARD 17)
+# MatX requires C++20 to build. Enforce on all libraries pulled in as well
+set(CMAKE_CXX_STANDARD 20)
+set(CUDA_CXX_STANDARD 20)
 
 if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
     execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion OUTPUT_VARIABLE GCC_VERSION)
@@ -124,6 +124,9 @@ target_include_directories(matx INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOU
                                          "$<INSTALL_INTERFACE:include>")
 target_include_directories(matx INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/matx/kernels>"
 "$<INSTALL_INTERFACE:include/matx/kernels>")
+# Add build directory for generated headers
+target_include_directories(matx INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
+                                         "$<INSTALL_INTERFACE:include>")
 target_compile_features(matx INTERFACE cxx_std_17 $<BUILD_INTERFACE:cuda_std_17>)
 
 # 11.2 and above required for async allocation
@@ -376,6 +379,7 @@ if (NOT_SUBPROJECT)
     install(TARGETS matx EXPORT matx-exports)
     install(DIRECTORY include/ DESTINATION include)
     install(FILES ${CMAKE_BINARY_DIR}/include/version_config.h DESTINATION include)
+    install(FILES ${CMAKE_BINARY_DIR}/include/nvrtc_config.h DESTINATION include)
 
     set(doc_string
     [=[
