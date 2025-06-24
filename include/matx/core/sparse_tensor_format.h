@@ -219,23 +219,26 @@ public:
         lvls[L] = dims[ftype::Expr::di];
       } else if constexpr (ftype::Expr::op == LvlOp::Add) {
         static_assert(ftype::Expr::cj < DIM);
-        if constexpr (SZ) // range [0:M+N-2]
+        if constexpr (SZ) { // range [0:M+N-2]
           lvls[L] = dims[ftype::Expr::di] + dims[ftype::Expr::cj] - 1;
-        else
+        } else {
           lvls[L] = dims[ftype::Expr::di] + dims[ftype::Expr::cj];
+        }
       } else if constexpr (ftype::Expr::op == LvlOp::Sub) {
         static_assert(ftype::Expr::cj < DIM);
-        if constexpr (SZ) // range [-M+1:N-1]
+        if constexpr (SZ) { // range [-M+1:N-1]
           lvls[L] = dims[ftype::Expr::di] + dims[ftype::Expr::cj] - 1;
-        else
+        } else {
           lvls[L] = dims[ftype::Expr::di] - dims[ftype::Expr::cj];
+        }
       } else if constexpr (ftype::Expr::op == LvlOp::Div) {
         lvls[L] = dims[ftype::Expr::di] / ftype::Expr::cj;
       } else if constexpr (ftype::Expr::op == LvlOp::Mod) {
-        if constexpr (SZ) // range [0:i % C]
+        if constexpr (SZ) { // range [0:i % C]
           lvls[L] = ftype::Expr::cj;
-        else
+        } else {
           lvls[L] = dims[ftype::Expr::di] % ftype::Expr::cj;
+        }
       } else {
 #ifndef __CUDACC__
         MATX_THROW(matxNotSupported, "unimplemented case");
@@ -258,17 +261,19 @@ public:
       } else if constexpr (ftype::Expr::op == LvlOp::Add) {
         using ntype = cuda::std::tuple_element_t<L + 1, LvlSpecs>;
         static_assert(ntype::Expr::op == LvlOp::Id && ntype::Type::isRange());
-        if constexpr (ftype::Expr::cj == ntype::Expr::di)
+        if constexpr (ftype::Expr::cj == ntype::Expr::di) {
           dims[ftype::Expr::di] = lvls[L] - lvls[L + 1];
-        else if constexpr (ftype::Expr::di == ntype::Expr::di)
+        } else if constexpr (ftype::Expr::di == ntype::Expr::di) {
           dims[ftype::Expr::cj] = lvls[L] - lvls[L + 1];
+        }
       } else if constexpr (ftype::Expr::op == LvlOp::Sub) {
         using ntype = cuda::std::tuple_element_t<L + 1, LvlSpecs>;
         static_assert(ntype::Expr::op == LvlOp::Id && ntype::Type::isRange());
-        if constexpr (ftype::Expr::cj == ntype::Expr::di)
+        if constexpr (ftype::Expr::cj == ntype::Expr::di) {
           dims[ftype::Expr::di] = lvls[L] + lvls[L + 1];
-        else if constexpr (ftype::Expr::di == ntype::Expr::di)
+        } else if constexpr (ftype::Expr::di == ntype::Expr::di) {
           dims[ftype::Expr::cj] = lvls[L + 1] - lvls[L];
+        }
       } else if constexpr (ftype::Expr::op == LvlOp::Div) {
         dims[ftype::Expr::di] = lvls[L] * ftype::Expr::cj;
       } else if constexpr (ftype::Expr::op == LvlOp::Mod) {
