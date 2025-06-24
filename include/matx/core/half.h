@@ -52,20 +52,20 @@ template <typename T> struct alignas(sizeof(T)) matxHalf {
 
   /**
    * @brief Default constructor
-   * 
+   *
    */
   __MATX_INLINE__ matxHalf() = default;
 
   /**
    * @brief Default copy constructor
-   * 
+   *
    * @param x_ Parameter to copy
    */
   __MATX_INLINE__ matxHalf(const matxHalf<T> &x_) noexcept = default;
 
   /**
    * @brief Copy constructor from arbitrary type
-   * 
+   *
    * @tparam T2 Type to copy from
    * @param x_ Value to copy
    */
@@ -77,33 +77,33 @@ template <typename T> struct alignas(sizeof(T)) matxHalf {
 
   /**
    * @brief Default destructor
-   * 
+   *
    */
   __MATX_INLINE__ ~matxHalf() = default;
 
   /**
    * @brief Half casting operator
-   * 
+   *
    * @return Underlying half type
    */
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ operator T() const
   {
     return x;
-  }  
+  }
 
   /**
    * @brief Half reference casting operator
-   * 
+   *
    * @return Underlying reference to half type
    */
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ operator T&()
   {
     return x;
-  }  
+  }
 
   /**
    * @brief Float casting operator
-   * 
+   *
    * @return float of value
    */
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ operator float() const
@@ -113,14 +113,14 @@ template <typename T> struct alignas(sizeof(T)) matxHalf {
 
   /**
    * @brief Default copy assignment operator
-   * 
+   *
    * @param rhs Value to copy
    */
   __MATX_INLINE__ matxHalf<T> &operator=(const matxHalf<T> &rhs) = default;
 
   /**
    * @brief Copy assignment operator
-   * 
+   *
    * @tparam T2 Type to copy from
    * @param rhs Value to copy from
    */
@@ -133,7 +133,7 @@ template <typename T> struct alignas(sizeof(T)) matxHalf {
 
   /**
    * @brief Increment and assign operator
-   * 
+   *
    * @tparam X Type of half
    * @param rhs Value of cource
    * @return Updated object
@@ -148,7 +148,7 @@ template <typename T> struct alignas(sizeof(T)) matxHalf {
 
   /**
    * @brief Decrement and assign operator
-   * 
+   *
    * @tparam X Type of half
    * @param rhs Value of cource
    * @return Updated object
@@ -163,7 +163,7 @@ template <typename T> struct alignas(sizeof(T)) matxHalf {
 
   /**
    * @brief Multiply and assign operator
-   * 
+   *
    * @tparam X Type of half
    * @param rhs Value of cource
    * @return Updated object
@@ -178,7 +178,7 @@ template <typename T> struct alignas(sizeof(T)) matxHalf {
 
   /**
    * @brief Divide and assign operator
-   * 
+   *
    * @tparam X Type of half
    * @param rhs Value of cource
    * @return Updated object
@@ -193,7 +193,7 @@ template <typename T> struct alignas(sizeof(T)) matxHalf {
 
   /**
    * @brief Increment and assign operator from float
-   * 
+   *
    * @param f Value of cource
    * @return Updated object
    */
@@ -208,7 +208,7 @@ template <typename T> struct alignas(sizeof(T)) matxHalf {
 
   /**
    * @brief Decrement and assign operator from float
-   * 
+   *
    * @param f Value of cource
    * @return Updated object
    */
@@ -226,7 +226,7 @@ template <typename T> struct alignas(sizeof(T)) matxHalf {
 
 /**
  * @brief Add a half precious wrapper type with native type
- * 
+ *
  * @tparam T Native type
  * @param lhs Left parameter
  * @param rhs Right parameter
@@ -242,7 +242,7 @@ operator+(const matxHalf<T> &lhs, const T &rhs)
 
 /**
  * @brief Add a half precious wrapper type with native type
- * 
+ *
  * @tparam T Native type
  * @param lhs Left parameter
  * @param rhs Right parameter
@@ -258,7 +258,7 @@ operator+(const T &lhs, const matxHalf<T> &rhs)
 
 /**
  * @brief Subtract a half precious wrapper type with native type
- * 
+ *
  * @tparam T Native type
  * @param lhs Left parameter
  * @param rhs Right parameter
@@ -274,7 +274,7 @@ operator-(const matxHalf<T> &lhs, const T &rhs)
 
 /**
  * @brief Subtract a half precious wrapper type with native type
- * 
+ *
  * @tparam T Native type
  * @param lhs Left parameter
  * @param rhs Right parameter
@@ -290,7 +290,7 @@ operator-(const T &lhs, const matxHalf<T> &rhs)
 
 /**
  * @brief Multiply a half precious wrapper type with native type
- * 
+ *
  * @tparam T Native type
  * @param lhs Left parameter
  * @param rhs Right parameter
@@ -306,7 +306,7 @@ operator*(const matxHalf<T> &lhs, const T &rhs)
 
 /**
  * @brief Multiply a half precious wrapper type with native type
- * 
+ *
  * @tparam T Native type
  * @param lhs Left parameter
  * @param rhs Right parameter
@@ -322,7 +322,7 @@ operator*(const T &lhs, const matxHalf<T> &rhs)
 
 /**
  * @brief Divide a half precious wrapper type with native type
- * 
+ *
  * @tparam T Native type
  * @param lhs Left parameter
  * @param rhs Right parameter
@@ -338,7 +338,7 @@ operator/(const matxHalf<T> &lhs, const T &rhs)
 
 /**
  * @brief Divide a half precious wrapper type with native type
- * 
+ *
  * @tparam T Native type
  * @param lhs Left parameter
  * @param rhs Right parameter
@@ -354,7 +354,7 @@ operator/(const T &lhs, const matxHalf<T> &rhs)
 
 /**
  * @brief Negate operator
- * 
+ *
  * @tparam T Half type
  * @param l operator
  * @return Result of negation
@@ -366,12 +366,12 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf<T> operator-(const matxHa
   return {-l.x};
 #else
   return {-static_cast<float>(l.x)};
-#endif  
+#endif
 }
 
 /**
  * @brief Comparison operator
- * 
+ *
  * @tparam T Native type
  * @param lhs Left parameter
  * @param rhs Right parameter
@@ -390,7 +390,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator==(const matxHalf<T> 
 
 /**
  * @brief Comparison operator
- * 
+ *
  * @tparam T Native type
  * @param lhs Left parameter
  * @param rhs Right parameter
@@ -406,7 +406,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator==(const matxHalf<T> 
 
 /**
  * @brief Comparison operator
- * 
+ *
  * @tparam T Native type
  * @param lhs Left parameter
  * @param rhs Right parameter
@@ -422,7 +422,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator==(const T &lhs,
 
 /**
  * @brief Not equal operator
- * 
+ *
  * @tparam T Native type
  * @param lhs Left parameter
  * @param rhs Right parameter
@@ -437,7 +437,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator!=(const matxHalf<T> 
 
 /**
  * @brief Not equal operator
- * 
+ *
  * @tparam T Native type
  * @param lhs Left parameter
  * @param rhs Right parameter
@@ -453,7 +453,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator!=(const matxHalf<T> 
 
 /**
  * @brief Not equal operator
- * 
+ *
  * @tparam T Native type
  * @param lhs Left parameter
  * @param rhs Right parameter
@@ -469,7 +469,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator!=(const T &lhs,
 
 /**
  * @brief Greater than operator
- * 
+ *
  * @tparam T Native type
  * @param lhs Left parameter
  * @param rhs Right parameter
@@ -488,7 +488,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator>(const matxHalf<T> &
 
 /**
  * @brief Less than operator
- * 
+ *
  * @tparam T Native type
  * @param lhs Left parameter
  * @param rhs Right parameter
@@ -507,7 +507,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator<(const matxHalf<T> &
 
 /**
  * @brief Less than or equal to operator
- * 
+ *
  * @tparam T Native type
  * @param lhs Left parameter
  * @param rhs Right parameter
@@ -522,7 +522,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator<=(const matxHalf<T> 
 
 /**
  * @brief Greater than or equal to operator
- * 
+ *
  * @tparam T Native type
  * @param lhs Left parameter
  * @param rhs Right parameter
@@ -537,7 +537,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator>=(const matxHalf<T> 
 
 /**
  * @brief Addition operator
- * 
+ *
  * @tparam T Native type
  * @param lhs Left parameter
  * @param rhs Right parameter
@@ -556,7 +556,7 @@ operator+(const matxHalf<T> &lhs, const matxHalf<T> &rhs)
 
 /**
  * @brief Subtraction operator
- * 
+ *
  * @tparam T Native type
  * @param lhs Left parameter
  * @param rhs Right parameter
@@ -575,7 +575,7 @@ operator-(const matxHalf<T> &lhs, const matxHalf<T> &rhs)
 
 /**
  * @brief Multiplication operator
- * 
+ *
  * @tparam T Native type
  * @param lhs Left parameter
  * @param rhs Right parameter
@@ -594,7 +594,7 @@ operator*(const matxHalf<T> &lhs, const matxHalf<T> &rhs)
 
 /**
  * @brief Division operator
- * 
+ *
  * @tparam T Native type
  * @param lhs Left parameter
  * @param rhs Right parameter
@@ -613,7 +613,7 @@ operator/(const matxHalf<T> &lhs, const matxHalf<T> &rhs)
 
 /**
  * @brief Absolute value
- * 
+ *
  * @tparam T Type of half
  * @param x Value of half
  * @return Absolute value of input
@@ -630,7 +630,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf<T> abs(const matxHalf<T> 
 
 /**
  * @brief Absolute value
- * 
+ *
  * @tparam T Type of half
  * @param x Value of half
  * @return Absolute value of input
@@ -648,7 +648,7 @@ abs(const matxHalf<__nv_bfloat16> &x)
 
 /**
  * @brief Natural logarithm value
- * 
+ *
  * @tparam T Type of half
  * @param x Value of half
  * @return Natural logarithm of input
@@ -665,7 +665,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf<T> log(const matxHalf<T> 
 
 /**
  * @brief Square root value
- * 
+ *
  * @tparam T Type of half
  * @param x Value of half
  * @return Square root of input
@@ -682,7 +682,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf<T> sqrt(const matxHalf<T>
 
 /**
  * @brief Square root value
- * 
+ *
  * @tparam T Type of half
  * @param x Value of half
  * @return Square root of input
@@ -700,7 +700,7 @@ sqrt(const matxHalf<__nv_bfloat16> &x)
 
 /**
  * @brief Reciprocal Square root value
- * 
+ *
  * @tparam T Type of half
  * @param x Value of half
  * @return Reciprocal square root of input
@@ -721,7 +721,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf<T> rsqrt(const matxHalf<T
 
 /**
  * @brief Square root value
- * 
+ *
  * @tparam T Type of half
  * @param x Value of half
  * @return Square root of input
@@ -743,7 +743,7 @@ rsqrt(const matxHalf<__nv_bfloat16> &x)
 
 /**
  * @brief Test for infiity
- * 
+ *
  * @tparam T Type of half
  * @param x Value of half
  * @return True if input is infinity
@@ -760,7 +760,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ int isinf(const matxHalf<T> &x)
 
 /**
  * @brief Test for infiity
- * 
+ *
  * @tparam T Type of half
  * @param x Value of half
  * @return True if input is infinity
@@ -777,7 +777,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ int isinf(const matxHalf<__nv_bflo
 
 /**
  * @brief Natural logarithm
- * 
+ *
  * @tparam T Type of half
  * @param x Value of half
  * @return Natural log of input
@@ -795,7 +795,7 @@ log(const matxHalf<__nv_bfloat16> &x)
 
 /**
  * @brief logarithm base 10
- * 
+ *
  * @tparam T Type of half
  * @param x Value of half
  * @return Log base 10 of input
@@ -812,7 +812,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf<T> log10(const matxHalf<T
 
 /**
  * @brief logarithm base 10
- * 
+ *
  * @tparam T Type of half
  * @param x Value of half
  * @return Log base 10 of input
@@ -830,7 +830,7 @@ log10(const matxHalf<__nv_bfloat16> &x)
 
 /**
  * @brief logarithm base 2
- * 
+ *
  * @tparam T Type of half
  * @param x Value of half
  * @return Log base 2 of input
@@ -847,7 +847,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf<T> log2(const matxHalf<T>
 
 /**
  * @brief logarithm base 2
- * 
+ *
  * @tparam T Type of half
  * @param x Value of half
  * @return Log base 2 of input
@@ -865,7 +865,7 @@ log2(const matxHalf<__nv_bfloat16> &x)
 
 /**
  * @brief Exponential function
- * 
+ *
  * @tparam T Type of half
  * @param x Value of half
  * @return Exponential of input
@@ -882,7 +882,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf<T> exp(const matxHalf<T> 
 
 /**
  * @brief Exponential function
- * 
+ *
  * @tparam T Type of half
  * @param x Value of half
  * @return Exponential of input
@@ -900,7 +900,7 @@ exp(const matxHalf<__nv_bfloat16> &x)
 
 /**
  * @brief Power function
- * 
+ *
  * @tparam T Type of half
  * @param x Value of half
  * @param y Value to raise x to
@@ -916,7 +916,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf<T> pow(const matxHalf<T> 
 
 /**
  * @brief Power function
- * 
+ *
  * @tparam T Type of half
  * @param x Value of half
  * @param y Value to raise x to
@@ -932,7 +932,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf<T> pow(const matxHalf<T> 
 
 /**
  * @brief Power function
- * 
+ *
  * @tparam T Type of float
  * @param x Value of half
  * @param y Value to raise x to
@@ -948,7 +948,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf<T> pow(const T &x,
 
 /**
  * @brief Floor function
- * 
+ *
  * @tparam T Type of half
  * @param x Value of half
  * @return Floor of input
@@ -965,7 +965,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf<T> floor(const matxHalf<T
 
 /**
  * @brief Floor function
- * 
+ *
  * @tparam T Type of half
  * @param x Value of half
  * @return Floor of input
@@ -983,7 +983,7 @@ floor(const matxHalf<__nv_bfloat16> &x)
 
 /**
  * @brief Ceiling function
- * 
+ *
  * @tparam T Type of half
  * @param x Value of half
  * @return Ceiling of input
@@ -1000,7 +1000,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf<T> ceil(const matxHalf<T>
 
 /**
  * @brief Ceiling function
- * 
+ *
  * @tparam T Type of half
  * @param x Value of half
  * @return Ceiling of input
@@ -1018,7 +1018,7 @@ ceil(const matxHalf<__nv_bfloat16> &x)
 
 /**
  * @brief Round function
- * 
+ *
  * @tparam T Type of half
  * @param x Value of half
  * @return Rounding of input
@@ -1035,7 +1035,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf<T> round(const matxHalf<T
 
 /**
  * @brief Round function
- * 
+ *
  * @tparam T Type of half
  * @param x Value of half
  * @return Rounding of input
@@ -1052,8 +1052,53 @@ round(const matxHalf<__nv_bfloat16> &x)
 }
 
 /**
+ * @brief Modulo function
+ *
+ * @tparam T Type of float
+ * @param x Value of half
+ * @param y Value to raise x to
+ * @return Remainder of x / y
+ */
+template <class T>
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf<T>
+fmod(const T &x, const matxHalf<T> &y) {
+  auto tmp = cuda::std::fmod(x, static_cast<float>(y.x));
+  return static_cast<T>(tmp);
+}
+
+/**
+ * @brief Modulo function
+ *
+ * @tparam T Type of float
+ * @param x Value of half
+ * @param y Value to raise x to
+ * @return Remainder of x / y
+ */
+template <class T>
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf<T>
+fmod(const matxHalf<T> &x, const matxHalf<T> &y) {
+  auto tmp = cuda::std::fmod(static_cast<float>(x.x), static_cast<float>(y.x));
+  return static_cast<T>(tmp);
+}
+
+/**
+ * @brief Modulo function
+ *
+ * @tparam T Type of float
+ * @param x Value of half
+ * @param y Value to raise x to
+ * @return Remainder of x / y
+ */
+template <class T>
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf<T>
+fmod(const matxHalf<T> &x, const T &y) {
+  auto tmp = cuda::std::fmod(static_cast<float>(x.x), y);
+  return static_cast<T>(tmp);
+}
+
+/**
  * @brief Sine function
- * 
+ *
  * @tparam T Type of half
  * @param x Value of half
  * @return Sine of input
@@ -1070,7 +1115,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf<T> sin(const matxHalf<T> 
 
 /**
  * @brief Sine function
- * 
+ *
  * @tparam T Type of half
  * @param x Value of half
  * @return Sine of input
@@ -1088,7 +1133,7 @@ sin(const matxHalf<__nv_bfloat16> &x)
 
 /**
  * @brief Cosine function
- * 
+ *
  * @tparam T Type of half
  * @param x Value of half
  * @return Cosine of input
@@ -1105,7 +1150,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf<T> cos(const matxHalf<T> 
 
 /**
  * @brief Cosine function
- * 
+ *
  * @tparam T Type of half
  * @param x Value of half
  * @return Cosine of input
@@ -1123,7 +1168,7 @@ cos(const matxHalf<__nv_bfloat16> &x)
 
 /**
  * @brief Tangent function
- * 
+ *
  * @tparam T Type of half
  * @param x Value of half
  * @return Tangent of input
@@ -1136,7 +1181,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf<T> tan(const matxHalf<T> 
 
 /**
  * @brief Arctangent function
- * 
+ *
  * @tparam T Type of half
  * @param x Value of half
  * @return Arctangent of input
@@ -1150,7 +1195,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf<T> asin(const matxHalf<T>
 
 /**
  * @brief Arccosine function
- * 
+ *
  * @tparam T Type of half
  * @param x Value of half
  * @return Arccosine of input
@@ -1163,7 +1208,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf<T> acos(const matxHalf<T>
 
 /**
  * @brief Arctangent function
- * 
+ *
  * @tparam T Type of half
  * @param x Value of half
  * @return Arctangent of input
@@ -1176,7 +1221,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf<T> atan(const matxHalf<T>
 
 /**
  * @brief Two argument Arctangent function
- * 
+ *
  * @tparam T Type of half
  * @param x Numerator
  * @param y Denominator
@@ -1191,7 +1236,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf<T> atan2(const matxHalf<T
 
 /**
  * @brief Hyperbolic arcsine function
- * 
+ *
  * @tparam T Type of half
  * @param x Value of half
  * @return Hyperbolic arcsine of input
@@ -1204,7 +1249,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf<T> asinh(const matxHalf<T
 
 /**
  * @brief Hyperbolic arccosine function
- * 
+ *
  * @tparam T Type of half
  * @param x Value of half
  * @return Hyperbolic arccosine of input
@@ -1217,7 +1262,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf<T> acosh(const matxHalf<T
 
 /**
  * @brief Hyperbolic arctangent function
- * 
+ *
  * @tparam T Type of half
  * @param x Value of half
  * @return Hyperbolic arctangent of input
@@ -1230,7 +1275,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf<T> atanh(const matxHalf<T
 
 /**
  * @brief Hyperbolic sine function
- * 
+ *
  * @tparam T Type of half
  * @param x Value of half
  * @return Hyperbolic sine of input
@@ -1243,7 +1288,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf<T> sinh(const matxHalf<T>
 
 /**
  * @brief Hyperbolic cosine function
- * 
+ *
  * @tparam T Type of half
  * @param x Value of half
  * @return Hyperbolic cosine of input
@@ -1256,7 +1301,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf<T> cosh(const matxHalf<T>
 
 /**
  * @brief Hyperbolic tangent function
- * 
+ *
  * @tparam T Type of half
  * @param x Value of half
  * @return Hyperbolic tangent of input

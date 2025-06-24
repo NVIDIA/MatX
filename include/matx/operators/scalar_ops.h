@@ -89,7 +89,7 @@ namespace detail {
       return UnaryVecFunc(internal_##FUNC<T>, v1); \
     } \
     using value_type = std::invoke_result_t<decltype(scalar_internal_##FUNC<T>), T>; \
-  };  
+  };
 
 // Standard binary function
 #define MATX_BINARY_OP_GEN(FUNC, OPNAME)                                       \
@@ -161,7 +161,7 @@ namespace detail {
       return BinVecFunc(internal_##FUNC<T1, T2>, v1, v2); \
     } \
     using value_type = std::invoke_result_t<decltype(scalar_internal_##FUNC<T1, T2>), T1, T2>; \
-  };  
+  };
 
 
   // Helper function to apply a callable binary operator onto two inputs. There are many compile-time
@@ -211,7 +211,7 @@ namespace detail {
     else {
       return func(v1);
     }
-  }    
+  }
 
 
 MATX_UNARY_OP_GEN(ceil, Ceil);
@@ -246,7 +246,7 @@ static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto scalar_internal_rsqrt(
 #else
     return static_cast<T>(1) / sqrt(v1);
 #endif
-  }  
+  }
 }
 MATX_UNARY_OP_GEN_NOFUNC(rsqrt, RSqrt);
 
@@ -313,7 +313,7 @@ static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto scalar_internal_expj(T
     } else {
       return cuda::std::complex<T>{scalar_internal_cos(v1), scalar_internal_sin(v1)};
     }
-  }  
+  }
 }
 MATX_UNARY_OP_GEN_NOFUNC(expj, Expj);
 
@@ -413,7 +413,7 @@ static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto scalar_internal_isinf(
     return cuda::std::isinf(static_cast<typename castType::value_type>(v1.real())) || cuda::std::isinf(static_cast<typename castType::value_type>(v1.imag()));
   } else {
     return cuda::std::isinf(static_cast<castType>(v1));
-  } 
+  }
 }
 MATX_UNARY_OP_GEN_NOFUNC(isinf, IsInf);
 
@@ -427,8 +427,12 @@ MATX_BINARY_OP_GEN_OPERATOR(mod, Mod, %);
 
 template <typename T1, typename T2>
 static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto scalar_internal_fmod(T1 v1, T2 v2) {
-  return cuda::std::fmod(v1, v2);
-}  
+  if constexpr (is_matx_half_v<T1> || is_matx_half_v<T2>) {
+    return fmod(v1, v2);
+  } else {
+    return cuda::std::fmod(v1, v2);
+  }
+}
 MATX_BINARY_OP_NOFUNC(fmod, FMod);
 
 template <typename T1, typename T2>
@@ -439,7 +443,7 @@ static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto scalar_internal_atan2(
   else {
     return cuda::std::atan2(v1, v2);
   }
-}  
+}
 MATX_BINARY_OP_NOFUNC(atan2, Atan2);
 
 MATX_BINARY_OP_GEN(pow, Pow);
@@ -447,13 +451,13 @@ MATX_BINARY_OP_GEN(pow, Pow);
 template <typename T1, typename T2>
 static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto scalar_internal_max(T1 v1, T2 v2) {
   return cuda::std::max(v1, v2);
-}  
+}
 MATX_BINARY_OP_NOFUNC(max, Maximum);
 
 template <typename T1, typename T2>
 static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto scalar_internal_min(T1 v1, T2 v2) {
   return cuda::std::min(v1, v2);
-}  
+}
 MATX_BINARY_OP_NOFUNC(min, Minimum);
 
 // Logical Operators
