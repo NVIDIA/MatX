@@ -256,9 +256,19 @@ public:
       if constexpr (ftype::Expr::op == LvlOp::Id) {
         dims[ftype::Expr::di] = lvls[L];
       } else if constexpr (ftype::Expr::op == LvlOp::Add) {
-        dims[ftype::Expr::cj] = lvls[L + 1] + lvls[L];
+        using ntype = cuda::std::tuple_element_t<L + 1, LvlSpecs>;
+        static_assert(ntype::Expr::op == LvlOp::Id && ntype::Type::isRange());
+        if constexpr (ftype::Expr::cj == ntype::Expr::di)
+          dims[ftype::Expr::di] = lvls[L] - lvls[L + 1];
+        else if constexpr (ftype::Expr::di == ntype::Expr::di)
+          dims[ftype::Expr::cj] = lvls[L] - lvls[L + 1];
       } else if constexpr (ftype::Expr::op == LvlOp::Sub) {
-        dims[ftype::Expr::cj] = lvls[L + 1] - lvls[L]; // order!
+        using ntype = cuda::std::tuple_element_t<L + 1, LvlSpecs>;
+        static_assert(ntype::Expr::op == LvlOp::Id && ntype::Type::isRange());
+        if constexpr (ftype::Expr::cj == ntype::Expr::di)
+          dims[ftype::Expr::di] = lvls[L] + lvls[L + 1];
+        else if constexpr (ftype::Expr::di == ntype::Expr::di)
+          dims[ftype::Expr::cj] = lvls[L + 1] - lvls[L];
       } else if constexpr (ftype::Expr::op == LvlOp::Div) {
         dims[ftype::Expr::di] = lvls[L] * ftype::Expr::cj;
       } else if constexpr (ftype::Expr::op == LvlOp::Mod) {
