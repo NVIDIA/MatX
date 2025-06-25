@@ -38,6 +38,7 @@
 #include "matx/core/type_utils.h"
 #include "matx/core/tensor_utils.h"
 #include "matx/core/capabilities.h"
+#include "matx/core/operator_utils.h"
 
 namespace matx {
 template <typename T, int RANK, typename Storage, typename Desc> class tensor_t; ///< Tensor detail type
@@ -72,6 +73,7 @@ public:
   using tensor_type = T;
   using op_type = Op;
   using matx_setop = bool;
+
 
 #ifndef __CUDACC_RTC__
   __MATX_INLINE__ const std::string str() const {
@@ -165,6 +167,7 @@ public:
 
     //return out_(indices...);
   }  
+
 
   template <typename... Is>
   __MATX_DEVICE__ __MATX_HOST__ inline decltype(auto) operator()(Is... indices) const noexcept  

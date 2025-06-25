@@ -40,11 +40,12 @@ using namespace matx;
 int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 {
   MATX_ENTER_HANDLER();
+  int batches = 2;
   using complex = cuda::std::complex<float>;
-  auto a = make_tensor<complex>({32});
-  auto b = make_tensor<complex>({32});
-  auto c = make_tensor<complex>({32});
-  auto d = make_tensor<complex>({32});
+  auto a = make_tensor<complex>({batches,32});
+  auto b = make_tensor<complex>({batches,32});
+  auto c = make_tensor<complex>({batches,32});
+  auto d = make_tensor<complex>({batches,32});
 
   (a = random<complex>(a.Shape(), UNIFORM)).run();
   (b = random<complex>(b.Shape(), UNIFORM)).run();
@@ -58,10 +59,13 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   print(a);
   print(b);
   print(c);
-    (d = fft(a) + fft(b) + fft(c)).run();
+    //(d = fft(a) + fft(b) + fft(c)).run();
   //
   // for (int i = 0; i < 10; i++) {
-  //   (d = a + fft(b*c)).run();
+
+  //gg.assign_ids(counter);
+
+(d = a + fft(b*c)).run();
   // }
 
   cudaDeviceSynchronize();

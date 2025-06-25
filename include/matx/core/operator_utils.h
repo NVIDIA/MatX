@@ -38,6 +38,12 @@
 #include "matx/core/type_utils.h"
 #include "matx/operators/collapse.h"
 
+#define MATX_COMPILE_TIME_INC() \
+    []() constexpr { \
+        constexpr uint32_t unique_index = __COUNTER__; \
+        return unique_index; \
+    }()
+
 namespace matx {
 
   template <bool ConvertType, typename Func, typename OutputOp, typename InputOp, typename BeginIter, typename EndIter>
@@ -185,7 +191,9 @@ namespace matx {
 }; 
 #endif
 
-// namespace matx{
+
+
+// namespace matx {
 //   namespace detail {
 //     template<unsigned N>
 //     struct reader {
@@ -214,11 +222,7 @@ namespace matx {
 //     };
 
 
-//     template<
-//         auto Tag,
-//         unsigned NextVal = 0
-//     >
-//     [[nodiscard]]
+//     template<typename Tag, unsigned NextVal = 0> [[nodiscard]]
 //     consteval auto counter_impl() {
 //         constexpr bool counted_past_value = requires(reader<NextVal> r) {
 //             counted_flag(r);
@@ -234,48 +238,8 @@ namespace matx {
 //     }
 
 
-//     template<
-//         auto Tag = []{},
-//         auto Val = counter_impl<Tag>()
-//     >
-//     constexpr auto counter = Val;
-
-//       constexpr auto get_counter() {
-//         constexpr auto count = counter<>;
-//         return count;
+    // template<typename Tag, auto Val = counter_impl<Tag>()>
+    // constexpr inline auto counter = Val;
 //       }
-//     }  
 // }
 
-#include <string_view>
-
-namespace matx {
-  namespace detail {
-
-template <auto>
-struct UniqueTag {};
-
-template <typename T>
-constexpr std::string_view get_type_name() {
-#if defined(__clang__) || defined(__GNUC__)
-    return __PRETTY_FUNCTION__;
-#elif defined(_MSC_VER)
-    return __FUNCSIG__;
-#else
-#error "Compiler not supported for type name retrieval"
-#endif
-}
-
-    // FNV-1a compile-time hash
-    constexpr uint64_t fnv1a_64(const std::string_view str) {
-        uint64_t hash = 0xcbf29ce484222325;
-        const uint64_t prime = 0x100000001b3;
-
-        for (char c : str) {
-            hash ^= static_cast<uint64_t>(c);
-            hash *= prime;
-        }
-        return hash;
-    }
-  }
-}

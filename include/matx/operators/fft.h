@@ -48,37 +48,13 @@
   #include "matx/transforms/fft/fft_cufftdx.h"
 #endif
 
-// using id_value = const int *;
-
-// template <id_value>
-// struct id_t {};
-
-// template <class T>
-// struct unique_id {
-//   static constexpr int value = 0;
-//   constexpr unique_id(T const &) {}
-//   constexpr operator id_value() const { return &value; }
-// };
-
-// #define FORCE_UNIQUE(name...) id_value name = unique_id([] {})
 
 namespace matx
 {
   namespace detail {
-    // Simple hash function for source_location
-    // constexpr uint64_t location_hash(const std::source_location& loc) {
-    //   // Combine line number and file name hash
-    //   uint64_t hash = static_cast<uint64_t>(loc.line());
-    //   const char* file = loc.file_name();
-    //   while (*file) {
-    //     hash = ((hash << 5) + hash) ^ static_cast<uint64_t>(*file);
-    //     ++file;
-    //   }
-    //   return hash;
-    // }
 
-    template <typename OpA, typename PermDims, typename FFTDirection, typename Tag>
-    class FFTOp : public BaseOp<FFTOp<OpA, PermDims, FFTDirection, Tag>>
+    template <typename OpA, typename PermDims, typename FFTDirection>
+    class FFTOp : public BaseOp<FFTOp<OpA, PermDims, FFTDirection>>
     {
       // public:
       //   static constexpr intptr_t unique_id_ = reinterpret_cast<intptr_t>(Id.singleton); // No unique ID needed
@@ -106,7 +82,7 @@ namespace matx
           input_type,
           typename scalar_to_complex<input_type>::ctype>;
         using matx_transform_op = bool;
-        using fft_xform_op = bool;
+        using fft_xform_op = bool;    
 
         __MATX_INLINE__ std::string str() const { 
           if constexpr (std::is_same_v<FFTDirection, detail::fft_t>) {
@@ -178,12 +154,12 @@ namespace matx
         }
 
         __MATX_INLINE__ std::string get_capability_str() const {
-          return std::string("struct jit_fft1_params_t <") + std::string("") + "> {\n"
+          return std::string("template <> struct jit_fft1_params_t<0>  {\n") + 
                  "  constexpr static unsigned int fft_size = " + std::to_string(fft_size_) + ";\n"
                  "  constexpr static bool fft_forward = " + std::to_string(static_cast<bool>(std::is_same_v<FFTDirection, detail::fft_t>)) + ";\n"
                  "};\n";         
         }
-                  
+
         template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
@@ -193,7 +169,7 @@ namespace matx
           }
           else {
 #if defined(__CUDA_ARCH__) && defined(__CUDACC_RTC__)
-            return detail::RunDxFFT1D<input_type, CapType, unique_id_>(a_, indices...);
+            return detail::RunDxFFT1D<input_type, CapType>(a_, indices...);
 #else
             return tmp_out_.template operator()<CapType>(indices...);
 #endif
@@ -346,11 +322,11 @@ namespace matx
    * @param norm
    *   Normalization to apply to FFT
    */
-  template<typename OpA, auto ID = []{}>
+  template<typename OpA>
   __MATX_INLINE__ auto fft(const OpA &a, uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD) {
     const index_t fft_size_ = static_cast<index_t>(fft_size);
 
-    return detail::FFTOp<OpA, detail::no_permute_t, detail::fft_t, detail::UniqueTag<ID>>(a, fft_size_, detail::no_permute_t{}, detail::fft_t{}, norm);
+    return detail::FFTOp(a, fft_size_, detail::no_permute_t{}, detail::fft_t{}, norm);
   }
 
   /**
@@ -373,11 +349,11 @@ namespace matx
    * @param norm
    *   Normalization to apply to FFT
    */
-  template<typename OpA, auto ID = []{}>
+  template<typename OpA>
   __MATX_INLINE__ auto fft(const OpA &a, const int32_t (&axis)[1], uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD) {
     auto perm = detail::getPermuteDims<remove_cvref_t<OpA>::Rank()>(axis);
     const index_t fft_size_ = static_cast<index_t>(fft_size);
-    return detail::FFTOp<OpA, decltype(perm), detail::fft_t, detail::UniqueTag<ID>>(a, fft_size_, perm, detail::fft_t{}, norm);
+    return detail::FFTOp(a, fft_size_, perm, detail::fft_t{}, norm);
   }
 
   /**
@@ -399,10 +375,10 @@ namespace matx
    * @param norm
    *   Normalization to apply to IFFT
    */
-  template<typename OpA, auto ID = []{}>
+  template<typename OpA>
   __MATX_INLINE__ auto ifft(const OpA &a, uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD) {
     const index_t fft_size_ = static_cast<index_t>(fft_size);
-    return detail::FFTOp<OpA, detail::no_permute_t, detail::ifft_t, detail::UniqueTag<ID>>(a, fft_size_, detail::no_permute_t{} , detail::ifft_t{}, norm);
+    return detail::FFTOp(a, fft_size_, detail::no_permute_t{} , detail::ifft_t{}, norm);
   }
 
   /**
@@ -425,18 +401,18 @@ namespace matx
    * @param norm
    *   Normalization to apply to IFFT
    */
-  template<typename OpA, auto ID = []{}>
+  template<typename OpA>
   __MATX_INLINE__ auto ifft(const OpA &a, const int32_t (&axis)[1], uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD) {
     auto perm = detail::getPermuteDims<remove_cvref_t<OpA>::Rank()>(axis);
     const index_t fft_size_ = static_cast<index_t>(fft_size);
-    return detail::FFTOp<OpA, decltype(perm), detail::ifft_t, detail::UniqueTag<ID>>(a, fft_size_, perm, detail::ifft_t{}, norm);
+    return detail::FFTOp(a, fft_size_, perm, detail::ifft_t{}, norm);
   }  
 #endif
 
 
   namespace detail {
-    template <typename OpA, typename PermDims, typename FFTType, typename UniqueId>
-    class FFT2Op : public BaseOp<FFT2Op<OpA, PermDims, FFTType, UniqueId>>
+    template <typename OpA, typename PermDims, typename FFTType>
+    class FFT2Op : public BaseOp<FFT2Op<OpA, PermDims, FFTType>>
     {
       private:
         typename detail::base_type_t<OpA> a_;
@@ -466,7 +442,7 @@ namespace matx
           }
         }
 
-        __MATX_INLINE__ FFT2Op(const OpA &a, PermDims perm, FFTType t, FFTNorm norm, UniqueId) : a_(a),  perm_(perm), type_(t), norm_(norm) {
+        __MATX_INLINE__ FFT2Op(const OpA &a, PermDims perm, FFTType t, FFTNorm norm) : a_(a),  perm_(perm), type_(t), norm_(norm) {
           for (int r = 0; r < Rank(); r++) {
             out_dims_[r] = a_.Size(r);
           }

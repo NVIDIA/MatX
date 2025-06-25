@@ -70,14 +70,15 @@ namespace matx {
   }
 
 #ifdef __CUDA_ARCH__
-  template <typename input_type, typename CapType, uint32_t ID, typename Op, typename... Is>
+  template <typename input_type, typename CapType, typename Op, typename... Is>
   __MATX_INLINE__ __MATX_DEVICE__ auto RunDxFFT1D(const Op &op, Is... indices) {
-    static constexpr unsigned int fft_size = jit_fft1_params_t<ID>::fft_size;
-    static constexpr bool fft_forward = jit_fft1_params_t<ID>::fft_forward;
+    static constexpr unsigned int fft_size = jit_fft1_params_t<0>::fft_size;
+    static constexpr bool fft_forward = jit_fft1_params_t<0>::fft_forward;
     __syncthreads();
 
     extern __shared__  Vector<input_type, static_cast<int>(CapType::ept)> thread_data[];
-
+    // cuda::std::array<index_t,2> gg{indices...};
+    // printf("%d %d\n", gg[0], gg[1]);
     thread_data[threadIdx.x] = op.template operator()<CapType>(indices...);
     __syncthreads();
 

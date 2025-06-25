@@ -37,7 +37,7 @@
 #include "matx/executors/host.h"
 #include "matx/executors/kernel.h"
 #include "matx/core/capabilities.h"
-#include "matx/core/nvrtc.h"
+#include "matx/core/nvrtc_helper.h"
 #include "matx/core/get_grid_dims.h"
 
 namespace matx
@@ -152,48 +152,48 @@ namespace matx
             cuda::std::array<index_t, Op::Rank()> sizes;
             for (int i = 0; i < Op::Rank(); i++) {
               sizes[i] = op.Size(i);
-            }        
+            }   
 
-            bool stride = detail::get_grid_dims<Op::Rank()>(blocks, threads, sizes, static_cast<int>(max_ept), 1024);
-            
-            // Helper function to execute kernel without JIT
-            auto execute_without_jit = [&](auto ept_tag) -> bool {
-              constexpr auto EPT = decltype(ept_tag)::ept;
-              using CapType      = decltype(ept_tag);
-              if (max_ept == EPT) {
-                if constexpr (Op::Rank() == 1) {
-                  detail::matxOpT1Kernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0]);
-                }
-                else if constexpr (Op::Rank() == 2) {
-                  if (stride) {
-                    detail::matxOpT2StrideKernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
-                  } else {
-                    detail::matxOpT2Kernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
-                  }
-                }
-                else if constexpr (Op::Rank() == 3) {
-                  if (stride) {
-                    detail::matxOpT3StrideKernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
-                  } else {
-                    detail::matxOpT3Kernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
-                  }
-                }
-                else if constexpr (Op::Rank() == 4) {
-                  if (stride) {
-                    detail::matxOpT4StrideKernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
-                  } else {
-                    detail::matxOpT4Kernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
-                  }
-                }
-                return true;
-              }
-              return false;
-            };
+            const bool use_jit = detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op) && Op::Rank() < 4;
+              printf("use_jit %d\n", use_jit);                  
 
-
-            const bool use_jit = detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op);
-              printf("use_jit %d\n", use_jit);            
             if (!use_jit) {
+              bool stride = detail::get_grid_dims<Op::Rank()>(blocks, threads, sizes, static_cast<int>(max_ept), 1024);
+              
+              // Helper function to execute kernel without JIT
+              auto execute_without_jit = [&](auto ept_tag) -> bool {
+                constexpr auto EPT = decltype(ept_tag)::ept;
+                using CapType      = decltype(ept_tag);
+                if (max_ept == EPT) {
+                  if constexpr (Op::Rank() == 1) {
+                    detail::matxOpT1Kernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0]);
+                  }
+                  else if constexpr (Op::Rank() == 2) {
+                    if (stride) {
+                      detail::matxOpT2StrideKernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
+                    } else {
+                      detail::matxOpT2Kernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
+                    }
+                  }
+                  else if constexpr (Op::Rank() == 3) {
+                    if (stride) {
+                      detail::matxOpT3StrideKernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
+                    } else {
+                      detail::matxOpT3Kernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
+                    }
+                  }
+                  else if constexpr (Op::Rank() == 4) {
+                    if (stride) {
+                      detail::matxOpT4StrideKernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
+                    } else {
+                      detail::matxOpT4Kernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
+                    }
+                  }
+                  return true;
+                }
+                return false;
+              };
+            
               // Helper tags for template parameter deduction
               constexpr auto one_tag = detail::CapabilityParams<detail::ElementsPerThread::ONE, false>{};
               constexpr auto two_tag = detail::CapabilityParams<detail::ElementsPerThread::TWO, false>{};
@@ -218,6 +218,7 @@ namespace matx
               }
             }
             else {
+              bool stride = detail::get_grid_dims_jit<Op::Rank()>(blocks, threads, sizes, static_cast<int>(max_ept), 1024);
               int shm_size = detail::get_operator_capability<detail::OperatorCapability::DYN_SHM_SIZE>(op);
               printf("shm_size %d\n", shm_size);
               detail::nvrtc_compile_and_run("output.cu", op, sizes, blocks, threads, static_cast<detail::ElementsPerThread>(max_ept), stride, shm_size);
