@@ -95,7 +95,7 @@ matvec, matmul, and solve::
    (Acsr = sparse2sparse(Acoo)).run(exec);
    (V = matvec(Acoo, W)).run(exec); // only Sparse-Matrix x Vector (SpMV)
    (C = matmul(Acoo, B)).run(exec); // only Sparse-Matrix x Matrix (SpMM)
-   (X = solve(Acsr, Y)).run(exec);  // only on CSR or tri-DIA format
+   (X = solve(Acsr, Y)).run(exec);  // only on CSR or (batched) tri-DIA format
 
 We expect the assortment of supported sparse operations and storage
 formats to grow if the experimental implementation is well-received.
@@ -139,15 +139,28 @@ to construct COO, CSR, CSC, and DIA are provided::
 
   // Constructs a sparse matrix in DIA format directly from the values and the
   // offset vectors. For an m x n matrix, this format uses a linearized storage
-  // where each diagonal has n entries and is accessed by index I or index J.
-  // For index I, diagonals padded with zeros on the left for the lower triangular
-  // part and padded with zeros on the right for the upper triangular part. This
-  // is vv. when using index J. This format is most efficient for matrices with
-  // only a few nonzero diagonals that are close to the main diagonal.
+  // where each diagonal has m or n entries and is accessed by either index I or
+  // index J, respectively. For index I, diagonals are padded with zeros on the
+  // left for the lower triangular part and padded with zeros on the right for
+  // the upper triagonal part. This is vv. when using index J. This format is
+  // most efficient for matrices with only a few nonzero diagonals that are
+  // close to the main diagonal.
   template <typename IDX, typename ValTensor, typename CrdTensor>
   auto make_tensor_dia(ValTensor &val,
                        CrdTensor &off,
-                       const index_t (&shape)[2]) {
+                       const index_t (&shape)[2]);
+
+  // Constructs a sparse tensor in uniform batched DIA format directly from
+  // the values and the offset vectors. For a b x m x n tensor, this format
+  // effectively stores b times m x n matrices in DIA format, using a uniform
+  // nonzero structure for each (non-uniform formats are possible as well).
+  // All diagonals are stored consecutively in linearized format, sorted lower
+  // to upper, with all diagonals at a certain offset appearing consecutively
+  // for all batches. With DIA(b,i,j) as indexing, can be indexed by i or j.
+  template <typename IDX, typename ValTensor, typename CrdTensor>
+  auto make_tensor_uniform_batched_dia(ValTensor &val,
+                                       CrdTensor &off,
+                                       const index_t (&shape)[2]);
 
 Matx Implementation of the UST Type
 -----------------------------------

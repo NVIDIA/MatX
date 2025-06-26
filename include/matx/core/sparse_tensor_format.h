@@ -44,6 +44,8 @@ namespace experimental {
 //
 // TODO: more elegant to have Var(i) and Const(c) in type "syntax"
 //
+// TODO: Add/Sub inversion semantics restricted to j+i,j-i and last-level range
+//
 enum class LvlOp { Id, Add, Sub, Div, Mod };
 template <LvlOp O, int I, int J = 0> class LvlExpr {
 public:
@@ -150,7 +152,7 @@ public:
   static_assert(DIM <= LVL);
 
   static constexpr bool isSpVec() {
-    if constexpr (LVL == 1) {
+    if constexpr (DIM == 1 && LVL == 1) {
       using type0 = cuda::std::tuple_element_t<0, LvlSpecs>;
       return type0::Expr::isId(0) && type0::Type::isCompressed();
     }
@@ -158,7 +160,7 @@ public:
   }
 
   static constexpr bool isCOO() {
-    if constexpr (LVL == 2) {
+    if constexpr (DIM == 2 && LVL == 2) {
       using type0 = cuda::std::tuple_element_t<0, LvlSpecs>;
       using type1 = cuda::std::tuple_element_t<1, LvlSpecs>;
       return type0::Expr::isId(0) && type0::Type::isCompressedNU() &&
@@ -168,7 +170,7 @@ public:
   }
 
   static constexpr bool isCSR() {
-    if constexpr (LVL == 2) {
+    if constexpr (DIM == 2 && LVL == 2) {
       using type0 = cuda::std::tuple_element_t<0, LvlSpecs>;
       using type1 = cuda::std::tuple_element_t<1, LvlSpecs>;
       return type0::Expr::isId(0) && type0::Type::isDense() &&
@@ -178,7 +180,7 @@ public:
   }
 
   static constexpr bool isCSC() {
-    if constexpr (LVL == 2) {
+    if constexpr (DIM == 2 && LVL == 2) {
       using type0 = cuda::std::tuple_element_t<0, LvlSpecs>;
       using type1 = cuda::std::tuple_element_t<1, LvlSpecs>;
       return type0::Expr::isId(1) && type0::Type::isDense() &&
@@ -188,7 +190,7 @@ public:
   }
 
   static constexpr bool isDIAI() {
-    if constexpr (LVL == 2) {
+    if constexpr (DIM == 2 && LVL == 2) {
       using type0 = cuda::std::tuple_element_t<0, LvlSpecs>;
       using type1 = cuda::std::tuple_element_t<1, LvlSpecs>;
       return type0::Expr::op == LvlOp::Sub && type0::Expr::di == 1 &&
@@ -199,12 +201,25 @@ public:
   }
 
   static constexpr bool isDIAJ() {
-    if constexpr (LVL == 2) {
+    if constexpr (DIM == 2 && LVL == 2) {
       using type0 = cuda::std::tuple_element_t<0, LvlSpecs>;
       using type1 = cuda::std::tuple_element_t<1, LvlSpecs>;
       return type0::Expr::op == LvlOp::Sub && type0::Expr::di == 1 &&
              type0::Expr::cj == 0 && type0::Type::isCompressed() &&
              type1::Expr::isId(1) && type1::Type::isRange();
+    }
+    return false;
+  }
+
+  static constexpr bool isBatchedDIAIUniform() {
+    if constexpr (DIM == 3 && LVL == 3) {
+      using type0 = cuda::std::tuple_element_t<0, LvlSpecs>;
+      using type1 = cuda::std::tuple_element_t<1, LvlSpecs>;
+      using type2 = cuda::std::tuple_element_t<2, LvlSpecs>;
+      return type0::Expr::op == LvlOp::Sub && type0::Expr::di == 2 &&
+             type0::Expr::cj == 1 && type0::Type::isCompressed() &&
+             type1::Expr::isId(0) && type1::Type::isDense() &&
+             type2::Expr::isId(1) && type2::Type::isRange();
     }
     return false;
   }
@@ -256,19 +271,21 @@ public:
       if constexpr (ftype::Expr::op == LvlOp::Id) {
         dims[ftype::Expr::di] = lvls[L];
       } else if constexpr (ftype::Expr::op == LvlOp::Add) {
-        using ntype = cuda::std::tuple_element_t<L + 1, LvlSpecs>;
-        static_assert(ntype::Expr::op == LvlOp::Id && ntype::Type::isRange());
-        if constexpr (ftype::Expr::cj == ntype::Expr::di)
-          dims[ftype::Expr::di] = lvls[L] - lvls[L + 1];
-        else if constexpr (ftype::Expr::di == ntype::Expr::di)
-          dims[ftype::Expr::cj] = lvls[L] - lvls[L + 1];
+        using ltype = cuda::std::tuple_element_t<LVL - 1, LvlSpecs>;
+        static_assert(ltype::Expr::op == LvlOp::Id && ltype::Type::isRange());
+        if constexpr (ftype::Expr::cj == ltype::Expr::di) {
+          dims[ftype::Expr::di] = lvls[L] - lvls[LVL - 1];
+        } else if constexpr (ftype::Expr::di == ltype::Expr::di) {
+          dims[ftype::Expr::cj] = lvls[L] - lvls[LVL - 1];
+        }
       } else if constexpr (ftype::Expr::op == LvlOp::Sub) {
-        using ntype = cuda::std::tuple_element_t<L + 1, LvlSpecs>;
-        static_assert(ntype::Expr::op == LvlOp::Id && ntype::Type::isRange());
-        if constexpr (ftype::Expr::cj == ntype::Expr::di)
-          dims[ftype::Expr::di] = lvls[L] + lvls[L + 1];
-        else if constexpr (ftype::Expr::di == ntype::Expr::di)
-          dims[ftype::Expr::cj] = lvls[L + 1] - lvls[L];
+        using ltype = cuda::std::tuple_element_t<LVL - 1, LvlSpecs>;
+        static_assert(ltype::Expr::op == LvlOp::Id && ltype::Type::isRange());
+        if constexpr (ftype::Expr::cj == ltype::Expr::di) {
+          dims[ftype::Expr::di] = lvls[L] + lvls[LVL - 1];
+        } else if constexpr (ftype::Expr::di == ltype::Expr::di) {
+          dims[ftype::Expr::cj] = lvls[LVL - 1] - lvls[L];
+        }
       } else if constexpr (ftype::Expr::op == LvlOp::Div) {
         dims[ftype::Expr::di] = lvls[L] * ftype::Expr::cj;
       } else if constexpr (ftype::Expr::op == LvlOp::Mod) {
@@ -387,6 +404,22 @@ using COO3 = SparseTensorFormat<3, LvlSpec<D0, CompressedNU>,
 using CSF3 =
     SparseTensorFormat<3, LvlSpec<D0, Compressed>, LvlSpec<D1, Compressed>,
                        LvlSpec<D2, Compressed>>;
+
+// Experimental batched DIA formats. Placing the batch *after* the offset
+// compression ensures similar diagonals of the batches are stored
+// consecutively, but forces a uniform nonzero structure over all.
+using BatchedDIAINonUniform =
+    SparseTensorFormat<3, LvlSpec<D0, Dense>, LvlSpec<Sub<2, 1>, Compressed>,
+                       LvlSpec<D1, Range>>;
+using BatchedDIAJNonUniform =
+    SparseTensorFormat<3, LvlSpec<D0, Dense>, LvlSpec<Sub<2, 1>, Compressed>,
+                       LvlSpec<D2, Range>>;
+using BatchedDIAIUniform =
+    SparseTensorFormat<3, LvlSpec<Sub<2, 1>, Compressed>, LvlSpec<D0, Dense>,
+                       LvlSpec<D1, Range>>;
+using BatchedDIAJUniform =
+    SparseTensorFormat<3, LvlSpec<Sub<2, 1>, Compressed>, LvlSpec<D0, Dense>,
+                       LvlSpec<D2, Range>>;
 
 // Sparse Block 3-D Tensors.
 template <int M, int N, int K>

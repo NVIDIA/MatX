@@ -216,6 +216,13 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv) {
   // Perform a direct solve. This is only supported for a tri-diagonal
   // matrix in DIA-I format where the rhs is overwritten with the answer.
   //
+  // |  4  1  0  0  0  0 |    | 1   7 |   |  6  36 |
+  // | -1  4  1  0  0  0 |    | 2   8 |   | 10  34 |
+  // |  0 -1  4  1  0  0 | x  | 3   9 | = | 14  38 |
+  // |  0  0 -1  4  1  0 |    | 4  10 |   | 18  42 |
+  // |  0  0  0 -1  4  1 |    | 5  11 |   | 22  46 |
+  // |  0  0  0  0 -1  4 |    | 6  12 |   | 19  37 |
+  //
   dvals.SetVals({0, -1, -1, -1, -1, -1, 4, 4, 4, 4, 4, 4, 1, 1, 1, 1, 1, 0});
   auto AdiaI = experimental::make_tensor_dia<experimental::DIA_INDEX_I>(
       dvals, doffsets, {6, 6});
@@ -223,6 +230,28 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv) {
   Rhs.SetVals({{6, 10, 14, 18, 22, 19}, {36, 34, 38, 42, 46, 37}});
   (Rhs = solve(AdiaI, Rhs)).run(exec);
   print(Rhs);
+
+  //
+  // Perform a batched direct solve. This is only supported for a uniform
+  // batched tri-diagonal matrix in DIA-I format where the rhs-s are
+  //  overwritten with the answers.
+  //
+  // batch0          batch1
+  // | 10 -1  0  0 | | 20 -2  0  0 | x  | 1  1  1  1 |  1  1  1  1 |
+  // | -1 10 -1  0 | | -2 20 -2  0 |
+  // |  0 -1 10 -1 | |  0 -2 20 -2 | =  | 9  8  8  9 | 18 16 16 18 |
+  // |  0  0 -1 10 | |  0  0 -2 20 |
+  //
+  auto bdvals = make_tensor<float>({2 * 3 * 4});
+  bdvals.SetVals({0,  -1, -1, -1, 0,  -2, -2, -2, 10, 10, 10, 10,
+                  20, 20, 20, 20, -1, -1, -1, 0,  -2, -2, -2, 0});
+  auto AbatcheddiaI =
+      experimental::make_tensor_uniform_batched_dia<experimental::DIA_INDEX_I>(
+          bdvals, doffsets, {2, 4, 4});
+  auto L = make_tensor<float, 1>({2 * 4});
+  L.SetVals({9, 8, 8, 9, 18, 16, 16, 18});
+  (L = solve(AbatcheddiaI, L)).run(exec);
+  print(L);
 
   MATX_EXIT_HANDLER();
 }
