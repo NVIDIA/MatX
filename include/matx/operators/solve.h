@@ -108,6 +108,8 @@ public:
     if constexpr (is_sparse_tensor_v<OpA>) {
       if constexpr (OpA::Format::isDIAI() || OpA::Format::isDIAJ()) {
         sparse_dia_solve_impl(cuda::std::get<0>(out), a_, b_, ex);
+      } else if constexpr (OpA::Format::isBatchedDIAIUniform()) {
+        sparse_batched_dia_solve_impl(cuda::std::get<0>(out), a_, b_, ex);
       } else {
 #ifdef MATX_EN_CUDSS
         sparse_solve_impl(cuda::std::get<0>(out), a_, b_, ex);
