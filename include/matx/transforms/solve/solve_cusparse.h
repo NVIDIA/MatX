@@ -51,7 +51,7 @@ namespace detail {
 // shared context. Rather, we just do a single-shot solve.
 template <class VAL>
 inline void SolveTridiagonalSystem(int m, int n, VAL *dl, VAL *dm, VAL *du,
-                                   VAL *x) {
+                                   VAL *x, cudaStream_t stream) {
   cusparseHandle_t handle = nullptr; // TODO: share handle globally?
   [[maybe_unused]] cusparseStatus_t ret = cusparseCreate(&handle);
   MATX_ASSERT(ret == CUSPARSE_STATUS_SUCCESS, matxSolverError);
@@ -76,7 +76,7 @@ inline void SolveTridiagonalSystem(int m, int n, VAL *dl, VAL *dm, VAL *du,
   }
   MATX_ASSERT(ret == CUSPARSE_STATUS_SUCCESS, matxSolverError);
 
-  matxAlloc((void **)&workspace, workspaceSize, MATX_DEVICE_MEMORY);
+  matxAlloc((void **)&workspace, workspaceSize, MATX_DEVICE_MEMORY, stream);
 
   if constexpr (std::is_same_v<VAL, float>) {
     ret = cusparseSgtsv2(handle, m, n, dl, dm, du, x, /*ldb*/ m, workspace);
@@ -89,7 +89,7 @@ inline void SolveTridiagonalSystem(int m, int n, VAL *dl, VAL *dm, VAL *du,
   }
   MATX_ASSERT(ret == CUSPARSE_STATUS_SUCCESS, matxSolverError);
 
-  matxFree(workspace);
+  matxFree(workspace, stream);
 
   ret = cusparseDestroy(handle);
   MATX_ASSERT(ret == CUSPARSE_STATUS_SUCCESS, matxSolverError);
@@ -98,7 +98,8 @@ inline void SolveTridiagonalSystem(int m, int n, VAL *dl, VAL *dm, VAL *du,
 // Batched version of tridiagonal solver.
 template <class VAL>
 inline void SolveBatchedTridiagonalSystem(int m, int b, VAL *dl, VAL *dm,
-                                          VAL *du, VAL *x) {
+                                          VAL *du, VAL *x,
+                                          cudaStream_t stream) {
   cusparseHandle_t handle = nullptr; // TODO: share handle globally?
   [[maybe_unused]] cusparseStatus_t ret = cusparseCreate(&handle);
   MATX_ASSERT(ret == CUSPARSE_STATUS_SUCCESS, matxSolverError);
@@ -123,7 +124,7 @@ inline void SolveBatchedTridiagonalSystem(int m, int b, VAL *dl, VAL *dm,
   }
   MATX_ASSERT(ret == CUSPARSE_STATUS_SUCCESS, matxSolverError);
 
-  matxAlloc((void **)&workspace, workspaceSize, MATX_DEVICE_MEMORY);
+  matxAlloc((void **)&workspace, workspaceSize, MATX_DEVICE_MEMORY, stream);
 
   if constexpr (std::is_same_v<VAL, float>) {
     ret = cusparseSgtsv2StridedBatch(handle, m, dl, dm, du, x, b, m, workspace);
@@ -136,7 +137,7 @@ inline void SolveBatchedTridiagonalSystem(int m, int b, VAL *dl, VAL *dm,
   }
   MATX_ASSERT(ret == CUSPARSE_STATUS_SUCCESS, matxSolverError);
 
-  matxFree(workspace);
+  matxFree(workspace, stream);
 
   ret = cusparseDestroy(handle);
   MATX_ASSERT(ret == CUSPARSE_STATUS_SUCCESS, matxSolverError);
@@ -220,7 +221,7 @@ void sparse_dia_solve_impl(TensorTypeC &C, const TensorTypeA &a,
   T *BD = reinterpret_cast<T *>(b.Data());
   const int m = static_cast<int>(a.Size(RANKA - 2));
   const int n = static_cast<int>(b.Size(RANKB - 2));
-  detail::SolveTridiagonalSystem<T>(m, n, AD, AD + m, AD + m + m, BD);
+  detail::SolveTridiagonalSystem<T>(m, n, AD, AD + m, AD + m + m, BD, stream);
 
   // Copy transformed output back.
   if (!c.isSameView(C)) {
@@ -292,8 +293,8 @@ void sparse_batched_dia_solve_impl(TensorTypeC &C, const TensorTypeA &a,
   const int batch = static_cast<int>(a.Size(RANKA - 3));
   const auto l = b.Size(RANKB - 1);
   MATX_ASSERT(batch * m == l, matxSolverError);
-  detail::SolveBatchedTridiagonalSystem<T>(m, batch, AD, AD + l, AD + l + l,
-                                           BD);
+  detail::SolveBatchedTridiagonalSystem<T>(m, batch, AD, AD + l, AD + l + l, BD,
+                                           stream);
 
   // Copy transformed output back.
   if (!c.isSameView(C)) {
