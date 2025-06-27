@@ -248,7 +248,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv) {
   auto AbatcheddiaI =
       experimental::make_tensor_uniform_batched_dia<experimental::DIA_INDEX_I>(
           bdvals, doffsets, {2, 4, 4});
-  auto L = make_tensor<float, 1>({2 * 4});
+  auto L = make_tensor<float>({2 * 4});
   L.SetVals({9, 8, 8, 9, 18, 16, 16, 18});
   (L = solve(AbatcheddiaI, L)).run(exec);
   print(L);
