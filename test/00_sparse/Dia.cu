@@ -230,3 +230,88 @@ TYPED_TEST(DiaSolveSparseTestsAll, SolveDIAI) {
 
   MATX_EXIT_HANDLER();
 }
+
+TYPED_TEST(DiaSolveSparseTestsAll, SolveBatchedUniformDIAI) {
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+
+  ExecType exec{};
+
+  // batch0          batch1             batch0       batch1
+  // | 10 -1  0  0 | | 20 -2  0  0 | x  | 1  2  3  4 |  5  6   7   8 |
+  // | -1 10 -1  0 | | -2 20 -2  0 |
+  // |  0 -1 10 -1 | |  0 -2 20 -2 | =  | 8 16 24 37 | 88 96 112 146 |
+  // |  0  0 -1 10 | |  0  0 -2 20 |
+  auto D = make_tensor<TestType>({2 * 3 * 4});
+  D(0) = static_cast<TestType>(0);
+  D(1) = static_cast<TestType>(-1);
+  D(2) = static_cast<TestType>(-1);
+  D(3) = static_cast<TestType>(-1);
+  D(4) = static_cast<TestType>(0);
+  D(5) = static_cast<TestType>(-2);
+  D(6) = static_cast<TestType>(-2);
+  D(7) = static_cast<TestType>(-2);
+  D(8) = static_cast<TestType>(10);
+  D(9) = static_cast<TestType>(10);
+  D(10) = static_cast<TestType>(10);
+  D(11) = static_cast<TestType>(10);
+  D(12) = static_cast<TestType>(20);
+  D(13) = static_cast<TestType>(20);
+  D(14) = static_cast<TestType>(20);
+  D(15) = static_cast<TestType>(20);
+  D(16) = static_cast<TestType>(-1);
+  D(17) = static_cast<TestType>(-1);
+  D(18) = static_cast<TestType>(-1);
+  D(19) = static_cast<TestType>(0);
+  D(20) = static_cast<TestType>(-2);
+  D(21) = static_cast<TestType>(-2);
+  D(22) = static_cast<TestType>(-2);
+  D(23) = static_cast<TestType>(0);
+  auto O = make_tensor<index_t>({3});
+  O(0) = -1;
+  O(1) = 0;
+  O(2) = 1;
+  auto A =
+      experimental::make_tensor_uniform_batched_dia<experimental::DIA_INDEX_I>(
+          D, O, {2, 4, 4});
+
+  // RHS.
+  // |  0 -1 10 -1 | |  0 -2 20 -2 | =  | 8 16 24 37 | 88 96 112 146 |
+  auto X = make_tensor<TestType>({2 * 4});
+  X(0) = static_cast<TestType>(8);
+  X(1) = static_cast<TestType>(16);
+  X(2) = static_cast<TestType>(24);
+  X(3) = static_cast<TestType>(37);
+  X(4) = static_cast<TestType>(88);
+  X(5) = static_cast<TestType>(96);
+  X(6) = static_cast<TestType>(112);
+  X(7) = static_cast<TestType>(146);
+
+  // Expected.
+  auto E = make_tensor<TestType>({2 * 4});
+  E(0) = static_cast<TestType>(1);
+  E(1) = static_cast<TestType>(2);
+  E(2) = static_cast<TestType>(3);
+  E(3) = static_cast<TestType>(4);
+  E(4) = static_cast<TestType>(5);
+  E(5) = static_cast<TestType>(6);
+  E(6) = static_cast<TestType>(7);
+  E(7) = static_cast<TestType>(8);
+
+  // Solve.
+  (X = solve(A, X)).run(exec);
+
+  // Verify result.
+  exec.sync();
+  for (index_t i = 0; i < 2 * 4; i++) {
+    if constexpr (is_complex_v<TestType>) {
+      ASSERT_NEAR(X(i).real(), E(i).real(), this->thresh);
+      ASSERT_NEAR(X(i).imag(), E(i).imag(), this->thresh);
+    } else {
+      ASSERT_NEAR(X(i), E(i), this->thresh);
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
