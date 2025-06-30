@@ -87,9 +87,9 @@ public:
   template <OperatorCapability Cap>
   __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
     auto self_has_cap = capability_attributes<Cap>::default_value;
-    return combine_capabilities<Cap>(self_has_cap, 
-                                       detail::get_operator_capability<Cap>(a_),
-                                       detail::get_operator_capability<Cap>(b_));
+    return combine_capabilities<Cap>(self_has_cap,
+                                     detail::get_operator_capability<Cap>(a_),
+                                     detail::get_operator_capability<Cap>(b_));
   }
 
   static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t
@@ -108,6 +108,8 @@ public:
     if constexpr (is_sparse_tensor_v<OpA>) {
       if constexpr (OpA::Format::isDIAI() || OpA::Format::isDIAJ()) {
         sparse_dia_solve_impl(cuda::std::get<0>(out), a_, b_, ex);
+      } else if constexpr (OpA::Format::isBatchedDIAIUniform()) {
+        sparse_batched_dia_solve_impl(cuda::std::get<0>(out), a_, b_, ex);
       } else {
 #ifdef MATX_EN_CUDSS
         sparse_solve_impl(cuda::std::get<0>(out), a_, b_, ex);
