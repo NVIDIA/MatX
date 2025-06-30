@@ -83,10 +83,14 @@ __MATX_INLINE__ static auto makeDefaultNonOwningEmptyStorage() {
 // MatX implements a universal sparse tensor type that uses a tensor format
 // DSL (Domain Specific Language) to describe a vast space of storage formats.
 // This file provides a number of convenience factory methods that construct
-// sparse tensors in well-known storage formats, like COO, CSR, and CSC,
+// sparse tensors in well-known storage formats, like COO, CSR, CSC, and DIA,
 // directly from the constituent buffers. More factory methods can easily be
 // added as the need arises.
 //
+
+// Indexing options.
+struct DIA_INDEX_I {};
+struct DIA_INDEX_J {};
 
 // Constructs a sparse matrix in COO format directly from the values and
 // the two coordinates vectors. The entries should be sorted by row, then
@@ -204,13 +208,12 @@ auto make_zero_tensor_csc(const index_t (&shape)[2],
 
 // Constructs a sparse matrix in DIA format directly from the values and the
 // offset vectors. For an m x n matrix, this format uses a linearized storage
-// where each diagonal has n entries and is accessed by index I or index J.
-// For index I, diagonals padded with zeros on the left for the lower triangular
-// part and padded with zeros on the right for the upper triagonal part. This
-// is vv. when using index J. This format is most efficient for matrices with
-// only a few nonzero diagonals that are close to the main diagonal.
-struct DIA_INDEX_I {};
-struct DIA_INDEX_J {};
+// where each diagonal has m or n entries and is accessed by either index I or
+// index J, respectively. For index I, diagonals are padded with zeros on the
+// left for the lower triangular part and padded with zeros on the right for
+// the upper triagonal part. This is vv. when using index J. This format is
+// most efficient for matrices with only a few nonzero diagonals that are
+// close to the main diagonal.
 template <typename IDX, typename ValTensor, typename CrdTensor>
 auto make_tensor_dia(ValTensor &val, CrdTensor &off,
                      const index_t (&shape)[2]) {
@@ -220,6 +223,13 @@ auto make_tensor_dia(ValTensor &val, CrdTensor &off,
   // Proper structure.
   MATX_STATIC_ASSERT_STR(ValTensor::Rank() == 1 && CrdTensor::Rank() == 1,
                          matxInvalidParameter, "data arrays should be rank-1");
+  if constexpr (std::is_same_v<IDX, DIA_INDEX_I>) {
+    MATX_ASSERT_STR(val.Size(0) == shape[0] * off.Size(0), matxInvalidParameter,
+                    "data arrays should contain all diagonals (by row index)");
+  } else {
+    MATX_ASSERT_STR(val.Size(0) == shape[1] * off.Size(0), matxInvalidParameter,
+                    "data arrays should contain all diagonals (by col index)");
+  }
   // Note that the DIA API typically does not involve positions.
   // However, under the formal DSL specifications, the top level
   // compression should set up pos[0] = {0, #diags}. This is done
@@ -229,6 +239,47 @@ auto make_tensor_dia(ValTensor &val, CrdTensor &off,
   setVal(tp.data() + 1, static_cast<POS>(off.Size(0)), space);
   // Construct DIA-I/J.
   using DIA = std::conditional_t<std::is_same_v<IDX, DIA_INDEX_I>, DIAI, DIAJ>;
+  return sparse_tensor_t<VAL, CRD, POS, DIA>(
+      shape, val.GetStorage(),
+      {off.GetStorage(), makeDefaultNonOwningEmptyStorage<CRD>()},
+      {tp, makeDefaultNonOwningEmptyStorage<POS>()});
+}
+
+// Constructs a sparse tensor in uniform batched DIA format directly from
+// the values and the offset vectors. For a b x m x n tensor, this format
+// effectively stores b times m x n matrices in DIA format, using a uniform
+// nonzero structure for each (non-uniform formats are possible as well).
+// All diagonals are stored consecutively in linearized format, sorted lower
+// to upper, with all diagonals at a certain offset appearing consecutively
+// for all batches. With DIA(b,i,j) as indexing, can be indexed by i or j.
+template <typename IDX, typename ValTensor, typename CrdTensor>
+auto make_tensor_uniform_batched_dia(ValTensor &val, CrdTensor &off,
+                                     const index_t (&shape)[3]) {
+  using VAL = typename ValTensor::value_type;
+  using CRD = typename CrdTensor::value_type;
+  using POS = index_t;
+  // Proper structure.
+  MATX_STATIC_ASSERT_STR(ValTensor::Rank() == 1 && CrdTensor::Rank() == 1,
+                         matxInvalidParameter, "data arrays should be rank-1");
+  if constexpr (std::is_same_v<IDX, DIA_INDEX_I>) {
+    MATX_ASSERT_STR(val.Size(0) == shape[0] * shape[1] * off.Size(0),
+                    matxInvalidParameter,
+                    "data arrays should contain all diagonals (by row index)");
+  } else {
+    MATX_ASSERT_STR(val.Size(0) == shape[0] * shape[2] * off.Size(0),
+                    matxInvalidParameter,
+                    "data arrays should contain all diagonals (by col index)");
+  }
+  // Note that the DIA API typically does not involve positions.
+  // However, under the formal DSL specifications, the top level
+  // compression should set up pos[0] = {0, #diags}. This is done
+  // here, using the same memory space as the other data.
+  matxMemorySpace_t space = GetPointerKind(val.GetStorage().data());
+  auto tp = makeDefaultNonOwningZeroStorage<POS>(2, space);
+  setVal(tp.data() + 1, static_cast<POS>(off.Size(0)), space);
+  // Construct Batched DIA-I/J.
+  using DIA = std::conditional_t<std::is_same_v<IDX, DIA_INDEX_I>,
+                                 BatchedDIAIUniform, BatchedDIAJUniform>;
   return sparse_tensor_t<VAL, CRD, POS, DIA>(
       shape, val.GetStorage(),
       {off.GetStorage(), makeDefaultNonOwningEmptyStorage<CRD>()},
