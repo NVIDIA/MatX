@@ -123,13 +123,14 @@ public:
                                            &workspaceSize_);
     MATX_ASSERT(ret == CUSPARSE_STATUS_SUCCESS, matxCudaError);
     if (workspaceSize_) {
-      matxAlloc((void **)&workspace_, workspaceSize_, MATX_DEVICE_MEMORY);
+      matxAlloc((void **)&workspace_, workspaceSize_, MATX_DEVICE_MEMORY,
+                stream);
     }
   }
 
   ~Sparse2DenseHandle_t() {
     if (workspaceSize_) {
-      matxFree(workspace_);
+      matxFree(workspace_, params_.stream);
     }
     cusparseDestroy(handle_);
   }
