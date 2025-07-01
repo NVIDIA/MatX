@@ -1,5 +1,7 @@
 #pragma once
 
+#ifdef __CUDACC__
+
 #include "matx/core/operator_options.h"
 #include "matx/core/capabilities.h"
 #include "matx/core/jit_param_structs.h"
@@ -77,8 +79,6 @@ namespace matx {
     __syncthreads();
 
     extern __shared__  Vector<input_type, static_cast<int>(CapType::ept)> thread_data[];
-    // cuda::std::array<index_t,2> gg{indices...};
-    // printf("%d %d\n", gg[0], gg[1]);
     thread_data[threadIdx.x] = op.template operator()<CapType>(indices...);
     __syncthreads();
 
@@ -110,8 +110,8 @@ namespace matx {
   template <typename InputType>
   class cuFFTDxHelper {
     public:
-      cuFFTDxHelper() = default;
-      cuFFTDxHelper(index_t fft_size, FFTType fft_type, FFTDirection direction) {
+      static cufftdxDescriptor Init(index_t fft_size, FFTType fft_type, FFTDirection direction) {
+        cufftdxDescriptor h_;
         LIBMATHDX_CHECK(cufftdxCreateDescriptor(&h_));
         // CUFFTDX_API_LMEM means the function will be of signature:
         //     void(value_type*, value_type*)
@@ -172,45 +172,55 @@ printf("lib size %lld\n", fft_size);
         LIBMATHDX_CHECK(cufftdxSetOperatorInt64(h_, CUFFTDX_OPERATOR_SM, cc));
 
         // COMMONDX_OPTION_SYMBOL_NAME indicates the required name for the device function.
-        LIBMATHDX_CHECK(cufftdxSetOptionStr(h_, commondxOption::COMMONDX_OPTION_SYMBOL_NAME, "my_fft"));    
+        LIBMATHDX_CHECK(cufftdxSetOptionStr(h_, commondxOption::COMMONDX_OPTION_SYMBOL_NAME, "my_fft")); 
+        return h_;
       }
 
-      bool IsSupported() const {
+      static bool IsSupported(index_t fft_size, FFTType fft_type, FFTDirection direction) {
+        auto handle = Init(fft_size, fft_type, direction);
         int valid = -1;
-        LIBMATHDX_CHECK(cufftdxHasImplementation(h_, &valid));
+        LIBMATHDX_CHECK(cufftdxHasImplementation(handle, &valid));
         return static_cast<bool>(valid);
       }
 
-      int GetShmRequired() const {
+      static int GetShmRequired(index_t fft_size, FFTType fft_type, FFTDirection direction, ElementsPerThread ept) {
+        auto handle = Init(fft_size, fft_type, direction);
         // SHM size is based on EPT, so set the one we're using here. Eventually make these uncoupled
-        long long int ept = static_cast<long long int>(GetBestEPT());
-        LIBMATHDX_CHECK(cufftdxSetOperatorInt64(h_, CUFFTDX_OPERATOR_ELEMENTS_PER_THREAD, ept));
+        long long int ept_int = static_cast<long long int>(ept);
+        LIBMATHDX_CHECK(cufftdxSetOperatorInt64(handle, CUFFTDX_OPERATOR_ELEMENTS_PER_THREAD, ept_int));
 
         long long int shared_memory_size = 0;
-        LIBMATHDX_CHECK(cufftdxGetTraitInt64(h_, CUFFTDX_TRAIT_SHARED_MEMORY_SIZE, &shared_memory_size));
+        LIBMATHDX_CHECK(cufftdxGetTraitInt64(handle, CUFFTDX_TRAIT_SHARED_MEMORY_SIZE, &shared_memory_size));
         printf("shared_memory_size libmath %lld\n", shared_memory_size);
         return static_cast<int>(shared_memory_size);
       }
 
 
-      ElementsPerThread GetBestEPT() const {
+      static auto GetEPTs(index_t fft_size, FFTType fft_type, FFTDirection direction) {
+        auto handle = Init(fft_size, fft_type, direction);
         // ElementsPerThread type is needed for EPT capability, but cuFFTDx uses long long int for EPTs
         cufftdxKnobType_t knobs = CUFFTDX_KNOB_ELEMENTS_PER_THREAD;
         size_t num_epts = 0;
-        LIBMATHDX_CHECK(cufftdxGetKnobInt64Size(h_, 1, &knobs, &num_epts));
+        LIBMATHDX_CHECK(cufftdxGetKnobInt64Size(handle, 1, &knobs, &num_epts));
         std::vector<long long int> epts(num_epts, 0);
-        LIBMATHDX_CHECK(cufftdxGetKnobInt64s(h_, 1, &knobs, epts.size(), epts.data()));      
+        LIBMATHDX_CHECK(cufftdxGetKnobInt64s(handle, 1, &knobs, epts.size(), epts.data()));      
 
         if (epts.size() == 0) {
-          return ElementsPerThread::ONE;
+          return cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
         }
 
-        return static_cast<ElementsPerThread>(*std::min_element(epts.begin(), epts.end()));
+        return cuda::std::array<ElementsPerThread, 2>{static_cast<ElementsPerThread>(*std::min_element(epts.begin(), epts.end())),
+                                                      static_cast<ElementsPerThread>(*std::max_element(epts.begin(), epts.end()))};
       }
 
-    private:
-      std::vector<long long int> valid_epts_;
-      cufftdxDescriptor h_;
+      static BlockDimType GetBlockDim(index_t fft_size, FFTType fft_type, FFTDirection direction) {
+        auto handle = Init(fft_size, fft_type, direction);
+        BlockDimType block_dim = { 0, 0, 0 };
+        LIBMATHDX_CHECK(
+            cufftdxGetTraitInt64s(handle, cufftdxTraitType::CUFFTDX_TRAIT_BLOCK_DIM, block_dim.size(), block_dim.data()));
+printf("block_dim %lld %lld %lld\n", block_dim[0], block_dim[1], block_dim[2]);
+        return block_dim;
+      }
   };
 
 
@@ -218,3 +228,5 @@ printf("lib size %lld\n", fft_size);
 
   } // namespace detail
 } // namespace matx
+
+#endif

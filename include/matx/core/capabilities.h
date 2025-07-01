@@ -39,6 +39,7 @@
 #include <algorithm>
 #include <cuda/std/__algorithm/min.h>
 #include <cuda/std/__algorithm/max.h>
+#include <cuda/std/array>
 
 namespace matx {
 
@@ -55,6 +56,13 @@ namespace detail {
     MAX = THIRTY_TWO
   };
 
+  // Input structure for types that require it
+  struct ShmQueryInput {
+    ElementsPerThread ept;
+  };
+
+  using BlockDimType = cuda::std::array<long long int, 3>;
+
 
   // Enum for different operator capabilities
   enum class OperatorCapability {
@@ -63,6 +71,7 @@ namespace detail {
     ELEMENTS_PER_THREAD,          // How many elements per thread?
     JIT_CAP_QUERY,  // Result is the concatenation of the capabilities of the operator and its children.
     DYN_SHM_SIZE,   // Result is the dynamic shared memory size required for the operator.
+    BLOCK_DIM,      // Result is the block dimensions required for the operator.
     // Add more capabilities as needed
   };
 
@@ -75,6 +84,7 @@ namespace detail {
     MIN_QUERY,  // Result is the minimum of the capabilities of the operator and its children.
     MAX_QUERY,  // Result is the maximum of the capabilities of the operator and its children.
     STR_CAT_QUERY,  // Result is the concatenation of the capabilities of the operator and its children.
+    RANGE_QUERY,  // Result is the range of the capabilities of the operator and its children.
   };
   
 
@@ -113,11 +123,19 @@ namespace detail {
   };
 
   template <>
+  struct capability_attributes<OperatorCapability::BLOCK_DIM> {
+    using type = BlockDimType; // min/max elements per thread
+    static constexpr BlockDimType default_value = {1, 1, 1024}; // Example: 1 element per thread by default
+    static constexpr BlockDimType min_identity = {1, 1, 32};
+    static constexpr BlockDimType max_identity = {1, 1, 1024};
+  };  
+
+  template <>
   struct capability_attributes<OperatorCapability::ELEMENTS_PER_THREAD> {
-    using type = ElementsPerThread;
-    static constexpr ElementsPerThread default_value = ElementsPerThread::MAX; // Example: 1 element per thread by default
-    static constexpr ElementsPerThread min_identity = ElementsPerThread::MAX;
-    static constexpr ElementsPerThread max_identity = ElementsPerThread::ONE;
+    using type = cuda::std::array<ElementsPerThread, 2>; // min/max elements per thread
+    static constexpr cuda::std::array<ElementsPerThread, 2> default_value = {ElementsPerThread::ONE, ElementsPerThread::MAX}; // Example: 1 element per thread by default
+    static constexpr cuda::std::array<ElementsPerThread, 2> min_identity = {ElementsPerThread::MAX, ElementsPerThread::ONE};
+    static constexpr cuda::std::array<ElementsPerThread, 2> max_identity = {ElementsPerThread::ONE, ElementsPerThread::MAX};
   };
 
   template <>
@@ -148,6 +166,17 @@ namespace detail {
     }
   }
 
+  template <OperatorCapability Cap, typename OperatorType, typename InType>
+  __MATX_INLINE__ __MATX_HOST__ typename capability_attributes<Cap>::type
+  get_operator_capability(const OperatorType& op, const InType& in) {
+    if constexpr (matx::is_matx_op<OperatorType>()) {
+      return op.template get_capability<Cap, InType>(in);
+    } else {
+      // Default capabilities for non-MatX ops
+      return capability_attributes<Cap>::default_value;
+    }
+  }  
+
   // Helper function to get the query type associated with a capability
   // This defines the default aggregation logic for each capability.
   inline CapabilityQueryType get_query_type(OperatorCapability cap) {
@@ -155,11 +184,13 @@ namespace detail {
       case OperatorCapability::SUPPORTS_JIT:
         return CapabilityQueryType::OR_QUERY; // If any sub-operator supports JIT, the expression might be JIT-able.
       case OperatorCapability::ELEMENTS_PER_THREAD:
-        return CapabilityQueryType::MIN_QUERY; // The expression should use the minimum elements per thread of its children.
+        return CapabilityQueryType::RANGE_QUERY; // The expression should use the range of elements per thread of its children.
       case OperatorCapability::JIT_CAP_QUERY:
         return CapabilityQueryType::STR_CAT_QUERY; // The expression should use the concatenation of the capabilities of its children.
       case OperatorCapability::DYN_SHM_SIZE:
         return CapabilityQueryType::MAX_QUERY; // The expression should use the maximum dynamic shared memory size of its children.
+      case OperatorCapability::BLOCK_DIM:
+        return CapabilityQueryType::MIN_QUERY; // The expression should use the minimum block size supported by all operators.
       default:
         // Default to OR_QUERY or handle as an error/assertion if a capability isn't mapped.
         return CapabilityQueryType::OR_QUERY; 
@@ -199,11 +230,23 @@ namespace detail {
           // This path needs clear definition if other query types are used for int.
           children_aggregated_val = capability_attributes<Cap>::default_value; // Fallback
         }
+      } else if constexpr (std::is_same_v<CapType, BlockDimType>) {
+        if (query_type == CapabilityQueryType::MIN_QUERY) {
+          children_aggregated_val = capability_attributes<Cap>::min_identity;
+        } else {
+          children_aggregated_val = capability_attributes<Cap>::default_value; // Fallback
+        }
       } else if constexpr (std::is_same_v<CapType, std::string>) {
         children_aggregated_val = capability_attributes<Cap>::default_value;
       } else {
-        // Fallback for other types, should be defined in capability_attributes
-        children_aggregated_val = capability_attributes<Cap>::default_value; // Fallback
+        // Check if it's a cuda::std::array<T, 2> for RANGE_QUERY
+        if (query_type == CapabilityQueryType::RANGE_QUERY) {
+          // For RANGE_QUERY with no children, use the default_value as identity
+          children_aggregated_val = capability_attributes<Cap>::default_value;
+        } else {
+          // Fallback for other types, should be defined in capability_attributes
+          children_aggregated_val = capability_attributes<Cap>::default_value; // Fallback
+        }
       }
     } else { // One or more children
       if constexpr (std::is_same_v<CapType, bool>) {
@@ -233,6 +276,18 @@ namespace detail {
               // Not implemented for other query types.
               MATX_ASSERT_STR(false, matxInvalidParameter, "Not implemented for other query types.");
           }
+      } else if constexpr (std::is_same_v<CapType, BlockDimType>) {
+          if (query_type == CapabilityQueryType::MIN_QUERY) {
+              children_aggregated_val = capability_attributes<Cap>::min_identity;
+              // For BLOCK_DIM, we only care about the third element (index 2)
+              cuda::std::initializer_list<CapType> values = {child_vals...};
+              for (const CapType& val : values) {
+                  children_aggregated_val[2] = cuda::std::min(children_aggregated_val[2], val[2]);
+              }
+          } else {
+              // Not implemented for other query types.
+              MATX_ASSERT_STR(false, matxInvalidParameter, "Not implemented for other query types.");
+          }
       } else if constexpr (std::is_same_v<CapType, std::string>) {
         if (query_type == CapabilityQueryType::STR_CAT_QUERY) {
           children_aggregated_val = capability_attributes<Cap>::default_value;
@@ -241,8 +296,28 @@ namespace detail {
           children_aggregated_val = capability_attributes<Cap>::default_value;
         }
       } else {
-          // Not implemented for other types.
-          MATX_ASSERT_STR(false, matxInvalidParameter, "Not implemented for other types.");
+          // Handle RANGE_QUERY for cuda::std::array<T, 2> types
+          if (query_type == CapabilityQueryType::RANGE_QUERY) {
+            // Initialize with the first child's value
+            cuda::std::initializer_list<CapType> values = {child_vals...};
+            auto it = values.begin();
+            children_aggregated_val = *it;
+            ++it;
+            
+            // Apply range intersection logic for remaining children
+            for (; it != values.end(); ++it) {
+              const auto& child_range = *it;
+              // Minimum is the maximum of the two range's minimums
+              // Maximum is the minimum of the two range's maximums
+              children_aggregated_val[0] = static_cast<typename CapType::value_type>(
+                cuda::std::max(static_cast<int>(children_aggregated_val[0]), static_cast<int>(child_range[0])));
+              children_aggregated_val[1] = static_cast<typename CapType::value_type>(
+                cuda::std::min(static_cast<int>(children_aggregated_val[1]), static_cast<int>(child_range[1])));
+            }
+          } else {
+            // Not implemented for other types.
+            MATX_ASSERT_STR(false, matxInvalidParameter, "Not implemented for other types.");
+          }
       }
     }
 
@@ -272,6 +347,16 @@ namespace detail {
             MATX_ASSERT_STR(false, matxInvalidParameter, "Not implemented for other query types.");
             return self_val;
         }
+    } else if constexpr (std::is_same_v<CapType, BlockDimType>) {
+        if (query_type == CapabilityQueryType::MIN_QUERY) {
+            CapType result = self_val;
+            // For BLOCK_DIM, we only care about the third element (index 2)
+            result[2] = cuda::std::min(self_val[2], children_aggregated_val[2]);
+            return result;
+        } else {
+            MATX_ASSERT_STR(false, matxInvalidParameter, "Not implemented for other query types.");
+            return self_val;
+        }
     } else if constexpr (std::is_same_v<CapType, std::string>) {
         if (query_type == CapabilityQueryType::STR_CAT_QUERY) {
             return self_val + children_aggregated_val;
@@ -280,8 +365,21 @@ namespace detail {
             return self_val;
         }
     } else {
-        MATX_ASSERT_STR(false, matxInvalidParameter, "Not implemented for other types.");
-        return self_val;
+        // Handle RANGE_QUERY for cuda::std::array<T, 2> types
+        if (query_type == CapabilityQueryType::RANGE_QUERY) {
+          CapType result = self_val;
+          // Apply range intersection logic: 
+          // Minimum is the maximum of the two range's minimums
+          // Maximum is the minimum of the two range's maximums
+          result[0] = static_cast<typename CapType::value_type>(
+            cuda::std::max(static_cast<int>(self_val[0]), static_cast<int>(children_aggregated_val[0])));
+          result[1] = static_cast<typename CapType::value_type>(
+            cuda::std::min(static_cast<int>(self_val[1]), static_cast<int>(children_aggregated_val[1])));
+          return result;
+        } else {
+          MATX_ASSERT_STR(false, matxInvalidParameter, "Not implemented for other types.");
+          return self_val;
+        }
     }
   }
 

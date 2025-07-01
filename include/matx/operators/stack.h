@@ -200,10 +200,20 @@ namespace matx
       template <OperatorCapability Cap>
       __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
         if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-          return ElementsPerThread::ONE;
+          return cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
         } else {
           auto self_has_cap = capability_attributes<Cap>::default_value;
           return combine_capabilities<Cap>(self_has_cap, get_combined_ops_capability<Cap>(ops_));
+        }
+      }
+
+      template <OperatorCapability Cap, typename InType>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability(const InType& in) const {
+        if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+          return cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+        } else {
+          auto self_has_cap = capability_attributes<Cap>::default_value;
+          return combine_capabilities<Cap>(self_has_cap, get_combined_ops_capability<Cap>(ops_, in));
         }
       }
 
@@ -219,6 +229,17 @@ namespace matx
         } else {
           auto current_cap = detail::get_operator_capability<Cap>(cuda::std::get<I>(ops));
           auto rest_cap = get_combined_ops_capability<Cap, I + 1>(ops);
+          return combine_capabilities<Cap>(current_cap, rest_cap);
+        }
+      }
+
+      template <OperatorCapability Cap, typename InType, size_t I = 0>
+      __MATX_INLINE__ __MATX_HOST__ auto get_combined_ops_capability(const cuda::std::tuple<typename detail::base_type_t<Ts>...>& ops, const InType& in) const {
+        if constexpr (I == sizeof...(Ts)) {
+          return capability_attributes<Cap>::default_value;
+        } else {
+          auto current_cap = detail::get_operator_capability<Cap>(cuda::std::get<I>(ops), in);
+          auto rest_cap = get_combined_ops_capability<Cap, InType, I + 1>(ops, in);
           return combine_capabilities<Cap>(current_cap, rest_cap);
         }
       }

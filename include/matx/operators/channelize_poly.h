@@ -98,6 +98,14 @@ namespace detail {
                                            detail::get_operator_capability<Cap>(f_));
       }
 
+      template <OperatorCapability Cap, typename InType>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability(const InType& in) const {
+        auto self_has_cap = capability_attributes<Cap>::default_value;
+        return combine_capabilities<Cap>(self_has_cap, 
+                                           detail::get_operator_capability<Cap>(a_, in),
+                                           detail::get_operator_capability<Cap>(f_, in));
+      }
+
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
       {
         return OpA::Rank() + 1;

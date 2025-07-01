@@ -93,6 +93,12 @@ namespace detail {
         return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_));
       }
 
+      template <OperatorCapability Cap, typename InType>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability(const InType& in) const {
+        auto self_has_cap = capability_attributes<Cap>::default_value;
+        return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
+      }
+
 #ifndef __CUDACC_RTC__
       __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
       template <typename Out, typename Executor>

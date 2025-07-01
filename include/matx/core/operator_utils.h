@@ -38,11 +38,6 @@
 #include "matx/core/type_utils.h"
 #include "matx/operators/collapse.h"
 
-#define MATX_COMPILE_TIME_INC() \
-    []() constexpr { \
-        constexpr uint32_t unique_index = __COUNTER__; \
-        return unique_index; \
-    }()
 
 namespace matx {
 

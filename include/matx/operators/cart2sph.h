@@ -94,7 +94,7 @@ namespace matx
         __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
           // No specific capabilities enforced
           if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-            return ElementsPerThread::ONE;
+            return cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
           }
           else {
             auto self_has_cap = capability_attributes<Cap>::default_value;
@@ -103,7 +103,21 @@ namespace matx
               detail::get_operator_capability<Cap>(y_), 
               detail::get_operator_capability<Cap>(z_));
           }
+        }
 
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability(const InType &in) const {
+          // No specific capabilities enforced
+          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            return cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+          }
+          else {
+            auto self_has_cap = capability_attributes<Cap>::default_value;
+            return combine_capabilities<Cap>(self_has_cap, 
+              detail::get_operator_capability<Cap>(x_, in), 
+              detail::get_operator_capability<Cap>(y_, in), 
+              detail::get_operator_capability<Cap>(z_, in));
+          }
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()

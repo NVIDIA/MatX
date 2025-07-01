@@ -152,7 +152,7 @@ target_link_libraries(matx INTERFACE CCCL::CCCL)
 
 # Set flags for compiling tests faster (only for nvcc)
 if (NOT CMAKE_CUDA_COMPILER_ID STREQUAL "Clang")
-    set(MATX_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} --threads 0 -ftemplate-backtrace-limit=0)
+    set(MATX_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} --threads 0 -ftemplate-backtrace-limit=0 -Xptxas -v)
 endif()
 
 # Hack because CMake doesn't have short circult evaluation
@@ -315,6 +315,7 @@ if (MATX_EN_MATHDX)
     set(MathDx_NANO 0)
     include(cmake/FindMathDx.cmake)
     target_compile_definitions(matx INTERFACE MATX_EN_MATHDX)
+    target_compile_definitions(matx INTERFACE MATX_EN_JIT)
     #target_include_directories(matx INTERFACE libmathdx/include)
     target_link_directories(matx INTERFACE $<BUILD_INTERFACE:/repro/MatX/libmathdx/lib>)
     target_include_directories(matx INTERFACE $<BUILD_INTERFACE:/repro/MatX/libmathdx/include>)

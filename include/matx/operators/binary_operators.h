@@ -157,6 +157,23 @@ namespace matx
         }
       }
 
+      template <OperatorCapability Cap, typename InType>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability(const InType &in) const {
+        // Shared memory requirements for a binary operator is additive. For example, fft(a) + fft(b) requires both outputs
+        // to have resident shared memory.
+        if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
+          return detail::get_operator_capability<Cap>(in1_, in) + detail::get_operator_capability<Cap>(in2_, in);
+        }
+        else {
+          // 1. Determine if the binary operation ITSELF intrinsically has this capability.
+          auto self_has_cap = capability_attributes<Cap>::default_value;
+          auto lhs_child_cap = detail::get_operator_capability<Cap>(in1_, in);
+          auto rhs_child_cap = detail::get_operator_capability<Cap>(in2_, in);
+
+          return combine_capabilities<Cap>(self_has_cap, lhs_child_cap, rhs_child_cap);
+        }
+      }
+
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
       {
         return detail::matx_max(detail::get_rank<I1>(), detail::get_rank<I2>());

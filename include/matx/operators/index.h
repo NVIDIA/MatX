@@ -84,7 +84,16 @@ namespace matx
         template <OperatorCapability Cap>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
           if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-            return ElementsPerThread::ONE;
+            return cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+          } else {
+            return capability_attributes<Cap>::default_value;
+          }
+        }
+
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability(const InType& in) const {
+          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            return cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
           } else {
             return capability_attributes<Cap>::default_value;
           }

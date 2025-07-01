@@ -1152,24 +1152,29 @@ MATX_IGNORE_WARNING_POP_GCC
         }, idx);
     }
 
+    template <detail::OperatorCapability Cap, typename InType>
+    __MATX_INLINE__ __MATX_HOST__ auto get_capability(const InType&) const {    
+      return detail::capability_attributes<Cap>::default_value;
+    }
+
     template <detail::OperatorCapability Cap>
     __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
       // Since tensors are a "leaf" operator type, we will never have an operator passed to a tensor as the
       // type, but only POD types.
       if constexpr (Cap == detail::OperatorCapability::ELEMENTS_PER_THREAD) {
         if constexpr (Rank() == 0) {
-          return detail::ElementsPerThread::ONE;
+          return cuda::std::array<detail::ElementsPerThread, 2>{detail::ElementsPerThread::ONE, detail::ElementsPerThread::ONE};
         }
         else {
           if (Stride(Rank() - 1) != 1) {
-            return detail::ElementsPerThread::ONE;
+            return cuda::std::array<detail::ElementsPerThread, 2>{detail::ElementsPerThread::ONE, detail::ElementsPerThread::ONE};
           }
         }
 
         // Maybe relax this constraint later, but for now the tensor has to be contiguous. This should prevent clones
         // and strides from vectorizing.
         if (!IsContiguous()) {
-          return detail::ElementsPerThread::ONE;
+          return cuda::std::array<detail::ElementsPerThread, 2>{detail::ElementsPerThread::ONE, detail::ElementsPerThread::ONE};
         }
 
         int width = 32;
@@ -1182,10 +1187,11 @@ MATX_IGNORE_WARNING_POP_GCC
           width /= 2;
         } while (width > 1);
 
-        return static_cast<detail::ElementsPerThread>(width);
+        auto ept = static_cast<detail::ElementsPerThread>(width);
+        return cuda::std::array<detail::ElementsPerThread, 2>{detail::ElementsPerThread::ONE, ept};
       }
       else {
-        return capability_attributes<Cap>::default_value;
+        return detail::capability_attributes<Cap>::default_value;
       }
     }    
 

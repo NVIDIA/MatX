@@ -86,6 +86,11 @@ namespace matx
       __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
         return capability_attributes<Cap>::default_value;
       }
+
+      template <OperatorCapability Cap, typename InType>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability(const InType& in) const {
+        return capability_attributes<Cap>::default_value;
+      }
     };
   }
 } // end namespace matx

@@ -72,6 +72,12 @@ namespace detail {
         return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_));
       }
 
+      template <OperatorCapability Cap, typename InType>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability(const InType& in) const {
+        auto self_has_cap = capability_attributes<Cap>::default_value;
+        return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
+      }
+
 #ifndef __CUDACC_RTC__
       // TODO: Handle SVDMode::NONE case better to not require U & VT
       template <typename Out, typename Executor>
@@ -175,13 +181,26 @@ namespace detail {
       template <OperatorCapability Cap>
       __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
         if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-          return ElementsPerThread::ONE;
+          return cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
         }
         else {
           auto self_has_cap = capability_attributes<Cap>::default_value;
           return combine_capabilities<Cap>(self_has_cap, 
                                            detail::get_operator_capability<Cap>(a_),
                                            detail::get_operator_capability<Cap>(x_));
+        }
+      }
+
+      template <OperatorCapability Cap, typename InType>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability(const InType& in) const {
+        if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+          return cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+        }
+        else {
+          auto self_has_cap = capability_attributes<Cap>::default_value;
+          return combine_capabilities<Cap>(self_has_cap, 
+                                           detail::get_operator_capability<Cap>(a_, in),
+                                           detail::get_operator_capability<Cap>(x_, in));
         }
       }
 
@@ -267,11 +286,22 @@ namespace detail {
       template <OperatorCapability Cap>
       __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
         if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-          return ElementsPerThread::ONE;
+          return cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
         }
         else {
           auto self_has_cap = capability_attributes<Cap>::default_value;
           return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_));
+        }
+      }
+
+      template <OperatorCapability Cap, typename InType>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability(const InType& in) const {
+        if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+          return cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+        }
+        else {
+          auto self_has_cap = capability_attributes<Cap>::default_value;
+          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
         }
       }
 

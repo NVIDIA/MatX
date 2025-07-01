@@ -169,11 +169,11 @@ inline bool get_grid_dims(dim3 &blocks, dim3 &threads, const cuda::std::array<in
 // For JIT code we want to use a grid-stride loop always
 template <int RANK>
 inline bool get_grid_dims_jit(dim3 &blocks, dim3 &threads, const cuda::std::array<index_t, RANK> &sizes, uint32_t ept,
-                          int max_cta_size = 1024)
+                          int max_cta_size = 1024, bool force_size = false)
 {
   bool stride = false;
   [[maybe_unused]] int nt = 1;
-  threads.x = 1;
+  threads.x = force_size ? max_cta_size : 1;
   threads.y = 1;
   threads.z = 1;
   blocks.x = 1;  
@@ -182,33 +182,39 @@ inline bool get_grid_dims_jit(dim3 &blocks, dim3 &threads, const cuda::std::arra
   // Dynamic logic to pick thread block size.
   //   Fill in order x, y, z up to 1024 threads
   if constexpr (RANK == 1) {
-    while (nt < max_cta_size) {
-      if ((static_cast<index_t>(threads.x) * ept) < sizes[0]) {
-        threads.x *= 2;
+    if (!force_size) {
+      while (nt < max_cta_size) {
+        if ((static_cast<index_t>(threads.x) * ept) < sizes[0]) {
+          threads.x *= 2;
+        }
+        
+        nt *= 2;
       }
-      nt *= 2;
     }
-    // launch as many blocks as necessary
-
   }
   else if constexpr (RANK == 2) {
-    while (nt < max_cta_size) {
-      if ((static_cast<index_t>(threads.x) * ept) < sizes[1]) {
-        threads.x *= 2;
-      }
+    if (!force_size) {
+      while (nt < max_cta_size) {
+        if ((static_cast<index_t>(threads.x) * ept) < sizes[1]) {
+          threads.x *= 2;
+        }
 
-      nt *= 2;
+        nt *= 2;
+      }
     }
+
     // launch as many blocks as necessary
     blocks.x = static_cast<int>(sizes[0]);
   }  
   else if constexpr (RANK == 3) {
-    while (nt < max_cta_size) {
-      if (static_cast<index_t>(threads.x) < sizes[2]) {
-        threads.x *= 2;
-      }
+    if (!force_size) {
+      while (nt < max_cta_size) {
+        if (static_cast<index_t>(threads.x) * ept < sizes[2]) {
+          threads.x *= 2;
+        }
 
-      nt *= 2;
+        nt *= 2;
+      }
     }
 
     // launch as many blocks as necessary
@@ -226,12 +232,14 @@ inline bool get_grid_dims_jit(dim3 &blocks, dim3 &threads, const cuda::std::arra
 
   }  
   else if constexpr (RANK == 4) {
-    while (nt < max_cta_size) {
-      if (static_cast<index_t>(threads.x) < sizes[3]) {
-        threads.x *= 2;
+    if (!force_size) {
+      while (nt < max_cta_size) {
+        if (static_cast<index_t>(threads.x) * ept < sizes[3]) {
+          threads.x *= 2;
       }
 
-      nt *= 2;
+        nt *= 2;
+      }
     }
     
     // launch as many blocks as necessary
@@ -255,6 +263,8 @@ inline bool get_grid_dims_jit(dim3 &blocks, dim3 &threads, const cuda::std::arra
   else {
     MATX_THROW(matxInvalidParameter, "Rank not supported");
   } 
+
+  printf("blocks %d %d %d threads %d %d %d\n", blocks.x, blocks.y, blocks.z, threads.x, threads.y, threads.z);
   return stride;
 }
 } // end namespace detail

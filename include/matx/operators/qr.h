@@ -70,6 +70,12 @@ namespace detail {
         return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_));
       }
 
+      template <OperatorCapability Cap, typename InType>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability(const InType& in) const {
+        auto self_has_cap = capability_attributes<Cap>::default_value;
+        return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
+      }
+
 #ifndef __CUDACC_RTC__
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
@@ -145,6 +151,12 @@ namespace detail {
       __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
         auto self_has_cap = capability_attributes<Cap>::default_value;
         return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_));
+      }
+
+      template <OperatorCapability Cap, typename InType>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability(const InType& in) const {
+        auto self_has_cap = capability_attributes<Cap>::default_value;
+        return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
       }
 
       template <typename Out, typename Executor>
@@ -224,6 +236,12 @@ namespace detail {
       __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
         auto self_has_cap = capability_attributes<Cap>::default_value;
         return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_));
+      }
+
+      template <OperatorCapability Cap, typename InType>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability(const InType& in) const {
+        auto self_has_cap = capability_attributes<Cap>::default_value;
+        return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
       }
 
       template <typename Out, typename Executor>

@@ -40,7 +40,7 @@
 #endif
 #endif
 
-#ifdef MATX_EN_MATHDX
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
 #include <cufftdx.hpp>
 #endif
 

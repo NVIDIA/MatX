@@ -63,17 +63,14 @@ namespace matx
         index_t fft_size_;
         PermDims perm_;
         FFTDirection direction_;
-        FFTNorm norm_;
-#if defined(MATX_EN_MATHDX) && !defined(__CUDACC_RTC__)
-        cuFFTDxHelper<typename OpA::value_type> cufftdx_helper_;
-#endif        
+        FFTNorm norm_;    
         cuda::std::array<index_t, OpA::Rank()> out_dims_;
         using ttype = std::conditional_t<is_complex_v<typename OpA::value_type>, 
                                           typename OpA::value_type, 
                                           typename scalar_to_complex<typename OpA::value_type>::ctype>;
         // This should be tensor_impl_t, but need to work around issues with temp types returned in fft
         mutable ::matx::detail::tensor_impl_t<ttype, OpA::Rank()> tmp_out_;
-        mutable ttype *ptr = nullptr;    
+        mutable ttype *ptr = nullptr;           
 
       public:
         using matxop = bool;
@@ -144,13 +141,6 @@ namespace matx
               fft_size_ = a.Size(a.Rank()-1);
             }
           }
-
-#if defined(MATX_EN_MATHDX) && !defined(__CUDACC_RTC__)
-          detail::FFTDirection dir = std::is_same_v<FFTDirection, detail::fft_t> ? 
-                                             detail::FFTDirection::FORWARD : 
-                                             detail::FFTDirection::BACKWARD;
-          cufftdx_helper_ = cuFFTDxHelper<typename OpA::value_type>(fft_size_, FFTType::C2C, dir);
-#endif
         }
 
         __MATX_INLINE__ std::string get_capability_str() const {
@@ -194,9 +184,13 @@ namespace matx
 
         template <OperatorCapability Cap>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+          [[maybe_unused]] detail::FFTDirection dir = std::is_same_v<FFTDirection, detail::fft_t> ? 
+                                            detail::FFTDirection::FORWARD : 
+                                            detail::FFTDirection::BACKWARD;      
+
           if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {            
-#ifdef MATX_EN_MATHDX
-            bool supported = cufftdx_helper_.IsSupported();
+#if defined(MATX_EN_MATHDX) && !defined(__CUDACC_RTC__) && !defined(__CUDA_ARCH__)
+            bool supported = cuFFTDxHelper<typename OpA::value_type>::IsSupported(fft_size_, FFTType::C2C, dir);
 #else
             bool supported = false;
 #endif
@@ -207,11 +201,12 @@ namespace matx
             return combine_capabilities<Cap>(self_cap, detail::get_operator_capability<Cap>(a_));
           }
           else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-#ifdef MATX_EN_MATHDX
+#if defined(MATX_EN_MATHDX) && !defined(__CUDACC_RTC__) && !defined(__CUDA_ARCH__)
             // Currently MatX only attempts to use the "best" EPT as returned by cuFFTDx. In the future we may
             // try other EPT values that yield different SHM values.
-            if (cufftdx_helper_.IsSupported()) {
-              return combine_capabilities<Cap>(cufftdx_helper_.GetBestEPT(), detail::get_operator_capability<Cap>(a_));
+            if (cuFFTDxHelper<typename OpA::value_type>::IsSupported(fft_size_, FFTType::C2C, dir)) {
+              return combine_capabilities<Cap>(cuFFTDxHelper<typename OpA::value_type>::GetEPTs(fft_size_, FFTType::C2C, dir), 
+                      detail::get_operator_capability<Cap>(a_));
             }
             else {
               return combine_capabilities<Cap>(capability_attributes<Cap>::default_value, detail::get_operator_capability<Cap>(a_));
@@ -220,9 +215,6 @@ namespace matx
             return combine_capabilities<Cap>(capability_attributes<Cap>::default_value, detail::get_operator_capability<Cap>(a_));
 #endif
           }
-          else if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
-            return combine_capabilities<Cap>(cufftdx_helper_.GetShmRequired(), detail::get_operator_capability<Cap>(a_));
-          }
           else {
             // 1. Determine if the binary operation ITSELF intrinsically has this capability.
             auto self_has_cap = capability_attributes<Cap>::default_value;
@@ -230,6 +222,26 @@ namespace matx
           }
         }
 
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability(const InType &in) const {
+          [[maybe_unused]] detail::FFTDirection dir = std::is_same_v<FFTDirection, detail::fft_t> ? 
+                                            detail::FFTDirection::FORWARD : 
+                                            detail::FFTDirection::BACKWARD;      
+
+          if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
+            static_assert(std::is_same_v<InType, ShmQueryInput>, "DYN_SHM_SIZE capability requires ShmQueryInput as input type");
+#if defined(MATX_EN_MATHDX) && !defined(__CUDACC_RTC__) && !defined(__CUDA_ARCH__)            
+            return combine_capabilities<Cap>(cuFFTDxHelper<typename OpA::value_type>::GetShmRequired(fft_size_, FFTType::C2C, dir, in.ept), detail::get_operator_capability<Cap>(a_, in));
+#else
+            return combine_capabilities<Cap>(capability_attributes<Cap>::default_value, detail::get_operator_capability<Cap>(a_, in));
+#endif
+          }
+          else {
+            // 1. Determine if the binary operation ITSELF intrinsically has this capability.
+            auto self_has_cap = capability_attributes<Cap>::default_value;
+            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
+          }
+        }
 
 // #ifndef __CUDACC_RTC__  
 //         __MATX_INLINE__ __MATX_HOST__ bool get_capability_impl(OperatorCapability cap) const {
@@ -508,7 +520,14 @@ namespace matx
           // 1. Determine if the binary operation ITSELF intrinsically has this capability.
           auto self_has_cap = capability_attributes<Cap>::default_value;
           return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_));
-        }        
+        }
+
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability(const InType &in) const {
+          // 1. Determine if the binary operation ITSELF intrinsically has this capability.
+          auto self_has_cap = capability_attributes<Cap>::default_value;
+          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
+        }
 
         template <typename ShapeType, typename Executor>
         __MATX_INLINE__ void InnerPreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept

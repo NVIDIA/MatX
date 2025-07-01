@@ -150,11 +150,20 @@ namespace matx
         template <detail::OperatorCapability Cap>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
           if constexpr (Cap == detail::OperatorCapability::ELEMENTS_PER_THREAD) {
-            return detail::ElementsPerThread::ONE;
+            return cuda::std::array<detail::ElementsPerThread, 2>{detail::ElementsPerThread::ONE, detail::ElementsPerThread::ONE};
           }
           auto self_has_cap = capability_attributes<Cap>::default_value;          
           return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
-        }        
+        }
+
+        template <detail::OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability(const InType& in) const {
+          if constexpr (Cap == detail::OperatorCapability::ELEMENTS_PER_THREAD) {
+            return cuda::std::array<detail::ElementsPerThread, 2>{detail::ElementsPerThread::ONE, detail::ElementsPerThread::ONE};
+          }
+          auto self_has_cap = capability_attributes<Cap>::default_value;          
+          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_, in));
+        }
 
         template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 

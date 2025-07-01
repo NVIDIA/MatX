@@ -73,7 +73,7 @@ public:
   template <OperatorCapability Cap>
   __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
     if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-      return ElementsPerThread::ONE;
+      return cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
     }
     else {
       auto self_has_cap = capability_attributes<Cap>::default_value;
@@ -83,6 +83,18 @@ public:
     }
   }
 
+  template <OperatorCapability Cap, typename InType>
+  __MATX_INLINE__ __MATX_HOST__ auto get_capability(const InType& in_param) const {
+    if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+      return cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+    }
+    else {
+      auto self_has_cap = capability_attributes<Cap>::default_value;
+      return combine_capabilities<Cap>(self_has_cap, 
+        detail::get_operator_capability<Cap>(out_, in_param), 
+        detail::get_operator_capability<Cap>(in_, in_param));
+    }
+  }
 
   constexpr __MATX_HOST__ __MATX_DEVICE__ inline index_t Size(int i) const
   {

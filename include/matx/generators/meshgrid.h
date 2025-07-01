@@ -60,7 +60,7 @@ namespace matx
           template <detail::OperatorCapability Cap>
           __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
             if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-              return ElementsPerThread::ONE;
+              return cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
             } else {            
               auto self_has_cap = detail::capability_attributes<Cap>::default_value;
               return detail::combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(t1_));

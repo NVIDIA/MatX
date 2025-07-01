@@ -429,7 +429,7 @@ namespace matx
         // to index into the broadcasted dimensions. For example, if T is a 3D tensor and we want to index as a 5D, we take the indices
         // {0, 1, 2} we'd normally index with, and add the difference in rank (2), to get {2, 3, 4}. Another way to think of this is it
         // simply chops off the first sizeof...(Is) - RANK indices since they're not used for operator().
-        using seq = offset_sequence_t<sizeof...(Is) - RANK, std::make_index_sequence<RANK>>;
+        using seq = offset_sequence_t<sizeof...(Is) - RANK, cuda::std::make_index_sequence<RANK>>;
         auto tup = cuda::std::make_tuple(indices...);
         auto sliced_tup = select_tuple(std::forward<decltype(tup)>(tup), seq{});
         return cuda::std::apply([&](auto... args) {
@@ -464,7 +464,12 @@ namespace matx
     {
       if constexpr (is_matx_op<T>())
       {
-        return get_matx_value<CapType>(cuda::std::forward<T>(i), indices...);
+        if constexpr (remove_cvref_t<T>::Rank() == 0) {
+          return i.template operator()<CapType>();
+        }
+        else {
+          return get_matx_value<CapType>(cuda::std::forward<T>(i), indices...);
+        }
       }
       else
       {
@@ -478,7 +483,12 @@ namespace matx
     {
       if constexpr (is_matx_op<T>())
       {
-        return get_matx_value<CapType, T, IdxType, N>(cuda::std::forward<T>(i), idx);
+        if constexpr (remove_cvref_t<T>::Rank() == 0) {
+          return i.template operator()<CapType>();
+        }
+        else {
+          return get_matx_value<CapType, T, IdxType, N>(cuda::std::forward<T>(i), idx);
+        }
       }
       else
       {

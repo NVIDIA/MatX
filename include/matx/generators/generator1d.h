@@ -51,8 +51,14 @@ namespace matx
 
         template <detail::OperatorCapability Cap>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
-          if constexpr (RANK != 1) { // Vectorization not supported yet
-            return detail::ElementsPerThread::ONE;
+          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            if constexpr (RANK != 1) { // Vectorization not supported yet
+              return cuda::std::array<detail::ElementsPerThread, 2>{detail::ElementsPerThread::ONE, detail::ElementsPerThread::ONE};
+            }
+            else {
+              auto self_has_cap = detail::capability_attributes<Cap>::default_value;
+              return self_has_cap;
+            }
           } else {          
             auto self_has_cap = detail::capability_attributes<Cap>::default_value;
             return self_has_cap;

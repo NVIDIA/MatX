@@ -114,7 +114,7 @@ public:
   template <detail::OperatorCapability Cap>
   __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
     if constexpr (Cap == detail::OperatorCapability::ELEMENTS_PER_THREAD) {
-      return detail::ElementsPerThread::ONE;
+      return cuda::std::array<detail::ElementsPerThread, 2>{detail::ElementsPerThread::ONE, detail::ElementsPerThread::ONE};
     }
     else {
       auto self_has_cap = detail::capability_attributes<Cap>::default_value;
