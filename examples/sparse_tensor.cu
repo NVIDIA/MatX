@@ -234,7 +234,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv) {
   //
   // Perform a batched direct solve. This is only supported for a uniform
   // batched tri-diagonal matrix in DIA-I format where the rhs-s are
-  //  overwritten with the answers.
+  // overwritten with the answers.
   //
   // batch0          batch1
   // | 10 -1  0  0 | | 20 -2  0  0 | x  | 1  1  1  1 |  1  1  1  1 |
