@@ -277,7 +277,6 @@ TYPED_TEST(DiaSolveSparseTestsAll, SolveBatchedUniformDIAI) {
           D, O, {2, 4, 4});
 
   // RHS.
-  // |  0 -1 10 -1 | |  0 -2 20 -2 | =  | 8 16 24 37 | 88 96 112 146 |
   auto X = make_tensor<TestType>({2 * 4});
   X(0) = static_cast<TestType>(8);
   X(1) = static_cast<TestType>(16);
