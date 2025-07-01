@@ -268,7 +268,7 @@ public:
     auto waveformFull = slice(waveformView, {0}, {numSamplesRnd});
 
     auto x = inputView;
-
+    //printf("in here\n");
     // create waveform (assuming waveform is the same for every pulse)
     // this allows us to precompute waveform in frequency domain
     // Apply a Hamming window to the waveform to suppress sidelobes. Other
@@ -287,6 +287,7 @@ public:
     (x = fft(x)).run(exec);
     (x = x * waveformT).run(exec);
     (x = ifft(x)).run(exec);
+   // printf("out here\n");
   }
 
 

@@ -316,6 +316,12 @@ if (MATX_EN_MATHDX)
     include(cmake/FindMathDx.cmake)
     target_compile_definitions(matx INTERFACE MATX_EN_MATHDX)
     target_compile_definitions(matx INTERFACE MATX_EN_JIT)
+    
+    # Add NVRTC configuration as compiler definitions
+    list(GET CMAKE_CUDA_ARCHITECTURES 0 NVRTC_CUDA_ARCH)
+    target_compile_definitions(matx INTERFACE NVRTC_CUDA_ARCH="${NVRTC_CUDA_ARCH}")
+    target_compile_definitions(matx INTERFACE NVRTC_CXX_STANDARD="${CMAKE_CXX_STANDARD}")
+    
     #target_include_directories(matx INTERFACE libmathdx/include)
     target_link_directories(matx INTERFACE $<BUILD_INTERFACE:/repro/MatX/libmathdx/lib>)
     target_include_directories(matx INTERFACE $<BUILD_INTERFACE:/repro/MatX/libmathdx/include>)
@@ -392,7 +398,6 @@ if (NOT_SUBPROJECT)
     install(TARGETS matx EXPORT matx-exports)
     install(DIRECTORY include/ DESTINATION include)
     install(FILES ${CMAKE_BINARY_DIR}/include/version_config.h DESTINATION include)
-    install(FILES ${CMAKE_BINARY_DIR}/include/nvrtc_config.h DESTINATION include)
 
     set(doc_string
     [=[

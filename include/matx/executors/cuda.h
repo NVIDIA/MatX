@@ -169,11 +169,10 @@ namespace matx
       std::pair<detail::ElementsPerThread, int> find_best_launch_params(const Op &op, const cuda::std::array<detail::ElementsPerThread, 2>& max_ept, KernelProvider kernel_provider, bool use_jit = false) const {
         // Get device properties for constraints
         constexpr int min_occupancy = 2;
-        cudaDeviceProp prop;
-        cudaGetDeviceProperties(&prop, 0);
-        int max_dynamic_shm = static_cast<int>(prop.sharedMemPerBlock);
-        int max_threads_per_block = static_cast<int>(prop.maxThreadsPerBlock);
-        int regs_per_multiprocessor = static_cast<int>(prop.regsPerMultiprocessor);
+        int max_dynamic_shm, max_threads_per_block, regs_per_multiprocessor;
+        cudaDeviceGetAttribute(&max_dynamic_shm, cudaDevAttrMaxSharedMemoryPerBlock , 0);
+        cudaDeviceGetAttribute(&max_threads_per_block, cudaDevAttrMaxThreadsPerBlock, 0);
+        cudaDeviceGetAttribute(&regs_per_multiprocessor, cudaDevAttrMaxRegistersPerMultiprocessor, 0);
         [[maybe_unused]]int block_size;
         
         // Start with maximum EPT and work down
@@ -186,12 +185,10 @@ namespace matx
           // Get kernel function pointer for this EPT and check register usage (if available)
           auto kernel_func = kernel_provider(current_ept);
           bool register_viable = true;  // Default to viable for JIT
-          int num_regs = 0;  // Default for JIT or when kernel_func is null
           
           if (kernel_func != nullptr) {
             cudaFuncAttributes attr;
             cudaFuncGetAttributes(&attr, (const void*)kernel_func);
-            num_regs = attr.numRegs;
             
             // Determine block size for register calculation
             block_size = max_threads_per_block;
@@ -403,7 +400,7 @@ namespace matx
                   int max_tpb = 1024;
 
                   bool stride = detail::get_grid_dims<Op::Rank()>(blocks, threads, sizes, static_cast<int>(EPT), max_tpb);
-                  auto block_dim = detail::get_operator_capability<detail::OperatorCapability::BLOCK_DIM>(op);
+                  //auto block_dim = detail::get_operator_capability<detail::OperatorCapability::BLOCK_DIM>(op);
                   //printf("block_dim %lld %lld %lld\n", block_dim[0], block_dim[1], block_dim[2]);
 
                   using CapType = detail::CapabilityParams<EPT, false>;

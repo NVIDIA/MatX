@@ -80,8 +80,19 @@ std::vector<std::string> get_preprocessor_options() {
     options.push_back("-I" + jitify2::get_cuda_include_dir());
 
     options.push_back("-no-system-headers-workaround");
-    options.push_back("-arch=sm_80");
-    options.push_back("-std=c++20");
+    
+    // Use CMake-configured CUDA architecture and C++ standard
+    #ifdef NVRTC_CUDA_ARCH
+        options.push_back("-arch=sm_" NVRTC_CUDA_ARCH);
+    #else
+        options.push_back("-arch=sm_80");  // fallback
+    #endif
+    
+    #ifdef NVRTC_CXX_STANDARD
+        options.push_back("-std=c++" NVRTC_CXX_STANDARD);
+    #else
+        options.push_back("-std=c++20");   // fallback
+    #endif
 
     return options;
 }
