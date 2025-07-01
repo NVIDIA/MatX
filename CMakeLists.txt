@@ -152,7 +152,7 @@ target_link_libraries(matx INTERFACE CCCL::CCCL)
 
 # Set flags for compiling tests faster (only for nvcc)
 if (NOT CMAKE_CUDA_COMPILER_ID STREQUAL "Clang")
-    set(MATX_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} --threads 0 -ftemplate-backtrace-limit=0 -Xptxas -v)
+    set(MATX_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} --threads 0 -ftemplate-backtrace-limit=0)
 endif()
 
 # Hack because CMake doesn't have short circult evaluation

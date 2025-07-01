@@ -219,7 +219,7 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, cons
     cudaDeviceGetAttribute(&static_shared_size, cudaDevAttrMaxSharedMemoryPerBlock, device);
     auto end_time_device = std::chrono::high_resolution_clock::now();
     auto duration_device = std::chrono::duration_cast<std::chrono::microseconds>(end_time_device - start_time_device);
-    printf("Device attribute calls took %ld microseconds\n", duration_device.count());
+   // printf("Device attribute calls took %ld microseconds\n", duration_device.count());
     
     
     // Need to set dynamic shared memory size if it is greater than the static shared memory size
@@ -227,9 +227,9 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, cons
       kernel->set_attribute(CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, dynamic_shmem_size);
     }      
 
-    printf("dynamic_shmem_size %d\n", dynamic_shmem_size);    
-    printf(" threads %d %d\n", threads.x, threads.y);
-    printf("blocks %d %d %d\n", blocks.x, blocks.y, blocks.z);
+    // printf("dynamic_shmem_size %d\n", dynamic_shmem_size);    
+    // printf(" threads %d %d\n", threads.x, threads.y);
+    // printf("blocks %d %d %d\n", blocks.x, blocks.y, blocks.z);
     // Configure the kernel launch.
     auto start_time_configure = std::chrono::high_resolution_clock::now();
     if constexpr (Op::Rank() == 1) {

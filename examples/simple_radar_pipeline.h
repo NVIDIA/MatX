@@ -111,6 +111,11 @@ public:
     return O::Rank();
   }
 
+  template <detail::OperatorCapability Cap, typename InType>
+  __MATX_INLINE__ __MATX_HOST__ auto get_capability(const InType &) const {          
+    return detail::capability_attributes<Cap>::default_value;
+  }
+
   template <detail::OperatorCapability Cap>
   __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
     if constexpr (Cap == detail::OperatorCapability::ELEMENTS_PER_THREAD) {

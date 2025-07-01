@@ -49,6 +49,11 @@ namespace matx
         template <typename S>
           matxGenerator1D_t(S &&s, Generator1D f) : f_(f), s_(std::forward<S>(s)) {}
 
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability(const InType &) const {          
+          return detail::capability_attributes<Cap>::default_value;
+        }
+
         template <detail::OperatorCapability Cap>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
           if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
@@ -56,12 +61,10 @@ namespace matx
               return cuda::std::array<detail::ElementsPerThread, 2>{detail::ElementsPerThread::ONE, detail::ElementsPerThread::ONE};
             }
             else {
-              auto self_has_cap = detail::capability_attributes<Cap>::default_value;
-              return self_has_cap;
+              return detail::capability_attributes<Cap>::default_value;
             }
           } else {          
-            auto self_has_cap = detail::capability_attributes<Cap>::default_value;
-            return self_has_cap;
+            return detail::capability_attributes<Cap>::default_value;
           }
         }
 
