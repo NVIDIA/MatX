@@ -180,6 +180,13 @@ else()
 endif()
 set(WARN_FLAGS ${WARN_FLAGS} $<$<COMPILE_LANGUAGE:CXX>:-Werror>)
 
+# ARM64-specific flags to handle relocation issues
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
+    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler -fPIC")
+    message(STATUS "Added ARM64-specific flags for relocation handling")
+endif()
+
 # CUTLASS slows down compile times when used, so leave it as optional for now
 # if (MATX_EN_CUTLASS)
 #     include(cmake/GetCUTLASS.cmake)

@@ -109,6 +109,14 @@ target_include_directories(matx_test SYSTEM PRIVATE "${system_inc}")
 target_link_libraries(matx_test PRIVATE matx::matx) # Transitive properties
 target_link_libraries(matx_test PRIVATE ${NVSHMEM_LIBRARY} gtest)
 
+# Enable position independent code to fix relocation issues on ARM64
+set_property(TARGET matx_test PROPERTY POSITION_INDEPENDENT_CODE ON)
+
+# For ARM64, prefer dynamic linking to avoid relocation issues
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+    set_property(TARGET matx_test PROPERTY LINK_PREFERENCE_PUBLIC SHARED)
+endif()
+
 add_custom_target(test
     DEPENDS matx_test
     COMMAND ${CMAKE_CURRENT_BINARY_DIR}/matx_test)
