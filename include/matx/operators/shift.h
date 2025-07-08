@@ -65,7 +65,7 @@ namespace matx
         {
           static_assert(DIM < Rank(), "Dimension to shift must be less than rank of tensor");
 
-          #pragma unroll
+          MATX_LOOP_UNROLL
           for (int i = 0; i < Rank(); i++) {
             index_t size1 = detail::get_expanded_size<Rank()>(op_, i);
             index_t size2 = detail::get_expanded_size<Rank()>(shift_, i);

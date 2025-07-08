@@ -116,4 +116,13 @@ enum {
 // Do this on a per-architecture basis in the future
 static constexpr int MAX_VEC_WIDTH_BYTES = 16;
 
+
+#if defined(__CUDACC__)
+  #define MATX_LOOP_UNROLL _Pragma("unroll")
+  #define MATX_LOOP_DO_NOT_UNROLL _Pragma("unroll 1")
+#else
+#  define MATX_LOOP_UNROLL
+  #define MATX_LOOP_DO_NOT_UNROLL
+#endif
+
 }

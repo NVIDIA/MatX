@@ -62,7 +62,7 @@ inline void matxFFTConv1DInternal(OutputType &o, const InType &i,
   std::fill(std::begin(slice_start), std::end(slice_start), 0);
   std::fill(std::begin(slice_end), std::end(slice_end), matxEnd);
 
-  
+
 #if (CUDART_VERSION <= 11080)
   matx::tensor_t<complex_from_scalar_t<typename InType::scalar_type>, InType::Rank()> s1;
   matx::tensor_t<complex_from_scalar_t<typename InType::scalar_type>, InType::Rank()> s2;
@@ -90,7 +90,7 @@ inline void matxFFTConv1DInternal(OutputType &o, const InType &i,
   auto s1 = allocate_tensor(in_shape_padded);
   auto s2 = allocate_tensor(in_shape_padded);
   auto sifft = allocate_tensor(in_shape_padded);
-#endif  
+#endif
 
   if constexpr (! is_complex_v<typename InType::value_type>) {
     slice_end[InType::Rank() - 1] = padded_size/2 + 1;
@@ -336,13 +336,13 @@ inline void conv1d_impl(OutputType o, const In1Type &i1, const In2Type &i2,
     index_t shape[LRank];
 
     // copy left-most dimensions from i1
-    #pragma unroll
+    MATX_LOOP_UNROLL
     for(int i = 0; i < DRank; i++) {
       shape[i] = i1.Size(i);
     }
 
     // set right most dimensions as matxKeepDim
-    #pragma unroll
+    MATX_LOOP_UNROLL
     for(int i = 0; i < SRank; i++) {
       shape[DRank+i] = matxKeepDim;
     }
@@ -363,13 +363,13 @@ inline void conv1d_impl(OutputType o, const In1Type &i1, const In2Type &i2,
     index_t shape[LRank];
 
     // copy left-most dimensions from i2
-    #pragma unroll
+    MATX_LOOP_UNROLL
     for(int i = 0; i < DRank; i++) {
       shape[i] = i2.Size(i);
     }
 
     // set right most dimensions as matxKeepDim
-    #pragma unroll
+    MATX_LOOP_UNROLL
     for(int i = 0; i < SRank; i++) {
       shape[DRank+i] = matxKeepDim;
     }

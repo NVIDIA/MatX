@@ -46,7 +46,7 @@ namespace matx
     template <int DIM, typename T, typename StrideType>
       class SliceOp : public BaseOp<SliceOp<DIM, T, StrideType>>
     {
-      public: 
+      public:
         using value_type = typename T::value_type;
         using self_type = SliceOp<DIM, T, StrideType>;
 
@@ -89,7 +89,7 @@ namespace matx
             // compute dims and sizes
             if(end != matxDropDim) {
               MATX_ASSERT_STR(end != matxKeepDim, matxInvalidParameter, "matxKeepDim only valid for clone(), not slice()");
-              
+
               dims_[d] = i;
 
               if(end == matxEnd) {
@@ -111,23 +111,23 @@ namespace matx
 
         template <detail::ElementsPerThread EPT, typename Op, typename... Is>
         static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(
-            Op&& op, 
-            const decltype(starts_) &starts, 
-            const decltype(strides_) &strides, 
-            const decltype(dims_) &dims, 
+            Op&& op,
+            const decltype(starts_) &starts,
+            const decltype(strides_) &strides,
+            const decltype(dims_) &dims,
             Is... indices)
-        {   
+        {
           if constexpr (EPT == ElementsPerThread::ONE) {
             static_assert(sizeof...(Is)==Rank());
             static_assert((std::is_convertible_v<Is, index_t> && ... ));
-        
+
             // convert variadic type to tuple so we can read/update
             cuda::std::array<index_t, T::Rank()> ind = starts;
-            cuda::std::array<index_t, Rank()> inds{indices...};   
+            cuda::std::array<index_t, Rank()> inds{indices...};
 
-            #pragma unroll            
+            MATX_LOOP_UNROLL
             for (int32_t i = 0; i < T::Rank(); i++) {
-              #pragma unroll
+              MATX_LOOP_UNROLL
               for(int32_t j = 0; j < Rank(); j++) {
                 if(dims[j] == i) {
                   if constexpr (!std::is_same_v<NoStride, StrideType>) {
@@ -138,8 +138,8 @@ namespace matx
                   }
                 }
               }
-            }       
-                
+            }
+
             return get_value<EPT>(cuda::std::forward<Op>(op), ind);
           } else {
             return Vector<value_type, static_cast<index_t>(EPT)>{};
@@ -151,12 +151,12 @@ namespace matx
           if constexpr (Cap == detail::OperatorCapability::ELEMENTS_PER_THREAD) {
             return detail::ElementsPerThread::ONE;
           }
-          auto self_has_cap = capability_attributes<Cap>::default_value;          
+          auto self_has_cap = capability_attributes<Cap>::default_value;
           return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
-        }        
+        }
 
         template <detail::ElementsPerThread EPT, typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
           return get_impl<EPT>(cuda::std::as_const(op_), starts_, strides_, dims_, indices...);
         }
@@ -168,7 +168,7 @@ namespace matx
         }
 
         template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
           return this->operator()<detail::ElementsPerThread::ONE>(indices...);
         }
@@ -177,7 +177,7 @@ namespace matx
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
           return this->operator()<detail::ElementsPerThread::ONE>(indices...);
-        }        
+        }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {
@@ -190,17 +190,17 @@ namespace matx
 
         ~SliceOp() = default;
         SliceOp(const SliceOp &rhs) = default;
-        __MATX_INLINE__ auto operator=(const self_type &rhs) { 
-          return set(*this, rhs); 
-        }            
+        __MATX_INLINE__ auto operator=(const self_type &rhs) {
+          return set(*this, rhs);
+        }
 
-        template<typename R> 
-        __MATX_INLINE__ auto operator=(const R &rhs) { 
+        template<typename R>
+        __MATX_INLINE__ auto operator=(const R &rhs) {
           if constexpr (is_matx_transform_op<R>()) {
             return mtie(*this, rhs);
           }
-          else {          
-            return set(*this, rhs); 
+          else {
+            return set(*this, rhs);
           }
         }
 
@@ -228,7 +228,7 @@ namespace matx
    *
    * The rank of the the operator must be greater than 0.
 
-   * This operator can appear as an rvalue or lvalue. 
+   * This operator can appear as an rvalue or lvalue.
    *
    * @tparam OpType Input operator/tensor type
    * @param op Input operator
@@ -238,7 +238,7 @@ namespace matx
    * @return sliced operator
    */
   template <typename OpType>
-  __MATX_INLINE__ auto slice( const OpType &op, 
+  __MATX_INLINE__ auto slice( const OpType &op,
       const cuda::std::array<index_t, OpType::Rank()> &starts,
       const cuda::std::array<index_t, OpType::Rank()> &ends,
       const cuda::std::array<index_t, OpType::Rank()> &strides)
@@ -251,7 +251,7 @@ namespace matx
   }
 
   template <typename OpType>
-  __MATX_INLINE__ auto slice( const OpType &op, 
+  __MATX_INLINE__ auto slice( const OpType &op,
       const cuda::std::array<index_t, OpType::Rank()> &starts,
       const cuda::std::array<index_t, OpType::Rank()> &ends,
       detail::NoStride strides)
@@ -261,16 +261,16 @@ namespace matx
     } else {
       return detail::SliceOp<OpType::Rank(),OpType,detail::NoStride>(op, starts, ends, detail::NoStride{});
     }
-  }  
+  }
 
   template <typename OpType>
-  __MATX_INLINE__ auto slice( const OpType &op, 
+  __MATX_INLINE__ auto slice( const OpType &op,
       const index_t (&starts)[OpType::Rank()],
       const index_t (&ends)[OpType::Rank()],
-      const index_t (&strides)[OpType::Rank()]) 
+      const index_t (&strides)[OpType::Rank()])
   {
-    return slice(op, 
-        detail::to_array(starts), 
+    return slice(op,
+        detail::to_array(starts),
         detail::to_array(ends),
         detail::to_array(strides));
   }
@@ -280,7 +280,7 @@ namespace matx
    *
    * The rank of the the operator must be greater than 0.
 
-   * This operator can appear as an rvalue or lvalue. 
+   * This operator can appear as an rvalue or lvalue.
    *
    * @tparam OpType Input operator/tensor type
    * @param op Input operator
@@ -289,19 +289,19 @@ namespace matx
    * @return sliced operator
    */
   template <typename OpType>
-  __MATX_INLINE__ auto slice( const OpType &op, 
+  __MATX_INLINE__ auto slice( const OpType &op,
       const cuda::std::array<index_t, OpType::Rank()> &starts,
       const cuda::std::array<index_t, OpType::Rank()> &ends)
   {
     return slice(op, starts, ends, detail::NoStride{});
   }
   template <typename OpType>
-  __MATX_INLINE__ auto slice( const OpType &op, 
+  __MATX_INLINE__ auto slice( const OpType &op,
       const index_t (&starts)[OpType::Rank()],
-      const index_t (&ends)[OpType::Rank()]) 
+      const index_t (&ends)[OpType::Rank()])
   {
-    return slice(op, 
-        detail::to_array(starts), 
+    return slice(op,
+        detail::to_array(starts),
         detail::to_array(ends));
   }
 
@@ -310,7 +310,7 @@ namespace matx
    *
    * The rank of the the operator must be greater than 0.
 
-   * This operator can appear as an rvalue or lvalue. 
+   * This operator can appear as an rvalue or lvalue.
    *
    * The Rank template parameter N is optional when rank does not change
    *
@@ -323,7 +323,7 @@ namespace matx
    * @return sliced operator
    */
   template <int N, typename OpType>
-    __MATX_INLINE__ auto slice( const OpType &op, 
+    __MATX_INLINE__ auto slice( const OpType &op,
       const cuda::std::array<index_t, OpType::Rank()> &starts,
       const cuda::std::array<index_t, OpType::Rank()> &ends,
       const cuda::std::array<index_t, OpType::Rank()> &strides)
@@ -336,7 +336,7 @@ namespace matx
   }
 
   template <int N, typename OpType>
-    __MATX_INLINE__ auto slice( const OpType &op, 
+    __MATX_INLINE__ auto slice( const OpType &op,
       const cuda::std::array<index_t, OpType::Rank()> &starts,
       const cuda::std::array<index_t, OpType::Rank()> &ends,
       [[maybe_unused]] detail::NoStride no_stride)
@@ -350,13 +350,13 @@ namespace matx
 
 
   template <int N, typename OpType>
-    __MATX_INLINE__ auto slice( const OpType &op, 
+    __MATX_INLINE__ auto slice( const OpType &op,
         const index_t (&starts)[OpType::Rank()],
         const index_t (&ends)[OpType::Rank()],
-        const index_t (&strides)[OpType::Rank()]) 
+        const index_t (&strides)[OpType::Rank()])
   {
-    return slice<N,OpType>(op, 
-        detail::to_array(starts), 
+    return slice<N,OpType>(op,
+        detail::to_array(starts),
         detail::to_array(ends),
         detail::to_array(strides));
   }
@@ -366,8 +366,8 @@ namespace matx
    *
    * The rank of the the operator must be greater than 0.
 
-   * This operator can appear as an rvalue or lvalue. 
-   
+   * This operator can appear as an rvalue or lvalue.
+
    * The Rank template parameter N is optional when rank does not change
    *
    * @tparam N The Rank of the output operator - optional when slice produces same rank as input
@@ -378,7 +378,7 @@ namespace matx
    * @return sliced operator
    */
   template <int N, typename OpType>
-  __MATX_INLINE__ auto slice (const OpType &op, 
+  __MATX_INLINE__ auto slice (const OpType &op,
       const cuda::std::array<index_t, OpType::Rank()> &starts,
       const cuda::std::array<index_t, OpType::Rank()> &ends)
   {
@@ -386,23 +386,23 @@ namespace matx
   }
 
   template <int N, typename OpType>
-  __MATX_INLINE__ auto slice (const OpType &op, 
+  __MATX_INLINE__ auto slice (const OpType &op,
       const index_t (&starts)[OpType::Rank()],
-      const index_t (&ends)[OpType::Rank()]) 
+      const index_t (&ends)[OpType::Rank()])
   {
-    return slice<N,OpType>(op, 
-        detail::to_array(starts), 
+    return slice<N,OpType>(op,
+        detail::to_array(starts),
         detail::to_array(ends));
   }
 
 #else
-   auto slice (const OpType &op, 
+   auto slice (const OpType &op,
       const index_t (&starts)[OpType::Rank()],
       const index_t (&ends)[OpType::Rank()]) { }
 
-   auto slice (const OpType &op, 
+   auto slice (const OpType &op,
       const index_t (&starts)[OpType::Rank()],
       const index_t (&ends)[OpType::Rank()],
-      const index_t (&strides)[OpType::Rank()]) { }      
-#endif  
+      const index_t (&strides)[OpType::Rank()]) { }
+#endif
 } // end namespace matx

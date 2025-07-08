@@ -87,7 +87,7 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
   // number of chunks per Y block, rounded up
   num_chunks = (num_chunks + gridDim.y - 1) / gridDim.y;
 
-#pragma unroll 1
+  MATX_LOOP_DO_NOT_UNROLL
   for(uint32_t n = 0; n < num_chunks; n++) {
     // compute current chunk idx
     uint32_t chunk_idx = blockIdx.y + n * gridDim.y;
@@ -137,14 +137,14 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
       intype_strip ival[EPT];
       // load N elements of the signal into registers
 
-#pragma unroll
+MATX_LOOP_UNROLL
       for(uint32_t i = 0; i < EPT; i++) {
         ival[i] = s_data[i*THREADS];
       }
       s_data--; // next signal value
 
       // compute N elements of the convolution
-#pragma unroll
+MATX_LOOP_UNROLL
       for(uint32_t i = 0; i < EPT; i++) {
         oval[i] = detail::madd(ival[i], fval, oval[i]);
       }
@@ -174,7 +174,7 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
       stop = full_len - filter_len;
     }
 
-#pragma unroll
+MATX_LOOP_UNROLL
     for (uint32_t i = 0; i < EPT; i++) {
       // index for the computation
       uint32_t idx = chunk_idx * CONV1D_ELEMENTS_PER_BLOCK + i * THREADS + threadIdx.x;
@@ -336,16 +336,16 @@ __global__ void Conv2D(OutType d_out, InType1 d_in1, InType2 d_in2,
             in1type i1[ILPY];
 
             // loop through shared memory filter one chunk at a time
-#pragma unroll
+MATX_LOOP_UNROLL
             for (int mm = 0; mm < FILTER_SHARED_CHUNK_X; mm+=FILTER_REG_CHUNK_X) {
-#pragma unroll
+MATX_LOOP_UNROLL
               for (int nn = 0; nn < FILTER_SHARED_CHUNK_Y; nn+=FILTER_REG_CHUNK_Y) {
 
 
                 // Copy chunk from shared memory in to registers
-#pragma unroll
+MATX_LOOP_UNROLL
                 for(int ii = 0; ii < FILTER_REG_CHUNK_Y; ii++) {
-#pragma unroll
+MATX_LOOP_UNROLL
                   for(int jj = 0; jj < FILTER_REG_CHUNK_X; jj++) {
                     r_filter[ii][jj] = s_filter(nn+ii, mm+jj);
                   }
@@ -354,10 +354,10 @@ __global__ void Conv2D(OutType d_out, InType1 d_in1, InType2 d_in2,
 
                 // convolution loop:  convolve filter and signal.
                 // Keep signal in registers as much as possible by shifting.
-#pragma unroll
+MATX_LOOP_UNROLL
                 for (int m = 0; m < FILTER_REG_CHUNK_X; m++) {
 
-#pragma unroll
+MATX_LOOP_UNROLL
                   for (int n = 0; n < FILTER_REG_CHUNK_Y; n++) {
 
                     in2type i2 = r_filter[n][m];
@@ -366,13 +366,13 @@ __global__ void Conv2D(OutType d_out, InType1 d_in1, InType2 d_in2,
                     if( nn == 0 ||
                         (FILTER_REG_CHUNK_X > 1 && n == 0)) {
                     // load ILPY signal points
-#pragma unroll
+MATX_LOOP_UNROLL
                       for(int u = 0; u < ILPY; u++) {
                         i1[u] = s_signal(nn+n+threadIdx.y*ILPY + u, mm+m+threadIdx.x);
                       }
                     } else {
                       // advance/shift signal points in registers
-#pragma unroll
+MATX_LOOP_UNROLL
                       for(int u = 0; u < ILPY - 1; u++) {
                         i1[u]=i1[u+1];
                       }
@@ -382,7 +382,7 @@ __global__ void Conv2D(OutType d_out, InType1 d_in1, InType2 d_in2,
                     }
 
                     // inner convolution loop
-#pragma unroll
+MATX_LOOP_UNROLL
                     for(int u = 0; u < ILPY; u++) {
                       sum[u] = detail::madd(i1[u], i2, sum[u]);
                     }
@@ -394,7 +394,7 @@ __global__ void Conv2D(OutType d_out, InType1 d_in1, InType2 d_in2,
         } // end ii loop
 
         // finally output the solution
-#pragma unroll
+MATX_LOOP_UNROLL
         for(int u = 0; u < ILPY; u++) {
           if(i + u < oN && j < oM) {
             bdims[Rank - 2] = i + u;

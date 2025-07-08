@@ -795,13 +795,13 @@ public:
     Type *data = reinterpret_cast<Type *>(this->Data());
     cuda::std::array<typename Desc::stride_type, RANK> strides;
 
-#pragma unroll
+MATX_LOOP_UNROLL
     for (int i = 0; i < RANK; i++) {
       strides[i] = this->desc_.Stride(i);
     }
 
     if constexpr (RANK > 0) {
-#pragma unroll
+MATX_LOOP_UNROLL
       for (int i = 0; i < RANK; i++) {
         strides[i] *= 2;
       }
@@ -839,13 +839,13 @@ public:
     using Type = typename U::value_type;
     Type *data = reinterpret_cast<Type *>(this->Data()) + 1;
     cuda::std::array<stride_type, RANK> strides;
-#pragma unroll
+MATX_LOOP_UNROLL
     for (int i = 0; i < RANK; i++) {
       strides[i] = this->Stride(i);
     }
 
     if constexpr (RANK > 0) {
-#pragma unroll
+MATX_LOOP_UNROLL
       for (int i = 0; i < RANK; i++) {
         strides[i] *= 2;
       }

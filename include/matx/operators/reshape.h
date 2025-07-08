@@ -46,9 +46,9 @@ namespace matx
     template <int RANK, typename T, typename ShapeType>
       class ReshapeOp : public BaseOp<ReshapeOp<RANK, T, ShapeType>>
     {
-      public: 
+      public:
         using value_type = typename T::value_type;
-	
+
       private:
         typename detail::base_type_t<T> op_;
 	      ShapeType sizes_;
@@ -81,7 +81,7 @@ namespace matx
 
         template <ElementsPerThread EPT, typename Op, typename... Is>
         static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, const decltype(sizes_) &sizes, Is... indices)
-        {   
+        {
           if constexpr (EPT == ElementsPerThread::ONE) {
             cuda::std::array<index_t, Rank()> inds{indices...};
             cuda::std::array<index_t, T::Rank()> ninds;
@@ -90,33 +90,33 @@ namespace matx
             index_t stride = 1;
 
             // linearlize incoming index
-#pragma unroll
+MATX_LOOP_UNROLL
             for(int i = Rank() - 1 ; i >= 0 ; i--) {
               idx += stride * inds[i];
               stride *= sizes[i];
             }
 
             // extract new indices
-  #pragma unroll
+  MATX_LOOP_UNROLL
             for(int i = T::Rank() - 1; i >= 0; i--) {
               ninds[i] = idx % op.Size(i);
               idx /= op.Size(i);
-            }   
+            }
 
-            return get_value<EPT>(cuda::std::forward<Op>(op), ninds);       
+            return get_value<EPT>(cuda::std::forward<Op>(op), ninds);
           } else {
             return Vector<value_type, static_cast<index_t>(EPT)>{};
           }
         }
 
         template <ElementsPerThread EPT, typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
           return get_impl<EPT>(cuda::std::as_const(op_), sizes_, indices...);
         }
 
         template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
           return this->operator()<detail::ElementsPerThread::ONE>(indices...);
         }
@@ -162,21 +162,21 @@ namespace matx
           if constexpr (is_matx_op<T>()) {
             op_.PostRun(std::forward<S2>(shape), std::forward<Executor>(ex));
           }
-        }  
+        }
 
         ~ReshapeOp() = default;
         ReshapeOp(const ReshapeOp &rhs) = default;
-        __MATX_INLINE__ auto operator=(const self_type &rhs) { 
-          return set(*this, rhs); 
-        }                      
+        __MATX_INLINE__ auto operator=(const self_type &rhs) {
+          return set(*this, rhs);
+        }
 
-        template<typename R> 
-        __MATX_INLINE__ auto operator=(const R &rhs) { 
+        template<typename R>
+        __MATX_INLINE__ auto operator=(const R &rhs) {
           if constexpr (is_matx_transform_op<R>()) {
             return mtie(*this, rhs);
           }
-          else {          
-            return set(*this, rhs); 
+          else {
+            return set(*this, rhs);
           }
         }
     };
@@ -185,7 +185,7 @@ namespace matx
     /**
    * @brief Operator to reshape a tensor or operator.
    *
-   * This operator can appear as an rvalue or lvalue. 
+   * This operator can appear as an rvalue or lvalue.
    *
    * @tparam RANK the reshaped rank
    * @tparam T Input operator/tensor type
@@ -198,12 +198,12 @@ namespace matx
              __MATX_INLINE__ auto reshape(const T &op, ShapeType &&s)
   {
     return detail::ReshapeOp<RANK, T, ShapeType>(op, std::forward<ShapeType>(s));
-  }  
-  
+  }
+
     /**
    * @brief Operator to reshape a tensor or operator.
    *
-   * This operator can appear as an rvalue or lvalue. 
+   * This operator can appear as an rvalue or lvalue.
    *
    * @tparam RANK the reshaped rank
    * @tparam T Input operator/tensor type
@@ -212,7 +212,7 @@ namespace matx
    * @return reshaped operator
    */
   template <int RANK, typename T>
-    __MATX_INLINE__ auto reshape( const T &op, 
+    __MATX_INLINE__ auto reshape( const T &op,
         const index_t (&sizes)[RANK]) {
       return reshape<RANK, T>(op, detail::to_array(sizes));
     }

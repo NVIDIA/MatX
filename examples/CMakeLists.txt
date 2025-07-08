@@ -66,6 +66,7 @@ endforeach()
 # Add host-compiler only example program to catch missing ifdef __CUDACC__ guards
 add_executable(test_host test_host.cpp)
 target_link_libraries(test_host matx::matx)
+target_compile_options(test_host PRIVATE -Wall -Werror)
 
 if(MATX_EN_PYBIND11)
     add_subdirectory(python_integration_sample)

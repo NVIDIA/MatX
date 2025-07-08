@@ -67,7 +67,7 @@ __global__ __launch_bounds__(BLOCK_SIZE_RECURSIVE, 1) void RecursiveFilter(
 // const index_t batch_offset = blockIdx.y * len;
 
 // Load non-recursive coefficients
-#pragma unroll
+MATX_LOOP_UNROLL
   for (uint8_t i = 0; i < MAX_NON_RECURSIVE_COEFFS; i++) {
     if (i < num_non_recursive) {
       r_nonr[i] = d_nrec[i];
@@ -106,13 +106,13 @@ __global__ __launch_bounds__(BLOCK_SIZE_RECURSIVE, 1) void RecursiveFilter(
   // Copy signal input. If we're a thread that needs to share data with other
   // blocks for the map step, store that value as well
   if (tid < len) {
-#pragma unroll
+MATX_LOOP_UNROLL
     for (uint32_t r = 0; r < RECURSIVE_VALS_PER_THREAD; r++) {
       vals[r] = d_in(blockIdx.y, tid + BLOCK_SIZE_RECURSIVE * r);
     }
 
     if (lane > WARP_SIZE - num_non_recursive) {
-#pragma unroll
+MATX_LOOP_UNROLL
       for (uint32_t r = 0; r < RECURSIVE_VALS_PER_THREAD; r++) {
         s_exch[((BLOCK_SIZE_RECURSIVE / WARP_SIZE) * r + (warp_id + 1)) *
                    (num_non_recursive - 1) +
@@ -150,11 +150,11 @@ __global__ __launch_bounds__(BLOCK_SIZE_RECURSIVE, 1) void RecursiveFilter(
 
   // Map operation
   if constexpr (num_non_recursive > 0) {
-#pragma unroll
+MATX_LOOP_UNROLL
     for (uint32_t r = 0; r < RECURSIVE_VALS_PER_THREAD; r++) {
 // Load all values from other threads in our warp. Some values will not be used
 // in lanes that straddle warps
-#pragma unroll
+MATX_LOOP_UNROLL
       for (uint32_t nrec = 1; nrec < num_non_recursive; nrec++) {
         if constexpr (is_cuda_complex_v<InType>) {
           *reinterpret_cast<uint64_t *>(&tmp[nrec - 1]) =
@@ -176,7 +176,7 @@ __global__ __launch_bounds__(BLOCK_SIZE_RECURSIVE, 1) void RecursiveFilter(
 
         int32_t lid = lane - 1;
 // Now apply all coefficients to previous values
-#pragma unroll
+MATX_LOOP_UNROLL
         for (uint32_t nrec = 1; nrec < num_non_recursive; nrec++) {
           if (lid < 0) { // need to grab from shm since it's from another warp
             if constexpr (is_cuda_complex_v<InType>) {
@@ -214,7 +214,7 @@ __global__ __launch_bounds__(BLOCK_SIZE_RECURSIVE, 1) void RecursiveFilter(
   int grptid;
 
 // 1->2
-#pragma unroll
+MATX_LOOP_UNROLL
   for (uint32_t r = 0; r < RECURSIVE_VALS_PER_THREAD; r++) {
     if constexpr (is_cuda_complex_v<InType>) {
       *reinterpret_cast<uint64_t *>(&tmp[0]) =
@@ -239,7 +239,7 @@ __global__ __launch_bounds__(BLOCK_SIZE_RECURSIVE, 1) void RecursiveFilter(
 
 // Loop through correcting 2->4, 4->8, 8->16, and 16->32. At the end of this
 // step the first 32 values will be correct
-#pragma unroll
+MATX_LOOP_UNROLL
   for (int32_t wl = 2; wl <= 16; wl *= 2) {
     grptid = threadIdx.x & (2 * wl - 1);
 
@@ -252,10 +252,10 @@ __global__ __launch_bounds__(BLOCK_SIZE_RECURSIVE, 1) void RecursiveFilter(
       tmp[0] = (grptid > (wl - 1)) ? 1.0 : 0.0;
     }
 
-#pragma unroll
+MATX_LOOP_UNROLL
     for (uint32_t r = 0; r < RECURSIVE_VALS_PER_THREAD; r++) {
 // Load all of the values we need from other threads in the warp
-#pragma unroll
+MATX_LOOP_UNROLL
       for (uint32_t rec = 0; rec < cuda::std::min(num_recursive, static_cast<uint32_t>(wl)); rec++) {
         if constexpr (is_cuda_complex_v<InType>) {
           *reinterpret_cast<uint64_t *>(&tmp[rec + 1]) =
@@ -270,7 +270,7 @@ __global__ __launch_bounds__(BLOCK_SIZE_RECURSIVE, 1) void RecursiveFilter(
       if ((blockIdx.x * RECURSIVE_VALS_PER_THREAD + threadIdx.x * r) <
           static_cast<uint32_t>(len)) { // Make sure this value is within bounds of the signal
 // Now apply those values
-#pragma unroll
+MATX_LOOP_UNROLL
         for (uint32_t rec = 0; rec < cuda::std::min(num_recursive, static_cast<uint32_t>(wl)); rec++) {
           if constexpr (is_cuda_complex_v<InType>) {
             vals[r] =
@@ -307,7 +307,7 @@ __global__ __launch_bounds__(BLOCK_SIZE_RECURSIVE, 1) void RecursiveFilter(
   uint32_t cor_size = 32;
   int32_t dcor = 2 * cor_size - 1;
   int32_t cor_log2 = 5;
-#pragma unroll
+MATX_LOOP_UNROLL
   do {
     sub_group_base =
         threadIdx.x >>
@@ -318,7 +318,7 @@ __global__ __launch_bounds__(BLOCK_SIZE_RECURSIVE, 1) void RecursiveFilter(
 
     // Pick off the last num_recursive threads in the block
     if (sub_group_idx < 0 && (-sub_group_idx <= static_cast<int32_t>(num_recursive))) {
-#pragma unroll
+MATX_LOOP_UNROLL
       for (uint32_t r = 0; r < RECURSIVE_VALS_PER_THREAD; r++) {
         s_exch[num_recursive * (sub_group_base +
                                 r * (BLOCK_SIZE_RECURSIVE / 2) / cor_size) -
@@ -330,11 +330,11 @@ __global__ __launch_bounds__(BLOCK_SIZE_RECURSIVE, 1) void RecursiveFilter(
 
     // Each subgroup applies the corrections
     if (sub_group_idx >= 0) {
-#pragma unroll
+MATX_LOOP_UNROLL
       for (uint32_t vpt = 0; vpt < RECURSIVE_VALS_PER_THREAD; vpt++) {
         if ((blockIdx.x * RECURSIVE_VALS_PER_THREAD + threadIdx.x * vpt) <
             len) { // Make sure this value is within bounds of the signal
-#pragma unroll
+MATX_LOOP_UNROLL
           for (uint32_t r = 0; r < num_recursive; r++) {
             tmp[r] = s_exch[(sub_group_base +
                              vpt * ((BLOCK_SIZE_RECURSIVE / 2) / cor_size)) *
@@ -383,7 +383,7 @@ __global__ __launch_bounds__(BLOCK_SIZE_RECURSIVE, 1) void RecursiveFilter(
 
       if ((blockIdx.x * RECURSIVE_VALS_PER_THREAD + threadIdx.x * block_idx) <
           len) { // Make sure this value is within bounds of the signal
-#pragma unroll
+MATX_LOOP_UNROLL
         for (uint32_t r = 0; r < num_recursive; r++) {
           if constexpr (is_cuda_complex_v<InType>) {
             vals[block_idx] = cuCaddf(
@@ -480,7 +480,7 @@ __global__ __launch_bounds__(BLOCK_SIZE_RECURSIVE, 1) void RecursiveFilter(
       // Pull in all the partial carries first by as many threads that can get
       // them
       if (threadIdx.x < last_full) {
-#pragma unroll
+MATX_LOOP_UNROLL
         for (uint32_t r = 0; r < num_recursive; r++) {
           if constexpr (is_cuda_complex_v<InType>) {
             *reinterpret_cast<volatile uint64_t *>(
@@ -505,7 +505,7 @@ __global__ __launch_bounds__(BLOCK_SIZE_RECURSIVE, 1) void RecursiveFilter(
       // The first thread will do all the FMAs until we can finally apply the
       // value to all threads
       if (threadIdx.x == 0) {
-#pragma unroll
+MATX_LOOP_UNROLL
         for (uint32_t r = 0; r < num_recursive; r++) {
           if constexpr (is_cuda_complex_v<InType>) {
             *reinterpret_cast<volatile uint64_t *>(&tmp[r]) =
@@ -552,7 +552,7 @@ __global__ __launch_bounds__(BLOCK_SIZE_RECURSIVE, 1) void RecursiveFilter(
     // loaded the exchange values for the initial priming above
     block_idx = 0;
     do {
-#pragma unroll
+MATX_LOOP_UNROLL
       for (uint32_t r = 0; r < num_recursive; r++) {
         if ((blockIdx.x * RECURSIVE_VALS_PER_THREAD + threadIdx.x * r) < len) {
           if constexpr (is_cuda_complex_v<InType>) {
@@ -598,7 +598,7 @@ __global__ __launch_bounds__(BLOCK_SIZE_RECURSIVE, 1) void RecursiveFilter(
   }
 
 // Write solution out
-#pragma unroll
+MATX_LOOP_UNROLL
   for (uint32_t r = 0; r < RECURSIVE_VALS_PER_THREAD; r++) {
     if ((tid + r * BLOCK_SIZE_RECURSIVE) < len) {
       d_out(blockIdx.y, tid + r * BLOCK_SIZE_RECURSIVE) = vals[r];

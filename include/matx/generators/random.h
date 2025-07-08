@@ -68,7 +68,7 @@ __global__ void curand_setup_kernel(Gen *states, uint64_t seed, index_t size)
 template <typename T, typename Gen>
 __MATX_INLINE__ __MATX_DEVICE__ void get_randomi(T &val, Gen *state, double min, double max)
 {
-  
+
   double normFloat = curand_uniform(state);
 
   // Scale to the provided min and max range
@@ -219,14 +219,14 @@ namespace detail {
     T min_;
     T max_;
   };
-  
+
   template< typename T >
   struct randFloatParams{
     Distribution_t dist_;
     T alpha_;
     T beta_;
-  };  
-  
+  };
+
   template <typename T, typename ShapeType>
   class RandomOp : public BaseOp<RandomOp<T, ShapeType>> {
     private:
@@ -236,15 +236,15 @@ namespace detail {
       cuda::std::array<index_t, RANK> strides_;
       index_t total_size_;
       mutable curandStatePhilox4_32_10_t *states_;
-      uint64_t seed_;     
+      uint64_t seed_;
       mutable bool init_ = false;
       mutable bool device_;
-      
+
       union{
         randFloatParams<inner_t> fParams_;
         randIntParams<inner_t>   iParams_;
       };
-      
+
       // Used by host operators only
       mutable curandGenerator_t gen_;
       //T val;
@@ -252,7 +252,7 @@ namespace detail {
 
     public:
       using value_type = T;
-      using matxop = bool;     
+      using matxop = bool;
 
       __MATX_INLINE__ std::string str() const { return "random"; }
 
@@ -268,14 +268,14 @@ namespace detail {
           strides_[RANK-1] = 1;
         }
 
-        #pragma unroll
+        MATX_LOOP_UNROLL
         for (int i = 0; i < RANK; ++i)
         {
           shape_[i] = s[i];
         }
 
 
-        #pragma unroll
+        MATX_LOOP_UNROLL
         for (int i = RANK - 2; i >= 0; i--) {
           strides_[i] = strides_[i+1] * s[i+1];
         }
@@ -285,11 +285,11 @@ namespace detail {
       __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
         if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
           return ElementsPerThread::ONE; // Fix this to support vectorization
-        } else {        
+        } else {
           auto self_has_cap = capability_attributes<Cap>::default_value;
-          return self_has_cap;  
+          return self_has_cap;
         }
-      }      
+      }
 
       // Constructor for randFloatParams
       __MATX_INLINE__ RandomOp(ShapeType &&s, uint64_t seed, randFloatParams<inner_t> params) :
@@ -307,13 +307,13 @@ namespace detail {
 
       template <typename ST, typename Executor>
       __MATX_INLINE__ void InnerPreRun([[maybe_unused]] ST &&shape, [[maybe_unused]] Executor &&ex) const noexcept
-      {          
+      {
       }
-           
+
       template <typename ST, typename Executor>
       __MATX_INLINE__ void PreRun([[maybe_unused]] ST &&shape, Executor &&ex) const
       {
-        InnerPreRun(std::forward<ST>(shape), std::forward<Executor>(ex));          
+        InnerPreRun(std::forward<ST>(shape), std::forward<Executor>(ex));
 #ifdef __CUDACC__
         if constexpr (is_cuda_executor_v<Executor>) {
           if (!init_) {
@@ -329,7 +329,7 @@ namespace detail {
             device_ = true;
           }
         }
-#endif          
+#endif
         if constexpr (is_host_executor_v<Executor>) {
           if (!init_) {
             [[maybe_unused]] curandStatus_t ret;
@@ -381,14 +381,14 @@ namespace detail {
       {
         Vector<T, static_cast<int>(EPT)> val;
 #ifdef __CUDA_ARCH__
-        #pragma unroll
+        MATX_LOOP_UNROLL
         for (int i = 0; i < static_cast<int>(EPT); ++i) {
           if constexpr (
                        std::is_same_v<T, float>  ||
-                       std::is_same_v<T, double> || 
+                       std::is_same_v<T, double> ||
                        std::is_same_v<T, cuda::std::complex<float>> ||
                        std::is_same_v<T, cuda::std::complex<double>>
-                       ) 
+                       )
           {
             if constexpr (sizeof...(indices) == 0) {
               get_random(val.data[i], &states_[0], fParams_.dist_);
@@ -400,10 +400,10 @@ namespace detail {
             val.data[i] = fParams_.alpha_ * val.data[i] + fParams_.beta_;
           }
           else if constexpr(
-                    std::is_same_v<T, uint32_t> || 
+                    std::is_same_v<T, uint32_t> ||
                     std::is_same_v<T,  int32_t> ||
                     std::is_same_v<T, uint64_t> ||
-                    std::is_same_v<T,  int64_t>   
+                    std::is_same_v<T,  int64_t>
           )
           {
             if constexpr (sizeof...(indices) == 0) {
@@ -411,19 +411,19 @@ namespace detail {
             }
             else {
               get_randomi(val.data[i], &states_[static_cast<int>(EPT) * GetValC<0, Is...>(cuda::std::make_tuple(indices...)) + i], iParams_.min_, iParams_.max_);
-            }          
+            }
           }
         }
 
 #else
         if constexpr (
                      std::is_same_v<T, float>  ||
-                     std::is_same_v<T, double> || 
+                     std::is_same_v<T, double> ||
                      std::is_same_v<T, cuda::std::complex<float>> ||
                      std::is_same_v<T, cuda::std::complex<double>>
-                     ) 
-        {        
-          
+                     )
+        {
+
           if (fParams_.dist_ == UNIFORM) {
             if constexpr (std::is_same_v<T, float>) {
               curandGenerateUniform(gen_, &val.data[0], static_cast<int>(EPT));
@@ -438,7 +438,7 @@ namespace detail {
               curandGenerateUniformDouble(gen_, reinterpret_cast<double*>(&val.data[0]), static_cast<int>(EPT) * 2);
             }
 
-            #pragma unroll
+            MATX_LOOP_UNROLL
             for (int i = 0; i < static_cast<int>(EPT); ++i) {
               val.data[i] = fParams_.alpha_ * val.data[i] + fParams_.beta_;
             }
@@ -457,34 +457,34 @@ namespace detail {
               curandGenerateNormalDouble(gen_, reinterpret_cast<double*>(&val.data[0]), static_cast<int>(EPT) * 2, fParams_.beta_, fParams_.alpha_);
             }
 
-            #pragma unroll
+            MATX_LOOP_UNROLL
             for (int i = 0; i < static_cast<int>(EPT); ++i) {
               val.data[i] = fParams_.alpha_ * val.data[i] + fParams_.beta_;
             }
           }
           else {
-            #pragma unroll
+            MATX_LOOP_UNROLL
             for (int i = 0; i < static_cast<int>(EPT); ++i) {
               val.data[i] = 0;
             }
           }
         }
         else if constexpr(
-                         std::is_same_v<T, uint32_t> || 
+                         std::is_same_v<T, uint32_t> ||
                          std::is_same_v<T,  int32_t> ||
                          std::is_same_v<T, uint64_t> ||
-                         std::is_same_v<T,  int64_t>   
+                         std::is_same_v<T,  int64_t>
                          )
         {
-          #pragma unroll
+          MATX_LOOP_UNROLL
           for (int i = 0; i < static_cast<int>(EPT); ++i) {
             float fScale;
             curandGenerateUniform(gen_, &fScale, 1);
-                    
+
             // Scale to the provided min and max range
             double fMax = static_cast<double>(iParams_.max_);
             double fMin = static_cast<double>(iParams_.min_);
-            val.data[i] = static_cast<T>(fScale * (fMax - fMin) + fMin);                                
+            val.data[i] = static_cast<T>(fScale * (fMax - fMin) + fMin);
           }
         }
 #endif
@@ -508,12 +508,12 @@ namespace detail {
 
   /**
    * @brief Return a random number with a specified shape.
-   * 
+   *
    * Supported Types: float, double, complex<float>, complex<double>
    *
    * @tparam ShapeType Shape type
    * @tparam T Type of output
-   * @tparam LowerType Either T or the inner type of T if T is complex* 
+   * @tparam LowerType Either T or the inner type of T if T is complex*
    * @param s Shape of operator
    * @param dist Distribution (either NORMAL or UNIFORM)
    * @param seed Random number seed
@@ -526,13 +526,13 @@ namespace detail {
   __MATX_INLINE__ auto random(ShapeType &&s, Distribution_t dist, uint64_t seed = 0, LowerType alpha = 1, LowerType beta = 0)
   {
     static_assert(
-                  std::is_same_v<T, float> || 
+                  std::is_same_v<T, float> ||
                   std::is_same_v<T, double> ||
                   std::is_same_v<T, cuda::std::complex<float>> ||
-                  std::is_same_v<T, cuda::std::complex<double>>, 
+                  std::is_same_v<T, cuda::std::complex<double>>,
                   "random only supports floating point or complex floating point data types"
 
-                 );   
+                 );
 
     using shape_strip_t = remove_cvref_t<ShapeType>;
     matx::detail::randFloatParams<LowerType> params{dist, alpha, beta};
@@ -542,9 +542,9 @@ namespace detail {
 
   /**
    * @brief Return a random number with a specified shape.
-   * 
+   *
    * Supported Types: float, double, complex<float>, complex<double>
-   * 
+   *
    * @tparam RANK Rank of operator
    * @tparam T Type of output
    * @tparam LowerType Either T or the inner type of T if T is complex
@@ -565,12 +565,12 @@ namespace detail {
 
   /**
    * @brief Return a random number with a specified shape.
-   * 
+   *
    *  Supported types: uint32_t, int32_t, uint64_t, int64_t
-   * 
+   *
    * @tparam ShapeType Shape type
    * @tparam T Type of output
-   * @tparam LowerType Either T or the inner type of T if T is complex* 
+   * @tparam LowerType Either T or the inner type of T if T is complex*
    * @param s Shape of operator
    * @param seed Random number seed
    * @param min min of generation range
@@ -582,22 +582,22 @@ namespace detail {
   __MATX_INLINE__ auto randomi(ShapeType &&s, uint64_t seed = 0, LowerType min = 0, LowerType max = 100)
   {
     static_assert(
-                  std::is_same_v<T, uint32_t> || 
+                  std::is_same_v<T, uint32_t> ||
                   std::is_same_v<T,  int32_t> ||
                   std::is_same_v<T, uint64_t> ||
                   std::is_same_v<T,  int64_t> ,
                   "randomi only supports signed and unsigned integral types"
-                 );      
-                  
+                 );
+
     using shape_strip_t = remove_cvref_t<ShapeType>;
     matx::detail::randIntParams<T> params{min, max};
-    
+
     return detail::RandomOp<T, shape_strip_t>(std::forward<shape_strip_t>(s), seed, params);
   }
-  
+
   /**
    * @brief Return a random number with a specified shape.
-   * 
+   *
    *  Supported types: uint32_t, int32_t, uint64_t, int64_t
    *
    * @tparam RANK Rank of operator
@@ -605,7 +605,7 @@ namespace detail {
    * @tparam LowerType Either T or the inner type of T if T is complex
    * @param s Array of dimensions
    * @param seed Random number seed
-   * @param min min of generation range 
+   * @param min min of generation range
    * @param max max of generation range
    * @return Random number operator
    */

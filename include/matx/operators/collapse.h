@@ -63,7 +63,7 @@ namespace matx
           size_ = 1;
 
           // Collapse left-most dims
-  #pragma unroll
+  MATX_LOOP_UNROLL
           for(int i = 0 ; i < DIM; i++) {
             size_ *= op_.Size(i);
           }
@@ -77,7 +77,7 @@ namespace matx
             cuda::std::array<index_t, Rank()> in{indices...};  // index coming in
             cuda::std::array<index_t, T1::Rank()> out;         // index going out
 
-  #pragma unroll
+  MATX_LOOP_UNROLL
             for(int i = 1; i < Rank(); i++) {
               // copy all but first input index into out array
               out[DIM + i - 1] = in[i];
@@ -85,7 +85,7 @@ namespace matx
 
             // expand first input index into DIM indices
             auto ind = in[0];
-  #pragma unroll
+  MATX_LOOP_UNROLL
             for(int i = 0; i < DIM; i++) {
               int d = DIM - i - 1;
               out[d] = ind % op.Size(d);
@@ -106,7 +106,7 @@ namespace matx
         }
 
         template <ElementsPerThread EPT, typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
           return get_impl<EPT>(cuda::std::as_const(op_), indices...);
         }
@@ -118,10 +118,10 @@ namespace matx
         }
 
         template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
           return get_impl<ElementsPerThread::ONE>(cuda::std::as_const(op_), indices...);
-        }    
+        }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
@@ -144,17 +144,17 @@ namespace matx
 
         ~LCollapseOp() = default;
         LCollapseOp(const LCollapseOp &rhs) = default;
-        __MATX_INLINE__ auto operator=(const self_type &rhs) { 
-          return set(*this, rhs); 
-        }              
+        __MATX_INLINE__ auto operator=(const self_type &rhs) {
+          return set(*this, rhs);
+        }
 
-        template<typename R> 
-        __MATX_INLINE__ auto operator=(const R &rhs) { 
+        template<typename R>
+        __MATX_INLINE__ auto operator=(const R &rhs) {
           if constexpr (is_matx_transform_op<R>()) {
             return mtie(*this, rhs);
           }
-          else {          
-            return set(*this, rhs); 
+          else {
+            return set(*this, rhs);
           }
         }
 
@@ -206,7 +206,7 @@ namespace matx
     {
       if constexpr (DIM <= 1) {
         return a;
-      }      
+      }
       else {
         return detail::LCollapseOp<DIM, T1>(a);
       }
@@ -238,7 +238,7 @@ namespace matx
           size_ = 1;
 
           // Collapse right-most dims
-  #pragma unroll
+  MATX_LOOP_UNROLL
           for(int i = 0 ; i < DIM; i++) {
             size_ *= op_.Size(T1::Rank() - 1 - i);
           }
@@ -246,13 +246,13 @@ namespace matx
 
         template <ElementsPerThread EPT, typename Op, typename... Is>
         static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, Is... indices)
-        {      
+        {
           if constexpr (EPT == ElementsPerThread::ONE) {
             // indices coming in
             cuda::std::array<index_t, Rank()> in{indices...};  // index coming in
             cuda::std::array<index_t, T1::Rank()> out;         // index going out
 
-#pragma unroll
+MATX_LOOP_UNROLL
             for(int i = 0 ; i < Rank() - 1; i++) {
               // copy all but last index into out array
               out[i] = in[i];
@@ -260,7 +260,7 @@ namespace matx
 
             // expand last index into DIM indices
             auto ind = in[Rank() - 1];
-#pragma unroll
+MATX_LOOP_UNROLL
             for(int i = 0; i < DIM; i++) {
               int d = T1::Rank() - 1 - i;
               out[d] = ind % op.Size(d);
@@ -272,7 +272,7 @@ namespace matx
           else {
             return Vector<value_type, static_cast<index_t>(EPT)>{};
           }
-        }  
+        }
 
         template <typename Op, typename... Is>
         static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, Is... indices)
@@ -281,22 +281,22 @@ namespace matx
         }
 
         template <ElementsPerThread EPT, typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
           return get_impl<EPT>(cuda::std::as_const(op_), indices...);
-        }    
+        }
 
         template <ElementsPerThread EPT, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
           return get_impl<EPT>(cuda::std::forward<decltype(op_)>(op_), indices...);
-        } 
+        }
 
         template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
           return get_impl<ElementsPerThread::ONE>(cuda::std::as_const(op_), indices...);
-        }    
+        }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
@@ -319,17 +319,17 @@ namespace matx
 
         ~RCollapseOp() = default;
         RCollapseOp(const RCollapseOp &rhs) = default;
-        __MATX_INLINE__ auto operator=(const self_type &rhs) { 
-          return set(*this, rhs); 
-        }           
+        __MATX_INLINE__ auto operator=(const self_type &rhs) {
+          return set(*this, rhs);
+        }
 
-        template<typename R> 
-        __MATX_INLINE__ auto operator=(const R &rhs) { 
+        template<typename R>
+        __MATX_INLINE__ auto operator=(const R &rhs) {
           if constexpr (is_matx_transform_op<R>()) {
             return mtie(*this, rhs);
           }
-          else {          
-            return set(*this, rhs); 
+          else {
+            return set(*this, rhs);
           }
         }
 

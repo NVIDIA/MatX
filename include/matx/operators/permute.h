@@ -91,15 +91,15 @@ MATX_IGNORE_WARNING_POP_GCC
 
 #if 0
     //This causes register spills but might be faster if Rank is large
-#pragma unroll
+MATX_LOOP_UNROLL
             for(int32_t i = 0; i < Rank(); i++) {
               ind[dims_[i]] = inds[i];
             }
 #else
-#pragma unroll
+MATX_LOOP_UNROLL
       // use double loop to avoid register spills
             for(int32_t i = 0; i < Rank(); i++) {
-#pragma unroll
+MATX_LOOP_UNROLL
               for(int32_t j = 0; j < Rank(); j++) {
                 if(dims[j] == i) {
                   ind[i] = inds[j];

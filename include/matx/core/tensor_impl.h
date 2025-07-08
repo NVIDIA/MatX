@@ -60,7 +60,7 @@ struct DenseTensorData {
 template <typename T, typename CRD, typename POS, typename TF>
 struct SparseTensorData {
   using sparse_data = bool;
-  using value_type = T;  
+  using value_type = T;
   using crd_type = CRD;
   using pos_type = POS;
   using Format = TF;
@@ -676,7 +676,7 @@ MATX_IGNORE_WARNING_POP_GCC
       MATX_ASSERT_STR(((RANK - end_count) == N), matxInvalidSize,
               "Number of matxDropDim specifiers must match the output rank");
 
-  #pragma unroll
+  MATX_LOOP_UNROLL
       for (int i = 0; i < RANK; i++) {
         typename Desc::shape_type first = firsts[i] < 0 ? this->Size(i) + firsts[i] : firsts[i];
         typename Desc::shape_type end = ends[i]   < 0 ? this->Size(i) + ends[i]   : ends[i];
@@ -761,7 +761,7 @@ MATX_IGNORE_WARNING_POP_GCC
 
       int d = 0;
 
-      #pragma unroll
+      MATX_LOOP_UNROLL
       for (int i = 0; i < N; i++) {
         index_t size = clones[i];
 
@@ -806,7 +806,7 @@ MATX_IGNORE_WARNING_POP_GCC
       cuda::std::array<stride_type, RANK> s;
       [[maybe_unused]] bool done[RANK] = {0};
 
-  #pragma unroll
+  MATX_LOOP_UNROLL
       for (int i = 0; i < RANK; i++) {
         int d = dims[i];
         MATX_ASSERT_STR(d < RANK, matxInvalidDim,
@@ -948,7 +948,7 @@ MATX_IGNORE_WARNING_POP_GCC
         }
       }
       return -1; // not found
-    }    
+    }
 
     // Element getter (viz. "lhs = Acoo(0,0);"). Note that due to the compact
     // nature of sparse data structures, these storage formats do not provide
@@ -959,7 +959,7 @@ MATX_IGNORE_WARNING_POP_GCC
     // should avoid using getters inside performance critial regions, since
     // the implementation is far worse than O(1).
     template <typename... Is>
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T GetSparseValue(Is... indices) const noexcept { 
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T GetSparseValue(Is... indices) const noexcept {
       static constexpr int DIM = TensorData::Format::DIM;
       static constexpr int LVL = TensorData::Format::LVL;
 
@@ -1062,7 +1062,7 @@ MATX_IGNORE_WARNING_POP_GCC
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) const noexcept
     {
       return this->template operator()<detail::ElementsPerThread::ONE>(indices...);
-    }    
+    }
 
     /**
      * operator() getter
@@ -1125,7 +1125,7 @@ MATX_IGNORE_WARNING_POP_GCC
       return cuda::std::apply([&](auto &&...args) -> T& {
           return this->operator()<EPT>(args...);
         }, idx);
-    }    
+    }
 
     /**
      * operator() getter with an array index
@@ -1188,7 +1188,7 @@ MATX_IGNORE_WARNING_POP_GCC
       else {
         return capability_attributes<Cap>::default_value;
       }
-    }    
+    }
 
     /**
      * Get the rank of the tensor
@@ -1271,12 +1271,12 @@ MATX_IGNORE_WARNING_POP_GCC
       data_.ldata_ = data;
     }
 
-    template <typename U = TensorData, 
+    template <typename U = TensorData,
           std::enable_if_t<is_sparse_data_v<U>, int> = 0>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__  auto CRDData(int l) const noexcept {
       return data_.crd_[l];
     }
-    template <typename U = TensorData, 
+    template <typename U = TensorData,
           std::enable_if_t<is_sparse_data_v<U>, int> = 0>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__  auto POSData(int l) const noexcept{
       return data_.pos_[l];
@@ -1293,8 +1293,8 @@ MATX_IGNORE_WARNING_POP_GCC
     }
 
     template <typename U = TensorData>
-    auto SetSparseData(T* data, 
-                      typename U::crd_type* crd[U::LVL], 
+    auto SetSparseData(T* data,
+                      typename U::crd_type* crd[U::LVL],
                       typename U::pos_type* pos[U::LVL])
         -> std::enable_if_t<is_sparse_data_v<U>, void> {
       data_.ldata_ = data;
