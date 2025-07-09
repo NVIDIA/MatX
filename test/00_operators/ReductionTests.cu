@@ -279,6 +279,7 @@ TYPED_TEST(ReductionTestsNumericNoHalfAllExecs, Sum)
     auto t2t = make_tensor<TestType>({3, 4});
     (t2t = ones<TestType>({3, 4})).run(exec);
     (t1 = sum(t2t, {1})).run(exec);
+    exec.sync();
 
     for (index_t i = 0; i < t1.Size(0); i++) {
       ASSERT_TRUE(MatXUtils::MatXTypeCompare(t1(i), (TestType)(t2t.Size(1))));
