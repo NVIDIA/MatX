@@ -50,17 +50,17 @@ namespace detail {
       using value_type = typename OpA::value_type;
 
       __MATX_INLINE__ std::string str() const { return "frexp()"; }
-      __MATX_INLINE__ FrexpOp(const OpA &a) : a_(a) { 
+      __MATX_INLINE__ FrexpOp(const OpA &a) : a_(a) {
         static_assert(std::is_floating_point_v<value_type> ||
                       is_cuda_complex_v<value_type>, "frexp() must take a floating point input");
 
       };
 
       template <ElementsPerThread EPT, typename... Is>
-      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
       {
         auto get_scalar = [](const auto &x){
-          [[maybe_unused]] int rexp;        
+          [[maybe_unused]] int rexp;
           if constexpr (is_cuda_complex_v<value_type>) {
             if constexpr (std::is_same_v<float, typename value_type::value_type>) {
               if constexpr (WHICH == 0) { // real fractional
@@ -118,7 +118,7 @@ namespace detail {
           return get_scalar(val);
         } else {
           Vector<remove_cvref_t<decltype(get_scalar(val.data[0]))>, static_cast<int>(EPT)> out;
-          #pragma unroll
+          MATX_LOOP_UNROLL
           for (index_t i = 0; i < static_cast<int>(EPT); i++) {
             out.data[i] = get_scalar(val.data[i]);
           }
@@ -126,7 +126,7 @@ namespace detail {
         }
       }
       template <typename... Is>
-      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
       {
         return this->operator()<detail::ElementsPerThread::ONE>(indices...);
       }

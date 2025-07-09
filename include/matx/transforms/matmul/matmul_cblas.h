@@ -515,10 +515,6 @@ void matmul_impl([[maybe_unused]] TensorTypeC C,
   auto a = getCBLASSupportedTensor(A_);
   auto b = getCBLASSupportedTensor(B_);
 
-  typedef decltype(c) ctype;
-  typedef decltype(a) atype;
-  typedef decltype(b) btype;
-
   if (!is_matx_transform_op<TensorTypeA>() && !a.isSameView(A_)) {
     (a = A_).run(exec);
   }

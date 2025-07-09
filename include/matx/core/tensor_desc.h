@@ -260,7 +260,7 @@ public:
       *(stride_.end() - 1) = 1;
     }
 
-    #pragma unroll
+    MATX_LOOP_UNROLL
     for (int i = RANK - 2; i >= 0; i--) {
       *(stride_.begin() + i) = Stride(i+1) * Size(i+1);
     }

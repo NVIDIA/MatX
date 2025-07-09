@@ -100,7 +100,7 @@ namespace matx
         }
 
         template <ElementsPerThread EPT, typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
         {
           if constexpr (EPT == ElementsPerThread::ONE) {
             cuda::std::array<index_t, Rank()> inds{indices...};
@@ -108,16 +108,16 @@ namespace matx
 
             int axis1 = axis_[0];
             int axis2 = axis_[1];
-            
+
             // compute n
             index_t nind = inds[axis1];
             int n = get_value<ElementsPerThread::ONE>(n_, nind);
-            
-            // compute m 
+
+            // compute m
             index_t mind = inds[axis2];
             int m = get_value<ElementsPerThread::ONE>(m_, mind);
-            
-            if(axis1>axis2) 
+
+            if(axis1>axis2)
               cuda::std::swap(axis1, axis2);
 
             // compute indices for x
@@ -142,7 +142,7 @@ namespace matx
             auto x = get_value<ElementsPerThread::ONE>(in_, xinds);
             if constexpr (EPT != ElementsPerThread::ONE) {
               Vector<value_type, static_cast<int>(EPT)> ret;
-              #pragma unroll
+              MATX_LOOP_UNROLL
               for (int e = 0; e < static_cast<int>(EPT); ++e) {
                 ret.data[e] = lret(GetVectorVal(n, e), GetVectorVal(m, e), GetVectorVal(x, e));
               }
@@ -158,7 +158,7 @@ namespace matx
         }
 
         template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
         {
           return this->operator()<detail::ElementsPerThread::ONE>(indices...);
         }
@@ -191,7 +191,7 @@ namespace matx
 
           if constexpr (is_matx_op<T3>()) {
             in_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-          }                    
+          }
         }
 
         template <typename ShapeType, typename Executor>
@@ -208,7 +208,7 @@ namespace matx
           if constexpr (is_matx_op<T3>()) {
             in_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           }
-        }            
+        }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {
@@ -225,16 +225,16 @@ namespace matx
             return get_size(m_,0);
           } else {
             int d = dim;
-            if(dim>axis1) 
+            if(dim>axis1)
               d--;
-            if(dim>axis2) 
+            if(dim>axis2)
               d--;
             return get_size(in_, d);
           }
         }
     };
   }
-  
+
   /**
    * Legendre polynomial operator
    *

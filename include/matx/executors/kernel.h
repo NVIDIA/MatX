@@ -39,10 +39,10 @@
 namespace matx {
 namespace detail {
 
-#ifdef __CUDACC__  
-template <class Op> __global__ void matxOpT0Kernel(Op op) { 
+#ifdef __CUDACC__
+template <class Op> __global__ void matxOpT0Kernel(Op op) {
   if constexpr (std::is_pointer_v<Op>) {
-    (*op)(); 
+    (*op)();
   }
   else {
     op();
@@ -54,7 +54,7 @@ __global__ void matxOpT1Kernel(Op op, index_t size0) {
   index_t idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
   if (idx * static_cast<index_t>(EPT) < size0) {
     if constexpr (std::is_pointer_v<Op>) {
-      (*op).template operator()<EPT>(idx); 
+      (*op).template operator()<EPT>(idx);
     }
     else {
       op.template operator()<EPT>(idx);
@@ -69,17 +69,17 @@ __global__ void matxOpT2Kernel(Op op, index_t size0, index_t size1) {
   index_t idy = static_cast<index_t>(blockIdx.y) * blockDim.y + threadIdx.y;
   if (idx * static_cast<index_t>(EPT) < size1 && idy < size0) {
     if constexpr (std::is_pointer_v<Op>) {
-      (*op).template operator()<EPT>(idy, idx); 
+      (*op).template operator()<EPT>(idy, idx);
     }
     else {
       op.template operator()<EPT>(idy, idx);
-    }    
+    }
   }
 }
 
 template <ElementsPerThread EPT, class Op>
 __global__ void matxOpT2StrideKernel(Op op, index_t size0, index_t size1) {
-  
+
   for(index_t idy = static_cast<index_t>(blockIdx.y) * blockDim.y + threadIdx.y;
       idy < size0;
       idy += blockDim.y * gridDim.y) {
@@ -87,11 +87,11 @@ __global__ void matxOpT2StrideKernel(Op op, index_t size0, index_t size1) {
         idx * static_cast<index_t>(EPT) < size1;
         idx += blockDim.x * gridDim.x) {
       if constexpr (std::is_pointer_v<Op>) {
-        (*op).template operator()<EPT>(idy, idx); 
+        (*op).template operator()<EPT>(idy, idx);
       }
       else {
         op.template operator()<EPT>(idy, idx);
-      }    
+      }
     }
   }
 }
@@ -103,17 +103,17 @@ __global__ void matxOpT3Kernel(Op op, index_t size0, index_t size1, index_t size
   index_t idz = static_cast<index_t>(blockIdx.z) * blockDim.z + threadIdx.z;
   if (idx * static_cast<index_t>(EPT) < size2 && idy < size1 && idz < size0) {
     if constexpr (std::is_pointer_v<Op>) {
-      (*op).template operator()<EPT>(idz, idy, idx); 
+      (*op).template operator()<EPT>(idz, idy, idx);
     }
     else {
       op.template operator()<EPT>(idz, idy, idx);
-    }      
+    }
   }
 }
 
 template <ElementsPerThread EPT, class Op>
 __global__ void matxOpT3StrideKernel(Op op, index_t size0, index_t size1, index_t size2) {
-  
+
   for(index_t idz = static_cast<index_t>(blockIdx.z) * blockDim.z + threadIdx.z;
       idz < size0;
       idz += blockDim.z * gridDim.z) {
@@ -124,11 +124,11 @@ __global__ void matxOpT3StrideKernel(Op op, index_t size0, index_t size1, index_
           idx * static_cast<index_t>(EPT) < size2;
           idx += blockDim.x * gridDim.x) {
         if constexpr (std::is_pointer_v<Op>) {
-          (*op).template operator()<EPT>(idz, idy, idx); 
+          (*op).template operator()<EPT>(idz, idy, idx);
         }
         else {
           op.template operator()<EPT>(idz, idy, idx);
-        }      
+        }
       }
     }
   }
@@ -143,11 +143,11 @@ __global__ void matxOpT4Kernel(Op op, index_t size0, index_t size1, index_t size
   index_t idw = static_cast<index_t>(blockIdx.z) * blockDim.z + threadIdx.z;
   if (idx * static_cast<index_t>(EPT) < size3 && idy < size2 && idz < size1 && idw < size0) {
     if constexpr (std::is_pointer_v<Op>) {
-      (*op).template operator()<EPT>(idw, idz, idy, idx); 
+      (*op).template operator()<EPT>(idw, idz, idy, idx);
     }
     else {
       op.template operator()<EPT>(idw, idz, idy, idx);
-    }      
+    }
   }
 }
 
@@ -155,7 +155,7 @@ template <ElementsPerThread EPT, class Op>
 __global__ void matxOpT4StrideKernel(Op op, index_t size0, index_t size1, index_t size2, index_t size3) {
 
   for(index_t nmy = static_cast<index_t>(blockIdx.y) * blockDim.y + threadIdx.y;
-      nmy < size2 * size3; 
+      nmy < size2 * size3;
       nmy += blockDim.y * gridDim.y) {
     index_t idy = nmy % size2;
     index_t idz = nmy / size2;
@@ -168,20 +168,20 @@ __global__ void matxOpT4StrideKernel(Op op, index_t size0, index_t size1, index_
             idx += blockDim.x * gridDim.x) {
 
           if constexpr (std::is_pointer_v<Op>) {
-            (*op).template operator()<EPT>(idw, idz, idy, idx); 
+            (*op).template operator()<EPT>(idw, idz, idy, idx);
           }
           else {
             op.template operator()<EPT>(idw, idz, idy, idx);
           }
         }
       }
-    }      
+    }
   }
 }
 
 /**
  * @brief Launch an operator with rank N
- * 
+ *
  * @tparam Op operator type
  * @param op operator
  * @param sizes sizes of each dimension
@@ -194,7 +194,7 @@ __global__ void matxOpTDKernel(Op op, const cuda::std::array<index_t, Op::Rank()
   // This kernel is currently only used for ranks > 4. We assume the rank is
   // at least one in the following accesses into sizes and indices
   static_assert(Op::Rank() >= 1, "rank must exceed zero");
-  
+
   // Compute the index into the operator for this thread. N-D tensors require more computations
   // since we're limited to 3 dimensions in both grid and block, so we need to iterate to compute
   // our index.
@@ -202,7 +202,7 @@ __global__ void matxOpTDKernel(Op op, const cuda::std::array<index_t, Op::Rank()
   const bool valid = x_abs < mult*sizes[0];
 
   if (valid) {
-    #pragma unroll
+    MATX_LOOP_UNROLL
     for (int r = 0; r < Op::Rank()-1; r++) {
       indices[r] = x_abs / mult;
       x_abs -= indices[r] * mult;
@@ -219,7 +219,7 @@ __global__ void matxOpTDKernel(Op op, const cuda::std::array<index_t, Op::Rank()
       cuda::std::apply([&](auto... args){
         op(args...);
       }, indices);
-    }      
+    }
   }
 }
 #endif

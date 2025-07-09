@@ -229,7 +229,7 @@ namespace matx
 #define MATX_ASSERT_COMPATIBLE_OP_SIZES(op)                          \
   if constexpr (Rank() > 0) {                                        \
     bool compatible = true;                                          \
-    _Pragma("unroll")                                                \
+    MATX_LOOP_UNROLL                                                 \
     for (int32_t i = 0; i < Rank(); i++) {                           \
       [[maybe_unused]] index_t size = matx::detail::get_expanded_size<Rank()>(op, i); \
       compatible = (size == 0 || size == Size(i));                   \

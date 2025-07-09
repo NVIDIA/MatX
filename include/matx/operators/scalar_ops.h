@@ -171,7 +171,7 @@ namespace detail {
     if constexpr (is_vector_v<T1> && is_vector_v<T2>) {
       static_assert(T1::width == T2::width, "Vector sizes must match");
       detail::Vector<decltype(func(v1.data[0], v2.data[0])), T1::width> res;
-      #pragma unroll
+      MATX_LOOP_UNROLL
       for (size_t i = 0; i < T1::width; i++) {
         res.data[i] = func(v1.data[i], v2.data[i]);
       }
@@ -179,7 +179,7 @@ namespace detail {
     }
     else if constexpr (is_vector_v<T1> && !is_vector_v<T2>) {
       detail::Vector<decltype(func(v1.data[0], v2)), T1::width> res;
-      #pragma unroll
+      MATX_LOOP_UNROLL
       for (size_t i = 0; i < T1::width; i++) {
         res.data[i] = func(v1.data[i], v2);
       }
@@ -187,7 +187,7 @@ namespace detail {
     }
     else if constexpr (!is_vector_v<T1> && is_vector_v<T2>) {
       detail::Vector<decltype(func(v1, v2.data[0])), T2::width> res;
-      #pragma unroll
+      MATX_LOOP_UNROLL
       for (size_t i = 0; i < T2::width; i++) {
         res.data[i] = func(v1, v2.data[i]);
       }
@@ -202,7 +202,7 @@ namespace detail {
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ auto UnaryVecFunc(const UnaryOpFunc &func, const T1 &v1) {
     if constexpr (is_vector_v<T1>) {
       detail::Vector<decltype(func(v1.data[0])), T1::width> res;
-      #pragma unroll
+      MATX_LOOP_UNROLL
       for (size_t i = 0; i < T1::width; i++) {
         res.data[i] = func(v1.data[i]);
       }

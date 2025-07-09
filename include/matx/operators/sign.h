@@ -53,18 +53,18 @@ namespace matx
         using matxop = bool;
         using value_type = typename T::value_type;
 
-        value_type zval_; 
+        value_type zval_;
 
         __MATX_INLINE__ std::string str() const { return "sign(" + get_type_str(op_) + ")"; }
-        __MATX_INLINE__ SignOp(const T &op, value_type zval) : op_(op), zval_(zval) {};  
+        __MATX_INLINE__ SignOp(const T &op, value_type zval) : op_(op), zval_(zval) {};
 
         template <ElementsPerThread EPT, typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
         {
           if constexpr (EPT == ElementsPerThread::ONE) {
             auto v = get_value<EPT>(op_,indices...);
 
-            auto set_val = [this](auto vl) { 
+            auto set_val = [this](auto vl) {
               if constexpr (is_complex_v<value_type> ) {
                 if ( vl == value_type(0)) {
                   return zval_;
@@ -72,11 +72,11 @@ namespace matx
                   return vl / abs(vl); // sign defintion for complex values
                 }
               } else {  // real branch
-                if( vl < 0) 
+                if( vl < 0)
                   return value_type(-1);
-                else if ( vl > 0 ) 
+                else if ( vl > 0 )
                   return value_type(1);
-                else 
+                else
                   return zval_;
               }
             };
@@ -86,7 +86,7 @@ namespace matx
             }
             else {
               Vector<value_type, static_cast<int>(EPT)> ret;
-              #pragma unroll
+              MATX_LOOP_UNROLL
               for (int e = 0; e < static_cast<int>(EPT); ++e) {
                 ret.data[e] = set_val(GetVectorVal(v, e));
               }
@@ -98,7 +98,7 @@ namespace matx
         }
 
         template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
         {
           return this->operator()<detail::ElementsPerThread::ONE>(indices...);
         }
@@ -127,7 +127,7 @@ namespace matx
           if constexpr (is_matx_op<T>()) {
             op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           }
-        }        
+        }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {
@@ -138,7 +138,7 @@ namespace matx
           return op_.Size(dim);
         }
     };
-  } // end namespace detail   
+  } // end namespace detail
 
   template <typename T>
   __MATX_INLINE__ auto sign(const T &op, typename T::value_type zval=0) {

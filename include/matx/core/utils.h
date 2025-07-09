@@ -182,7 +182,7 @@ auto __MATX_INLINE__ getPermuteDims(T dims) {
 
   // construct permutation array by moving fastest changing dims to end
   int j = RANK-1;
-  #pragma unroll
+  MATX_LOOP_UNROLL
   for(int i = D-1; i>= 0; i--) {
     int a = dims[i];
     MATX_ASSERT_STR(a >= 0 && a < RANK, matxInvalidDim, "Reduction dim out of range\n");

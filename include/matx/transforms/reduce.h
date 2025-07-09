@@ -406,7 +406,7 @@ void __MATX_INLINE__ softmax_impl(OutType dest, const InType &in, PermDims dims,
 
   // Create the shape of the summed tensor based on the permutation params
   cuda::std::array<index_t, InType::Rank() - (int)dims.size()> red_shape{};
-  #pragma unroll
+  MATX_LOOP_UNROLL
   for (int r = 0; r < in.Rank() - (int)dims.size(); r++) {
     red_shape[r] = in.Size(perm[r]);
   }
@@ -415,7 +415,7 @@ void __MATX_INLINE__ softmax_impl(OutType dest, const InType &in, PermDims dims,
   // We need to clone the summed tensor on the appropriate dims for the final divide.
   cuda::std::array<index_t, InType::Rank()> clone_dims;
   int axis_ptr = 0;
-  #pragma unroll
+  MATX_LOOP_UNROLL
   for (int r = 0; r < InType::Rank(); r++) {
     if (axis_ptr >= 0 && dims[axis_ptr] == r) {
       clone_dims[r] = in.Size(r);

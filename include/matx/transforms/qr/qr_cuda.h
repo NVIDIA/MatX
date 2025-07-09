@@ -85,7 +85,6 @@ namespace detail {
       MATX_ASSERT_STR(AType::Rank() == RType::Rank(), matxInvalidDim, "qr: A and R must have the same rank");
 
       using ATypeS = typename AType::value_type;
-      using NTypeS = typename inner_op_type_t<ATypeS>::type;
       const int RANK = AType::Rank();
 
       index_t m = A.Size(RANK-2);

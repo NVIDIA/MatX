@@ -87,7 +87,7 @@ namespace matx
 
         template <ElementsPerThread EPT, typename Op, typename... Is>
         static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, Is... indices)
-        { 
+        {
           if constexpr (EPT == ElementsPerThread::ONE) {
             if constexpr (Rank() == 0) {
               return op.template operator()<EPT>();
@@ -95,18 +95,18 @@ namespace matx
             else {
               cuda::std::array idx{indices...};
 
-              #pragma unroll
+              MATX_LOOP_UNROLL
               for (int i = 0; i < static_cast<int>(idx.size()); i++) {
                 idx[i] %= op.Size(i);
               }
 
               return get_value<EPT>(cuda::std::forward<Op>(op), idx);
-            }          
+            }
           } else {
             return Vector<value_type, static_cast<index_t>(EPT)>{};
           }
         }
-        
+
         template <ElementsPerThread EPT, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
@@ -155,7 +155,7 @@ namespace matx
           if constexpr (is_matx_op<T1>()) {
             op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           }
-        }               
+        }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {

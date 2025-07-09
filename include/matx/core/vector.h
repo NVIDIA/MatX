@@ -59,14 +59,14 @@ struct alignas(sizeof(T) * N) Vector {
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ void load(T* ptr) {
     constexpr int elements_per_load = (MAX_VEC_WIDTH_BYTES / sizeof(T));
     constexpr int num_iterations = EPT / elements_per_load;
-    #pragma unroll
+    MATX_LOOP_UNROLL
     for (int i = 0; i < num_iterations; i++) {
       *reinterpret_cast<float4*>(&data[i*elements_per_load]) = *reinterpret_cast<float4*>(ptr + i * elements_per_load);
     }
   }
 
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ void Fill(T val) {
-    #pragma unroll
+    MATX_LOOP_UNROLL
     for (int i = 0; i < N; i++) {
       data[i] = val;
     }
