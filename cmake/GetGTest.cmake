@@ -36,13 +36,21 @@ function(find_and_configure_gtest VERSION)
         return()
     endif()
 
+    # Set GoogleTest-specific options
+    set(GTEST_OPTIONS "INSTALL_GTEST ON")
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+        # Force PIC for GoogleTest on ARM64 to avoid relocation issues
+        list(APPEND GTEST_OPTIONS "CMAKE_POSITION_INDEPENDENT_CODE ON")
+        message(STATUS "Enabling PIC for GoogleTest on ARM64")
+    endif()
+
     # Find or install GoogleTest
     CPMFindPackage(NAME GTest
         VERSION         ${VERSION}
         GIT_REPOSITORY  https://github.com/google/googletest.git
         GIT_TAG         v${VERSION}
         GIT_SHALLOW     TRUE
-        OPTIONS         "INSTALL_GTEST ON"
+        OPTIONS         ${GTEST_OPTIONS}
         # googletest >= 1.10.0 provides a cmake config file -- use it if it exists
         FIND_PACKAGE_ARGUMENTS "CONFIG")
     # Add GTest aliases if they don't already exist.
