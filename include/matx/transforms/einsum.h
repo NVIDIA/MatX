@@ -496,7 +496,7 @@ namespace cutensor {
    * @tparam InT Types of input tensors
    * @param out Output tensor
    * @param subscripts String containing Einstein notation of operation to perform
-   * @param stream CUDA stream
+   * @param exec CUDA executor
    * @param tensors List of input tensors
    */
   template <typename OutputType, typename... InT>

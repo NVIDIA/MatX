@@ -589,11 +589,11 @@ using inv_cache_t = std::unordered_map<InverseParams_t, std::any, InverseParamsK
  * @tparam ALGO Algorithm to use
  * @param a_inv Inverse tensor
  * @param a Input tensor
- * @param stream CUDA stream
+ * @param exec CUDA executor
  */
 template <typename TensorTypeAInv, typename TensorTypeA, MatInverseAlgo_t ALGO = MAT_INVERSE_ALGO_LU>
 void inv_impl(TensorTypeAInv &a_inv, const TensorTypeA &a,
-              cudaExecutor exec = cudaExecutor())
+              const cudaExecutor &exec)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   static_assert(TensorTypeAInv::Rank() == TensorTypeA::Rank(), "Input and output ranks must match");

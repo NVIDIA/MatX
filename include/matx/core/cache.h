@@ -137,9 +137,11 @@ public:
 
   void* GetStreamAlloc(cudaStream_t stream, size_t size) {
     void *ptr = nullptr;
+    int device_id;
+    cudaGetDevice(&device_id);
 
-    auto el = stream_alloc_cache.find(stream);
-    if (el == stream_alloc_cache.end()) {
+    auto el = stream_alloc_cache[device_id].find(stream);
+    if (el == stream_alloc_cache[device_id].end()) {
       StreamAllocation alloc;
 
       // We allocate at least 2MB for workspace so we don't keep reallocating from small sizes
@@ -148,7 +150,7 @@ public:
 
       alloc.size = size;
       alloc.ptr = ptr;
-      stream_alloc_cache[stream] = alloc;
+      stream_alloc_cache[device_id][stream] = alloc;
     }
     else if (el->second.size < size) {
       // Free the old allocation and allocate a new one
@@ -166,7 +168,7 @@ public:
 
 private:
   std::unordered_map<CacheId, std::any> cache;
-  std::unordered_map<cudaStream_t, StreamAllocation> stream_alloc_cache;
+  cuda::std::array<std::unordered_map<cudaStream_t, StreamAllocation>, MAX_CUDA_DEVICES_PER_SYSTEM> stream_alloc_cache;
 };
 
 /**
