@@ -356,7 +356,8 @@ void eig_impl(OutputTensor &&out, WTensor &&w,
     },
     [&](std::shared_ptr<cache_val_type> ctype) {
       ctype->Exec(tv, w_new, tv, exec, jobz_cusolver, uplo_cusolver);
-    }
+    },
+    exec
   );
 
   /* Copy and free async buffer for transpose */

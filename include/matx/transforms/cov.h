@@ -248,7 +248,8 @@ void cov_impl(TensorTypeC &c, const TensorTypeA &a,
     },
     [&](std::shared_ptr<cache_val_type> ctype) {
       ctype->Exec(c, a, exec);
-    }
+    },
+    exec
   );
 }
 

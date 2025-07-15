@@ -299,7 +299,8 @@ void lu_impl(OutputTensor &&out, PivotTensor &&piv,
     },
     [&](std::shared_ptr<cache_val_type> ctype) {
       ctype->Exec(tvt, piv_new, tvt, exec);
-    }
+    },
+    exec
   );
 
   /* Temporary WAR

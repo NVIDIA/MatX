@@ -90,7 +90,7 @@ namespace detail {
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
         static_assert(is_cuda_executor_v<Executor>, "inv() only supports the CUDA executor currently");
-        inv_impl(cuda::std::get<0>(out), a_, ex.getStream());
+        inv_impl(cuda::std::get<0>(out), a_, ex);
       }
 
       template <typename ShapeType, typename Executor>

@@ -500,11 +500,12 @@ namespace cutensor {
    * @param tensors List of input tensors
    */
   template <typename OutputType, typename... InT>
-  void einsum_impl([[maybe_unused]] OutputType &out, [[maybe_unused]] const std::string &subscripts, [[maybe_unused]] cudaStream_t stream, [[maybe_unused]] InT... tensors)
+  void einsum_impl([[maybe_unused]] OutputType &out, [[maybe_unused]] const std::string &subscripts, [[maybe_unused]] const cudaExecutor &exec, [[maybe_unused]] InT... tensors)
   {
 #ifdef MATX_EN_CUTENSOR
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
+    const auto stream = exec.getStream();
     auto out_n = detail::cutensor::getEinsumSupportedTensor(out, stream);
     auto in_t = cuda::std::make_tuple(detail::cutensor::getEinsumSupportedTensor(tensors, stream)...);
 
@@ -542,7 +543,8 @@ namespace cutensor {
             cuda::std::apply([&](auto&&... args) {
                 ctype->Exec(out_n, stream, args...);
             }, in_t);
-        }
+        },
+        exec
     );
 #else
     MATX_THROW(matxNotSupported, "einsum() currently requires MATX_EN_CUTENSOR=ON but MATX_EN_CUTENSOR=OFF");

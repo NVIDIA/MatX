@@ -481,7 +481,8 @@ void qr_solver_impl(OutTensor &&out, TauTensor &&tau,
     },
     [&](std::shared_ptr<cache_val_type> ctype) {
       ctype->Exec(tvt, tau_new, tvt, exec);
-    }
+    },
+    exec
   );
 
   /* Temporary WAR
@@ -849,7 +850,8 @@ void qr_econ_impl(OutTensor &&out, RTensor &&out_r,
     },
     [&](std::shared_ptr<cache_val_type> ctype) {
       ctype->Exec(tvt, out_r, tau_new, tvt, exec);
-    }
+    },
+    exec
   );
 
   /* Temporary WAR

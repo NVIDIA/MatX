@@ -305,7 +305,8 @@ void qr_solver_impl([[maybe_unused]] OutTensor &&out,
     },
     [&](std::shared_ptr<cache_val_type> ctype) {
       ctype->Exec(tvt, tau_new, tvt, exec);
-    }
+    },
+    exec
   );
 
   /* Temporary WAR

@@ -262,7 +262,8 @@ void sparse2dense_impl(OutputTensorType &O, const InputTensorType &a,
       [&]() { return std::make_shared<cache_val_type>(o, a, stream); },
       [&](std::shared_ptr<cache_val_type> cache_type) {
         cache_type->Exec(o, a);
-      });
+      },
+      exec);
 
   // Copy transformed output back.
   if (!o.isSameView(O)) {

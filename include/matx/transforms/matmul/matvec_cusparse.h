@@ -350,7 +350,8 @@ void sparse_matvec_impl(TensorTypeC &C, const TensorTypeA &a,
         },
         [&](std::shared_ptr<cache_val_type> cache_type) {
           cache_type->Exec(c, a, b);
-        });
+        },
+        exec);
   }
 
   // Copy transformed output back.

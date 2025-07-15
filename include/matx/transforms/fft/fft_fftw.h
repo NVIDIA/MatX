@@ -564,7 +564,8 @@ private:
       },
       [&](std::shared_ptr<cache_val_type> ctype) {
         ctype->Exec(o, i);
-      }
+      },
+      exec
     );
 #endif
   }

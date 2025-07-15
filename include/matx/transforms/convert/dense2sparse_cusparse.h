@@ -311,7 +311,8 @@ void dense2sparse_impl(OutputTensorType &o, const InputTensorType &A,
       [&]() { return std::make_shared<cache_val_type>(o, a, stream); },
       [&](std::shared_ptr<cache_val_type> cache_type) {
         cache_type->Exec(o, a);
-      });
+      },
+      exec);
 }
 
 } // end namespace matx

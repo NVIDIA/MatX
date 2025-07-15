@@ -454,7 +454,8 @@ void svd_impl([[maybe_unused]] UTensor &&u,
     },
     [&](std::shared_ptr<cache_val_type> ctype) {
       ctype->Exec(u_in, s_new, vt_in, at_col_maj, exec, job_lapack);
-    }
+    },
+    exec
   );
 
 
