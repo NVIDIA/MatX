@@ -173,6 +173,18 @@ struct MemTracker {
     }
 
     *ptr = nullptr;
+
+    // If requesting managed memory, check if the device supports concurrent managed access.
+    // If not, fall back to pinned host memory. Jetsons are one system type where this is needed.
+    if (space == MATX_MANAGED_MEMORY) {
+      int device = 0;
+      MATX_CUDA_CHECK(cudaGetDevice(&device));
+      int concurrentManagedAccess = 0;
+      MATX_CUDA_CHECK(cudaDeviceGetAttribute(&concurrentManagedAccess, cudaDevAttrConcurrentManagedAccess, device));
+      if (concurrentManagedAccess == 0) {
+        space = MATX_HOST_MEMORY;
+      }
+    }
     
     switch (space) {
     case MATX_MANAGED_MEMORY:
