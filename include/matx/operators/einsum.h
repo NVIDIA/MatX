@@ -69,7 +69,7 @@ namespace detail {
         static_assert(is_cuda_executor_v<Executor>, "einsum() only supports the CUDA executor currently");   
 
         cuda::std::apply([&](auto... args) {
-          ::matx::cutensor::einsum_impl(cuda::std::get<0>(out), subscripts_, ex.getStream(), args...);
+          ::matx::cutensor::einsum_impl(cuda::std::get<0>(out), subscripts_, ex, args...);
         }, a_);
       }
 

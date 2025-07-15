@@ -485,7 +485,8 @@ void filter_impl([[maybe_unused]] OutType &o, [[maybe_unused]] const InType &i,
     },
     [&](std::shared_ptr<cache_val_type> ctype) {
       ctype->Exec(o, i, exec);
-    }
+    },
+    exec
   );
 }
 

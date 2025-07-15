@@ -1463,7 +1463,8 @@ void sort_impl_inner(OutputTensor &a_out, const InputOperator &a,
       },
       [&](std::shared_ptr<cache_val_type> ctype) {
         ctype->ExecSort(a_out, a, dir, stream);
-      }
+      },
+      exec
     );
 #else
   auto tmp = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_RADIX_SORT, decltype(p)>{
@@ -2217,7 +2218,8 @@ void cumsum_impl(OutputTensor &a_out, const InputOperator &a,
       },
       [&](std::shared_ptr<cache_val_type> ctype) {
         ctype->ExecPrefixScanEx(a_out, a, stream);
-      }
+      },
+      exec
     );
 #else
   auto tmp =
@@ -2453,7 +2455,8 @@ void find_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperator 
       },
       [&](std::shared_ptr<cache_val_type> ctype) {
         ctype->ExecSelect(a_out, a, stream);
-      }
+      },
+      exec
     );
 
 #else
@@ -2571,7 +2574,8 @@ void find_idx_impl(OutputTensor &a_out, CountTensor &num_found, const InputOpera
       },
       [&](std::shared_ptr<cache_val_type> ctype) {
         ctype->ExecSelectIndex(a_out, a, stream);
-      }
+      },
+      exec
     );
 
 #else
@@ -2689,7 +2693,8 @@ void unique_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperato
       },
       [&](std::shared_ptr<cache_val_type> ctype) {
         ctype->ExecUnique(a_out, sort_tensor, stream);
-      }
+      },
+      exec
     );
 #else
   auto tmp = detail::matxCubPlan_t< OutputTensor,

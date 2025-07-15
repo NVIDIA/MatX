@@ -45,6 +45,7 @@
 namespace matx {
 namespace detail {
 
+static constexpr size_t MAX_CUDA_DEVICES_PER_SYSTEM = 16;
 using CacheId = uint64_t;
 
 #ifndef DOXYGEN_ONLY
@@ -95,22 +96,34 @@ public:
     auto el = cache.find(id);
     MATX_ASSERT_STR(el != cache.end(), matxInvalidType, "Cache type not found");
 
-    std::any_cast<CacheType>(el->second).clear();
+    for (int i = 0; i < MAX_CUDA_DEVICES_PER_SYSTEM; i++) {
+      using CacheArray = cuda::std::array<CacheType, MAX_CUDA_DEVICES_PER_SYSTEM>;
+      std::any_cast<CacheArray&>(el->second)[i].clear();
+    }
   }
 
-  template <typename CacheType, typename InParams, typename MakeFun, typename ExecFun>
-  void LookupAndExec(const CacheId &id, const InParams &params, const MakeFun &mfun, const ExecFun &efun) {
+  template <typename CacheType, typename InParams, typename MakeFun, typename ExecFun, typename Executor>
+  void LookupAndExec(const CacheId &id, const InParams &params, const MakeFun &mfun, const ExecFun &efun, [[maybe_unused]] const Executor &exec) {
     // This mutex should eventually be finer-grained so each transform doesn't get blocked by others
     [[maybe_unused]] std::lock_guard<std::recursive_mutex> lock(cache_mtx);
+    using CacheArray = cuda::std::array<CacheType, MAX_CUDA_DEVICES_PER_SYSTEM>;
 
     // Create named cache if it doesn't exist
+    int device_id;
     auto el = cache.find(id);
     if (el == cache.end()) {
-      cache[id] = CacheType{};
+      cache[id] = CacheArray{};
     }
 
     auto &cval = cache[id];
-    auto &rmap = std::any_cast<CacheType&>(cval);
+    if constexpr (is_cuda_executor_v<Executor>) {
+      cudaGetDevice(&device_id);
+    }
+    else {
+      device_id = 0;
+    }
+
+    auto &rmap = std::any_cast<CacheArray&>(cval)[device_id];
     auto cache_el = rmap.find(params);
     if (cache_el == rmap.end()) {
       std::any tmp = mfun();
@@ -124,9 +137,11 @@ public:
 
   void* GetStreamAlloc(cudaStream_t stream, size_t size) {
     void *ptr = nullptr;
+    int device_id;
+    cudaGetDevice(&device_id);
 
-    auto el = stream_alloc_cache.find(stream);
-    if (el == stream_alloc_cache.end()) {
+    auto el = stream_alloc_cache[device_id].find(stream);
+    if (el == stream_alloc_cache[device_id].end()) {
       StreamAllocation alloc;
 
       // We allocate at least 2MB for workspace so we don't keep reallocating from small sizes
@@ -135,7 +150,7 @@ public:
 
       alloc.size = size;
       alloc.ptr = ptr;
-      stream_alloc_cache[stream] = alloc;
+      stream_alloc_cache[device_id][stream] = alloc;
     }
     else if (el->second.size < size) {
       // Free the old allocation and allocate a new one
@@ -153,7 +168,7 @@ public:
 
 private:
   std::unordered_map<CacheId, std::any> cache;
-  std::unordered_map<cudaStream_t, StreamAllocation> stream_alloc_cache;
+  cuda::std::array<std::unordered_map<cudaStream_t, StreamAllocation>, MAX_CUDA_DEVICES_PER_SYSTEM> stream_alloc_cache;
 };
 
 /**

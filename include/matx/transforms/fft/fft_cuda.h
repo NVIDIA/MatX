@@ -720,7 +720,8 @@ __MATX_INLINE__ void fft_impl(OutputTensor o, const InputTensor i,
     },
     [&](std::shared_ptr<cache_val_type> ctype) {
       ctype->Forward(out, in, stream, norm);
-    }
+    },
+    exec
   );
 
   if(!out.isSameView(o)) {
@@ -765,7 +766,8 @@ __MATX_INLINE__ void ifft_impl(OutputTensor o, const InputTensor i,
     },
     [&](std::shared_ptr<cache_val_type> ctype) {
       ctype->Inverse(out, in, stream, norm);
-    }
+    },
+    exec
   );
 
   if(!out.isSameView(o)) {
@@ -805,7 +807,8 @@ __MATX_INLINE__ void fft2_impl(OutputTensor o, const InputTensor i, FFTNorm norm
     },
     [&](std::shared_ptr<cache_val_type> ctype) {
       ctype->Forward(out, in, stream, norm);
-    }
+    },
+    exec
   );
 
   if(!out.isSameView(o)) {
@@ -846,7 +849,8 @@ __MATX_INLINE__ void ifft2_impl(OutputTensor o, const InputTensor i, FFTNorm nor
     },
     [&](std::shared_ptr<cache_val_type> ctype) {
       ctype->Inverse(out, in, stream, norm);
-    }
+    },
+    exec
   );
 
   if(!out.isSameView(o)) {

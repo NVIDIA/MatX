@@ -1238,7 +1238,8 @@ void matmul_impl(TensorTypeC C, const TensorTypeA A,
       },
       [&](std::shared_ptr<cache_val_type> cache_type) {
         cache_type->Exec(c, a, b, stream, alpha, beta);
-      }
+      },
+      exec
     );
    }
 

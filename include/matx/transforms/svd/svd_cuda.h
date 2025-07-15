@@ -1009,7 +1009,8 @@ void svd_impl(UTensor &&u, STensor &&s,
       },
       [&](std::shared_ptr<cache_val_type> ctype) {
         ctype->Exec(u_in, s_new, vt_in, at_col_maj, exec, job_cusolver);
-      }
+      },
+      exec
     );
 
     if(!u_new.isSameView(u)) {
@@ -1046,7 +1047,8 @@ void svd_impl(UTensor &&u, STensor &&s,
       },
       [&](std::shared_ptr<cache_val_type> ctype) {
         ctype->Exec(u_col_maj, s_new, vt_col_maj, tvt, exec, job_cusolver);
-      }
+      },
+      exec
     );
 
     // cuSolver writes u and vt in col-major format, so we need to transpose them back.

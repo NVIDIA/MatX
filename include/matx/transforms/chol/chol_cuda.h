@@ -311,7 +311,8 @@ void chol_impl(OutputTensor &&out, const ATensor &a,
     },
     [&](std::shared_ptr<cache_val_type> ctype) {
       ctype->Exec(tmp_out, tmp_out, exec, uplo_cusolver);
-    }
+    },
+    exec
   );
 
   if (!allContiguous) {

@@ -291,7 +291,8 @@ void sparse_solve_impl(TensorTypeC &C, const TensorTypeA &a,
       [&]() { return std::make_shared<cache_val_type>(c, a, b, stream); },
       [&](std::shared_ptr<cache_val_type> cache_type) {
         cache_type->Exec(c, a, b);
-      });
+      },
+      exec);
 
   // Copy transformed output back.
   if (!c.isSameView(C)) {
