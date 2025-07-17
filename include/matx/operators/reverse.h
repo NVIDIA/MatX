@@ -196,12 +196,8 @@ namespace matx
   template <typename T1>
   auto __MATX_INLINE__ flipud(const T1 &t)
   {
-    if constexpr (T1::Rank() == 1)
-    {
-      return detail::ReverseOp<T1::Rank() - 1 , T1>(t);
-    }
-
-    return detail::ReverseOp<T1::Rank() - 2, T1>(t);
+    constexpr int dim = std::max(0, T1::Rank() - 2);
+    return detail::ReverseOp<dim, T1>(t);
   };
 
   /**
