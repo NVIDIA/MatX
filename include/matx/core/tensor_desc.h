@@ -62,12 +62,12 @@ public:
   /**
    * @brief Default copy constructor
    */
-  __MATX_INLINE__  tensor_desc_t<ShapeContainer, StrideContainer, RANK>(const tensor_desc_t &) = default;
+  __MATX_INLINE__  tensor_desc_t(const tensor_desc_t &) = default;
 
   /**
    * @brief Default move constructor
    */
-  __MATX_INLINE__  tensor_desc_t<ShapeContainer, StrideContainer, RANK>(tensor_desc_t &&) = default;
+  __MATX_INLINE__  tensor_desc_t(tensor_desc_t &&) = default;
 
   /**
    * @brief Default const copy assignment constructor
