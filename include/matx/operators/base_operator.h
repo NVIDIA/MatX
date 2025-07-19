@@ -52,6 +52,7 @@ namespace matx
       public:
         using matxop = bool;  ///< Is a MatX custom operator
         using value_type = T; ///< Value type for type traits
+        static constexpr int RANK = remove_cvref_t<T>::Rank();
 
         //static constexpr uint64_t unique_id_ = detail::fnv1a_64(detail::get_type_name<T>());
 	      __MATX_INLINE__ std::string str() const { return "BaseOp"; }
@@ -61,6 +62,18 @@ namespace matx
         // }
 
 
+      private:
+        // Helper template to safely check if T is a matx_set_op with transform and tensor_view
+        template<typename U>
+        static constexpr bool is_matx_set_op_with_transform_and_tensor_view() {
+          if constexpr (is_matx_set_op<U>()) {
+            return is_matx_transform_op<typename U::op_type>() && is_tensor_view_v<typename U::tensor_type>;
+          } else {
+            return false;
+          }
+        }
+
+      public:
         /**
          * @brief Launch work in an arbitrary executor
          * 
@@ -73,35 +86,36 @@ namespace matx
           static_assert(is_executor_t<Ex>(), "Ex must be a MatX executor type");
 
           auto tp = static_cast<T *>(this);
-
+          printf("run\n");
           // If we're doing a simple set operation from a transform we take a shorcut to avoid the extra
           // async allocation we'd normally have to do
           if constexpr (is_mtie<T>() ) {
             tp->Exec(ex);
             return;
           }          
-          else if constexpr (is_matx_set_op<T>()) {
-            if constexpr (is_matx_transform_op<typename T::op_type>() && is_tensor_view_v<typename T::tensor_type>) {
-              // If this is a direct assignment from a transform, we can skip the async allocation and just do the assignment
-              tp->TransformExec(tp->Shape(), ex);
-              return;
-            }
+          else if constexpr (is_matx_set_op_with_transform_and_tensor_view<T>()) {
+            printf("set on transform and tensor view\n");
+            // If this is a direct assignment from a transform, we can skip the async allocation and just do the assignment
+            tp->TransformExec(tp->Shape(), ex);
+            return;
           }
-
-          if (detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(*tp)) {
-            ex.Exec(*tp);
-          }
-          else {
-            if constexpr (is_matx_op<T>()) {
-              tp->PreRun(tp->Shape(), ex);
+          else  {
+            if (RANK <= 4 && detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(*tp)) {
+              ex.Exec(*tp);
             }
+            else {
+              printf("branch %d\n", detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(*tp));
+              if constexpr (is_matx_op<T>()) {
+                tp->PreRun(tp->Shape(), ex);
+              }
 
-            ex.Exec(*tp);
+              ex.Exec(*tp);
 
-            if constexpr (is_matx_op<T>()) {
-              tp->PostRun(tp->Shape(), ex);
-            } 
-          }             
+              if constexpr (is_matx_op<T>()) {
+                tp->PostRun(tp->Shape(), ex);
+              } 
+            }     
+          }        
         }
 
         /**

@@ -111,11 +111,11 @@ namespace matx
             
             // compute n
             index_t nind = inds[axis1];
-            int n = get_value<ElementsPerThread::ONE>(n_, nind);
+            int n = get_value<DefaultCapabilities>(n_, nind);
             
             // compute m 
             index_t mind = inds[axis2];
-            int m = get_value<ElementsPerThread::ONE>(m_, mind);
+            int m = get_value<DefaultCapabilities>(m_, mind);
             
             if(axis1>axis2) 
               cuda::std::swap(axis1, axis2);
@@ -139,11 +139,11 @@ namespace matx
               }
             };
 
-            auto x = get_value<ElementsPerThread::ONE>(in_, xinds);
+            auto x = get_value<DefaultCapabilities>(in_, xinds);
             if constexpr (CapType::ept != ElementsPerThread::ONE) {
-              Vector<value_type, CapType::ept> ret;
+              Vector<value_type, static_cast<int>(CapType::ept)> ret;
               #pragma unroll
-              for (int e = 0; e < CapType::ept; ++e) {
+              for (int e = 0; e < static_cast<int>(CapType::ept); ++e) {
                 ret.data[e] = lret(GetVectorVal(n, e), GetVectorVal(m, e), GetVectorVal(x, e));
               }
 
@@ -153,7 +153,7 @@ namespace matx
               return lret(n, m, x);
             }
           } else {
-            return Vector<value_type, CapType::ept>{};
+            return Vector<value_type, static_cast<int>(CapType::ept)>{};
           }
         }
 

@@ -85,9 +85,9 @@ namespace matx
               return set_val(v);
             }
             else {
-              Vector<value_type, CapType::ept> ret;
+              Vector<value_type, static_cast<int>(CapType::ept)> ret;
               #pragma unroll
-              for (int e = 0; e < CapType::ept; ++e) {
+              for (int e = 0; e < static_cast<int>(CapType::ept); ++e) {
                 ret.data[e] = set_val(GetVectorVal(v, e));
               }
               return ret;

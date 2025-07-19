@@ -78,6 +78,11 @@ namespace matx
             return val;
           }
 
+          template <OperatorCapability Cap, typename InType>
+          __MATX_INLINE__ __MATX_HOST__ auto get_capability(const InType &) const {          
+            return detail::capability_attributes<Cap>::default_value;
+          }          
+
           template <typename... Is>
           __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const {
             return this->operator()<DefaultCapabilities>(indices...);

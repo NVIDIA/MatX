@@ -188,11 +188,17 @@ namespace matx
                                             detail::FFTDirection::FORWARD : 
                                             detail::FFTDirection::BACKWARD;      
 
-          if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {            
-#if defined(MATX_EN_MATHDX) && !defined(__CUDACC_RTC__) && !defined(__CUDA_ARCH__)
-            bool supported = cuFFTDxHelper<typename OpA::value_type>::IsSupported(fft_size_, FFTType::C2C, dir);
+          if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+            bool supported = true;
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__) && !defined(__CUDACC_RTC__) && !defined(__CUDA_ARCH__)
+            // Only support power-of-2 FFT sizes for JIT support
+            if ((fft_size_ & (fft_size_ - 1)) != 0 || fft_size_ == 0) {
+              supported = false;
+            } else {
+              supported = cuFFTDxHelper<typename OpA::value_type>::IsSupported(fft_size_, FFTType::C2C, dir);
+            }
 #else
-            bool supported = false;
+            supported = false;
 #endif
             return combine_capabilities<Cap>(supported, detail::get_operator_capability<Cap>(a_));      
           }
@@ -201,7 +207,7 @@ namespace matx
             return combine_capabilities<Cap>(self_cap, detail::get_operator_capability<Cap>(a_));
           }
           else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-#if defined(MATX_EN_MATHDX) && !defined(__CUDACC_RTC__) && !defined(__CUDA_ARCH__)
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__) && !defined(__CUDACC_RTC__) && !defined(__CUDA_ARCH__)
             // Currently MatX only attempts to use the "best" EPT as returned by cuFFTDx. In the future we may
             // try other EPT values that yield different SHM values.
             if (cuFFTDxHelper<typename OpA::value_type>::IsSupported(fft_size_, FFTType::C2C, dir)) {
@@ -230,7 +236,7 @@ namespace matx
 
           if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
             static_assert(std::is_same_v<InType, ShmQueryInput>, "DYN_SHM_SIZE capability requires ShmQueryInput as input type");
-#if defined(MATX_EN_MATHDX) && !defined(__CUDACC_RTC__) && !defined(__CUDA_ARCH__)            
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__) && !defined(__CUDACC_RTC__) && !defined(__CUDA_ARCH__)            
             return combine_capabilities<Cap>(cuFFTDxHelper<typename OpA::value_type>::GetShmRequired(fft_size_, FFTType::C2C, dir, in.ept), detail::get_operator_capability<Cap>(a_, in));
 #else
             return combine_capabilities<Cap>(capability_attributes<Cap>::default_value, detail::get_operator_capability<Cap>(a_, in));
@@ -243,24 +249,6 @@ namespace matx
           }
         }
 
-// #ifndef __CUDACC_RTC__  
-//         __MATX_INLINE__ __MATX_HOST__ bool get_capability_impl(OperatorCapability cap) const {
-//           // 1. Determine if the binary operation ITSELF intrinsically has this capability.
-//           if (cap == OperatorCapability::SUPPORTS_JIT) {
-// #ifndef MATX_EN_MATHDX            
-//             return combine_capabilities(cap, true, detail::get_operand_capability(a_, cap));
-// #else
-//             // We need to determine if the particular FFT combination is supported by the cuFFTDx
-//             // library
-//             int cc = detail::GetComputeCapability();  
-//             printf("%d ttt\n", IsDxBlockFFTSupported<typename OpA::value_type>(cc, fft_size_, FFTType::C2C));
-//             return combine_capabilities(cap,  
-//                           IsDxBlockFFTSupported<typename OpA::value_type>(cc, fft_size_, FFTType::C2C), 
-//                           detail::get_operand_capability(a_, cap));
-// #endif
-//           }
-//           return false;
-//         }
 #ifndef __CUDACC_RTC__  
         __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
@@ -295,6 +283,7 @@ namespace matx
         template <typename ShapeType, typename Executor>
         __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
         {
+          printf("prerun\n");
           InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));  
 
           detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);         
@@ -577,7 +566,7 @@ namespace matx
  */
   template<typename OpA>
   __MATX_INLINE__ auto fft2(const OpA &a, FFTNorm norm = FFTNorm::BACKWARD) {
-    return detail::FFT2Op(a, detail::no_permute_t{}, detail::fft_t{}, norm, []{});
+    return detail::FFT2Op(a, detail::no_permute_t{}, detail::fft_t{}, norm);
   }
 
 /**
@@ -600,7 +589,7 @@ namespace matx
   __MATX_INLINE__ auto fft2(const OpA &a, const int32_t (&axis)[2], FFTNorm norm = FFTNorm::BACKWARD) {
 
     auto perm = detail::getPermuteDims<remove_cvref_t<OpA>::Rank()>(axis);  
-    return detail::FFT2Op(a, perm, detail::fft_t{}, norm, []{});
+    return detail::FFT2Op(a, perm, detail::fft_t{}, norm);
   }
 
 /**
@@ -619,7 +608,7 @@ namespace matx
  */
   template<typename OpA>
   __MATX_INLINE__ auto ifft2(const OpA &a, FFTNorm norm = FFTNorm::BACKWARD) {
-    return detail::FFT2Op(a, detail::no_permute_t{}, detail::ifft_t{}, norm, []{});
+    return detail::FFT2Op(a, detail::no_permute_t{}, detail::ifft_t{}, norm);
   }
 
 /**
@@ -641,7 +630,7 @@ namespace matx
   template<typename OpA>
   __MATX_INLINE__ auto ifft2(const OpA &a, const int32_t (&axis)[2], FFTNorm norm = FFTNorm::BACKWARD) {
     auto perm = detail::getPermuteDims<remove_cvref_t<OpA>::Rank()>(axis);  
-    return detail::FFT2Op(a, perm, detail::ifft_t{}, norm, []{});
+    return detail::FFT2Op(a, perm, detail::ifft_t{}, norm);
   }  
 #endif
 }

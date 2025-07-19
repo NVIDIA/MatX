@@ -93,9 +93,7 @@ public:
 
   template <detail::OperatorCapability Cap>
   __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {  
-    auto self_has_cap = detail::capability_attributes<Cap>::default_value;
     return detail::combine_capabilities<Cap>(
-        self_has_cap,
       detail::get_operator_capability<Cap>(V_),
       detail::get_operator_capability<Cap>(S_),
       detail::get_operator_capability<Cap>(K_),
@@ -103,6 +101,17 @@ public:
       detail::get_operator_capability<Cap>(T_)
     );
   }
+
+  template <detail::OperatorCapability Cap, typename InType>
+  __MATX_INLINE__ __MATX_HOST__ auto get_capability(const InType& in) const {
+    return detail::combine_capabilities<Cap>(
+      detail::get_operator_capability<Cap>(V_, in),
+      detail::get_operator_capability<Cap>(S_, in),
+      detail::get_operator_capability<Cap>(K_, in),
+      detail::get_operator_capability<Cap>(r_, in),
+      detail::get_operator_capability<Cap>(T_, in)
+    );
+  }  
 };
 
 /* Arithmetic expression */
@@ -131,7 +140,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
   using dtype = float;
 
-  index_t input_size = 100000000;
+  index_t input_size = 100'000'000;
   constexpr uint32_t num_iterations = 1;
   float time_ms;
 
@@ -155,7 +164,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   cudaEventRecord(start, stream);
   // Time non-operator version
   for (uint32_t i = 0; i < num_iterations; i++) {
-    compute_black_scholes_matx(K_tensor, S_tensor, V_tensor, r_tensor, T_tensor, output_tensor, exec);
+    //compute_black_scholes_matx(K_tensor, S_tensor, V_tensor, r_tensor, T_tensor, output_tensor, exec);
   }
   cudaEventRecord(stop, stream);
   exec.sync();
@@ -167,7 +176,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   cudaEventRecord(start, stream);
   // Time non-operator version
   for (uint32_t i = 0; i < num_iterations; i++) {
-    BlackScholes(output_tensor, K_tensor, V_tensor, S_tensor, r_tensor, T_tensor).run(exec);
+    //BlackScholes(output_tensor, K_tensor, V_tensor, S_tensor, r_tensor, T_tensor).run(exec);
   }
   cudaEventRecord(stop, stream);
   exec.sync();

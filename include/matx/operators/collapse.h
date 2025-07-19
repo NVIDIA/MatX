@@ -32,7 +32,6 @@
 
 #pragma once
 
-
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
 
@@ -102,7 +101,7 @@ namespace matx
         template <typename Op, typename... Is>
         static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, Is... indices)
         {
-          return get_impl<detail::ElementsPerThread::ONE>(cuda::std::forward<Op>(op), indices...);
+          return get_impl<DefaultCapabilities>(cuda::std::forward<Op>(op), indices...);
         }
 
         template <typename CapType, typename... Is>
@@ -120,13 +119,13 @@ namespace matx
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
         {
-          return get_impl<ElementsPerThread::ONE>(cuda::std::as_const(op_), indices...);
+          return get_impl<DefaultCapabilities>(cuda::std::as_const(op_), indices...);
         }    
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
-          return get_impl<ElementsPerThread::ONE>(cuda::std::forward<decltype(op_)>(op_), indices...);
+          return get_impl<DefaultCapabilities>(cuda::std::forward<decltype(op_)>(op_), indices...);
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -145,7 +144,7 @@ namespace matx
         ~LCollapseOp() = default;
         LCollapseOp(const LCollapseOp &rhs) = default;
         __MATX_INLINE__ auto operator=(const self_type &rhs) { 
-          return set(*this, rhs); 
+          return set<self_type, self_type>(*this, rhs); 
         }              
 
         template<typename R> 
@@ -183,6 +182,12 @@ namespace matx
             return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
           }
         }
+
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability(const InType &in) const {          
+          auto self_has_cap = capability_attributes<Cap>::default_value;
+          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_, in));
+        } 
     };
   }
   /**
@@ -228,7 +233,7 @@ namespace matx
 
         __MATX_INLINE__ std::string str() const { return "rcollapse<" + std::to_string(DIM) + ">(" + op_.str() + ")"; }
 
-        __MATX_INLINE__ RCollapseOp(const T1 op) : op_(op)
+        __MATX_INLINE__ RCollapseOp(const T1 &op) : op_(op)
         {
           static_assert(DIM <= T1::Rank(),  "Collapse DIM must be less than or equal to Rank() of operator");
           static_assert(DIM > 1, "Collapse DIM must have be greater than 1");
@@ -277,7 +282,7 @@ namespace matx
         template <typename Op, typename... Is>
         static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, Is... indices)
         {
-          return get_impl<detail::ElementsPerThread::ONE>(cuda::std::forward<Op>(op), indices...);
+          return get_impl<DefaultCapabilities>(cuda::std::forward<Op>(op), indices...);
         }
 
         template <typename CapType, typename... Is>
@@ -295,13 +300,13 @@ namespace matx
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
         {
-          return get_impl<ElementsPerThread::ONE>(cuda::std::as_const(op_), indices...);
+          return get_impl<DefaultCapabilities>(cuda::std::as_const(op_), indices...);
         }    
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
-          return get_impl<ElementsPerThread::ONE>(cuda::std::forward<decltype(op_)>(op_), indices...);
+          return get_impl<DefaultCapabilities>(cuda::std::forward<decltype(op_)>(op_), indices...);
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -358,6 +363,12 @@ namespace matx
             return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
           }
         }
+
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability(const InType &in) const {          
+          auto self_has_cap = capability_attributes<Cap>::default_value;
+          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_, in));
+        }         
     };
   }
   /**

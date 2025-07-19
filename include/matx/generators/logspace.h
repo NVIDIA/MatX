@@ -87,6 +87,11 @@ namespace matx
           return detail::ApplyVecFunc<CapType, value_type>(log_func, range_val); 
         }
 
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability(const InType &) const {          
+          return detail::capability_attributes<Cap>::default_value;
+        }        
+
         __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t idx) const
         {
           return this->operator()<DefaultCapabilities>(idx);

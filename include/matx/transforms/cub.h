@@ -47,6 +47,7 @@
 #include "matx/core/tensor.h"
 #include "matx/core/iterator.h"
 #include "matx/core/operator_utils.h"
+#include "matx/core/reduce_utils.h"
 
 namespace matx {
 

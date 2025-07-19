@@ -55,6 +55,11 @@ namespace matx
           return self_has_cap;
         }
 
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability(const InType &) const {          
+          return detail::capability_attributes<Cap>::default_value;
+        }        
+
         template <typename CapType>
         __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
         {

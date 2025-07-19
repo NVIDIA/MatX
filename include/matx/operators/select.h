@@ -82,13 +82,13 @@ namespace matx
           return this->operator()<DefaultCapabilities>(i);
         }
 
-        template <typename CapType, typename... Is>
+        template <typename CapType, typename... Is, std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i)
         {
           return get_impl<CapType>(cuda::std::forward<decltype(op_)>(op_), idx_, i);
         }
 
-        template <typename... Is>
+        template <typename... Is, std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i)
         {
           return this->operator()<DefaultCapabilities>(i);

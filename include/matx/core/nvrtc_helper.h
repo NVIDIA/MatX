@@ -55,7 +55,7 @@ namespace matx {
 
 namespace detail {  
 
-std::vector<std::string> get_preprocessor_options() {
+std::vector<std::string> __MATX_HOST__ __MATX_INLINE__ get_preprocessor_options() {
     // Get the project root from the current file's location
     const auto source_path = std::filesystem::path(std::source_location::current().file_name());
     // This assumes nvrtc.h is in <root>/include/matx/core/

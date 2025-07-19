@@ -1177,7 +1177,7 @@ MATX_IGNORE_WARNING_POP_GCC
           return cuda::std::array<detail::ElementsPerThread, 2>{detail::ElementsPerThread::ONE, detail::ElementsPerThread::ONE};
         }
 
-        int width = 32;
+        int width = 4;
         do  {
           if (((Lsize() % width) == 0) &&                                       // Last dim is a multiple of vector load size
             ((reinterpret_cast<uintptr_t>(data_.ldata_) % (sizeof(T) * width)) == 0)) {

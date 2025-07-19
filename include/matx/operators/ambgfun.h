@@ -55,8 +55,8 @@ namespace matx
         AMBGFunCutType_t cut_;
         float cut_val_;
         cuda::std::array<index_t, 2> out_dims_;
-        mutable ::matx::detail::tensor_impl_t<typename remove_cvref_t<OpX>::value_type, 2> tmp_out_;
-        mutable typename remove_cvref_t<OpX>::value_type *ptr = nullptr;         
+        mutable ::matx::detail::tensor_impl_t<typename remove_cvref_t<OpX>::value_type::value_type, 2> tmp_out_;
+        mutable typename remove_cvref_t<OpX>::value_type::value_type *ptr = nullptr;         
 
       public:
         using matxop = bool;
@@ -65,8 +65,8 @@ namespace matx
         using ambgfun_xform_op = bool;
 
         __MATX_INLINE__ std::string str() const { 
-          if (y_) {
-            return "ambgfun(" + get_type_str(x_) + "," + get_type_str(x_)  + ")";
+          if constexpr (std::is_same_v<OpY, EmptyY>) {
+            return "ambgfun(" + get_type_str(x_) + ")";
           }
           else {
             return "ambgfun(" + get_type_str(x_) + ")";

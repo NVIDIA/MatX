@@ -117,9 +117,9 @@ namespace detail {
         if constexpr (CapType::ept == ElementsPerThread::ONE) {
           return get_scalar(val);
         } else {
-          Vector<remove_cvref_t<decltype(get_scalar(val.data[0]))>, CapType::ept> out;
+          Vector<remove_cvref_t<decltype(get_scalar(val.data[0]))>, static_cast<size_t>(CapType::ept)> out;
           #pragma unroll
-          for (index_t i = 0; i < CapType::ept; i++) {
+          for (index_t i = 0; i < static_cast<index_t>(CapType::ept); i++) {
             out.data[i] = get_scalar(val.data[i]);
           }
           return out;

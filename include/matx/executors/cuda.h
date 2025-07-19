@@ -127,32 +127,6 @@ namespace matx
         return time;
       }
 
-      /** 
-       * With high EPT values the register pressure can increase, so we need to find a good value for enough occupancy. 
-       * Target a minimum of 2 blocks per SM from register pressure.
-       */
-       template <typename T>
-      [[nodiscard]] static __MATX_INLINE__ auto get_max_threads(int num_regs, int min_ept, int max_ept, int arch_max_tpb) {
-        cuda::std::array<cuda::std::pair<int, int>, 6> ept_tpb_pairs;
-        // int ept_tpb_idx = 0;
-        // constexpr int min_occupancy = 2;
-
-        // for (int ept = ept_start; ept <= 32; ept <<= 1) {
-        //   int reg_estimate_per_thread = num_regs * ept;
-        //   int current_threads = arch_max_tpb;
-
-        //   // Find the highest tpb that allows min_occupancy
-        //   while(current_threads > 32) { // 32 is min warp size
-        //     if (reg_estimate_per_thread * current_threads * min_occupancy < arch_max_tpb * 256) { // TODO: Get max regs per block
-        //       break;
-        //     }
-        //     current_threads >>= 1;
-        //   }
-        //   ept_tpb_pairs[ept_tpb_idx++] = {ept, current_threads};
-        // }
-
-        return ept_tpb_pairs;
-      }
 
       /**
        * Find the best launch parameters by testing EPT values for optimal occupancy
@@ -166,40 +140,36 @@ namespace matx
        * @return Pair containing the best EPT and corresponding shared memory size
        */
       template <typename Op, typename KernelProvider>
-      std::pair<detail::ElementsPerThread, int> find_best_launch_params(const Op &op, const cuda::std::array<detail::ElementsPerThread, 2>& max_ept, KernelProvider kernel_provider, bool use_jit = false) const {
+      std::pair<detail::ElementsPerThread, int> find_best_launch_params(const Op &op, const cuda::std::array<detail::ElementsPerThread, 2>& max_ept, KernelProvider kernel_provider, int block_size, bool use_jit = false) const {
         // Get device properties for constraints
         constexpr int min_occupancy = 2;
         int max_dynamic_shm, max_threads_per_block, regs_per_multiprocessor;
         cudaDeviceGetAttribute(&max_dynamic_shm, cudaDevAttrMaxSharedMemoryPerBlock , 0);
         cudaDeviceGetAttribute(&max_threads_per_block, cudaDevAttrMaxThreadsPerBlock, 0);
         cudaDeviceGetAttribute(&regs_per_multiprocessor, cudaDevAttrMaxRegistersPerMultiprocessor, 0);
-        [[maybe_unused]]int block_size;
         
         // Start with maximum EPT and work down
         auto current_ept = max_ept[1];
         auto min_ept = max_ept[0];
         
         while (current_ept >= min_ept) {
-          int shm_size = detail::get_operator_capability<detail::OperatorCapability::DYN_SHM_SIZE>(op, detail::ShmQueryInput{current_ept});
-          
+          int shm_size = 0; // Default to no shm since non-JIT doesn't use any
           // Get kernel function pointer for this EPT and check register usage (if available)
           auto kernel_func = kernel_provider(current_ept);
           bool register_viable = true;  // Default to viable for JIT
+
+          cudaFuncAttributes attr;
+          cudaFuncGetAttributes(&attr, (const void*)kernel_func);
           
-          if (kernel_func != nullptr) {
-            cudaFuncAttributes attr;
-            cudaFuncGetAttributes(&attr, (const void*)kernel_func);
-            
-            // Determine block size for register calculation
-            block_size = max_threads_per_block;
-            if (use_jit) {
-              auto block_dim = detail::get_operator_capability<detail::OperatorCapability::BLOCK_DIM>(op);
-              block_size = static_cast<int>(block_dim[2]);
-            }
-            
-            // Check register pressure constraint: numRegs * block_size * 2 < regsPerMultiprocessor
-            register_viable = (attr.numRegs * block_size * min_occupancy) < regs_per_multiprocessor;
+          // Determine block size for register calculation
+          if (use_jit) {
+            auto block_dim = detail::get_operator_capability<detail::OperatorCapability::BLOCK_DIM>(op);
+            block_size = static_cast<int>(block_dim[2]);
+            shm_size = detail::get_operator_capability<detail::OperatorCapability::DYN_SHM_SIZE>(op, detail::ShmQueryInput{current_ept});
           }
+          
+          // Check register pressure constraint: numRegs * block_size * 2 < regsPerMultiprocessor
+          register_viable = (attr.numRegs * block_size * min_occupancy) < regs_per_multiprocessor;
           
           // Check if launch is viable (2 blocks can be resident on SM)
           
@@ -207,9 +177,13 @@ namespace matx
           bool shm_viable = (shm_size * 2) < max_dynamic_shm;
           
           if (shm_viable && register_viable) {
-            // printf("Selected EPT %d: registers %d, shm_size %d\n", 
-            //        static_cast<int>(current_ept), num_regs, shm_size);
+            printf("Selected EPT %d: registers %d, shm_size %d\n", 
+                   static_cast<int>(current_ept), attr.numRegs, shm_size);
             return {current_ept, shm_size};
+          }
+          else {
+            printf("EPT %d failed constraints: shm_viable %d (%d of %d), register_viable %d (regs=%d) block size %d\n",
+                   static_cast<int>(current_ept), shm_viable, shm_size, max_dynamic_shm, register_viable, attr.numRegs, block_size);
           }
           
           // printf("EPT %d failed constraints: shm_viable %d (%d of %d), register_viable %d (regs=%d) block size %d\n",
@@ -263,7 +237,7 @@ namespace matx
               "Please break up your operator statement into multiple executions to limit the size of the parameters");
 
           const auto max_ept = detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(op);     
-          //printf("min/max ept %d %d\n", static_cast<int>(max_ept[0]), static_cast<int>(max_ept[1]));
+          printf("min/max ept %d %d\n", static_cast<int>(max_ept[0]), static_cast<int>(max_ept[1]));
 
           if constexpr (Op::Rank() == 0) {
             threads = 1;
@@ -281,11 +255,12 @@ namespace matx
               auto create_kernel_provider = [&](bool is_jit) {
                 return [&, is_jit](detail::ElementsPerThread ept) {
                   // Determine if we'll use stride kernels
+                  printf("is_jit %d\n", is_jit);
                   bool stride;
                   if (is_jit) {
                     stride = detail::get_grid_dims_jit<Op::Rank()>(blocks, threads, sizes, static_cast<int>(ept), 1024, true);
                   } else {
-                    stride = detail::get_grid_dims<Op::Rank()>(blocks, threads, sizes, static_cast<int>(ept), 1024);
+                    stride = detail::get_grid_dims<Op::Rank()>(blocks, threads, sizes, static_cast<int>(ept), 256);
                   }
                   
                   // Return appropriate kernel function pointer based on EPT, rank, and stride
@@ -383,7 +358,7 @@ namespace matx
 
 #ifdef MATX_EN_JIT
               const bool use_jit = detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op) && Op::Rank() <= 4;               
-
+              printf("use_jit2 %d\n", use_jit);
               if (!use_jit)
 #endif
               {
@@ -391,17 +366,17 @@ namespace matx
                 auto kernel_provider = create_kernel_provider(false);
                 
                 // Find the best launch parameters
-                auto [best_ept, shm_size] = find_best_launch_params(op, max_ept, kernel_provider, false);
-                //printf("Non-JIT best_ept %d shm_size %d\n", static_cast<int>(best_ept), shm_size);
+                auto [best_ept, shm_size] = find_best_launch_params(op, max_ept, kernel_provider, 256, false);
+                printf("Non-JIT best_ept %d shm_size %d\n", static_cast<int>(best_ept), shm_size);
 
                 // Helper lambda to handle kernel dispatch. This is templated on the EPT
                 // type since that's what the kernels are templated on.
                 auto dispatch_kernel = [&]<detail::ElementsPerThread EPT>(auto&& kernel_handler) {
-                  int max_tpb = 1024;
+                  int max_tpb = 256;
 
                   bool stride = detail::get_grid_dims<Op::Rank()>(blocks, threads, sizes, static_cast<int>(EPT), max_tpb);
-                  //auto block_dim = detail::get_operator_capability<detail::OperatorCapability::BLOCK_DIM>(op);
-                  //printf("block_dim %lld %lld %lld\n", block_dim[0], block_dim[1], block_dim[2]);
+                  auto block_dim = detail::get_operator_capability<detail::OperatorCapability::BLOCK_DIM>(op);
+                  printf("block_dim %lld %lld %lld\n", block_dim[0], block_dim[1], block_dim[2]);
 
                   using CapType = detail::CapabilityParams<EPT, false>;
                   
@@ -478,11 +453,12 @@ namespace matx
               }
 #ifdef MATX_EN_JIT
               else {
+                printf("JIT\n");
                 // Create kernel provider for JIT using shared generator
                 auto kernel_provider = create_kernel_provider(true);
                 
                 // Find the best launch parameters
-                auto [best_ept, shm_size] = find_best_launch_params(op, max_ept, kernel_provider, true);
+                auto [best_ept, shm_size] = find_best_launch_params(op, max_ept, kernel_provider, 0, true);
                 
                 auto block_dim = detail::get_operator_capability<detail::OperatorCapability::BLOCK_DIM>(op);              
                 bool stride    = detail::get_grid_dims_jit<Op::Rank()>(blocks, threads, sizes, static_cast<int>(best_ept), static_cast<int>(block_dim[2]), true);            

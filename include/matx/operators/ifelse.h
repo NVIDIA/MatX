@@ -113,11 +113,11 @@ namespace matx
       template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator()(Is... indices) const {
           if constexpr (CapType::ept == ElementsPerThread::ONE) {
-            if (get_value<ElementsPerThread::ONE>(cond_, indices...)) {
-              return get_value<ElementsPerThread::ONE>(op1_, indices...);
+            if (get_value<DefaultCapabilities>(cond_, indices...)) {
+              return get_value<DefaultCapabilities>(op1_, indices...);
             }
             else {
-              return get_value<ElementsPerThread::ONE>(op2_, indices...);
+              return get_value<DefaultCapabilities>(op2_, indices...);
             }
           } else {
             return Vector<int, static_cast<index_t>(CapType::ept)>{};

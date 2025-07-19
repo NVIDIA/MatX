@@ -40,38 +40,65 @@ using namespace matx;
 int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 {
   MATX_ENTER_HANDLER();
+  
   [[maybe_unused]] int batches = 2;
   using complex = cuda::std::complex<float>;
-  auto a = make_tensor<complex>({32});
-  auto b = make_tensor<complex>({32});
-  auto c = make_tensor<complex>({32});
-  auto d = make_tensor<complex>({32});
+  using TestType = float;
+    using ComplexType = detail::complex_from_scalar_t<TestType>;
+    auto c0 = make_tensor<ComplexType>({});  
+  auto t1 = make_tensor<TestType>({10});
+  auto t0 = make_tensor<TestType>({});
 
-  (a = random<complex>(a.Shape(), UNIFORM)).run();
-  (b = random<complex>(b.Shape(), UNIFORM)).run();
-  (c = random<complex>(c.Shape(), UNIFORM)).run();
+  t1.SetVals({10, 20, 30, 40, 50, 60, 70, 80, 90, 100});
+  (c0 = at(fft(t1), 0)).run();
+  print(c0);
+  print(fft(t1));
+
+  {
+    using inner_type = typename inner_op_type_t<TestType>::type;
+    using complex_type = detail::complex_from_scalar_t<inner_type>;
+
+    [[maybe_unused]] const inner_type thresh = static_cast<inner_type>(1.0e-6);
   
-  //print(a);
-  // a.SetVals({{1,3},{-2,1},{4,-1},{0,2},{-3,0},{1,-4},{2,3},{-1,-2},{3,1},{0,-3},{-2,4},{1,0},{-4,2},{2,-1},{0,1},{-1,3}});
-  // b.SetVals({{1,3},{-2,1},{4,-1},{0,2},{-3,0},{1,-4},{2,3},{-1,-2},{3,1},{0,-3},{-2,4},{1,0},{-4,2},{2,-1},{0,1},{-1,3}});
-  // c.SetVals({{1,3},{-2,1},{4,-1},{0,2},{-3,0},{1,-4},{2,3},{-1,-2},{3,1},{0,-3},{-2,4},{1,0},{-4,2},{2,-1},{0,1},{-1,3}});
+    // Verify that fftshift1D/ifftshift1D work with nested transforms.
+    // These tests are limited to complex-to-complex transforms where we have matched
+    // dimensions and types for the inputs/outputs. Adding tests that include real-to-complex
+    // or complex-to-real fft compositions is TBD.
 
-  print(a);
-  print(b);
-  print(c);
+      const int N1 = 3;
+      const int N2 = 4;
+  
+      auto t3 = make_tensor<complex_type>({N1});
+      auto t4 = make_tensor<complex_type>({N2});
+      auto T3 = make_tensor<complex_type>({N1});
+      auto T4 = make_tensor<complex_type>({N2});
+  
+      const cuda::std::array<complex_type, N1> t3_vals = {{ { 1.0, 0.0 }, { 2.0, 0.0 }, { 3.0, 0.0 } }};
+      const cuda::std::array<complex_type, N2> t4_vals = {{ { 1.0, 0.0 }, { 2.0, 0.0 }, { 3.0, 0.0 }, { 4.0, 0.0 } }};
+  
+      for (int i = 0; i < N1; i++) { t3(i) = t3_vals[i]; };
+      for (int i = 0; i < N2; i++) { t4(i) = t4_vals[i]; };
+  
+  
+      (T3 = fftshift1D(fft(t3))).run();    
+      print(T3);
+  }
+  // print(b);
+  // print(c);
    // (d = fft(a) + fft(b) + fft(c)).run();
   //
   // for (int i = 0; i < 10; i++) {
 
   //gg.assign_ids(counter);
 
-(d = a + fft(b*c)).run();
+//(d = a + fft(b*c)).run();
+
   // }
 
-  cudaDeviceSynchronize();
+
   //(d = a + b*c).run();
   //(d = fft(a)).run();
-  print(d);
+  //print(d);
   // using complex = cuda::std::complex<float>;
   // cudaExecutor exec{};
 

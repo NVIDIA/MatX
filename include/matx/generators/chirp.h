@@ -78,6 +78,11 @@ namespace matx
           return detail::combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(sop_));
         }
 
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability(const InType &) const {          
+          return detail::capability_attributes<Cap>::default_value;
+        }        
+
         template <typename CapType>
         inline __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
         {
@@ -128,6 +133,11 @@ namespace matx
           method_(method)
         {}
 
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability(const InType &) const {          
+          return detail::capability_attributes<Cap>::default_value;
+        }    
+        
         template <detail::OperatorCapability Cap>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
           auto self_has_cap = detail::capability_attributes<Cap>::default_value;

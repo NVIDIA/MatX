@@ -352,8 +352,12 @@ namespace matx {\n\
     }\n\
   }\n\
 }";
+#else
+static const char *matxKernelStr = nullptr;
 #endif 
 
+#else 
+static const char *matxKernelStr = nullptr;
 #endif
 }
 

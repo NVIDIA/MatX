@@ -106,7 +106,17 @@ public:
             detail::get_operator_capability<Cap>(ynorm_),
             detail::get_operator_capability<Cap>(out_));
     }
-  }    
+  }  
+
+  template <OperatorCapability Cap, typename InType>
+  __MATX_INLINE__ __MATX_HOST__ auto get_capability(const InType& in) const {
+    // No specific capabilities enforced
+    auto self_has_cap = capability_attributes<Cap>::default_value;
+    return combine_capabilities<Cap>(self_has_cap, 
+          detail::get_operator_capability<Cap>(xnorm_, in), 
+          detail::get_operator_capability<Cap>(ynorm_, in),
+          detail::get_operator_capability<Cap>(out_, in));
+  }     
 };
 
 template <class O, class I1>
@@ -151,8 +161,17 @@ public:
       return combine_capabilities<Cap>(self_has_cap, 
             detail::get_operator_capability<Cap>(out_), 
             detail::get_operator_capability<Cap>(x_));
-    }
-  }    
+    }      
+  }  
+
+  template <OperatorCapability Cap, typename InType>
+  __MATX_INLINE__ __MATX_HOST__ auto get_capability(const InType& in) const {
+    // No specific capabilities enforced
+    auto self_has_cap = capability_attributes<Cap>::default_value;
+    return combine_capabilities<Cap>(self_has_cap, 
+          detail::get_operator_capability<Cap>(out_), 
+          detail::get_operator_capability<Cap>(x_, in));
+  }       
 
   constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
   {
@@ -203,7 +222,16 @@ public:
             detail::get_operator_capability<Cap>(out_), 
             detail::get_operator_capability<Cap>(x_));
     }
-  }    
+  }  
+
+  template <OperatorCapability Cap, typename InType>
+  __MATX_INLINE__ __MATX_HOST__ auto get_capability(const InType& in) const {
+    // No specific capabilities enforced
+    auto self_has_cap = capability_attributes<Cap>::default_value;
+    return combine_capabilities<Cap>(self_has_cap, 
+          detail::get_operator_capability<Cap>(out_), 
+          detail::get_operator_capability<Cap>(x_, in));
+  }           
 
   constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
   {

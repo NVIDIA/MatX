@@ -69,28 +69,28 @@ namespace matx
        * @param op Operator if conditional branch is true
        */
       __MATX_INLINE__ IFOP(const T1 &cond, const T2 &op) : cond_(cond), op_(op)
-    {
-      static_assert((!is_tensor_view_v<T2>),
-          "Only operator emmitters are allowed in IF. Tensor views are "
-          "not allowed");
-      constexpr index_t rank1 = detail::get_rank<T1>();
-      constexpr index_t rank2 = detail::get_rank<T2>();
-      static_assert(rank1 == -1 || rank1 == Rank());
-      static_assert(rank2 == -1 || rank2 == Rank());
-
-      if constexpr (Rank() > 0)
       {
-        for (int i = 0; i < Rank(); i++)
-        {
-          index_t size1 = detail::get_expanded_size<Rank()>(cond_, i);
-          index_t size2 = detail::get_expanded_size<Rank()>(op_, i);
-          size_[i] = detail::matx_max(size1, size2);
-        }
+        static_assert((!is_tensor_view_v<T2>),
+            "Only operator emmitters are allowed in IF. Tensor views are "
+            "not allowed");
+        constexpr index_t rank1 = detail::get_rank<T1>();
+        constexpr index_t rank2 = detail::get_rank<T2>();
+        static_assert(rank1 == -1 || rank1 == Rank());
+        static_assert(rank2 == -1 || rank2 == Rank());
 
-        MATX_ASSERT_COMPATIBLE_OP_SIZES(op_);
-        MATX_ASSERT_COMPATIBLE_OP_SIZES(cond_);
+        if constexpr (Rank() > 0)
+        {
+          for (int i = 0; i < Rank(); i++)
+          {
+            index_t size1 = detail::get_expanded_size<Rank()>(cond_, i);
+            index_t size2 = detail::get_expanded_size<Rank()>(op_, i);
+            size_[i] = detail::matx_max(size1, size2);
+          }
+
+          MATX_ASSERT_COMPATIBLE_OP_SIZES(op_);
+          MATX_ASSERT_COMPATIBLE_OP_SIZES(cond_);
+        }
       }
-    }
 
       /**
        * @brief Operator() for getting values of an if operator. Does not support multiple elements per thread.
@@ -102,8 +102,8 @@ namespace matx
       template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator()(Is... indices) const {
           if constexpr (CapType::ept == ElementsPerThread::ONE) {
-            if (get_value<ElementsPerThread::ONE>(cond_, indices...)) {
-              get_value<ElementsPerThread::ONE>(op_, indices...);
+            if (get_value<CapType>(cond_, indices...)) {
+              get_value<CapType>(op_, indices...);
             }
           }
         }

@@ -48,6 +48,7 @@
 #include "matx/transforms/cub.h"
 #include "matx/transforms/copy.h"
 #endif
+#include "matx/core/reduce_utils.h"
 #include "matx/core/half.h"
 
 union HalfBits {

@@ -447,7 +447,7 @@ namespace detail {
             }
 
             #pragma unroll
-            for (int i = 0; i < CapType::ept; ++i) {
+            for (int i = 0; i < static_cast<int>(CapType::ept); ++i) {
               val.data[i] = fParams_.alpha_ * val.data[i] + fParams_.beta_;
             }
           }

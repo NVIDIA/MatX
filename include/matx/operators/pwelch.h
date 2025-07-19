@@ -170,8 +170,8 @@ namespace matx
         PwelchOutputScaleMode output_scale_mode_;
         fsType fs_;
         cuda::std::array<index_t, 1> out_dims_;
-        mutable ::matx::detail::tensor_impl_t<typename remove_cvref_t<OpX>::value_type, 1> tmp_out_;
-        mutable typename remove_cvref_t<OpX>::value_type *ptr = nullptr;
+        mutable ::matx::detail::tensor_impl_t<value_type, 1> tmp_out_;
+        mutable value_type *ptr = nullptr;
     };
   }
 

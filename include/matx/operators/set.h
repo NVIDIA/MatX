@@ -151,11 +151,10 @@ public:
   template <typename CapType, typename... Is>
   __MATX_DEVICE__ __MATX_HOST__ inline decltype(auto) operator()(Is... indices) const noexcept
   {
-    //auto &&out = out_(indices...);
-    //out = detail::get_value<CapType>(op_, indices...);
-
     const auto in_val = detail::get_value<CapType>(op_, indices...);
     using out_type = decltype(out_.template operator()<CapType>(indices...));
+
+    // If we get a scalar on the input and a vector output, construct a vector of these scalars to write out
     if constexpr (!is_vector_v<decltype(in_val)> && is_vector_v<out_type>) {
       Vector<remove_cvref_t<decltype(in_val)>, static_cast<size_t>(CapType::ept)> vec{in_val};
       out_.template operator()<CapType>(indices...) = vec;
