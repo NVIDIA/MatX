@@ -48,7 +48,7 @@ __global__ void diai_spmv_kernel(VAL *A, CRD *diags, uint64_t numDiags, VAL *B,
     VAL acc = 0.0;
     for (uint64_t d = 0; d < numDiags; d++) {
       int64_t j = i + diags[d]; // signed
-      if (0 <= j && j < n) {
+      if (0 <= j && j < static_cast<int64_t>(n)) {
         acc += A[d * m + i] * B[j];
       }
     }
@@ -65,7 +65,7 @@ __global__ void diaj_spmv_kernel(VAL *A, CRD *diags, uint64_t numDiags, VAL *B,
     VAL acc = 0.0;
     for (uint64_t d = 0; d < numDiags; d++) {
       int64_t j = i + diags[d]; // signed
-      if (0 <= j && j < n) {
+      if (0 <= j && j < static_cast<int64_t>(n)) {
         acc += A[d * n + j] * B[j];
       }
     }

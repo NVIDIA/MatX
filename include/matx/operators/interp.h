@@ -301,7 +301,7 @@ namespace matx {
       // Next value interpolation implementation
       template <ElementsPerThread EPT>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__
-      value_type interpolate_next(const domain_type x_query, cuda::std::array<index_t, RANK> idx_low, cuda::std::array<index_t, RANK> idx_high) const {
+      value_type interpolate_next([[maybe_unused]] const domain_type x_query, cuda::std::array<index_t, RANK> idx_low, cuda::std::array<index_t, RANK> idx_high) const {
         value_type v;
         if (idx_high[AXIS] == x_.Size(AXIS_X)) { // x_query > x(n-1)
           v = get_value<EPT>(v_, idx_low);
@@ -314,7 +314,7 @@ namespace matx {
       // Previous value interpolation implementation
       template <ElementsPerThread EPT>      
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__
-      value_type interpolate_prev(const domain_type x_query, cuda::std::array<index_t, RANK> idx_low, cuda::std::array<index_t, RANK> idx_high) const {
+      value_type interpolate_prev([[maybe_unused]] const domain_type x_query, cuda::std::array<index_t, RANK> idx_low, cuda::std::array<index_t, RANK> idx_high) const {
         value_type v;
         if (idx_low[AXIS] == x_.Size(AXIS_X)) { // x_query < x(0)
           v = get_value<EPT>(v_, idx_high);

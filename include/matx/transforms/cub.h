@@ -1490,7 +1490,6 @@ void sort_pairs_impl_inner(OutputIndexTensor &idx_out, const InputIndexTensor &i
 
   static constexpr int RANK = OutputIndexTensor::Rank();
   using T1 = typename InputKeyTensor::value_type;
-  using T2 = typename OutputIndexTensor::value_type;
 
   cudaStream_t stream = exec.getStream();
   void *d_temp = nullptr;
