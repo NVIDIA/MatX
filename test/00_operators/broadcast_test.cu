@@ -20,6 +20,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Broadcast)
     tensor_t<TestType, 4> t4i({10, 20, 30, 40});
     tensor_t<TestType, 4> t4o({10, 20, 30, 40});
     (t4o = t0).run(exec);
+    exec.sync();
 
     t0() = (TestType)2.0f;
     for (index_t i = 0; i < t4i.Size(0); i++) {
