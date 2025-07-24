@@ -96,7 +96,7 @@ public:
     auto el = cache.find(id);
     MATX_ASSERT_STR(el != cache.end(), matxInvalidType, "Cache type not found");
 
-    for (int i = 0; i < MAX_CUDA_DEVICES_PER_SYSTEM; i++) {
+    for (int i = 0; i < static_cast<int>(MAX_CUDA_DEVICES_PER_SYSTEM); i++) {
       using CacheArray = cuda::std::array<CacheType, MAX_CUDA_DEVICES_PER_SYSTEM>;
       std::any_cast<CacheArray&>(el->second)[i].clear();
     }
