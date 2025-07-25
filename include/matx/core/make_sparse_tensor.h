@@ -286,5 +286,43 @@ auto make_tensor_uniform_batched_dia(ValTensor &val, CrdTensor &off,
       {tp, makeDefaultNonOwningEmptyStorage<POS>()});
 }
 
+// Convenience constructor for uniform batched tri-diagonal storage.
+template <typename IDX, typename ValTensor>
+auto make_tensor_uniform_batched_tri_dia(ValTensor &val,
+                                         const index_t (&shape)[3]) {
+  using VAL = typename ValTensor::value_type;
+  using CRD = index_t;
+  using POS = index_t;
+  // Proper structure.
+  MATX_STATIC_ASSERT_STR(ValTensor::Rank() == 1, matxInvalidParameter,
+                         "data array should be rank-1");
+  if constexpr (std::is_same_v<IDX, DIA_INDEX_I>) {
+    MATX_ASSERT_STR(
+        val.Size(0) == shape[0] * shape[1] * 3, matxInvalidParameter,
+        "data arrays should contain all three diagonals (by row index)");
+  } else {
+    MATX_ASSERT_STR(
+        val.Size(0) == shape[0] * shape[2] * 3, matxInvalidParameter,
+        "data arrays should contain all three diagonals (by col index)");
+  }
+  // Construct the off = { -1, 0, +1 } in values memory space.
+  matxMemorySpace_t space = GetPointerKind(val.GetStorage().data());
+  auto off = makeDefaultNonOwningZeroStorage<CRD>(3, space);
+  setVal(off.data() + 0, static_cast<CRD>(-1), space);
+  setVal(off.data() + 2, static_cast<CRD>(+1), space);
+  // Note that the DIA API typically does not involve positions.
+  // However, under the formal DSL specifications, the top level
+  // compression should set up pos[0] = {0, #diags}. This is done
+  // here, using the same memory space as the other data.
+  auto tp = makeDefaultNonOwningZeroStorage<POS>(2, space);
+  setVal(tp.data() + 1, static_cast<POS>(3), space);
+  // Construct Batched DIA-I/J.
+  using DIA = std::conditional_t<std::is_same_v<IDX, DIA_INDEX_I>,
+                                 BatchedDIAIUniform, BatchedDIAJUniform>;
+  return sparse_tensor_t<VAL, CRD, POS, DIA>(
+      shape, val.GetStorage(), {off, makeDefaultNonOwningEmptyStorage<CRD>()},
+      {tp, makeDefaultNonOwningEmptyStorage<POS>()});
+}
+
 } // namespace experimental
 } // namespace matx
