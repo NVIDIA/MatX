@@ -88,13 +88,20 @@ To build unit tests, pass the argument ``-DMATX_BUILD_TESTS=ON`` to CMake to con
 
     make -j test
 
-This will compile and run all unit tests. For more control over which tests to run, you may run test/matx_test directly with parameters 
-defined by Google Test (https://github.com/google/googletest). To run matx_test directly, you must be inside the build/test directory 
-for the correct paths to be set. For example, to run only tests with the name FFT:
+This will execute all unit tests defined. It is also possible to build and execute a single test, for example:
 
 .. code-block:: shell
 
-    test/matx_test --gtest_filter="*FFT*"
+    make test_00_operators_interp_test
+    test/test_00_operators_interp_test
+
+To run a subset of tests, it is possible to use `ctest <https://cmake.org/cmake/help/latest/manual/ctest.1.html>`_ from inside the ``build/test`` directory. For example, to run only tests with the name FFT:
+
+.. code-block:: shell
+
+    cd build/test
+    ctest -R "FFT"
+
 
 Examples
 --------
