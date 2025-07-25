@@ -29,7 +29,7 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
-
+#ifndef __CUDACC_RTC__
 #pragma once
 
 
@@ -117,3 +117,4 @@ namespace matx
     return matx::copy(in, cudaExecutor(stream));
   };
 } // end namespace matx
+#endif // JITIFY

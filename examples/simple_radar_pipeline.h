@@ -32,6 +32,7 @@
 
 #pragma once
 #include "matx.h"
+#include "matx/core/capabilities.h"
 #include <memory>
 #include <stdint.h>
 
@@ -78,10 +79,10 @@ public:
    * @param idy Y position
    * @param idx X position
    */
-  template <detail::ElementsPerThread EPT>
+  template <typename CapType>
   __device__ inline void operator()(index_t idz, index_t idy, index_t idx)
   {
-    if constexpr (EPT == detail::ElementsPerThread::ONE) {
+    if constexpr (CapType::ept == detail::ElementsPerThread::ONE) {
       typename I1::type xpow = xpow_(idz, idy, idx);
       typename I2::type ba = ba_(idz, idy, idx);
       typename I2::type norm = norm_(idz, idy, idx);
@@ -111,10 +112,16 @@ public:
     return O::Rank();
   }
 
-  template <detail::OperatorCapability Cap>
-  __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+
+  template <detail::OperatorCapability Cap, typename InType>
+  __MATX_INLINE__ __MATX_HOST__ auto get_capability(const InType &) const {
     if constexpr (Cap == detail::OperatorCapability::ELEMENTS_PER_THREAD) {
-      return detail::ElementsPerThread::ONE;
+      const auto my_cap = cuda::std::array<detail::ElementsPerThread, 2>{detail::ElementsPerThread::ONE, detail::ElementsPerThread::ONE};
+      return combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(xpow_),
+        detail::get_operator_capability<Cap>(ba_),
+        detail::get_operator_capability<Cap>(norm_),
+        detail::get_operator_capability<Cap>(pfa_)
+      );
     }
     else {
       auto self_has_cap = detail::capability_attributes<Cap>::default_value;
@@ -263,7 +270,7 @@ public:
     auto waveformFull = slice(waveformView, {0}, {numSamplesRnd});
 
     auto x = inputView;
-
+    //printf("in here\n");
     // create waveform (assuming waveform is the same for every pulse)
     // this allows us to precompute waveform in frequency domain
     // Apply a Hamming window to the waveform to suppress sidelobes. Other
@@ -282,6 +289,7 @@ public:
     (x = fft(x)).run(exec);
     (x = x * waveformT).run(exec);
     (x = ifft(x)).run(exec);
+   // printf("out here\n");
   }
 
 

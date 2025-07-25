@@ -32,14 +32,15 @@
 
 #pragma once
 
-#include "cublas_v2.h"
-#include "cusolverDn.h"
+#include <cublas_v2.h>
+#include <cusolverDn.h>
 
 #include "matx/core/error.h"
 #include "matx/core/nvtx.h"
 #include "matx/core/tensor.h"
 #include "matx/core/cache.h"
 #include "matx/operators/slice.h"
+#include "matx/operators/index.h"
 #include "matx/transforms/solver_common.h"
 
 #include <cstdio>

@@ -70,10 +70,17 @@ namespace matx
 #endif
         }
 
-        template <detail::ElementsPerThread EPT>
+        template <typename CapType>
         __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t idx) const
         {
-          auto range_val = range_.template operator()<EPT>(idx);
+#ifdef __CUDA_ARCH__
+        if constexpr (CapType::jit) {
+          if ((threadIdx.x * CapType::ept) >= Size(0)) {
+            return detail::GetJitSentinelValue<CapType, value_type>();
+          }
+        }
+#endif
+          auto range_val = range_.template operator()<CapType>(idx);
           auto log_func = [](const auto &val) {
             if constexpr (is_matx_half_v<T>) {
               return static_cast<T>(
@@ -84,12 +91,34 @@ namespace matx
             }
           };
 
-          return detail::ApplyVecFunc<EPT, value_type>(log_func, range_val); 
+          return detail::ApplyVecFunc<CapType, value_type>(log_func, range_val); 
+        }
+
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] const InType &in) const {
+          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+            return my_cap;
+          } else {          
+            auto self_has_cap = detail::capability_attributes<Cap>::default_value;
+            return self_has_cap;
+          }
+        }       
+
+        template <OperatorCapability Cap>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability_proc() const {
+          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+            return my_cap;
+          } else {          
+            auto self_has_cap = detail::capability_attributes<Cap>::default_value;
+            return self_has_cap;
+          }
         }
 
         __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t idx) const
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(idx);
+          return this->operator()<DefaultCapabilities>(idx);
         }
 
         constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size([[maybe_unused]] int dim) const
@@ -117,7 +146,7 @@ namespace matx
    * @return Operator with log10-spaced values 
    */
   template <int Dim, typename ShapeType, typename T = float,
-           std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+           std::enable_if_t<!cuda::std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
              inline auto logspace(ShapeType &&s, T first, T last)
              {
                constexpr int RANK = cuda::std::tuple_size<std::decay_t<ShapeType>>::value;

@@ -37,6 +37,7 @@
 #include "matx/core/nvtx.h"
 #include "matx/core/operator_utils.h"
 #include "matx/core/capabilities.h"
+
 namespace matx
 {
 
@@ -52,8 +53,26 @@ namespace matx
         using matxop = bool;  ///< Is a MatX custom operator
         using value_type = T; ///< Value type for type traits
 
+        //static constexpr uint64_t unique_id_ = detail::fnv1a_64(detail::get_type_name<T>());
 	      __MATX_INLINE__ std::string str() const { return "BaseOp"; }
 
+        // BaseOp() {
+        //   printf("id: %lu %s\n", id, std::string(detail::get_type_name<T>()).c_str());
+        // }
+
+
+      private:
+        // Helper template to safely check if T is a matx_set_op with transform and tensor_view
+        template<typename U>
+        static constexpr bool is_matx_set_op_with_transform_and_tensor_view() {
+          if constexpr (is_matx_set_op<U>()) {
+            return is_matx_transform_op<typename U::op_type>() && is_tensor_view_v<typename U::tensor_type>;
+          } else {
+            return false;
+          }
+        }
+
+      public:
         /**
          * @brief Launch work in an arbitrary executor
          * 
@@ -66,15 +85,23 @@ namespace matx
           static_assert(is_executor_t<Ex>(), "Ex must be a MatX executor type");
 
           auto tp = static_cast<T *>(this);
-
           // If we're doing a simple set operation from a transform we take a shorcut to avoid the extra
           // async allocation we'd normally have to do
           if constexpr (is_mtie<T>() ) {
             tp->Exec(ex);
+            return;
           }          
-          else if constexpr (is_matx_set_op<T>()) {
-            if constexpr (is_matx_transform_op<typename T::op_type>() && is_tensor_view_v<typename T::tensor_type>) {
-              tp->TransformExec(tp->Shape(), ex);
+          else if constexpr (is_matx_set_op_with_transform_and_tensor_view<T>()) {
+            // If this is a direct assignment from a transform, we can skip the async allocation and just do the assignment
+            tp->TransformExec(tp->Shape(), ex);
+            return;
+          }
+          else  {
+            const auto ept_bounds = detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(*tp, detail::EPTQueryInput{true});  
+            if (T::Rank() <= 4 &&
+                detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(*tp) && 
+                ept_bounds[0] != detail::ElementsPerThread::INVALID) { // Make sure that if we try to JIT the EPT is compatible on all operators
+              ex.Exec(*tp);
             }
             else {
               if constexpr (is_matx_op<T>()) {
@@ -85,20 +112,9 @@ namespace matx
 
               if constexpr (is_matx_op<T>()) {
                 tp->PostRun(tp->Shape(), ex);
-              }              
-            }
-          }
-          else {
-            if constexpr (is_matx_op<T>()) {
-              tp->PreRun(tp->Shape(), ex);
-            }
-
-            ex.Exec(*tp);
-
-            if constexpr (is_matx_op<T>()) {
-              tp->PostRun(tp->Shape(), ex);
-            }
-          }
+              } 
+            }     
+          }        
         }
 
         /**
@@ -175,6 +191,7 @@ namespace matx
           }
           return size;
         }
+
 
         /* This must be in derived class.  Copy paste line below to derived case if it is an lvalue
            template<typename R> __MATX_INLINE__ auto operator=(const R &rhs) { return set(*reinterpret_cast<T*>(this), rhs); }

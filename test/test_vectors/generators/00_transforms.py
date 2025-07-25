@@ -258,6 +258,13 @@ class fft_operators:
             'a_in': seq,
             'a_out': np.fft.fft(seq, self.size[1])
         }
+    
+    def fft_1d_scaled(self) -> Dict[str, np.ndarray]:
+        seq = matx_common.randn_ndarray((self.size[0],), self.dtype)
+        return {
+            'a_in': seq,
+            'a_out': np.fft.fft(seq, self.size[1]) * 5.0
+        }    
 
     def fft_1d_ortho(self) -> Dict[str, np.ndarray]:
         seq = matx_common.randn_ndarray((self.size[0],), self.dtype)

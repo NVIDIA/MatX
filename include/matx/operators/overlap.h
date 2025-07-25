@@ -86,36 +86,50 @@ namespace matx
           s_[0] = stride_size;
         };
 
-        template <ElementsPerThread EPT, typename Op, typename... Is>
+        template <typename CapType, typename Op, typename... Is>
         static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, index_t i0)
         {   
-          if constexpr (EPT == ElementsPerThread::ONE) {
-            return get_value<EPT>(cuda::std::forward<Op>(op), i0);
+          if constexpr (CapType::ept == ElementsPerThread::ONE) {
+            return get_value<CapType>(cuda::std::forward<Op>(op), i0);
           } else {
-            return Vector<value_type, static_cast<index_t>(EPT)>{};
+            return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
           }
         }        
 
-        template <ElementsPerThread EPT>
+        template <typename CapType>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i0, index_t i1) const
         {
-          return get_impl<EPT>(cuda::std::as_const(op_), i0*s_[0] + i1);
+#ifdef __CUDA_ARCH__
+        if constexpr (CapType::jit) {
+          if ((threadIdx.x * CapType::ept) >= Size(Rank() - 1)) {
+            return detail::GetJitSentinelValue<CapType, value_type>();
+          }
+        }
+#endif
+          return get_impl<CapType>(cuda::std::as_const(op_), i0*s_[0] + i1);
         }
 
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i0, index_t i1) const
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(i0, i1);
+          return this->operator()<DefaultCapabilities>(i0, i1);
         }
 
-        template <ElementsPerThread EPT>
+        template <typename CapType>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i0, index_t i1)
         {
-          return get_impl<EPT>(cuda::std::forward<decltype(op_)>(op_), i0*s_[0] + i1);
+#ifdef __CUDA_ARCH__
+        if constexpr (CapType::jit) {
+          if ((threadIdx.x * CapType::ept) >= Size(Rank() - 1)) {
+            return detail::GetJitSentinelValue<CapType, value_type>();
+          }
+        }
+#endif
+          return get_impl<CapType>(cuda::std::forward<decltype(op_)>(op_), i0*s_[0] + i1);
         }
 
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i0, index_t i1)
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(i0, i1);
+          return this->operator()<DefaultCapabilities>(i0, i1);
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -159,13 +173,14 @@ namespace matx
           }
         }
 
-        template <OperatorCapability Cap>
-        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] const InType& in) const {
           if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-            return ElementsPerThread::ONE;
+            const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+            return combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(op_, in));
           } else {
             auto self_has_cap = capability_attributes<Cap>::default_value;
-            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
+            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_, in));
           }
         }
     };
