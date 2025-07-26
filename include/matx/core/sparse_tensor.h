@@ -145,11 +145,6 @@ public:
     for (int l = 0; l < LVL; l++) {
       c[l] = coordinates_[l].data();
       p[l] = positions_[l].data();
-      // All non-null data resides in same space.
-      if (v) {
-        assert(!c[l] || GetPointerKind(c[l]) == GetPointerKind(v));
-        assert(!p[l] || GetPointerKind(p[l]) == GetPointerKind(v));
-      }
     }
     this->SetSparseData(v, c, p);
   }

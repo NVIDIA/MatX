@@ -106,6 +106,7 @@ public:
   void Exec([[maybe_unused]] Out &&out, [[maybe_unused]] Executor &&ex) const {
     static_assert(!is_sparse_tensor_v<OpB>, "sparse rhs not implemented");
     if constexpr (is_sparse_tensor_v<OpA>) {
+      // Note that diagonal solve assumes TRI-diagonal storage currently.
       if constexpr (OpA::Format::isDIAI() || OpA::Format::isDIAJ()) {
         sparse_dia_solve_impl(cuda::std::get<0>(out), a_, b_, ex);
       } else if constexpr (OpA::Format::isBatchedDIAIUniform()) {
