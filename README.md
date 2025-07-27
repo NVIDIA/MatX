@@ -16,15 +16,14 @@ and MatX version are shown below:
 * CuPy: **10.6ms**  (A100)
 * MatX: **2.54ms** (A100)
 
-While the code complexity and length are roughly the same, the MatX version shows a **2100x** over the Numpy version, and over **4x** faster than
+While the code complexity and length are roughly the same, the MatX version shows a **2100x** speedup over the NumPy version, and over **4x** faster than
 the CuPy version on the same GPU. 
 
 Key features include:
 
-* :zap: MatX is fast. By using existing, optimized libraries as a backend, and efficient kernel generation when needed, no hand-optimizations
-are necessary
+* :zap: MatX is fast. By using existing, optimized libraries as a backend, and efficient kernel generation when needed, no manual optimizations are necessary
 
-* :open_hands: MatX is easy to learn. Users familiar with high-level languages will pick up the syntax quickly
+* :open_hands: MatX is easy to learn. Users familiar with high-level languages can quickly learn the syntax
 
 * :bookmark_tabs: MatX easily integrates with existing libraries and code
 
@@ -48,7 +47,7 @@ are necessary
 
 
 ## Requirements
-MatX support is currently limited to **Linux only** due to the time to test Windows. If you'd like to voice your support for native Windows support using Visual Studio, please comment on the issue here: https://github.com/NVIDIA/MatX/issues/153.
+MatX support is currently limited to **Linux only** due to the time required to test on Windows. If you'd like to voice your support for native Windows support using Visual Studio, please comment on the issue here: https://github.com/NVIDIA/MatX/issues/153.
 
 **Note**: CUDA 12.0.0 through 12.2.0 have an issue that causes building MatX unit tests to show a compiler error or cause a segfault in the compiler. Please use CUDA 11.8 or CUDA 12.2.1+ with MatX.
 
@@ -129,7 +128,7 @@ make && make install
 ```
 
 If you have the correct permissions, the headers and cmake packages will be installed on your system in the expected paths for your operating
-system. With the package installed you can use ``find_package`` as follows:
+system. Once the package is installed, you can use ``find_package`` as follows: 
 
 ```cmake
 find_package(matx CONFIG REQUIRED)
@@ -146,14 +145,14 @@ MatX may add other optional targets in the future inside the matx:: namespace as
 
 
 ## Documentation
-Documentation for MatX can be built locally as shown above with the `DBUILD_DOCS=ON` cmake flag. Building documentation requires the following to be installed:
+Documentation for MatX can be built locally as shown above with the `-DMATX_BUILD_DOCS` cmake flag. Building documentation requires the following to be installed:
 doxygen, breathe, sphinx, sphinx-rtd-theme, libjs-mathjax, texlive-font-utils, flex, bison
 
 - Current documentation can be [found here](https://nvidia.github.io/MatX)
 - A quick start guide can be [found here](https://nvidia.github.io/MatX/quickstart.html)
 - Current library executor support is [listed here](https://nvidia.github.io/MatX/executor_compatibility.html)
 - A conversion from MATLAB and Python syntax is [found here](https://nvidia.github.io/MatX/basics/matlabpython.html)
-- A self-guided Jupyer notebook training can be [found here](docs/notebooks)
+- A self-guided Jupyter notebook training can be [found here](docs/notebooks)
 
 MatX uses semantic versioning and reserve the right to introduce breaking API changes on major releases.
 
@@ -182,7 +181,7 @@ test/matx_test
 ```
 
 This will execute all unit tests defined. If you wish to execute a subset of tests, or run with different options, you
-may run test/matx_test directly with parameters defined by [Google Test](https://github.com/google/googletest). To run matx_test
+may run `test/matx_test` directly with parameters defined by [Google Test](https://github.com/google/googletest). To run matx_test
 directly, you must be inside the build/test directory for the correct paths to be set. For example,
 to run only tests with the name FFT:
 
@@ -196,7 +195,7 @@ cd build/test
 We provide a variety of training materials and examples to quickly learn the MatX API.
 - A [quick start guide](docs_input/quickstart.rst) can be found in the docs directory or from the [main documentation site](https://nvidia.github.io/MatX/quickstart.html). The MatX quick start guide is modeled after [NumPy's](https://numpy.org/doc/stable/user/quickstart.html) and demonstrates how to manipulate and create tensors.
 - A set of MatX [notebooks](docs_input/notebooks) can be found in the docs directory. These four notebooks walk through the major MatX features and allow the developer to practice writing MatX code with guided examples and questions.
-- Finally, for new MatX developers, browsing the [example applications](examples) can provide familarity with the API and best practices.
+- Finally, for new MatX developers, browsing the [example applications](examples) can provide familiarity with the API and best practices.
 
 ## Release Major Features
 **v0.9.1**:
