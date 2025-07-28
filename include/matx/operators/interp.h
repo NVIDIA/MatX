@@ -443,7 +443,7 @@ namespace matx {
           // Allocate temporary storage for tridiagonal system
           // use a single buffer for all three diagonals so that we can use the DIA format
           value_type *ptr_tridiag_ = nullptr;
-          matxAlloc((void**)&ptr_tridiag_, 3 * batch_count * n * sizeof(value_type), MATX_MANAGED_MEMORY, stream);
+          matxAlloc((void**)&ptr_tridiag_, 3 * batch_count * n * sizeof(value_type), MATX_ASYNC_DEVICE_MEMORY, stream);
           value_type *ptr_dl_ = ptr_tridiag_;
           value_type *ptr_d_  = ptr_tridiag_ + batch_count * n;
           value_type *ptr_du_ = ptr_tridiag_ + batch_count * n * 2;
@@ -458,9 +458,8 @@ namespace matx {
 
           // // Convert to uniform batched dia format
           auto val_tensor = make_tensor(ptr_tridiag_, {batch_count * n * 3});
-          auto offset_tensor = make_tensor<index_t>({3}, MATX_MANAGED_MEMORY, stream);
-          offset_tensor.SetVals({-1, 0, 1});
-          auto A = experimental::make_tensor_uniform_batched_dia<experimental::DIA_INDEX_I>(val_tensor, offset_tensor, {batch_count, n, n});
+
+          auto A = experimental::make_tensor_uniform_batched_tri_dia<experimental::DIA_INDEX_I>(val_tensor, {batch_count, n, n});
 
           auto M = make_tensor(ptr_m_, {batch_count * n});
 
