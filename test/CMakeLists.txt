@@ -138,6 +138,18 @@ endforeach()
 # Number of test jobs to run in parallel
 set(CTEST_PARALLEL_JOBS 4)
 
+# Create a legacy matx_test script for CI compatibility
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/matx_test.sh
+    ${CMAKE_CURRENT_BINARY_DIR}/matx_test
+    COPYONLY
+)
+# Make the script executable
+file(CHMOD ${CMAKE_CURRENT_BINARY_DIR}/matx_test
+    PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE
+                GROUP_READ GROUP_EXECUTE
+                WORLD_READ WORLD_EXECUTE)
+
 # Add a custom target to run CTest from the main build directory
 add_custom_target(test
     COMMAND ${CMAKE_CTEST_COMMAND} -j${CTEST_PARALLEL_JOBS} --output-on-failure
