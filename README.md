@@ -178,17 +178,20 @@ the need to store large test vector files in git, and instead can be generated a
 
 To run the unit tests, from the cmake build directory run:
 ```sh
-test/matx_test
+make -j test
 ```
 
-This will execute all unit tests defined. If you wish to execute a subset of tests, or run with different options, you
-may run test/matx_test directly with parameters defined by [Google Test](https://github.com/google/googletest). To run matx_test
-directly, you must be inside the build/test directory for the correct paths to be set. For example,
-to run only tests with the name FFT:
+This will execute all unit tests defined. It is also possible to build and execute a single test, for example:
+```
+make test_00_operators_interp_test
+test/test_00_operators_interp_test
+```
+
+To run a subset of tests, it is possible to use [ctest](https://cmake.org/cmake/help/latest/manual/ctest.1.html) from inside the `build/test` directory. For example, to run only tests with the name FFT:
 
 ```sh
 cd build/test
-./matx_test --gtest_filter="*FFT*"
+ctest -R "FFT"
 ```
 
 
