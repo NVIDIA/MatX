@@ -209,7 +209,7 @@ void sparse_dia_solve_impl(TensorTypeC &C, const TensorTypeA &a,
   }
   using CRD = typename atype::crd_type;
   CRD *diags = a.CRDData(0);
-  const index_t numD = a.crdSize(0);
+  [[maybe_unused]] const index_t numD = a.crdSize(0);
   // TODO: we should also check that offsets = {-1,0,1} (host and device)?
   MATX_ASSERT(numD == 3, matxInvalidParameter);
   using T = std::conditional_t<
@@ -278,7 +278,7 @@ void sparse_batched_dia_solve_impl(TensorTypeC &C, const TensorTypeA &a,
   }
   using CRD = typename atype::crd_type;
   CRD *diags = a.CRDData(0);
-  const index_t numD = a.crdSize(0);
+  [[maybe_unused]] const index_t numD = a.crdSize(0);
   // TODO: we should also check that offsets = {-1,0,1} (host and device)?
   MATX_ASSERT(numD == 3, matxInvalidParameter);
   using T = std::conditional_t<
