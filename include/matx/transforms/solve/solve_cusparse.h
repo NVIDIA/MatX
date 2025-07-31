@@ -33,6 +33,8 @@
 
 #pragma once
 
+#ifndef __CUDACC_RTC__
+
 #include <cusparse.h>
 
 #include <numeric>
@@ -301,3 +303,5 @@ void sparse_batched_dia_solve_impl(TensorTypeC &C, const TensorTypeA &a,
 }
 
 } // end namespace matx
+
+#endif

@@ -35,7 +35,6 @@
 #include "matx/core/capabilities.h"
 #include "matx/core/defines.h"
 #include "matx/executors/host.h"
-#include "matx/executors/kernel.h"
 #include "matx/core/capabilities.h"
 #include "matx/core/nvrtc_helper.h"
 #include "matx/core/get_grid_dims.h"

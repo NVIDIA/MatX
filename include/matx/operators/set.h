@@ -205,6 +205,11 @@ public:
   template <detail::OperatorCapability Cap, typename InType>
   __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] const InType& in) const {
     auto self_has_cap = capability_attributes<Cap>::default_value;
+    if constexpr (Cap == detail::OperatorCapability::SUPPORTS_JIT) {
+      printf("set get_capability %d %d %d %d\n", (int)Cap, detail::get_operator_capability<Cap>(out_, in), detail::get_operator_capability<Cap>(op_, in),  combine_capabilities<Cap>(self_has_cap, 
+        detail::get_operator_capability<Cap>(out_, in),
+        detail::get_operator_capability<Cap>(op_, in)));
+    }
     return combine_capabilities<Cap>(self_has_cap, 
                                       detail::get_operator_capability<Cap>(out_, in),
                                       detail::get_operator_capability<Cap>(op_, in));

@@ -57,6 +57,11 @@ struct jit_fft1_params_t {
     static constexpr bool fft_forward = false;
 };
 
+template <uint64_t ID>
+struct jit_sort_params_t {
+    static constexpr int ttl_items = 0;
+};
+
 
 } // namespace detail
 } // namespace matx

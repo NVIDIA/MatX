@@ -197,7 +197,6 @@ namespace matx
                                             detail::FFTDirection::BACKWARD;      
 
           if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
-            static_assert(!std::is_same_v<InType, void>, "DYN_SHM_SIZE capability requires InType to be specified");
             static_assert(std::is_same_v<InType, ShmQueryInput>, "DYN_SHM_SIZE capability requires ShmQueryInput as input type");
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__) && !defined(__CUDACC_RTC__) && !defined(__CUDA_ARCH__)            
             return combine_capabilities<Cap>(cuFFTDxHelper<typename OpA::value_type>::GetShmRequired(fft_size_, FFTType::C2C, dir, in.ept), detail::get_operator_capability<Cap>(a_, in));

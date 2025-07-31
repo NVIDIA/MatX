@@ -355,11 +355,11 @@ namespace matx {\n\
   }\n\
 }";
 #else
-static const char *matxKernelStr = nullptr;
+[[maybe_unused]] static const char *matxKernelStr = nullptr;
 #endif 
 
 #else 
-static const char *matxKernelStr = nullptr;
+[[maybe_unused]] static const char *matxKernelStr = nullptr;
 #endif
 }
 

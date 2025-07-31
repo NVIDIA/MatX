@@ -33,7 +33,7 @@
 #pragma once
 
 #include "matx/core/defines.h"
-#include "matx/core/type_utils.h"
+#include "matx/core/type_utils_both.h"
 #include <type_traits>
 #include <limits>
 #include <algorithm>
@@ -74,6 +74,10 @@ namespace detail {
     ElementsPerThread ept;
   };
 
+  struct JITQueryInput {
+    ElementsPerThread ept;
+  };
+
   using BlockDimType = int;
 
 
@@ -106,6 +110,8 @@ namespace detail {
   struct CapabilityParams {
     static constexpr ElementsPerThread ept = EPT;
     static constexpr bool jit = JIT;
+    static constexpr int osize = 0;
+    static constexpr int block_size = 0;
 
     // For JIT there will be other capabilties patched in with a string
   };  

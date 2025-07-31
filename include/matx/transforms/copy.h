@@ -35,7 +35,7 @@
 
 #include "matx/core/nvtx.h"
 #include "matx/core/type_utils.h"
-#include "matx/executors/cuda.h"
+
 namespace matx
 {
   /**

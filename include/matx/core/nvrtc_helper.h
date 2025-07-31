@@ -44,7 +44,7 @@
 #endif
 #include "matx/core/jitify2.hpp"
 #include "matx/executors/kernel.h"
-#include "matx/core/type_utils.h"
+//#include "matx/core/type_utils.h"
 #include <filesystem>
 #include <source_location>
 #include <vector>
@@ -64,6 +64,7 @@ std::vector<std::string> __MATX_HOST__ __MATX_INLINE__ get_preprocessor_options(
 
     std::vector<std::string> options;
     options.push_back("-DMATX_EN_MATHDX");
+    options.push_back("-DMATX_EN_JIT");
     options.push_back("-I" + matx_root.string() + "/include");
     options.push_back("-I" + matx_root.string() + "/include/matx/kernels");
     
@@ -131,7 +132,7 @@ std::string get_kernel_name([[maybe_unused]] const Op &op, bool stride) {
 }
 
 template <typename Op>
-std::string generate_capability_params_string(const Op &op, ElementsPerThread EPT, bool JIT, int osize) {
+std::string generate_capability_params_string(const Op &op, ElementsPerThread EPT, bool JIT, int osize, int block_size) {
   std::string ept_str;
   switch (EPT) {
     case ElementsPerThread::ONE:
@@ -161,7 +162,7 @@ std::string generate_capability_params_string(const Op &op, ElementsPerThread EP
 
   std::string jit_caps_str = "";
   if (detail::get_operator_capability<OperatorCapability::SUPPORTS_JIT>(op)) {
-    jit_caps_str = detail::get_operator_capability<OperatorCapability::JIT_CAP_QUERY>(op);
+    jit_caps_str = detail::get_operator_capability<OperatorCapability::JIT_CAP_QUERY>(op, detail::JITQueryInput{EPT});
   }
 
   std::string final_str =  "#include <matx.h>\n"
@@ -171,6 +172,7 @@ std::string generate_capability_params_string(const Op &op, ElementsPerThread EP
          "  static constexpr ElementsPerThread ept = EPT;\n"
          "  static constexpr bool jit = JIT;\n"
          "  static constexpr int osize = " + std::to_string(osize) + ";\n"
+         "  static constexpr int block_size = " + std::to_string(block_size) + ";\n"
          "};\n"
          "\n" + jit_caps_str + "\n"
          "using CurrentCapabilities = CapabilityParams<" + ept_str + ", " + jit_str + ">;\n"
@@ -217,7 +219,7 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, cons
   // auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
   //printf("Preprocess step took %ld microseconds\n", duration.count());
 
-    auto capstr = generate_capability_params_string(op, ept, false, osize);
+    auto capstr = generate_capability_params_string(op, ept, false, osize, threads.x);
     //auto start_time_kernel = std::chrono::high_resolution_clock::now();
     auto kernel = cache
         // Compile, link, and load the program, and obtain the loaded kernel.
