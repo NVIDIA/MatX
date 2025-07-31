@@ -14,19 +14,6 @@
 #include "matx/core/half.h"
 
 namespace matx {
-
-  enum class PercentileMethod {
-    LINEAR,
-    LOWER,
-    HIGHER,
-    HAZEN,
-    WEIBULL,
-    MEDIAN_UNBIASED,
-    NORMAL_UNBIASED,
-    MIDPOINT,
-    NEAREST
-  }; 
-
 namespace detail {
 
 /**

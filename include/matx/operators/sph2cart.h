@@ -64,13 +64,20 @@ namespace matx
         MATX_ASSERT_COMPATIBLE_OP_SIZES(r);
       }
 
-        template <ElementsPerThread EPT, typename... Is>
+        template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
         {
-          if constexpr (EPT == ElementsPerThread::ONE) {
-            [[maybe_unused]] auto theta = get_value<EPT>(theta_, indices...);
-            [[maybe_unused]] auto phi = get_value<EPT>(phi_, indices...);
-            auto r = get_value<EPT>(r_, indices...);
+#ifdef __CUDA_ARCH__
+        if constexpr (CapType::jit) {
+          if ((threadIdx.x * CapType::ept) >= Size(Rank() - 1)) {
+            return detail::GetJitSentinelValue<CapType, value_type>();
+          }
+        }
+#endif
+          if constexpr (CapType::ept == ElementsPerThread::ONE) {
+            [[maybe_unused]] auto theta = get_value<CapType>(theta_, indices...);
+            [[maybe_unused]] auto phi = get_value<CapType>(phi_, indices...);
+            auto r = get_value<CapType>(r_, indices...);
 
             if constexpr (WHICH==0) { // X
               return r * (scalar_internal_cos(phi) * scalar_internal_cos(theta));
@@ -80,14 +87,14 @@ namespace matx
               return r * scalar_internal_sin(phi);
             }
           } else {
-            return Vector<value_type, static_cast<index_t>(EPT)>{};
+            return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
           }
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+          return this->operator()<DefaultCapabilities>(indices...);
         }
 
         template <typename ShapeType, typename Executor>
@@ -135,17 +142,23 @@ namespace matx
 					return detail::matx_max(size1, size2, size3);
         }
 
-        template <OperatorCapability Cap>
-        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] const InType &in) const {
           if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-            return ElementsPerThread::ONE;
+            const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+            return combine_capabilities<Cap>(
+              my_cap,
+              detail::get_operator_capability<Cap>(theta_, in),
+              detail::get_operator_capability<Cap>(phi_, in),
+              detail::get_operator_capability<Cap>(r_, in)
+            );
           } else {
             auto self_has_cap = capability_attributes<Cap>::default_value;
             return combine_capabilities<Cap>(
               self_has_cap,
-              detail::get_operator_capability<Cap>(theta_),
-              detail::get_operator_capability<Cap>(phi_),
-              detail::get_operator_capability<Cap>(r_)
+              detail::get_operator_capability<Cap>(theta_, in),
+              detail::get_operator_capability<Cap>(phi_, in),
+              detail::get_operator_capability<Cap>(r_, in)
             );
           }
         }

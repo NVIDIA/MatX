@@ -30,7 +30,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
-
+#ifndef __CUDACC_RTC__
 #pragma once
 
 #include <cstdint>
@@ -72,3 +72,4 @@ __MATX_INLINE__ void corr_impl(OutputTensor o, const In1Type i1, const In2Type i
 
 
 } // end namespace matx
+#endif

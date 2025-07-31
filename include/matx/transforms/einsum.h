@@ -33,6 +33,8 @@
 
 #pragma once
 
+#ifndef __CUDACC_RTC__
+
 #ifdef MATX_EN_CUTENSOR
 #include <cstdio>
 #include <numeric>
@@ -553,3 +555,5 @@ namespace cutensor {
 }
 
 } // end namespace matx
+
+#endif

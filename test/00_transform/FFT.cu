@@ -431,6 +431,31 @@ TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, FFT2Axis)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(FFTTestComplexTypes, FFTJITScale1D)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  if constexpr (!detail::CheckFFTSupport<ExecType, TestType>()) {
+    GTEST_SKIP();
+  } else {
+    for (index_t fft_dim = 64; fft_dim <= 32768; fft_dim *= 2) {
+      this->pb->template InitAndRunTVGenerator<TestType>(
+          "00_transforms", "fft_operators", "fft_1d_scaled", {fft_dim, fft_dim});
+
+      tensor_t<TestType, 1> av{{fft_dim}};
+      tensor_t<TestType, 1> avo{{fft_dim}};
+      this->pb->NumpyToTensorView(av, "a_in");
+
+      (avo = fft(av) * static_cast<typename TestType::value_type>(5.0f)).run(this->exec);
+      this->exec.sync();
+
+      MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
+    }
+  }
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(FFTTestComplexTypes, IFFT1D1024C2C)
 {
   MATX_ENTER_HANDLER();
@@ -944,45 +969,45 @@ TYPED_TEST(FFTTestComplexTypes, FFT2D16x32R2C)
 }
 
 // Enable once C2R is supported
-TYPED_TEST(FFTTestComplexNonHalfTypes, DISABLED_IFFT2D16C2R)
-{
-  MATX_ENTER_HANDLER();
-  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  const index_t fft_dim = 16;
-  using rtype = typename TestType::value_type;
-  this->pb->template InitAndRunTVGenerator<TestType>(
-      "00_transforms", "fft_operators", "irfft_2d", {fft_dim, fft_dim});
+// TYPED_TEST(FFTTestComplexNonHalfTypes, DISABLED_IFFT2D16C2R)
+// {
+//   MATX_ENTER_HANDLER();
+//   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+//   const index_t fft_dim = 16;
+//   using rtype = typename TestType::value_type;
+//   this->pb->template InitAndRunTVGenerator<TestType>(
+//       "00_transforms", "fft_operators", "irfft_2d", {fft_dim, fft_dim});
 
-  tensor_t<TestType, 2> av{{fft_dim, fft_dim / 2 + 1}};
-  tensor_t<rtype, 2> avo{{fft_dim, fft_dim}};
-  this->pb->NumpyToTensorView(av, "a_in");
+//   tensor_t<TestType, 2> av{{fft_dim, fft_dim / 2 + 1}};
+//   tensor_t<rtype, 2> avo{{fft_dim, fft_dim}};
+//   this->pb->NumpyToTensorView(av, "a_in");
 
-  (avo = ifft2(av)).run(this->exec);
-  this->exec.sync();
+//   (avo = ifft2(av)).run(this->exec);
+//   this->exec.sync();
 
-  MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
-  MATX_EXIT_HANDLER();
-}
+//   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
+//   MATX_EXIT_HANDLER();
+// }
 
-TYPED_TEST(FFTTestComplexNonHalfTypes, DISABLED_IFFT2D16x32C2R)
-{
-  MATX_ENTER_HANDLER();
-  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  const index_t fft_dim[] = {16, 32};
-  using rtype = typename TestType::value_type;
-  this->pb->template InitAndRunTVGenerator<TestType>(
-      "00_transforms", "fft_operators", "irfft_2d", {fft_dim[0], fft_dim[1]});
+// TYPED_TEST(FFTTestComplexNonHalfTypes, DISABLED_IFFT2D16x32C2R)
+// {
+//   MATX_ENTER_HANDLER();
+//   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+//   const index_t fft_dim[] = {16, 32};
+//   using rtype = typename TestType::value_type;
+//   this->pb->template InitAndRunTVGenerator<TestType>(
+//       "00_transforms", "fft_operators", "irfft_2d", {fft_dim[0], fft_dim[1]});
 
-  tensor_t<TestType, 2> av{{fft_dim[0], fft_dim[1] / 2 + 1}};
-  tensor_t<rtype, 2> avo{{fft_dim[0], fft_dim[1]}};
-  this->pb->NumpyToTensorView(av, "a_in");
+//   tensor_t<TestType, 2> av{{fft_dim[0], fft_dim[1] / 2 + 1}};
+//   tensor_t<rtype, 2> avo{{fft_dim[0], fft_dim[1]}};
+//   this->pb->NumpyToTensorView(av, "a_in");
 
-  (avo = ifft2(av)).run(this->exec);
-  this->exec.sync();
+//   (avo = ifft2(av)).run(this->exec);
+//   this->exec.sync();
 
-  MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
-  MATX_EXIT_HANDLER();
-}
+//   MATX_TEST_ASSERT_COMPARE(this->pb, avo, "a_out", this->thresh);
+//   MATX_EXIT_HANDLER();
+// }
 
 TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, FFT1D1024C2CShort)
 {

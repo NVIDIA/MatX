@@ -60,25 +60,32 @@ namespace matx
           MATX_STATIC_ASSERT_STR(Op::Rank() == 1, matxInvalidDim, "Input operator must be rank 1");
         };
 
-        template <ElementsPerThread EPT>
+        template <typename CapType>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t idx) const
         {
-          if constexpr (EPT == ElementsPerThread::ONE) {
+#ifdef __CUDA_ARCH__
+        if constexpr (CapType::jit) {
+          if ((threadIdx.x * CapType::ept) >= Size(0)) {
+            return detail::GetJitSentinelValue<CapType, value_type>();
+          }
+        }
+#endif
+          if constexpr (CapType::ept == ElementsPerThread::ONE) {
             // Horner's method for computing polynomial
-            value_type ttl{get_value<EPT>(coeffs_, 0)};
+            value_type ttl{get_value<CapType>(coeffs_, 0)};
             for(int i = 1; i < coeffs_.Size(0); i++) {
-                ttl = ttl * get_value<EPT>(op_, idx) + get_value<EPT>(coeffs_, i);
+                ttl = ttl * get_value<CapType>(op_, idx) + get_value<CapType>(coeffs_, i);
             }
 
             return ttl;
           } else {
-            return Vector<value_type, static_cast<index_t>(EPT)>{};
+            return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
           }
         }
 
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t idx) const
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(idx);
+          return this->operator()<DefaultCapabilities>(idx);
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -107,16 +114,21 @@ namespace matx
           }
         }
 
-        template <OperatorCapability Cap>
-        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] const InType& in) const {
           if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-            return ElementsPerThread::ONE;
+            const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+            return combine_capabilities<Cap>(
+              my_cap,
+              detail::get_operator_capability<Cap>(op_, in),
+              detail::get_operator_capability<Cap>(coeffs_, in)
+            );
           } else {
             auto self_has_cap = capability_attributes<Cap>::default_value;
             return combine_capabilities<Cap>(
               self_has_cap,
-              detail::get_operator_capability<Cap>(op_),
-              detail::get_operator_capability<Cap>(coeffs_)
+              detail::get_operator_capability<Cap>(op_, in),
+              detail::get_operator_capability<Cap>(coeffs_, in)
             );
           }
         }
