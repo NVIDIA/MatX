@@ -29,7 +29,7 @@ Stage0 += packages(ospackages=[
     'ghostscript',
     'git',
     'libjs-mathjax',
-    'liblapacke-dev',    
+    'liblapacke-dev',
     'libopenblas64-openmp-dev',
     'lcov',
     'ninja-build',
@@ -80,10 +80,15 @@ Stage0 += shell(commands=[
     '/bin/echo "matx ALL = (root) NOPASSWD: ALL" >> /etc/sudoers',
    ])
 
-Stage0 += copy(src='run_from_venv.sh',dest='/opt/nvidia/run_from_venv.sh')
-
 Stage0 += shell(commands=[
     'python3 -m venv /opt/nvidia/venv'
+])
+
+Stage0 += copy(src='run_from_venv.sh',dest='/opt/nvidia/run_from_venv.sh')
+Stage0 += shell(commands=[
+    "echo '[[ -z \"$VIRTUAL_ENV\" ]] && source /opt/nvidia/run_from_venv.sh /bin/bash' >> /etc/skel/.bashrc",
+    "echo '[[ -z \"$VIRTUAL_ENV\" ]] && source /opt/nvidia/run_from_venv.sh /bin/bash' >> /root/.bashrc",
+    "echo '[[ -z \"$VIRTUAL_ENV\" ]] && source /opt/nvidia/run_from_venv.sh /bin/bash' >> /home/matx/.bashrc"
 ])
 
 pip_packages=[
