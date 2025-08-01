@@ -67,7 +67,3 @@ docker run --platform=$MATX_PLATFORM \
     --userns=host \
     --ipc=host \
     $MATX_REPO$MATX_IMAGE_NAME:$MATX_VERSION_TAG-$TARGETARCH fixuid /bin/bash -c "/opt/nvidia/run_from_venv.sh $CMDS"
-
-#    $MATX_REPO$MATX_IMAGE_NAME:$MATX_VERSION_TAG-$TARGETARCH fixuid /bin/bash -c "$CMDS"
-
-#    $MATX_REPO$MATX_IMAGE_NAME:$MATX_VERSION_TAG-$TARGETARCH fixuid /bin/bash -c "/opt/nvidia/run_from_venv.sh $CMDS"
