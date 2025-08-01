@@ -9,8 +9,8 @@
     "dockerfile": "./dev.Dockerfile",
     "args": {
       "REMOTE_USER": "${localEnv:USER}",
-      "REMOTE_UID": "${localEnv:REMOTE_UID:1000}",
-      "REMOTE_GID": "${localEnv:REMOTE_GID:1000}"
+      "REMOTE_UID": "${localEnv:REMOTE_UID:2001}",
+      "REMOTE_GID": "${localEnv:REMOTE_GID:2001}"
     }
   },
   "privileged": true,
@@ -36,13 +36,20 @@
   // "postCreateCommand": "cat /etc/os-release",
   "runArgs": [
     "--ipc=host",
-    "--gpus=all",
-    "--entrypoint",
-    "fixuid"
+    "--gpus=all"
   ],
+  "postCreateCommand": "echo '[[ -z \"$VIRTUAL_ENV\" ]] && source /opt/nvidia/run_from_venv.sh /bin/bash' >> ~/.bashrc",
   // Configure tool-specific properties.
   "customizations": {
     "vscode": {
+      "settings": {
+        "terminal.integrated.profiles.linux": {
+          "bash": {
+            "path": "/bin/bash"
+          }
+        },
+        "terminal.integrated.defaultProfile.linux": "bash"
+      },
       "extensions": [
         "ms-python.python",
         "ms-toolsai.jupyter",
