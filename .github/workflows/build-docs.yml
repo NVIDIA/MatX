@@ -72,8 +72,8 @@ jobs:
         run: |
           mkdir build
           cd build
-          cmake .. -DMATX_BUILD_DOCS=ON
-          make
+          /opt/nvidia/run_from_venv.sh cmake .. -DMATX_BUILD_DOCS=ON
+          /opt/nvidia/run_from_venv.sh make
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact
