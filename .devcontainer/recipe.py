@@ -4,7 +4,7 @@ import hpccm
 from hpccm.building_blocks import gnu, mlnx_ofed, nvshmem, cmake
 from hpccm.primitives import baseimage
 
-DOXYGEN_VER = "1.9.6"
+DOXYGEN_VER = "1.14.0"
 GDRCOPY_HOME = "/usr/local/gdrcopy"
 PYBIND11_VER = "2.7.1"
 FFTW_VER="3.3.10"

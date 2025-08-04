@@ -580,10 +580,6 @@ static __MATX_INLINE__ SVDMethod GetCUDASVDMethod(const ATensor &a) {
   return method;
 }
 
-#ifndef DOXYGEN_ONLY
-// Hide this from doxygen, otherwise we get
-// error: Detected potential recursive class relation between class matx::detail::matxDnSVDCUDAPlan_t and base class matx::detail::matxDnCUDASolver_t
-
 template <typename UTensor, typename STensor, typename VtTensor, typename ATensor>
 class matxDnSVDCUDAPlan_t : matxDnCUDASolver_t {
   using T1 = typename ATensor::value_type;
@@ -878,8 +874,6 @@ private:
   gesvdjInfo_t batch_params = nullptr;
   DnSVDCUDAParams_t params;
 };
-
-#endif // DOXYGEN_ONLY
 
 /**
  * Crude hash to get a reasonably good delta for collisions. This doesn't need
