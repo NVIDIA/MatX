@@ -54,7 +54,7 @@ MatX support is currently limited to **Linux only** due to the time to test Wind
 
 MatX is using features in C++17 and the latest CUDA compilers and libraries. For this reason, when running with GPU support, CUDA 11.8 and g++9, nvc++ 24.5, or clang 17 or newer is required. You can download the CUDA Toolkit [here](https://developer.nvidia.com/cuda-downloads).
 
-MatX has been tested on and supports Pascal, Turing, Volta, Ampere, Ada, and Hopper GPU architectures. Jetson products are supported with Jetpack 5.0 or above.
+MatX has been tested on and supports Turing, Volta, Ampere, Ada, and Hopper GPU architectures. Jetson products are supported with Jetpack 5.0 or above.
 
 The MatX build system when used with CMake will automatically fetch packages from the internet that are missing or out of date. If you are on a machine without internet access or want to manage the packages yourself, please follow the [offline instructions](https://nvidia.github.io/MatX/build.html#matx-in-offline-environments) 
 and pay attention to the [required versions of the dependencies](https://nvidia.github.io/MatX/build.html#required-third-party-dependencies).
