@@ -92,11 +92,18 @@ namespace matx
           }
         };
 
-        template <ElementsPerThread EPT, typename... Is>
+        template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          // Only support EPT == ONE for now
-          if constexpr (EPT == ElementsPerThread::ONE) {
+#ifdef __CUDA_ARCH__
+        if constexpr (CapType::jit) {
+          if ((threadIdx.x * CapType::ept) >= Size(Rank() - 1)) {
+            return detail::GetJitSentinelValue<CapType, value_type>();
+          }
+        }
+#endif
+          // Only support CapType::ept == ONE for now
+          if constexpr (CapType::ept == ElementsPerThread::ONE) {
             cuda::std::array idx{indices...};
               auto idxOut = idx[idx.size() - 1];
 
@@ -109,11 +116,11 @@ namespace matx
             idx1[idx1.size() - 1] = 1LL;
             idx2[idx2.size() - 1] = 2LL;
 
-            auto a0 = get_value<EPT>(a_, idx0);
-            auto a1 = get_value<EPT>(a_, idx1);
+            auto a0 = get_value<CapType>(a_, idx0);
+            auto a1 = get_value<CapType>(a_, idx1);
             
-            auto b0 = get_value<EPT>(b_, idx0);
-            auto b1 = get_value<EPT>(b_, idx1);
+            auto b0 = get_value<CapType>(b_, idx0);
+            auto b1 = get_value<CapType>(b_, idx1);
 
             //lots of if-elses, but similar to numpy implementation
             
@@ -122,8 +129,8 @@ namespace matx
             }
 
             if (!isA2D_ && !isB2D_){
-              auto a2 = get_value<EPT>(a_, idx2);
-              auto b2 = get_value<EPT>(b_, idx2);
+              auto a2 = get_value<CapType>(a_, idx2);
+              auto b2 = get_value<CapType>(b_, idx2);
               if (idxOut == 0){
                   return a1 * b2 - a2 * b1;
               }
@@ -132,7 +139,7 @@ namespace matx
               
             }
             else if (isA2D_ && !isB2D_){
-              auto b2 = get_value<EPT>(b_, idx2);
+              auto b2 = get_value<CapType>(b_, idx2);
               if (idxOut == 0){
                   return a1 * b2;
               }
@@ -140,7 +147,7 @@ namespace matx
               return -a0 * b2;
             }
             else{// !isA2D_ && isB2D_, case of both 2D are covered in the first if statement
-              auto a2 = get_value<EPT>(a_, idx2);
+              auto a2 = get_value<CapType>(a_, idx2);
               if (idxOut == 0){
                   return -a2 * b1;
               }
@@ -148,7 +155,7 @@ namespace matx
               return a2 * b0;
             }
           } else {
-            return Vector<value_type, static_cast<size_t>(EPT)>();
+            return Vector<value_type, static_cast<size_t>(CapType::ept)>();
           }
           
         }
@@ -156,19 +163,24 @@ namespace matx
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+          return this->operator()<DefaultCapabilities>(indices...);
         }
 
-        template <OperatorCapability Cap>
-        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] const InType& in) const {
           if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-            return ElementsPerThread::ONE;
+            const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+            return combine_capabilities<Cap>(
+              my_cap,
+              detail::get_operator_capability<Cap>(a_, in),
+              detail::get_operator_capability<Cap>(b_, in)
+            );
           } else {
             auto self_has_cap = capability_attributes<Cap>::default_value;
             return combine_capabilities<Cap>(
               self_has_cap,
-            detail::get_operator_capability<Cap>(a_),
-              detail::get_operator_capability<Cap>(b_)
+            detail::get_operator_capability<Cap>(a_, in),
+              detail::get_operator_capability<Cap>(b_, in)
             );
           }
         }

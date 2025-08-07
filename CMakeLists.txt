@@ -78,6 +78,8 @@ option(MATX_DISABLE_CUB_CACHE "Disable caching for CUB allocations" ON)
 option(MATX_EN_COVERAGE OFF "Enable code coverage reporting")
 option(MATX_EN_COMPLEX_OP_NAN_CHECKS "Enable full NaN/Inf handling for complex multiplication and division" OFF)
 option(MATX_EN_CUDA_LINEINFO "Enable line information for CUDA kernels via -lineinfo nvcc flag" OFF)
+option(MATX_EN_MATHDX "Enable MathDx support for kernel fusion" OFF)
+option(MATX_EN_JIT_PREPROCESSING "Enable JIT preprocessing" OFF)
 
 set(MATX_EN_PYBIND11 OFF CACHE BOOL "Enable pybind11 support")
 
@@ -95,9 +97,9 @@ if (MATX_BUILD_DOCS)
     add_subdirectory(docs_input)
 endif()
 
-# MatX requires C++17 to build. Enforce on all libraries pulled in as well
-set(CMAKE_CXX_STANDARD 17)
-set(CUDA_CXX_STANDARD 17)
+# MatX requires C++20 to build. Enforce on all libraries pulled in as well
+set(CMAKE_CXX_STANDARD 20)
+set(CUDA_CXX_STANDARD 20)
 
 if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
     execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion OUTPUT_VARIABLE GCC_VERSION)
@@ -123,6 +125,14 @@ target_include_directories(matx INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOU
                                          "$<INSTALL_INTERFACE:include>")
 target_include_directories(matx INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/matx/kernels>"
 "$<INSTALL_INTERFACE:include/matx/kernels>")
+# Add build directory for generated headers
+target_include_directories(matx INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
+                                         "$<INSTALL_INTERFACE:include>")
+
+set_property(GLOBAL APPEND PROPERTY PREPROCESSOR_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/include")
+set_property(GLOBAL APPEND PROPERTY PREPROCESSOR_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/include/matx/kernels")
+set_property(GLOBAL APPEND PROPERTY PREPROCESSOR_INCLUDE_DIRS "${CMAKE_CURRENT_BINARY_DIR}/include")
+                                         
 target_compile_features(matx INTERFACE cxx_std_17 $<BUILD_INTERFACE:cuda_std_17>)
 
 # 11.2 and above required for async allocation
@@ -135,6 +145,8 @@ rapids_cpm_cccl(
     BUILD_EXPORT_SET matx-exports
     INSTALL_EXPORT_SET matx-exports
 )
+set_property(GLOBAL APPEND PROPERTY PREPROCESSOR_INCLUDE_DIRS "${CCCL_INCLUDE_DIRS}")
+set_property(GLOBAL APPEND PROPERTY PREPROCESSOR_INCLUDE_DIRS "${CUDAToolkit_INCLUDE_DIRS}")
 
 target_link_libraries(matx INTERFACE CCCL::CCCL)
 
@@ -298,6 +310,32 @@ if (MATX_EN_CUTENSOR)
     target_link_libraries(matx INTERFACE "-Wl,--disable-new-dtags")
 endif()
 
+if (MATX_EN_MATHDX)
+    set(MathDx_VERSION 25.06)
+    set(MathDx_NANO 0)
+    include(cmake/FindMathDx.cmake)
+    target_compile_definitions(matx INTERFACE MATX_EN_MATHDX)
+    target_compile_definitions(matx INTERFACE MATX_EN_JIT)
+    
+    # Add NVRTC configuration as compiler definitions
+    list(GET CMAKE_CUDA_ARCHITECTURES 0 NVRTC_CUDA_ARCH)
+    # Strip -real or -virt postfix if present
+    string(REGEX REPLACE "-real$" "" NVRTC_CUDA_ARCH "${NVRTC_CUDA_ARCH}")
+    string(REGEX REPLACE "-virtual$" "" NVRTC_CUDA_ARCH "${NVRTC_CUDA_ARCH}")
+    target_compile_definitions(matx INTERFACE NVRTC_CUDA_ARCH="${NVRTC_CUDA_ARCH}")
+    target_compile_definitions(matx INTERFACE NVRTC_CXX_STANDARD="${CMAKE_CXX_STANDARD}")
+    
+    #target_include_directories(matx INTERFACE libmathdx/include)
+    target_link_directories(matx INTERFACE $<BUILD_INTERFACE:/repro/MatX/libmathdx/lib>)
+    target_include_directories(matx INTERFACE $<BUILD_INTERFACE:/repro/MatX/libmathdx/include>)
+    target_link_libraries(matx INTERFACE mathdx)
+    target_link_libraries(matx INTERFACE mathdx::cufftdx CUDA::nvrtc)
+
+    # For JIT preprocessing
+    set_property(GLOBAL APPEND PROPERTY PREPROCESSOR_INCLUDE_DIRS "${MathDx_INCLUDE_DIR}/include")
+    set_property(GLOBAL APPEND PROPERTY PREPROCESSOR_INCLUDE_DIRS "${MathDx_INCLUDE_DIR}/external/cutlass/include")
+endif()
+
 if (MATX_EN_CUDSS)
     set(cuDSS_VERSION 0.4.0.2)
     include(cmake/FindcuDSS.cmake)
@@ -389,16 +427,83 @@ if (NOT_SUBPROJECT)
 endif()
 
 
+if (MATX_EN_JIT_PREPROCESSING)
+    message(STATUS "Adding tools subdirectory for JIT preprocessing")
+    add_subdirectory(tools)
+
+    # Get the include directories from the matx target
+    get_property(PREPROCESSOR_INCLUDE_DIRS GLOBAL PROPERTY PREPROCESSOR_INCLUDE_DIRS)
+    set(PREPROCESSOR_INCLUDE_FLAGS "")
+    foreach(DIR IN LISTS PREPROCESSOR_INCLUDE_DIRS)
+        list(APPEND PREPROCESSOR_INCLUDE_FLAGS "-I${DIR}")
+    endforeach()
+    message(STATUS "PREPROCESSOR_INCLUDE_FLAGS: ${CMAKE_CURRENT_SOURCE_DIR}/include/")
+    # Convert the list of architectures to the format jitify2_preprocess expects
+    set(JITIFY_ARCH_FLAGS "")
+    foreach(ARCH IN LISTS CMAKE_CUDA_ARCHITECTURES)
+        string(REPLACE "-" ";" ARCH_PARTS "${ARCH}")
+        list(GET ARCH_PARTS 0 ARCH_NUM)
+        list(APPEND JITIFY_ARCH_FLAGS "-arch=sm_${ARCH_NUM}")
+    endforeach()
+
+    file(GLOB_RECURSE MATX_JIT_DEPS CONFIGURE_DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/matx.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/matx/*.h"
+    )
+
+    add_custom_command(
+        OUTPUT "${CMAKE_BINARY_DIR}/include/matx_preprocessed.h"
+        COMMAND $<TARGET_FILE:jitify2_preprocess>
+            "${CMAKE_CURRENT_SOURCE_DIR}/include/matx.h"
+            -i
+            -DJITIFY=1
+            ${PREPROCESSOR_INCLUDE_FLAGS}
+            ${JITIFY_ARCH_FLAGS}
+        DEPENDS jitify2_preprocess matx ${MATX_JIT_DEPS}
+        COMMENT "Running JIT preprocessor on matx.h"
+        WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
+    )
+
+    add_custom_target(
+        matx_jit_preprocess ALL
+        DEPENDS "${CMAKE_BINARY_DIR}/include/matx_preprocessed.h"
+    )
+
+    # Ensure the jitify2_preprocess tool is built before the preprocessing runs
+    add_dependencies(matx_jit_preprocess jitify2_preprocess)
+    
+    message(STATUS "JIT preprocessing target 'matx_jit_preprocess' configured with dependency on 'jitify2_preprocess'")
+
+    target_compile_definitions(matx INTERFACE MATX_EN_JIT_PREPROCESSING)
+endif()
+
+# Function to add JIT preprocessing dependency to all targets in a directory
+function(add_jit_dependency_to_directory dir_name)
+    if (MATX_EN_JIT_PREPROCESSING)
+        get_property(DIRECTORY_TARGETS DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/${dir_name} PROPERTY BUILDSYSTEM_TARGETS)
+        foreach(target ${DIRECTORY_TARGETS})
+            get_target_property(target_type ${target} TYPE)
+            if(NOT target_type STREQUAL "INTERFACE_LIBRARY")
+                add_dependencies(${target} matx_jit_preprocess)
+                message(STATUS "Added JIT preprocessing dependency to target: ${target}")
+            endif()
+        endforeach()
+    endif()
+endfunction()
+
 if (MATX_BUILD_EXAMPLES)
     add_subdirectory(examples)
+    add_jit_dependency_to_directory(examples)
 endif()
 
 if (MATX_BUILD_BENCHMARKS)
     rapids_cpm_nvbench()
     add_subdirectory(bench)
+    add_jit_dependency_to_directory(bench)
 endif()
 
 if (MATX_BUILD_TESTS)
     include(cmake/GetGTest.cmake)
     add_subdirectory(test)
+    add_jit_dependency_to_directory(test)
 endif()

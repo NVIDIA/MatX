@@ -42,11 +42,19 @@ namespace detail {
 
 template <typename T, int N>
 struct alignas(sizeof(T) * N) Vector {
-  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Vector() {}
+  __MATX_INLINE__  Vector() = default;
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Vector(T v) { Fill(v); }
+  // Copy constructor
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Vector(const Vector<T, N>& other) {
+    MATX_LOOP_UNROLL
+    for (int i = 0; i < N; i++) {   
+      data[i] = other.data[i];
+    }
+  }
 
   template <typename T2, std::enable_if_t<std::is_same_v<typename T2::matx_vec, bool> && T2::width == N, bool> = true>
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Vector& operator=(const T2& v) {
+    MATX_LOOP_UNROLL
     for (int i = 0; i < N; i++) {
       data[i] = v.data[i];
     }
@@ -91,25 +99,6 @@ struct is_vector<T, std::void_t<typename T::matx_vec>>
 
 template< class T >
 inline constexpr bool is_vector_v = detail::is_vector<typename remove_cvref<T>::type>::value;
-
-
-template <typename T, int EPT, typename = void>
-struct vector_or_scalar_impl {
-  using type = Vector<T, EPT>;
-};
-
-template <typename T, int EPT>
-struct vector_or_scalar_impl<T, EPT, std::enable_if_t<is_vector_v<T> && EPT != 1>> {
-  using type = T;
-};
-
-template <typename T, int EPT>
-struct vector_or_scalar_impl<T, EPT, std::enable_if_t<!is_vector_v<T> && EPT == 1>> {
-  using type = T;
-};
-
-template <typename T, int EPT>
-using vector_or_scalar_t = typename vector_or_scalar_impl<T, EPT>::type;
 
 
 

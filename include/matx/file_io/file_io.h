@@ -32,9 +32,9 @@
 
 #pragma once
 
+#ifndef __CUDACC_RTC__
 #include <cstdio>
 #include <filesystem>
-#include <iterator>
 #include <shared_mutex>
 #include <unordered_map>
 #include <utility>
@@ -365,4 +365,5 @@ void write_npy(const TensorType &t, const std::string& fname)
 }; // namespace io
 }; // namespace matx
 
+#endif // JITIFY
 #endif
