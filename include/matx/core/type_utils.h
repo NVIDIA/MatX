@@ -677,6 +677,26 @@ inline constexpr bool has_shape_type_v = detail::has_shape_type<typename remove_
 
 
 
+// Detect presence of nested alias `index_cmp_op` and verify it equals bool
+namespace detail {
+template <typename T, typename = void>
+struct has_index_cmp_op : std::false_type {};
+
+template <typename T>
+struct has_index_cmp_op<T, std::void_t<typename T::index_cmp_op>>
+    : std::bool_constant<std::is_same_v<typename T::index_cmp_op, bool>> {};
+}
+
+/**
+ * @brief Determine if a type defines `using index_cmp_op = bool;`
+ * 
+ * @tparam T Type to test
+ */
+template <typename T>
+inline constexpr bool has_index_cmp_op_v = detail::has_index_cmp_op<typename remove_cvref<T>::type>::value;
+
+
+
 namespace detail {
 template <typename T>
 struct is_complex_half
