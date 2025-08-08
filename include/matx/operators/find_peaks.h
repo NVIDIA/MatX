@@ -131,13 +131,13 @@ namespace detail {
  *
  * @param in
  *   Input data to reduce
+ * @param height
+ *   Height threshold for peak detection. Values below this threshold are not considered peaks.
+ * @param threshold
+ *   Threshold for peak detection. Neighboring values must be larger in vertical distance than this threshold
  * @returns Operator with reduced values of peak search computed
  */
-#ifdef DOXYGEN_ONLY
 template <typename InType>
-#else
-template <typename InType>
-#endif
 __MATX_INLINE__ auto find_peaks(const InType &in,
                                  typename InType::value_type height,
                                  typename InType::value_type threshold)
