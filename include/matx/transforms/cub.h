@@ -72,7 +72,7 @@ typedef enum {
   CUB_OP_REDUCE_SUM,
   CUB_OP_REDUCE_MIN,
   CUB_OP_REDUCE_MAX,
-  CUB_OP_SELECT,
+  CUB_OP_SELECT_VALS,
   CUB_OP_SELECT_IDX,
   CUB_OP_UNIQUE,
   CUB_OP_SINGLE_ARG_REDUCE,
@@ -178,7 +178,7 @@ public:
     else if constexpr (op == CUB_OP_REDUCE_MAX) {
       ExecMax(a_out, a, stream);
     }
-    else if constexpr (op == CUB_OP_SELECT) {
+    else if constexpr (op == CUB_OP_SELECT_VALS) {
       ExecSelect(a_out, a, stream);
     }
     else if constexpr (op == CUB_OP_SELECT_IDX) {
@@ -819,8 +819,6 @@ inline void ExecSort(OutputTensor &a_out,
 #endif
   }
 
-
-
   /**
    * Execute a selection reduction on a tensor
    *
@@ -922,16 +920,30 @@ inline void ExecSort(OutputTensor &a_out,
 #ifdef __CUDACC__
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
-    if constexpr (is_tensor_view_v<InputOperator>) {
-      if (a.IsContiguous()) {
-        cub::DeviceSelect::If(d_temp,
-                              temp_storage_bytes,
-                              thrust::counting_iterator<index_t>(0),
-                              a_out.Data(),
-                              cparams_.num_found.Data(),
-                              static_cast<int>(TotalSize(a)),
-                              IndexToSelectOp<decltype(a.Data()), decltype(cparams_.op)>{a.Data(), cparams_.op},
-                              stream);
+    if (!has_index_cmp_op_v<decltype(cparams_.op)>) {
+      if constexpr (is_tensor_view_v<InputOperator>) {
+        if (a.IsContiguous()) {
+          cub::DeviceSelect::If(d_temp,
+                                temp_storage_bytes,
+                                thrust::counting_iterator<index_t>(0),
+                                a_out.Data(),
+                                cparams_.num_found.Data(),
+                                static_cast<int>(TotalSize(a)),
+                                IndexToSelectOp<decltype(a.Data()), decltype(cparams_.op)>{a.Data(), cparams_.op},
+                                stream);
+        }
+        else {
+          tensor_impl_t<typename InputOperator::value_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
+          cub::DeviceSelect::If(d_temp,
+                                temp_storage_bytes,
+                                thrust::counting_iterator<index_t>(0),
+                                a_out.Data(),
+                                cparams_.num_found.Data(),
+                                static_cast<int>(TotalSize(a)),
+                                IndexToSelectOp<decltype(RandomOperatorIterator{base}), decltype(cparams_.op)>
+                                  {RandomOperatorIterator{base}, cparams_.op},
+                                stream);
+        }
       }
       else {
         tensor_impl_t<typename InputOperator::value_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
@@ -947,16 +959,18 @@ inline void ExecSort(OutputTensor &a_out,
       }
     }
     else {
+      // Custom compare op that only takes an index. This can be more powerful for users by allowing them to define whatever
+      // they want inside the op and not be limited to simple binary comparisons.
       cub::DeviceSelect::If(d_temp,
-                            temp_storage_bytes,
-                            thrust::counting_iterator<index_t>(0),
-                            a_out.Data(),
-                            cparams_.num_found.Data(),
-                            static_cast<int>(TotalSize(a)),
-                            IndexToSelectOp<decltype(RandomOperatorIterator{a}), decltype(cparams_.op)>
-                              {RandomOperatorIterator{a}, cparams_.op},
-                            stream);
+        temp_storage_bytes,
+        thrust::counting_iterator<index_t>(0),
+        a_out.Data(),
+        cparams_.num_found.Data(),
+        static_cast<int>(TotalSize(a)),
+        cparams_.op,
+        stream);
     }
+
 #endif
   }
 
@@ -2399,6 +2413,7 @@ struct GTE
 };
 
 
+
 /**
  * Reduce values that meet a certain criteria
  *
@@ -2443,9 +2458,9 @@ void find_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperator 
   auto params =
       detail::matxCubPlan_t<OutputTensor,
                             InputOperator,
-                            detail::CUB_OP_SELECT,
+                            detail::CUB_OP_SELECT_VALS,
                             param_type>::GetCubParams(a_out, a, stream);
-  using cache_val_type = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_SELECT, param_type>;
+  using cache_val_type = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_SELECT_VALS, param_type>;
   detail::GetCache().LookupAndExec<detail::cub_cache_t>(
       detail::GetCacheIdFromType<detail::cub_cache_t>(),
       params,
@@ -2461,7 +2476,7 @@ void find_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperator 
 #else
   auto tmp = detail::matxCubPlan_t< OutputTensor,
                                         InputOperator,
-                                        detail::CUB_OP_SELECT,
+                                        detail::CUB_OP_SELECT_VALS,
                                         decltype(cparams)>{a_out, a, cparams, stream};
   tmp.ExecSelect(a_out, a, stream);
 #endif

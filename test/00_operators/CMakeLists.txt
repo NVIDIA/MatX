@@ -16,6 +16,7 @@ set(OPERATOR_TEST_FILES
   concat_test.cu
   cross_test.cu
   fftshift_test.cu
+  find_peaks.cu
   flatten_test.cu
   fmod_test.cu
   frexp_test.cu

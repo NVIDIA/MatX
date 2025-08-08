@@ -68,6 +68,9 @@ template <typename TensorType>
 class OperatorTestsFloatNonComplexAllExecs : public ::testing::Test {};
 
 template <typename TensorType>
+class OperatorTestsFloatNonComplexSingleThreadedHostAllExecs : public ::testing::Test {};
+
+template <typename TensorType>
 class OperatorTestsNumericAllExecs : public ::testing::Test {};
 
 template <typename TensorType>
@@ -87,6 +90,8 @@ TYPED_TEST_SUITE(OperatorTestsFloatNonComplexNonHalfAllExecs,
                  MatXFloatNonComplexNonHalfTypesAllExecs);  
 TYPED_TEST_SUITE(OperatorTestsFloatNonComplexAllExecs,
                  MatXTypesFloatNonComplexAllExecs);
+TYPED_TEST_SUITE(OperatorTestsFloatNonComplexSingleThreadedHostAllExecs,
+                 MatXTypesFloatNonComplexSingleThreadedHostAllExecs);
 TYPED_TEST_SUITE(OperatorTestsNumericAllExecs,
                  MatXTypesNumericAllExecs);                                
 TYPED_TEST_SUITE(OperatorTestsNumericNoHalfAllExecs, MatXNumericNoHalfTypesAllExecs);          
