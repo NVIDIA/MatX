@@ -10,12 +10,12 @@
 // 1. Redistributions of source code must retain the above copyright notice, this
 //    list of conditions and the following disclaimer.
 //
-// 2. Redistributions in binary form must resumuce the above copyright notice,
+// 2. Redistributions in binary form must reproduce the above copyright notice,
 //    this list of conditions and the following disclaimer in the documentation
 //    and/or other materials provided with the distribution.
 //
 // 3. Neither the name of the copyright holder nor the names of its
-//    contributors may be used to endorse or promote sumucts derived from
+//    contributors may be used to endorse or promote products derived from
 //    this software without specific prior written permission.
 //
 // THIS SOFTWARE IS PROVIDED BY THE COpBRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
@@ -122,7 +122,9 @@ namespace detail {
 /**
  * Compute peak search of input
  *
- * Returns a tensor representing the peak search of all items in the reduction
+ * Returns a tensor representing the indices of peaks found in the input operator. The first output parameter holds the indices
+ * while the second holds the number of indices/peaks found. The output index tensor must be large enough to hold all of the peaks 
+ * found or the behavior is undefined.
  *
  * @tparam InType
  *   Input data type
