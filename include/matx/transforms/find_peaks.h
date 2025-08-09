@@ -34,6 +34,7 @@
 
 #include <thrust/copy.h>
 #include <thrust/execution_policy.h>
+#include <thrust/iterator/counting_iterator.h>
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
 #include "matx/operators/permute.h"
@@ -63,8 +64,8 @@ struct PeakSearchCmpOp {
 
     if (val < height_) {
       return false;
-    }    
-    
+    }
+
     // Check two neighboring peaks
     for (index_t i = -1; i <= 1; i++) {
       if (i == 0) {
@@ -114,7 +115,7 @@ struct PeakSearchCmpOp {
  {
     MATX_NVTX_START("find_peaks_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
-    find_idx_impl(out_idxs, num_found, in, PeakSearchCmpOp{in, height, threshold}, exec);    
+    find_idx_impl(out_idxs, num_found, in, PeakSearchCmpOp{in, height, threshold}, exec);
  }
 
  template <typename OutIdxType, typename NumFoundType, typename InType, ThreadsMode MODE>
@@ -138,6 +139,6 @@ struct PeakSearchCmpOp {
 
     num_found() = static_cast<int>(end_iter - out_idxs.Data());
  }
- 
+
 }
 }
