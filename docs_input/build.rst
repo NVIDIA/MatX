@@ -27,7 +27,7 @@ for supported host compilers. Other requirements for optional components are lis
 Required Third-party Dependencies
 ---------------------------------
 
-- `CCCL <https://github.com/NVIDIA/cccl>`_ 2.8.0 or higher
+- `CCCL <https://github.com/NVIDIA/cccl>`_ 3.0.0 or higher
 
 
 Optional Third-party Dependencies
