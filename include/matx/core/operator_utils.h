@@ -29,73 +29,16 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
+#ifndef __CUDACC_RTC__
 
 #pragma once
 
+#include <source_location>
 #include "matx/core/iterator.h"
 #include "matx/core/type_utils.h"
-#include "matx/operators/collapse.h"
+
 
 namespace matx {
-
-  template <bool ConvertType, typename Func, typename OutputOp, typename InputOp, typename BeginIter, typename EndIter>
-  __MATX_HOST__ __MATX_INLINE__ auto ReduceOutput(Func &&func, OutputOp &&out, InputOp &&in, BeginIter &&bi, EndIter &&ei) {
-    if constexpr (remove_cvref_t<decltype(out)>::Rank() <= 1 && is_tensor_view_v<OutputOp>) {
-      if (out.IsContiguous()) {
-        if constexpr(ConvertType) {
-          return func(  in,
-                        reinterpret_cast<detail::convert_matx_type_t<typename remove_cvref_t<OutputOp>::value_type> *>(out.Data()),
-                        bi,
-                        ei);
-        }
-        else {
-          return func(  in,
-                        reinterpret_cast<typename remove_cvref_t<OutputOp>::value_type *>(out.Data()),
-                        bi,
-                        ei);
-        }
-      }
-    }
-
-    detail::base_type_t<OutputOp> out_base = out;
-    auto iter = RandomOperatorOutputIterator<decltype(out_base), ConvertType>{out_base};
-    return func(in, iter, bi, ei);
-  }
-
-  template <typename Func, typename OutputOp, typename InputOp, bool ConvertType = true>
-  __MATX_HOST__ __MATX_INLINE__ auto ReduceInput(Func &&func, OutputOp &&out, InputOp &&in) {
-    typename detail::base_type_t<InputOp> in_base = in;
-    if constexpr (in_base.Rank() < 2 && is_tensor_view_v<InputOp>) {
-      if (in_base.IsContiguous()) {
-        if constexpr (ConvertType) {
-          return ReduceOutput<ConvertType>( std::forward<Func>(func),
-                                            std::forward<OutputOp>(out),
-                                            reinterpret_cast<detail::convert_matx_type_t<typename remove_cvref_t<InputOp>::value_type> *>(in_base.Data()),
-                                            BeginOffset{in_base},
-                                            EndOffset{in_base});
-        }
-        else {
-          return ReduceOutput<ConvertType>( std::forward<Func>(func),
-                                            std::forward<OutputOp>(out),
-                                            reinterpret_cast<typename remove_cvref_t<InputOp>::value_type *>(in_base.Data()),
-                                            BeginOffset{in_base},
-                                            EndOffset{in_base});
-        }
-      }
-    }
-
-    // Collapse the right-most dimensions by the difference in ranks for the reduction dimension,
-    // then collapse the left size by the output rank to get the batch dimensions
-    auto collapsed = matx::lcollapse<remove_cvref_t<decltype(out)>::Rank()>(rcollapse<remove_cvref_t<decltype(in)>::Rank() -
-                                                                                      remove_cvref_t<decltype(out)>::Rank()>(in_base));
-    const auto &iter = matx::RandomOperatorIterator<decltype(collapsed), ConvertType>{collapsed};
-    return ReduceOutput<ConvertType>(std::forward<Func>(func), std::forward<OutputOp>(out), iter, BeginOffset{iter}, EndOffset{iter});
-  }
-
-  template <typename Func, typename OutputOp, typename InputOp>
-  __MATX_HOST__ __MATX_INLINE__ auto ReduceInputNoConvert(Func &&func, OutputOp &&out, InputOp &&in) {
-    return ReduceInput<Func, OutputOp, InputOp, false>(std::forward<Func>(func), std::forward<OutputOp>(out), std::forward<InputOp>(in));
-  }
 
   constexpr bool RankGTE(int32_t rank1, int32_t rank2) {
     return rank1 >= rank2 || rank1 == matxNoRank;
@@ -118,8 +61,10 @@ namespace matx {
     // Used inside of transforms to allocate temporary output
     template <typename TensorType, typename Executor, typename ShapeType>
     __MATX_HOST__ __MATX_INLINE__ void AllocateTempTensor(TensorType &tensor, Executor &&ex, ShapeType &&shape, typename TensorType::value_type **ptr) {
-      const auto ttl_size = std::accumulate(shape.begin(), shape.end(), static_cast<index_t>(1),
-                                  std::multiplies<index_t>()) * sizeof(typename TensorType::value_type);
+
+      const auto ttl_size = cuda::std::accumulate(shape.begin(), shape.end(), static_cast<index_t>(1),
+                                  std::multiplies<index_t>()) * sizeof(typename TensorType::value_type);      
+
       if constexpr (is_cuda_executor_v<Executor>) {
         matxAlloc((void**)ptr, ttl_size, MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
         make_tensor(tensor, *ptr, shape);
@@ -151,32 +96,50 @@ namespace matx {
       }
     }
 
-    template <ElementsPerThread EPT, typename T, typename Func>
+    template <typename CapType, typename T, typename Func>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto ApplyGeneratorVecFunc(const Func &func, index_t index) {
-      if constexpr (EPT == ElementsPerThread::ONE) {
+      if constexpr (CapType::ept == ElementsPerThread::ONE) {
         return func(index);
       } else {
-        Vector<T, static_cast<index_t>(EPT)> result;
+
+        Vector<T, static_cast<index_t>(CapType::ept)> result;
         MATX_LOOP_UNROLL
-        for (int i = 0; i < static_cast<index_t>(EPT); i++) {
-          result.data[i] = func(index * static_cast<index_t>(EPT) + i);
+        for (int i = 0; i < static_cast<index_t>(CapType::ept); i++) {
+          result.data[i] = func(index * static_cast<index_t>(CapType::ept) + i);
         }
         return result;
       }
     }
 
-    template <ElementsPerThread EPT, typename OutType, typename Func, typename... Vals>
+    template <typename CapType, typename OutType, typename Func, typename... Vals>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto ApplyVecFunc(const Func &func, const Vals &...vals) {
-      if constexpr (EPT == ElementsPerThread::ONE) {
+      if constexpr (CapType::ept == ElementsPerThread::ONE) {
         return func(vals...);
       } else {
-        Vector<OutType, static_cast<index_t>(EPT)> result;
+        Vector<OutType, static_cast<index_t>(CapType::ept)> result;
         MATX_LOOP_UNROLL
-        for (int i = 0; i < static_cast<index_t>(EPT); i++) {
+        for (int i = 0; i < static_cast<index_t>(CapType::ept); i++) {
           result.data[i] = func(vals.data[i]...);
         }
         return result;
       }
     }
   }
-};
+}; 
+#endif
+
+// RTC and nvcc
+namespace matx {
+  namespace detail {
+    template <typename CapType, typename ValueType>
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto GetJitSentinelValue() {
+      if constexpr (CapType::ept == ElementsPerThread::ONE) {
+        return ValueType{};
+      }
+      else {
+        return Vector<ValueType, static_cast<size_t>(CapType::ept)>{};
+      }
+    }    
+  }
+}
+

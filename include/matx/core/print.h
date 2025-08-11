@@ -30,6 +30,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
+#ifndef __CUDACC_RTC__
+
 #include <matx/core/type_utils.h>
 
 namespace matx {
@@ -808,3 +810,4 @@ namespace matx {
   }
 
 } // End namespace matx
+#endif // JITIFY

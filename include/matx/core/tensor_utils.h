@@ -38,12 +38,15 @@
 
 #include "matx/core/nvtx.h"
 #include "matx/core/dlpack.h"
+#include "matx/core/capabilities.h"
 #include "matx/core/make_tensor.h"
 #include "matx/kernels/utility.cuh"
 #include "matx/transforms/copy.h"
 
 namespace matx
 {
+
+#ifndef __CUDACC_RTC__
   static constexpr bool PRINT_ON_DEVICE = false;      ///< print() uses printf on device
   inline unsigned int PRINT_PRECISION = 4;            ///< control PrintVal()'s precision
 
@@ -105,6 +108,170 @@ namespace matx
 
     return maxSize;
   }
+
+  namespace detail {
+
+
+    template <typename T> __MATX_INLINE__ std::string to_short_str() {
+      if constexpr (!is_complex_v<T>) {
+        if constexpr (std::is_same_v<T, bool>)
+          return "b";
+        if constexpr (std::is_same_v<T, int32_t>)
+          return "i32";
+        if constexpr (std::is_same_v<T, uint32_t>)
+          return "u32";
+        if constexpr (std::is_same_v<T, int64_t>)
+          return "i64";
+        if constexpr (std::is_same_v<T, uint64_t>)
+          return "u64";
+        if constexpr (std::is_same_v<T, float>)
+          return "f32";
+        if constexpr (std::is_same_v<T, double>)
+          return "f64";
+        if constexpr (std::is_same_v<T, matxHalf<__half>>)
+          return "f16";
+        if constexpr (std::is_same_v<T, matxHalf<__nv_bfloat16>>)
+          return "bf16";
+        else
+          return "x" + std::to_string(sizeof(T)*8);
+      }
+      else {
+        if constexpr (std::is_same_v<typename T::value_type, int32_t>)
+          return "i32c";
+        if constexpr (std::is_same_v<typename T::value_type, uint32_t>)
+          return "u32c";
+        if constexpr (std::is_same_v<typename T::value_type, int64_t>)
+          return "i64c";
+        if constexpr (std::is_same_v<typename T::value_type, uint64_t>)
+          return "u64c";
+        if constexpr (std::is_same_v<typename T::value_type, float>)
+          return "f32c";
+        if constexpr (std::is_same_v<typename T::value_type, double>)
+          return "f64c";
+        if constexpr (std::is_same_v<typename T::value_type, matxHalf<__half>>)
+          return "f16";
+        if constexpr (std::is_same_v<typename T::value_type, matxHalf<__nv_bfloat16>>)
+          return "bf16";
+        else
+          return "x" + std::to_string(sizeof(typename T::value_type)*8) + "c";
+      }
+    }
+
+    template <class T>
+    __MATX_INLINE__ __MATX_HOST__  auto get_type_str( [[maybe_unused]] T op) {
+      if constexpr (is_matx_op<T>()) {
+        return op.str();
+      } else {
+        // This should be a scalar value
+        return "S_" + to_short_str<T>();
+      }
+    }
+
+
+    template <typename T, typename I, int32_t R>
+    void UpdateIndices(const T& op, cuda::std::array<I, R> &idx, int res) {
+      for (int32_t r = T::Rank() - res - 1; r >= 0; r--) {
+        idx[r]++;
+        if (idx[r] == op.Size(r)) {
+          idx[r] = 0;
+        }
+        else {
+          return;
+        }
+      }
+    }
+
+
+    template <typename T> constexpr DLDataType TypeToDLPackType()
+    {
+      if constexpr (std::is_same_v<T, cuda::std::complex<float>> || 
+                    std::is_same_v<T, std::complex<float>>)
+        return {kDLComplex, 64, 1};
+      if constexpr (std::is_same_v<T, cuda::std::complex<double>> ||
+                    std::is_same_v<T, std::complex<double>>)
+        return {kDLComplex, 128, 1};
+      if constexpr (std::is_same_v<T, matxFp16>)
+        return {kDLFloat, 16, 1};
+      if constexpr (std::is_same_v<T, matxBf16>)
+        return {kDLBfloat, 16, 1};
+      if constexpr (std::is_same_v<T, matxFp16Complex>)
+        return {kDLComplex, 32, 1};
+      if constexpr (std::is_same_v<T, matxBf16Complex>)
+        return {kDLComplex, 32, 1}; // Wrong, but no other choice
+      if constexpr (std::is_same_v<T, float>)
+        return {kDLFloat, 32, 1};
+      if constexpr (std::is_same_v<T, double>)
+        return {kDLFloat, 64, 1};
+      if constexpr (std::is_same_v<T, int8_t>)
+        return {kDLInt, 8, 1};
+      if constexpr (std::is_same_v<T, int16_t>)
+        return {kDLInt, 16, 1};
+      if constexpr (std::is_same_v<T, int32_t>)
+        return {kDLInt, 32, 1};
+      if constexpr (std::is_same_v<T, int64_t>)
+        return {kDLInt, 64, 1};
+      if constexpr (std::is_same_v<T, uint8_t>)
+        return {kDLUInt, 8, 1};
+      if constexpr (std::is_same_v<T, uint16_t>)
+        return {kDLUInt, 16, 1};
+      if constexpr (std::is_same_v<T, uint32_t>)
+        return {kDLUInt, 32, 1};
+      if constexpr (std::is_same_v<T, uint64_t>)
+        return {kDLUInt, 64, 1};
+      if constexpr (std::is_same_v<T, bool>)
+  #if DLPACK_VERSION >= 80
+        return {kDLBool, 8, 1};
+  #else
+        return {kDLUInt, 8, 1};
+  #endif
+
+      return {kDLOpaqueHandle, 1, 1};
+    }
+
+
+  template <typename Op, typename Executor>
+  auto OpToTensor(Op &&op, [[maybe_unused]] const Executor &exec) {
+    if constexpr (is_matx_transform_op<Op>()) {
+      // We can assume that if a transform is passed to the input then PreRun has already completed
+      // on the transform and we can use the internal pointer
+      return make_tensor<typename Op::value_type>(op.Data(), Shape(op));
+    }    
+    else if constexpr (!is_tensor_view_v<Op>) {
+      if constexpr (is_cuda_executor_v<Executor>) {
+        return make_tensor<typename remove_cvref<Op>::value_type>(op.Shape(), MATX_ASYNC_DEVICE_MEMORY, exec.getStream());
+      } else {
+        return make_tensor<typename remove_cvref<Op>::value_type>(op.Shape(), MATX_HOST_MALLOC_MEMORY);
+      }
+    } else {
+      return op;
+    }
+  }
+
+  /**
+   * Get a transposed view of a tensor or operator into a user-supplied buffer
+   *
+   * @param tp
+   *   Pointer to pre-allocated memory
+   * @param a
+   *   Tensor to transpose
+   * @param exec
+   *   Executor
+   */
+  template <typename TensorType, typename Executor>
+  __MATX_INLINE__ auto
+  TransposeCopy(typename TensorType::value_type *tp, const TensorType &a, const Executor &exec)
+  {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+
+    auto pa = transpose_matrix(a);
+    auto tv = make_tensor(tp, pa.Shape());
+    matx::copy(tv, pa, exec);
+    return tv;
+  }
+
+  }
+
+#endif // JITIFY
 
   namespace detail {
 
@@ -240,20 +407,20 @@ namespace matx
     /**
      * @brief Get the matx value object using broadcasting
      *
-     * @tparam EPT Elements Per Thread
+     * @tparam CapType Capability type
      * @tparam T type of operator
      * @tparam Is type of indices
      * @param i operator
      * @param indices indices
      * @return Value after broadcasting
      */
-    template <ElementsPerThread EPT, typename T, typename... Is, std::enable_if_t<std::conjunction_v<std::is_integral<Is>...>, bool> = true>
+    template <typename CapType, typename T, typename... Is, std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_matx_value(T &&i, Is... indices)
     {
       constexpr int RANK = remove_cvref_t<T>::Rank();
       if constexpr (RANK == int(sizeof...(Is)) || RANK == matxNoRank) {
         // If we're only indexing with the same number of arguments as the rank of the operator, just return operator()
-        return cuda::std::forward<T>(i).template operator()<EPT>(indices...);
+        return cuda::std::forward<T>(i).template operator()<CapType>(indices...);
       }
       else
       {
@@ -262,23 +429,23 @@ namespace matx
         // to index into the broadcasted dimensions. For example, if T is a 3D tensor and we want to index as a 5D, we take the indices
         // {0, 1, 2} we'd normally index with, and add the difference in rank (2), to get {2, 3, 4}. Another way to think of this is it
         // simply chops off the first sizeof...(Is) - RANK indices since they're not used for operator().
-        using seq = offset_sequence_t<sizeof...(Is) - RANK, std::make_index_sequence<RANK>>;
+        using seq = offset_sequence_t<sizeof...(Is) - RANK, cuda::std::make_index_sequence<RANK>>;
         auto tup = cuda::std::make_tuple(indices...);
         auto sliced_tup = select_tuple(std::forward<decltype(tup)>(tup), seq{});
         return cuda::std::apply([&](auto... args) {
-          return cuda::std::forward<T>(i).template operator()<EPT>(args...);
+          return cuda::std::forward<T>(i).template operator()<CapType>(args...);
         }, sliced_tup);
       }
     }
 
-    template <ElementsPerThread EPT, typename T, typename IdxType, size_t N>
+    template <typename CapType, typename T, typename IdxType, size_t N>
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_matx_value(T &&i, const cuda::std::array<IdxType, N> idx)
     {
       constexpr int RANK = remove_cvref_t<T>::Rank();
       if constexpr (RANK == N || RANK == matxNoRank) {
         // If we're only indexing with the same number of arguments as the rank of the operator, just return operator()
         return cuda::std::apply([&i](auto... args) -> decltype(auto) {
-          return cuda::std::forward<T>(i).template operator()<EPT>(args...);
+          return cuda::std::forward<T>(i).template operator()<CapType>(args...);
         }, idx);        
       }
       else
@@ -286,18 +453,23 @@ namespace matx
         cuda::std::array<index_t, RANK> nbc_idx; // non-broadcast indices
         cuda::std::copy(idx.begin() + (N - RANK), idx.end(), nbc_idx.begin());
         return cuda::std::apply([&i](auto... args) -> decltype(auto) {
-          return cuda::std::forward<T>(i).template operator()<EPT>(args...);
+          return cuda::std::forward<T>(i).template operator()<CapType>(args...);
         }, nbc_idx);
       }
     }    
 
 
-    template <ElementsPerThread EPT, typename T, typename... Is, std::enable_if_t<std::conjunction_v<std::is_integral<Is>...>, bool> = true>
+    template <typename CapType, typename T, typename... Is, std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_value(T &&i, Is... indices)
     {
       if constexpr (is_matx_op<T>())
       {
-        return get_matx_value<EPT>(cuda::std::forward<T>(i), indices...);
+        if constexpr (remove_cvref_t<T>::Rank() == 0) {
+          return i.template operator()<CapType>();
+        }
+        else {
+          return get_matx_value<CapType>(cuda::std::forward<T>(i), indices...);
+        }
       }
       else
       {
@@ -306,74 +478,23 @@ namespace matx
     }
 
 
-    template <ElementsPerThread EPT, typename T, typename IdxType, size_t N>
+    template <typename CapType, typename T, typename IdxType, size_t N>
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_value(T &&i, const cuda::std::array<IdxType, N> idx)
     {
       if constexpr (is_matx_op<T>())
       {
-        return get_matx_value<EPT, T, IdxType, N>(cuda::std::forward<T>(i), idx);
+        if constexpr (remove_cvref_t<T>::Rank() == 0) {
+          return i.template operator()<CapType>();
+        }
+        else {
+          return get_matx_value<CapType, T, IdxType, N>(cuda::std::forward<T>(i), idx);
+        }
       }
       else
       {
         return i;
       }
-    }    
-
-    template <typename T> __MATX_INLINE__ std::string to_short_str() {
-      if constexpr (!is_complex_v<T>) {
-        if constexpr (std::is_same_v<T, bool>)
-          return "b";
-        if constexpr (std::is_same_v<T, int32_t>)
-          return "i32";
-        if constexpr (std::is_same_v<T, uint32_t>)
-          return "u32";
-        if constexpr (std::is_same_v<T, int64_t>)
-          return "i64";
-        if constexpr (std::is_same_v<T, uint64_t>)
-          return "u64";
-        if constexpr (std::is_same_v<T, float>)
-          return "f32";
-        if constexpr (std::is_same_v<T, double>)
-          return "f64";
-        if constexpr (std::is_same_v<T, matxHalf<__half>>)
-          return "f16";
-        if constexpr (std::is_same_v<T, matxHalf<__nv_bfloat16>>)
-          return "bf16";
-        else
-          return "x" + std::to_string(sizeof(T)*8);
-      }
-      else {
-        if constexpr (std::is_same_v<typename T::value_type, int32_t>)
-          return "i32c";
-        if constexpr (std::is_same_v<typename T::value_type, uint32_t>)
-          return "u32c";
-        if constexpr (std::is_same_v<typename T::value_type, int64_t>)
-          return "i64c";
-        if constexpr (std::is_same_v<typename T::value_type, uint64_t>)
-          return "u64c";
-        if constexpr (std::is_same_v<typename T::value_type, float>)
-          return "f32c";
-        if constexpr (std::is_same_v<typename T::value_type, double>)
-          return "f64c";
-        if constexpr (std::is_same_v<typename T::value_type, matxHalf<__half>>)
-          return "f16";
-        if constexpr (std::is_same_v<typename T::value_type, matxHalf<__nv_bfloat16>>)
-          return "bf16";
-        else
-          return "x" + std::to_string(sizeof(typename T::value_type)*8) + "c";
-      }
-    }
-
-    template <class T>
-    __MATX_INLINE__ __MATX_HOST__  auto get_type_str( [[maybe_unused]] T op) {
-      if constexpr (is_matx_op<T>()) {
-        return op.str();
-      } else {
-        // This should be a scalar value
-        return "S_" + to_short_str<T>();
-      }
-    }
-
+    }   
 
     // Returns an address of a pointer of type T aligned to new address
     template <typename T>
@@ -387,106 +508,6 @@ namespace matx
 
       return reinterpret_cast<T *>(addr);
     }
-
-    template <typename T> constexpr DLDataType TypeToDLPackType()
-    {
-      if constexpr (std::is_same_v<T, cuda::std::complex<float>> || 
-                    std::is_same_v<T, std::complex<float>>)
-        return {kDLComplex, 64, 1};
-      if constexpr (std::is_same_v<T, cuda::std::complex<double>> ||
-                    std::is_same_v<T, std::complex<double>>)
-        return {kDLComplex, 128, 1};
-      if constexpr (std::is_same_v<T, matxFp16>)
-        return {kDLFloat, 16, 1};
-      if constexpr (std::is_same_v<T, matxBf16>)
-        return {kDLBfloat, 16, 1};
-      if constexpr (std::is_same_v<T, matxFp16Complex>)
-        return {kDLComplex, 32, 1};
-      if constexpr (std::is_same_v<T, matxBf16Complex>)
-        return {kDLComplex, 32, 1}; // Wrong, but no other choice
-      if constexpr (std::is_same_v<T, float>)
-        return {kDLFloat, 32, 1};
-      if constexpr (std::is_same_v<T, double>)
-        return {kDLFloat, 64, 1};
-      if constexpr (std::is_same_v<T, int8_t>)
-        return {kDLInt, 8, 1};
-      if constexpr (std::is_same_v<T, int16_t>)
-        return {kDLInt, 16, 1};
-      if constexpr (std::is_same_v<T, int32_t>)
-        return {kDLInt, 32, 1};
-      if constexpr (std::is_same_v<T, int64_t>)
-        return {kDLInt, 64, 1};
-      if constexpr (std::is_same_v<T, uint8_t>)
-        return {kDLUInt, 8, 1};
-      if constexpr (std::is_same_v<T, uint16_t>)
-        return {kDLUInt, 16, 1};
-      if constexpr (std::is_same_v<T, uint32_t>)
-        return {kDLUInt, 32, 1};
-      if constexpr (std::is_same_v<T, uint64_t>)
-        return {kDLUInt, 64, 1};
-      if constexpr (std::is_same_v<T, bool>)
-  #if DLPACK_VERSION >= 80
-        return {kDLBool, 8, 1};
-  #else
-        return {kDLUInt, 8, 1};
-  #endif
-
-      return {kDLOpaqueHandle, 1, 1};
-    }
-
-
-  template <typename Op, typename Executor>
-  auto OpToTensor(Op &&op, [[maybe_unused]] const Executor &exec) {
-    if constexpr (is_matx_transform_op<Op>()) {
-      // We can assume that if a transform is passed to the input then PreRun has already completed
-      // on the transform and we can use the internal pointer
-      return make_tensor<typename Op::value_type>(op.Data(), Shape(op));
-    }    
-    else if constexpr (!is_tensor_view_v<Op>) {
-      if constexpr (is_cuda_executor_v<Executor>) {
-        return make_tensor<typename remove_cvref<Op>::value_type>(op.Shape(), MATX_ASYNC_DEVICE_MEMORY, exec.getStream());
-      } else {
-        return make_tensor<typename remove_cvref<Op>::value_type>(op.Shape(), MATX_HOST_MALLOC_MEMORY);
-      }
-    } else {
-      return op;
-    }
-  }
-
-  /**
-   * Get a transposed view of a tensor or operator into a user-supplied buffer
-   *
-   * @param tp
-   *   Pointer to pre-allocated memory
-   * @param a
-   *   Tensor to transpose
-   * @param exec
-   *   Executor
-   */
-  template <typename TensorType, typename Executor>
-  __MATX_INLINE__ auto
-  TransposeCopy(typename TensorType::value_type *tp, const TensorType &a, const Executor &exec)
-  {
-    MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-
-    auto pa = transpose_matrix(a);
-    auto tv = make_tensor(tp, pa.Shape());
-    matx::copy(tv, pa, exec);
-    return tv;
-  }
-
-  template <typename T, typename I, int32_t R>
-  void UpdateIndices(const T& op, cuda::std::array<I, R> &idx, int res) {
-    for (int32_t r = T::Rank() - res - 1; r >= 0; r--) {
-      idx[r]++;
-      if (idx[r] == op.Size(r)) {
-        idx[r] = 0;
-      }
-      else {
-        return;
-      }
-    }
-  }
 
   }
 
