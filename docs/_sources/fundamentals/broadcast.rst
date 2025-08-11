@@ -1,6 +1,0 @@
-.. _broadcast:
-
-Broadcasting
-############
-
-TODO
