@@ -257,7 +257,7 @@ __MATX_INLINE__ void matmul_exec(TensorTypeC &c,
     // Get total number of batches
     auto c_shape = c.Shape();
     total_iter = std::accumulate(c_shape.begin(),
-                                 c_shape.begin() + TensorTypeC::Rank() - 3, 1,
+                                 c_shape.begin() + TensorTypeC::Rank() - 3, static_cast<shape_type>(1),
                                  std::multiplies<shape_type>());
   }
 

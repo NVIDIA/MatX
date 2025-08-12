@@ -974,7 +974,7 @@ void svd_impl(UTensor &&u, STensor &&s,
   // cuSolver destroys the input, so we need to make a copy of A regardless
   T1 *tp;
   auto a_shape = a.Shape();
-  auto a_total_size = std::accumulate(a_shape.begin(), a_shape.begin() + ATensor::Rank(), 1, std::multiplies<index_t>());
+  auto a_total_size = std::accumulate(a_shape.begin(), a_shape.begin() + ATensor::Rank(), static_cast<index_t>(1), std::multiplies<index_t>());
   matxAlloc(reinterpret_cast<void **>(&tp), sizeof(T1) * a_total_size, MATX_ASYNC_DEVICE_MEMORY, stream);
 
   if (m_leq_n) {

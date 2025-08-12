@@ -262,7 +262,7 @@ namespace detail {
       // base constructor, should never be called directly
       __MATX_INLINE__ RandomOp(ShapeType &&s, uint64_t seed) : seed_(seed)
       {
-        total_size_ = std::accumulate(s.begin(), s.end(), 1, std::multiplies<index_t>());
+        total_size_ = std::accumulate(s.begin(), s.end(), static_cast<index_t>(1), std::multiplies<index_t>());
 
         if constexpr (RANK >= 1) {
           strides_[RANK-1] = 1;

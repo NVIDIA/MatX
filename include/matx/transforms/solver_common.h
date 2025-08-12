@@ -197,7 +197,7 @@ __MATX_INLINE__ void SetBatchPointers(const TensorType &a, std::vector<PointerTy
     int batch_offset = static_cast<int>(BTYPE);
     cuda::std::array<shape_type, TensorType::Rank()> idx{0};
     auto a_shape = a.Shape();
-    size_t total_iter = std::accumulate(a_shape.begin(), a_shape.begin() + TensorType::Rank() - batch_offset, 1, std::multiplies<shape_type>());
+    size_t total_iter = std::accumulate(a_shape.begin(), a_shape.begin() + TensorType::Rank() - batch_offset, static_cast<shape_type>(1), std::multiplies<shape_type>());
     for (size_t iter = 0; iter < total_iter; iter++) {
       auto ap = cuda::std::apply([&a](auto... param) { return a.GetPointer(param...); }, idx);
       batch_ptrs.push_back(ap);

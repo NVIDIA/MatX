@@ -416,7 +416,7 @@ public:
    * @return Product of all sizes
    */
   static constexpr auto TotalSize() {
-      return std::accumulate(shape_.begin(), shape_.end(), 1, std::multiplies<index_t>());
+      return std::accumulate(shape_.begin(), shape_.end(), static_cast<index_t>(1), std::multiplies<index_t>());
   }
 
 private:
