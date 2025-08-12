@@ -1045,7 +1045,7 @@ MATX_IGNORE_WARNING_POP_GCC
         constexpr int EPT_int = static_cast<int>(EPT);
         if constexpr (EPT == detail::ElementsPerThread::ONE) {
           return data_.ldata_[GetValC<EPT, 0, Is...>(cuda::std::make_tuple(indices...))];
-        } else if constexpr (EPT_int * sizeof(T) <= MAX_VEC_WIDTH_BYTES ) {
+        } else if constexpr (EPT_int * detail::alignment_by_type<T>() <= MAX_VEC_WIDTH_BYTES ) {
           return *reinterpret_cast<detail::Vector<T, EPT_int>*>(data_.ldata_ + GetValC<EPT, 0, Is...>(cuda::std::make_tuple(indices...)));
         } else {
           detail::Vector<T, EPT_int> vec;
@@ -1085,7 +1085,7 @@ MATX_IGNORE_WARNING_POP_GCC
         constexpr int EPT_int = static_cast<int>(EPT);
         if constexpr (EPT == detail::ElementsPerThread::ONE) {
           return data_.ldata_[GetVal<EPT, 0, Is...>(cuda::std::make_tuple(indices...))];
-        } else if constexpr (EPT_int * sizeof(T) <= MAX_VEC_WIDTH_BYTES ) {
+        } else if constexpr (EPT_int * detail::alignment_by_type<T>() <= MAX_VEC_WIDTH_BYTES ) {
           return *reinterpret_cast<detail::Vector<T, EPT_int>*>(data_.ldata_ + GetVal<EPT, 0, Is...>(cuda::std::make_tuple(indices...)));
         } else {
           detail::Vector<T, EPT_int> vec;
@@ -1173,10 +1173,10 @@ MATX_IGNORE_WARNING_POP_GCC
           return detail::ElementsPerThread::ONE;
         }
 
-        int width = MAX_VEC_WIDTH_BYTES / sizeof(T);
+        int width = MAX_VEC_WIDTH_BYTES / alignment_by_type<T>();
         while (width > 1) {
           if (((Lsize() % width) == 0) &&                                       // Last dim is a multiple of vector load size
-            ((reinterpret_cast<uintptr_t>(data_.ldata_) % (sizeof(T) * width)) == 0)) {
+            ((reinterpret_cast<uintptr_t>(data_.ldata_) % (alignment_by_type<T>() * width)) == 0)) {
             break;
           }
 

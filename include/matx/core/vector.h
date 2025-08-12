@@ -39,9 +39,39 @@
 namespace matx{
 namespace detail {
 
+template <typename T>
+constexpr size_t __MATX_HOST__ __MATX_DEVICE__ alignment_by_type() {
+  // See alignment requirements for CUDA vector types at https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#vector-types-alignment-requirements-in-device-code
+  // Some vector types allow alignments lower than sizeof(T) to maintain power-of-two alignments. This is particularly
+  // important for types where sizeof(T) > MAX_VEC_WIDTH_BYTES as we would not be able to load a single element
+  // with one load instruction if we assume that the alignment is sizeof(T).
+  if constexpr (std::is_same_v<T, char3> || std::is_same_v<T, uchar3>) {
+    return 1;
+  } else if constexpr (std::is_same_v<T, short3> || std::is_same_v<T, ushort3>) {
+    return 2;
+  } else if constexpr (std::is_same_v<T, int3> || std::is_same_v<T, uint3>) {
+    return 4;
+  } else if constexpr (std::is_same_v<T, long3> || std::is_same_v<T, ulong3>) {
+    return sizeof(long) == sizeof(int) ? 4 : 8;
+  } else if constexpr (std::is_same_v<T, long4> || std::is_same_v<T, ulong4>) {
+    return 16;
+  } else if constexpr (std::is_same_v<T, longlong3> || std::is_same_v<T, ulonglong3>) {
+    return 8;
+  } else if constexpr (std::is_same_v<T, longlong4> || std::is_same_v<T, ulonglong4>) {
+    return 16;
+  } else if constexpr (std::is_same_v<T, float3>) {
+    return 4;
+  } else if constexpr (std::is_same_v<T, double3>) {
+    return 8;
+  } else if constexpr (std::is_same_v<T, double4>) {
+    return 16;
+  } else {
+    return sizeof(T);
+  }
+}
 
 template <typename T, int N>
-struct alignas(sizeof(T) * N) Vector {
+struct alignas(alignment_by_type<T>() * N) Vector {
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Vector() {}
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Vector(T v) { Fill(v); }
 
@@ -57,7 +87,7 @@ struct alignas(sizeof(T) * N) Vector {
   // loads need to be issued to fill the vector
   template <int EPT>
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ void load(T* ptr) {
-    constexpr int elements_per_load = (MAX_VEC_WIDTH_BYTES / sizeof(T));
+    constexpr int elements_per_load = (MAX_VEC_WIDTH_BYTES / alignment_by_type<T>());
     constexpr int num_iterations = EPT / elements_per_load;
     MATX_LOOP_UNROLL
     for (int i = 0; i < num_iterations; i++) {

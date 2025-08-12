@@ -1185,6 +1185,169 @@ constexpr cusparseIndexType_t MatXTypeToCuSparseIndexType() {
   }
 }
 
+template <typename T, size_t N>
+struct VecTypeSelector {
+  // Helper to make static_assert dependent on template parameters
+  static constexpr bool always_false = sizeof(T) == 0;
+
+  static_assert(N >= 1 && N <= 4, "VecTypeSelector only supports vector sizes 1, 2, 3, and 4");
+  static_assert(std::is_arithmetic_v<T> || std::is_same_v<T, __half>, "VecTypeSelector only supports arithmetic types and __half");
+  static_assert(always_false, "VecTypeSelector: No specialization available for this type and size combination. Check that the combination is supported: most types support sizes 1-4, but __half only supports size 2");
+};
+
+template <> struct VecTypeSelector<float, 1> { using type = float1; };
+template <> struct VecTypeSelector<float, 2> { using type = float2; };
+template <> struct VecTypeSelector<float, 3> { using type = float3; };
+template <> struct VecTypeSelector<float, 4> { using type = float4; };
+
+template <> struct VecTypeSelector<double, 1> { using type = double1; };
+template <> struct VecTypeSelector<double, 2> { using type = double2; };
+template <> struct VecTypeSelector<double, 3> { using type = double3; };
+template <> struct VecTypeSelector<double, 4> { using type = double4; };
+
+template <> struct VecTypeSelector<char, 1> { using type = char1; };
+template <> struct VecTypeSelector<char, 2> { using type = char2; };
+template <> struct VecTypeSelector<char, 3> { using type = char3; };
+template <> struct VecTypeSelector<char, 4> { using type = char4; };
+
+template <> struct VecTypeSelector<unsigned char, 1> { using type = uchar1; };
+template <> struct VecTypeSelector<unsigned char, 2> { using type = uchar2; };
+template <> struct VecTypeSelector<unsigned char, 3> { using type = uchar3; };
+template <> struct VecTypeSelector<unsigned char, 4> { using type = uchar4; };
+
+template <> struct VecTypeSelector<short, 1> { using type = short1; };
+template <> struct VecTypeSelector<short, 2> { using type = short2; };
+template <> struct VecTypeSelector<short, 3> { using type = short3; };
+template <> struct VecTypeSelector<short, 4> { using type = short4; };
+
+template <> struct VecTypeSelector<unsigned short, 1> { using type = ushort1; };
+template <> struct VecTypeSelector<unsigned short, 2> { using type = ushort2; };
+template <> struct VecTypeSelector<unsigned short, 3> { using type = ushort3; };
+template <> struct VecTypeSelector<unsigned short, 4> { using type = ushort4; };
+
+template <> struct VecTypeSelector<int, 1> { using type = int1; };
+template <> struct VecTypeSelector<int, 2> { using type = int2; };
+template <> struct VecTypeSelector<int, 3> { using type = int3; };
+template <> struct VecTypeSelector<int, 4> { using type = int4; };
+
+template <> struct VecTypeSelector<unsigned int, 1> { using type = uint1; };
+template <> struct VecTypeSelector<unsigned int, 2> { using type = uint2; };
+template <> struct VecTypeSelector<unsigned int, 3> { using type = uint3; };
+template <> struct VecTypeSelector<unsigned int, 4> { using type = uint4; };
+
+template <> struct VecTypeSelector<long, 1> { using type = long1; };
+template <> struct VecTypeSelector<long, 2> { using type = long2; };
+template <> struct VecTypeSelector<long, 3> { using type = long3; };
+template <> struct VecTypeSelector<long, 4> { using type = long4; };
+
+template <> struct VecTypeSelector<unsigned long, 1> { using type = ulong1; };
+template <> struct VecTypeSelector<unsigned long, 2> { using type = ulong2; };
+template <> struct VecTypeSelector<unsigned long, 3> { using type = ulong3; };
+template <> struct VecTypeSelector<unsigned long, 4> { using type = ulong4; };
+
+template <> struct VecTypeSelector<long long, 1> { using type = longlong1; };
+template <> struct VecTypeSelector<long long, 2> { using type = longlong2; };
+template <> struct VecTypeSelector<long long, 3> { using type = longlong3; };
+template <> struct VecTypeSelector<long long, 4> { using type = longlong4; };
+
+template <> struct VecTypeSelector<unsigned long long, 1> { using type = ulonglong1; };
+template <> struct VecTypeSelector<unsigned long long, 2> { using type = ulonglong2; };
+template <> struct VecTypeSelector<unsigned long long, 3> { using type = ulonglong3; };
+template <> struct VecTypeSelector<unsigned long long, 4> { using type = ulonglong4; };
+
+template <> struct VecTypeSelector<__half, 2> { using type = __half2; };
+
+// Helper to check if all types in a pack are the same types
+template <typename... Ts>
+struct all_same;
+
+template <typename T>
+struct all_same<T> : std::true_type {};
+
+template <typename T, typename U, typename... Rest>
+struct all_same<T, U, Rest...> : std::bool_constant<std::is_same_v<T, U> && all_same<U, Rest...>::value> {};
+
+template <typename... Ts>
+inline constexpr bool all_same_v = all_same<Ts...>::value;
+
+template <typename... Ts>
+struct AggregateToVec {
+  static_assert(sizeof...(Ts) > 0, "AggregateToVec requires at least one type");
+  static_assert(((std::is_arithmetic_v<Ts> || std::is_same_v<Ts, __half>) && ...), "All types must be arithmetic or __half");
+
+private:
+  static constexpr bool all_half = (std::is_same_v<Ts, __half> && ...);
+  static constexpr bool any_half = (std::is_same_v<Ts, __half> || ...);
+  static constexpr bool has_mixed_half = any_half && !all_half;
+
+  // Check for mixed __half with other types and provide helpful error message
+  static_assert(!has_mixed_half,
+    "zipvec does not support mixing __half with other types. "
+    "Use explicit type conversion (e.g., as_type<float>()) to convert __half operands to a common type before calling zipvec.");
+
+  // Helper to determine the common type
+  using common_type_impl = std::conditional_t<
+    all_half,
+    __half,  // If all types are __half, keep as __half
+    std::common_type_t<Ts...>  // Otherwise use standard common type (no __half mixed in due to static_assert)
+  >;
+
+  // Helper to check if a conversion from T to TargetType is non-narrowing
+  template <typename T, typename TargetType>
+  static constexpr bool is_non_narrowing_conversion() {
+    // Same type is always safe
+    if constexpr (std::is_same_v<T, TargetType>) {
+      return true;
+    }
+    // Integer to larger or equal integer is safe
+    else if constexpr (std::is_integral_v<T> && std::is_integral_v<TargetType>) {
+      return sizeof(T) <= sizeof(TargetType) && 
+             std::is_signed_v<T> == std::is_signed_v<TargetType>;
+    }
+    // Floating point to larger or equal floating point is safe
+    else if constexpr (std::is_floating_point_v<T> && std::is_floating_point_v<TargetType>) {
+      return sizeof(T) <= sizeof(TargetType);
+    }
+    // Integer to floating point is safe if the floating point can represent all integer values
+    else if constexpr (std::is_integral_v<T> && std::is_floating_point_v<TargetType>) {
+      // float can safely represent all values of int8_t, int16_t, uint8_t, uint16_t
+      // double can safely represent all values of int32_t, uint32_t and smaller
+      if constexpr (std::is_same_v<TargetType, float>) {
+        return sizeof(T) <= 2; // 16-bit or smaller integers
+      } else if constexpr (std::is_same_v<TargetType, double>) {
+        return sizeof(T) <= 4; // 32-bit or smaller integers
+      } else {
+        return false; // Conservative for other floating point types
+      }
+    }
+    // __half conversions
+    else if constexpr (std::is_same_v<T, __half> || std::is_same_v<TargetType, __half>) {
+      // __half to float is safe, others are not
+      return std::is_same_v<T, __half> && std::is_same_v<TargetType, float>;
+    }
+    else {
+      return false; // All other conversions are considered narrowing
+    }
+  }
+
+  // Check if all conversions to common type are non-narrowing
+  static constexpr bool all_non_narrowing =
+    (is_non_narrowing_conversion<Ts, common_type_impl>() && ...);
+
+public:
+  using common_type = common_type_impl;
+
+  static_assert(!std::is_void_v<common_type>, "Types must have a common type");
+  static_assert(!all_half || sizeof...(Ts) == 2,  "__half vector types only support size 2 (__half2)");
+  static_assert(all_non_narrowing,
+    "AggregateToVec requires all input types to have non-narrowing conversions to the common type. "
+    "Use explicit type conversion (e.g., as_type<float>()) if narrowing conversions are desired.");
+  using type = typename VecTypeSelector<common_type, sizeof...(Ts)>::type;
+};
+
+template <typename... Ts>
+using AggregateToVecType = typename AggregateToVec<Ts...>::type;
+
 } // end namespace detail
 
 } // end namespace matx
