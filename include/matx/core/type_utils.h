@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // BSD 3-Clause License
 //
-// Copyright (c) 2021, NVIDIA Corporation
+// Copyright (c) 2025, NVIDIA Corporation
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -1191,7 +1191,7 @@ struct VecTypeSelector {
   static constexpr bool always_false = sizeof(T) == 0;
 
   static_assert(N >= 1 && N <= 4, "VecTypeSelector only supports vector sizes 1, 2, 3, and 4");
-  static_assert(std::is_arithmetic_v<T> || std::is_same_v<T, __half>, "VecTypeSelector only supports arithmetic types and __half");
+  static_assert(cuda::std::is_arithmetic_v<T> || std::is_same_v<T, __half>, "VecTypeSelector only supports arithmetic types and __half");
   static_assert(always_false, "VecTypeSelector: No specialization available for this type and size combination. Check that the combination is supported: most types support sizes 1-4, but __half only supports size 2");
 };
 
@@ -1273,7 +1273,7 @@ inline constexpr bool all_same_v = all_same<Ts...>::value;
 template <typename... Ts>
 struct AggregateToVec {
   static_assert(sizeof...(Ts) > 0, "AggregateToVec requires at least one type");
-  static_assert(((std::is_arithmetic_v<Ts> || std::is_same_v<Ts, __half>) && ...), "All types must be arithmetic or __half");
+  static_assert(((cuda::std::is_arithmetic_v<Ts> || std::is_same_v<Ts, __half>) && ...), "All types must be arithmetic or __half");
 
 private:
   static constexpr bool all_half = (std::is_same_v<Ts, __half> && ...);
@@ -1286,10 +1286,10 @@ private:
     "Use explicit type conversion (e.g., as_type<float>()) to convert __half operands to a common type before calling zipvec.");
 
   // Helper to determine the common type
-  using common_type_impl = std::conditional_t<
+  using common_type_impl = cuda::std::conditional_t<
     all_half,
     __half,  // If all types are __half, keep as __half
-    std::common_type_t<Ts...>  // Otherwise use standard common type (no __half mixed in due to static_assert)
+    cuda::std::common_type_t<Ts...>  // Otherwise use standard common type (no __half mixed in due to static_assert)
   >;
 
   // Helper to check if a conversion from T to TargetType is non-narrowing
@@ -1300,16 +1300,16 @@ private:
       return true;
     }
     // Integer to larger or equal integer is safe
-    else if constexpr (std::is_integral_v<T> && std::is_integral_v<TargetType>) {
+    else if constexpr (cuda::std::is_integral_v<T> && cuda::std::is_integral_v<TargetType>) {
       return sizeof(T) <= sizeof(TargetType) && 
-             std::is_signed_v<T> == std::is_signed_v<TargetType>;
+             cuda::std::is_signed_v<T> == cuda::std::is_signed_v<TargetType>;
     }
     // Floating point to larger or equal floating point is safe
-    else if constexpr (std::is_floating_point_v<T> && std::is_floating_point_v<TargetType>) {
+    else if constexpr (cuda::std::is_floating_point_v<T> && cuda::std::is_floating_point_v<TargetType>) {
       return sizeof(T) <= sizeof(TargetType);
     }
     // Integer to floating point is safe if the floating point can represent all integer values
-    else if constexpr (std::is_integral_v<T> && std::is_floating_point_v<TargetType>) {
+    else if constexpr (cuda::std::is_integral_v<T> && cuda::std::is_floating_point_v<TargetType>) {
       // float can safely represent all values of int8_t, int16_t, uint8_t, uint16_t
       // double can safely represent all values of int32_t, uint32_t and smaller
       if constexpr (std::is_same_v<TargetType, float>) {
