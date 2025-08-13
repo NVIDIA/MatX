@@ -129,7 +129,6 @@ namespace matx
             return ElementsPerThread::ONE;
           }
           else {
-            return capability_attributes<Cap>::default_value;
             auto self_has_cap = capability_attributes<Cap>::default_value;
             return combine_capabilities<Cap>(
               self_has_cap,
