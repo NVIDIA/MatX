@@ -216,7 +216,7 @@ public:
         // and for small FFTs this call can create extra latency. For now we'll just assume the user knows what 
         // they're doing and not try to batch FFTs that are too small        
         const auto shape = i.Shape();
-        params.batch = std::accumulate(std::begin(shape), std::end(shape) - 1, 1, std::multiplies<index_t>());
+        params.batch = std::accumulate(std::begin(shape), std::end(shape) - 1, static_cast<index_t>(1), std::multiplies<index_t>());
         params.batch_dims = i.Rank() - 1;
       }
       else {
@@ -453,7 +453,7 @@ virtual void inline Exec(OutTensorType &o, const InTensorType &i,
     cuda::std::array<shape_type, InTensorType::Rank()> idx{0};
     auto i_shape = i.Shape();
     // Get total number of batches
-    size_t total_iter = std::accumulate(i_shape.begin(), i_shape.begin() + InTensorType::Rank() - (this->params_.batch_dims + 1), 1, std::multiplies<shape_type>());
+    size_t total_iter = std::accumulate(i_shape.begin(), i_shape.begin() + InTensorType::Rank() - (this->params_.batch_dims + 1), static_cast<shape_type>(1), std::multiplies<shape_type>());
     for (size_t iter = 0; iter < total_iter; iter++) {
       auto ip = cuda::std::apply([&i](auto... param) { return i.GetPointer(param...); }, idx);
       auto op = cuda::std::apply([&o](auto... param) { return o.GetPointer(param...); }, idx);
@@ -599,7 +599,7 @@ private:
       cuda::std::array<shape_type, InTensorType::Rank()> idx{0};
       auto i_shape = i.Shape();
       // Get total number of batches
-      size_t total_iter = std::accumulate(i_shape.begin(), i_shape.begin() + InTensorType::Rank() - batch_offset, 1, std::multiplies<shape_type>());
+      size_t total_iter = std::accumulate(i_shape.begin(), i_shape.begin() + InTensorType::Rank() - batch_offset, static_cast<shape_type>(1), std::multiplies<shape_type>());
       for (size_t iter = 0; iter < total_iter; iter++) {
         auto ip = cuda::std::apply([&i](auto... param) { return i.GetPointer(param...); }, idx);
         auto op = cuda::std::apply([&o](auto... param) { return o.GetPointer(param...); }, idx);
