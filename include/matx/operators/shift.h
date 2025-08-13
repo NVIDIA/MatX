@@ -167,18 +167,10 @@ namespace matx
 
         ~ShiftOp() = default;
         ShiftOp(const ShiftOp &rhs) = default;
-        __MATX_INLINE__ auto operator=(const self_type &rhs) {
-          return set(*this, rhs);
-        }
 
         template<typename R>
         __MATX_INLINE__ auto operator=(const R &rhs) {
-          if constexpr (is_matx_transform_op<R>()) {
-            return mtie(*this, rhs);
-          }
-          else {
-            return set(*this, rhs);
-          }
+          return set(*this, rhs);
         }
 
       private:
