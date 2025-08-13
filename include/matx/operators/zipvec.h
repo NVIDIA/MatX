@@ -86,40 +86,36 @@ namespace matx
         }
       }
 
+      template <ElementsPerThread EPT, typename Ops, typename... Is>
+      static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Ops&& ops, Is... is) {
+        return cuda::std::apply([&](auto&&... op) {
+          using scalar_type = typename AggregateToVec<typename Ts::value_type...>::common_type;
+          return value_type{ static_cast<scalar_type>(op(cuda::std::forward<Is>(is)...))... };
+        }, cuda::std::forward<Ops>(ops));
+      }
+
       template <ElementsPerThread EPT, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is) const
       {
-        return cuda::std::apply([&](auto&&... ops) { 
-          using scalar_type = typename AggregateToVec<typename Ts::value_type...>::common_type;
-          return value_type{ static_cast<scalar_type>(ops(std::forward<Is>(is)...))... }; 
-        }, ops_);
+        return get_impl<EPT>(cuda::std::as_const(ops_), cuda::std::forward<Is>(is)...);
       }
 
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is) const
       {
-        return cuda::std::apply([&](auto&&... ops) { 
-          using scalar_type = typename AggregateToVec<typename Ts::value_type...>::common_type;
-          return value_type{ static_cast<scalar_type>(ops(std::forward<Is>(is)...))... }; 
-        }, ops_);
+        return get_impl<ElementsPerThread::ONE>(cuda::std::as_const(ops_), cuda::std::forward<Is>(is)...);
       }
 
       template <ElementsPerThread EPT, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is)
       {
-        return cuda::std::apply([&](auto&&... ops) { 
-          using scalar_type = typename AggregateToVec<typename Ts::value_type...>::common_type;
-          return value_type{ static_cast<scalar_type>(ops(std::forward<Is>(is)...))... }; 
-        }, ops_);
+        return get_impl<EPT>(ops_, cuda::std::forward<Is>(is)...);
       }
 
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is)
       {
-        return cuda::std::apply([&](auto&&... ops) { 
-          using scalar_type = typename AggregateToVec<typename Ts::value_type...>::common_type;
-          return value_type{ static_cast<scalar_type>(ops(std::forward<Is>(is)...))... }; 
-        }, ops_);
+        return get_impl<ElementsPerThread::ONE>(ops_, cuda::std::forward<Is>(is)...);
       }
 
       template <OperatorCapability Cap>

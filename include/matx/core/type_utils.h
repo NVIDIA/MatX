@@ -1257,19 +1257,6 @@ template <> struct VecTypeSelector<unsigned long long, 4> { using type = ulonglo
 
 template <> struct VecTypeSelector<__half, 2> { using type = __half2; };
 
-// Helper to check if all types in a pack are the same types
-template <typename... Ts>
-struct all_same;
-
-template <typename T>
-struct all_same<T> : std::true_type {};
-
-template <typename T, typename U, typename... Rest>
-struct all_same<T, U, Rest...> : std::bool_constant<std::is_same_v<T, U> && all_same<U, Rest...>::value> {};
-
-template <typename... Ts>
-inline constexpr bool all_same_v = all_same<Ts...>::value;
-
 template <typename... Ts>
 struct AggregateToVec {
   static_assert(sizeof...(Ts) > 0, "AggregateToVec requires at least one type");
@@ -1292,56 +1279,12 @@ private:
     cuda::std::common_type_t<Ts...>  // Otherwise use standard common type (no __half mixed in due to static_assert)
   >;
 
-  // Helper to check if a conversion from T to TargetType is non-narrowing
-  template <typename T, typename TargetType>
-  static constexpr bool is_non_narrowing_conversion() {
-    // Same type is always safe
-    if constexpr (std::is_same_v<T, TargetType>) {
-      return true;
-    }
-    // Integer to larger or equal integer is safe
-    else if constexpr (cuda::std::is_integral_v<T> && cuda::std::is_integral_v<TargetType>) {
-      return sizeof(T) <= sizeof(TargetType) && 
-             cuda::std::is_signed_v<T> == cuda::std::is_signed_v<TargetType>;
-    }
-    // Floating point to larger or equal floating point is safe
-    else if constexpr (cuda::std::is_floating_point_v<T> && cuda::std::is_floating_point_v<TargetType>) {
-      return sizeof(T) <= sizeof(TargetType);
-    }
-    // Integer to floating point is safe if the floating point can represent all integer values
-    else if constexpr (cuda::std::is_integral_v<T> && cuda::std::is_floating_point_v<TargetType>) {
-      // float can safely represent all values of int8_t, int16_t, uint8_t, uint16_t
-      // double can safely represent all values of int32_t, uint32_t and smaller
-      if constexpr (std::is_same_v<TargetType, float>) {
-        return sizeof(T) <= 2; // 16-bit or smaller integers
-      } else if constexpr (std::is_same_v<TargetType, double>) {
-        return sizeof(T) <= 4; // 32-bit or smaller integers
-      } else {
-        return false; // Conservative for other floating point types
-      }
-    }
-    // __half conversions
-    else if constexpr (std::is_same_v<T, __half> || std::is_same_v<TargetType, __half>) {
-      // __half to float is safe, others are not
-      return std::is_same_v<T, __half> && std::is_same_v<TargetType, float>;
-    }
-    else {
-      return false; // All other conversions are considered narrowing
-    }
-  }
-
-  // Check if all conversions to common type are non-narrowing
-  static constexpr bool all_non_narrowing =
-    (is_non_narrowing_conversion<Ts, common_type_impl>() && ...);
-
 public:
   using common_type = common_type_impl;
 
   static_assert(!std::is_void_v<common_type>, "Types must have a common type");
   static_assert(!all_half || sizeof...(Ts) == 2,  "__half vector types only support size 2 (__half2)");
-  static_assert(all_non_narrowing,
-    "AggregateToVec requires all input types to have non-narrowing conversions to the common type. "
-    "Use explicit type conversion (e.g., as_type<float>()) if narrowing conversions are desired.");
+
   using type = typename VecTypeSelector<common_type, sizeof...(Ts)>::type;
 };
 
