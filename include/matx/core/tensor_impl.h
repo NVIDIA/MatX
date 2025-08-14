@@ -1173,17 +1173,25 @@ MATX_IGNORE_WARNING_POP_GCC
           return detail::ElementsPerThread::ONE;
         }
 
-        int width = MAX_VEC_WIDTH_BYTES / alignment_by_type<T>();
-        while (width > 1) {
-          if (((Lsize() % width) == 0) &&                                       // Last dim is a multiple of vector load size
-            ((reinterpret_cast<uintptr_t>(data_.ldata_) % (alignment_by_type<T>() * width)) == 0)) {
-            break;
+        if constexpr (sizeof(T) != alignment_by_type<T>()) {
+          // If the alignment of the type does not match sizeof(T), then the logic
+          // below will not necessarily work. It would generally work if alignment_by_type<T>() < sizeof(T),
+          // except for cases where sizeof(T) > MAX_VEC_WIDTH_BYTES, which result in division by zero.
+          // Curently, this is only true for vector types (e.g., double3) and we use one EPT for these cases.
+          return detail::ElementsPerThread::ONE;
+        } else {
+          int width = MAX_VEC_WIDTH_BYTES / sizeof(T);
+          while (width > 1) {
+            if (((Lsize() % width) == 0) &&                                       // Last dim is a multiple of vector load size
+              ((reinterpret_cast<uintptr_t>(data_.ldata_) % (sizeof(T) * width)) == 0)) {
+              break;
+            }
+
+            width /= 2;
           }
 
-          width /= 2;
+          return static_cast<detail::ElementsPerThread>(width);
         }
-
-        return static_cast<detail::ElementsPerThread>(width);
       }
       else {
         return capability_attributes<Cap>::default_value;
