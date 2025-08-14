@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // BSD 3-Clause License
 //
-// Copyright (c) 2021, NVIDIA Corporation
+// Copyright (c) 2025, NVIDIA Corporation
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -50,7 +50,6 @@ namespace matx
       class ZipVecOp : public BaseOp<ZipVecOp<Ts...>>
     {
       using first_type = cuda::std::tuple_element_t<0, cuda::std::tuple<Ts...>>;
-      using scalar_value_type = typename first_type::value_type;
       using self_type = ZipVecOp<Ts...>;
 
       static constexpr int RANK = first_type::Rank();
@@ -212,9 +211,9 @@ namespace matx
    * be combined into an operator of type float2.
    *
    * The input operators must have the same rank and size in all dimensions and the types must be compatible. This
-   * is only supported for the types for which CUDA has corresponding vector types, including [u]char, [u]short,
-   * [u]int, [u]long, float, and double. For these sizes, the number of input operators and the corresponding zipped
-   * vector length can be 1-4.
+   * is only supported for the types for which CUDA has corresponding vector types, including char, short,
+   * int, long, float, and double. The integer types also support unsigned variants (uchar, ushort, etc.).
+   * For these sizes, the number of input operators and the corresponding zipped vector length can be 1-4.
    *
    * The components from the input operators are accessed by the fields x, y, z, and w, respectively, in the zipped operator.
    *

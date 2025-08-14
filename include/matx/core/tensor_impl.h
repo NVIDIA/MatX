@@ -1085,7 +1085,7 @@ MATX_IGNORE_WARNING_POP_GCC
         constexpr int EPT_int = static_cast<int>(EPT);
         if constexpr (EPT == detail::ElementsPerThread::ONE) {
           return data_.ldata_[GetVal<EPT, 0, Is...>(cuda::std::make_tuple(indices...))];
-        } else if constexpr (EPT_int * detail::alignment_by_type<T>() <= MAX_VEC_WIDTH_BYTES ) {
+        } else if constexpr (EPT_int * sizeof(T) <= MAX_VEC_WIDTH_BYTES ) {
           return *reinterpret_cast<detail::Vector<T, EPT_int>*>(data_.ldata_ + GetVal<EPT, 0, Is...>(cuda::std::make_tuple(indices...)));
         } else {
           detail::Vector<T, EPT_int> vec;
