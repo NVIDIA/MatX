@@ -15,7 +15,6 @@ TYPED_TEST(OperatorTestsFloatNonComplexNonHalfAllExecs, ZipVecOp)
 
   ExecType exec{};
 
-  if constexpr (!std::is_same_v<TestType, __half>) // __half only supports size 2 (__half2)
   { // Test 1D vector types
     using vec1_type = typename matx::detail::VecTypeSelector<TestType, 1>::type;
     auto t = make_tensor<vec1_type>({1});
@@ -69,7 +68,6 @@ TYPED_TEST(OperatorTestsFloatNonComplexNonHalfAllExecs, ZipVecOp)
     }
   }
 
-  if constexpr (!std::is_same_v<TestType, __half>) // __half only supports size 2 (__half2)
   { // Test 3D vector types
     using vec3_type = typename matx::detail::VecTypeSelector<TestType, 3>::type;
     auto v = linspace<TestType>(1, 3, 3);
@@ -88,7 +86,6 @@ TYPED_TEST(OperatorTestsFloatNonComplexNonHalfAllExecs, ZipVecOp)
     }
   }
 
-  if constexpr (!std::is_same_v<TestType, __half>) // __half only supports size 2 (__half2)
   { // Test 4D vector types
     using vec4_type = typename matx::detail::VecTypeSelector<TestType, 4>::type;
     auto v = linspace<TestType>(1, 3, 3);
@@ -131,16 +128,6 @@ TYPED_TEST(OperatorTestsFloatNonComplexNonHalfAllExecs, ZipVecOp)
       ASSERT_EQ(t3(0).y, static_cast<double>(1));  
     }
     {
-      // __half can be converted to float without narrowing
-      auto t = ones<float>({1});
-      auto t2 = ones<__half>({1});
-      auto t3 = make_tensor<float2>({1});
-      (t3 = zipvec(t, as_type<float>(t2))).run(exec);
-      exec.sync();
-      ASSERT_EQ(t3(0).x, static_cast<float>(1));
-      ASSERT_EQ(t3(0).y, static_cast<float>(1));  
-    }
-    {
       // int can be converted to double without narrowing
       auto t = ones<double>({1});
       auto t2 = ones<int>({1});
@@ -150,6 +137,9 @@ TYPED_TEST(OperatorTestsFloatNonComplexNonHalfAllExecs, ZipVecOp)
       ASSERT_EQ(t3(0).x, static_cast<double>(1));
       ASSERT_EQ(t3(0).y, static_cast<double>(1));  
     }
+    // Note that some narrowing conversions like int -> float are currently allowed.
+    // This is because std::common_type_t<int, float> is float, and the zipvec operator
+    // uses std::common_type for its value_type.
   }
 
   MATX_EXIT_HANDLER();

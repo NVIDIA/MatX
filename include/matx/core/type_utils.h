@@ -1191,8 +1191,7 @@ struct VecTypeSelector {
   static constexpr bool always_false = sizeof(T) == 0;
 
   static_assert(N >= 1 && N <= 4, "VecTypeSelector only supports vector sizes 1, 2, 3, and 4");
-  static_assert(cuda::std::is_arithmetic_v<T> || std::is_same_v<T, __half>, "VecTypeSelector only supports arithmetic types and __half");
-  static_assert(always_false, "VecTypeSelector: No specialization available for this type and size combination. Check that the combination is supported: most types support sizes 1-4, but __half only supports size 2");
+  static_assert(always_false, "VecTypeSelector: No specialization available for this type and size combination. Check the documentation for supported types.");
 };
 
 template <> struct VecTypeSelector<float, 1> { using type = float1; };
@@ -1255,35 +1254,18 @@ template <> struct VecTypeSelector<unsigned long long, 2> { using type = ulonglo
 template <> struct VecTypeSelector<unsigned long long, 3> { using type = ulonglong3; };
 template <> struct VecTypeSelector<unsigned long long, 4> { using type = ulonglong4; };
 
-template <> struct VecTypeSelector<__half, 2> { using type = __half2; };
-
 template <typename... Ts>
 struct AggregateToVec {
   static_assert(sizeof...(Ts) > 0, "AggregateToVec requires at least one type");
-  static_assert(((cuda::std::is_arithmetic_v<Ts> || std::is_same_v<Ts, __half>) && ...), "All types must be arithmetic or __half");
 
 private:
-  static constexpr bool all_half = (std::is_same_v<Ts, __half> && ...);
-  static constexpr bool any_half = (std::is_same_v<Ts, __half> || ...);
-  static constexpr bool has_mixed_half = any_half && !all_half;
-
-  // Check for mixed __half with other types and provide helpful error message
-  static_assert(!has_mixed_half,
-    "zipvec does not support mixing __half with other types. "
-    "Use explicit type conversion (e.g., as_type<float>()) to convert __half operands to a common type before calling zipvec.");
-
-  // Helper to determine the common type
-  using common_type_impl = cuda::std::conditional_t<
-    all_half,
-    __half,  // If all types are __half, keep as __half
-    cuda::std::common_type_t<Ts...>  // Otherwise use standard common type (no __half mixed in due to static_assert)
-  >;
+  static constexpr bool any_half = ((is_half_v<Ts> || is_matx_half_v<Ts>) || ...);
 
 public:
-  using common_type = common_type_impl;
+  using common_type = cuda::std::common_type_t<Ts...>;
 
   static_assert(!std::is_void_v<common_type>, "Types must have a common type");
-  static_assert(!all_half || sizeof...(Ts) == 2,  "__half vector types only support size 2 (__half2)");
+  static_assert(!any_half,  "zipvec does not support input operators with half types");
 
   using type = typename VecTypeSelector<common_type, sizeof...(Ts)>::type;
 };

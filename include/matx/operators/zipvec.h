@@ -214,7 +214,7 @@ namespace matx
    * The input operators must have the same rank and size in all dimensions and the types must be compatible. This
    * is only supported for the types for which CUDA has corresponding vector types, including [u]char, [u]short,
    * [u]int, [u]long, float, and double. For these sizes, the number of input operators and the corresponding zipped
-   * vector length can be 1-4. __half types are also supported, but only for a vector length of 2.
+   * vector length can be 1-4.
    *
    * The components from the input operators are accessed by the fields x, y, z, and w, respectively, in the zipped operator.
    *
