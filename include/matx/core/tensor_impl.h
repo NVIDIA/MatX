@@ -1045,14 +1045,6 @@ MATX_IGNORE_WARNING_POP_GCC
         constexpr int EPT_int = static_cast<int>(EPT);
         if constexpr (EPT == detail::ElementsPerThread::ONE) {
           return data_.ldata_[GetValC<EPT, 0, Is...>(cuda::std::make_tuple(indices...))];
-        } else if constexpr (sizeof(T) != detail::alignment_by_type<T>()) {
-          // If the alignment of the type does not match the types size, then we use the Vector load
-          // method. That method specializes this case to load the elements as scalars in a loop over
-          // all EPT elements. A common case where sizeof(T) != detail::alignment_by_type<T>() is for vector types,
-          // e.g. float3 has an alignment of 4B, but a size of 12B.
-          detail::Vector<T, EPT_int> vec;
-          vec.template load<EPT_int>(data_.ldata_ + GetValC<EPT, 0, Is...>(cuda::std::make_tuple(indices...)));
-          return vec;
         } else if constexpr (EPT_int * sizeof(T) <= MAX_VEC_WIDTH_BYTES ) {
           return *reinterpret_cast<detail::Vector<T, EPT_int>*>(data_.ldata_ + GetValC<EPT, 0, Is...>(cuda::std::make_tuple(indices...)));
         } else {
