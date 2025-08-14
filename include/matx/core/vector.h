@@ -87,11 +87,22 @@ struct alignas(alignment_by_type<T>() * N) Vector {
   // loads need to be issued to fill the vector
   template <int EPT>
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ void load(T* ptr) {
-    constexpr int elements_per_load = (MAX_VEC_WIDTH_BYTES / alignment_by_type<T>());
-    constexpr int num_iterations = EPT / elements_per_load;
-    MATX_LOOP_UNROLL
-    for (int i = 0; i < num_iterations; i++) {
-      *reinterpret_cast<float4*>(&data[i*elements_per_load]) = *reinterpret_cast<float4*>(ptr + i * elements_per_load);
+    if constexpr (sizeof(T) == alignment_by_type<T>()) {
+      constexpr int elements_per_load = (MAX_VEC_WIDTH_BYTES / sizeof(T));
+      constexpr int num_iterations = EPT / elements_per_load;
+      MATX_LOOP_UNROLL
+      for (int i = 0; i < num_iterations; i++) {
+        *reinterpret_cast<float4*>(&data[i*elements_per_load]) = *reinterpret_cast<float4*>(ptr + i * elements_per_load);
+      }
+    } else {
+      // If the alignment of the type does not match the types size, then we load it as
+      // a scalar. This is true for vector types -- e.g. float3 has an alignment of 4B,
+      // but a size of 12B. The vectorization logic would need to be updated to handle
+      // such cases, but we now we load them as scalars.
+      MATX_LOOP_UNROLL
+      for (int i = 0; i < EPT; i++) {
+        data[i] = ptr[i];
+      }
     }
   }
 
