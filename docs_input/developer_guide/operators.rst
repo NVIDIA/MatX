@@ -126,42 +126,65 @@ Going back to the `lcollapse` example, the operator class `LCollapseOp` is defin
         size_ = 1;
 
         // Collapse left-most dims
-  #pragma unroll
+        #pragma unroll
         for(int i = 0 ; i < DIM; i++) {
           size_ *= op_.Size(i);
         }
       }
 
-      template <typename... Is>
-      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
+      template <ElementsPerThread EPT, typename Op, typename... Is>
+      static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, Is... indices)
       {
-        // indices coming in
-        cuda::std::array<index_t, Rank()> in{indices...};  // index coming in
-        cuda::std::array<index_t, T1::Rank()> out;         // index going out
+        if constexpr (EPT == ElementsPerThread::ONE) {
+          // indices coming in
+          cuda::std::array<index_t, Rank()> in{indices...};  // index coming in
+          cuda::std::array<index_t, T1::Rank()> out;         // index going out
 
-  #pragma unroll
-        for(int i = 1; i < Rank(); i++) {
-          // copy all but first input index into out array
-          out[DIM + i - 1] = in[i];
+          MATX_LOOP_UNROLL
+          for(int i = 1; i < Rank(); i++) {
+            // copy all but first input index into out array
+            out[DIM + i - 1] = in[i];
+          }
+
+          // expand first input index into DIM indices
+          auto ind = in[0];
+          MATX_LOOP_UNROLL
+          for(int i = 0; i < DIM; i++) {
+            int d = DIM - i - 1;
+            out[d] = ind % op.Size(d);
+            ind /= op.Size(d);
+          }
+
+          return get_value<EPT>(cuda::std::forward<Op>(op), out);
         }
-
-        // expand first input index into DIM indices
-        auto ind = in[0];
-  #pragma unroll
-        for(int i = 0; i < DIM; i++) {
-          int d = DIM - i - 1;
-          out[d] = ind % op_.Size(d);
-          ind /= op_.Size(d);
+        else {
+          return Vector<value_type, static_cast<index_t>(EPT)>{};
         }
+      }   
 
-        return cuda::std::apply(op_, out);
-      }    
+      template <typename Op, typename... Is>
+      static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, Is... indices)
+      {
+        return get_impl<detail::ElementsPerThread::ONE>(cuda::std::forward<Op>(op), indices...);
+      }
 
-      template <typename... Is>
+      template <ElementsPerThread EPT, typename... Is>
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
+      {
+        return get_impl<EPT>(cuda::std::as_const(op_), indices...);
+      }
+
+      template <ElementsPerThread EPT, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
       {
-        return cuda::std::as_const(*this).template operator()(indices...);
-      }   
+        return get_impl<EPT>(cuda::std::forward<decltype(op_)>(op_), indices...);
+      }
+
+      template <typename... Is>
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
+      {
+        return get_impl<ElementsPerThread::ONE>(cuda::std::as_const(op_), indices...);
+      } 
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
       {
@@ -205,6 +228,16 @@ Going back to the `lcollapse` example, the operator class `LCollapseOp` is defin
           op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
       }
+
+      template <OperatorCapability Cap>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+        if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+          return ElementsPerThread::ONE;
+        } else {
+          auto self_has_cap = capability_attributes<Cap>::default_value;
+          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
+        }
+      }      
   };
 
 
@@ -288,53 +321,93 @@ The next functions are the most important functions in the operator:
 
 .. code-block:: cpp
 
-  template <typename... Is>
-  __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
+  template <ElementsPerThread EPT, typename Op, typename... Is>
+  static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, Is... indices)
   {
-    // indices coming in
-    cuda::std::array<index_t, Rank()> in{indices...};  // index coming in
-    cuda::std::array<index_t, T1::Rank()> out;         // index going out
+    if constexpr (EPT == ElementsPerThread::ONE) {
+      // indices coming in
+      cuda::std::array<index_t, Rank()> in{indices...};  // index coming in
+      cuda::std::array<index_t, T1::Rank()> out;         // index going out
 
-  #pragma unroll
-    for(int i = 1; i < Rank(); i++) {
-      // copy all but first input index into out array
-      out[DIM + i - 1] = in[i];
+  MATX_LOOP_UNROLL
+      for(int i = 1; i < Rank(); i++) {
+        // copy all but first input index into out array
+        out[DIM + i - 1] = in[i];
+      }
+
+      // expand first input index into DIM indices
+      auto ind = in[0];
+  MATX_LOOP_UNROLL
+      for(int i = 0; i < DIM; i++) {
+        int d = DIM - i - 1;
+        out[d] = ind % op.Size(d);
+        ind /= op.Size(d);
+      }
+
+      return get_value<EPT>(cuda::std::forward<Op>(op), out);
     }
-
-    // expand first input index into DIM indices
-    auto ind = in[0];
-  #pragma unroll
-    for(int i = 0; i < DIM; i++) {
-      int d = DIM - i - 1;
-      out[d] = ind % op_.Size(d);
-      ind /= op_.Size(d);
+    else {
+      return Vector<value_type, static_cast<index_t>(EPT)>{};
     }
+  }
 
-    return cuda::std::apply(op_, out);  
+  template <typename Op, typename... Is>
+  static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, Is... indices)
+  {
+    return get_impl<detail::ElementsPerThread::ONE>(cuda::std::forward<Op>(op), indices...);
+  }  
+
+The `get_impl` function is used by the executor to get values from the operator at specified indices. Usually `get_impl` is only implemented 
+in operators where `operator()` would duplicate this code. Instead, we make one accessor function called `get_impl` that various versions of 
+`operator()` call. The `ElementsPerThread` template parameter is used to specify the number of elements per thread that are being accessed. This 
+value could be compiled with EPT values that the operator does not support, but it will not be called with unsupported values. `EPT` should be 
+used as a parameter to `get_value` to ensure the correct vectorization is used. Note there is also a version of `get_impl` that does not take
+an `ElementsPerThread` parameter, and is used in the default path where vectorization is not used.
+
+The various versions of `operator()` are defined as follows:
+
+.. code-block:: cpp
+
+  template <ElementsPerThread EPT, typename... Is>
+  __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
+  {
+    return get_impl<EPT>(cuda::std::as_const(op_), indices...);
+  }
+
+  template <ElementsPerThread EPT, typename... Is>
+  __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
+  {
+    return get_impl<EPT>(cuda::std::forward<decltype(op_)>(op_), indices...);
+  }
+
+  template <typename... Is>
+  __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
+  {
+    return get_impl<ElementsPerThread::ONE>(cuda::std::as_const(op_), indices...);
   }
 
   template <typename... Is>
   __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
   {
-    return cuda::std::as_const(*this).template operator()(indices...);
+    return get_impl<ElementsPerThread::ONE>(cuda::std::forward<decltype(op_)>(op_), indices...);
   }
 
 `operator()` is defined on both the host and device, and is used by the executor to get values from this operator at specified indices. Most operators 
 support arbitrary-rank inputs, and a parameter pack is used as input to reflect this. If the operator will never need more than a certain rank input, 
 it's also valid to only specify `operator()` with a fixed number of indices. In general, this should be avoided since it prevents batching and broadcasting.
 
-The next part to note is that there is a `const` and a non-`const` version of `operator()` defined. If the operator will never be written to as an lvalue, 
-it's valid to only define the `const` version. Either way, the non-`const` version should call the `const` version with a cast as shown above to avoid
-duplicate code. These two function bodies should never differ.
+Sometimes there is a `const` and a non-`const` version of `operator()` defined. If the operator will never be written to as an lvalue, 
+it's valid to only define the `const` version. Either way, the non-`const` version should call the `const` version with a cast as shown above to combine 
+code in `get_impl`. As with `get_impl` above, `operator()` also needs a version without the `ElementsPerThread` parameter when the fallback path is used.
 
 .. note::
   Since `operator()` may be called on both the host and device, it's important to make sure that it's as performant as possible. Using extra stack memory, 
   big loops, etc, are generally bad practice here unless there's a good reason to do so. This function will be called by *every* thread in almost all
   cases.
 
-The body of the `operator()` function should contain all the business logic your operator uses to perform the function it's designed for. For example, 
+The body of the `get_impl()` function should contain all the business logic your operator uses to perform the function it's designed for. For example, 
 `lcollapse` is intended to take a higher-rank operator, collapse some number of left-most dimenions, and allow accessing that new collapsed operator. To
-perform that function `operator()` indexes the higher-rank operator using indices for its own rank, which is lower. Some operators return the same rank, 
+perform that function `get_impl()` indexes the higher-rank operator using indices for its own rank, which is lower. Some operators return the same rank, 
 while others return higher ranks. It's worth looking at an operator that's most similar to yours to see how it might be done.
 
 The next function describes the rank of our operator:
@@ -374,7 +447,7 @@ are used.
 If the operator provides lvalue semantics, meaning it can be assigned on the left-hand side of an expression, it must also define `operator=` when assigning to itself.
 The `operator=` function is identical on any operator implementing lvalue semantics.
 
-The last functions defined are `PreRun` and `PostRun`. While these are defined in all operators, they're only used in transform operators and will be covered in that 
+The next functions defined are `PreRun` and `PostRun`. While these are defined in all operators, they're only used in transform operators and will be covered in that 
 document. For regular operators these functions can be copied and pasted from other operators:
 
 .. code-block:: cpp
@@ -384,6 +457,25 @@ document. For regular operators these functions can be copied and pasted from ot
 
   template <typename ShapeType, typename Executor>
   __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
+
+Last, the `get_capability` function is defined. This function is used by the executor to determine if the operator supports a specific capability.
+
+.. code-block:: cpp
+
+  template <OperatorCapability Cap>
+  __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+    if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+      return ElementsPerThread::ONE;
+    } else {
+      auto self_has_cap = capability_attributes<Cap>::default_value;
+      return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
+    }
+  }
+
+An operator only needs a branch above if it wishes to override the support for a capability. For example, if an operator does not support vectorization,
+it should define a branch for `OperatorCapability::ELEMENTS_PER_THREAD` and force the value to `ElementsPerThread::ONE` (by default it allows up to 
+`ElementsPerThread::THIRTY_TWO`). Any capability the operator wishes to use the default values for simply uses code similar to what's in the `else` branch. 
+The `combine_capabilities` function must be called with all input operators to the operator being defined so that they are aggregated properly.
 
 With the operator class written, there are only a few loose ends to finish to make the operator useable. 
 
