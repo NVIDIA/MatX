@@ -39,6 +39,7 @@
 #include <shared_mutex>
 #include <unordered_map>
 #include <cuda/atomic>
+#include <thread>
 
 #include "matx/core/error.h"
 
@@ -47,6 +48,24 @@ namespace detail {
 
 static constexpr size_t MAX_CUDA_DEVICES_PER_SYSTEM = 16;
 using CacheId = uint64_t;
+
+// Common cache parameters that every cache entry needs
+struct CacheCommonParamsKey {
+  int device_id;
+  std::thread::id thread_id;
+  
+  bool operator==(const CacheCommonParamsKey& other) const {
+    return device_id == other.device_id && thread_id == other.thread_id;
+  }
+};
+
+struct CacheCommonParamsKeyHash {
+  std::size_t operator()(const CacheCommonParamsKey& key) const {
+    std::size_t h1 = std::hash<int>{}(key.device_id);
+    std::size_t h2 = std::hash<std::thread::id>{}(key.thread_id);
+    return h1 ^ (h2 << 1);
+  }
+};
 
 #ifndef DOXYGEN_ONLY
 __attribute__ ((visibility ("default")))
@@ -96,38 +115,39 @@ public:
     auto el = cache.find(id);
     MATX_ASSERT_STR(el != cache.end(), matxInvalidType, "Cache type not found");
 
-    for (int i = 0; i < static_cast<int>(MAX_CUDA_DEVICES_PER_SYSTEM); i++) {
-      using CacheArray = cuda::std::array<CacheType, MAX_CUDA_DEVICES_PER_SYSTEM>;
-      std::any_cast<CacheArray&>(el->second)[i].clear();
-    }
+    using CacheMap = std::unordered_map<CacheCommonParamsKey, CacheType, CacheCommonParamsKeyHash>;
+    std::any_cast<CacheMap&>(el->second).clear();
   }
 
   template <typename CacheType, typename InParams, typename MakeFun, typename ExecFun, typename Executor>
   void LookupAndExec(const CacheId &id, const InParams &params, const MakeFun &mfun, const ExecFun &efun, [[maybe_unused]] const Executor &exec) {
     // This mutex should eventually be finer-grained so each transform doesn't get blocked by others
     [[maybe_unused]] std::lock_guard<std::recursive_mutex> lock(cache_mtx);
-    using CacheArray = cuda::std::array<CacheType, MAX_CUDA_DEVICES_PER_SYSTEM>;
+    using CacheMap = std::unordered_map<CacheCommonParamsKey, CacheType, CacheCommonParamsKeyHash>;
 
     // Create named cache if it doesn't exist
-    int device_id;
+    CacheCommonParamsKey key;
+    key.thread_id = std::this_thread::get_id();
+    
     auto el = cache.find(id);
     if (el == cache.end()) {
-      cache[id] = CacheArray{};
+      cache[id] = CacheMap{};
     }
 
     auto &cval = cache[id];
     if constexpr (is_cuda_executor_v<Executor>) {
-      cudaGetDevice(&device_id);
+      cudaGetDevice(&key.device_id);
     }
     else {
-      device_id = 0;
+      key.device_id = 0;
     }
 
-    auto &rmap = std::any_cast<CacheArray&>(cval)[device_id];
-    auto cache_el = rmap.find(params);
-    if (cache_el == rmap.end()) {
+    auto &rmap = std::any_cast<CacheMap&>(cval);
+    auto &common_params_cache = rmap[key];
+    auto cache_el = common_params_cache.find(params);
+    if (cache_el == common_params_cache.end()) {
       std::any tmp = mfun();
-      rmap.insert({params, tmp});
+      common_params_cache.insert({params, tmp});
       efun(std::any_cast<decltype(mfun())>(tmp));
     }
     else {
@@ -137,11 +157,13 @@ public:
 
   void* GetStreamAlloc(cudaStream_t stream, size_t size) {
     void *ptr = nullptr;
-    int device_id;
-    cudaGetDevice(&device_id);
+    CacheCommonParamsKey key;
+    key.thread_id = std::this_thread::get_id();
+    cudaGetDevice(&key.device_id);
 
-    auto el = stream_alloc_cache[device_id].find(stream);
-    if (el == stream_alloc_cache[device_id].end()) {
+    auto &common_params_cache = stream_alloc_cache[key];
+    auto el = common_params_cache.find(stream);
+    if (el == common_params_cache.end()) {
       StreamAllocation alloc;
 
       // We allocate at least 2MB for workspace so we don't keep reallocating from small sizes
@@ -150,7 +172,7 @@ public:
 
       alloc.size = size;
       alloc.ptr = ptr;
-      stream_alloc_cache[device_id][stream] = alloc;
+      common_params_cache[stream] = alloc;
     }
     else if (el->second.size < size) {
       // Free the old allocation and allocate a new one
@@ -168,7 +190,7 @@ public:
 
 private:
   std::unordered_map<CacheId, std::any> cache;
-  cuda::std::array<std::unordered_map<cudaStream_t, StreamAllocation>, MAX_CUDA_DEVICES_PER_SYSTEM> stream_alloc_cache;
+  std::unordered_map<CacheCommonParamsKey, std::unordered_map<cudaStream_t, StreamAllocation>, CacheCommonParamsKeyHash> stream_alloc_cache;
 };
 
 /**
