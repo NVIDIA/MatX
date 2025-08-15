@@ -126,7 +126,7 @@ Going back to the `lcollapse` example, the operator class `LCollapseOp` is defin
         size_ = 1;
 
         // Collapse left-most dims
-  #pragma unroll
+        #pragma unroll
         for(int i = 0 ; i < DIM; i++) {
           size_ *= op_.Size(i);
         }
@@ -140,7 +140,7 @@ Going back to the `lcollapse` example, the operator class `LCollapseOp` is defin
           cuda::std::array<index_t, Rank()> in{indices...};  // index coming in
           cuda::std::array<index_t, T1::Rank()> out;         // index going out
 
-MATX_LOOP_UNROLL
+          MATX_LOOP_UNROLL
           for(int i = 1; i < Rank(); i++) {
             // copy all but first input index into out array
             out[DIM + i - 1] = in[i];
@@ -148,7 +148,7 @@ MATX_LOOP_UNROLL
 
           // expand first input index into DIM indices
           auto ind = in[0];
-MATX_LOOP_UNROLL
+          MATX_LOOP_UNROLL
           for(int i = 0; i < DIM; i++) {
             int d = DIM - i - 1;
             out[d] = ind % op.Size(d);
