@@ -133,6 +133,10 @@ namespace matx
         ~UpsampleOp() = default;
         UpsampleOp(const UpsampleOp &rhs) = default;
         
+        __MATX_INLINE__ auto operator=(const self_type &rhs) {
+          return set(*this, rhs);
+        }
+
         template<typename R> __MATX_INLINE__ auto operator=(const R &rhs) { 
           return set(*this, rhs); 
         }

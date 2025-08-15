@@ -191,6 +191,10 @@ namespace matx
         ~SliceOp() = default;
         SliceOp(const SliceOp &rhs) = default;
 
+        __MATX_INLINE__ auto operator=(const self_type &rhs) {
+          return set(*this, rhs);
+        }
+
         template<typename R>
         __MATX_INLINE__ auto operator=(const R &rhs) {
           return set(*this, rhs);

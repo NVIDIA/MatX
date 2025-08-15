@@ -146,6 +146,10 @@ namespace matx
         ~OverlapOp() = default;
         OverlapOp(const OverlapOp &rhs) = default;
 
+        __MATX_INLINE__ auto operator=(const self_type &rhs) {
+          return set(*this, rhs);
+        }
+
         template<typename R>
         __MATX_INLINE__ auto operator=(const R &rhs) {
           return set(*this, rhs);
