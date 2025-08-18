@@ -41,9 +41,9 @@ namespace matx
   /**
    * ZipVecOp operator
    *
-   * Class for concatening operators along a single dimension. Sizes of the operators not
-   * being concatenated must be the same, and the new operator has dimensions equal to the original
-   * operator on non-index dimension, and the sum of sizes along the index dimension.
+   * Class for zipping operators into a vectorized output operator. The rank and
+   * dimensions of the input operators must all be the same and the output operator
+   * will have the same rank and dimensions.
    */
   namespace detail {
     template <typename... Ts>
@@ -58,7 +58,6 @@ namespace matx
       using matxop = bool;
       using matxoplvalue = bool;
 
-      // Scalar type of operation
       using value_type = AggregateToVecType<typename Ts::value_type...>;
 
       template <int I = -1>
