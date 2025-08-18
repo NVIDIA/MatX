@@ -968,7 +968,6 @@ void svd_impl(UTensor &&u, STensor &&s,
   if (method == detail::SVDMethod::POW_ITER) {
     MATX_THROW(matxInvalidType, "Power iteration method not implemented");
     //svdbpi_impl(u, s, vt, a, 10, 0.f, exec);
-    return;
   }
 
   // cuSolver destroys the input, so we need to make a copy of A regardless
