@@ -447,3 +447,27 @@ TYPED_TEST(OperatorTestsComplexTypesAllExecs, OperatorFuncs)
 
   MATX_EXIT_HANDLER();
 }
+
+
+TYPED_TEST(OperatorTestsQuaternionTypesAllExecs, OperatorFuncs)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+
+  ExecType exec{};   
+
+  auto tiv0 = make_tensor<TestType>({});
+  auto tov0 = make_tensor<TestType>({});
+
+  TestType c = GenerateData<TestType>();
+  tiv0() = c;
+
+  // example-begin exp-test-1
+  (tov0 = exp(tiv0)).run(exec);
+  // example-end exp-test-1
+  exec.sync();
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_exp(c)));
+
+  MATX_EXIT_HANDLER();
+}
