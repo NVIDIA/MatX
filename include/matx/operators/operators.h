@@ -84,6 +84,7 @@
 #include "matx/operators/normalize.h"
 #include "matx/operators/outer.h"
 #include "matx/operators/overlap.h"
+#include "matx/operators/pad.h"
 #include "matx/operators/percentile.h"
 #include "matx/operators/pinv.h"
 #include "matx/operators/permute.h"

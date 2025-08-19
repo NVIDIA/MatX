@@ -29,6 +29,7 @@ set(OPERATOR_TEST_FILES
   legendre_test.cu
   operator_func_test.cu
   overlap_test.cu
+  pad_test.cu
   permute_test.cu
   planar_test.cu
   polyval_test.cu
