@@ -109,7 +109,7 @@ public:
   // functions, so we have to make a separate one.
   template <ElementsPerThread EPT, typename... Ts>
   __MATX_DEVICE__ __MATX_HOST__ inline auto _internal_mapply(Ts&&... args) const noexcept {
-    auto r = detail::get_value<EPT>(op_, args...);
+    const auto r = detail::get_value<EPT>(op_, args...);
     out_(args...) = r;
     return r;
   }

@@ -90,31 +90,10 @@ namespace matx
         }
       }
 
-      template <ElementsPerThread EPT, int I = 0, int N>
-      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) GetVal(cuda::std::array<index_t,RANK> &indices) const {
-        if constexpr ( I == N ) {
-          // This should never happen, but we return a fake value from the first tuple element anyways
-          const auto &op = cuda::std::get<0>(ops_);
-          return cuda::std::apply([&](auto &&...call_args) -> decltype(auto) { return op.template operator()<EPT>(call_args...); }, indices);
-        } else {
-          const auto &op = cuda::std::get<I>(ops_);
-          auto idx = indices[axis_];
-          auto size = op.Size(axis_);
-          // If in range of this operator
-          if(idx < size) {
-            // evaluate operator
-            return cuda::std::apply([&](auto &&...call_args) -> decltype(auto) { return op.template operator()<EPT>(call_args...); }, indices);
-          } else {
-            // otherwise remove this operator and recurse
-            indices[axis_] -= size;
-            return GetVal<EPT, I+1, N>(indices);
-          }
-        }
-      }
 
-
+      // Non-const path returns references where available (used for LHS writes)
       template <ElementsPerThread EPT, int I = 0, int N>
-      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) GetVal(cuda::std::array<index_t,RANK> &indices) {
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(cuda::std::array<index_t,RANK> &indices) {
         if constexpr ( I == N ) {
           // This should never happen, but we return a fake value from the first tuple element anyways
           auto &op = cuda::std::get<0>(ops_);
@@ -130,7 +109,34 @@ namespace matx
           } else {
             // otherwise remove this operator and recurse
             indices[axis_] -= size;
-            return GetVal<EPT, I+1, N>(indices);
+            return get_impl<EPT, I+1, N>(indices);
+          }
+        }
+      }
+
+      // Const path: unify scalar return type to value_type to avoid ref/value conflicts
+      template <ElementsPerThread EPT, int I = 0, int N>
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto get_impl(cuda::std::array<index_t,RANK> &indices) const {
+        using return_t = cuda::std::conditional_t<
+            (EPT == ElementsPerThread::ONE),
+            value_type,
+            Vector<value_type, static_cast<index_t>(EPT)>>;
+        if constexpr ( I == N ) {
+          const auto &op = cuda::std::get<0>(ops_);
+          return cuda::std::apply([&](auto &&...call_args) -> return_t {
+            return op.template operator()<EPT>(call_args...);
+          }, indices);
+        } else {
+          const auto &op = cuda::std::get<I>(ops_);
+          auto idx = indices[axis_];
+          auto size = op.Size(axis_);
+          if(idx < size) {
+            return cuda::std::apply([&](auto &&...call_args) -> return_t {
+              return op.template operator()<EPT>(call_args...);
+            }, indices);
+          } else {
+            indices[axis_] -= size;
+            return get_impl<EPT, I+1, N>(indices);
           }
         }
       }
@@ -140,12 +146,14 @@ namespace matx
       {
         if constexpr (EPT == ElementsPerThread::ONE) {
           cuda::std::array<index_t, sizeof...(Is)> indices = {{is...}};
-          return GetVal<EPT, 0, sizeof...(Ts)>(indices);
+          return get_impl<EPT, 0, sizeof...(Ts)>(indices);
         }
         else {
           return Vector<value_type, static_cast<index_t>(EPT)>{};
         }
       }
+
+      
 
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is) const
@@ -158,7 +166,7 @@ namespace matx
       {
         if constexpr (EPT == ElementsPerThread::ONE) {
           cuda::std::array<index_t, sizeof...(Is)> indices = {{is...}};
-          return GetVal<EPT, 0, sizeof...(Ts)>(indices);
+          return get_impl<EPT, 0, sizeof...(Ts)>(indices);
         }
         else {
           return Vector<value_type, static_cast<index_t>(EPT)>{};
