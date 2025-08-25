@@ -54,4 +54,5 @@ set(OPERATOR_TEST_FILES
   transpose_test.cu
   trig_funcs_test.cu
   updownsample_test.cu 
+  zipvec_test.cu
 )

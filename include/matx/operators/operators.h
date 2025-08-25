@@ -118,6 +118,7 @@
 #include "matx/operators/unique.h"
 #include "matx/operators/updownsample.h"
 #include "matx/operators/var.h"
+#include "matx/operators/zipvec.h"
 
 #include "matx/operators/softmax.h"
 #include "matx/operators/sum.h"

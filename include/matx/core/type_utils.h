@@ -1185,6 +1185,94 @@ constexpr cusparseIndexType_t MatXTypeToCuSparseIndexType() {
   }
 }
 
+template <typename T, size_t N>
+struct VecTypeSelector {
+  // Helper to make static_assert dependent on template parameters
+  static constexpr bool always_false = sizeof(T) == 0;
+
+  static_assert(N >= 1 && N <= 4, "VecTypeSelector only supports vector sizes 1, 2, 3, and 4");
+  static_assert(always_false, "VecTypeSelector: No specialization available for this type and size combination. Check the documentation for supported types.");
+};
+
+template <> struct VecTypeSelector<float, 1> { using type = float1; };
+template <> struct VecTypeSelector<float, 2> { using type = float2; };
+template <> struct VecTypeSelector<float, 3> { using type = float3; };
+template <> struct VecTypeSelector<float, 4> { using type = float4; };
+
+template <> struct VecTypeSelector<double, 1> { using type = double1; };
+template <> struct VecTypeSelector<double, 2> { using type = double2; };
+template <> struct VecTypeSelector<double, 3> { using type = double3; };
+template <> struct VecTypeSelector<double, 4> { using type = double4; };
+
+template <> struct VecTypeSelector<char, 1> { using type = char1; };
+template <> struct VecTypeSelector<char, 2> { using type = char2; };
+template <> struct VecTypeSelector<char, 3> { using type = char3; };
+template <> struct VecTypeSelector<char, 4> { using type = char4; };
+
+template <> struct VecTypeSelector<unsigned char, 1> { using type = uchar1; };
+template <> struct VecTypeSelector<unsigned char, 2> { using type = uchar2; };
+template <> struct VecTypeSelector<unsigned char, 3> { using type = uchar3; };
+template <> struct VecTypeSelector<unsigned char, 4> { using type = uchar4; };
+
+template <> struct VecTypeSelector<short, 1> { using type = short1; };
+template <> struct VecTypeSelector<short, 2> { using type = short2; };
+template <> struct VecTypeSelector<short, 3> { using type = short3; };
+template <> struct VecTypeSelector<short, 4> { using type = short4; };
+
+template <> struct VecTypeSelector<unsigned short, 1> { using type = ushort1; };
+template <> struct VecTypeSelector<unsigned short, 2> { using type = ushort2; };
+template <> struct VecTypeSelector<unsigned short, 3> { using type = ushort3; };
+template <> struct VecTypeSelector<unsigned short, 4> { using type = ushort4; };
+
+template <> struct VecTypeSelector<int, 1> { using type = int1; };
+template <> struct VecTypeSelector<int, 2> { using type = int2; };
+template <> struct VecTypeSelector<int, 3> { using type = int3; };
+template <> struct VecTypeSelector<int, 4> { using type = int4; };
+
+template <> struct VecTypeSelector<unsigned int, 1> { using type = uint1; };
+template <> struct VecTypeSelector<unsigned int, 2> { using type = uint2; };
+template <> struct VecTypeSelector<unsigned int, 3> { using type = uint3; };
+template <> struct VecTypeSelector<unsigned int, 4> { using type = uint4; };
+
+template <> struct VecTypeSelector<long, 1> { using type = long1; };
+template <> struct VecTypeSelector<long, 2> { using type = long2; };
+template <> struct VecTypeSelector<long, 3> { using type = long3; };
+template <> struct VecTypeSelector<long, 4> { using type = long4; };
+
+template <> struct VecTypeSelector<unsigned long, 1> { using type = ulong1; };
+template <> struct VecTypeSelector<unsigned long, 2> { using type = ulong2; };
+template <> struct VecTypeSelector<unsigned long, 3> { using type = ulong3; };
+template <> struct VecTypeSelector<unsigned long, 4> { using type = ulong4; };
+
+template <> struct VecTypeSelector<long long, 1> { using type = longlong1; };
+template <> struct VecTypeSelector<long long, 2> { using type = longlong2; };
+template <> struct VecTypeSelector<long long, 3> { using type = longlong3; };
+template <> struct VecTypeSelector<long long, 4> { using type = longlong4; };
+
+template <> struct VecTypeSelector<unsigned long long, 1> { using type = ulonglong1; };
+template <> struct VecTypeSelector<unsigned long long, 2> { using type = ulonglong2; };
+template <> struct VecTypeSelector<unsigned long long, 3> { using type = ulonglong3; };
+template <> struct VecTypeSelector<unsigned long long, 4> { using type = ulonglong4; };
+
+template <typename... Ts>
+struct AggregateToVec {
+  static_assert(sizeof...(Ts) > 0, "AggregateToVec requires at least one type");
+
+private:
+  static constexpr bool any_half = ((is_half_v<Ts> || is_matx_half_v<Ts>) || ...);
+
+public:
+  using common_type = cuda::std::common_type_t<Ts...>;
+
+  static_assert(!std::is_void_v<common_type>, "Types must have a common type");
+  static_assert(!any_half,  "zipvec does not support input operators with half types");
+
+  using type = typename VecTypeSelector<common_type, sizeof...(Ts)>::type;
+};
+
+template <typename... Ts>
+using AggregateToVecType = typename AggregateToVec<Ts...>::type;
+
 } // end namespace detail
 
 } // end namespace matx
