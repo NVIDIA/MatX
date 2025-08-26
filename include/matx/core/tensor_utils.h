@@ -247,21 +247,37 @@ namespace matx
      * @param indices indices
      * @return Value after broadcasting
      */
-    template <ElementsPerThread EPT, typename T, typename... Is, std::enable_if_t<std::conjunction_v<std::is_integral<Is>...>, bool> = true>
+    // Const-qualified RHS fetch
+    template <ElementsPerThread EPT, typename T, typename... Is, std::enable_if_t<std::conjunction_v<std::is_integral<Is>...> && std::is_const_v<std::remove_reference_t<T>>, bool> = true>
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_matx_value(T &&i, Is... indices)
+    {
+      using OpT = remove_cvref_t<T>;
+      constexpr int RANK = OpT::Rank();
+      const OpT &ci = i;
+      if constexpr (RANK == int(sizeof...(Is)) || RANK == matxNoRank) {
+        return ci.template operator()<EPT>(indices...);
+      }
+      else
+      {
+        using seq = offset_sequence_t<sizeof...(Is) - RANK, std::make_index_sequence<RANK>>;
+        auto tup = cuda::std::make_tuple(indices...);
+        auto sliced_tup = select_tuple(std::forward<decltype(tup)>(tup), seq{});
+        return cuda::std::apply([&](auto... args) {
+          return ci.template operator()<EPT>(args...);
+        }, sliced_tup);
+      }
+    }
+
+    // Non-const fetch preserves original behavior (may return refs)
+    template <ElementsPerThread EPT, typename T, typename... Is, std::enable_if_t<std::conjunction_v<std::is_integral<Is>...> && !std::is_const_v<std::remove_reference_t<T>>, bool> = true>
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_matx_value(T &&i, Is... indices)
     {
       constexpr int RANK = remove_cvref_t<T>::Rank();
       if constexpr (RANK == int(sizeof...(Is)) || RANK == matxNoRank) {
-        // If we're only indexing with the same number of arguments as the rank of the operator, just return operator()
         return cuda::std::forward<T>(i).template operator()<EPT>(indices...);
       }
       else
       {
-        // Otherwise we need to broadcast by constructing a large set of indices
-        // Construct an integer sequence of the length of the tuple, but only using the last indices. We construct an offset sequence
-        // to index into the broadcasted dimensions. For example, if T is a 3D tensor and we want to index as a 5D, we take the indices
-        // {0, 1, 2} we'd normally index with, and add the difference in rank (2), to get {2, 3, 4}. Another way to think of this is it
-        // simply chops off the first sizeof...(Is) - RANK indices since they're not used for operator().
         using seq = offset_sequence_t<sizeof...(Is) - RANK, std::make_index_sequence<RANK>>;
         auto tup = cuda::std::make_tuple(indices...);
         auto sliced_tup = select_tuple(std::forward<decltype(tup)>(tup), seq{});
@@ -271,25 +287,41 @@ namespace matx
       }
     }
 
-    template <ElementsPerThread EPT, typename T, typename IdxType, size_t N>
+    template <ElementsPerThread EPT, typename T, typename IdxType, size_t N, std::enable_if_t<std::is_const_v<std::remove_reference_t<T>>, bool> = true>
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_matx_value(T &&i, const cuda::std::array<IdxType, N> idx)
+    {
+      using OpT = remove_cvref_t<T>;
+      constexpr int RANK = OpT::Rank();
+      const OpT &ci = i;
+      if constexpr (RANK == N || RANK == matxNoRank) {
+        return cuda::std::apply([&ci](auto... args) -> decltype(auto) {
+          return ci.template operator()<EPT>(args...);
+        }, idx);
+      } else {
+        cuda::std::array<index_t, RANK> nbc_idx;
+        cuda::std::copy(idx.begin() + (N - RANK), idx.end(), nbc_idx.begin());
+        return cuda::std::apply([&ci](auto... args) -> decltype(auto) {
+          return ci.template operator()<EPT>(args...);
+        }, nbc_idx);
+      }
+    }
+
+    template <ElementsPerThread EPT, typename T, typename IdxType, size_t N, std::enable_if_t<!std::is_const_v<std::remove_reference_t<T>>, bool> = true>
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_matx_value(T &&i, const cuda::std::array<IdxType, N> idx)
     {
       constexpr int RANK = remove_cvref_t<T>::Rank();
       if constexpr (RANK == N || RANK == matxNoRank) {
-        // If we're only indexing with the same number of arguments as the rank of the operator, just return operator()
         return cuda::std::apply([&i](auto... args) -> decltype(auto) {
           return cuda::std::forward<T>(i).template operator()<EPT>(args...);
-        }, idx);        
-      }
-      else
-      {
-        cuda::std::array<index_t, RANK> nbc_idx; // non-broadcast indices
+        }, idx);
+      } else {
+        cuda::std::array<index_t, RANK> nbc_idx;
         cuda::std::copy(idx.begin() + (N - RANK), idx.end(), nbc_idx.begin());
         return cuda::std::apply([&i](auto... args) -> decltype(auto) {
           return cuda::std::forward<T>(i).template operator()<EPT>(args...);
         }, nbc_idx);
       }
-    }    
+    }
 
 
     template <ElementsPerThread EPT, typename T, typename... Is, std::enable_if_t<std::conjunction_v<std::is_integral<Is>...>, bool> = true>
@@ -317,7 +349,8 @@ namespace matx
       {
         return i;
       }
-    }    
+    }
+    
 
     template <typename T> __MATX_INLINE__ std::string to_short_str() {
       if constexpr (!is_complex_v<T>) {
