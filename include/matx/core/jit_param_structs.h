@@ -62,6 +62,16 @@ struct jit_sort_params_t {
     static constexpr int ttl_items = 0;
 };
 
+template <uint64_t ID>
+struct jit_scan_params_t {
+    static constexpr int ttl_items = 0;
+};
+
+template <uint64_t ID>
+struct jit_reduce_params_t {
+    static constexpr int ttl_items = 0;
+};
+
 
 } // namespace detail
 } // namespace matx

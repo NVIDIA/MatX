@@ -136,7 +136,7 @@ namespace detail {
   template <>
   struct capability_attributes<OperatorCapability::SUPPORTS_JIT> {
     using type = bool;
-    static constexpr bool default_value = false;
+    static constexpr bool default_value = true;
     static constexpr bool or_identity = false;
     static constexpr bool and_identity = true;
   };
@@ -202,7 +202,7 @@ namespace detail {
   inline CapabilityQueryType get_query_type(OperatorCapability cap) {
     switch (cap) {
       case OperatorCapability::SUPPORTS_JIT:
-        return CapabilityQueryType::OR_QUERY; // If any sub-operator supports JIT, the expression might be JIT-able.
+        return CapabilityQueryType::AND_QUERY; // If any sub-operator supports JIT, the expression might be JIT-able.
       case OperatorCapability::ELEMENTS_PER_THREAD:
         return CapabilityQueryType::RANGE_QUERY; // The expression should use the range of elements per thread of its children.
       case OperatorCapability::JIT_CAP_QUERY:

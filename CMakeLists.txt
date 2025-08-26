@@ -145,7 +145,10 @@ rapids_cpm_cccl(
     BUILD_EXPORT_SET matx-exports
     INSTALL_EXPORT_SET matx-exports
 )
-set_property(GLOBAL APPEND PROPERTY PREPROCESSOR_INCLUDE_DIRS "${CCCL_INCLUDE_DIRS}")
+# Add CCCL include directories
+set_property(GLOBAL APPEND PROPERTY PREPROCESSOR_INCLUDE_DIRS "${CMAKE_BINARY_DIR}/_deps/cccl-src/libcudacxx/include")
+set_property(GLOBAL APPEND PROPERTY PREPROCESSOR_INCLUDE_DIRS "${CMAKE_BINARY_DIR}/_deps/cccl-src/thrust")
+set_property(GLOBAL APPEND PROPERTY PREPROCESSOR_INCLUDE_DIRS "${CMAKE_BINARY_DIR}/_deps/cccl-src/cub")
 set_property(GLOBAL APPEND PROPERTY PREPROCESSOR_INCLUDE_DIRS "${CUDAToolkit_INCLUDE_DIRS}")
 
 target_link_libraries(matx INTERFACE CCCL::CCCL)
@@ -332,8 +335,9 @@ if (MATX_EN_MATHDX)
     target_link_libraries(matx INTERFACE mathdx::cufftdx CUDA::nvrtc)
 
     # For JIT preprocessing
-    set_property(GLOBAL APPEND PROPERTY PREPROCESSOR_INCLUDE_DIRS "${MathDx_INCLUDE_DIR}/include")
-    set_property(GLOBAL APPEND PROPERTY PREPROCESSOR_INCLUDE_DIRS "${MathDx_INCLUDE_DIR}/external/cutlass/include")
+    # Use the actual paths where MathDx is extracted by CPM
+    set_property(GLOBAL APPEND PROPERTY PREPROCESSOR_INCLUDE_DIRS "${CMAKE_BINARY_DIR}/_deps/mathdx-src/nvidia/mathdx/${MathDx_VERSION}/include")
+    set_property(GLOBAL APPEND PROPERTY PREPROCESSOR_INCLUDE_DIRS "${CMAKE_BINARY_DIR}/_deps/mathdx-src/nvidia/mathdx/${MathDx_VERSION}/external/cutlass/include")
 endif()
 
 if (MATX_EN_CUDSS)
@@ -431,34 +435,68 @@ if (MATX_EN_JIT_PREPROCESSING)
     message(STATUS "Adding tools subdirectory for JIT preprocessing")
     add_subdirectory(tools)
 
-    # Get the include directories from the matx target
-    get_property(PREPROCESSOR_INCLUDE_DIRS GLOBAL PROPERTY PREPROCESSOR_INCLUDE_DIRS)
-    set(PREPROCESSOR_INCLUDE_FLAGS "")
-    foreach(DIR IN LISTS PREPROCESSOR_INCLUDE_DIRS)
-        list(APPEND PREPROCESSOR_INCLUDE_FLAGS "-I${DIR}")
-    endforeach()
-    message(STATUS "PREPROCESSOR_INCLUDE_FLAGS: ${CMAKE_CURRENT_SOURCE_DIR}/include/")
-    # Convert the list of architectures to the format jitify2_preprocess expects
-    set(JITIFY_ARCH_FLAGS "")
-    foreach(ARCH IN LISTS CMAKE_CUDA_ARCHITECTURES)
-        string(REPLACE "-" ";" ARCH_PARTS "${ARCH}")
-        list(GET ARCH_PARTS 0 ARCH_NUM)
-        list(APPEND JITIFY_ARCH_FLAGS "-arch=sm_${ARCH_NUM}")
-    endforeach()
+    # Get all options for the preprocessor
+    function(get_preprocessor_options options_var)
+        set(options "")
+
+        # Defines
+        list(APPEND options "-DMATX_EN_JIT")
+        list(APPEND options "-DJITIFY=1")
+        if (MATX_EN_MATHDX)
+            list(APPEND options "-DMATX_EN_MATHDX")
+        endif()
+
+        # Standard
+        list(APPEND options "-std=c++${CMAKE_CXX_STANDARD}")
+
+        # Arch flags
+        foreach(ARCH IN LISTS CMAKE_CUDA_ARCHITECTURES)
+            string(REPLACE "-" ";" ARCH_PARTS "${ARCH}")
+            list(GET ARCH_PARTS 0 ARCH_NUM)
+            list(APPEND options "-arch=sm_${ARCH_NUM}")
+        endforeach()
+        
+        # Include directories
+        get_property(PREPROCESSOR_INCLUDE_DIRS GLOBAL PROPERTY PREPROCESSOR_INCLUDE_DIRS)
+        foreach(DIR IN LISTS PREPROCESSOR_INCLUDE_DIRS)
+            list(APPEND options "-I${DIR}")
+        endforeach()
+
+        # Python includes, if enabled
+        if (MATX_EN_PYBIND11)
+            list(APPEND options "-I${Python3_INCLUDE_DIRS}")
+            if(TARGET pybind11::pybind11)
+                get_target_property(PYBIND11_INCLUDE_DIR pybind11::pybind11 INTERFACE_INCLUDE_DIRECTORIES)
+                if(PYBIND11_INCLUDE_DIR)
+                    list(APPEND options "-I${PYBIND11_INCLUDE_DIR}")
+                endif()
+            else()
+                # Fallback to less robust path from nvrtc_helper
+                list(APPEND options "-I${CMAKE_BINARY_DIR}/_deps/pybind11-src/include")
+            endif()
+        endif()
+        
+        # Other miscellaneous flags from nvrtc_helper
+        list(APPEND options "-no-system-headers-workaround")
+
+        set(${options_var} "${options}" PARENT_SCOPE)
+    endfunction()
+
+    get_preprocessor_options(JITIFY_OPTIONS)
 
     file(GLOB_RECURSE MATX_JIT_DEPS CONFIGURE_DEPENDS
         "${CMAKE_CURRENT_SOURCE_DIR}/include/matx.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/include/matx/*.h"
     )
 
+    string(REPLACE ";" " " JITIFY_OPTIONS_STR "${JITIFY_OPTIONS}")
     add_custom_command(
         OUTPUT "${CMAKE_BINARY_DIR}/include/matx_preprocessed.h"
+        COMMAND ${CMAKE_COMMAND} -E echo "JITIFY_PREPROCESS_COMMAND: $<TARGET_FILE:jitify2_preprocess> ${CMAKE_CURRENT_SOURCE_DIR}/include/matx.h -i ${JITIFY_OPTIONS_STR}"
         COMMAND $<TARGET_FILE:jitify2_preprocess>
             "${CMAKE_CURRENT_SOURCE_DIR}/include/matx.h"
             -i
-            -DJITIFY=1
-            ${PREPROCESSOR_INCLUDE_FLAGS}
-            ${JITIFY_ARCH_FLAGS}
+            ${JITIFY_OPTIONS}
         DEPENDS jitify2_preprocess matx ${MATX_JIT_DEPS}
         COMMENT "Running JIT preprocessor on matx.h"
         WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"

@@ -37,9 +37,17 @@
 #include "matx/core/vector.h"
 #include <cub/block/block_load.cuh>
 #include <cub/block/block_radix_sort.cuh> 
+#include <cub/block/block_scan.cuh> 
 
 namespace matx {
 namespace detail {
+
+  enum class BlockReduceType {
+    SUM,
+    MIN,
+    MAX,
+    PRODUCT
+  };
 
   template <typename Op, ElementsPerThread ept>
   __MATX_INLINE__ __MATX_DEVICE__ auto RunBlockReduce(const Op &op) {
@@ -57,7 +65,8 @@ namespace detail {
   struct BlockSort {
     template <typename sort_type>
     static __MATX_INLINE__ __MATX_DEVICE__ int GetShmRequired() {
-      return sizeof(typename BlockRadixSort<sort_type, CapType::block_size, static_cast<int>(CapType::ept)>::TempStorage);
+      //return sizeof(typename BlockRadixSort<sort_type, CapType::block_size, static_cast<int>(CapType::ept)>::TempStorage);
+      return 0;
     }
 
     template <typename Op, typename... Is>
@@ -70,14 +79,82 @@ namespace detail {
       __shared__ typename BlockRadixSort::TempStorage temp_storage;
 
       using ret_type = cuda::std::conditional_t<CapType::ept == ElementsPerThread::ONE, sort_type, Vector<sort_type, ept>>;
-      ret_type thread_data;
-
-      thread_data = op.template operator()<CapType>(indices...);
+      ret_type thread_data = op.template operator()<CapType>(indices...);
 
       BlockRadixSort(temp_storage).Sort(reinterpret_cast<sort_type (&)[ept]>(thread_data));    
       return thread_data;
     }  
   };
+
+  template <typename CapType>
+  struct BlockScan {
+    template <typename sort_type>
+    static __MATX_INLINE__ __MATX_DEVICE__ int GetShmRequired() {
+      return 0;
+    }
+
+    template <typename Op, typename... Is>
+    static __MATX_INLINE__ __MATX_DEVICE__ auto Run(const Op &op, Is... indices) {
+      static constexpr int ttl_items = jit_scan_params_t<0>::ttl_items;
+      static constexpr int ept       = static_cast<int>(CapType::ept);
+      using sort_type                = typename Op::value_type;
+      using BlockScan                = cub::BlockScan<sort_type, ttl_items>;
+
+      __shared__ typename BlockScan::TempStorage temp_storage;
+
+      using ret_type = cuda::std::conditional_t<CapType::ept == ElementsPerThread::ONE, sort_type, Vector<sort_type, ept>>;
+      ret_type thread_data = op.template operator()<CapType>(indices...);
+
+      BlockScan(temp_storage).InclusiveSum(reinterpret_cast<sort_type (&)[ept]>(thread_data), reinterpret_cast<sort_type (&)[ept]>(thread_data));    
+      return thread_data;
+    }  
+  };  
+
+  template <typename _Tp = void>
+  struct ProdReduce
+  {
+    [[nodiscard]] constexpr _Tp operator()(const _Tp& __lhs, const _Tp& __rhs) const
+      noexcept(noexcept(__lhs * __rhs))
+    {
+      return __lhs * __rhs;
+    }
+  };  
+
+  template <typename CapType, BlockReduceType reduce_type>
+  struct BlockReduce {
+    template <typename sort_type>
+    static __MATX_INLINE__ __MATX_DEVICE__ int GetShmRequired() {
+      return 0;
+    }
+
+    template <typename Op, typename... Is>
+    static __MATX_INLINE__ __MATX_DEVICE__ auto Run(const Op &op, Is... indices) {
+      static constexpr int ttl_items = jit_reduce_params_t<0>::ttl_items;
+      static constexpr int ept       = static_cast<int>(CapType::ept);
+      using sort_type                = typename Op::value_type;
+      using BlockReduce                = cub::BlockReduce<sort_type, ttl_items>;
+
+      __shared__ typename BlockReduce::TempStorage temp_storage;
+
+      using ret_type = cuda::std::conditional_t<CapType::ept == ElementsPerThread::ONE, sort_type, Vector<sort_type, ept>>;
+      ret_type thread_data = op.template operator()<CapType>(indices...);
+
+      if constexpr (reduce_type == BlockReduceType::SUM) {
+        BlockReduce(temp_storage).Sum(reinterpret_cast<sort_type (&)[ept]>(thread_data));    
+      }
+      else if constexpr (reduce_type == BlockReduceType::MIN) {
+        BlockReduce(temp_storage).Reduce(reinterpret_cast<sort_type (&)[ept]>(thread_data), cuda::minimum<>{});    
+      }
+      else if constexpr (reduce_type == BlockReduceType::MAX) {
+        BlockReduce(temp_storage).Reduce(reinterpret_cast<sort_type (&)[ept]>(thread_data), cuda::maximum<>{});    
+      }
+      else if constexpr (reduce_type == BlockReduceType::PRODUCT) {
+        BlockReduce(temp_storage).Reduce(reinterpret_cast<sort_type (&)[ept]>(thread_data), ProdReduce<sort_type>{});    
+      }
+      
+      return thread_data;
+    }  
+  };    
   
 }
 }

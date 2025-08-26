@@ -38,6 +38,9 @@
 #ifndef __CUDACC_RTC__
 #include "matx/transforms/cub.h"
 #endif
+#ifdef MATX_EN_JIT
+  #include "matx/transforms/cub_device.h"
+#endif
 
 namespace matx {
 
@@ -68,6 +71,12 @@ namespace detail {
 
       __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
+      __MATX_INLINE__ std::string get_capability_str(int EPT) const {
+        return std::string("template <> struct jit_scan_params_t<0>  {\n") + 
+               "  constexpr static int ttl_items = " + std::to_string(a_.Size(OpA::Rank() - 1) / EPT) + ";\n"
+               "};\n";         
+      }      
+
       template <typename CapType, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
 #ifdef __CUDA_ARCH__
@@ -77,7 +86,11 @@ namespace detail {
           }
         }
 #endif
+#if defined(__CUDA_ARCH__) && defined(__CUDACC_RTC__)
+        return BlockScan<CapType>::Run(a_, indices...);
+#else
         return tmp_out_.template operator()<CapType>(indices...);
+#endif
       };
 
       template <typename... Is>
@@ -86,9 +99,55 @@ namespace detail {
       };
 
       template <OperatorCapability Cap, typename InType>
-      __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] const InType& in) const {
-        auto self_has_cap = capability_attributes<Cap>::default_value;
-        return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] const InType& in) const {      
+        if constexpr (Cap == OperatorCapability::BLOCK_DIM) {
+          static_assert(std::is_same_v<InType, BlockSizeQueryInput>, "BLOCK_DIM capability requires BlockSizeQueryInput as input type");
+#if defined(MATX_EN_JIT) && defined(__CUDACC__) && !defined(__CUDACC_RTC__) && !defined(__CUDA_ARCH__)
+          printf("cumsum block dim %d\n",static_cast<int>(a_.Size(OpA::Rank() - 1) / static_cast<int>(in.ept)));
+          return combine_capabilities<Cap>(static_cast<int>(a_.Size(OpA::Rank() - 1) / static_cast<int>(in.ept)), detail::get_operator_capability<Cap>(a_, in));
+#else
+          return combine_capabilities<Cap>(capability_attributes<Cap>::default_value, detail::get_operator_capability<Cap>(a_, in));
+#endif
+        }
+        else if constexpr (Cap == OperatorCapability::JIT_CAP_QUERY) {
+          static_assert(std::is_same_v<InType, JITQueryInput>, "JIT_CAP_QUERY capability requires JITQueryInput as input type");
+          auto self_cap = get_capability_str(static_cast<int>(in.ept));
+          return combine_capabilities<Cap>(self_cap, detail::get_operator_capability<Cap>(a_, in));
+        }
+        else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+          static_assert(std::is_same_v<InType, EPTQueryInput>, "ELEMENTS_PER_THREAD capability requires EPTQueryInput as input type");
+#if defined(MATX_EN_JIT) && defined(__CUDACC__) && !defined(__CUDACC_RTC__) && !defined(__CUDA_ARCH__)
+          if (in.jit) {
+            const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::THIRTY_TWO};
+            return combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(a_, in));                
+          }
+          else {
+            return combine_capabilities<Cap>(capability_attributes<Cap>::default_value, detail::get_operator_capability<Cap>(a_, in));
+          }
+#else
+          return combine_capabilities<Cap>(capability_attributes<Cap>::default_value, detail::get_operator_capability<Cap>(a_, in));
+#endif
+        }            
+        else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+          printf("in JIT check\n");
+          bool supported = true;
+#if defined(MATX_EN_JIT) && defined(__CUDACC__) && !defined(__CUDACC_RTC__) && !defined(__CUDA_ARCH__)
+          const auto scan_size = a_.Size(OpA::Rank() - 1);   
+          printf("scan_size %lld\n", scan_size);
+          if (OpA::Rank() == 0 || 
+              scan_size > 4096 || 
+             (scan_size & (scan_size - 1)) != 0) {
+            supported = false;
+          } 
+#else
+          supported = false;
+#endif
+          return combine_capabilities<Cap>(supported, detail::get_operator_capability<Cap>(a_, in));      
+        }        
+        else {
+          auto self_has_cap = capability_attributes<Cap>::default_value;
+          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
+        }
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()

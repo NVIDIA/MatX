@@ -35,7 +35,7 @@
 #ifdef MATX_EN_JIT
 
 #include <cuda.h>
-//#define JITIFY_ENABLE_NVTX 1
+#define JITIFY_ENABLE_NVTX 1
 //#define JITIFY_VERBOSE_ERRORS 1
 #define JITIFY_ENABLE_EMBEDDED_FILES 1
 #define JITIFY_IGNORE_NOT_TRIVIALLY_COPYABLE_ARGS 1
@@ -212,7 +212,7 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, cons
 #else          
   static ProgramCache<> cache(
       100,
-      *_repro_MatX_include_matx_h_jit_serialized);
+      *_repro_MatX_include_matx_h_jit);
 #endif
 
   // auto end_time = std::chrono::high_resolution_clock::now();
@@ -244,12 +244,15 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, cons
       kernel->set_attribute(CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, dynamic_shmem_size);
     }      
 
-    // printf("dynamic_shmem_size %d\n", dynamic_shmem_size);    
-    // printf(" threads %d %d\n", threads.x, threads.y);
-    // printf("blocks %d %d %d\n", blocks.x, blocks.y, blocks.z);
+
     // Configure the kernel launch.
     //auto start_time_configure = std::chrono::high_resolution_clock::now();
-    if constexpr (Op::Rank() == 1) {
+    if constexpr (Op::Rank() == 0) {
+      kernel->configure(blocks, threads, dynamic_shmem_size)
+            // Launch the kernel.
+            ->launch(op);
+    }
+    else if constexpr (Op::Rank() == 1) {
       kernel->configure(blocks, threads, dynamic_shmem_size)
             // Launch the kernel.
             ->launch(op, sa[0]);

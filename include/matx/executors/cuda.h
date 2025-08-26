@@ -364,6 +364,8 @@ namespace matx
               }
               printf("Using JIT: %d %d %d\n", use_jit, static_cast<int>(jit_ept_bounds[0]), static_cast<int>(jit_ept_bounds[1]));
             }
+            printf("Not using JIT: %d %d %d\n", use_jit, (int)detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(op, detail::EPTQueryInput{true})[0],
+            (int)detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(op, detail::EPTQueryInput{true})[1]);
             
             if (!use_jit)
 #endif

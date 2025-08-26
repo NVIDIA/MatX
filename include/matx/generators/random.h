@@ -285,7 +285,12 @@ namespace detail {
       __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] const InType& in) const {
         if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
           return cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
-        } else {        
+        } 
+        else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+          printf("random returning false\n");
+          return false;
+        }  
+        else {        
           auto self_has_cap = capability_attributes<Cap>::default_value;
           return self_has_cap;
         }
