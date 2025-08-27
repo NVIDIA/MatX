@@ -83,9 +83,9 @@ TYPED_TEST(FileIoTestsNonComplexFloatTypes, CSVReadFileNotFound)
   
   // Test reading a non-existent CSV file
   const std::string non_existent_file = "../test/00_io/non_existent_file.csv";
-  EXPECT_THROW({
+  ASSERT_THROW({
     io::read_csv(t, non_existent_file, ",");
-  }, matxIOError);
+  }, matx::detail::matxException);
 
   MATX_EXIT_HANDLER();
 }
@@ -108,9 +108,9 @@ TYPED_TEST(FileIoTestsComplexFloatTypes, CSVReadFileNotFound)
   
   // Test reading a non-existent CSV file with complex types
   const std::string non_existent_file = "../test/00_io/non_existent_complex_file.csv";
-  EXPECT_THROW({
+  ASSERT_THROW({
     io::read_csv(t, non_existent_file, ",");
-  }, matxIOError);
+  }, matx::detail::matxException);
 
   MATX_EXIT_HANDLER();
 }
@@ -154,14 +154,14 @@ TYPED_TEST(FileIoTestsNonComplexFloatTypes, MATReadFileNotFound)
 
   // Test reading a non-existent MAT file
   const std::string non_existent_file = "../test/00_io/non_existent_file.mat";
-  EXPECT_THROW({
+  ASSERT_THROW({
     io::read_mat(t, non_existent_file, "myvar");
-  }, matxIOError);
+  }, matx::detail::matxException);
 
   // Test the overloaded read_mat that returns a tensor  
-  EXPECT_THROW({
+  ASSERT_THROW({
     auto t2 = io::read_mat<decltype(t)>(non_existent_file, "myvar");
-  }, matxIOError);
+  }, matx::detail::matxException);
 
   MATX_EXIT_HANDLER();
 }
@@ -288,14 +288,14 @@ TYPED_TEST(FileIoTestsComplexFloatTypes, MATReadFileNotFound)
 
   // Test reading a non-existent MAT file with complex types
   const std::string non_existent_file = "../test/00_io/non_existent_complex_file.mat";
-  EXPECT_THROW({
+  ASSERT_THROW({
     io::read_mat(t, non_existent_file, "myvar");
-  }, matxIOError);
+  }, matx::detail::matxException);
 
   // Test the overloaded read_mat that returns a tensor  
-  EXPECT_THROW({
+  ASSERT_THROW({
     auto t2 = io::read_mat<decltype(t)>(non_existent_file, "myvar");
-  }, matxIOError);
+  }, matx::detail::matxException);
 
   MATX_EXIT_HANDLER();
 }
@@ -309,9 +309,9 @@ TYPED_TEST(FileIoTestsComplexFloatTypes, NPYReadFileNotFound)
 
   // Test reading a non-existent NPY file with complex types
   const std::string non_existent_file = "../test/00_io/non_existent_complex_file.npy";
-  EXPECT_THROW({
+  ASSERT_THROW({
     io::read_npy(t, non_existent_file);
-  }, matxIOError);
+  }, matx::detail::matxException);
 
   MATX_EXIT_HANDLER();
 }
@@ -347,9 +347,9 @@ TYPED_TEST(FileIoTestsNonComplexFloatTypes, NPYReadFileNotFound)
 
   // Test reading a non-existent NPY file
   const std::string non_existent_file = "../test/00_io/non_existent_file.npy";
-  EXPECT_THROW({
+  ASSERT_THROW({
     io::read_npy(t, non_existent_file);
-  }, matxIOError);
+  }, matx::detail::matxException);
 
   MATX_EXIT_HANDLER();
 }
