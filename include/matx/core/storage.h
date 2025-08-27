@@ -48,6 +48,7 @@ namespace matx
   template<typename T, typename = void>
   struct has_allocator_interface : std::false_type {};
 
+  /// @cond DOXYGEN_SHOULD_SKIP_THIS
   // For allocator objects
   template<typename T>
   struct has_allocator_interface<T, 
@@ -57,7 +58,9 @@ namespace matx
       void()
     )
   > : std::true_type {};
+  /// @endcond
 
+  /// @cond DOXYGEN_SHOULD_SKIP_THIS
   // For allocator pointers
   template<typename T>
   struct has_allocator_interface<T*, 
@@ -67,6 +70,7 @@ namespace matx
       void()
     )
   > : std::true_type {};
+  /// @endcond
 
   /**
    * @brief Unified storage class for both owning and non-owning pointers
