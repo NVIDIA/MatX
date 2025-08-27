@@ -85,6 +85,9 @@ namespace matx
     using iterator = T*;
     using const_iterator = const T*;
 
+    // Default constructor - creates empty storage
+    Storage() : size_(0), data_(nullptr) {}
+
     // Non-owning constructor - wraps existing pointer
     Storage(T* ptr, size_t size) 
       : size_(size), data_(ptr, [](T*){}) {}
