@@ -53,15 +53,9 @@ auto make_tensor( const index_t (&shape)[RANK],
                   cudaStream_t stream = 0) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-  T *ptr;
   DefaultDescriptor<RANK> desc{shape};
-
-  size_t size = static_cast<size_t>(desc.TotalSize()) * sizeof(T);
-  matxAlloc((void**)&ptr, size, space, stream);
-
-  raw_pointer_buffer<T, matx_allocator<T>> rp(ptr, size, true);
-  basic_storage<decltype(rp)> s{std::move(rp)};
-  return tensor_t<T, RANK, decltype(s), decltype(desc)>{std::move(s), std::move(desc)};
+  auto storage = make_owning_storage<T>(desc.TotalSize(), space, stream);
+  return tensor_t<T, RANK, decltype(desc)>{std::move(storage), std::move(desc)};
 }
 
 /**
@@ -98,15 +92,9 @@ auto make_tensor_p( const index_t (&shape)[RANK],
                     cudaStream_t stream = 0) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-  T *ptr;
   DefaultDescriptor<RANK> desc{shape};
-
-  size_t size = static_cast<size_t>(desc.TotalSize()) * sizeof(T);
-  matxAlloc((void**)&ptr, size, space, stream);
-
-  raw_pointer_buffer<T, matx_allocator<T>> rp(ptr, size, true);
-  basic_storage<decltype(rp)> s{std::move(rp)};
-  return new tensor_t<T, RANK, decltype(s), decltype(desc)>{std::move(s), std::move(desc)};
+  auto storage = make_owning_storage<T>(desc.TotalSize(), space, stream);
+  return new tensor_t<T, RANK, decltype(desc)>{std::move(storage), std::move(desc)};
 }
 
 /**
@@ -130,20 +118,14 @@ auto make_tensor( ShapeType &&shape,
                   cudaStream_t stream = 0) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-  T *ptr;
   constexpr int rank = static_cast<int>(cuda::std::tuple_size<typename remove_cvref<ShapeType>::type>::value);
   DefaultDescriptor<rank> desc{std::move(shape)};
 
-  size_t size = static_cast<size_t>(desc.TotalSize()) * sizeof(T);
-  matxAlloc((void**)&ptr, size, space, stream);
-
-  raw_pointer_buffer<T, matx_allocator<T>> rp(ptr, size, true);
-  basic_storage<decltype(rp)> s{std::move(rp)};
+  auto storage = make_owning_storage<T>(desc.TotalSize(), space, stream);
 
   return tensor_t<T,
     cuda::std::tuple_size<typename remove_cvref<ShapeType>::type>::value,
-    decltype(s),
-    decltype(desc)>{std::move(s), std::move(desc)};
+    decltype(desc)>{std::move(storage), std::move(desc)};
 }
 
 /**
@@ -191,18 +173,12 @@ auto make_tensor_p( ShapeType &&shape,
                     cudaStream_t stream = 0) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-  T *ptr;
   DefaultDescriptor<static_cast<int>(cuda::std::tuple_size<typename remove_cvref<ShapeType>::type>::value)> desc{std::move(shape)};
 
-  size_t size = static_cast<size_t>(desc.TotalSize()) * sizeof(T);
-  matxAlloc((void**)&ptr, size, space, stream);
-
-  raw_pointer_buffer<T, matx_allocator<T>> rp(ptr, size, true);
-  basic_storage<decltype(rp)> s{std::move(rp)};
+  auto storage = make_owning_storage<T>(desc.TotalSize(), space, stream);
   return new tensor_t<T,
   cuda::std::tuple_size<typename remove_cvref<ShapeType>::type>::value,
-  decltype(s),
-  decltype(desc)>{std::move(s), std::move(desc)};
+  decltype(desc)>{std::move(storage), std::move(desc)};
 }
 
 
@@ -278,9 +254,8 @@ auto make_tensor( T *data,
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
   DefaultDescriptor<RANK> desc{shape};
-  raw_pointer_buffer<T, matx_allocator<T>> rp{data, static_cast<size_t>(desc.TotalSize())*sizeof(T), owning};
-  basic_storage<decltype(rp)> s{std::move(rp)};
-  return tensor_t<T, RANK, decltype(s), decltype(desc)>{std::move(s), std::move(desc)};
+  auto storage = owning ? make_owning_storage<T>(desc.TotalSize()) : make_non_owning_storage<T>(data, desc.TotalSize());
+  return tensor_t<T, RANK, decltype(desc)>{std::move(storage), std::move(desc)};
 }
 
 /**
@@ -326,9 +301,8 @@ auto make_tensor( T *data,
   constexpr int RANK = static_cast<int>(cuda::std::tuple_size<typename remove_cvref<ShapeType>::type>::value);
   DefaultDescriptor<RANK>
     desc{std::forward<ShapeType>(shape)};
-  raw_pointer_buffer<T, matx_allocator<T>> rp{data, static_cast<size_t>(desc.TotalSize())*sizeof(T), owning};
-  basic_storage<decltype(rp)> s{std::move(rp)};
-  return tensor_t<T, RANK, decltype(s), decltype(desc)>{std::move(s), std::move(desc)};
+  auto storage = owning ? make_owning_storage<T>(desc.TotalSize()) : make_non_owning_storage<T>(data, desc.TotalSize());
+  return tensor_t<T, RANK, decltype(desc)>{std::move(storage), std::move(desc)};
 }
 
 /**
@@ -410,56 +384,15 @@ auto make_tensor_p( T *const data,
   constexpr int RANK = static_cast<int>(cuda::std::tuple_size<typename remove_cvref<ShapeType>::type>::value);
   DefaultDescriptor<RANK>
     desc{std::forward<ShapeType>(shape)};
-  raw_pointer_buffer<T, matx_allocator<T>> rp{data, static_cast<size_t>(desc.TotalSize())*sizeof(T), owning};
-  basic_storage<decltype(rp)> s{std::move(rp)};
-  return new tensor_t<T, RANK, decltype(s), decltype(desc)>{std::move(s), std::move(desc)};
+  auto storage = owning ? make_owning_storage<T>(desc.TotalSize()) : make_non_owning_storage<T>(data, desc.TotalSize());
+  return new tensor_t<T, RANK, decltype(desc)>{std::move(storage), std::move(desc)};
 }
 
-/**
- * Create a tensor with user-defined memory, custom storage, and conforming shape type
- *
- * @param s
- *   Storage object
- * @param shape
- *   Shape of tensor
- * @returns New tensor
- **/
-template <typename Storage, typename ShapeType,
-  std::enable_if_t<is_matx_storage_v<Storage> &&
-                  !is_matx_descriptor_v<ShapeType> &&
-                  !std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
-auto make_tensor( Storage &&s,
-                  ShapeType &&shape) {
-  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+// Note: Custom storage object functions have been removed in the refactored design.
+// Use make_tensor with data pointer and owning flag instead.
 
-  constexpr int RANK = static_cast<int>(cuda::std::tuple_size<typename remove_cvref<ShapeType>::type>::value);
-  DefaultDescriptor<RANK>
-    desc{std::forward<ShapeType>(shape)};
-  using T = typename Storage::T;
-  return tensor_t<T, RANK, Storage, decltype(desc)>{std::move(s), std::move(desc)};
-}
-
-/**
- * Create a tensor with user-defined memory, custom storage, and conforming shape type
- *
- * @param tensor
- *   Tensor object to store newly-created tensor into
- * @param s
- *   Storage object
- * @param shape
- *   Shape of tensor
- * @returns New tensor
- **/
-template <typename TensorType,
-  std::enable_if_t<is_tensor_view_v<TensorType>, bool> = true>
-auto make_tensor( TensorType &tensor,
-                  typename TensorType::storage_type &&s,
-                  typename TensorType::shape_container &&shape) {
-  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-
-  auto tmp = make_tensor<typename TensorType::storage_type, typename TensorType::shape_container>(std::forward<typename TensorType::storage_type>(s), std::forward<typename TensorType::shape_container>(shape));
-  tensor.Shallow(tmp);
-}
+// Note: Custom storage object functions have been removed in the refactored design.
+// Use make_tensor with data pointer and owning flag instead.
 
 
 /**
@@ -480,9 +413,8 @@ auto make_tensor( T* const data,
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
   using Dstrip = typename remove_cvref<D>::type;
-  raw_pointer_buffer<T, matx_allocator<T>> rp{data, static_cast<size_t>(desc.TotalSize())*sizeof(T), owning};
-  basic_storage<decltype(rp)> s{std::move(rp)};
-  return tensor_t<T, Dstrip::Rank(), decltype(s), Dstrip>{std::move(s), std::forward<D>(desc)};
+  auto storage = owning ? make_owning_storage<T>(desc.TotalSize()) : make_non_owning_storage<T>(data, desc.TotalSize());
+  return tensor_t<T, Dstrip::Rank(), Dstrip>{std::move(storage), std::forward<D>(desc)};
 }
 
 /**
@@ -522,15 +454,10 @@ auto make_tensor( D &&desc,
                   cudaStream_t stream = 0) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-  T *ptr;
   using Dstrip = typename remove_cvref<D>::type;
 
-  size_t size = static_cast<size_t>(desc.TotalSize()) * sizeof(T);
-  matxAlloc((void**)&ptr, size, space, stream);
-
-  raw_pointer_buffer<T, matx_allocator<T>> rp(ptr, size, true);
-  basic_storage<decltype(rp)> s{std::move(rp)};
-  return tensor_t<T, Dstrip::Rank(), decltype(s), Dstrip>{std::move(s), std::forward<D>(desc)};
+  auto storage = make_owning_storage<T>(desc.TotalSize(), space, stream);
+  return tensor_t<T, Dstrip::Rank(), Dstrip>{std::move(storage), std::forward<D>(desc)};
 }
 
 /**
@@ -575,9 +502,8 @@ auto make_tensor( T *const data,
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
   DefaultDescriptor<RANK>  desc{shape, strides};
-  raw_pointer_buffer<T, matx_allocator<T>> rp{data, static_cast<size_t>(static_cast<size_t>(desc.TotalSize())*sizeof(T)), owning};
-  basic_storage<decltype(rp)> s{std::move(rp)};
-  return tensor_t<T,RANK, decltype(s), decltype(desc)>{s, std::move(desc), data};
+  auto storage = owning ? make_owning_storage<T>(desc.TotalSize()) : make_non_owning_storage<T>(data, desc.TotalSize());
+  return tensor_t<T,RANK, decltype(desc)>{std::move(storage), std::move(desc), data};
 }
 
 /**
@@ -615,9 +541,8 @@ auto make_static_tensor() {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
   static_tensor_desc_t<I, Is...> desc{};
-  raw_pointer_buffer<T, matx_allocator<T>> rp{static_cast<size_t>(static_cast<size_t>(desc.TotalSize())*sizeof(T))};
-  basic_storage<decltype(rp)> s{std::move(rp)};
-  return tensor_t<T, desc.Rank(), decltype(s), decltype(desc)>{std::move(s), std::move(desc)};
+  auto storage = make_owning_storage<T>(desc.TotalSize());
+  return tensor_t<T, desc.Rank(), decltype(desc)>{std::move(storage), std::move(desc)};
 }
 
 template <typename TensorType,
