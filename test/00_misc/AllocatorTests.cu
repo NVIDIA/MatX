@@ -324,20 +324,16 @@ TEST_F(DuckTypingAllocatorTest, CompareWithDefault) {
     MATX_EXIT_HANDLER();
 }
 
-// Demonstrate that it works with tensor_t too!
+// Demonstrate that it works with new make_tensor API!
 TEST_F(DuckTypingAllocatorTest, WithTensorAPI) {
     MATX_ENTER_HANDLER();
-    std::cout << "\n=== Testing with Tensor API ===" << std::endl;
+    std::cout << "\n=== Testing with New make_tensor API ===" << std::endl;
     
     TrackedAllocator alloc;
     
     {
-        // Create storage with custom allocator
-        auto storage = make_owning_storage<float>(1000, alloc);
-        
-        // Use with tensor_t (this shows the full integration)
-        DefaultDescriptor<1> desc({1000});
-        tensor_t<float, 1> tensor(std::move(storage), std::move(desc));
+        // NEW: Use make_tensor directly with custom allocator - much simpler!
+        auto tensor = make_tensor<float>({1000}, alloc);
         
         EXPECT_NE(tensor.Data(), nullptr);
         EXPECT_EQ(tensor.Size(0), 1000);
@@ -348,6 +344,101 @@ TEST_F(DuckTypingAllocatorTest, WithTensorAPI) {
         tensor(999) = 2.71f;
         EXPECT_EQ(tensor(0), 3.14f);
         EXPECT_EQ(tensor(999), 2.71f);
+    }
+    
+    EXPECT_EQ(TrackedAllocator::getActiveAllocations(), 0);
+    
+    MATX_EXIT_HANDLER();
+}
+
+// Test all variants of new make_tensor with custom allocators
+TEST_F(DuckTypingAllocatorTest, MakeTensorAllVariants) {
+    MATX_ENTER_HANDLER();
+    std::cout << "\n=== Testing All make_tensor Variants with Custom Allocators ===" << std::endl;
+    
+    TrackedAllocator alloc;
+    
+    {
+        std::cout << "Testing C-array shape variant..." << std::endl;
+        index_t shape[2] = {10, 20};
+        auto tensor1 = make_tensor<double>(shape, alloc);
+        
+        EXPECT_NE(tensor1.Data(), nullptr);
+        EXPECT_EQ(tensor1.Size(0), 10);
+        EXPECT_EQ(tensor1.Size(1), 20);
+        EXPECT_EQ(TrackedAllocator::getActiveAllocations(), 1);
+        
+        std::cout << "Testing shape type variant..." << std::endl;
+        auto tensor2 = make_tensor<float>({5, 8}, alloc);
+        
+        EXPECT_NE(tensor2.Data(), nullptr);
+        EXPECT_EQ(tensor2.Size(0), 5);
+        EXPECT_EQ(tensor2.Size(1), 8);
+        EXPECT_EQ(TrackedAllocator::getActiveAllocations(), 2);
+        
+        std::cout << "Testing 1D tensor with C-array..." << std::endl;
+        index_t shape1d[1] = {100};
+        auto tensor3 = make_tensor<int>(shape1d, alloc);
+        
+        EXPECT_NE(tensor3.Data(), nullptr);
+        EXPECT_EQ(tensor3.Size(0), 100);
+        EXPECT_EQ(TrackedAllocator::getActiveAllocations(), 3);
+        
+        std::cout << "Testing 3D tensor with initializer list..." << std::endl;
+        auto tensor4 = make_tensor<char>({2, 3, 4}, alloc);
+        
+        EXPECT_NE(tensor4.Data(), nullptr);
+        EXPECT_EQ(tensor4.Size(0), 2);
+        EXPECT_EQ(tensor4.Size(1), 3);
+        EXPECT_EQ(tensor4.Size(2), 4);
+        EXPECT_EQ(TrackedAllocator::getActiveAllocations(), 4);
+        
+        // Test that all tensors work correctly
+        tensor1(0, 0) = 1.23;
+        tensor2(0, 0) = 4.56f;
+        tensor3(0) = 789;
+        tensor4(0, 0, 0) = 'A';
+        
+        EXPECT_DOUBLE_EQ(tensor1(0, 0), 1.23);
+        EXPECT_FLOAT_EQ(tensor2(0, 0), 4.56f);
+        EXPECT_EQ(tensor3(0), 789);
+        EXPECT_EQ(tensor4(0, 0, 0), 'A');
+    }
+    
+    // All tensors should be freed
+    EXPECT_EQ(TrackedAllocator::getActiveAllocations(), 0);
+    
+    MATX_EXIT_HANDLER();
+}
+
+// Test with PMR-style allocator pointer
+TEST_F(DuckTypingAllocatorTest, MakeTensorWithAllocatorPointer) {
+    MATX_ENTER_HANDLER();
+    std::cout << "\n=== Testing make_tensor with Allocator Pointer ===" << std::endl;
+    
+    TrackedAllocator alloc;
+    
+    {
+        // Test passing allocator pointer (like PMR usage)
+        auto tensor1 = make_tensor<float>({50, 60}, &alloc);
+        
+        EXPECT_NE(tensor1.Data(), nullptr);
+        EXPECT_EQ(tensor1.Size(0), 50);
+        EXPECT_EQ(tensor1.Size(1), 60);
+        EXPECT_EQ(TrackedAllocator::getActiveAllocations(), 1);
+        
+        // Test with allocator pointer and return by value
+        auto tensor2 = make_tensor<double>({1000}, &alloc);
+        
+        EXPECT_NE(tensor2.Data(), nullptr);
+        EXPECT_EQ(tensor2.Size(0), 1000);
+        EXPECT_EQ(TrackedAllocator::getActiveAllocations(), 2);
+        
+        // Verify they work
+        tensor1(0, 0) = 3.14f;
+        tensor2(0) = 2.718;
+        EXPECT_FLOAT_EQ(tensor1(0, 0), 3.14f);
+        EXPECT_DOUBLE_EQ(tensor2(0), 2.718);
     }
     
     EXPECT_EQ(TrackedAllocator::getActiveAllocations(), 0);

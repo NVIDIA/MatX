@@ -388,11 +388,89 @@ auto make_tensor_p( T *const data,
   return new tensor_t<T, RANK, decltype(desc)>{std::move(storage), std::move(desc)};
 }
 
-// Note: Custom storage object functions have been removed in the refactored design.
-// Use make_tensor with data pointer and owning flag instead.
+/**
+ * Create a tensor with custom allocator using C-array shape
+ *
+ * @param shape
+ *   Shape of tensor as C-array
+ * @param alloc
+ *   Custom allocator (PMR allocator, custom allocator pointer, etc.)
+ * @returns New tensor
+ **/
+template <typename T, int RANK, typename Allocator>
+auto make_tensor( const index_t (&shape)[RANK],
+                  Allocator&& alloc) {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-// Note: Custom storage object functions have been removed in the refactored design.
-// Use make_tensor with data pointer and owning flag instead.
+  DefaultDescriptor<RANK> desc{shape};
+  auto storage = make_owning_storage<T>(desc.TotalSize(), std::forward<Allocator>(alloc));
+  return tensor_t<T, RANK, decltype(desc)>{std::move(storage), std::move(desc)};
+}
+
+/**
+ * Create a tensor with custom allocator using conforming shape type
+ *
+ * @param shape
+ *   Shape of tensor (tuple, array, etc.)
+ * @param alloc
+ *   Custom allocator (PMR allocator, custom allocator pointer, etc.)
+ * @returns New tensor
+ **/
+template <typename T, typename ShapeType, typename Allocator,
+  std::enable_if_t<!is_matx_shape_v<ShapeType> && !is_matx_descriptor_v<ShapeType> && 
+                   !std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+auto make_tensor( ShapeType &&shape,
+                  Allocator&& alloc) {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+
+  constexpr int RANK = static_cast<int>(cuda::std::tuple_size<typename remove_cvref<ShapeType>::type>::value);
+  DefaultDescriptor<RANK> desc{std::forward<ShapeType>(shape)};
+  auto storage = make_owning_storage<T>(desc.TotalSize(), std::forward<Allocator>(alloc));
+  return tensor_t<T, RANK, decltype(desc)>{std::move(storage), std::move(desc)};
+}
+
+/**
+ * Create a tensor with custom allocator using existing tensor reference
+ *
+ * @param tensor
+ *   Tensor object to store newly-created tensor into  
+ * @param shape
+ *   Shape of tensor as C-array
+ * @param alloc
+ *   Custom allocator (PMR allocator, custom allocator pointer, etc.)
+ **/
+template <typename TensorType, typename Allocator,
+  std::enable_if_t<is_tensor_view_v<TensorType>, bool> = true>
+void make_tensor( TensorType &tensor,
+                  const index_t (&shape)[TensorType::Rank()],
+                  Allocator&& alloc) {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+
+  auto tmp = make_tensor<typename TensorType::value_type, TensorType::Rank()>(shape, std::forward<Allocator>(alloc));
+  tensor.Shallow(tmp);
+}
+
+/**
+ * Create a tensor with custom allocator using existing tensor reference and conforming shape
+ *
+ * @param tensor
+ *   Tensor object to store newly-created tensor into  
+ * @param shape
+ *   Shape of tensor (tuple, array, etc.)
+ * @param alloc
+ *   Custom allocator (PMR allocator, custom allocator pointer, etc.)
+ **/
+template <typename TensorType, typename ShapeType, typename Allocator,
+  std::enable_if_t<is_tensor_view_v<TensorType> && 
+                   !std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+void make_tensor( TensorType &tensor,
+                  ShapeType &&shape,
+                  Allocator&& alloc) {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+
+  auto tmp = make_tensor<typename TensorType::value_type>(std::forward<ShapeType>(shape), std::forward<Allocator>(alloc));
+  tensor.Shallow(tmp);
+}
 
 
 /**
