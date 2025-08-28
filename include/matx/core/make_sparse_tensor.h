@@ -38,6 +38,15 @@
 namespace matx {
 namespace experimental {
 
+// Helper to convert Storage<T> to DefaultStorage<T> for sparse tensor compatibility
+template <typename T>
+__MATX_INLINE__ auto convertToDefaultStorage(const Storage<T>& storage) {
+  raw_pointer_buffer<T, matx_allocator<T>> buf{
+    const_cast<T*>(storage.data()), storage.size(), /*owning=*/false
+  };
+  return basic_storage<decltype(buf)>{std::move(buf)};
+}
+
 // Helper method to zero memory.
 template <typename T>
 __MATX_INLINE__ static void setZero(T *ptr, index_t sz,
@@ -116,7 +125,7 @@ auto make_tensor_coo(ValTensor &val, CrdTensor &row, CrdTensor &col,
   setVal(tp.data() + 1, static_cast<POS>(val.Size(0)), space);
   // Construct COO.
   return sparse_tensor_t<VAL, CRD, POS, COO>(
-      shape, val.GetStorage(), {row.GetStorage(), col.GetStorage()},
+      shape, convertToDefaultStorage(val.GetStorage()), {convertToDefaultStorage(row.GetStorage()), convertToDefaultStorage(col.GetStorage())},
       {tp, makeDefaultNonOwningEmptyStorage<POS>()});
 }
 
@@ -152,9 +161,9 @@ auto make_tensor_csr(ValTensor &val, PosTensor &rowp, CrdTensor &col,
                   "data arrays should have consistent length (nse)");
   // Construct CSR.
   return sparse_tensor_t<VAL, CRD, POS, CSR>(
-      shape, val.GetStorage(),
-      {makeDefaultNonOwningEmptyStorage<CRD>(), col.GetStorage()},
-      {makeDefaultNonOwningEmptyStorage<POS>(), rowp.GetStorage()});
+      shape, convertToDefaultStorage(val.GetStorage()),
+      {makeDefaultNonOwningEmptyStorage<CRD>(), convertToDefaultStorage(col.GetStorage())},
+      {makeDefaultNonOwningEmptyStorage<POS>(), convertToDefaultStorage(rowp.GetStorage())});
 }
 
 // Constructs a zero sparse matrix in CSR format (viz. nse=0).
@@ -189,9 +198,9 @@ auto make_tensor_csc(ValTensor &val, PosTensor &colp, CrdTensor &row,
                   "data arrays should have consistent length (nse)");
   // Construct CSC.
   return sparse_tensor_t<VAL, CRD, POS, CSC>(
-      shape, val.GetStorage(),
-      {makeDefaultNonOwningEmptyStorage<CRD>(), row.GetStorage()},
-      {makeDefaultNonOwningEmptyStorage<POS>(), colp.GetStorage()});
+      shape, convertToDefaultStorage(val.GetStorage()),
+      {makeDefaultNonOwningEmptyStorage<CRD>(), convertToDefaultStorage(row.GetStorage())},
+      {makeDefaultNonOwningEmptyStorage<POS>(), convertToDefaultStorage(colp.GetStorage())});
 }
 
 // Constructs a zero sparse matrix in CSC format (viz. nse=0).
@@ -240,8 +249,8 @@ auto make_tensor_dia(ValTensor &val, CrdTensor &off,
   // Construct DIA-I/J.
   using DIA = std::conditional_t<std::is_same_v<IDX, DIA_INDEX_I>, DIAI, DIAJ>;
   return sparse_tensor_t<VAL, CRD, POS, DIA>(
-      shape, val.GetStorage(),
-      {off.GetStorage(), makeDefaultNonOwningEmptyStorage<CRD>()},
+      shape, convertToDefaultStorage(val.GetStorage()),
+      {convertToDefaultStorage(off.GetStorage()), makeDefaultNonOwningEmptyStorage<CRD>()},
       {tp, makeDefaultNonOwningEmptyStorage<POS>()});
 }
 
@@ -281,8 +290,8 @@ auto make_tensor_uniform_batched_dia(ValTensor &val, CrdTensor &off,
   using DIA = std::conditional_t<std::is_same_v<IDX, DIA_INDEX_I>,
                                  BatchedDIAIUniform, BatchedDIAJUniform>;
   return sparse_tensor_t<VAL, CRD, POS, DIA>(
-      shape, val.GetStorage(),
-      {off.GetStorage(), makeDefaultNonOwningEmptyStorage<CRD>()},
+      shape, convertToDefaultStorage(val.GetStorage()),
+      {convertToDefaultStorage(off.GetStorage()), makeDefaultNonOwningEmptyStorage<CRD>()},
       {tp, makeDefaultNonOwningEmptyStorage<POS>()});
 }
 
@@ -320,7 +329,7 @@ auto make_tensor_uniform_batched_tri_dia(ValTensor &val,
   using DIA = std::conditional_t<std::is_same_v<IDX, DIA_INDEX_I>,
                                  BatchedDIAIUniform, BatchedDIAJUniform>;
   return sparse_tensor_t<VAL, CRD, POS, DIA>(
-      shape, val.GetStorage(), {off, makeDefaultNonOwningEmptyStorage<CRD>()},
+      shape, convertToDefaultStorage(val.GetStorage()), {off, makeDefaultNonOwningEmptyStorage<CRD>()},
       {tp, makeDefaultNonOwningEmptyStorage<POS>()});
 }
 
