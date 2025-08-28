@@ -59,6 +59,23 @@ auto make_tensor( const index_t (&shape)[RANK],
 }
 
 /**
+ * Create a tensor from existing storage and a shape specification
+ *
+ * @param storage Storage object containing the data
+ * @param shape Shape specification for the tensor
+ * @returns New tensor
+ **/
+template <typename T, typename ShapeType,
+  std::enable_if_t<!is_matx_descriptor_v<ShapeType> && !std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+auto make_tensor(Storage<T> storage, ShapeType &&shape) {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+
+  constexpr int RANK = static_cast<int>(cuda::std::tuple_size<typename remove_cvref<ShapeType>::type>::value);
+  DefaultDescriptor<RANK> desc{std::forward<ShapeType>(shape)};
+  return tensor_t<T, RANK, decltype(desc)>{std::move(storage), std::move(desc)};
+}
+
+/**
  * Create a tensor with a C array for the shape using implicitly-allocated memory
  *
  * @param tensor Tensor object to store newly-created tensor into
