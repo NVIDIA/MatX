@@ -53,7 +53,7 @@ constexpr size_t __MATX_HOST__ __MATX_DEVICE__ alignment_by_type() {
     return 4;
   } else if constexpr (std::is_same_v<T, long3> || std::is_same_v<T, ulong3>) {
     return sizeof(long) == sizeof(int) ? 4 : 8;
-#if defined(__CUDACC_VER_MAJOR__) && __CUDACC_VER_MAJOR__ >= 13
+#if CUDART_VERSION >= 13000
   } else if constexpr (std::is_same_v<T, long4_32a> || std::is_same_v<T, ulong4_32a>) {
 #else
   } else if constexpr (std::is_same_v<T, long4> || std::is_same_v<T, ulong4>) {
@@ -61,7 +61,7 @@ constexpr size_t __MATX_HOST__ __MATX_DEVICE__ alignment_by_type() {
     return 16;
   } else if constexpr (std::is_same_v<T, longlong3> || std::is_same_v<T, ulonglong3>) {
     return 8;
-#if defined(__CUDACC_VER_MAJOR__) && __CUDACC_VER_MAJOR__ >= 13
+#if CUDART_VERSION >= 13000
   } else if constexpr (std::is_same_v<T, longlong4_32a> || std::is_same_v<T, ulonglong4_32a>) {
 #else
   } else if constexpr (std::is_same_v<T, longlong4> || std::is_same_v<T, ulonglong4>) {
@@ -71,7 +71,7 @@ constexpr size_t __MATX_HOST__ __MATX_DEVICE__ alignment_by_type() {
     return 4;
   } else if constexpr (std::is_same_v<T, double3>) {
     return 8;
-#if defined(__CUDACC_VER_MAJOR__) && __CUDACC_VER_MAJOR__ >= 13
+#if CUDART_VERSION >= 13000
   } else if constexpr (std::is_same_v<T, double4_32a>) {
 #else
   } else if constexpr (std::is_same_v<T, double4>) {
