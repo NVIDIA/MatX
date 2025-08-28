@@ -808,7 +808,9 @@ MATX_LOOP_UNROLL
 
     // Copy descriptor and call ctor with shape
     Desc new_desc{this->desc_.Shape(), std::move(strides)};
-    return tensor_t<Type, RANK, Desc>{storage_, std::move(new_desc), data};
+    // Create non-owning storage with the correct type for the real view
+    auto real_storage = make_non_owning_storage<Type>(data, storage_.size() * 2);
+    return tensor_t<Type, RANK, Desc>{real_storage, std::move(new_desc), data};
   }
 
   /**
@@ -851,7 +853,9 @@ MATX_LOOP_UNROLL
     }
 
     Desc new_desc{this->desc_.Shape(), std::move(strides)};
-    return tensor_t<Type, RANK, Desc>{storage_, std::move(new_desc), data};
+    // Create non-owning storage with the correct type for the imaginary view  
+    auto imag_storage = make_non_owning_storage<Type>(data, storage_.size() * 2);
+    return tensor_t<Type, RANK, Desc>{imag_storage, std::move(new_desc), data};
   }
 
   /**
