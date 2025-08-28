@@ -1202,7 +1202,7 @@ template <> struct VecTypeSelector<float, 4> { using type = float4; };
 template <> struct VecTypeSelector<double, 1> { using type = double1; };
 template <> struct VecTypeSelector<double, 2> { using type = double2; };
 template <> struct VecTypeSelector<double, 3> { using type = double3; };
-#if defined(__CUDACC_VER_MAJOR__) && __CUDACC_VER_MAJOR__ >= 13
+#if CUDART_VERSION >= 13000
 template <> struct VecTypeSelector<double, 4> { using type = double4_32a; };
 #else
 template <> struct VecTypeSelector<double, 4> { using type = double4; };
@@ -1241,7 +1241,7 @@ template <> struct VecTypeSelector<unsigned int, 4> { using type = uint4; };
 template <> struct VecTypeSelector<long, 1> { using type = long1; };
 template <> struct VecTypeSelector<long, 2> { using type = long2; };
 template <> struct VecTypeSelector<long, 3> { using type = long3; };
-#if defined(__CUDACC_VER_MAJOR__) && __CUDACC_VER_MAJOR__ >= 13
+#if CUDART_VERSION >= 13000
 template <> struct VecTypeSelector<long, 4> { using type = long4_32a; };
 #else
 template <> struct VecTypeSelector<long, 4> { using type = long4; };
@@ -1250,7 +1250,7 @@ template <> struct VecTypeSelector<long, 4> { using type = long4; };
 template <> struct VecTypeSelector<unsigned long, 1> { using type = ulong1; };
 template <> struct VecTypeSelector<unsigned long, 2> { using type = ulong2; };
 template <> struct VecTypeSelector<unsigned long, 3> { using type = ulong3; };
-#if defined(__CUDACC_VER_MAJOR__) && __CUDACC_VER_MAJOR__ >= 13
+#if CUDART_VERSION >= 13000
 template <> struct VecTypeSelector<unsigned long, 4> { using type = ulong4_32a; };
 #else
 template <> struct VecTypeSelector<unsigned long, 4> { using type = ulong4; };
@@ -1259,7 +1259,7 @@ template <> struct VecTypeSelector<unsigned long, 4> { using type = ulong4; };
 template <> struct VecTypeSelector<long long, 1> { using type = longlong1; };
 template <> struct VecTypeSelector<long long, 2> { using type = longlong2; };
 template <> struct VecTypeSelector<long long, 3> { using type = longlong3; };
-#if defined(__CUDACC_VER_MAJOR__) && __CUDACC_VER_MAJOR__ >= 13
+#if CUDART_VERSION >= 13000
 template <> struct VecTypeSelector<long long, 4> { using type = longlong4_32a; };
 #else
 template <> struct VecTypeSelector<long long, 4> { using type = longlong4; };
@@ -1268,7 +1268,7 @@ template <> struct VecTypeSelector<long long, 4> { using type = longlong4; };
 template <> struct VecTypeSelector<unsigned long long, 1> { using type = ulonglong1; };
 template <> struct VecTypeSelector<unsigned long long, 2> { using type = ulonglong2; };
 template <> struct VecTypeSelector<unsigned long long, 3> { using type = ulonglong3; };
-#if defined(__CUDACC_VER_MAJOR__) && __CUDACC_VER_MAJOR__ >= 13
+#if CUDART_VERSION >= 13000
 template <> struct VecTypeSelector<unsigned long long, 4> { using type = ulonglong4_32a; };
 #else
 template <> struct VecTypeSelector<unsigned long long, 4> { using type = ulonglong4; };
