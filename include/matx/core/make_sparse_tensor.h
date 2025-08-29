@@ -76,7 +76,7 @@ makeDefaultNonOwningZeroStorage(index_t sz, matxMemorySpace_t space) {
   assert(sz > 0);
   matxAlloc((void **)&ptr, sz * sizeof(T), space, /*stream=*/0);
   setZero(ptr, sz, space);
-  raw_pointer_buffer<T, matx_allocator<T>> buf{ptr, sz * sizeof(T),
+  raw_pointer_buffer<T, matx_allocator<T>> buf{ptr, static_cast<size_t>(sz),
                                                /*owning=*/false};
   return basic_storage<decltype(buf)>{std::move(buf)};
 }

@@ -158,13 +158,13 @@ public:
 
   // Size getters.
   index_t Nse() const {
-    return static_cast<index_t>(values_.size() / sizeof(VAL));
+    return static_cast<index_t>(values_.size());
   }
   index_t crdSize(int l) const {
-    return static_cast<index_t>(coordinates_[l].size() / sizeof(CRD));
+    return static_cast<index_t>(coordinates_[l].size());
   }
   index_t posSize(int l) const {
-    return static_cast<index_t>(positions_[l].size() / sizeof(POS));
+    return static_cast<index_t>(positions_[l].size());
   }
 
 private:
