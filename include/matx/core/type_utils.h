@@ -113,7 +113,7 @@ template <typename T>
 using remove_cvref_t = typename remove_cvref<T>::type;
 
 template <typename T, int RANK, typename Desc, typename Data> class tensor_impl_t;
-template <typename T, int RANK, typename Storage, typename Desc> class tensor_t;
+template <typename T, int RANK, typename Desc> class tensor_t;
 
 namespace detail {
 template <typename T, typename = void>
@@ -857,7 +857,7 @@ constexpr cuda::std::array<std::remove_cv_t<T>, N> to_array(T (&a)[N])
     return to_array_impl(a, std::make_index_sequence<N>{});
 }
 
-template <typename T, int RANK, typename Storage, typename Desc> class tensor_t;
+template <typename T, int RANK, typename Desc> class tensor_t;
 template <typename T, int RANK, typename Desc, typename Data> class tensor_impl_t;
 // Traits for casting down to impl tensor conditionally
 template <typename T, typename = void> 
