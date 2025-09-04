@@ -39,7 +39,7 @@
 #include "matx/core/tensor_utils.h"
 
 namespace matx {
-template <typename T, int RANK, typename Storage, typename Desc> class tensor_t; ///< Tensor detail type
+template <typename T, int RANK, typename Desc> class tensor_t; ///< Tensor detail type
 template <typename T> class BaseOp; ///< Base operator type
 
 namespace detail {
