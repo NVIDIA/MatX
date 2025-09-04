@@ -729,6 +729,8 @@ private:
       // should never reach here
       static_assert(always_false_v<T1>, "Unsupported type for economic QR");
     }
+
+    return CUSOLVER_STATUS_NOT_SUPPORTED;
   }
 
   cusolverStatus_t orgqr_dispatch(
