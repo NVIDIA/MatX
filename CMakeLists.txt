@@ -55,7 +55,7 @@ if (NOT CMAKE_CUDA_ARCHITECTURES)
 endif()
 message(STATUS "Using GPU architectures ${CMAKE_CUDA_ARCHITECTURES}")
 
-rapids_cmake_write_version_file(include/version_config.h)
+rapids_cmake_write_version_file(include/matx/version_config.h)
 
 # Command line options
 option(MATX_BUILD_EXAMPLES "Build examples" OFF)
@@ -362,7 +362,7 @@ if (NOT_SUBPROJECT)
 
     install(TARGETS matx EXPORT matx-exports)
     install(DIRECTORY include/ DESTINATION include)
-    install(FILES ${CMAKE_BINARY_DIR}/include/version_config.h DESTINATION include)
+    install(FILES ${CMAKE_BINARY_DIR}/include/matx/version_config.h DESTINATION include)
 
     set(doc_string
     [=[
