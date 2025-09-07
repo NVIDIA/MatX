@@ -98,6 +98,7 @@
 #include "matx/operators/resample_poly.h"
 #include "matx/operators/reshape.h"
 #include "matx/operators/reverse.h"
+#include "matx/operators/sar_bp.h"
 #include "matx/operators/select.h"
 #include "matx/operators/self.h"
 #include "matx/operators/set.h"
