@@ -71,8 +71,8 @@ __MATX_INLINE__ static auto makeDefaultNonOwningStorage(size_t sz,
   if (sz != 0) {
     matxAlloc(reinterpret_cast<void **>(&ptr), sz * sizeof(T), space, stream);
   }
-  raw_pointer_buffer<T, matx_allocator<T>> buf{ptr, sz * sizeof(T),
-                                               /*owning=*/false};
+  // FIX: raw_pointer_buffer constructor expects ELEMENT count, not byte count
+  raw_pointer_buffer<T, matx_allocator<T>> buf{ptr, sz, /*owning=*/false};
   return basic_storage<decltype(buf)>{std::move(buf)};
 }
 
@@ -101,6 +101,8 @@ public:
     static_assert(is_tensor_view_v<TensorTypeA>);
     cudaDataType dta = MatXTypeToCudaType<TA>();
     const cusparseOrder_t order = CUSPARSE_ORDER_ROW;
+
+    
     ret = cusparseCreateDnMat(&matA_, params_.m, params_.n, /*ld=*/params_.n,
                               params_.ptrA, dta, order);
     MATX_ASSERT(ret == CUSPARSE_STATUS_SUCCESS, matxCudaError);
@@ -111,13 +113,21 @@ public:
     cusparseIndexType_t ct = MatXTypeToCuSparseIndexType<CRD>();
     cusparseIndexBase_t zb = CUSPARSE_INDEX_BASE_ZERO;
     cudaDataType dto = MatXTypeToCudaType<TO>();
+    fprintf(stderr, "[FORMAT DEBUG] TensorFormat detected\n");
+    fflush(stderr);
     if constexpr (TensorTypeO::Format::isCOO()) {
+      fprintf(stderr, "[FORMAT DEBUG] Using COO format\n");
+      fflush(stderr);
       ret = cusparseCreateCoo(&matO_, params_.m, params_.n, 0, nullptr, nullptr,
                               nullptr, ct, zb, dto);
     } else if constexpr (TensorTypeO::Format::isCSR()) {
+      fprintf(stderr, "[FORMAT DEBUG] Using CSR format\n");
+      fflush(stderr);
       ret = cusparseCreateCsr(&matO_, params_.m, params_.n, 0, params_.ptrO2,
                               nullptr, nullptr, pt, ct, zb, dto);
     } else if constexpr (TensorTypeO::Format::isCSC()) {
+      fprintf(stderr, "[FORMAT DEBUG] Using CSC format\n");
+      fflush(stderr);
       ret = cusparseCreateCsc(&matO_, params_.m, params_.n, 0, params_.ptrO2,
                               nullptr, nullptr, pt, ct, zb, dto);
     } else {
@@ -143,6 +153,14 @@ public:
     [[maybe_unused]] int64_t num_rows_tmp, num_cols_tmp, nnz;
     ret = cusparseSpMatGetSize(matO_, &num_rows_tmp, &num_cols_tmp, &nnz);
     MATX_ASSERT(ret == CUSPARSE_STATUS_SUCCESS, matxCudaError);
+    
+    if constexpr (TensorTypeO::Format::isCSC()) {
+      fprintf(stderr, "[CSC DEBUG] cuSPARSE analysis result: nnz=%ld\n", (long)nnz);
+      fflush(stderr);
+    }
+    
+    
+
 
     // Pre-allocate sparse tensor output.
     if constexpr (TensorTypeO::Format::isCOO()) {
@@ -169,10 +187,14 @@ public:
       ret = cusparseCsrSetPointers(matO_, o.POSData(1), o.CRDData(1), o.Data());
     } else if constexpr (TensorTypeO::Format::isCSC()) {
       matxMemorySpace_t space = GetPointerKind(params_.ptrO2);
+      fprintf(stderr, "[CSC DEBUG] Setting up CSC storage: nnz=%ld, space=%d\n", (long)nnz, (int)space);
+      fflush(stderr);
       o.SetVal(makeDefaultNonOwningStorage<VAL>(nnz, space, stream));
       o.SetCrd(1, makeDefaultNonOwningStorage<CRD>(nnz, space, stream));
       o.SetSparseDataImpl();
       ret = cusparseCscSetPointers(matO_, o.POSData(1), o.CRDData(1), o.Data());
+      fprintf(stderr, "[CSC DEBUG] After CSC setup, tensor Nse=%ld\n", (long)o.Nse());
+      fflush(stderr);
     }
     MATX_ASSERT(ret == CUSPARSE_STATUS_SUCCESS, matxCudaError);
   }
