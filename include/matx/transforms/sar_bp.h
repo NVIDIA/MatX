@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // BSD 3-Clause License
 //
-// Copyright (c) 2021, NVIDIA Corporation
+// Copyright (c) 2025, NVIDIA Corporation
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -71,7 +71,6 @@ inline void sar_bp_impl(OutImageType &out, const InitialImageType &initial_image
   constexpr double C = 2.997291625155841e+08; // FIXME: Add to matx/core/constants.h or similar
   const double phase_correction_partial = 4.0 * M_PI * (params.center_frequency / C);
   const double dr_inv = 1.0 / params.del_r;
-  printf("DEBUG Op: dr_inv: %e, phase_correction_partial: %e\n", dr_inv, phase_correction_partial);
 
   const dim3 block(16, 16);
   const dim3 grid(
