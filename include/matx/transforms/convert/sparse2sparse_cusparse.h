@@ -68,8 +68,8 @@ struct Sparse2SparseParams_t {
 // Helper method to wrap pointer/size in new storage.
 template <typename T>
 __MATX_INLINE__ static auto wrapDefaultNonOwningStorage(T *ptr, size_t sz) {
-  raw_pointer_buffer<T, matx_allocator<T>> buf{ptr, sz * sizeof(T),
-                                               /*owning=*/false};
+  // FIX: raw_pointer_buffer constructor expects ELEMENT count, not byte count
+  raw_pointer_buffer<T, matx_allocator<T>> buf{ptr, sz, /*owning=*/false};
   return basic_storage<decltype(buf)>{std::move(buf)};
 }
 
