@@ -79,10 +79,13 @@ inline void sar_bp_impl(OutImageType &out, const InitialImageType &initial_image
     static_cast<uint32_t>((out.Size(0) + block.y - 1) / block.y));
 
   if (params.compute_type == SarBpComputeType::Double) {
-    SarBp<double, OutImageType, InitialImageType, RangeProfilesType, PlatPosType, VoxLocType, RangeToMcpType><<<grid, block, 0, stream>>>(
+    SarBp<SarBpComputeType::Double, OutImageType, InitialImageType, RangeProfilesType, PlatPosType, VoxLocType, RangeToMcpType><<<grid, block, 0, stream>>>(
+      out, initial_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, dr_inv, phase_correction_partial);
+  } else if (params.compute_type == SarBpComputeType::Mixed) {
+    SarBp<SarBpComputeType::Mixed, OutImageType, InitialImageType, RangeProfilesType, PlatPosType, VoxLocType, RangeToMcpType><<<grid, block, 0, stream>>>(
       out, initial_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, dr_inv, phase_correction_partial);
   } else {
-    SarBp<float, OutImageType, InitialImageType, RangeProfilesType, PlatPosType, VoxLocType, RangeToMcpType><<<grid, block, 0, stream>>>(
+    SarBp<SarBpComputeType::Float, OutImageType, InitialImageType, RangeProfilesType, PlatPosType, VoxLocType, RangeToMcpType><<<grid, block, 0, stream>>>(
       out, initial_image, range_profiles, platform_positions, voxel_locations, range_to_mcp,
       static_cast<float>(dr_inv), static_cast<float>(phase_correction_partial));
   }
