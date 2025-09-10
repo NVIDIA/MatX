@@ -48,9 +48,6 @@ namespace detail {
     C2C,
     R2C,
     C2R,
-    Z2Z,
-    D2Z,
-    Z2D
   };
 
   enum class FFTDirection {
@@ -161,6 +158,18 @@ namespace detail {
     return i;
   }  
 
+  template <typename InType>
+  constexpr __MATX_INLINE__ FFTType ComplexInType()
+  {
+    if constexpr (is_complex_v<typename InType::value_type>) {
+      return FFTType::C2C;
+    }
+    else {
+      return FFTType::R2C;
+    }
+  }
+
+
   template <typename T1T, typename T2T>
   constexpr __MATX_INLINE__ FFTType DeduceFFTTransformType()
   {
@@ -168,44 +177,22 @@ namespace detail {
     using T2 = typename T2T::value_type;
 
     // Deduce plan type from view types
-    if constexpr (std::is_same_v<T1, cuda::std::complex<float>>) {
-      if constexpr (std::is_same_v<T2, cuda::std::complex<float>>) {
-        return FFTType::C2C;
-      }
-      else if constexpr (std::is_same_v<T2, float>) {
-
-        return FFTType::R2C;
-      }
+    // Check if input is complex and output is real -> C2R
+    if constexpr ((std::is_same_v<T1, cuda::std::complex<float>> && std::is_same_v<T2, float>) ||
+                  (std::is_same_v<T1, cuda::std::complex<double>> && std::is_same_v<T2, double>) ||
+                  (is_complex_half_v<T1> && (is_half_v<T2> || is_matx_half_v<T2>))) {
+      return FFTType::R2C;
     }
-    else if constexpr (std::is_same_v<T1, float> &&
-                       std::is_same_v<T2, cuda::std::complex<float>>) {
+    // Check if input is real and output is complex -> R2C  
+    else if constexpr ((std::is_same_v<T1, float> && std::is_same_v<T2, cuda::std::complex<float>>) ||
+                       (std::is_same_v<T1, double> && std::is_same_v<T2, cuda::std::complex<double>>) ||
+                       ((is_half_v<T1> || is_matx_half_v<T1>) && is_complex_half_v<T2>)) {
       return FFTType::C2R;
     }
-    else if constexpr (std::is_same_v<T1, cuda::std::complex<double>>) {
-      if constexpr (std::is_same_v<T2, cuda::std::complex<double>>) {
-        return FFTType::Z2Z;
-      }
-      else if constexpr (std::is_same_v<T2, double>) {
-        return FFTType::D2Z;
-      }
+    // Both complex or both real -> C2C
+    else {
+      return FFTType::C2C;
     }
-    else if constexpr (std::is_same_v<T1, double> &&
-                       std::is_same_v<T2, cuda::std::complex<double>>) {
-      return FFTType::Z2D;
-    }
-    else if constexpr (is_complex_half_v<T1>) {
-      if constexpr (is_complex_half_v<T2>) {
-        return FFTType::C2C;
-      }
-      else if constexpr (is_half_v<T2> || is_matx_half_v<T2>) {
-        return FFTType::R2C;
-      }
-    }
-    else if constexpr ((is_half_v<T1> || is_matx_half_v<T1>) && is_complex_half_v<T2>) {
-      return FFTType::C2R;
-    }
-
-    return FFTType::C2C;  
   }
 }
 

@@ -43,14 +43,13 @@
 namespace matx
 {
   namespace detail {
-    template <typename OpA, typename PermDims, typename FFTType>
-    class FFTOp : public BaseOp<FFTOp<OpA, PermDims, FFTType>>
+    template <typename OpA, typename PermDims, FFTDirection Direction, FFTType Type>
+    class FFTOp : public BaseOp<FFTOp<OpA, PermDims, Direction, Type>>
     {
       private:
         typename detail::base_type_t<OpA> a_;
         index_t fft_size_;
         PermDims perm_;
-        FFTType type_;
         FFTNorm norm_;
         cuda::std::array<index_t, OpA::Rank()> out_dims_;
         using ttype = std::conditional_t<is_complex_v<typename OpA::value_type>, 
@@ -69,7 +68,7 @@ namespace matx
         using fft_xform_op = bool;
 
         __MATX_INLINE__ std::string str() const { 
-          if constexpr (std::is_same_v<FFTType, detail::fft_t>) {
+          if constexpr (Direction == detail::FFTDirection::FORWARD) {
             return "fft(" + get_type_str(a_) + ")";
           }
           else {
@@ -77,21 +76,22 @@ namespace matx
           }
         }
 
-        __MATX_INLINE__ FFTOp(const OpA &a, index_t size, PermDims perm, FFTType t, FFTNorm norm) : 
-            a_(a), fft_size_(size),  perm_(perm), type_(t), norm_(norm) {
+        __MATX_INLINE__ FFTOp(const OpA &a, index_t size, PermDims perm, FFTNorm norm) : 
+            a_(a), fft_size_(size),  perm_(perm), norm_(norm) {
           for (int r = 0; r < Rank(); r++) {
             out_dims_[r] = a_.Size(r);
           }
 
           if (fft_size_ != 0) {
-            if constexpr (is_complex_v<typename OpA::value_type>) {
+            if constexpr (Type == detail::FFTType::C2C) {
               if constexpr (std::is_same_v<PermDims, no_permute_t>) {
                 out_dims_[Rank() - 1] = fft_size_;
               }
               else {
                 out_dims_[perm_[Rank()-1]] = fft_size_;
               }
-            } else {
+            } 
+            else if constexpr (Type == detail::FFTType::R2C) {
               // R2C transforms pack the results in fft_size_/2 + 1 complex elements
               if constexpr (std::is_same_v<PermDims, no_permute_t>) {
                 out_dims_[Rank() - 1] = fft_size_ / 2 + 1;
@@ -100,16 +100,16 @@ namespace matx
                 out_dims_[perm_[Rank()-1]] = fft_size_ / 2 + 1;
               }
             }
-          }
-          else { 
-            if constexpr (!is_complex_v<typename OpA::value_type>) { // C2C uses the same input/output size. R2C is N/2+1
+            else {
               if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
-                out_dims_[perm_[Rank()-1]] = out_dims_[perm_[Rank()-1]] / 2 + 1;
+                out_dims_[perm_[Rank()-1]] = 2 * (fft_size_ - 1);
               }
               else {
-                out_dims_[Rank() - 1] = out_dims_[Rank() - 1] / 2 + 1;
-              }
+                out_dims_[Rank() - 1] = 2 * (fft_size_ - 1);
+              }                
             }
+          }
+          else { 
             // For R2C transforms, the output length could correspond to an input length of
             // either (out_dim-1)*2 or (out_dim-1)*2+1. The FFT transform will be unable to
             // deduce which is correct, so explicitly set the transform size here. For C2C
@@ -119,11 +119,30 @@ namespace matx
             // (N-1)*2 or (N-1)*2+1. If the operator is used such that the output is a
             // real tensor, then the size will be set to the output tensor length. If we
             // create a temporary, then this will be a C2C transform and the output length
-            // will match the input length.
-            if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
-              fft_size_ = a.Size(perm_[Rank()-1]);
-            } else {
-              fft_size_ = a.Size(a.Rank()-1);
+            // will match the input length.            
+            if constexpr (Type == detail::FFTType::C2C) { 
+              if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
+                fft_size_ = a.Size(perm_[Rank()-1]);
+              } else {
+                fft_size_ = a.Size(a.Rank()-1);
+              }              
+            }
+            else if constexpr (Type == detail::FFTType::R2C) { // R2C is N/2+1
+              if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
+                out_dims_[perm_[Rank()-1]] = out_dims_[perm_[Rank()-1]] / 2 + 1;
+              }
+              else {
+                out_dims_[Rank() - 1] = out_dims_[Rank() - 1] / 2 + 1;
+              }
+            }
+            else {
+              // R2C is 2*(N-1) unless overridden
+              if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
+                out_dims_[perm_[Rank()-1]] = 2 * (out_dims_[perm_[Rank()-1]] - 1);
+              }
+              else {
+                out_dims_[Rank() - 1] = 2 * (out_dims_[Rank() - 1] - 1);
+              }              
             }
           }
         }
@@ -161,7 +180,7 @@ namespace matx
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
           if constexpr (std::is_same_v<PermDims, no_permute_t>) {
-            if constexpr (std::is_same_v<FFTType, fft_t>) {
+            if constexpr (Direction == detail::FFTDirection::FORWARD) {
               fft_impl(cuda::std::get<0>(out), a_, fft_size_, norm_, ex);
             }
             else {
@@ -169,7 +188,7 @@ namespace matx
             }
           }
           else {
-            if constexpr (std::is_same_v<FFTType, fft_t>) { 
+            if constexpr (Direction == detail::FFTDirection::FORWARD) { 
               fft_impl(permute(cuda::std::get<0>(out), perm_), permute(a_, perm_), fft_size_, norm_, ex);
             }
             else {
@@ -227,10 +246,11 @@ namespace matx
    * @param norm
    *   Normalization to apply to FFT
    */
-  template<typename OpA>
+  template <typename OpA>
   __MATX_INLINE__ auto fft(const OpA &a, uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD) {
+    constexpr auto fft_type = detail::ComplexInType<OpA>();
     const index_t fft_size_ = static_cast<index_t>(fft_size);
-    return detail::FFTOp(a, fft_size_, detail::no_permute_t{}, detail::fft_t{}, norm);
+    return detail::FFTOp<OpA, detail::no_permute_t, detail::FFTDirection::FORWARD, fft_type>(a, fft_size_, detail::no_permute_t{}, norm);
   }
 
   /**
@@ -255,10 +275,56 @@ namespace matx
    */
   template<typename OpA>
   __MATX_INLINE__ auto fft(const OpA &a, const int32_t (&axis)[1], uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD) {
+    constexpr auto fft_type = detail::ComplexInType<OpA>();
     auto perm = detail::getPermuteDims<remove_cvref_t<OpA>::Rank()>(axis);
     const index_t fft_size_ = static_cast<index_t>(fft_size);
-    return detail::FFTOp(a, fft_size_, perm, detail::fft_t{}, norm);
+    return detail::FFTOp<OpA, decltype(perm), detail::FFTDirection::FORWARD, fft_type>(a, fft_size_, perm, norm);
   }
+
+  /**
+   * R2C FFT
+   *
+   * Performs an R2C FFT.
+   *
+   * @tparam OpA
+   *   Input tensor or operator type
+   * @param a
+   *   input tensor or operator
+   * @param fft_size
+   *   Size of FFT. Setting to 0 uses the output size to figure out the FFT size.
+   * @param norm
+   *   Normalization to apply to FFT
+   */
+   template<typename OpA>
+   __MATX_INLINE__ auto rfft(const OpA &a, uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD) {
+     static_assert(!is_complex_v<typename remove_cvref_t<OpA>::value_type>, "RFFT only supports real input");
+     const index_t fft_size_ = static_cast<index_t>(fft_size);
+     return detail::FFTOp<OpA, detail::no_permute_t, detail::FFTDirection::FORWARD, detail::FFTType::R2C>(a, fft_size_, detail::no_permute_t{}, norm);
+   }
+ 
+   /**
+    * R2C FFT
+    *
+    * Performs an R2C FFT.
+    *
+    * @tparam OpA
+    *   Input tensor or operator type
+    * @param a
+    *   input tensor or operator
+    * @param axis
+    *   axis to perform FFT along
+    * @param fft_size
+    *   Size of FFT. Setting to 0 uses the output size to figure out the FFT size.
+    * @param norm
+    *   Normalization to apply to FFT
+    */
+   template<typename OpA>
+   __MATX_INLINE__ auto rfft(const OpA &a, const int32_t (&axis)[1], uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD) {
+     static_assert(!is_complex_v<typename remove_cvref_t<OpA>::value_type>, "RFFT only supports real input");
+     auto perm = detail::getPermuteDims<remove_cvref_t<OpA>::Rank()>(axis);
+     const index_t fft_size_ = static_cast<index_t>(fft_size);
+     return detail::FFTOp<OpA, decltype(perm), detail::FFTDirection::FORWARD, detail::FFTType::R2C>(a, fft_size_, perm, norm);
+   }  
 
   /**
    * Run a 1D IFFT with a cached plan
@@ -282,7 +348,7 @@ namespace matx
   template<typename OpA>
   __MATX_INLINE__ auto ifft(const OpA &a, uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD) {
     const index_t fft_size_ = static_cast<index_t>(fft_size);
-    return detail::FFTOp(a, fft_size_, detail::no_permute_t{} , detail::ifft_t{}, norm);
+    return detail::FFTOp<OpA, detail::no_permute_t, detail::FFTDirection::BACKWARD, detail::FFTType::C2C>(a, fft_size_, detail::no_permute_t{} , norm);
   }
 
   /**
@@ -309,18 +375,63 @@ namespace matx
   __MATX_INLINE__ auto ifft(const OpA &a, const int32_t (&axis)[1], uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD) {
     auto perm = detail::getPermuteDims<remove_cvref_t<OpA>::Rank()>(axis);
     const index_t fft_size_ = static_cast<index_t>(fft_size);
-    return detail::FFTOp(a, fft_size_, perm, detail::ifft_t{}, norm);
-  }  
+    return detail::FFTOp<OpA, decltype(perm), detail::FFTDirection::BACKWARD, detail::FFTType::C2C>(a, fft_size_, perm, norm);
+  }
+
+  /**
+   * C2R inverse FFT
+   *
+   * Performs an inverse FFT on a complex operator to produce a complex operator.
+   *
+   * @tparam OpA
+   *   Input tensor or operator type
+   * 
+   * Note: fft_size must be unsigned so that the axis overload does not match both 
+   * prototypes with index_t. However, the value of fft_size must still fit into an index_t.
+   * @param a
+   *   input tensor or operator
+   * @param fft_size
+   *   Size of FFT. Setting to 0 uses the output size to figure out the FFT size.
+   * @param norm
+   *   Normalization to apply to IFFT
+   */
+   template<typename OpA>
+   __MATX_INLINE__ auto irfft(const OpA &a, uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD) {
+     const index_t fft_size_ = static_cast<index_t>(fft_size);
+     return detail::FFTOp<OpA, detail::no_permute_t, detail::FFTDirection::BACKWARD, detail::FFTType::C2R>(a, fft_size_, detail::no_permute_t{} , norm);
+   }
+ 
+   /**
+    * C2R inverse FFT
+    *
+    * Performs an inverse FFT on a complex operator to produce a real operator.
+    *
+    * @tparam OpA
+    *   Input tensor or operator type
+    * @param a
+    *   input tensor or operator
+    * @param axis
+    *   axis to perform FFT along
+    * @param fft_size
+    *   Size of FFT. Setting to 0 uses the output size to figure out the FFT size.
+    * @param norm
+    *   Normalization to apply to IFFT
+    */
+   template<typename OpA>
+   __MATX_INLINE__ auto irfft(const OpA &a, const int32_t (&axis)[1], uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD) {
+     auto perm = detail::getPermuteDims<remove_cvref_t<OpA>::Rank()>(axis);
+     const index_t fft_size_ = static_cast<index_t>(fft_size);
+     return detail::FFTOp<OpA, decltype(perm), detail::FFTDirection::BACKWARD, detail::FFTType::C2R>(a, fft_size_, perm, norm);
+   }    
 
 
   namespace detail {
-    template <typename OpA, typename PermDims, typename FFTType>
-    class FFT2Op : public BaseOp<FFT2Op<OpA, PermDims, FFTType>>
+    template <typename OpA, typename PermDims, FFTDirection Direction, FFTType Type>
+    class FFT2Op : public BaseOp<FFT2Op<OpA, PermDims, Direction, Type>>
     {
       private:
         typename detail::base_type_t<OpA> a_;
         PermDims perm_;
-        FFTType type_;
         FFTNorm norm_;
         cuda::std::array<index_t, OpA::Rank()> out_dims_;
         using ttype = std::conditional_t<is_complex_v<typename OpA::value_type>, 
@@ -337,7 +448,7 @@ namespace matx
         using fft2_xform_op = bool;
 
         __MATX_INLINE__ std::string str() const { 
-          if constexpr (std::is_same_v<FFTType, detail::fft_t>) {
+          if constexpr (Direction == detail::FFTDirection::FORWARD) {
             return "fft2(" + get_type_str(a_) + ")";
           }
           else {
@@ -345,21 +456,37 @@ namespace matx
           }
         }
 
-        __MATX_INLINE__ FFT2Op(const OpA &a, PermDims perm, FFTType t, FFTNorm norm) : a_(a),  perm_(perm), type_(t), norm_(norm) {
+        __MATX_INLINE__ FFT2Op(const OpA &a, PermDims perm, FFTNorm norm) : a_(a),  perm_(perm), norm_(norm) {
           for (int r = 0; r < Rank(); r++) {
             out_dims_[r] = a_.Size(r);
           }
 
-          if constexpr (!is_complex_v<typename OpA::value_type>) { // C2C uses the same input/output size. R2C is N/2+1
+          if constexpr (Type == detail::FFTType::C2C) {
+            if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
+              out_dims_[perm_[0]] = out_dims_[perm_[0]];
+              out_dims_[perm_[1]] = out_dims_[perm_[1]];
+            }
+          }
+          else if constexpr (Type == detail::FFTType::R2C) {
             if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
               out_dims_[perm_[0]] = out_dims_[perm_[0]] / 2 + 1;
-              out_dims_[perm_[1]] = out_dims_[perm_[1]] / 2 + 1;
+              out_dims_[perm_[1]] = out_dims_[perm_[1]];
             }
             else {
               out_dims_[Rank() - 1] = out_dims_[Rank() - 1] / 2 + 1;
-              out_dims_[Rank() - 2] = out_dims_[Rank() - 2] / 2 + 1;
+              out_dims_[Rank() - 2] = out_dims_[Rank() - 2];
             }
-          }  
+          }
+          else {
+            if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
+              out_dims_[perm_[0]] = 2 * (out_dims_[perm_[0]] - 1);
+              out_dims_[perm_[1]] = out_dims_[perm_[1]];
+            }
+            else {
+              out_dims_[Rank() - 1] = 2 * (out_dims_[Rank() - 1] - 1);
+              out_dims_[Rank() - 2] = out_dims_[Rank() - 2];
+            }
+          }
         }
 
         __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
@@ -386,7 +513,7 @@ namespace matx
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
           if constexpr (std::is_same_v<PermDims, no_permute_t>) {
-            if constexpr (std::is_same_v<FFTType, fft_t>) { 
+            if constexpr (Direction == detail::FFTDirection::FORWARD) { 
               fft2_impl(cuda::std::get<0>(out), a_, norm_, ex);
             }
             else {
@@ -394,7 +521,7 @@ namespace matx
             }
           }
           else {
-            if constexpr (std::is_same_v<FFTType, fft_t>) { 
+            if constexpr (Direction == detail::FFTDirection::FORWARD) { 
               fft2_impl(permute(cuda::std::get<0>(out), perm_), permute(a_, perm_), norm_, ex);
             }
             else {
@@ -457,7 +584,8 @@ namespace matx
  */
   template<typename OpA>
   __MATX_INLINE__ auto fft2(const OpA &a, FFTNorm norm = FFTNorm::BACKWARD) {
-    return detail::FFT2Op(a, detail::no_permute_t{}, detail::fft_t{}, norm);
+    constexpr auto fft_type = detail::ComplexInType<OpA>();
+    return detail::FFT2Op<OpA, detail::no_permute_t, detail::FFTDirection::FORWARD, fft_type>(a, detail::no_permute_t{}, norm);
   }
 
 /**
@@ -478,9 +606,9 @@ namespace matx
  */
   template<typename OpA>
   __MATX_INLINE__ auto fft2(const OpA &a, const int32_t (&axis)[2], FFTNorm norm = FFTNorm::BACKWARD) {
-
+    constexpr auto fft_type = detail::ComplexInType<OpA>();
     auto perm = detail::getPermuteDims<remove_cvref_t<OpA>::Rank()>(axis);  
-    return detail::FFT2Op(a, perm, detail::fft_t{}, norm);
+    return detail::FFT2Op<OpA, decltype(perm), detail::FFTDirection::FORWARD, fft_type>(a, perm, norm);
   }
 
 /**
@@ -499,7 +627,8 @@ namespace matx
  */
   template<typename OpA>
   __MATX_INLINE__ auto ifft2(const OpA &a, FFTNorm norm = FFTNorm::BACKWARD) {
-    return detail::FFT2Op(a, detail::no_permute_t{}, detail::ifft_t{}, norm);
+    constexpr auto fft_type = detail::ComplexInType<OpA>();
+    return detail::FFT2Op<OpA, detail::no_permute_t, detail::FFTDirection::BACKWARD, fft_type>(a, detail::no_permute_t{}, norm);
   }
 
 /**
@@ -520,8 +649,86 @@ namespace matx
  */
   template<typename OpA>
   __MATX_INLINE__ auto ifft2(const OpA &a, const int32_t (&axis)[2], FFTNorm norm = FFTNorm::BACKWARD) {
+    constexpr auto fft_type = detail::ComplexInType<OpA>();
     auto perm = detail::getPermuteDims<remove_cvref_t<OpA>::Rank()>(axis);  
-    return detail::FFT2Op(a, perm, detail::ifft_t{}, norm);
+    return detail::FFT2Op<OpA, decltype(perm), detail::FFTDirection::BACKWARD, fft_type>(a, perm, norm);
   }  
 
+/**
+ * Run a 2D RFFT (real-to-complex FFT)
+ *
+ * Performs a 2D RFFT.
+ *
+ * @tparam OpA
+ *   Input tensor or operator type (must be real-valued)
+ * @param a
+ *   Input tensor or operator
+ * @param norm
+ *   Normalization to apply to FFT
+ */
+template<typename OpA>
+__MATX_INLINE__ auto rfft2(const OpA &a, FFTNorm norm = FFTNorm::BACKWARD) {
+  static_assert(!is_complex_v<typename remove_cvref_t<OpA>::value_type>, "rfft2 only supports real input");
+  return detail::FFT2Op<OpA, detail::no_permute_t, detail::FFTDirection::FORWARD, detail::FFTType::R2C>(a, detail::no_permute_t{}, norm);
+}
+
+/**
+ * Run a 2D RFFT (real-to-complex FFT) along specified axes
+ *
+ * Performs a 2D RFFT along the given axes.
+ *
+ * @tparam OpA
+ *   Input tensor or operator type (must be real-valued)
+ * @param a
+ *   Input tensor or operator
+ * @param axis
+ *   Axes to perform FFT along
+ * @param norm
+ *   Normalization to apply to FFT
+ */
+template<typename OpA>
+__MATX_INLINE__ auto rfft2(const OpA &a, const int32_t (&axis)[2], FFTNorm norm = FFTNorm::BACKWARD) {
+  static_assert(!is_complex_v<typename remove_cvref_t<OpA>::value_type>, "rfft2 only supports real input");
+  auto perm = detail::getPermuteDims<remove_cvref_t<OpA>::Rank()>(axis);
+  return detail::FFT2Op<OpA, decltype(perm), detail::FFTDirection::FORWARD, detail::FFTType::R2C>(a, perm, norm);
+}
+
+/**
+ * Run a 2D IRFFT (complex-to-real inverse FFT)
+ *
+ * Performs a 2D IRFFT.
+ *
+ * @tparam OpA
+ *   Input tensor or operator type (must be complex-valued)
+ * @param a
+ *   Input tensor or operator
+ * @param norm
+ *   Normalization to apply to IFFT
+ */
+template<typename OpA>
+__MATX_INLINE__ auto irfft2(const OpA &a, FFTNorm norm = FFTNorm::BACKWARD) {
+  static_assert(is_complex_v<typename remove_cvref_t<OpA>::value_type>, "irfft2 only supports complex input");
+  return detail::FFT2Op<OpA, detail::no_permute_t, detail::FFTDirection::BACKWARD, detail::FFTType::C2R>(a, detail::no_permute_t{}, norm);
+}
+
+/**
+ * Run a 2D IRFFT (complex-to-real inverse FFT) along specified axes
+ *
+ * Performs a 2D IRFFT along the given axes.
+ *
+ * @tparam OpA
+ *   Input tensor or operator type (must be complex-valued)
+ * @param a
+ *   Input tensor or operator
+ * @param axis
+ *   Axes to perform IFFT along
+ * @param norm
+ *   Normalization to apply to IFFT
+ */
+template<typename OpA>
+__MATX_INLINE__ auto irfft2(const OpA &a, const int32_t (&axis)[2], FFTNorm norm = FFTNorm::BACKWARD) {
+  static_assert(is_complex_v<typename remove_cvref_t<OpA>::value_type>, "irfft2 only supports complex input");
+  auto perm = detail::getPermuteDims<remove_cvref_t<OpA>::Rank()>(axis);
+  return detail::FFT2Op<OpA, decltype(perm), detail::FFTDirection::BACKWARD, detail::FFTType::C2R>(a, perm, norm);
+}
 }
