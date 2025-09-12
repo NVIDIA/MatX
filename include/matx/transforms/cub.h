@@ -710,11 +710,20 @@ inline void ExecSort(OutputTensor &a_out,
     // type of reduction where there's not a single output, since any type of reduction can be generalized
     // to a segmented type
     if constexpr (OutputTensor::Rank() > 0) {
-      auto ft = [&](auto &&in, auto &&out, auto &&begin, auto &&end) {
-          return cub::DeviceSegmentedReduce::Sum(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(out_base)), begin, end, stream);
-      };
-      [[maybe_unused]] auto rv = ReduceInput(ft, out_base, in_base);
-      MATX_ASSERT_STR_EXP(rv, cudaSuccess, matxCudaError, "Error in cub::DeviceSegmentedReduce::Sum");
+      [[maybe_unused]] cudaError_t err;
+      if (is_tensor_view_v<InputOperator> && a.IsContiguous() && a_out.IsContiguous()) {
+        const int seg_size = static_cast<int>(TotalSize(a) / TotalSize(out_base));
+        err = cub::DeviceSegmentedReduce::Sum(d_temp, temp_storage_bytes, in_base.Data(), out_base.Data(), static_cast<cuda::std::int64_t>(TotalSize(out_base)), seg_size, stream);
+      }
+      else {      
+        auto ft = [&](auto &&in, auto &&out, auto &&begin, auto &&end) {
+            return cub::DeviceSegmentedReduce::Sum(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(out_base)), begin, end, stream);
+        };
+
+        err = ReduceInput(ft, out_base, in_base);
+      }
+
+      MATX_ASSERT_STR_EXP(err, cudaSuccess, matxCudaError, "Error in cub::DeviceSegmentedReduce::Sum");
     }
     else {
       auto ft = [&](auto &&in, auto &&out, [[maybe_unused]] auto &&unused1, [[maybe_unused]] auto &&unused2) {
