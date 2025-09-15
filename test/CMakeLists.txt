@@ -7,6 +7,7 @@ set (test_sources
     00_misc/AllocatorTests.cu
     00_tensor/BasicTensorTests.cu
     00_tensor/CUBTests.cu
+    00_tensor/Storage.cu
     00_tensor/ViewTests.cu
     00_tensor/VizTests.cu
     00_tensor/TensorCreationTests.cu
