@@ -77,7 +77,7 @@ namespace detail {
 
     // Auto-detect FFT size
     if (fft_size == 0) {
-      act_fft_size = o.Lsize();
+      act_fft_size = o.Lsize();   
 
       // If R2C transform, set length of FFT appropriately
       if constexpr ((std::is_same_v<T2, float> &&
@@ -89,7 +89,7 @@ namespace detail {
                     (std::is_same_v<T2, matxFp16> &&
                     std::is_same_v<T1, matxFp16Complex>)) { // R2C
         nom_fft_size = in_size;
-        act_fft_size = (o.Lsize() - 1) * 2;
+        act_fft_size = in_size;
       }
       else if constexpr ((std::is_same_v<T1, float> &&
                           std::is_same_v<T2, cuda::std::complex<float>>) ||
