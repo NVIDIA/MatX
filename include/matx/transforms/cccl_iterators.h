@@ -33,7 +33,7 @@
 
 #pragma once
 
-//! @file CCCL is deprecating a lot of thrust iterators for the newer `cuda` iterators
+//! CCCL is deprecating a lot of thrust iterators for the newer `cuda` iterators
 //! Work around the deprecation warning by conditionally replacing the definition of the iterators
 
 #include <cuda/std/version>
