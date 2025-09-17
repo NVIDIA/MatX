@@ -35,18 +35,18 @@
 
 #include <functional>
 #include <cstdio>
+#include <numeric>
+
 #ifdef __CUDACC__
 #include <cub/cub.cuh>
-#include <thrust/iterator/counting_iterator.h>
-#include <thrust/iterator/zip_iterator.h>
-#endif
-#include <numeric>
+#endif // __CUDACC__
 
 #include "matx/core/error.h"
 #include "matx/core/nvtx.h"
 #include "matx/core/tensor.h"
 #include "matx/core/iterator.h"
 #include "matx/core/operator_utils.h"
+#include "matx/transforms/cccl_iterators.h"
 
 
 namespace matx {
@@ -925,7 +925,7 @@ inline void ExecSort(OutputTensor &a_out,
         if (a.IsContiguous()) {
           cub::DeviceSelect::If(d_temp,
                                 temp_storage_bytes,
-                                thrust::counting_iterator<index_t>(0),
+                                detail::counting_iterator<index_t>(0),
                                 a_out.Data(),
                                 cparams_.num_found.Data(),
                                 static_cast<int>(TotalSize(a)),
@@ -936,7 +936,7 @@ inline void ExecSort(OutputTensor &a_out,
           tensor_impl_t<typename InputOperator::value_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
           cub::DeviceSelect::If(d_temp,
                                 temp_storage_bytes,
-                                thrust::counting_iterator<index_t>(0),
+                                detail::counting_iterator<index_t>(0),
                                 a_out.Data(),
                                 cparams_.num_found.Data(),
                                 static_cast<int>(TotalSize(a)),
@@ -949,7 +949,7 @@ inline void ExecSort(OutputTensor &a_out,
         tensor_impl_t<typename InputOperator::value_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
         cub::DeviceSelect::If(d_temp,
                               temp_storage_bytes,
-                              thrust::counting_iterator<index_t>(0),
+                              detail::counting_iterator<index_t>(0),
                               a_out.Data(),
                               cparams_.num_found.Data(),
                               static_cast<int>(TotalSize(a)),
@@ -963,7 +963,7 @@ inline void ExecSort(OutputTensor &a_out,
       // they want inside the op and not be limited to simple binary comparisons.
       cub::DeviceSelect::If(d_temp,
         temp_storage_bytes,
-        thrust::counting_iterator<index_t>(0),
+        detail::counting_iterator<index_t>(0),
         a_out.Data(),
         cparams_.num_found.Data(),
         static_cast<int>(TotalSize(a)),
@@ -1175,8 +1175,8 @@ public:
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
     const auto a_iter = matx::RandomOperatorThrustIterator{a};
-    const auto zipped_input = thrust::make_zip_iterator(thrust::make_counting_iterator<matx::index_t>(0), a_iter);
-    const auto zipped_output = thrust::make_zip_iterator(aidx_out.Data(), a_out.Data());
+    const auto zipped_input = detail::make_zip_iterator(detail::make_counting_iterator<matx::index_t>(0), a_iter);
+    const auto zipped_output = detail::make_zip_iterator(aidx_out.Data(), a_out.Data());
 
     if constexpr (OutputTensor::Rank() > 0) {
       const int BATCHES = static_cast<int>(TotalSize(a_out));
@@ -1333,11 +1333,11 @@ public:
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
     const auto a_iter = matx::RandomOperatorThrustIterator{a};
-    const auto zipped_input = thrust::make_zip_iterator(thrust::make_counting_iterator<matx::index_t>(0),
+    const auto zipped_input = detail::make_zip_iterator(detail::make_counting_iterator<matx::index_t>(0),
                                                         a_iter,
-                                                        thrust::make_counting_iterator<matx::index_t>(0),
+                                                        detail::make_counting_iterator<matx::index_t>(0),
                                                         a_iter);
-    const auto zipped_output = thrust::make_zip_iterator(aidx1_out.Data(), a1_out.Data(), aidx2_out.Data(), a2_out.Data());
+    const auto zipped_output = detail::make_zip_iterator(aidx1_out.Data(), a1_out.Data(), aidx2_out.Data(), a2_out.Data());
 
     if constexpr (OutputTensor::Rank() > 0) {
       const int BATCHES = static_cast<int>(TotalSize(a1_out));
@@ -1509,18 +1509,18 @@ void sort_pairs_impl_inner(OutputIndexTensor &idx_out, const InputIndexTensor &i
   void *d_temp = nullptr;
   size_t temp_storage_bytes = 0;
 
-  if constexpr (RANK == 1) {  
+  if constexpr (RANK == 1) {
     if (dir == SORT_DIR_ASC) {
       // First call to get size
-      cub::DeviceRadixSort::SortPairs(d_temp, temp_storage_bytes, 
+      cub::DeviceRadixSort::SortPairs(d_temp, temp_storage_bytes,
                                 a_in.Data(), a_out.Data(),
                                 idx_in.Data(), idx_out.Data(),
                                 a_in.Size(0), 0, sizeof(T1) * 8, stream);
       matxAlloc((void **)&d_temp, temp_storage_bytes, MATX_ASYNC_DEVICE_MEMORY,
                 stream);
-                      
+
       // Run sort
-      cub::DeviceRadixSort::SortPairs(d_temp, temp_storage_bytes, 
+      cub::DeviceRadixSort::SortPairs(d_temp, temp_storage_bytes,
                                 a_in.Data(), a_out.Data(),
                                 idx_in.Data(), idx_out.Data(),
                                      a_in.Size(0), 0, sizeof(T1) * 8, stream);
@@ -1528,17 +1528,17 @@ void sort_pairs_impl_inner(OutputIndexTensor &idx_out, const InputIndexTensor &i
       matxFree(d_temp, stream);
     }
     else {
-      cub::DeviceRadixSort::SortPairsDescending(d_temp, temp_storage_bytes, 
+      cub::DeviceRadixSort::SortPairsDescending(d_temp, temp_storage_bytes,
                                 a_in.Data(), a_out.Data(),
                                 idx_in.Data(), idx_out.Data(),
                                      a_in.Size(0), 0, sizeof(T1) * 8, stream);
-      
+
       // Allocate temporary storage
       matxAlloc((void **)&d_temp, temp_storage_bytes, MATX_ASYNC_DEVICE_MEMORY,
                 stream);
-                      
+
       // Run sort
-      cub::DeviceRadixSort::SortPairsDescending(d_temp, temp_storage_bytes, 
+      cub::DeviceRadixSort::SortPairsDescending(d_temp, temp_storage_bytes,
                                 a_in.Data(), a_out.Data(),
                                 idx_in.Data(), idx_out.Data(),
                                      a_in.Size(0), 0, sizeof(T1) * 8, stream);
@@ -1575,7 +1575,7 @@ void sort_pairs_impl_inner(OutputIndexTensor &idx_out, const InputIndexTensor &i
             BeginOffset{a_in}, EndOffset{a_in}, stream);
 
         matxAlloc((void **)&d_temp, temp_storage_bytes, MATX_ASYNC_DEVICE_MEMORY,
-                stream);  
+                stream);
 
         cub::DeviceSegmentedSort::SortPairs(
             d_temp, temp_storage_bytes,
@@ -1596,9 +1596,9 @@ void sort_pairs_impl_inner(OutputIndexTensor &idx_out, const InputIndexTensor &i
             num_items,
             num_segments,
             BeginOffset{a_in}, EndOffset{a_in}, stream);
-            
+
         matxAlloc((void **)&d_temp, temp_storage_bytes, MATX_ASYNC_DEVICE_MEMORY,
-                stream);  
+                stream);
 
         cub::DeviceSegmentedSort::SortPairsDescending(
             d_temp, temp_storage_bytes,
@@ -2069,7 +2069,7 @@ void argsort_impl(OutputTensor &idx_out, const InputOperator &a,
   detail::tensor_impl_t<a_type, InputOperator::Rank()> tmp_a;
   detail::tensor_impl_t<a_type, InputOperator::Rank()> tmp_a_out;
   detail::tensor_impl_t<index_t, InputOperator::Rank()> tmp_idx_in;
-    
+
   // sorting currently requires a contiguous tensor view, so allocate a temporary
   // tensor to copy the input if necessary.
   bool use_a = false;
@@ -2116,7 +2116,7 @@ void argsort_impl(OutputTensor &idx_out, const InputOperator &a,
   typename detail::base_type_t<OutputTensor>  out_base = idx_out;
   auto lout = matx::RandomOperatorOutputIterator{out_base};
 
-  if constexpr (RANK == 1) {    
+  if constexpr (RANK == 1) {
     if (dir == SORT_DIR_ASC) {
       std::sort(
           lout, lout + idx_out.Size(0),
@@ -2131,11 +2131,11 @@ void argsort_impl(OutputTensor &idx_out, const InputOperator &a,
   else if constexpr (RANK == 2) {
     for (index_t b = 0; b < lout.Size(0); b++) {
       if (dir == SORT_DIR_ASC) {
-        std::sort( lout + b*a.Size(1), lout + (b+1)*a.Size(1), 
+        std::sort( lout + b*a.Size(1), lout + (b+1)*a.Size(1),
                   [&a, b](index_t i, index_t j) { return a(b,i) < a(b,j); });
       }
       else {
-        std::sort( lout + b*a.Size(1), lout + (b+1)*a.Size(1), 
+        std::sort( lout + b*a.Size(1), lout + (b+1)*a.Size(1),
                   [&a, b](index_t i, index_t j) { return a(b,i) > a(b,j); });
       }
     }
