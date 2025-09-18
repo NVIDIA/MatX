@@ -32,18 +32,17 @@
 
 #pragma once
 
-#include <thrust/copy.h>
-#include <thrust/execution_policy.h>
-#include <thrust/iterator/counting_iterator.h>
+#include <cuda/std/__algorithm/copy_if.h>
+
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
 #include "matx/operators/permute.h"
 #include "matx/executors/cuda.h"
 #include "matx/executors/host.h"
+#include "matx/transforms/cccl_iterators.h"
 
 namespace matx {
 namespace detail {
-
 template <typename Op>
 struct PeakSearchCmpOp {
   using index_cmp_op = bool;
@@ -129,10 +128,9 @@ struct PeakSearchCmpOp {
     static_assert(MODE == ThreadsMode::SINGLE, "find_peaks() only supports a single threaded host executor");
 
     // Use thrust to find the number of peaks
-    const auto end_iter = thrust::copy_if(
-      thrust::host,
-      thrust::make_counting_iterator(static_cast<matx::index_t>(0)),
-      thrust::make_counting_iterator(TotalSize(in)),
+    const auto end_iter = cuda::std::copy_if(
+      detail::make_counting_iterator(static_cast<matx::index_t>(0)),
+      detail::make_counting_iterator(TotalSize(in)),
       out_idxs.Data(),
       PeakSearchCmpOp{in, height, threshold}
     );
