@@ -41,8 +41,28 @@ namespace experimental {
 // Helper to convert Storage<T> to DefaultStorage<T> for sparse tensor compatibility
 template <typename T>
 __MATX_INLINE__ auto convertToDefaultStorage(const Storage<T>& storage) {
+  // Create an owning copy of the data to ensure it persists
+  // This is necessary because the original tensor may go out of scope
+  
+  // Determine the memory space and allocate in the same space
+  auto space = GetPointerKind(const_cast<void*>(static_cast<const void*>(storage.data())));
+  
+  // Allocate in the appropriate memory space
+  T* new_data = nullptr;
+  if (space == MATX_DEVICE_MEMORY || space == MATX_ASYNC_DEVICE_MEMORY) {
+    cudaMalloc(&new_data, storage.size() * sizeof(T));
+    cudaMemcpy(new_data, storage.data(), storage.size() * sizeof(T), cudaMemcpyDeviceToDevice);
+  } else if (space == MATX_HOST_MEMORY) {
+    new_data = static_cast<T*>(malloc(storage.size() * sizeof(T)));
+    memcpy(new_data, storage.data(), storage.size() * sizeof(T));
+  } else {
+    // Managed memory
+    cudaMallocManaged(&new_data, storage.size() * sizeof(T));
+    cudaMemcpy(new_data, storage.data(), storage.size() * sizeof(T), cudaMemcpyDefault);
+  }
+  
   raw_pointer_buffer<T, matx_allocator<T>> buf{
-    const_cast<T*>(storage.data()), storage.size(), /*owning=*/false
+    new_data, storage.size(), /*owning=*/true
   };
   return basic_storage<decltype(buf)>{std::move(buf)};
 }
