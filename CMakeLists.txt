@@ -340,13 +340,15 @@ if (MATX_EN_FILEIO OR MATX_EN_VISUALIZATION OR MATX_EN_PYBIND11 OR MATX_BUILD_EX
 endif()
 
 # Add in all CUDA linker dependencies
-target_link_libraries(matx INTERFACE    CUDA::cudart
-                                        CUDA::cublas
-                                        CUDA::cublasLt
-                                        CUDA::cufft
-                                        CUDA::cusolver
-                                        CUDA::cuda_driver
-                                        CUDA::curand)
+target_link_libraries(matx INTERFACE
+    CUDA::cublas
+    CUDA::cublasLt
+    CUDA::cuda_driver
+    CUDA::cudart
+    CUDA::cufft
+    CUDA::curand
+    CUDA::cusolver
+    CUDA::cusparse)
 
 if (CMAKE_VERSION VERSION_LESS 3.25.0)
     target_link_libraries(matx INTERFACE CUDA::nvToolsExt)
