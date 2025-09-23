@@ -36,6 +36,7 @@
 #include <cusparse.h>
 
 #include <numeric>
+#include <typeinfo>
 
 #include "matx/core/cache.h"
 #include "matx/core/sparse_tensor.h"
@@ -60,20 +61,19 @@ struct Dense2SparseParams_t {
   void *ptrO1;
   void *ptrO2;
   void *ptrA;
+  size_t format_hash;  // Hash of the sparse tensor format type
 };
 
 // Helper method to construct storage.
 template <typename T>
-__MATX_INLINE__ static auto makeDefaultNonOwningStorage(size_t sz,
+__MATX_INLINE__ static Storage<T> makeDefaultNonOwningStorage(size_t sz,
                                                         matxMemorySpace_t space,
                                                         cudaStream_t stream) {
   T *ptr = nullptr;
   if (sz != 0) {
     matxAlloc(reinterpret_cast<void **>(&ptr), sz * sizeof(T), space, stream);
   }
-  // FIX: raw_pointer_buffer constructor expects ELEMENT count, not byte count
-  raw_pointer_buffer<T, matx_allocator<T>> buf{ptr, sz, /*owning=*/false};
-  return basic_storage<decltype(buf)>{std::move(buf)};
+  return Storage<T>(ptr, sz);
 }
 
 template <typename TensorTypeO, typename TensorTypeA>
@@ -201,6 +201,8 @@ public:
     params.ptrO1 = o.POSData(0);
     params.ptrO2 = o.POSData(1);
     params.ptrA = a.Data();
+    // Add format type hash to distinguish between COO/CSR/CSC etc
+    params.format_hash = typeid(typename TensorTypeO::Format).hash_code();
     return params;
   }
 
@@ -231,7 +233,8 @@ struct Dense2SparseParamsKeyHash {
   std::size_t operator()(const Dense2SparseParams_t &k) const noexcept {
     return std::hash<uint64_t>()(reinterpret_cast<uint64_t>(k.ptrO1)) +
            std::hash<uint64_t>()(reinterpret_cast<uint64_t>(k.ptrA)) +
-           std::hash<uint64_t>()(reinterpret_cast<uint64_t>(k.stream));
+           std::hash<uint64_t>()(reinterpret_cast<uint64_t>(k.stream)) +
+           std::hash<size_t>()(k.format_hash);
   }
 };
 
@@ -245,7 +248,8 @@ struct Dense2SparseParamsKeyEq {
                   const Dense2SparseParams_t &t) const noexcept {
     return l.dtype == t.dtype && l.ptype == t.ptype && l.ctype == t.ctype &&
            l.stream == t.stream && l.m == t.m && l.n == t.n &&
-           l.ptrO1 == t.ptrO1 && l.ptrO2 == t.ptrO2 && l.ptrA == t.ptrA;
+           l.ptrO1 == t.ptrO1 && l.ptrO2 == t.ptrO2 && l.ptrA == t.ptrA &&
+           l.format_hash == t.format_hash;
   }
 };
 

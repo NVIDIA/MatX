@@ -75,9 +75,9 @@ namespace experimental {
 //   TF  : tensor format
 //
 template <typename VAL, typename CRD, typename POS, typename TF,
-          typename StorageV = DefaultStorage<VAL>,
-          typename StorageC = DefaultStorage<CRD>,
-          typename StorageP = DefaultStorage<POS>,
+          typename StorageV = Storage<VAL>,
+          typename StorageC = Storage<CRD>,
+          typename StorageP = Storage<POS>,
           typename DimDesc = DefaultDescriptor<TF::DIM>>
 class sparse_tensor_t
     : public detail::tensor_impl_t<

@@ -86,7 +86,7 @@ namespace matx
     using const_iterator = const T*;
 
     // Default constructor - creates empty storage
-    Storage() : size_(0), data_(nullptr) {}
+    Storage() : size_(0), data_() {}
 
     // Non-owning constructor - wraps existing pointer
     Storage(T* ptr, size_t size) 
@@ -95,10 +95,15 @@ namespace matx
     // Owning constructor with default allocator
     Storage(size_t size) 
       : size_(size) {
-      T* ptr = matx_allocator<T>{}.allocate(size * sizeof(T));
-      data_ = std::shared_ptr<T>(ptr, [size](T* p) {
-        matx_allocator<T>{}.deallocate(p, size * sizeof(T));
-      });
+      if (size == 0) {
+        // For zero size, create empty storage without allocation
+        data_ = std::shared_ptr<T>();
+      } else {
+        T* ptr = matx_allocator<T>{}.allocate(size * sizeof(T));
+        data_ = std::shared_ptr<T>(ptr, [size](T* p) {
+          matx_allocator<T>{}.deallocate(p, size * sizeof(T));
+        });
+      }
     }
     
     // Owning constructor with any allocator that has allocate/deallocate methods
@@ -106,7 +111,10 @@ namespace matx
     Storage(size_t size, Allocator&& alloc, 
            typename std::enable_if_t<has_allocator_interface<std::decay_t<Allocator>>::value>* = nullptr)
       : size_(size) {
-      if constexpr (std::is_pointer_v<std::decay_t<Allocator>>) {
+      if (size == 0) {
+        // For zero size, create empty storage without allocation
+        data_ = std::shared_ptr<T>();
+      } else if constexpr (std::is_pointer_v<std::decay_t<Allocator>>) {
         // Handle allocator pointers (any pointer to object with allocate/deallocate methods)
         T* ptr = static_cast<T*>(alloc->allocate(size * sizeof(T)));
         data_ = std::shared_ptr<T>(ptr, [size, alloc](T* p) {
@@ -124,11 +132,16 @@ namespace matx
     // Owning constructor with memory space
     Storage(size_t size, matxMemorySpace_t space, cudaStream_t stream = 0)
       : size_(size) {
-      void* ptr;
-      matxAlloc(&ptr, size * sizeof(T), space, stream);
-      data_ = std::shared_ptr<T>(static_cast<T*>(ptr), [stream](T* p) {
-        matxFree(p, stream);
-      });
+      if (size == 0) {
+        // For zero size, create empty storage without allocation
+        data_ = std::shared_ptr<T>();
+      } else {
+        void* ptr;
+        matxAlloc(&ptr, size * sizeof(T), space, stream);
+        data_ = std::shared_ptr<T>(static_cast<T*>(ptr), [stream](T* p) {
+          matxFree(p, stream);
+        });
+      }
     }
 
     // Core interface
@@ -188,72 +201,5 @@ namespace matx
     return Storage<T>(ptr, size);
   }
 
-  // Legacy compatibility types for sparse tensor support
-  // These will be removed when sparse tensors are refactored
-  template <typename T, typename Allocator = matx_allocator<T>>
-  class raw_pointer_buffer {
-  public:
-    using value_type = T;
-    using iterator = T*;
-    using matx_storage_container = bool;
-
-    raw_pointer_buffer() : size_(0), data_(nullptr, 0) {}
-    raw_pointer_buffer(size_t size) : size_(size), data_(make_owning_storage<T>(size)) {}
-    raw_pointer_buffer(T* ptr, size_t size, bool owning) : size_(size), 
-      data_(owning ? make_owning_storage<T>(size) : make_non_owning_storage<T>(ptr, size)) {
-      if (owning && data_.data() != ptr && ptr != nullptr) {
-        std::memcpy(data_.data(), ptr, size * sizeof(T));
-      }
-    }
-
-    T* data() { return data_.data(); }
-    const T* data() const { return data_.data(); }
-    iterator begin() { return data(); }
-    iterator end() { return data() + size_; }
-    size_t size() const { return size_; }
-    size_t capacity() const { return size_; }
-    T* allocate(size_t new_size) { 
-      data_ = make_owning_storage<T>(new_size);
-      size_ = new_size;
-      return data_.data();
-    }
-    size_t use_count() const { return data_.use_count(); }
-    void SetData(T* ptr) { data_ = make_non_owning_storage<T>(ptr, size_); }
-
-  private:
-    size_t size_;
-    Storage<T> data_;
-  };
-
-  template <typename C>
-  class basic_storage {
-  public:
-    using value_type = typename C::value_type;
-    using T = value_type;
-    using iterator = value_type*;
-    using matx_storage = bool;
-    using container = C;
-
-    basic_storage() = default;
-    basic_storage(C&& c) : container_(std::move(c)) {}
-    basic_storage(const basic_storage&) = default;
-    basic_storage(basic_storage&&) = default;
-    basic_storage& operator=(const basic_storage&) = default;
-
-    T* data() { return container_.data(); }
-    iterator begin() { return container_.begin(); }
-    iterator end() { return container_.end(); }
-    size_t size() const { return container_.size(); }
-    T* allocate(size_t size) { return container_.allocate(size); }
-    size_t use_count() const { return container_.use_count(); }
-    size_t Bytes() const { return sizeof(T) * container_.capacity(); }
-    void SetData(T* data) { container_.SetData(data); }
-
-  private:
-    C container_;
-  };
-
-  template <typename T>
-  using DefaultStorage = basic_storage<raw_pointer_buffer<T, matx_allocator<T>>>;
 
 };
