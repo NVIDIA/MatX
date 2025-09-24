@@ -116,9 +116,9 @@ class tensor_impl_t {
       return std::string("tensor_impl_") + std::to_string(RANK) + "_" + to_short_str<T>();
     }
 
-    /** Swaps two raw_pointer_buffers
+    /** Swaps two tensor implementations
      *
-     * Swaps members of two raw_pointer_buffers
+     * Swaps members of two tensor implementations
      *
      * @param lhs
      *   Left argument

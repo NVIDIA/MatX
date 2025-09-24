@@ -75,9 +75,9 @@ namespace experimental {
 //   TF  : tensor format
 //
 template <typename VAL, typename CRD, typename POS, typename TF,
-          typename StorageV = DefaultStorage<VAL>,
-          typename StorageC = DefaultStorage<CRD>,
-          typename StorageP = DefaultStorage<POS>,
+          typename StorageV = Storage<VAL>,
+          typename StorageC = Storage<CRD>,
+          typename StorageP = Storage<POS>,
           typename DimDesc = DefaultDescriptor<TF::DIM>>
 class sparse_tensor_t
     : public detail::tensor_impl_t<
@@ -158,13 +158,13 @@ public:
 
   // Size getters.
   index_t Nse() const {
-    return static_cast<index_t>(values_.size() / sizeof(VAL));
+    return static_cast<index_t>(values_.size());
   }
   index_t crdSize(int l) const {
-    return static_cast<index_t>(coordinates_[l].size() / sizeof(CRD));
+    return static_cast<index_t>(coordinates_[l].size());
   }
   index_t posSize(int l) const {
-    return static_cast<index_t>(positions_[l].size() / sizeof(POS));
+    return static_cast<index_t>(positions_[l].size());
   }
 
 private:

@@ -79,9 +79,9 @@ public:
    */
   __MATX_INLINE__  tensor_desc_t& operator=(tensor_desc_t&&) = default;
 
-  /** Swaps two raw_pointer_buffers
+  /** Swaps two tensor descriptors
    *
-   * Swaps members of two raw_pointer_buffers
+   * Swaps members of two tensor descriptors
    *
    * @param lhs
    *   Left argument
