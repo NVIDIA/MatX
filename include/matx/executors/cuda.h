@@ -38,6 +38,7 @@
 #include "matx/core/capabilities.h"
 #include "matx/core/nvrtc_helper.h"
 #include "matx/core/get_grid_dims.h"
+#include "matx/executors/kernel.h"
 #include <cuda/std/array>
 #include <utility>
 #include <vector>
@@ -147,7 +148,8 @@ namespace matx
         MATX_CUDA_CHECK(cudaDeviceGetAttribute(&max_threads_per_block, cudaDevAttrMaxThreadsPerBlock, 0));
         MATX_CUDA_CHECK(cudaDeviceGetAttribute(&regs_per_multiprocessor, cudaDevAttrMaxRegistersPerMultiprocessor, 0));
 
-        const auto ept_bounds = detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(op, detail::EPTQueryInput{use_jit});  
+        const auto jit_query_in = detail::EPTQueryInput{use_jit};
+        const auto ept_bounds = detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(op, jit_query_in);  
         printf("ept_bounds %d %d\n", static_cast<int>(ept_bounds[0]), static_cast<int>(ept_bounds[1]));
         
         // Start with maximum EPT and work down
@@ -165,9 +167,12 @@ namespace matx
           
           // Determine block size for register calculation
           if (use_jit) {
-            block_size = detail::get_operator_capability<detail::OperatorCapability::BLOCK_DIM>(op, detail::BlockSizeQueryInput{current_ept});
-            shm_size = detail::get_operator_capability<detail::OperatorCapability::DYN_SHM_SIZE>(op, detail::ShmQueryInput{current_ept});
+            const auto block_query = detail::BlockSizeQueryInput{current_ept};
+            const auto shm_query = detail::ShmQueryInput{current_ept};
+            block_size = detail::get_operator_capability<detail::OperatorCapability::BLOCK_DIM>(op, block_query);
+            shm_size = detail::get_operator_capability<detail::OperatorCapability::DYN_SHM_SIZE>(op, shm_query);
           }
+          
           
           // Check register pressure constraint: numRegs * block_size * 2 < regsPerMultiprocessor
           register_viable = (attr.numRegs * block_size * min_occupancy) < regs_per_multiprocessor;
@@ -210,7 +215,8 @@ namespace matx
         }
         
         // Fallback to minimum EPT
-        int shm_size = detail::get_operator_capability<detail::OperatorCapability::DYN_SHM_SIZE>(op, detail::ShmQueryInput{min_ept});
+        const auto shm_query = detail::ShmQueryInput{min_ept};
+        int shm_size = detail::get_operator_capability<detail::OperatorCapability::DYN_SHM_SIZE>(op, shm_query);
         //printf("Fallback to minimum EPT %d with shm_size %d\n", static_cast<int>(min_ept), shm_size);
         return cuda::std::make_tuple(min_ept, shm_size, block_size);
       }
@@ -229,8 +235,8 @@ namespace matx
 
           // Parameters passed by value in CUDA are limited to CUDA_MAX_VAL_PARAM. If the user exceeds this, we 
           // need to error out and have them break up the statement
-          MATX_STATIC_ASSERT((sizeof(op) + sizeof(index_t) * Op::Rank()) <= CUDA_MAX_VAL_PARAM, 
-              "Parameter buffer to device is limited to " + std::to_string(CUDA_MAX_VAL_PARAM) + "B. "
+          MATX_STATIC_ASSERT((sizeof(op) + sizeof(index_t) * Op::Rank()) <= detail::CUDA_MAX_VAL_PARAM, 
+              "Parameter buffer to device is limited to " + std::to_string(detail::CUDA_MAX_VAL_PARAM) + "B. "
               "Please break up your operator statement into multiple executions to limit the size of the parameters");
 
           cuda::std::array<index_t, Op::Rank()> sizes;
@@ -358,14 +364,16 @@ namespace matx
 #ifdef MATX_EN_JIT
             bool use_jit = detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op) && Op::Rank() <= 4;
             if (use_jit) {
-              const auto jit_ept_bounds = detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(op, detail::EPTQueryInput{true}); 
+              auto ept_type = detail::EPTQueryInput{true};
+              const auto jit_ept_bounds = detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(op, ept_type); 
               if (jit_ept_bounds[0] == detail::ElementsPerThread::INVALID) {
                 use_jit = false;
               }
               printf("Using JIT: %d %d %d\n", use_jit, static_cast<int>(jit_ept_bounds[0]), static_cast<int>(jit_ept_bounds[1]));
             }
-            printf("Not using JIT: %d %d %d\n", use_jit, (int)detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(op, detail::EPTQueryInput{true})[0],
-            (int)detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(op, detail::EPTQueryInput{true})[1]);
+            auto ept_type = detail::EPTQueryInput{true};
+            printf("Not using JIT: %d %d %d\n", use_jit, (int)detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(op, ept_type)[0],
+            (int)detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(op, ept_type)[1]);
             
             if (!use_jit)
 #endif
@@ -478,7 +486,8 @@ namespace matx
 #endif
           }
           else {
-            const auto ept_bounds = detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(op, detail::EPTQueryInput{false});              
+            auto ept_type = detail::EPTQueryInput{false};
+            const auto ept_bounds = detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(op, ept_type);              
             bool stride = detail::get_grid_dims<Op::Rank()>(blocks, threads, sizes, static_cast<int>(ept_bounds[1]), 1024);   
             index_t dims = cuda::std::accumulate(cuda::std::begin(sizes) + 1, cuda::std::end(sizes), 1, cuda::std::multiplies<index_t>());
             detail::matxOpTDKernel<<<blocks, threads, 0, stream_>>>(op, sizes, dims);

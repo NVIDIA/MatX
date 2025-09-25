@@ -36,14 +36,14 @@
 
 #include <cuda.h>
 #define JITIFY_ENABLE_NVTX 1
-//#define JITIFY_VERBOSE_ERRORS 1
+#define JITIFY_VERBOSE_ERRORS 1
 #define JITIFY_ENABLE_EMBEDDED_FILES 1
 #define JITIFY_IGNORE_NOT_TRIVIALLY_COPYABLE_ARGS 1
 #ifdef MATX_EN_JIT_PREPROCESSING
   #include "matx.h.jit.hpp"
 #endif
 #include "matx/core/jitify2.hpp"
-#include "matx/executors/kernel.h"
+#include "matx/executors/jit_kernel.h"
 //#include "matx/core/type_utils.h"
 #include <filesystem>
 #include <source_location>
@@ -66,18 +66,19 @@ std::vector<std::string> __MATX_HOST__ __MATX_INLINE__ get_preprocessor_options(
     options.push_back("-DMATX_EN_MATHDX");
     options.push_back("-DMATX_EN_JIT");
     options.push_back("-I" + matx_root.string() + "/include");
-    options.push_back("-I" + matx_root.string() + "/include/matx/kernels");
+    //options.push_back("-I" + matx_root.string() + "/include/matx/core/");
+    //options.push_back("-I" + matx_root.string() + "/include/matx/kernels");
     
     // Dependencies in the build directory
     options.push_back("-I" + (build_dir / "_deps/cccl-src/thrust").string());
     options.push_back("-I" + (build_dir / "_deps/cccl-src/libcudacxx/include").string());
     options.push_back("-I" + (build_dir / "_deps/cccl-src/cub").string());
-    options.push_back("-I" + (build_dir / "_deps/pybind11-src/include").string());
+    //options.push_back("-I" + (build_dir / "_deps/pybind11-src/include").string());
     options.push_back("-I" + (build_dir / "_deps/mathdx-src/nvidia/mathdx/25.06/include").string());
     options.push_back("-I" + (build_dir / "_deps/mathdx-src/nvidia/mathdx/25.06/external/cutlass/include").string());
 
     // System paths
-    options.push_back("-I/usr/include/python3.10"); // This might need to be configured differently
+    //options.push_back("-I/usr/include/python3.10"); // This might need to be configured differently
     options.push_back("-I" + jitify2::get_cuda_include_dir());
 
     options.push_back("-no-system-headers-workaround");
@@ -132,7 +133,7 @@ std::string get_kernel_name([[maybe_unused]] const Op &op, bool stride) {
 }
 
 template <typename Op>
-std::string generate_capability_params_string(const Op &op, ElementsPerThread EPT, bool JIT, int osize, int block_size) {
+std::string generate_capability_params_string([[maybe_unused]] const Op &op, ElementsPerThread EPT, bool JIT, int osize, int block_size) {
   std::string ept_str;
   switch (EPT) {
     case ElementsPerThread::ONE:
@@ -160,13 +161,14 @@ std::string generate_capability_params_string(const Op &op, ElementsPerThread EP
   
   std::string jit_str = JIT ? "true" : "false";
 
-  std::string jit_caps_str = "";
-  if (detail::get_operator_capability<OperatorCapability::SUPPORTS_JIT>(op)) {
-    jit_caps_str = detail::get_operator_capability<OperatorCapability::JIT_CAP_QUERY>(op, detail::JITQueryInput{EPT});
-  }
+  // std::string jit_caps_str = "";
+  // if (detail::get_operator_capability<OperatorCapability::SUPPORTS_JIT>(op)) {
+  //   const auto jit_query_input = detail::JITQueryInput{EPT};
+  //   jit_caps_str = detail::get_operator_capability<OperatorCapability::JIT_CLASS_QUERY>(op, jit_query_input);
+  // }
 
-  std::string final_str =  "#include <matx.h>\n"
-         "namespace matx { namespace detail {\n"
+  std::string final_str =  
+         "namespace matx { namespace detail {\n"     
          "template <ElementsPerThread EPT, bool JIT>\n"
          "struct CapabilityParams {\n"
          "  static constexpr ElementsPerThread ept = EPT;\n"
@@ -174,21 +176,12 @@ std::string generate_capability_params_string(const Op &op, ElementsPerThread EP
          "  static constexpr int osize = " + std::to_string(osize) + ";\n"
          "  static constexpr int block_size = " + std::to_string(block_size) + ";\n"
          "};\n"
-         "\n" + jit_caps_str + "\n"
+         //"\n" + jit_caps_str + "\n"
          "using CurrentCapabilities = CapabilityParams<" + ept_str + ", " + jit_str + ">;\n"
          "} }\n";
 
-  printf("%s\n", final_str.c_str());
+  //final_str += std::string(matxKernelStr);       
   return final_str;
-}
-
-template <typename Op>
-std::string build_rtc_string(const Op &op, ElementsPerThread EPT, bool JIT) {
-  std::string rtc_str = "#include \"matx.h\"\n\n";
-  rtc_str += generate_capability_params_string(op, EPT, JIT);
-  rtc_str += matxKernelStr;
-  printf("%s\n", rtc_str.c_str());
-  return rtc_str;
 }
 
 
@@ -212,18 +205,38 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, cons
 #else          
   static ProgramCache<> cache(
       100,
-      *_repro_MatX_include_matx_h_jit);
+      *matx_h_jit);
 #endif
+
+  // Get all the JIT strings from each operator
+  std::unordered_map<std::string, std::string> jit_strings;
+  auto string_res = detail::get_operator_capability<OperatorCapability::JIT_CLASS_QUERY>(op, jit_strings);
+  for (const auto& kv : jit_strings) {
+    std::cout << "JIT string key: " << kv.first << "\n";
+    std::cout << "JIT string value:\n" << kv.second << "\n";
+  }
 
   // auto end_time = std::chrono::high_resolution_clock::now();
   // auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
   //printf("Preprocess step took %ld microseconds\n", duration.count());
 
+  printf("DEBUG: nvrtc_compile_and_run called with operator type: %s\n", typeid(op).name());
+  const auto ltoir_query_input = detail::LTOIRQueryInput{ept};
+  auto ltoir = detail::get_operator_capability<OperatorCapability::GENERATE_LTOIR>(op, ltoir_query_input);
+  printf("DEBUG: LTOIR capability result: %s\n", ltoir ? "true" : "false");
     auto capstr = generate_capability_params_string(op, ept, false, osize, threads.x);
+    std::cout << "DEBUG: Capability string: " << capstr << std::endl;
+    auto tstr = jitify2::reflection::reflect_template<Op>();
+    printf("DEBUG: Template string: %s\n", tstr.c_str());
     //auto start_time_kernel = std::chrono::high_resolution_clock::now();
     auto kernel = cache
+    .get_kernel(Template(get_kernel_name(op, stride)).instantiate<Op>(), 
+    {}, 
+    {{"matx_generated_code_hdr", capstr}}, {"-include=matx_generated_code_hdr"});    
         // Compile, link, and load the program, and obtain the loaded kernel.
-        .get_kernel(Template(get_kernel_name(op, stride)).instantiate<Op>(), {}, {{"matx_generated_code_hdr", capstr}}, {"-include=matx_generated_code_hdr"});
+        // .get_kernel(Template(get_kernel_name(op, stride)).instantiate<Op>(), 
+        //   {"defines.h", "half.h", "complex_half.h", "type_utils_both.h"}, 
+        //   {{"matx_generated_code_hdr", capstr}}, {"-include=matx_generated_code_hdr"});
     // auto end_time_kernel = std::chrono::high_resolution_clock::now();
     // auto duration_kernel = std::chrono::duration_cast<std::chrono::microseconds>(end_time_kernel - start_time_kernel);
     //printf("Kernel step took %ld microseconds\n", duration_kernel.count());

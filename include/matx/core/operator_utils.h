@@ -131,6 +131,8 @@ namespace matx {
 // RTC and nvcc
 namespace matx {
   namespace detail {
+
+
     template <typename CapType, typename ValueType>
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto GetJitSentinelValue() {
       if constexpr (CapType::ept == ElementsPerThread::ONE) {

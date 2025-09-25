@@ -40,9 +40,9 @@
 #endif
 #endif
 
-#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
-#include <cufftdx.hpp>
-#endif
+// #if defined(MATX_EN_MATHDX) && defined(__CUDACC_RTC__)
+// #include <cufftdx.hpp>
+// #endif
 
 // defines.h should always be included first. Its definitions may impact
 // the behavior of other headers.

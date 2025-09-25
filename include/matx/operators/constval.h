@@ -90,7 +90,7 @@ namespace matx
       }
 
       template <OperatorCapability Cap, typename InType>
-      __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] const InType&) const {
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType&) const {
         return capability_attributes<Cap>::default_value;
       }
     };

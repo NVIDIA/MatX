@@ -158,7 +158,7 @@ namespace matx
         }
 
         template <OperatorCapability Cap, typename InType>
-        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] const InType &in) const {
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
           // Just support 1 EPT in slice for now to get this thing out the door. Later on the logic should be similar
           // to the tensor's EPT logic if the input is a tensor
           if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {

@@ -32,7 +32,10 @@
 
 #pragma once
 
+#include <unordered_map>
+#include <string>
 #include "matx/core/type_utils.h"
+#include "matx/core/utils.h"
 #include "matx/operators/base_operator.h"
 #include "matx/core/operator_options.h"
 
@@ -56,8 +59,6 @@ namespace matx
     template <typename OpA, typename PermDims, typename FFTDirection>
     class FFTOp : public BaseOp<FFTOp<OpA, PermDims, FFTDirection>>
     {
-      // public:
-      //   static constexpr intptr_t unique_id_ = reinterpret_cast<intptr_t>(Id.singleton); // No unique ID needed
       private:
         typename detail::base_type_t<OpA> a_;
         index_t fft_size_;
@@ -70,7 +71,7 @@ namespace matx
                                           typename scalar_to_complex<typename OpA::value_type>::ctype>;
         // This should be tensor_impl_t, but need to work around issues with temp types returned in fft
         mutable ::matx::detail::tensor_impl_t<ttype, OpA::Rank()> tmp_out_;
-        mutable ttype *ptr = nullptr;           
+        mutable ttype *ptr = nullptr;    
 
       public:
         using matxop = bool;
@@ -81,6 +82,16 @@ namespace matx
         using matx_transform_op = bool;
         using fft_xform_op = bool;    
 
+#ifdef MATX_EN_JIT
+        struct JIT_Storage {
+          typename detail::inner_storage_t<detail::base_type_t<OpA>> a_;
+        };
+
+        JIT_Storage ToJITStorage() const {
+          return JIT_Storage{a_.ToJITStorage()};
+        }
+#endif             
+        
         __MATX_INLINE__ std::string str() const { 
           if constexpr (std::is_same_v<FFTDirection, detail::fft_t>) {
             return "fft(" + get_type_str(a_) + ")";
@@ -143,12 +154,49 @@ namespace matx
           }
         }
 
-        __MATX_INLINE__ std::string get_capability_str() const {
-          return std::string("template <> struct jit_fft1_params_t<0>  {\n") + 
-                 "  constexpr static unsigned int fft_size = " + std::to_string(fft_size_) + ";\n"
-                 "  constexpr static bool fft_forward = " + std::to_string(static_cast<bool>(std::is_same_v<FFTDirection, detail::fft_t>)) + ";\n"
-                 "};\n";         
+#ifdef MATX_EN_JIT
+        __MATX_INLINE__ std::string get_jit_class_name() const {
+          std::string symbol_name = "JITFFTOp_";
+          symbol_name += std::to_string(fft_size_);
+          symbol_name += "_T";
+          symbol_name += std::to_string(static_cast<int>(DeduceFFTTransformType<typename scalar_to_complex<typename OpA::value_type>::ctype, value_type>()));
+          symbol_name += "_D";
+          symbol_name += std::is_same_v<FFTDirection, detail::fft_t> ? std::string("F") : std::string("B");
+
+          return symbol_name;
         }
+
+        __MATX_INLINE__ auto get_jit_op_str() const {
+          const std::string class_name = get_jit_class_name();
+          return cuda::std::make_tuple(
+             class_name, 
+             std::string("template <typename OpA> class " + class_name + "  {\n") + 
+                 "  struct JIT_Storage {\n" +
+                 "    typename detail::inner_storage_t<detail::base_type_t<OpA>> a_;\n" +
+                 "  };\n" +
+                 "  JIT_Storage storage_;\n" +
+                 "  constexpr static cuda::std::array<index_t, " + std::to_string(Rank()) + "> out_dims_ = { " + 
+                 detail::array_to_string(out_dims_) + " };\n" +
+                 "  constexpr static unsigned int fft_size_ = " + std::to_string(fft_size_) + ";\n" +
+                 "  constexpr static bool fft_forward_ = " + std::to_string(static_cast<bool>(std::is_same_v<FFTDirection, detail::fft_t>)) + ";\n" +
+                 "  template <typename CapType, typename... Is>\n" +
+                 "  __MATX_INLINE__ __MATX_DEVICE__  decltype(auto) operator()(Is... indices) const\n" +
+                 "  {\n" +
+                 "    return detail::RunDxFFT1D<input_type, CapType, fft_size, fft_forward>(storage_.a_, indices...);\n" +
+                 "  }\n" +
+                 "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank()\n" +
+                 "  {\n" +
+                 "    return OpA::Rank();\n" +
+                 "  }\n" +
+                 "  constexpr __MATX_INLINE__  __MATX_DEVICE__ index_t Size(int dim) const\n" +
+                 "  {\n" +
+                 "    constexpr index_t dim_ = dim;\n" +
+                 "    return out_dims_[dim_];\n " +
+                 "  }\n" +    
+                 "};\n"
+          );
+        }
+#endif
 
         template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
@@ -168,6 +216,7 @@ namespace matx
           else {
 #if defined(__CUDA_ARCH__) && defined(__CUDACC_RTC__)
             return detail::RunDxFFT1D<input_type, CapType>(a_, indices...);
+            //return tmp_out_.template operator()<CapType>(indices...);
 #else
             return tmp_out_.template operator()<CapType>(indices...);
 #endif
@@ -191,13 +240,12 @@ namespace matx
 
 
         template <OperatorCapability Cap, typename InType>
-        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] const InType &in) const {
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
           [[maybe_unused]] detail::FFTDirection dir = std::is_same_v<FFTDirection, detail::fft_t> ? 
                                             detail::FFTDirection::FORWARD : 
                                             detail::FFTDirection::BACKWARD;      
 
           if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
-            static_assert(std::is_same_v<InType, ShmQueryInput>, "DYN_SHM_SIZE capability requires ShmQueryInput as input type");
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__) && !defined(__CUDACC_RTC__) && !defined(__CUDA_ARCH__)            
             return combine_capabilities<Cap>(cuFFTDxHelper<typename OpA::value_type>::GetShmRequired(fft_size_, FFTType::C2C, dir, in.ept), detail::get_operator_capability<Cap>(a_, in));
 #else
@@ -221,12 +269,22 @@ namespace matx
 #endif
             return combine_capabilities<Cap>(supported, detail::get_operator_capability<Cap>(a_, in));      
           }
-          else if constexpr (Cap == OperatorCapability::JIT_CAP_QUERY) {
-            auto self_cap = get_capability_str();
-            return combine_capabilities<Cap>(self_cap, detail::get_operator_capability<Cap>(a_, in));
+          else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {           
+            // Get the capability string and add to map
+            const auto [key, value] = get_jit_op_str();
+      
+            // Insert into the map if the key doesn't exist
+            if (in.find(key) == in.end()) {
+              in[key] = value;
+            }
+            
+            // Also handle child operators
+            detail::get_operator_capability<Cap>(a_, in);
+            
+            // Always return true for now
+            return true;
           }
           else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-            static_assert(std::is_same_v<InType, EPTQueryInput>, "ELEMENTS_PER_THREAD capability requires EPTQueryInput as input type");
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__) && !defined(__CUDACC_RTC__) && !defined(__CUDA_ARCH__)
             if (in.jit) {
               // Currently MatX only attempts to use the "best" EPT as returned by cuFFTDx. In the future we may
@@ -249,13 +307,27 @@ namespace matx
 #endif
           }
           else if constexpr (Cap == OperatorCapability::BLOCK_DIM) {
-            static_assert(std::is_same_v<InType, BlockSizeQueryInput>, "BLOCK_DIM capability requires BlockSizeQueryInput as input type");
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__) && !defined(__CUDACC_RTC__) && !defined(__CUDA_ARCH__)
             return combine_capabilities<Cap>(cuFFTDxHelper<typename OpA::value_type>::GetBlockDim(fft_size_, FFTType::C2C, dir, in.ept), detail::get_operator_capability<Cap>(a_, in));
 #else
             return combine_capabilities<Cap>(capability_attributes<Cap>::default_value, detail::get_operator_capability<Cap>(a_, in));
 #endif
           }
+          else if constexpr (Cap == OperatorCapability::GENERATE_LTOIR) {
+            printf("GENERATE_LTOIR\n");
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__) && !defined(__CUDACC_RTC__) && !defined(__CUDA_ARCH__)
+            return combine_capabilities<Cap>(
+                cuFFTDxHelper<typename OpA::value_type>::GenerateLTOIR(fft_size_, FFTType::C2C, dir, in.ept), 
+                detail::get_operator_capability<Cap>(a_, in));
+#else
+            return combine_capabilities<Cap>(capability_attributes<Cap>::default_value, detail::get_operator_capability<Cap>(a_, in));
+#endif
+          }    
+          else if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+            // No need to use combine_capabilities here since we're just returning a string.
+            const auto inner_op_jit_name = detail::get_operator_capability<Cap>(a_, in);
+            return get_jit_class_name() + "<" + inner_op_jit_name + ">";
+          }                
           else {
             // 1. Determine if the binary operation ITSELF intrinsically has this capability.
             auto self_has_cap = capability_attributes<Cap>::default_value;
@@ -526,7 +598,7 @@ namespace matx
         }
 
         template <OperatorCapability Cap, typename InType>
-        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] const InType &in) const {
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
           // 1. Determine if the binary operation ITSELF intrinsically has this capability.
           auto self_has_cap = capability_attributes<Cap>::default_value;
           return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));

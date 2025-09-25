@@ -32,7 +32,8 @@
 
 #pragma once
 
-
+#include <unordered_map>
+#include <string>
 #include "matx/core/type_utils.h"
 #include "matx/operators/permute.h"
 #include "matx/transforms/reduce.h"
@@ -97,7 +98,7 @@ namespace detail {
       }
 
       template <OperatorCapability Cap, typename InType>
-      __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] const InType& in) const {      
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {      
         if constexpr (Cap == OperatorCapability::BLOCK_DIM) {
           static_assert(std::is_same_v<InType, BlockSizeQueryInput>, "BLOCK_DIM capability requires BlockSizeQueryInput as input type");
 #if defined(MATX_EN_JIT) && defined(__CUDACC__) && !defined(__CUDACC_RTC__) && !defined(__CUDA_ARCH__)
@@ -106,10 +107,25 @@ namespace detail {
           return combine_capabilities<Cap>(capability_attributes<Cap>::default_value, detail::get_operator_capability<Cap>(a_, in));
 #endif
         }
-        else if constexpr (Cap == OperatorCapability::JIT_CAP_QUERY) {
-          static_assert(std::is_same_v<InType, JITQueryInput>, "JIT_CAP_QUERY capability requires JITQueryInput as input type");
-          auto self_cap = get_capability_str(static_cast<int>(in.ept));
-          return combine_capabilities<Cap>(self_cap, detail::get_operator_capability<Cap>(a_, in));
+        else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+          // For JIT_CLASS_QUERY, enforce that InType is std::unordered_map<string, string>
+          static_assert(std::is_same_v<InType, std::unordered_map<std::string, std::string>>, 
+                        "JIT_CLASS_QUERY capability requires std::unordered_map<std::string, std::string> as input type");
+          
+          // Get the capability string and add to map
+          auto self_cap = get_capability_str(static_cast<int>(ElementsPerThread::ONE));
+          // For sum, we need to handle the capability string differently
+          // since it's not a tuple. Add it with a generated key.
+          std::string key = "JITSumOp_" + std::to_string(a_.Rank());
+          if (in.find(key) == in.end()) {
+            in[key] = self_cap;
+          }
+          
+          // Also handle child operators
+          detail::get_operator_capability<Cap>(a_, in);
+          
+          // Always return true for now
+          return true;
         }
         else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
           static_assert(std::is_same_v<InType, EPTQueryInput>, "ELEMENTS_PER_THREAD capability requires EPTQueryInput as input type");

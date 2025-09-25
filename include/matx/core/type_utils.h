@@ -365,6 +365,7 @@ constexpr cusparseIndexType_t MatXTypeToCuSparseIndexType() {
     return CUSPARSE_INDEX_32I;
   }
 }
+
 }
 
 } // end namespace matx

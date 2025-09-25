@@ -129,4 +129,5 @@ static constexpr int MAX_VEC_WIDTH_BYTES = 16;
   #define MATX_LOOP_DO_NOT_UNROLL
 #endif
 
+
 }

@@ -140,7 +140,7 @@ namespace matx
         }
 
         template <OperatorCapability Cap, typename InType>
-        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] const InType& in) const {
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
           auto self_has_cap = capability_attributes<Cap>::default_value;
           // Similar to Conv1DOp, there's a method_ field. Assuming similar logic might apply for EPT capability.
           // However, the reference example for conv1d had direct EPT=1 for direct method.

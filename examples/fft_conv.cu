@@ -9,7 +9,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 {
   MATX_ENTER_HANDLER();
   {
-    using TestType = float;
+    using TestType = cuda::std::complex<float>;
     int size = 32;
     auto exec = cudaExecutor{};
 
@@ -19,7 +19,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     (av = random<TestType>(av.Shape(), UNIFORM)).run(exec);
     print(av);
 
-    (avo = 5.0f * sort(av * 8.f, SORT_DIR_ASC)).run(exec);
+    (avo = 5.0f * fft(av)).run(exec);
 
     print(avo);
   }

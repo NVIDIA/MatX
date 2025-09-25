@@ -97,7 +97,8 @@ namespace matx
             return;
           }
           else  {
-            const auto ept_bounds = detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(*tp, detail::EPTQueryInput{true});  
+            const auto in_type = detail::EPTQueryInput{true};
+            const auto ept_bounds = detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(*tp, in_type);  
             if (T::Rank() <= 4 &&
                 detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(*tp) && 
                 ept_bounds[0] != detail::ElementsPerThread::INVALID) { // Make sure that if we try to JIT the EPT is compatible on all operators

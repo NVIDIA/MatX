@@ -176,7 +176,7 @@ namespace matx {
   }
 #endif
 
-#ifndef __CUDACC_RTC__
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__) && !defined(__CUDACC_RTC__) && !defined(__CUDA_ARCH__)
   template <typename InputType>
   class cuFFTDxHelper {
     public:
@@ -240,10 +240,30 @@ namespace matx {
     
         // Compute capability to target
         LIBMATHDX_CHECK(cufftdxSetOperatorInt64(h_, CUFFTDX_OPERATOR_SM, cc));
-
-        // COMMONDX_OPTION_SYMBOL_NAME indicates the required name for the device function.
-        LIBMATHDX_CHECK(cufftdxSetOptionStr(h_, commondxOption::COMMONDX_OPTION_SYMBOL_NAME, "my_fft")); 
         return h_;
+      }
+
+      static std::string GetSymbolName(index_t fft_size, FFTType fft_type, FFTDirection direction, int cc) {
+        std::string symbol_name = "fft_cufftdx_";
+        symbol_name += std::to_string(fft_size);
+        symbol_name += "_T";
+        symbol_name += std::to_string(static_cast<int>(fft_type));
+        symbol_name += "_D";
+        symbol_name += std::to_string(static_cast<int>(direction));
+        symbol_name += "_CC";
+        symbol_name += std::to_string(cc);
+
+        // Add CUDA version to the symbol name
+#if defined(CUDA_VERSION)
+        symbol_name += "_CUDA";
+        symbol_name += std::to_string(CUDART_VERSION);
+#else
+        symbol_name += "_CUDAUNKNOWN";
+#endif
+
+        //symbol_name += ".ltoir";
+        
+        return symbol_name;
       }
 
       static bool IsSupported(index_t fft_size, FFTType fft_type, FFTDirection direction) {
@@ -257,12 +277,10 @@ namespace matx {
         auto handle = Init(fft_size, fft_type, direction);
         // SHM size is based on EPT, so set the one we're using here. Eventually make these uncoupled
         long long int ept_int = static_cast<long long int>(ept);
-        printf("ept_int %lld\n", ept_int);
         LIBMATHDX_CHECK(cufftdxSetOperatorInt64(handle, CUFFTDX_OPERATOR_ELEMENTS_PER_THREAD, ept_int));
 
         long long int shared_memory_size = 0;
         LIBMATHDX_CHECK(cufftdxGetTraitInt64(handle, CUFFTDX_TRAIT_SHARED_MEMORY_SIZE, &shared_memory_size));
-        printf("shared_memory_size libmath %lld\n", shared_memory_size);
         return static_cast<int>(shared_memory_size);
       }
 
@@ -292,8 +310,52 @@ namespace matx {
 
         LIBMATHDX_CHECK(
             cufftdxGetTraitInt64s(handle, cufftdxTraitType::CUFFTDX_TRAIT_BLOCK_DIM, block_dim.size(), block_dim.data()));
-        printf("FFT block_dim %lld %lld %lld\n", block_dim[0], block_dim[1], block_dim[2]);
         return static_cast<int>(block_dim[0]);
+      }
+
+      static bool GenerateLTOIR(index_t fft_size, FFTType fft_type, FFTDirection direction, ElementsPerThread ept) {
+                // Specify arch to compile to. This should eventually be pulled from the handle, but there's no way to do that currently
+        int major = 0;
+        int minor = 0;
+        int device;
+        cudaGetDevice(&device);            
+        cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device);
+        cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device);
+        long long int cc = major * 100 + minor;
+
+        const auto symbol_name = GetSymbolName(fft_size, fft_type, direction, static_cast<int>(cc));
+        LTOIRData ltoir;
+
+        if (detail::GetCache().GetLTOIRCachedBytes(symbol_name) != nullptr) {
+          printf("LTOIR found in cache\n");
+          return true;
+        }
+        printf("fft_size %lld fft_type %d direction %d cc %d symbol_name %s\n", fft_size, static_cast<int>(fft_type), static_cast<int>(direction), static_cast<int>(cc), symbol_name.c_str());
+        auto handle = Init(fft_size, fft_type, direction);
+        LIBMATHDX_CHECK(cufftdxSetOperatorInt64(handle, CUFFTDX_OPERATOR_ELEMENTS_PER_THREAD, static_cast<long long int>(ept)));
+
+        LIBMATHDX_CHECK(cufftdxSetOptionStr(handle, commondxOption::COMMONDX_OPTION_SYMBOL_NAME, symbol_name.c_str())); 
+
+        commondxCode code;
+        LIBMATHDX_CHECK(commondxCreateCode(&code));
+
+        LIBMATHDX_CHECK(commondxSetCodeOptionInt64(code, COMMONDX_OPTION_TARGET_SM, cc));
+        LIBMATHDX_CHECK(cufftdxFinalizeCode(code, handle));
+
+        LIBMATHDX_CHECK(commondxGetCodeLTOIRSize(code, &ltoir.length));
+        ltoir.data = static_cast<char*>(malloc(ltoir.length));
+        MATX_ASSERT_STR(ltoir.data != nullptr, matxInvalidParameter, "Failed to allocate LTO IR data");
+
+        LIBMATHDX_CHECK(commondxGetCodeLTOIR(code, ltoir.length, ltoir.data));
+
+        detail::GetCache().StoreLTOIRCachedBytes(symbol_name, ltoir.data, ltoir.length);
+        LIBMATHDX_CHECK(commondxDestroyCode(code));
+
+
+        printf("Function %s\n", symbol_name.c_str());        
+        printf("LTOIR size %zd\n", ltoir.length);
+    
+        return true;
       }
   };
 

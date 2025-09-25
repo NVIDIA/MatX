@@ -49,6 +49,7 @@
 #include <initializer_list>
 #include <iostream>
 #include <iterator>
+#include <set>
 #include <sstream>
 #include <streambuf>
 #include <string>
@@ -9030,30 +9031,49 @@ inline PreprocessedProgram PreprocessedProgram::preprocess(
   }
 
   // Put all includes from the maps into header_sources.
+  // Create canonical mappings and redirect duplicates to minimize content duplication
+  std::unordered_map<std::string, std::string> fullpath_to_canonical_patched_name;
+  
+  // First pass: identify canonical patched_name for each physical file
   for (const auto& include_fullpath : include_to_fullpath) {
     const IncludeName include_name = include_fullpath.first;
     const std::string& fullpath = include_fullpath.second;
+    const std::string current_patched_name = include_name.patched_name();
+    
+    // Use the first encountered patched_name as canonical for this file
+    if (fullpath_to_canonical_patched_name.find(fullpath) == fullpath_to_canonical_patched_name.end()) {
+      fullpath_to_canonical_patched_name[fullpath] = current_patched_name;
+    }
+  }
+  
+  // Second pass: create header_sources entries, with redirects for duplicates
+  for (const auto& include_fullpath : include_to_fullpath) {
+    const IncludeName include_name = include_fullpath.first;
+    const std::string& fullpath = include_fullpath.second;
+    const std::string current_patched_name = include_name.patched_name();
+    const std::string& canonical_patched_name = fullpath_to_canonical_patched_name[fullpath];
+    
     assert(fullpath_to_source.count(fullpath));
     detail::StringOrRef* source_ptr = &fullpath_to_source.at(fullpath);
+    
     // Note: This will not replace existing headers that were passed in, giving
     // them the priority. This also makes our use of StringOrRef safe, because
     // the ones that are references are the ones that are already in
     // header_sources.
     // Note: We insert an empty string first and then assign to it.
     auto iter_inserted =
-        header_sources.emplace(include_name.patched_name(), std::string());
+        header_sources.emplace(current_patched_name, std::string());
     auto iter = iter_inserted.first;
     std::string* out_source_ptr = &iter->second;
     const bool inserted = iter_inserted.second;
     if (inserted) {
-      // This is a cheap string move the first time this source_ptr is used.
-      // Subsequent times (i.e., if the same header source is mapped to multiple
-      // include names), it copies the string.
-      // TODO: In theory we could use StringOrRef in header_sources too to avoid
-      // needing copies of the same header sources, and I think it would be safe
-      // as long as we didn't erase any elements from it, but it's a bit risky,
-      // and would be exposed in the public interface.
-      source_ptr->copy_to_and_reference(out_source_ptr);
+      if (current_patched_name == canonical_patched_name) {
+        // This is the canonical entry - store the full content
+        source_ptr->copy_to_and_reference(out_source_ptr);
+      } else {
+        // This is a duplicate - create a minimal redirect to the canonical entry
+        *out_source_ptr = "#include <" + canonical_patched_name + ">\n";
+      }
     }
   }
 

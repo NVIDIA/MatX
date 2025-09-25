@@ -33,50 +33,19 @@
 #pragma once
 
 #include "matx/core/defines.h"
-#include "matx/core/type_utils_both.h"
-#include <type_traits>
-#include <limits>
-#include <algorithm>
+#include "matx/core/type_utils.h"
+#include "matx/core/utils.h"
+#include "matx/core/operator_options.h"
+#include <cuda/std/type_traits>
+#include <cuda/std/limits>
 #include <cuda/std/__algorithm/min.h>
 #include <cuda/std/__algorithm/max.h>
 #include <cuda/std/array>
+#include <string>
 
 namespace matx {
 
 namespace detail {
-
-  struct VoidCapabilityType {
-    static constexpr bool value = true;
-  };
-
-  enum class ElementsPerThread {
-    INVALID = 0,
-    ONE = 1,
-    TWO = 2,
-    FOUR = 4,
-    EIGHT = 8,
-    SIXTEEN = 16,
-    THIRTY_TWO = 32,
-
-    MAX = THIRTY_TWO
-  };
-
-  // Input structure for types that require it
-  struct ShmQueryInput {
-    ElementsPerThread ept;
-  };
-
-  struct EPTQueryInput {
-    bool jit;
-  };
-
-  struct BlockSizeQueryInput {
-    ElementsPerThread ept;
-  };
-
-  struct JITQueryInput {
-    ElementsPerThread ept;
-  };
 
   using BlockDimType = int;
 
@@ -86,9 +55,11 @@ namespace detail {
     NONE,
     SUPPORTS_JIT,                 // Can this operation be JIT-compiled?
     ELEMENTS_PER_THREAD,          // How many elements per thread?
-    JIT_CAP_QUERY,  // Result is the concatenation of the capabilities of the operator and its children.
+    JIT_CLASS_QUERY,  // Result is the concatenation of the capabilities of the operator and its children.
     DYN_SHM_SIZE,   // Result is the dynamic shared memory size required for the operator.
     BLOCK_DIM,      // Result is the block dimensions required for the operator.
+    GENERATE_LTOIR, // Generate LTOIR code for the operator.
+    JIT_TYPE_QUERY, // Result is the type of JIT code to generate for the operator.
     // Add more capabilities as needed
   };
 
@@ -120,10 +91,10 @@ namespace detail {
   
   // C++17-compatible trait to detect scoped enums
   template<typename T, typename = void>
-  struct is_scoped_enum : std::false_type {};
+  struct is_scoped_enum : cuda::std::false_type {};
 
   template<typename T>
-  struct is_scoped_enum<T, std::enable_if_t<cuda::std::is_enum_v<T>>> 
+  struct is_scoped_enum<T, cuda::std::enable_if_t<cuda::std::is_enum_v<T>>> 
       : cuda::std::bool_constant<!cuda::std::is_convertible_v<T, cuda::std::underlying_type_t<T>>> {};
 
   template<typename T>
@@ -136,14 +107,25 @@ namespace detail {
   template <>
   struct capability_attributes<OperatorCapability::SUPPORTS_JIT> {
     using type = bool;
+    using input_type = VoidCapabilityType;
     static constexpr bool default_value = true;
     static constexpr bool or_identity = false;
     static constexpr bool and_identity = true;
   };
 
   template <>
+  struct capability_attributes<OperatorCapability::GENERATE_LTOIR> {
+    using type = bool;
+    using input_type = LTOIRQueryInput;
+    static constexpr bool default_value = true;
+    static constexpr bool or_identity = false;
+    static constexpr bool and_identity = true;
+  };  
+
+  template <>
   struct capability_attributes<OperatorCapability::BLOCK_DIM> {
     using type = int; // min/max elements per thread
+    using input_type = BlockSizeQueryInput;
     static constexpr int default_value = 1024; // Example: 1 element per thread by default
     static constexpr int min_identity = 1024;
     static constexpr int max_identity = 1024;
@@ -152,6 +134,7 @@ namespace detail {
   template <>
   struct capability_attributes<OperatorCapability::ELEMENTS_PER_THREAD> {
     using type = cuda::std::array<ElementsPerThread, 2>; // min/max elements per thread
+    using input_type = EPTQueryInput;
     static constexpr ElementsPerThread invalid = ElementsPerThread::INVALID;
     static constexpr cuda::std::array<ElementsPerThread, 2> default_value = {ElementsPerThread::ONE, ElementsPerThread::MAX}; // Example: 1 element per thread by default
     static constexpr cuda::std::array<ElementsPerThread, 2> min_identity = {ElementsPerThread::MAX, ElementsPerThread::ONE};
@@ -159,42 +142,57 @@ namespace detail {
   };
 
   template <>
-  struct capability_attributes<OperatorCapability::JIT_CAP_QUERY> {
+  struct capability_attributes<OperatorCapability::JIT_CLASS_QUERY> {
+    using type = bool;
+    using input_type = std::unordered_map<std::string, std::string>;
+    static constexpr bool default_value = true;
+    static constexpr bool or_identity = false;
+    static constexpr bool and_identity = true;
+  };  
+
+  template <>
+  struct capability_attributes<OperatorCapability::JIT_TYPE_QUERY> {
     using type = std::string;
+    using input_type = JITQueryInput;
     static inline const std::string default_value = "";
     static inline const std::string min_identity = "";
-  };  
+  };    
 
   template <>
   struct capability_attributes<OperatorCapability::DYN_SHM_SIZE> {
     using type = int;
+    using input_type = ShmQueryInput;
     static constexpr int default_value = 0;
-    static constexpr int min_identity = std::numeric_limits<int>::max();
+    static constexpr int min_identity = cuda::std::numeric_limits<int>::max();
     static constexpr int max_identity = 0;
   };    
+
+
+
+  template <OperatorCapability Cap, typename OperatorType, typename InType>
+  __MATX_INLINE__ __MATX_HOST__ typename capability_attributes<Cap>::type
+  get_operator_capability(const OperatorType& op, InType& in) {
+    static_assert(std::is_same_v<remove_cvref_t<InType>, typename capability_attributes<Cap>::input_type>, "Input type mismatch");
+    if constexpr (matx::is_matx_op<OperatorType>()) {
+      return op.template get_capability<Cap, InType>(in);
+    } else {
+      // Default capabilities for non-MatX ops
+      if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+        return detail::type_to_string<OperatorType>();
+      }
+      else {
+        return capability_attributes<Cap>::default_value;
+      }
+    }
+  }  
 
   // Helper to safely get capability from an operator.
   // OperandType is likely base_type_t<ActualOpType> or a raw scalar/functor type.
   template <OperatorCapability Cap, typename OperatorType>
   __MATX_INLINE__ __MATX_HOST__ typename capability_attributes<Cap>::type
   get_operator_capability(const OperatorType& op) {
-    if constexpr (matx::is_matx_op<OperatorType>()) {
-      return op.template get_capability<Cap, VoidCapabilityType>(VoidCapabilityType{});
-    } else {
-      // Default capabilities for non-MatX ops
-      return capability_attributes<Cap>::default_value;
-    }
-  }
-
-  template <OperatorCapability Cap, typename OperatorType, typename InType>
-  __MATX_INLINE__ __MATX_HOST__ typename capability_attributes<Cap>::type
-  get_operator_capability(const OperatorType& op, const InType& in) {
-    if constexpr (matx::is_matx_op<OperatorType>()) {
-      return op.template get_capability<Cap, InType>(in);
-    } else {
-      // Default capabilities for non-MatX ops
-      return capability_attributes<Cap>::default_value;
-    }
+    VoidCapabilityType void_type{};
+    return get_operator_capability<Cap>(op, void_type);
   }  
 
   // Helper function to get the query type associated with a capability
@@ -205,12 +203,16 @@ namespace detail {
         return CapabilityQueryType::AND_QUERY; // If any sub-operator supports JIT, the expression might be JIT-able.
       case OperatorCapability::ELEMENTS_PER_THREAD:
         return CapabilityQueryType::RANGE_QUERY; // The expression should use the range of elements per thread of its children.
-      case OperatorCapability::JIT_CAP_QUERY:
+      case OperatorCapability::JIT_CLASS_QUERY:
+        return CapabilityQueryType::AND_QUERY; // The expression should succeed if all its children succeed.
+      case OperatorCapability::JIT_TYPE_QUERY:
         return CapabilityQueryType::STR_CAT_QUERY; // The expression should use the concatenation of the capabilities of its children.
       case OperatorCapability::DYN_SHM_SIZE:
         return CapabilityQueryType::MAX_QUERY; // The expression should use the maximum dynamic shared memory size of its children.
       case OperatorCapability::BLOCK_DIM:
         return CapabilityQueryType::MIN_QUERY; // The expression should use the minimum block size supported by all operators.
+      case OperatorCapability::GENERATE_LTOIR:
+        return CapabilityQueryType::AND_QUERY; // The expression should generate LTOIR code if all its children generate it.
       default:
         // Default to OR_QUERY or handle as an error/assertion if a capability isn't mapped.
         return CapabilityQueryType::OR_QUERY; 

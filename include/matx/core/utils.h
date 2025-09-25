@@ -33,6 +33,7 @@
 #pragma once
 
 #include <type_traits>
+#include <string>
 #include <cuda_fp16.h>
 
 #include "matx/core/defines.h"
@@ -230,6 +231,113 @@ auto __MATX_INLINE__ invPermute(const cuda::std::array<int, RANK> &perm) {
   }
   return inv_perm;
 }
+
+template <typename Container>
+__MATX_INLINE__ std::string array_to_string(const Container& container) {
+  std::string s;
+  for (size_t i = 0; i < container.size(); ++i) {
+    if (i != 0) s += ", ";
+    s += std::to_string(container[i]);
+  }
+  return s;
+}
+
+template <typename T, size_t N>
+__MATX_INLINE__ std::string array_to_string(const cuda::std::array<T, N>& arr) {
+  std::string s;
+  for (size_t i = 0; i < N; ++i) {
+    if (i != 0) s += ", ";
+    s += std::to_string(arr[i]);
+  }
+  return s;
+}
+
+
+template <typename T>
+__MATX_INLINE__ __MATX_HOST__  std::string type_to_string()
+{
+  // Handle standard POD types
+  if constexpr (std::is_same_v<T, float>) {
+    return "float";
+  }
+  else if constexpr (std::is_same_v<T, double>) {
+    return "double";
+  }
+  else if constexpr (std::is_same_v<T, int>) {
+    return "int";
+  }
+  else if constexpr (std::is_same_v<T, unsigned int>) {
+    return "unsigned int";
+  }
+  else if constexpr (std::is_same_v<T, long>) {
+    return "long";
+  }
+  else if constexpr (std::is_same_v<T, unsigned long>) {
+    return "unsigned long";
+  }
+  else if constexpr (std::is_same_v<T, long long>) {
+    return "long long";
+  }
+  else if constexpr (std::is_same_v<T, unsigned long long>) {
+    return "unsigned long long";
+  }
+  else if constexpr (std::is_same_v<T, short>) {
+    return "short";
+  }
+  else if constexpr (std::is_same_v<T, unsigned short>) {
+    return "unsigned short";
+  }
+  else if constexpr (std::is_same_v<T, char>) {
+    return "char";
+  }
+  else if constexpr (std::is_same_v<T, unsigned char>) {
+    return "unsigned char";
+  }
+  else if constexpr (std::is_same_v<T, bool>) {
+    return "bool";
+  }
+  else if constexpr (std::is_same_v<T, __half>) {
+    return "__half";
+  }
+  else if constexpr (std::is_same_v<T, __nv_bfloat16>) {
+    return "__nv_bfloat16";
+  }
+  else if constexpr (std::is_same_v<T, matxFp16>) {
+    return "matxFp16";
+  }
+  else if constexpr (std::is_same_v<T, matxBf16>) {
+    return "matxBf16";
+  }
+  else if constexpr (std::is_same_v<T, matxFp16Complex>) {
+    return "matxFp16Complex";
+  }
+  else if constexpr (std::is_same_v<T, matxBf16Complex>) {
+    return "matxBf16Complex";
+  }
+  // CCCL complex types
+  else if constexpr (std::is_same_v<T, cuda::std::complex<float>>) {
+    return "cuda::std::complex<float>";
+  }
+  else if constexpr (std::is_same_v<T, cuda::std::complex<double>>) {
+    return "cuda::std::complex<double>";
+  }
+  // fallback: use typeid if available, or unknown
+  else {
+    return "unknown";
+  }
+}
+
+template <typename T>
+auto get_jit_class_or_pod_name(const T& op)
+{
+  if constexpr (is_matx_op<T>()) {
+    return op.get_jit_class_name();
+  }
+  else {
+    return type_to_string<T>();
+  }
+}
+
 
 
 }

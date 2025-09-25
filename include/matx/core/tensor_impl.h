@@ -43,6 +43,7 @@
 #include "matx/core/tensor_utils.h"
 #include "matx/operators/set.h"
 #include "matx/core/sparse_tensor_format.h"
+#include "matx/core/utils.h"
 //#include "matx_exec_kernel.h"
 #include "iterator.h"
 #include "matx/core/make_tensor.h"
@@ -103,6 +104,105 @@ class tensor_impl_t {
 
     // Type specifier for signaling this is a matx operation
     using matxop = bool;
+
+#ifdef MATX_EN_JIT
+    // Tensors are considered a leaf type and there cannot be an inner storage type
+    struct JIT_Storage {
+      T *ldata_;
+    };
+
+    JIT_Storage ToJITStorage() const {
+      return JIT_Storage{data_.ldata_};
+    }
+
+    __MATX_INLINE__ std::string get_jit_class_name() const {
+      std::string symbol_name = "JITTensorImpl_";
+
+      symbol_name += "SI_";
+      for (int i = 0; i < RANK; ++i) {
+        symbol_name += std::to_string(desc_.Size(i));
+        if (i != RANK - 1) {
+          symbol_name += "_";
+        }
+      }
+
+      symbol_name += "ST_";
+      for (int i = 0; i < RANK; ++i) {
+        symbol_name += std::to_string(desc_.Stride(i));
+        if (i != RANK - 1) {
+          symbol_name += "_";
+        }
+      }
+
+      return symbol_name;
+    }        
+
+    __MATX_INLINE__ auto get_jit_op_str() const {
+      const std::string class_name = get_jit_class_name();
+      return cuda::std::make_tuple(
+         class_name, 
+         std::string("template <typename T> class " + class_name + "  {\n") + 
+             "  struct JIT_Storage {\n" +
+             "    T *ldata_;\n" +
+             "  };\n" +
+             "  constexpr static cuda::std::array<index_t, " + std::to_string(Rank()) + "> strides_ = { " + detail::array_to_string(desc_.Strides()) + " };\n" +
+             "  constexpr static cuda::std::array<index_t, " + std::to_string(Rank()) + "> sizes_ = { " + detail::array_to_string(desc_.Shape()) + " };\n" +
+             "  Storage storage_;\n" +
+             "  template <typename CapType, int I = 0, typename ...Is>\n" +
+             "  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type GetVal([[maybe_unused]] cuda::std::tuple<Is...> tup)  {\n" +
+             "    if constexpr (I < sizeof...(Is)) {\n" +
+             "      if constexpr (CapType::ept != detail::ElementsPerThread::ONE && I == sizeof...(Is) - 1) {\n" +
+             "        return GetVal<CapType, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(this->desc_.Stride(I) * static_cast<index_t>(CapType::ept));\n" +
+             "      }\n" +
+             "      else {\n" +
+             "        return GetVal<CapType, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(this->desc_.Stride(I));\n" +
+             "      }\n" +
+             "    }\n" +
+             "    else {\n" +
+             "      return 0;\n" +
+             "    }\n" +
+             "  }\n" +
+             "  template <typename CapType, int I = 0, typename ...Is>\n" +
+             "  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type GetValC([[maybe_unused]] const cuda::std::tuple<Is...> tup) const {\n" +
+             "    if constexpr (I < sizeof...(Is)) {\n" +
+             "      if constexpr (CapType::ept != detail::ElementsPerThread::ONE && I == sizeof...(Is) - 1) {\n" +
+             "        return GetValC<CapType, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(this->desc_.Stride(I) * static_cast<index_t>(CapType::ept));\n" +
+             "      }\n" +
+             "      else {\n" +
+             "        return GetValC<CapType, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(this->desc_.Stride(I));\n" +
+             "      }\n" +
+             "    }\n" +
+             "    else {\n" +
+             "      return 0;\n" +
+             "    }\n" +
+             "  }\n" +             
+             "  template <typename CapType, int M = RANK, typename... Is>\n" +
+             "  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) const noexcept" + "{\n" +
+             "    static_assert(sizeof...(Is) == M, \"Number of indices of operator() must match rank of tensor\");\n" +
+            "     constexpr int EPT_int = static_cast<int>(CapType::ept);\n" +
+            "     if constexpr (CapType::ept == detail::ElementsPerThread::ONE) {\n" +
+            "       return storage_.ldata_[GetValC<CapType, 0, Is...>(cuda::std::make_tuple(indices...))];\n" +
+            "     } else if constexpr (EPT_int * sizeof(T) <= MAX_VEC_WIDTH_BYTES ) {\n" +
+            "       return *reinterpret_cast<detail::Vector<T, EPT_int>*>(storage_.ldata_ + GetValC<CapType, 0, Is...>(cuda::std::make_tuple(indices...)));\n" +
+            "     } else {\n" +
+            "       detail::Vector<T, EPT_int> vec;\n" +
+            "       vec.load<EPT_int>(storage_.ldata_ + GetValC<CapType, 0, Is...>(cuda::std::make_tuple(indices...)));\n" +
+            "       return vec;\n" +
+            "     }\n" +
+             "  }\n" +
+             "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank()\n" +
+             "  {\n" +
+             "    return OpA::Rank();\n" +
+             "  }\n" +
+             "  constexpr __MATX_INLINE__  __MATX_DEVICE__ index_t Size(int dim) const\n" +
+             "  {\n" +
+             "    constexpr index_t dim_ = dim;\n" +
+             "    return sizes_[dim_];\n " +
+             "  }\n" +
+             "};\n"
+      );
+    }    
+#endif     
 
     __MATX_INLINE__ tensor_impl_t(const tensor_impl_t &) = default;
     __MATX_INLINE__ tensor_impl_t(tensor_impl_t &&) = default;
@@ -1154,7 +1254,7 @@ MATX_IGNORE_WARNING_POP_GCC
 
 
     template <detail::OperatorCapability Cap, typename InType>
-    __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] const InType&) const {
+    __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType&) const {
       // Since tensors are a "leaf" operator type, we will never have an operator passed to a tensor as the
       // type, but only POD types.
       if constexpr (Cap == detail::OperatorCapability::ELEMENTS_PER_THREAD) {
@@ -1186,10 +1286,15 @@ MATX_IGNORE_WARNING_POP_GCC
         auto ept = static_cast<detail::ElementsPerThread>(width);
         return cuda::std::array<detail::ElementsPerThread, 2>{detail::ElementsPerThread::ONE, ept};
       }
+      else if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+        // No need to use combine_capabilities here since we're just returning a string.
+        return get_jit_class_name();
+      }      
       else {
         return detail::capability_attributes<Cap>::default_value;
       }
     }
+
 
     /**
      * Get the rank of the tensor

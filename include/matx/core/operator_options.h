@@ -148,6 +148,44 @@ namespace detail {
   struct NoShape{};
   struct EmptyOp{};
   struct NoStride{};  
+
+  // Capabilities
+  struct VoidCapabilityType {
+    static constexpr bool value = true;
+  };
+
+  enum class ElementsPerThread {
+    INVALID = 0,
+    ONE = 1,
+    TWO = 2,
+    FOUR = 4,
+    EIGHT = 8,
+    SIXTEEN = 16,
+    THIRTY_TWO = 32,
+
+    MAX = THIRTY_TWO
+  };
+
+  // Input structure for types that require it
+  struct ShmQueryInput {
+    ElementsPerThread ept;
+  };
+
+  struct EPTQueryInput {
+    bool jit;
+  };
+
+  struct BlockSizeQueryInput {
+    ElementsPerThread ept;
+  };
+
+  struct JITQueryInput {
+    ElementsPerThread ept;
+  };
+
+  struct LTOIRQueryInput {
+    ElementsPerThread ept;
+  };  
 }
 
 };
