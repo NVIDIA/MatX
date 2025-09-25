@@ -42,6 +42,8 @@
 #include "matx/core/tensor.h"
 #include "matx/operators/clone.h"
 #include "matx/kernels/conv.cuh"
+#include <cuda/std/__algorithm/min.h>
+#include <cuda/std/__algorithm/max.h>
 
 namespace matx {
 namespace detail {

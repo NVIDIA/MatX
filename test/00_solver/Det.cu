@@ -36,6 +36,7 @@
 #include "utilities.h"
 #include "gtest/gtest.h"
 #include "matx/transforms/transpose.h"
+#include <cuda/std/__algorithm/max.h>
 
 using namespace matx;
 constexpr int m = 15;

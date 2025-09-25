@@ -41,6 +41,7 @@
 #include "matx/core/make_tensor.h"
 #include "matx/kernels/utility.cuh"
 #include "matx/transforms/copy.h"
+#include <cuda/std/__algorithm/max.h>
 
 namespace matx
 {

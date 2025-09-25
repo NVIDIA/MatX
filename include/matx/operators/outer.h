@@ -36,6 +36,7 @@
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
 #include "matx/transforms/outer.h"
+#include <cuda/std/__algorithm/max.h>
 
 namespace matx
 {
