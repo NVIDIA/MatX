@@ -129,6 +129,10 @@ namespace matx
       }
     }
     
+    // Constructor from existing shared_ptr
+    Storage(std::shared_ptr<T> ptr, size_t size)
+      : size_(size), data_(ptr) {}
+    
     // Owning constructor with memory space
     Storage(size_t size, matxMemorySpace_t space, cudaStream_t stream = 0)
       : size_(size) {
@@ -193,7 +197,15 @@ namespace matx
     return Storage<T>(size, space, stream);
   }
 
-    /**
+  /**
+   * @brief Factory function to create storage from existing shared_ptr
+   */
+  template <typename T>
+  Storage<T> make_storage_from_shared_ptr(std::shared_ptr<T> ptr, size_t size) {
+    return Storage<T>(ptr, size);
+  }
+
+  /**
    * @brief Factory function to create non-owning storage
    */
   template <typename T>
