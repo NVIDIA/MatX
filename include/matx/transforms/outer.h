@@ -32,6 +32,8 @@
 
 #pragma once
 
+#include <cuda/std/__algorithm/min.h>
+
 namespace matx {
 
 /**

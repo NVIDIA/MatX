@@ -44,6 +44,7 @@
 #include "matx/core/error.h"
 #include "matx/core/nvtx.h"
 #include <cuda/std/functional>
+#include <cuda/std/__algorithm/max.h>
 
 #pragma once
 

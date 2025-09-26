@@ -35,6 +35,7 @@
 #include "test_types.h"
 #include "utilities.h"
 #include "gtest/gtest.h"
+#include <cuda/std/__algorithm/min.h>
 
 using namespace matx;
 

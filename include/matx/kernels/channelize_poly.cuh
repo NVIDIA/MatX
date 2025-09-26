@@ -43,6 +43,8 @@
 #include "matx/core/utils.h"
 #include "matx/core/type_utils.h"
 #include "matx/core/tensor_utils.h"
+#include <cuda/std/__algorithm/min.h>
+#include <cuda/std/__algorithm/max.h>
 
 namespace matx {
 

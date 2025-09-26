@@ -44,6 +44,8 @@
 #include "matx/transforms/cub.h"
 #include "matx/transforms/copy.h"
 #include "matx/core/half.h"
+#include <cuda/std/__algorithm/min.h>
+#include <cuda/std/__algorithm/max.h>
 
 union HalfBits {
   constexpr HalfBits(short x) : i(x) {}
