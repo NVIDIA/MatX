@@ -5,6 +5,7 @@ list(TRANSFORM OPERATOR_TEST_FILES PREPEND "00_operators/")
 
 set (test_sources
     00_misc/AllocatorTests.cu
+    00_misc/ProfilingTests.cu
     00_tensor/BasicTensorTests.cu
     00_tensor/CUBTests.cu
     00_tensor/Storage.cu

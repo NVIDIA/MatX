@@ -102,12 +102,20 @@ namespace matx
       /**
        * @brief Start a timer for profiling workload
        */
-      void start_timer() { cudaEventRecord(start_, stream_); }
+      void start_timer() { 
+        if (profiling_) {
+          cudaEventRecord(start_, stream_); 
+        }
+      }
 
       /**
        * @brief Stop a timer for profiling workload
        */      
-      void stop_timer() { cudaEventRecord(stop_, stream_); }
+      void stop_timer() { 
+        if (profiling_) {
+          cudaEventRecord(stop_, stream_); 
+        }
+      }
 
       /**
        * @brief Get the time in milliseconds between start_timer and stop_timer. 
