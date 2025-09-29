@@ -34,7 +34,7 @@
 
 #include <cuda/std/array>
 #include <cuda/std/__algorithm/fill.h>
-#include <matx/core/type_utils.h>
+#include <matx/core/type_utils_both.h>
 
 namespace matx{
 namespace detail {

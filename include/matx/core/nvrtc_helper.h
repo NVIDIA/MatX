@@ -40,7 +40,7 @@
 #define JITIFY_ENABLE_EMBEDDED_FILES 1
 #define JITIFY_IGNORE_NOT_TRIVIALLY_COPYABLE_ARGS 1
 #ifdef MATX_EN_JIT_PREPROCESSING
-  #include "matx.h.jit.hpp"
+  #include "jit_includes.h.jit.hpp"
 #endif
 #include "matx/core/jitify2.hpp"
 #include "matx/executors/jit_kernel.h"
@@ -168,7 +168,7 @@ std::string generate_capability_params_string([[maybe_unused]] const Op &op, Ele
   // }
 
   std::string final_str =  
-         "namespace matx { namespace detail {\n"     
+         "namespace matx { namespace detail {\n"
          "template <ElementsPerThread EPT, bool JIT>\n"
          "struct CapabilityParams {\n"
          "  static constexpr ElementsPerThread ept = EPT;\n"
@@ -176,12 +176,35 @@ std::string generate_capability_params_string([[maybe_unused]] const Op &op, Ele
          "  static constexpr int osize = " + std::to_string(osize) + ";\n"
          "  static constexpr int block_size = " + std::to_string(block_size) + ";\n"
          "};\n"
-         //"\n" + jit_caps_str + "\n"
          "using CurrentCapabilities = CapabilityParams<" + ept_str + ", " + jit_str + ">;\n"
          "} }\n";
 
   //final_str += std::string(matxKernelStr);       
   return final_str;
+}
+
+template <typename Op>
+std::string get_all_jit_classes_string(const Op& op) {
+  std::unordered_map<std::string, std::string> jit_strings;
+  // Query all JIT class strings for the operator and its children
+  detail::get_operator_capability<OperatorCapability::JIT_CLASS_QUERY>(op, jit_strings);
+
+  std::string result;
+  if (!jit_strings.empty()) {
+    result += "namespace matx {\n";
+    for (const auto& kv : jit_strings) {
+      result += kv.second;
+      if (!result.empty() && result.back() != '\n') {
+        result += "\n\n\n";
+      }
+    }
+    result += "} // namespace matx\n";
+  }
+
+  // Print out the string before returning
+  std::cout << "All JIT classes string:\n" << result << std::endl;
+
+  return result;
 }
 
 
@@ -205,16 +228,16 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, cons
 #else          
   static ProgramCache<> cache(
       100,
-      *matx_h_jit);
+      *_workspaces_MatX_include_matx_core_jit_includes_h_jit);
 #endif
 
-  // Get all the JIT strings from each operator
-  std::unordered_map<std::string, std::string> jit_strings;
-  auto string_res = detail::get_operator_capability<OperatorCapability::JIT_CLASS_QUERY>(op, jit_strings);
-  for (const auto& kv : jit_strings) {
-    std::cout << "JIT string key: " << kv.first << "\n";
-    std::cout << "JIT string value:\n" << kv.second << "\n";
-  }
+printf("ALL SOURCE :%s\n", _workspaces_MatX_include_matx_core_jit_includes_h_jit->source().c_str());
+const auto t = _workspaces_MatX_include_matx_core_jit_includes_h_jit->header_sources();
+for (const auto& [key, value] : t) {
+  printf("HEADER: %s:%s\n", key.c_str(), value.c_str());
+}
+
+  const auto all_jit_classes_string = get_all_jit_classes_string(op);
 
   // auto end_time = std::chrono::high_resolution_clock::now();
   // auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
@@ -224,70 +247,75 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, cons
   const auto ltoir_query_input = detail::LTOIRQueryInput{ept};
   auto ltoir = detail::get_operator_capability<OperatorCapability::GENERATE_LTOIR>(op, ltoir_query_input);
   printf("DEBUG: LTOIR capability result: %s\n", ltoir ? "true" : "false");
-    auto capstr = generate_capability_params_string(op, ept, false, osize, threads.x);
-    std::cout << "DEBUG: Capability string: " << capstr << std::endl;
-    auto tstr = jitify2::reflection::reflect_template<Op>();
-    printf("DEBUG: Template string: %s\n", tstr.c_str());
-    //auto start_time_kernel = std::chrono::high_resolution_clock::now();
-    auto kernel = cache
-    .get_kernel(Template(get_kernel_name(op, stride)).instantiate<Op>(), 
-    {}, 
-    {{"matx_generated_code_hdr", capstr}}, {"-include=matx_generated_code_hdr"});    
-        // Compile, link, and load the program, and obtain the loaded kernel.
-        // .get_kernel(Template(get_kernel_name(op, stride)).instantiate<Op>(), 
-        //   {"defines.h", "half.h", "complex_half.h", "type_utils_both.h"}, 
-        //   {{"matx_generated_code_hdr", capstr}}, {"-include=matx_generated_code_hdr"});
-    // auto end_time_kernel = std::chrono::high_resolution_clock::now();
-    // auto duration_kernel = std::chrono::duration_cast<std::chrono::microseconds>(end_time_kernel - start_time_kernel);
-    //printf("Kernel step took %ld microseconds\n", duration_kernel.count());
-      // Get the current static shared memory size for the device
 
-    //auto start_time_device = std::chrono::high_resolution_clock::now();
-    int device;
-    cudaGetDevice(&device);
-    int static_shared_size;
-    cudaDeviceGetAttribute(&static_shared_size, cudaDevAttrMaxSharedMemoryPerBlock, device);
-    // auto end_time_device = std::chrono::high_resolution_clock::now();
-    // auto duration_device = std::chrono::duration_cast<std::chrono::microseconds>(end_time_device - start_time_device);
-   // printf("Device attribute calls took %ld microseconds\n", duration_device.count());
-    
-    
-    // Need to set dynamic shared memory size if it is greater than the static shared memory size
-    if (dynamic_shmem_size > static_shared_size) {
-      kernel->set_attribute(CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, dynamic_shmem_size);
-    }      
+  auto capstr = generate_capability_params_string(op, ept, false, osize, threads.x);
+  std::cout << "DEBUG: Capability string: " << capstr << std::endl;
+  auto tstr = jitify2::reflection::reflect_template<Op>();
+  printf("DEBUG: Template string: %s\n", tstr.c_str());
+
+  const auto kernel_op_type = detail::get_operator_capability<OperatorCapability::JIT_TYPE_QUERY>(op);
+  printf("DEBUG: Kernel op type: %s\n", kernel_op_type.c_str());
+  //auto start_time_kernel = std::chrono::high_resolution_clock::now();
+  auto kernel = cache
+  //.get_kernel(Template(get_kernel_name(op, stride)).instantiate<Op>(), 
+  .get_kernel(Template(get_kernel_name(op, stride)).instantiate({kernel_op_type}), 
+  {}, 
+  {{"matx_class_strings", all_jit_classes_string}, {"matx_generated_code_hdr", capstr}}, {"-include=matx_generated_code_hdr", "-include=matx_class_strings"});    
+      // Compile, link, and load the program, and obtain the loaded kernel.
+      // .get_kernel(Template(get_kernel_name(op, stride)).instantiate<Op>(), 
+      //   {"defines.h", "half.h", "complex_half.h", "type_utils_both.h"}, 
+      //   {{"matx_generated_code_hdr", capstr}}, {"-include=matx_generated_code_hdr"});
+  // auto end_time_kernel = std::chrono::high_resolution_clock::now();
+  // auto duration_kernel = std::chrono::duration_cast<std::chrono::microseconds>(end_time_kernel - start_time_kernel);
+  //printf("Kernel step took %ld microseconds\n", duration_kernel.count());
+    // Get the current static shared memory size for the device
+
+  //auto start_time_device = std::chrono::high_resolution_clock::now();
+  int device;
+  cudaGetDevice(&device);
+  int static_shared_size;
+  cudaDeviceGetAttribute(&static_shared_size, cudaDevAttrMaxSharedMemoryPerBlock, device);
+  // auto end_time_device = std::chrono::high_resolution_clock::now();
+  // auto duration_device = std::chrono::duration_cast<std::chrono::microseconds>(end_time_device - start_time_device);
+  // printf("Device attribute calls took %ld microseconds\n", duration_device.count());
+  
+  
+  // Need to set dynamic shared memory size if it is greater than the static shared memory size
+  if (dynamic_shmem_size > static_shared_size) {
+    kernel->set_attribute(CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, dynamic_shmem_size);
+  }      
 
 
-    // Configure the kernel launch.
-    //auto start_time_configure = std::chrono::high_resolution_clock::now();
-    if constexpr (Op::Rank() == 0) {
-      kernel->configure(blocks, threads, dynamic_shmem_size)
-            // Launch the kernel.
-            ->launch(op);
-    }
-    else if constexpr (Op::Rank() == 1) {
-      kernel->configure(blocks, threads, dynamic_shmem_size)
-            // Launch the kernel.
-            ->launch(op, sa[0]);
-    }
-    else if constexpr (Op::Rank() == 2) {
+  // Configure the kernel launch.
+  //auto start_time_configure = std::chrono::high_resolution_clock::now();
+  if constexpr (Op::Rank() == 0) {
     kernel->configure(blocks, threads, dynamic_shmem_size)
-            // Launch the kernel.
-            ->launch(op, sa[0], sa[1]);
-    }
-    else if constexpr (Op::Rank() == 3) {
-      kernel->configure(blocks, threads, dynamic_shmem_size)
-            // Launch the kernel.
-            ->launch(op, sa[0], sa[1], sa[2]);
-    }
-    else if constexpr (Op::Rank() == 4) {
-      kernel->configure(blocks, threads, dynamic_shmem_size)
-            // Launch the kernel.
-            ->launch(op, sa[0], sa[1], sa[2], sa[3]);
-    }    
-    else {
-      MATX_THROW(matxInvalidParameter, "Rank not supported");
-    }
+          // Launch the kernel.
+          ->launch(op);
+  }
+  else if constexpr (Op::Rank() == 1) {
+    kernel->configure(blocks, threads, dynamic_shmem_size)
+          // Launch the kernel.
+          ->launch(op, sa[0]);
+  }
+  else if constexpr (Op::Rank() == 2) {
+  kernel->configure(blocks, threads, dynamic_shmem_size)
+          // Launch the kernel.
+          ->launch(op, sa[0], sa[1]);
+  }
+  else if constexpr (Op::Rank() == 3) {
+    kernel->configure(blocks, threads, dynamic_shmem_size)
+          // Launch the kernel.
+          ->launch(op, sa[0], sa[1], sa[2]);
+  }
+  else if constexpr (Op::Rank() == 4) {
+    kernel->configure(blocks, threads, dynamic_shmem_size)
+          // Launch the kernel.
+          ->launch(op, sa[0], sa[1], sa[2], sa[3]);
+  }    
+  else {
+    MATX_THROW(matxInvalidParameter, "Rank not supported");
+  }
   // auto end_time_configure = std::chrono::high_resolution_clock::now();
   // auto duration_configure = std::chrono::duration_cast<std::chrono::microseconds>(end_time_configure - start_time_configure);
   // printf("Configure step took %ld microseconds\n", duration_configure.count());

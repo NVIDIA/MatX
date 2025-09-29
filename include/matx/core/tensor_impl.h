@@ -116,7 +116,9 @@ class tensor_impl_t {
     }
 
     __MATX_INLINE__ std::string get_jit_class_name() const {
-      std::string symbol_name = "JITTensorImpl_";
+      std::string symbol_name = "JITTensorImpl_" + detail::type_to_string_c_name<T>() + "_";
+
+      symbol_name += "R" + std::to_string(RANK) + "_";
 
       symbol_name += "SI_";
       for (int i = 0; i < RANK; ++i) {
@@ -141,7 +143,10 @@ class tensor_impl_t {
       const std::string class_name = get_jit_class_name();
       return cuda::std::make_tuple(
          class_name, 
-         std::string("template <typename T> class " + class_name + "  {\n") + 
+         std::string("class " + class_name + "  {\n") + 
+             "  static constexpr int RANK = " + std::to_string(Rank()) + ";\n" +
+             "  using T = " + detail::type_to_string<T>() + ";\n" +
+             "  using value_type = T;\n" +
              "  struct JIT_Storage {\n" +
              "    T *ldata_;\n" +
              "  };\n" +
@@ -1254,7 +1259,7 @@ MATX_IGNORE_WARNING_POP_GCC
 
 
     template <detail::OperatorCapability Cap, typename InType>
-    __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType&) const {
+    __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
       // Since tensors are a "leaf" operator type, we will never have an operator passed to a tensor as the
       // type, but only POD types.
       if constexpr (Cap == detail::OperatorCapability::ELEMENTS_PER_THREAD) {
@@ -1289,7 +1294,17 @@ MATX_IGNORE_WARNING_POP_GCC
       else if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
         // No need to use combine_capabilities here since we're just returning a string.
         return get_jit_class_name();
-      }      
+      } 
+      else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+        const auto [key, value] = get_jit_op_str();
+      
+        // Insert into the map if the key doesn't exist
+        if (in.find(key) == in.end()) {
+          in[key] = value;
+        }
+
+        return true;
+      }
       else {
         return detail::capability_attributes<Cap>::default_value;
       }

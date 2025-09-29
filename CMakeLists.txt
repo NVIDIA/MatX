@@ -130,8 +130,6 @@ target_include_directories(matx INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_BIN
                                          "$<INSTALL_INTERFACE:include>")
 
 set_property(GLOBAL APPEND PROPERTY PREPROCESSOR_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/include")
-set_property(GLOBAL APPEND PROPERTY PREPROCESSOR_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/include/matx/kernels")
-set_property(GLOBAL APPEND PROPERTY PREPROCESSOR_INCLUDE_DIRS "${CMAKE_CURRENT_BINARY_DIR}/include")
                                          
 target_compile_features(matx INTERFACE cxx_std_17 $<BUILD_INTERFACE:cuda_std_17>)
 
@@ -328,16 +326,14 @@ if (MATX_EN_MATHDX)
     target_compile_definitions(matx INTERFACE NVRTC_CUDA_ARCH="${NVRTC_CUDA_ARCH}")
     target_compile_definitions(matx INTERFACE NVRTC_CXX_STANDARD="${CMAKE_CXX_STANDARD}")
     
-    #target_include_directories(matx INTERFACE libmathdx/include)
-    target_link_directories(matx INTERFACE $<BUILD_INTERFACE:/repro/MatX/libmathdx/lib>)
-    target_include_directories(matx INTERFACE $<BUILD_INTERFACE:/repro/MatX/libmathdx/include>)
-    target_link_libraries(matx INTERFACE mathdx)
+    # Link libmathdx if available
+    if(TARGET libmathdx::libmathdx)
+        target_link_libraries(matx INTERFACE libmathdx::libmathdx)
+        message(STATUS "Linked libmathdx to matx target")
+    endif()
+    
+    # Link mathdx components
     target_link_libraries(matx INTERFACE mathdx::cufftdx CUDA::nvrtc)
-
-    # For JIT preprocessing
-    # Use the actual paths where MathDx is extracted by CPM
-    set_property(GLOBAL APPEND PROPERTY PREPROCESSOR_INCLUDE_DIRS "${CMAKE_BINARY_DIR}/_deps/mathdx-src/nvidia/mathdx/${MathDx_VERSION}/include")
-    set_property(GLOBAL APPEND PROPERTY PREPROCESSOR_INCLUDE_DIRS "${CMAKE_BINARY_DIR}/_deps/mathdx-src/nvidia/mathdx/${MathDx_VERSION}/external/cutlass/include")
 endif()
 
 if (MATX_EN_CUDSS)
@@ -492,13 +488,13 @@ if (MATX_EN_JIT_PREPROCESSING)
     string(REPLACE ";" " " JITIFY_OPTIONS_STR "${JITIFY_OPTIONS}")
     add_custom_command(
         OUTPUT "${CMAKE_BINARY_DIR}/include/matx_preprocessed.h"
-        COMMAND ${CMAKE_COMMAND} -E echo "JITIFY_PREPROCESS_COMMAND: $<TARGET_FILE:jitify2_preprocess> ${CMAKE_CURRENT_SOURCE_DIR}/include/matx.h -i ${JITIFY_OPTIONS_STR}"
+        COMMAND ${CMAKE_COMMAND} -E echo "JITIFY_PREPROCESS_COMMAND: $<TARGET_FILE:jitify2_preprocess> ${CMAKE_CURRENT_SOURCE_DIR}/include/matx/core/jit_includes.h -i ${JITIFY_OPTIONS_STR}"
         COMMAND $<TARGET_FILE:jitify2_preprocess>
-            "${CMAKE_CURRENT_SOURCE_DIR}/include/matx.h"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include/matx/core/jit_includes.h"
             -i
             ${JITIFY_OPTIONS}
         DEPENDS jitify2_preprocess matx ${MATX_JIT_DEPS}
-        COMMENT "Running JIT preprocessor on matx.h"
+        COMMENT "Running JIT preprocessor on jit_includes.h"
         WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
     )
 

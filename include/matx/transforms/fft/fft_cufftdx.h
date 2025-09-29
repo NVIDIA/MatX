@@ -269,7 +269,7 @@ namespace matx {
       static bool IsSupported(index_t fft_size, FFTType fft_type, FFTDirection direction) {
         auto handle = Init(fft_size, fft_type, direction);
         int valid = -1;
-        LIBMATHDX_CHECK(cufftdxHasImplementation(handle, &valid));
+        LIBMATHDX_CHECK(cufftdxIsSupported(handle, &valid));
         return static_cast<bool>(valid);
       }
 

@@ -327,6 +327,22 @@ __MATX_INLINE__ __MATX_HOST__  std::string type_to_string()
   }
 }
 
+// Unique type names compatible with C naming conventions
+template <typename T>
+__MATX_INLINE__ __MATX_HOST__  std::string type_to_string_c_name()
+{
+  if constexpr (std::is_same_v<T, cuda::std::complex<float>>) {
+    return "cuda_std_complex_float";
+  }
+  else if constexpr (std::is_same_v<T, cuda::std::complex<double>>) {
+    return "cuda_std_complex_double";
+  }
+  else {
+    return type_to_string<T>();
+  }
+}
+
+
 template <typename T>
 auto get_jit_class_or_pod_name(const T& op)
 {

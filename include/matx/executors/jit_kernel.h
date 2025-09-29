@@ -37,8 +37,7 @@ namespace matx {
 
 #ifdef MATX_EN_MATHDX
 static const char *matxKernelStr = "\n\
-#include \"matx/core/defines.h\"\n\
-#include \"matx/core/type_utils_both.h\"\n\
+#include <matx/core/jit_includes.h>\n\
 namespace matx {\n\
   namespace detail {\n\
     template <class Op>\n\

@@ -153,7 +153,7 @@ namespace detail {
   template <>
   struct capability_attributes<OperatorCapability::JIT_TYPE_QUERY> {
     using type = std::string;
-    using input_type = JITQueryInput;
+    using input_type = VoidCapabilityType;
     static inline const std::string default_value = "";
     static inline const std::string min_identity = "";
   };    
