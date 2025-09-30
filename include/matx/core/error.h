@@ -182,13 +182,15 @@ namespace matx
     }                                  \
   }
 
-  #define MATX_ASSERT_STR_EXP(a, expected, error, str) \
+  #define MATX_ASSERT_STR_EXP(a, expected, error, msgstr) \
   {                                    \
     auto tmp = a;                      \
     if ((tmp != expected))             \
     {                                  \
-      std::cout << #a ": " << str << "(" << tmp << " != " << expected << ")\n";\
-      MATX_THROW(error, "");           \
+      const char* var_name = #a;       \
+      std::stringstream ss;            \
+      ss << var_name << ": " << msgstr << " (" << tmp << " != " << expected << ")"; \
+      MATX_THROW(error, ss.str());     \
     }                                  \
   }
 
