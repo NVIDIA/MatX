@@ -1011,6 +1011,7 @@ MATX_IGNORE_WARNING_POP_GCC
     // Optimized offset calculation for ranks 1-4 with explicit stride multiplications
     template <detail::ElementsPerThread EPT, typename... Is>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type GetOffsetOptimized(Is... indices) const {
+MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")      
       constexpr size_t rank = sizeof...(Is);
       constexpr int EPT_int = static_cast<int>(EPT);
       const cuda::std::array<index_t, rank> idx{indices...};
@@ -1047,6 +1048,7 @@ MATX_IGNORE_WARNING_POP_GCC
         // For rank > 4, fall back to the recursive implementation
         return GetValC<EPT, 0, Is...>(cuda::std::make_tuple(indices...));
       }
+MATX_IGNORE_WARNING_POP_GCC      
     }
 
     template <detail::ElementsPerThread EPT, int I = 0, typename ...Is>
