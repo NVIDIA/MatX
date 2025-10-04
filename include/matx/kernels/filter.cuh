@@ -7,6 +7,8 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <vector>
+#include <cuda/std/__algorithm/min.h>
+#include <cuda/std/__algorithm/max.h>
 
 namespace matx {
 

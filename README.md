@@ -201,43 +201,6 @@ We provide a variety of training materials and examples to quickly learn the Mat
 - A set of MatX [notebooks](docs_input/notebooks) can be found in the docs directory. These four notebooks walk through the major MatX features and allow the developer to practice writing MatX code with guided examples and questions.
 - Finally, for new MatX developers, browsing the [example applications](examples) can provide familarity with the API and best practices.
 
-## Release Major Features
-**v0.9.1**:
-- New operators: `argminmax`, `dense2sparse`, `sparse2dense`, `interp1`, `normalize`, `argsort`
-- Removed requirement for --relaxed-constexpr
-- Added MatX NVTX domain
-- Significantly improved speed of `svd` and `inv`
-- Python integration sample
-- Experimental sparse tensor support (SpMM and solver routines supported)
-- Significantly reduced FFT memory usage
- 
-**v0.9.0**:
-- *Features*
-    * Full CPU support for both ARM and x86 on all solver, BLAS, and FFT functions, including multi-threaded support
-    * New vector_norm and matrix_norm operators
-- *Bug fixes*
-    * Many host and device compiler fixes and workarounds
-    * Performance improvements in nested transforms
-
-**v0.8.0**:
-- *Features*
-    * Updated cuTENSOR and cuTensorNet versions
-    * Added configurable print formatting
-    * ARM FFT support via NVPL
-    * New operators: abs2(), outer(), isnan(), isinf()
-    * Many more unit tests for CPU tests
-- Bug fixes for matmul on Hopper, 2D FFTs, and more
-  
-**v0.7.0**:
-- *Features*
-    * Automatic documentation generation
-    * Use CCCL instead of CUB/libcudac++
-    * New operators: `polyval`, `matvec`
-    * Improved caching and teardown of transforms
-    * Optimized polyphase resampler
-    * Negative slice indexing
-- Many new bug fixes and error checking
-
 ## Discussions
 We have an open discussions board [here](https://github.com/NVIDIA/MatX/discussions). We encourage any questions about the library to be posted here for other users to learn from and read through.
 

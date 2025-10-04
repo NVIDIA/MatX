@@ -116,9 +116,9 @@ class tensor_impl_t {
       return std::string("tensor_impl_") + std::to_string(RANK) + "_" + to_short_str<T>();
     }
 
-    /** Swaps two raw_pointer_buffers
+    /** Swaps two tensor implementations
      *
-     * Swaps members of two raw_pointer_buffers
+     * Swaps members of two tensor implementations
      *
      * @param lhs
      *   Left argument
@@ -894,7 +894,7 @@ MATX_IGNORE_WARNING_POP_GCC
     template <typename... Is>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T* GetPointer(Is... indices) const noexcept
     {
-      return data_.ldata_ + GetValC<detail::ElementsPerThread::ONE, 0, Is...>(cuda::std::make_tuple(indices...));
+      return data_.ldata_ + GetOffsetOptimized<detail::ElementsPerThread::ONE>(indices...);
     }
 
     // Locates position of an element at given indices, or returns -1 when not
@@ -1008,6 +1008,49 @@ MATX_IGNORE_WARNING_POP_GCC
       }
     }
 
+    // Optimized offset calculation for ranks 1-4 with explicit stride multiplications
+    template <detail::ElementsPerThread EPT, typename... Is>
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type GetOffsetOptimized(Is... indices) const {
+MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")      
+      constexpr size_t rank = sizeof...(Is);
+      constexpr int EPT_int = static_cast<int>(EPT);
+      const cuda::std::array<index_t, rank> idx{indices...};
+      
+      if constexpr (rank == 1) {
+        if constexpr (EPT != detail::ElementsPerThread::ONE) {
+          return idx[0] * (this->desc_.Stride(0) * EPT_int);
+        } else {
+          return idx[0] * this->desc_.Stride(0);
+        }
+      }
+      else if constexpr (rank == 2) {
+        if constexpr (EPT != detail::ElementsPerThread::ONE) {
+          return idx[0] * this->desc_.Stride(0) + idx[1] * (this->desc_.Stride(1) * EPT_int);
+        } else {
+          return idx[0] * this->desc_.Stride(0) + idx[1] * this->desc_.Stride(1);
+        }
+      }
+      else if constexpr (rank == 3) {
+        if constexpr (EPT != detail::ElementsPerThread::ONE) {
+          return idx[0] * this->desc_.Stride(0) + idx[1] * this->desc_.Stride(1) + idx[2] * (this->desc_.Stride(2) * EPT_int);
+        } else {
+          return idx[0] * this->desc_.Stride(0) + idx[1] * this->desc_.Stride(1) + idx[2] * this->desc_.Stride(2);
+        }
+      }
+      else if constexpr (rank == 4) {
+        if constexpr (EPT != detail::ElementsPerThread::ONE) {
+          return idx[0] * this->desc_.Stride(0) + idx[1] * this->desc_.Stride(1) + idx[2] * this->desc_.Stride(2) + idx[3] * (this->desc_.Stride(3) * EPT_int);
+        } else {
+          return idx[0] * this->desc_.Stride(0) + idx[1] * this->desc_.Stride(1) + idx[2] * this->desc_.Stride(2) + idx[3] * this->desc_.Stride(3);
+        }
+      }
+      else {
+        // For rank > 4, fall back to the recursive implementation
+        return GetValC<EPT, 0, Is...>(cuda::std::make_tuple(indices...));
+      }
+MATX_IGNORE_WARNING_POP_GCC      
+    }
+
     template <detail::ElementsPerThread EPT, int I = 0, typename ...Is>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type GetValC([[maybe_unused]] const cuda::std::tuple<Is...> tup) const {
       if constexpr (I < sizeof...(Is)) {
@@ -1043,13 +1086,14 @@ MATX_IGNORE_WARNING_POP_GCC
         assert(data_.ldata_ != nullptr);
 #endif
         constexpr int EPT_int = static_cast<int>(EPT);
+        const index_t offset = GetOffsetOptimized<EPT>(indices...);
         if constexpr (EPT == detail::ElementsPerThread::ONE) {
-          return data_.ldata_[GetValC<EPT, 0, Is...>(cuda::std::make_tuple(indices...))];
+          return data_.ldata_[offset];
         } else if constexpr (EPT_int * sizeof(T) <= MAX_VEC_WIDTH_BYTES ) {
-          return *reinterpret_cast<detail::Vector<T, EPT_int>*>(data_.ldata_ + GetValC<EPT, 0, Is...>(cuda::std::make_tuple(indices...)));
+          return *reinterpret_cast<detail::Vector<T, EPT_int>*>(data_.ldata_ + offset);
         } else {
           detail::Vector<T, EPT_int> vec;
-          vec.template load<EPT_int>(data_.ldata_ + GetValC<EPT, 0, Is...>(cuda::std::make_tuple(indices...)));
+          vec.template load<EPT_int>(data_.ldata_ + offset);
           return vec;
         }
       }
@@ -1083,13 +1127,14 @@ MATX_IGNORE_WARNING_POP_GCC
         assert(data_.ldata_ != nullptr);
 #endif
         constexpr int EPT_int = static_cast<int>(EPT);
+        const index_t offset = GetVal<EPT, 0, Is...>(cuda::std::make_tuple(indices...));
         if constexpr (EPT == detail::ElementsPerThread::ONE) {
-          return data_.ldata_[GetVal<EPT, 0, Is...>(cuda::std::make_tuple(indices...))];
+          return data_.ldata_[offset];
         } else if constexpr (EPT_int * sizeof(T) <= MAX_VEC_WIDTH_BYTES ) {
-          return *reinterpret_cast<detail::Vector<T, EPT_int>*>(data_.ldata_ + GetVal<EPT, 0, Is...>(cuda::std::make_tuple(indices...)));
+          return *reinterpret_cast<detail::Vector<T, EPT_int>*>(data_.ldata_ + offset);
         } else {
           detail::Vector<T, EPT_int> vec;
-          vec.template load<EPT_int>(data_.ldata_ + GetVal<EPT, 0, Is...>(cuda::std::make_tuple(indices...)));
+          vec.template load<EPT_int>(data_.ldata_ + offset);
           return vec;
         }
       }

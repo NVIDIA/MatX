@@ -40,6 +40,7 @@
 #ifdef MATX_EN_CPU_MATMUL
   #include "matx/transforms/matmul/matmul_cblas.h"
 #endif
+#include <cuda/std/__algorithm/max.h>
 
 namespace matx
 {

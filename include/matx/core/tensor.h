@@ -51,7 +51,7 @@
 
 // forward declare
 namespace matx {
-template <typename T, int RANK, typename Storage, typename Desc> class tensor_t;
+template <typename T, int RANK, typename Desc> class tensor_t;
 } // namespace matx
 
 /* Special values used to indicate properties of tensors */
@@ -72,7 +72,6 @@ namespace matx {
  */
 template <typename T,
           int RANK,
-          typename Storage = DefaultStorage<T>,
           typename Desc = DefaultDescriptor<RANK>>
 class tensor_t : public detail::tensor_impl_t<T,RANK,Desc> {
 public:
@@ -84,13 +83,12 @@ public:
   using matxoplvalue = bool; ///< Indicate this is a MatX operator that can be on the lhs of an equation
   using tensor_view = bool; ///< Indicate this is a MatX tensor view
   using tensor_t_type = bool; ///< This is a tensor_t (not a tensor_impl_t)
-  using storage_type = Storage; ///< Storage type trait
   using shape_type = typename Desc::shape_type;
   using stride_type = typename Desc::stride_type;
   using shape_container = typename Desc::shape_container;
   using stride_container = typename Desc::stride_container;
   using desc_type = Desc; ///< Descriptor type trait
-  using self_type = tensor_t<T, RANK, Storage, Desc>;
+  using self_type = tensor_t<T, RANK, Desc>;
 
   /**
    * @brief Construct a new 0-D tensor t object
@@ -175,11 +173,11 @@ public:
    * @param s Shape object
    * @param desc Descriptor object
    */
-  template <typename S2 = Storage, typename D2 = Desc,
-            std::enable_if_t<is_matx_storage_v<typename remove_cvref<S2>::type> && is_matx_descriptor_v<typename remove_cvref<D2>::type>, bool> = true>
-  tensor_t(S2 &&s, D2 &&desc) :
+  template <typename D2 = Desc,
+            std::enable_if_t<is_matx_descriptor_v<typename remove_cvref<D2>::type>, bool> = true>
+  tensor_t(Storage<T> s, D2 &&desc) :
     detail::tensor_impl_t<T, RANK, Desc>{std::forward<D2>(desc)},
-    storage_{std::forward<S2>(s)}
+    storage_{std::move(s)}
   {
     this->SetLocalData(storage_.data());
   }
@@ -192,7 +190,7 @@ public:
    * @param ldata
    */
   template <typename D2 = Desc>
-  tensor_t(Storage s, D2 &&desc, T* ldata) :
+  tensor_t(Storage<T> s, D2 &&desc, T* ldata) :
     detail::tensor_impl_t<T, RANK, D2>{std::forward<D2>(desc)},
     storage_{std::move(s)}
   {
@@ -210,7 +208,7 @@ public:
     typename std::enable_if_t<is_matx_descriptor_v<D2>>>
   __MATX_INLINE__ tensor_t(D2 &&desc) :
     detail::tensor_impl_t<T, RANK, D2>{std::forward<D2>(desc)},
-    storage_{typename Storage::container{this->desc_.TotalSize()*sizeof(T)}}
+    storage_{make_owning_storage<T>(this->desc_.TotalSize())}
   {
     this->SetLocalData(storage_.data());
   }
@@ -225,7 +223,7 @@ public:
     // The ctor argument is unused, but matches {} for rank-0 tensors. We do
     // not use [[maybe_unused]] due to https://gcc.gnu.org/bugzilla/show_bug.cgi?id=81429 in gcc < 9.3
     detail::tensor_impl_t<T, RANK, Desc>(cuda::std::array<index_t, 0>{}),
-    storage_{typename Storage::container{sizeof(T)}}
+    storage_{make_owning_storage<T>(1)}
   {
     this->SetLocalData(storage_.data());
   }
@@ -239,7 +237,7 @@ public:
    */
   __MATX_INLINE__ tensor_t(const typename Desc::shape_type (&shape)[RANK]) :
     detail::tensor_impl_t<T, RANK, Desc>(shape),
-    storage_{typename Storage::container{this->desc_.TotalSize()*sizeof(T)}}
+    storage_{make_owning_storage<T>(this->desc_.TotalSize())}
   {
     this->SetLocalData(storage_.data());
   }
@@ -643,7 +641,7 @@ public:
     [[maybe_unused]] stride_type prod = std::accumulate(std::begin(shape), std::end(shape), static_cast<stride_type>(1), std::multiplies<stride_type>());
     // Ensure new shape's total size is not larger than the original
     MATX_ASSERT_STR(
-        sizeof(M) * prod <= storage_.Bytes(), matxInvalidSize,
+        sizeof(M) * prod <= storage_.bytes(), matxInvalidSize,
         "Total size of new tensor must not be larger than the original");
 
     // This could be loosened up to make sure only the fastest changing dims
@@ -653,7 +651,8 @@ public:
 
     // Copy descriptor and call ctor with shape
     Desc new_desc{std::forward<Shape>(shape)};
-    return tensor_t<M, R, Storage, Desc>{storage_, std::move(new_desc), this->Data()};
+    // Multiple views can share the same storage
+    return tensor_t<M, R, Desc>{storage_, std::move(new_desc), this->Data()};
   }
 
   /**
@@ -703,7 +702,7 @@ public:
 
     [[maybe_unused]] stride_type prod = std::accumulate(std::begin(shape), std::end(shape), static_cast<stride_type>(1), std::multiplies<stride_type>());
     MATX_ASSERT_STR(
-        sizeof(T) * prod <= storage_.Bytes(), matxInvalidSize,
+        sizeof(T) * prod <= storage_.bytes(), matxInvalidSize,
         "Total size of new tensor must not be larger than the original");
 
     // This could be loosened up to make sure only the fastest changing dims
@@ -712,7 +711,7 @@ public:
        "To get a reshaped view the tensor must be compact");
 
     DefaultDescriptor<tshape.size()> desc{std::move(tshape)};
-    return tensor_t<T, NRANK, Storage, decltype(desc)>{storage_, std::move(desc), this->Data()};
+    return tensor_t<T, NRANK, decltype(desc)>{storage_, std::move(desc), this->Data()};
   }
 
   /**
@@ -809,7 +808,9 @@ MATX_LOOP_UNROLL
 
     // Copy descriptor and call ctor with shape
     Desc new_desc{this->desc_.Shape(), std::move(strides)};
-    return tensor_t<Type, RANK, Storage, Desc>{storage_, std::move(new_desc), data};
+    // Create non-owning storage with the correct type for the real view
+    auto real_storage = make_non_owning_storage<Type>(data, storage_.size() * 2);
+    return tensor_t<Type, RANK, Desc>{real_storage, std::move(new_desc), data};
   }
 
   /**
@@ -852,7 +853,9 @@ MATX_LOOP_UNROLL
     }
 
     Desc new_desc{this->desc_.Shape(), std::move(strides)};
-    return tensor_t<Type, RANK, Storage, Desc>{storage_, std::move(new_desc), data};
+    // Create non-owning storage with the correct type for the imaginary view  
+    auto imag_storage = make_non_owning_storage<Type>(data, storage_.size() * 2);
+    return tensor_t<Type, RANK, Desc>{imag_storage, std::move(new_desc), data};
   }
 
   /**
@@ -875,7 +878,7 @@ MATX_LOOP_UNROLL
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
     auto new_desc = this->PermuteImpl(dims);
-    return tensor_t<T, RANK, Storage, Desc>{storage_, std::move(new_desc), this->Data()};
+    return tensor_t<T, RANK, Desc>{storage_, std::move(new_desc), this->Data()};
   }
 
 
@@ -940,7 +943,8 @@ MATX_LOOP_UNROLL
   Reset(T *const data, ShapeType &&shape) noexcept
   {
     this->desc_.InitFromShape(std::forward<ShapeType>(shape));
-    storage_.SetData(data);
+    // For non-owning storage, we need to recreate the storage object
+    storage_ = make_non_owning_storage<T>(data, this->desc_.TotalSize());
     this->SetData(data);
   }
 
@@ -960,7 +964,8 @@ MATX_LOOP_UNROLL
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-    storage_.SetData(data);
+    // For non-owning storage, we need to recreate the storage object
+    storage_ = make_non_owning_storage<T>(data, this->desc_.TotalSize());
     this->SetData(data);
   }
 
@@ -980,7 +985,8 @@ MATX_LOOP_UNROLL
   __MATX_HOST__ __MATX_INLINE__ void
   Reset(T *const data, T *const ldata) noexcept
   {
-    storage_.SetData(data);
+    // For non-owning storage, we need to recreate the storage object
+    storage_ = make_non_owning_storage<T>(data, this->desc_.TotalSize());
     this->SetData(ldata);
   }
 
@@ -1043,7 +1049,7 @@ MATX_LOOP_UNROLL
   OverlapView(const cuda::std::array<typename Desc::shape_type, N> &windows,
               const cuda::std::array<typename Desc::stride_type, N> &strides) const {
     auto new_desc = this->template OverlapViewImpl<N>(windows, strides);
-    return tensor_t<T, RANK + 1, Storage, decltype(new_desc)>{storage_, std::move(new_desc), this->Data()};
+    return tensor_t<T, RANK + 1, decltype(new_desc)>{storage_, std::move(new_desc), this->Data()};
   }
 
   /**
@@ -1077,7 +1083,7 @@ MATX_LOOP_UNROLL
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
     auto new_desc = this->template CloneImpl<N>(clones);
-    return tensor_t<T, N, Storage, decltype(new_desc)>{storage_, std::move(new_desc), this->Data()};
+    return tensor_t<T, N, decltype(new_desc)>{storage_, std::move(new_desc), this->Data()};
   }
 
   template <int N>
@@ -1375,7 +1381,7 @@ MATX_LOOP_UNROLL
                             [[maybe_unused]] StrideType strides) const
   {
     auto [new_desc, data] = this->template SliceImpl<N, StrideType>(firsts, ends, strides);
-    return tensor_t<T, N, Storage, decltype(new_desc)>{storage_, std::move(new_desc), data};
+    return tensor_t<T, N, decltype(new_desc)>{storage_, std::move(new_desc), data};
   }
 
   template <typename StrideType, int N = RANK>
@@ -1523,7 +1529,7 @@ MATX_LOOP_UNROLL
   }
 
 private:
-  Storage storage_;
+  Storage<T> storage_;
   std::string name_ = std::string("tensor_") + std::to_string(RANK) + "_" + detail::to_short_str<T>();
 };
 

@@ -43,6 +43,8 @@
 
 #include <cstdio>
 #include <numeric>
+#include <cuda/std/__algorithm/min.h>
+#include <cuda/std/__algorithm/max.h>
 
 namespace matx {
 

@@ -45,6 +45,7 @@
 
 #include <cstdio>
 #include <numeric>
+#include <cuda/std/__algorithm/min.h>
 
 namespace matx {
 

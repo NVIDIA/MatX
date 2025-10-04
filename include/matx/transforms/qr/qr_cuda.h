@@ -44,6 +44,7 @@
 
 #include <cstdio>
 #include <numeric>
+#include <cuda/std/__algorithm/min.h>
 
 namespace matx {
 
@@ -774,6 +775,8 @@ private:
       // should never reach here
       static_assert(always_false_v<T1>, "Unsupported type for economic QR");
     }
+
+    return CUSOLVER_STATUS_NOT_SUPPORTED;
   }
 
   std::vector<T2 *> batch_tau_ptrs;

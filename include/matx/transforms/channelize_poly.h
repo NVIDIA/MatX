@@ -42,6 +42,7 @@
 #include "matx/kernels/channelize_poly.cuh"
 #include "matx/operators/fft.h"
 #include "matx/operators/slice.h"
+#include <cuda/std/__algorithm/max.h>
 
 namespace matx {
 namespace detail {

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.23.1)
 
-set(MATX_VERSION 0.9.2)
+set(MATX_VERSION 0.9.3)
 
 # Used for config file generation
 if(NOT DEFINED PROJECT_NAME)
@@ -55,7 +55,7 @@ if (NOT CMAKE_CUDA_ARCHITECTURES)
 endif()
 message(STATUS "Using GPU architectures ${CMAKE_CUDA_ARCHITECTURES}")
 
-rapids_cmake_write_version_file(include/version_config.h)
+rapids_cmake_write_version_file(include/matx/version_config.h)
 
 # Command line options
 option(MATX_BUILD_EXAMPLES "Build examples" OFF)
@@ -340,13 +340,15 @@ if (MATX_EN_FILEIO OR MATX_EN_VISUALIZATION OR MATX_EN_PYBIND11 OR MATX_BUILD_EX
 endif()
 
 # Add in all CUDA linker dependencies
-target_link_libraries(matx INTERFACE    CUDA::cudart
-                                        CUDA::cublas
-                                        CUDA::cublasLt
-                                        CUDA::cufft
-                                        CUDA::cusolver
-                                        CUDA::cuda_driver
-                                        CUDA::curand)
+target_link_libraries(matx INTERFACE
+    CUDA::cublas
+    CUDA::cublasLt
+    CUDA::cuda_driver
+    CUDA::cudart
+    CUDA::cufft
+    CUDA::curand
+    CUDA::cusolver
+    CUDA::cusparse)
 
 if (CMAKE_VERSION VERSION_LESS 3.25.0)
     target_link_libraries(matx INTERFACE CUDA::nvToolsExt)
@@ -362,7 +364,7 @@ if (NOT_SUBPROJECT)
 
     install(TARGETS matx EXPORT matx-exports)
     install(DIRECTORY include/ DESTINATION include)
-    install(FILES ${CMAKE_BINARY_DIR}/include/version_config.h DESTINATION include)
+    install(FILES ${CMAKE_BINARY_DIR}/include/matx/version_config.h DESTINATION include)
 
     set(doc_string
     [=[

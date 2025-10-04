@@ -49,6 +49,25 @@ __MATX_INLINE__ static void setZero(T *ptr, index_t sz,
   }
 }
 
+// Helper to create a Storage<T> with zeros
+template <typename T>
+__MATX_INLINE__ Storage<T> makeZeroStorage(index_t sz, matxMemorySpace_t space) {
+  assert(sz > 0);
+  Storage<T> storage(sz, space);
+  if (storage.data() != nullptr) {
+    setZero(storage.data(), sz, space);
+  }
+  return storage;
+}
+
+// Helper to create an empty Storage<T>
+template <typename T>
+__MATX_INLINE__ Storage<T> makeEmptyStorage() {
+  return Storage<T>();
+}
+
+
+
 // Helper method to fill memory.
 template <typename T>
 __MATX_INLINE__ static void setVal(T *ptr, T val, matxMemorySpace_t space) {
@@ -59,25 +78,6 @@ __MATX_INLINE__ static void setVal(T *ptr, T val, matxMemorySpace_t space) {
   }
 }
 
-// Helper method to create zero storage.
-template <typename T>
-__MATX_INLINE__ static auto
-makeDefaultNonOwningZeroStorage(index_t sz, matxMemorySpace_t space) {
-  T *ptr = nullptr;
-  assert(sz > 0);
-  matxAlloc((void **)&ptr, sz * sizeof(T), space, /*stream=*/0);
-  setZero(ptr, sz, space);
-  raw_pointer_buffer<T, matx_allocator<T>> buf{ptr, sz * sizeof(T),
-                                               /*owning=*/false};
-  return basic_storage<decltype(buf)>{std::move(buf)};
-}
-
-// Helper method to create empty storage.
-template <typename T>
-__MATX_INLINE__ static auto makeDefaultNonOwningEmptyStorage() {
-  raw_pointer_buffer<T, matx_allocator<T>> buf{nullptr, 0, /*owning=*/false};
-  return basic_storage<decltype(buf)>{std::move(buf)};
-}
 
 //
 // MatX implements a universal sparse tensor type that uses a tensor format
@@ -112,12 +112,12 @@ auto make_tensor_coo(ValTensor &val, CrdTensor &row, CrdTensor &col,
   // compression should set up pos[0] = {0, nse}. This is done
   // here, using the same memory space as the other data.
   matxMemorySpace_t space = GetPointerKind(val.GetStorage().data());
-  auto tp = makeDefaultNonOwningZeroStorage<POS>(2, space);
+  Storage<POS> tp = makeZeroStorage<POS>(2, space);
   setVal(tp.data() + 1, static_cast<POS>(val.Size(0)), space);
   // Construct COO.
   return sparse_tensor_t<VAL, CRD, POS, COO>(
       shape, val.GetStorage(), {row.GetStorage(), col.GetStorage()},
-      {tp, makeDefaultNonOwningEmptyStorage<POS>()});
+      {std::move(tp), makeEmptyStorage<POS>()});
 }
 
 // Constructs a zero sparse matrix in COO format (viz. nse=0).
@@ -125,11 +125,11 @@ template <typename VAL, typename CRD, typename POS = index_t>
 auto make_zero_tensor_coo(const index_t (&shape)[2],
                           matxMemorySpace_t space = MATX_MANAGED_MEMORY) {
   return sparse_tensor_t<VAL, CRD, POS, COO>(
-      shape, makeDefaultNonOwningEmptyStorage<VAL>(),
-      {makeDefaultNonOwningEmptyStorage<CRD>(),
-       makeDefaultNonOwningEmptyStorage<CRD>()},
-      {makeDefaultNonOwningZeroStorage<POS>(2, space),
-       makeDefaultNonOwningEmptyStorage<POS>()});
+      shape, makeEmptyStorage<VAL>(),
+      {makeEmptyStorage<CRD>(),
+       makeEmptyStorage<CRD>()},
+      {makeZeroStorage<POS>(2, space),
+       makeEmptyStorage<POS>()});
 }
 
 // Constructs a sparse matrix in CSR format directly from the values, the
@@ -153,8 +153,8 @@ auto make_tensor_csr(ValTensor &val, PosTensor &rowp, CrdTensor &col,
   // Construct CSR.
   return sparse_tensor_t<VAL, CRD, POS, CSR>(
       shape, val.GetStorage(),
-      {makeDefaultNonOwningEmptyStorage<CRD>(), col.GetStorage()},
-      {makeDefaultNonOwningEmptyStorage<POS>(), rowp.GetStorage()});
+      {makeEmptyStorage<CRD>(), col.GetStorage()},
+      {makeEmptyStorage<POS>(), rowp.GetStorage()});
 }
 
 // Constructs a zero sparse matrix in CSR format (viz. nse=0).
@@ -162,11 +162,11 @@ template <typename VAL, typename CRD, typename POS>
 auto make_zero_tensor_csr(const index_t (&shape)[2],
                           matxMemorySpace_t space = MATX_MANAGED_MEMORY) {
   return sparse_tensor_t<VAL, CRD, POS, CSR>(
-      shape, makeDefaultNonOwningEmptyStorage<VAL>(),
-      {makeDefaultNonOwningEmptyStorage<CRD>(),
-       makeDefaultNonOwningEmptyStorage<CRD>()},
-      {makeDefaultNonOwningEmptyStorage<POS>(),
-       makeDefaultNonOwningZeroStorage<POS>(shape[0] + 1, space)});
+      shape, makeEmptyStorage<VAL>(),
+      {makeEmptyStorage<CRD>(),
+       makeEmptyStorage<CRD>()},
+      {makeEmptyStorage<POS>(),
+       makeZeroStorage<POS>(shape[0] + 1, space)});
 }
 
 // Constructs a sparse matrix in CSC format directly from the values, the
@@ -190,8 +190,8 @@ auto make_tensor_csc(ValTensor &val, PosTensor &colp, CrdTensor &row,
   // Construct CSC.
   return sparse_tensor_t<VAL, CRD, POS, CSC>(
       shape, val.GetStorage(),
-      {makeDefaultNonOwningEmptyStorage<CRD>(), row.GetStorage()},
-      {makeDefaultNonOwningEmptyStorage<POS>(), colp.GetStorage()});
+      {makeEmptyStorage<CRD>(), row.GetStorage()},
+      {makeEmptyStorage<POS>(), colp.GetStorage()});
 }
 
 // Constructs a zero sparse matrix in CSC format (viz. nse=0).
@@ -199,11 +199,11 @@ template <typename VAL, typename CRD, typename POS>
 auto make_zero_tensor_csc(const index_t (&shape)[2],
                           matxMemorySpace_t space = MATX_MANAGED_MEMORY) {
   return sparse_tensor_t<VAL, CRD, POS, CSC>(
-      shape, makeDefaultNonOwningEmptyStorage<VAL>(),
-      {makeDefaultNonOwningEmptyStorage<CRD>(),
-       makeDefaultNonOwningEmptyStorage<CRD>()},
-      {makeDefaultNonOwningEmptyStorage<POS>(),
-       makeDefaultNonOwningZeroStorage<POS>(shape[1] + 1, space)});
+      shape, makeEmptyStorage<VAL>(),
+      {makeEmptyStorage<CRD>(),
+       makeEmptyStorage<CRD>()},
+      {makeEmptyStorage<POS>(),
+       makeZeroStorage<POS>(shape[1] + 1, space)});
 }
 
 // Constructs a sparse matrix in DIA format directly from the values and the
@@ -235,14 +235,14 @@ auto make_tensor_dia(ValTensor &val, CrdTensor &off,
   // compression should set up pos[0] = {0, #diags}. This is done
   // here, using the same memory space as the other data.
   matxMemorySpace_t space = GetPointerKind(val.GetStorage().data());
-  auto tp = makeDefaultNonOwningZeroStorage<POS>(2, space);
+  Storage<POS> tp = makeZeroStorage<POS>(2, space);
   setVal(tp.data() + 1, static_cast<POS>(off.Size(0)), space);
   // Construct DIA-I/J.
   using DIA = std::conditional_t<std::is_same_v<IDX, DIA_INDEX_I>, DIAI, DIAJ>;
   return sparse_tensor_t<VAL, CRD, POS, DIA>(
       shape, val.GetStorage(),
-      {off.GetStorage(), makeDefaultNonOwningEmptyStorage<CRD>()},
-      {tp, makeDefaultNonOwningEmptyStorage<POS>()});
+      {off.GetStorage(), makeEmptyStorage<CRD>()},
+      {std::move(tp), makeEmptyStorage<POS>()});
 }
 
 // Constructs a sparse tensor in uniform batched DIA format directly from
@@ -275,15 +275,15 @@ auto make_tensor_uniform_batched_dia(ValTensor &val, CrdTensor &off,
   // compression should set up pos[0] = {0, #diags}. This is done
   // here, using the same memory space as the other data.
   matxMemorySpace_t space = GetPointerKind(val.GetStorage().data());
-  auto tp = makeDefaultNonOwningZeroStorage<POS>(2, space);
+  Storage<POS> tp = makeZeroStorage<POS>(2, space);
   setVal(tp.data() + 1, static_cast<POS>(off.Size(0)), space);
   // Construct Batched DIA-I/J.
   using DIA = std::conditional_t<std::is_same_v<IDX, DIA_INDEX_I>,
                                  BatchedDIAIUniform, BatchedDIAJUniform>;
   return sparse_tensor_t<VAL, CRD, POS, DIA>(
       shape, val.GetStorage(),
-      {off.GetStorage(), makeDefaultNonOwningEmptyStorage<CRD>()},
-      {tp, makeDefaultNonOwningEmptyStorage<POS>()});
+      {off.GetStorage(), makeEmptyStorage<CRD>()},
+      {std::move(tp), makeEmptyStorage<POS>()});
 }
 
 // Convenience constructor for uniform batched tri-diagonal storage.
@@ -307,21 +307,21 @@ auto make_tensor_uniform_batched_tri_dia(ValTensor &val,
   }
   // Construct the off = { -1, 0, +1 } in values memory space.
   matxMemorySpace_t space = GetPointerKind(val.GetStorage().data());
-  auto off = makeDefaultNonOwningZeroStorage<CRD>(3, space);
+  Storage<CRD> off = makeZeroStorage<CRD>(3, space);
   setVal(off.data() + 0, static_cast<CRD>(-1), space);
   setVal(off.data() + 2, static_cast<CRD>(+1), space);
   // Note that the DIA API typically does not involve positions.
   // However, under the formal DSL specifications, the top level
   // compression should set up pos[0] = {0, #diags}. This is done
   // here, using the same memory space as the other data.
-  auto tp = makeDefaultNonOwningZeroStorage<POS>(2, space);
+  Storage<POS> tp = makeZeroStorage<POS>(2, space);
   setVal(tp.data() + 1, static_cast<POS>(3), space);
   // Construct Batched DIA-I/J.
   using DIA = std::conditional_t<std::is_same_v<IDX, DIA_INDEX_I>,
                                  BatchedDIAIUniform, BatchedDIAJUniform>;
   return sparse_tensor_t<VAL, CRD, POS, DIA>(
-      shape, val.GetStorage(), {off, makeDefaultNonOwningEmptyStorage<CRD>()},
-      {tp, makeDefaultNonOwningEmptyStorage<POS>()});
+      shape, val.GetStorage(), {std::move(off), makeEmptyStorage<CRD>()},
+      {std::move(tp), makeEmptyStorage<POS>()});
 }
 
 } // namespace experimental

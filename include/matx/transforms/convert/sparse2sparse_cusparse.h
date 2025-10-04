@@ -36,6 +36,7 @@
 #include <cusparse.h>
 
 #include <numeric>
+#include <typeinfo>
 
 #include "matx/core/cache.h"
 #include "matx/core/sparse_tensor.h"
@@ -63,14 +64,14 @@ struct Sparse2SparseParams_t {
   void *ptrA1;
   void *ptrA2;
   void *ptrA3;
+  size_t format_hash_in;   // Hash of the input sparse tensor format type
+  size_t format_hash_out;  // Hash of the output sparse tensor format type
 };
 
 // Helper method to wrap pointer/size in new storage.
 template <typename T>
-__MATX_INLINE__ static auto wrapDefaultNonOwningStorage(T *ptr, size_t sz) {
-  raw_pointer_buffer<T, matx_allocator<T>> buf{ptr, sz * sizeof(T),
-                                               /*owning=*/false};
-  return basic_storage<decltype(buf)>{std::move(buf)};
+__MATX_INLINE__ static Storage<T> wrapDefaultNonOwningStorage(T *ptr, size_t sz) {
+  return Storage<T>(ptr, sz);
 }
 
 template <typename TensorTypeO, typename TensorTypeA>
@@ -134,6 +135,9 @@ public:
     params.ptrA1 = a.POSData(0);
     params.ptrA2 = a.CRDData(0);
     params.ptrA3 = a.CRDData(1);
+    // Add format type hashes to distinguish between different sparse formats
+    params.format_hash_in = typeid(typename TensorTypeA::Format).hash_code();
+    params.format_hash_out = typeid(typename TensorTypeO::Format).hash_code();
     return params;
   }
 
@@ -165,7 +169,9 @@ struct Sparse2SparseParamsKeyHash {
   std::size_t operator()(const Sparse2SparseParams_t &k) const noexcept {
     return std::hash<uint64_t>()(reinterpret_cast<uint64_t>(k.ptrO1)) +
            std::hash<uint64_t>()(reinterpret_cast<uint64_t>(k.ptrA0)) +
-           std::hash<uint64_t>()(reinterpret_cast<uint64_t>(k.stream));
+           std::hash<uint64_t>()(reinterpret_cast<uint64_t>(k.stream)) +
+           std::hash<size_t>()(k.format_hash_in) +
+           std::hash<size_t>()(k.format_hash_out);
   }
 };
 
@@ -180,7 +186,8 @@ struct Sparse2SparseParamsKeyEq {
     return l.dtype == t.dtype && l.ptype == t.ptype && l.ctype == t.ctype &&
            l.stream == t.stream && l.nse == t.nse && l.m == t.m && l.n == t.n &&
            l.ptrO1 == t.ptrO1 && l.ptrA0 == t.ptrA0 && l.ptrA1 == t.ptrA1 &&
-           l.ptrA2 == t.ptrA2 && l.ptrA3 == t.ptrA3;
+           l.ptrA2 == t.ptrA2 && l.ptrA3 == t.ptrA3 && 
+           l.format_hash_in == t.format_hash_in && l.format_hash_out == t.format_hash_out;
   }
 };
 
