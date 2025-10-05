@@ -36,6 +36,7 @@
 #include <cstdio>
 #include <type_traits>
 
+#include "matx/core/cache.h"
 #include "matx/core/error.h"
 #include "matx/core/nvtx.h"
 #include "matx/core/tensor.h"
@@ -69,7 +70,6 @@ inline void sar_bp_impl(OutImageType &out, const InitialImageType &initial_image
   MATX_STATIC_ASSERT_STR(RangeProfilesType::Rank() == 2, matxInvalidDim, "sar_bp: range profiles must be a 2D tensor");
 
   constexpr double C = 2.997291625155841e+08; // FIXME: Add to matx/core/constants.h or similar
-  const double phase_correction_partial = 4.0 * M_PI * (params.center_frequency / C);
   const double dr_inv = 1.0 / params.del_r;
 
   const dim3 block(16, 16);
@@ -77,16 +77,46 @@ inline void sar_bp_impl(OutImageType &out, const InitialImageType &initial_image
     static_cast<uint32_t>((out.Size(1) + block.x - 1) / block.x),
     static_cast<uint32_t>((out.Size(0) + block.y - 1) / block.y));
 
-  if (params.compute_type == SarBpComputeType::Double) {
-    SarBp<SarBpComputeType::Double, OutImageType, InitialImageType, RangeProfilesType, PlatPosType, VoxLocType, RangeToMcpType><<<grid, block, 0, stream>>>(
-      out, initial_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, dr_inv, phase_correction_partial);
-  } else if (params.compute_type == SarBpComputeType::Mixed) {
-    SarBp<SarBpComputeType::Mixed, OutImageType, InitialImageType, RangeProfilesType, PlatPosType, VoxLocType, RangeToMcpType><<<grid, block, 0, stream>>>(
-      out, initial_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, dr_inv, phase_correction_partial);
+  const bool phase_lut_optimization = (params.features & SarBpFeature::PhaseLUTOptimization) != SarBpFeature::None;
+  if(phase_lut_optimization) {
+    const bool PhaseLUT = true;
+    const double phase_correction_partial = 4.0 * M_PI * params.del_r * (params.center_frequency / C);
+
+    void *workspace = detail::GetCache().GetStreamAlloc(stream, sizeof(cuda::std::complex<double>) * range_profiles.Size(1));
+    const dim3 lut_block(128);
+    const dim3 lut_grid(static_cast<uint32_t>((range_profiles.Size(1) + lut_block.x - 1) / lut_block.x));
+
+    if (params.compute_type == SarBpComputeType::Double) {
+      cuda::std::complex<double> *phase_lut = static_cast<cuda::std::complex<double> *>(workspace);
+      SarBpFillPhaseLUT<double><<<lut_grid, lut_block, 0, stream>>>(phase_lut, params.center_frequency, params.del_r, range_profiles.Size(1));
+      SarBp<SarBpComputeType::Double, OutImageType, InitialImageType, RangeProfilesType, PlatPosType, VoxLocType, RangeToMcpType, PhaseLUT><<<grid, block, 0, stream>>>(
+        out, initial_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, dr_inv, phase_correction_partial, phase_lut);
+    } else if (params.compute_type == SarBpComputeType::Mixed) {
+      cuda::std::complex<double> *phase_lut = static_cast<cuda::std::complex<double> *>(workspace);
+      SarBpFillPhaseLUT<double><<<lut_grid, lut_block, 0, stream>>>(phase_lut, params.center_frequency, params.del_r, range_profiles.Size(1));
+      SarBp<SarBpComputeType::Mixed, OutImageType, InitialImageType, RangeProfilesType, PlatPosType, VoxLocType, RangeToMcpType, PhaseLUT><<<grid, block, 0, stream>>>(
+        out, initial_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, dr_inv, phase_correction_partial, phase_lut);
+    } else {
+      cuda::std::complex<float> *phase_lut = static_cast<cuda::std::complex<float> *>(workspace);
+      SarBpFillPhaseLUT<float><<<lut_grid, lut_block, 0, stream>>>(phase_lut, static_cast<float>(params.center_frequency), static_cast<float>(params.del_r), range_profiles.Size(1));
+      SarBp<SarBpComputeType::Float, OutImageType, InitialImageType, RangeProfilesType, PlatPosType, VoxLocType, RangeToMcpType, PhaseLUT><<<grid, block, 0, stream>>>(
+        out, initial_image, range_profiles, platform_positions, voxel_locations, range_to_mcp,
+        static_cast<float>(dr_inv), static_cast<float>(phase_correction_partial), phase_lut);
+    }
   } else {
-    SarBp<SarBpComputeType::Float, OutImageType, InitialImageType, RangeProfilesType, PlatPosType, VoxLocType, RangeToMcpType><<<grid, block, 0, stream>>>(
-      out, initial_image, range_profiles, platform_positions, voxel_locations, range_to_mcp,
-      static_cast<float>(dr_inv), static_cast<float>(phase_correction_partial));
+    const bool PhaseLUT = false;
+    const double phase_correction_partial = 4.0 * M_PI * (params.center_frequency / C);
+    if (params.compute_type == SarBpComputeType::Double) {
+      SarBp<SarBpComputeType::Double, OutImageType, InitialImageType, RangeProfilesType, PlatPosType, VoxLocType, RangeToMcpType, PhaseLUT><<<grid, block, 0, stream>>>(
+        out, initial_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, dr_inv, phase_correction_partial, nullptr);
+    } else if (params.compute_type == SarBpComputeType::Mixed) {
+      SarBp<SarBpComputeType::Mixed, OutImageType, InitialImageType, RangeProfilesType, PlatPosType, VoxLocType, RangeToMcpType, PhaseLUT><<<grid, block, 0, stream>>>(
+        out, initial_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, dr_inv, phase_correction_partial, nullptr);
+    } else {
+      SarBp<SarBpComputeType::Float, OutImageType, InitialImageType, RangeProfilesType, PlatPosType, VoxLocType, RangeToMcpType, PhaseLUT><<<grid, block, 0, stream>>>(
+        out, initial_image, range_profiles, platform_positions, voxel_locations, range_to_mcp,
+        static_cast<float>(dr_inv), static_cast<float>(phase_correction_partial), nullptr);
+    }
   }
 #endif // __CUDACC__
 }

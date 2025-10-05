@@ -43,14 +43,41 @@ enum class SarBpComputeType {
   Float
 };
 
+// Features that can be enabled or disabled for the SAR BP kernel. These features are enabled by setting
+// the corresponding bit in the SarBpParams::features field.
+enum class SarBpFeature : uint32_t {
+  None = 0x0,
+  PhaseLUTOptimization = 0x1,
+  // Add more features here as needed
+};
+
+// Enable bitmask operations for SarBpFeature
+constexpr SarBpFeature operator|(SarBpFeature lhs, SarBpFeature rhs) noexcept {
+  return static_cast<SarBpFeature>(static_cast<uint32_t>(lhs) | static_cast<uint32_t>(rhs));
+}
+
+constexpr SarBpFeature operator&(SarBpFeature lhs, SarBpFeature rhs) noexcept {
+  return static_cast<SarBpFeature>(static_cast<uint32_t>(lhs) & static_cast<uint32_t>(rhs));
+}
+
+constexpr SarBpFeature& operator|=(SarBpFeature& lhs, SarBpFeature rhs) noexcept {
+  return lhs = lhs | rhs;
+}
+
+// Helper function to test if a feature is enabled
+constexpr bool has_feature(SarBpFeature features, SarBpFeature feature) noexcept {
+  return (features & feature) != SarBpFeature::None;
+}
+
 struct SarBpParams {
   // compute_type controls the floating point precision of intermediate calculations in the SAR BP kernel.
   // While the inputs (range profiles, antenna positions, etc.) and output (image) have their own data
   // types, we may wish to use a different precision for the internal calculations. For example, the
   // output may be cuda::std::complex<float> while the intermediate calculations are done in double.
-  SarBpComputeType compute_type;
-  double center_frequency;
-  double del_r;
+  SarBpComputeType compute_type{SarBpComputeType::Double};
+  SarBpFeature features{SarBpFeature::None};
+  double center_frequency{0.0};
+  double del_r{0.0};
 };
 
 }

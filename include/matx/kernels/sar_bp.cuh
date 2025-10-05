@@ -67,11 +67,36 @@ __device__ inline strict_compute_t ComputeRangeToPixel(const PlatPosType &ant_po
     }
 }
 
-template <SarBpComputeType ComputeType, typename OutImageType, typename InitialImageType, typename RangeProfilesType, typename PlatPosType, typename VoxLocType, typename RangeToMcpType>
+template <typename ComputeType>
+__global__ void SarBpFillPhaseLUT(cuda::std::complex<ComputeType> *phase_lut, ComputeType ref_freq, ComputeType dr, index_t num_range_bins)
+{
+    const int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    if (tid >= num_range_bins) return;
+    constexpr double C = 2.997291625155841e+08; // FIXME: Add to matx/core/constants.h or similar
+    constexpr ComputeType four_pi_over_c = static_cast<ComputeType>(4.0 * M_PI / C);
+    const ComputeType range_bin_start = static_cast<ComputeType>(tid - 0.5 * (num_range_bins-1)) * dr;
+    const ComputeType phase = four_pi_over_c * ref_freq * range_bin_start;
+    if constexpr (std::is_same_v<ComputeType, float>) {
+        ComputeType sinx, cosx;
+        ::sincosf(phase, &sinx, &cosx);
+        phase_lut[tid] = cuda::std::complex<ComputeType>(cosx, sinx);
+    } else {
+        ComputeType sinx, cosx;
+        ::sincos(phase, &sinx, &cosx);
+        phase_lut[tid] = cuda::std::complex<ComputeType>(cosx, sinx);
+    }
+}
+
+// Template alias for the strict compute parameter type used in SarBp kernel
+template <SarBpComputeType ComputeType>
+using strict_compute_param_t = typename std::conditional<ComputeType == SarBpComputeType::Double || ComputeType == SarBpComputeType::Mixed, double, float>::type;
+
+template <SarBpComputeType ComputeType, typename OutImageType, typename InitialImageType, typename RangeProfilesType, typename PlatPosType, typename VoxLocType, typename RangeToMcpType, bool PhaseLUT>
 __launch_bounds__(16*16)
 __global__ void SarBp(OutImageType output, const InitialImageType initial_image, const __grid_constant__ RangeProfilesType range_profiles, const __grid_constant__ PlatPosType platform_positions, const __grid_constant__ VoxLocType voxel_locations, const __grid_constant__ RangeToMcpType range_to_mcp,
-                      typename std::conditional<ComputeType == SarBpComputeType::Double || ComputeType == SarBpComputeType::Mixed, double, float>::type dr_inv,
-                      typename std::conditional<ComputeType == SarBpComputeType::Double || ComputeType == SarBpComputeType::Mixed, double, float>::type phase_correction_partial)
+                      strict_compute_param_t<ComputeType> dr_inv,
+                      strict_compute_param_t<ComputeType> phase_correction_partial,
+                      cuda::std::complex<strict_compute_param_t<ComputeType>> *phase_lut)
 {
     static_assert(is_complex_v<typename OutImageType::value_type>, "Output image must be complex");
     static_assert(is_complex_v<typename InitialImageType::value_type>, "Initial image must be complex");
@@ -89,17 +114,19 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
     using voxel_loc_t = typename VoxLocType::value_type;
     using compute_t = typename std::conditional<ComputeType == SarBpComputeType::Double, double, float>::type;
     using strict_compute_t = typename std::conditional<ComputeType == SarBpComputeType::Double || ComputeType == SarBpComputeType::Mixed, double, float>::type;
+    using strict_complex_compute_t = cuda::std::complex<strict_compute_t>;
     using loose_compute_t = typename std::conditional<ComputeType == SarBpComputeType::Mixed || ComputeType == SarBpComputeType::Float, float, double>::type;
     using loose_complex_compute_t = cuda::std::complex<loose_compute_t>;
 
-    const index_t num_pulses = range_profiles.Size(0);
-    const index_t num_range_bins = range_profiles.Size(1);
     const index_t image_height = output.Size(0);
     const index_t image_width = output.Size(1);
     const index_t ix = static_cast<index_t>(blockIdx.x * blockDim.x + threadIdx.x);
     const index_t iy = static_cast<index_t>(blockIdx.y * blockDim.y + threadIdx.y);
 
     if (ix >= image_width || iy >= image_height) return;
+
+    const index_t num_pulses = range_profiles.Size(0);
+    const index_t num_range_bins = range_profiles.Size(1);
 
     constexpr loose_compute_t half = static_cast<loose_compute_t>(0.5);
     const voxel_loc_t voxel_loc = voxel_locations(iy, ix);
@@ -116,6 +143,28 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
             }
         } else {
             return range_to_mcp;
+        }
+    };
+
+    const auto get_matched_filter = [&phase_lut, &phase_correction_partial](strict_compute_t diffR, index_t bin_floor_int, loose_compute_t w) -> loose_complex_compute_t {
+        if constexpr (PhaseLUT) {
+            const strict_complex_compute_t base_phase = phase_lut[bin_floor_int];
+            float incr_sinx, incr_cosx;
+            __sincosf(phase_correction_partial * w, &incr_sinx, &incr_cosx);
+            return loose_complex_compute_t{
+                base_phase.real() * incr_cosx - base_phase.imag() * incr_sinx,
+                base_phase.real() * incr_sinx + base_phase.imag() * incr_cosx
+            };
+        } else {
+            strict_compute_t sinx, cosx;
+            if constexpr (std::is_same_v<strict_compute_t, double>) {
+                ::sincos(phase_correction_partial * diffR, &sinx, &cosx);
+            } else {
+                ::sincosf(phase_correction_partial * diffR, &sinx, &cosx);
+            }
+            return loose_complex_compute_t{
+                static_cast<loose_compute_t>(cosx), static_cast<loose_compute_t>(sinx)
+            };
         }
     };
 
@@ -151,15 +200,7 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
             const loose_complex_compute_t sample =
                 (static_cast<loose_compute_t>(1.0) - w) * sample_lo + w * sample_hi;
 
-            strict_compute_t sinx, cosx;
-            if constexpr (std::is_same_v<strict_compute_t, double>) {
-                ::sincos(phase_correction_partial * diffR, &sinx, &cosx);
-            } else {
-                ::sincosf(phase_correction_partial * diffR, &sinx, &cosx);
-                //__sincosf(phase_correction_partial * diffR, &sinx, &cosx);
-            }
-            const loose_complex_compute_t matched_filter{
-                static_cast<loose_compute_t>(cosx), static_cast<loose_compute_t>(sinx)};
+            const loose_complex_compute_t matched_filter = get_matched_filter(diffR, bin_floor_int, w);
 
             accum += sample * matched_filter;
         }
