@@ -597,31 +597,22 @@ TYPED_TEST(MatMulTestFloatTypes, MediumRectBatched5D)
     auto b_4d = make_tensor<TestType>({4, 5, 256, 512});
     auto c_4d = make_tensor<TestType>({4, 5, 128, 512});
 
+
     // Get rank 4 test vectors from Python
     this->pb->template InitAndRunTVGenerator<TestType>(
-        "00_transforms", "matmul_operators", "run", {4, 5, 128, 256, 512});
+        "00_transforms", "matmul_operators", "run", {3, 4, 5, 128, 256, 512});
 
-    this->pb->NumpyToTensorView(a_4d, "a");
-    this->pb->NumpyToTensorView(b_4d, "b");
-
-    // Copy 4D tensors to each slice of 5D tensors
-    for (int i = 0; i < 3; i++) {
-      auto a_slice = slice<4>(a, {static_cast<index_t>(i), 0, 0, 0, 0}, {matxDropDim, matxEnd, matxEnd, matxEnd, matxEnd});
-      auto b_slice = slice<4>(b, {static_cast<index_t>(i), 0, 0, 0, 0}, {matxDropDim, matxEnd, matxEnd, matxEnd, matxEnd});
-      (a_slice = a_4d).run(this->exec);
-      (b_slice = b_4d).run(this->exec);
-    }
+    this->pb->NumpyToTensorView(a, "a");
+    this->pb->NumpyToTensorView(b, "b");
 
     // Perform batched matrix multiplication across all 3 batch dimensions
     (c = matmul(a, b)).run(this->exec);
+    this->exec.sync();
 
-    this->pb->NumpyToTensorView(c_4d, "c");
+    this->pb->NumpyToTensorView(c, "c");
 
     // Compare each slice of the 5D result with the Python-generated 4D result
-    for (int i = 0; i < 3; i++) {
-      auto c_slice = slice<4>(c, {static_cast<index_t>(i), 0, 0, 0, 0}, {matxDropDim, matxEnd, matxEnd, matxEnd, matxEnd});
-      MATX_TEST_ASSERT_COMPARE(this->pb, c_slice, "c", this->thresh);
-    }
+    MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
   }
   MATX_EXIT_HANDLER();
 }
