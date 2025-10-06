@@ -30,19 +30,50 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
+/**
+ * @file nvrtc_helper.h
+ * 
+ * This file provides runtime compilation support for MatX through two backends:
+ * 
+ * 1. Jitify (default): A wrapper around NVRTC that handles header dependencies automatically
+ * 2. Pure NVRTC: Direct use of NVIDIA's Runtime Compilation API
+ * 
+ * To enable pure NVRTC mode, define MATX_USE_PURE_NVRTC before including this header:
+ *   #define MATX_USE_PURE_NVRTC
+ * 
+ * Pure NVRTC mode:
+ * - Uses matx/core/jit_includes.h as the primary include for transitive dependencies
+ * - Treats all_jit_classes_string and capstr as additional header strings
+ * - Compiles kernels using NVRTC API and caches them for reuse
+ * - Requires CUDA Driver API for kernel loading and execution
+ */
+
 #pragma once
 
 #ifdef MATX_EN_JIT
 
 #include <cuda.h>
-#define JITIFY_ENABLE_NVTX 1
-#define JITIFY_VERBOSE_ERRORS 1
-#define JITIFY_ENABLE_EMBEDDED_FILES 1
-#define JITIFY_IGNORE_NOT_TRIVIALLY_COPYABLE_ARGS 1
-#ifdef MATX_EN_JIT_PREPROCESSING
-  #include "jit_includes.h.jit.hpp"
+
+// Macro to enable pure NVRTC (without Jitify). Default is to use Jitify.
+// Uncomment the line below or define this macro before including this header to enable pure NVRTC
+#define MATX_USE_PURE_NVRTC
+
+#ifdef MATX_USE_PURE_NVRTC
+  #include <nvrtc.h>
+  #include <fstream>
+  #include <sstream>
+  #include <unordered_map>
+#else
+  #define JITIFY_ENABLE_NVTX 1
+  #define JITIFY_VERBOSE_ERRORS 1
+  #define JITIFY_ENABLE_EMBEDDED_FILES 1
+  #define JITIFY_IGNORE_NOT_TRIVIALLY_COPYABLE_ARGS 1
+  #ifdef MATX_EN_JIT_PREPROCESSING
+    #include "jit_includes.h.jit.hpp"
+  #endif
+  #include "matx/core/jitify2.hpp"
 #endif
-#include "matx/core/jitify2.hpp"
+
 #include "matx/executors/jit_kernel.h"
 //#include "matx/core/type_utils.h"
 #include <filesystem>
@@ -79,9 +110,15 @@ std::vector<std::string> __MATX_HOST__ __MATX_INLINE__ get_preprocessor_options(
 
     // System paths
     //options.push_back("-I/usr/include/python3.10"); // This might need to be configured differently
+#ifdef MATX_USE_PURE_NVRTC
+    // Get CUDA include directory manually for pure NVRTC
+    const char* cuda_path = std::getenv("CUDA_PATH");
+    std::string cuda_inc_dir = cuda_path ? std::string(cuda_path) + "/include" : "/usr/local/cuda/include";
+    options.push_back("-I" + cuda_inc_dir);
+#else
     options.push_back("-I" + jitify2::get_cuda_include_dir());
-
     options.push_back("-no-system-headers-workaround");
+#endif
     
     // Use CMake-configured CUDA architecture and C++ standard
     #ifdef NVRTC_CUDA_ARCH
@@ -98,6 +135,51 @@ std::vector<std::string> __MATX_HOST__ __MATX_INLINE__ get_preprocessor_options(
 
     return options;
 }
+
+#ifdef MATX_USE_PURE_NVRTC
+// Helper function to check NVRTC errors
+#define NVRTC_CHECK(call)                                                      \
+  do {                                                                         \
+    nvrtcResult result = call;                                                 \
+    if (result != NVRTC_SUCCESS) {                                             \
+      std::cerr << "NVRTC error at " << __FILE__ << ":" << __LINE__            \
+                << ": " << nvrtcGetErrorString(result) << std::endl;           \
+      std::exit(EXIT_FAILURE);                                                 \
+    }                                                                          \
+  } while (0)
+
+// Helper function to check CUDA Driver API errors
+#define CUDA_CHECK(call)                                                       \
+  do {                                                                         \
+    CUresult result = call;                                                    \
+    if (result != CUDA_SUCCESS) {                                              \
+      const char* errStr;                                                      \
+      cuGetErrorString(result, &errStr);                                       \
+      std::cerr << "CUDA error at " << __FILE__ << ":" << __LINE__             \
+                << ": " << errStr << std::endl;                                \
+      std::exit(EXIT_FAILURE);                                                 \
+    }                                                                          \
+  } while (0)
+
+// Read file contents into a string
+std::string read_file_contents(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        std::cerr << "Failed to open file: " << filepath << std::endl;
+        return "";
+    }
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    return buffer.str();
+}
+
+// Get the full path to jit_includes.h
+std::string get_jit_includes_path() {
+    const auto source_path = std::filesystem::path(std::source_location::current().file_name());
+    const auto matx_root = source_path.parent_path().parent_path().parent_path().parent_path();
+    return (matx_root / "include" / "matx" / "core" / "jit_includes.h").string();
+}
+#endif
 
 template <typename Op>
 std::string get_kernel_name([[maybe_unused]] const Op &op, bool stride) {
@@ -190,8 +272,9 @@ std::string get_all_jit_classes_string(const Op& op) {
   detail::get_operator_capability<OperatorCapability::JIT_CLASS_QUERY>(op, jit_strings);
 
   std::string result;
+  result += " #include <matx/core/jit_includes.h>\n";
   if (!jit_strings.empty()) {
-    result += "namespace matx {\n";
+    result += "namespace matx { namespace detail {\n";
     for (const auto& kv : jit_strings) {
       result += kv.second;
       if (!result.empty() && result.back() != '\n') {
@@ -199,26 +282,197 @@ std::string get_all_jit_classes_string(const Op& op) {
       }
     }
     result += "} // namespace matx\n";
+    result += "} // namespace detail\n";
   }
-
-  // Print out the string before returning
-  std::cout << "All JIT classes string:\n" << result << std::endl;
 
   return result;
 }
 
+// Helper function to qualify JIT class names with matx::detail:: namespace
+// This is needed for NVRTC's #pragma nv_mangled_name to resolve the types
+inline std::string qualify_jit_type_names(const std::string& type_str) {
+  std::string result = type_str;
+  std::string search_prefix = "JIT";
+  std::string replacement = "matx::detail::JIT";
+  
+  size_t pos = 0;
+  while ((pos = result.find(search_prefix, pos)) != std::string::npos) {
+    // Check if this JIT is already qualified with matx::detail::
+    if (pos >= 14 && result.substr(pos - 14, 14) == "matx::detail::") {
+      pos += search_prefix.length();
+      continue;
+    }
+    // Check if it's at the start or preceded by a delimiter (not alphanumeric or ::)
+    if (pos == 0 || result[pos - 1] == '<' || result[pos - 1] == ',' || result[pos - 1] == ' ') {
+      result.insert(pos, "matx::detail::");
+      pos += replacement.length();
+    } else {
+      pos += search_prefix.length();
+    }
+  }
+  
+  return result;
+}
 
 template <typename Op, typename SizeArray>
 auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, const SizeArray &sa, dim3 &blocks, dim3 &threads, ElementsPerThread ept, bool stride, int dynamic_shmem_size, int osize) {
-  //static bool initialized = false;
-  //static jitify2::PreprocessedProgram preprog;
-  // if (!initialized) {
-  //   initialized = true;
+#ifdef MATX_USE_PURE_NVRTC
+  // Pure NVRTC implementation
+  static std::unordered_map<std::string, CUfunction> kernel_cache;
+  
+  const auto all_jit_classes_string = get_all_jit_classes_string(op);
+  auto capstr = generate_capability_params_string(op, ept, false, osize, threads.x);
+  const auto kernel_op_type = detail::get_operator_capability<OperatorCapability::JIT_TYPE_QUERY>(op);
+  
+  std::string kernel_name = get_kernel_name(op, stride);
+  std::string cache_key = kernel_name + "_" + kernel_op_type;
+  
+  CUfunction kernel_func;
+  
+  // Check if kernel is already compiled and cached
+  auto it = kernel_cache.find(cache_key);
+  if (it == kernel_cache.end()) {
+    printf("DEBUG: Compiling kernel with NVRTC for type: %s\n", kernel_op_type.c_str());
+    
+    // Read jit_includes.h content
+    std::string jit_includes_path = get_jit_includes_path();
+    std::string jit_includes_content = read_file_contents(jit_includes_path);
+    
+    // Construct the main kernel source that includes headers by name
+    // This matches the Jitify approach where headers are included via -include directives
+    std::string main_source = std::string(matxKernelStr);
+    
+    // Prepare headers array: jit_includes.h, matx_generated_code_hdr (capstr), matx_class_strings
+    const int numHeaders = 3;
+    const char* headers[numHeaders] = {
+      jit_includes_content.c_str(),
+      capstr.c_str(),
+      all_jit_classes_string.c_str()
+    };
+    const char* includeNames[numHeaders] = {
+      "matx/core/jit_includes.h",
+      "matx_generated_code_hdr",
+      "matx_class_strings"
+    };
+
+    // Print the contents of each include for debugging
+    printf("DEBUG: jit_includes.h content:\n%s\n", jit_includes_content.c_str());
+    printf("DEBUG: matx_generated_code_hdr content:\n%s\n", capstr.c_str());
+    printf("DEBUG: matx_class_strings content:\n%s\n", all_jit_classes_string.c_str());
+    
+    // Create NVRTC program with headers
+    nvrtcProgram prog;
+    NVRTC_CHECK(nvrtcCreateProgram(&prog, main_source.c_str(), "matx_kernel.cu", 
+                                   numHeaders, headers, includeNames));
+    
+    // Add name expression to get the proper mangled name after compilation
+    // Qualify JIT class names with matx::detail:: namespace so NVRTC can resolve them
+    // Note: The matxKernelStr kernels only take ONE template parameter (Op), not two
+    std::string qualified_kernel_op_type = qualify_jit_type_names(kernel_op_type);
+    std::string kernel_name_expr = kernel_name + "<" + qualified_kernel_op_type + ">";
+    printf("DEBUG: Kernel name expression: %s\n", kernel_name_expr.c_str());
+    NVRTC_CHECK(nvrtcAddNameExpression(prog, kernel_name_expr.c_str()));
+    
+    // Get compilation options
+    auto options = get_preprocessor_options();
+    
+    // Add -include directives for the generated headers (matching Jitify behavior)
+    // IMPORTANT: Include jit_includes.h FIRST to ensure all base types are defined
+    options.push_back("-include=matx/core/jit_includes.h");
+    options.push_back("-include=matx_generated_code_hdr");
+    options.push_back("-include=matx_class_strings");
+    
+    std::vector<const char*> opts;
+    for (const auto& opt : options) {
+      opts.push_back(opt.c_str());
+    }
+    
+    // Compile the program
+    nvrtcResult compile_result = nvrtcCompileProgram(prog, static_cast<int>(opts.size()), opts.data());
+    
+    // Get compilation log
+    size_t log_size;
+    NVRTC_CHECK(nvrtcGetProgramLogSize(prog, &log_size));
+    if (log_size > 1) {
+      std::vector<char> log(log_size);
+      NVRTC_CHECK(nvrtcGetProgramLog(prog, log.data()));
+      printf("NVRTC Compilation log:\n%s\n", log.data());
+    }
+    
+    if (compile_result != NVRTC_SUCCESS) {
+      std::cerr << "NVRTC compilation failed!" << std::endl;
+      nvrtcDestroyProgram(&prog);
+      MATX_THROW(matxInvalidParameter, "NVRTC compilation failed");
+    }
+    
+    // Get the lowered (mangled) kernel name
+    const char* lowered_name;
+    NVRTC_CHECK(nvrtcGetLoweredName(prog, kernel_name_expr.c_str(), &lowered_name));
+    printf("DEBUG: Lowered kernel name: %s\n", lowered_name);
+    
+    // Get PTX
+    size_t ptx_size;
+    NVRTC_CHECK(nvrtcGetPTXSize(prog, &ptx_size));
+    std::vector<char> ptx(ptx_size);
+    NVRTC_CHECK(nvrtcGetPTX(prog, ptx.data()));
+    
+    // Destroy the program
+    NVRTC_CHECK(nvrtcDestroyProgram(&prog));
+    
+    // Load PTX into CUDA module
+    CUmodule module;
+    CUDA_CHECK(cuModuleLoadDataEx(&module, ptx.data(), 0, nullptr, nullptr));
+    
+    // Get kernel function using the lowered name
+    CUDA_CHECK(cuModuleGetFunction(&kernel_func, module, lowered_name));
+    
+    // Cache the kernel
+    kernel_cache[cache_key] = kernel_func;
+  } else {
+    kernel_func = it->second;
+  }
+  
+  // Get device attributes
+  int device;
+  cudaGetDevice(&device);
+  int static_shared_size;
+  cudaDeviceGetAttribute(&static_shared_size, cudaDevAttrMaxSharedMemoryPerBlock, device);
+  
+  // Set dynamic shared memory if needed
+  if (dynamic_shmem_size > static_shared_size) {
+    CUDA_CHECK(cuFuncSetAttribute(kernel_func, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, dynamic_shmem_size));
+  }
+  
+  // Prepare kernel arguments
+  void* args[Op::Rank() + 1];
+  args[0] = &op;
+  if constexpr (Op::Rank() >= 1) {
+    args[1] = const_cast<void*>(reinterpret_cast<const void*>(&sa[0]));
+  }
+  if constexpr (Op::Rank() >= 2) {
+    args[2] = const_cast<void*>(reinterpret_cast<const void*>(&sa[1]));
+  }
+  if constexpr (Op::Rank() >= 3) {
+    args[3] = const_cast<void*>(reinterpret_cast<const void*>(&sa[2]));
+  }
+  if constexpr (Op::Rank() >= 4) {
+    args[4] = const_cast<void*>(reinterpret_cast<const void*>(&sa[3]));
+  }
+  
+  // Launch kernel
+  CUDA_CHECK(cuLaunchKernel(kernel_func,
+                            blocks.x, blocks.y, blocks.z,
+                            threads.x, threads.y, threads.z,
+                            dynamic_shmem_size,
+                            nullptr,  // stream
+                            args,
+                            nullptr));
+  
+#else
+  // Jitify implementation (original code)
   using jitify2::get_cuda_include_dir, jitify2::Program, jitify2::ProgramCache;
   using jitify2::reflection::Template, jitify2::reflection::Type;  
 
-  //auto start_time = std::chrono::high_resolution_clock::now();
-  
 #ifndef MATX_EN_JIT_PREPROCESSING  
   static ProgramCache<> cache(
       100,
@@ -239,10 +493,6 @@ for (const auto& [key, value] : t) {
 
   const auto all_jit_classes_string = get_all_jit_classes_string(op);
 
-  // auto end_time = std::chrono::high_resolution_clock::now();
-  // auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
-  //printf("Preprocess step took %ld microseconds\n", duration.count());
-
   printf("DEBUG: nvrtc_compile_and_run called with operator type: %s\n", typeid(op).name());
   const auto ltoir_query_input = detail::LTOIRQueryInput{ept};
   auto ltoir = detail::get_operator_capability<OperatorCapability::GENERATE_LTOIR>(op, ltoir_query_input);
@@ -255,39 +505,22 @@ for (const auto& [key, value] : t) {
 
   const auto kernel_op_type = detail::get_operator_capability<OperatorCapability::JIT_TYPE_QUERY>(op);
   printf("DEBUG: Kernel op type: %s\n", kernel_op_type.c_str());
-  //auto start_time_kernel = std::chrono::high_resolution_clock::now();
   auto kernel = cache
-  //.get_kernel(Template(get_kernel_name(op, stride)).instantiate<Op>(), 
   .get_kernel(Template(get_kernel_name(op, stride)).instantiate({kernel_op_type}), 
   {}, 
   {{"matx_class_strings", all_jit_classes_string}, {"matx_generated_code_hdr", capstr}}, {"-include=matx_generated_code_hdr", "-include=matx_class_strings"});    
-      // Compile, link, and load the program, and obtain the loaded kernel.
-      // .get_kernel(Template(get_kernel_name(op, stride)).instantiate<Op>(), 
-      //   {"defines.h", "half.h", "complex_half.h", "type_utils_both.h"}, 
-      //   {{"matx_generated_code_hdr", capstr}}, {"-include=matx_generated_code_hdr"});
-  // auto end_time_kernel = std::chrono::high_resolution_clock::now();
-  // auto duration_kernel = std::chrono::duration_cast<std::chrono::microseconds>(end_time_kernel - start_time_kernel);
-  //printf("Kernel step took %ld microseconds\n", duration_kernel.count());
-    // Get the current static shared memory size for the device
 
-  //auto start_time_device = std::chrono::high_resolution_clock::now();
   int device;
   cudaGetDevice(&device);
   int static_shared_size;
   cudaDeviceGetAttribute(&static_shared_size, cudaDevAttrMaxSharedMemoryPerBlock, device);
-  // auto end_time_device = std::chrono::high_resolution_clock::now();
-  // auto duration_device = std::chrono::duration_cast<std::chrono::microseconds>(end_time_device - start_time_device);
-  // printf("Device attribute calls took %ld microseconds\n", duration_device.count());
-  
   
   // Need to set dynamic shared memory size if it is greater than the static shared memory size
   if (dynamic_shmem_size > static_shared_size) {
     kernel->set_attribute(CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, dynamic_shmem_size);
   }      
 
-
   // Configure the kernel launch.
-  //auto start_time_configure = std::chrono::high_resolution_clock::now();
   if constexpr (Op::Rank() == 0) {
     kernel->configure(blocks, threads, dynamic_shmem_size)
           // Launch the kernel.
@@ -316,10 +549,7 @@ for (const auto& [key, value] : t) {
   else {
     MATX_THROW(matxInvalidParameter, "Rank not supported");
   }
-  // auto end_time_configure = std::chrono::high_resolution_clock::now();
-  // auto duration_configure = std::chrono::duration_cast<std::chrono::microseconds>(end_time_configure - start_time_configure);
-  // printf("Configure step took %ld microseconds\n", duration_configure.count());
-
+#endif
 }
 
 }

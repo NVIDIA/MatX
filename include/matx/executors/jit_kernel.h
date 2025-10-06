@@ -37,12 +37,11 @@ namespace matx {
 
 #ifdef MATX_EN_MATHDX
 static const char *matxKernelStr = "\n\
-#include <matx/core/jit_includes.h>\n\
 namespace matx {\n\
   namespace detail {\n\
     template <class Op>\n\
     __global__ void matxOpT0Kernel(Op op) {\n\
-      if constexpr (std::is_pointer_v<Op>) {\n\
+      if constexpr (cuda::std::is_pointer_v<Op>) {\n\
         (*op)();\n\
       } else {\n\
         op();\n\
@@ -53,7 +52,7 @@ namespace matx {\n\
     __global__ void matxOpT1Kernel(Op op, matx::index_t size0) {\n\
       matx::index_t idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;\n\
       if (idx * static_cast<index_t>(CurrentCapabilities::ept) < size0) {\n\
-        if constexpr (std::is_pointer_v<Op>) {\n\
+        if constexpr (cuda::std::is_pointer_v<Op>) {\n\
           (*op).template operator()<CurrentCapabilities>(idx);\n\
         } else {\n\
           op.template operator()<CurrentCapabilities>(idx);\n\
@@ -66,7 +65,7 @@ namespace matx {\n\
       matx::index_t idx = threadIdx.x;\n\
       matx::index_t idy = static_cast<matx::index_t>(blockIdx.x);\n\
       if (idx * static_cast<matx::index_t>(CurrentCapabilities::ept) < size1 && idy < size0) {\n\
-        if constexpr (std::is_pointer_v<Op>) {\n\
+        if constexpr (cuda::std::is_pointer_v<Op>) {\n\
           (*op).template operator()<CurrentCapabilities>(idy, idx);\n\
         } else {\n\
           op.template operator()<CurrentCapabilities>(idy, idx);\n\
@@ -80,7 +79,7 @@ namespace matx {\n\
       for(matx::index_t idy = static_cast<matx::index_t>(blockIdx.x);\n\
         idy < size0;\n\
         idy += blockDim.x * gridDim.x) {\n\
-        if constexpr (std::is_pointer_v<Op>) {\n\
+        if constexpr (cuda::std::is_pointer_v<Op>) {\n\
           (*op).template operator()<CurrentCapabilities>(idy, idx);\n\
         } else {\n\
           op.template operator()<CurrentCapabilities>(idy, idx);\n\
@@ -94,7 +93,7 @@ namespace matx {\n\
       matx::index_t idy = static_cast<matx::index_t>(blockIdx.x);\n\
       matx::index_t idz = static_cast<matx::index_t>(blockIdx.y);\n\
       if (idx * static_cast<matx::index_t>(CurrentCapabilities::ept) < size2 && idy < size1 && idz < size0) {\n\
-        if constexpr (std::is_pointer_v<Op>) {\n\
+        if constexpr (cuda::std::is_pointer_v<Op>) {\n\
           (*op).template operator()<CurrentCapabilities>(idz, idy, idx);\n\
         } else {\n\
           op.template operator()<CurrentCapabilities>(idz, idy, idx);\n\
@@ -114,7 +113,7 @@ namespace matx {\n\
             idy < size1;\n\
             idy += gridDim.y) {\n\
           if (idx * static_cast<matx::index_t>(CurrentCapabilities::ept) < size2 && idy < size1 && idz < size0) {\n\
-            if constexpr (std::is_pointer_v<Op>) {\n\
+            if constexpr (cuda::std::is_pointer_v<Op>) {\n\
               (*op).template operator()<CurrentCapabilities>(idz, idy, idx);\n\
             } else {\n\
               op.template operator()<CurrentCapabilities>(idz, idy, idx);\n\
@@ -131,7 +130,7 @@ namespace matx {\n\
       matx::index_t idz = static_cast<matx::index_t>(blockIdx.y);\n\
       matx::index_t idw = static_cast<matx::index_t>(blockIdx.z);\n\
       if (idx * static_cast<matx::index_t>(CurrentCapabilities::ept) < size3 && idy < size2 && idz < size1 && idw < size0) {\n\
-        if constexpr (std::is_pointer_v<Op>) {\n\
+        if constexpr (cuda::std::is_pointer_v<Op>) {\n\
           (*op).template operator()<CurrentCapabilities>(idw, idz, idy, idx);\n\
         } else {\n\
           op.template operator()<CurrentCapabilities>(idw, idz, idy, idx);\n\
@@ -152,7 +151,7 @@ namespace matx {\n\
               idy < size2;\n\
               idy += gridDim.x) {\n\
             if (idx * static_cast<matx::index_t>(CurrentCapabilities::ept) < size3 && idy < size2 && idz < size1 && idw < size0) {\n\
-              if constexpr (std::is_pointer_v<Op>) {\n\
+              if constexpr (cuda::std::is_pointer_v<Op>) {\n\
                 (*op).template operator()<CurrentCapabilities>(idw, idz, idy, idx);\n\
               } else {\n\
                 op.template operator()<CurrentCapabilities>(idw, idz, idy, idx);\n\

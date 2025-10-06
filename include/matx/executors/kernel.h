@@ -31,11 +31,8 @@
 /////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <type_traits>
+#include <cuda/std/type_traits>
 
-#include "matx/core/error.h"
-#include "matx/core/get_grid_dims.h"
-#include "matx/core/capabilities.h"
 namespace matx {
 namespace detail {
 
@@ -43,7 +40,7 @@ namespace detail {
 #ifdef __CUDACC__  
 template <typename CapType, class Op> 
 __global__ void matxOpT0Kernel(Op op) { 
-  if constexpr (std::is_pointer_v<Op>) {
+  if constexpr (cuda::std::is_pointer_v<Op>) {
     (*op).template operator()<CapType>(); 
   }
   else {
@@ -55,7 +52,7 @@ template <typename CapType, class Op>
 __global__ void matxOpT1Kernel(Op op, index_t size0) {
   index_t idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
   if (idx * static_cast<index_t>(CapType::ept) < size0) {
-    if constexpr (std::is_pointer_v<Op>) {
+    if constexpr (cuda::std::is_pointer_v<Op>) {
       (*op).template operator()<CapType>(idx); 
     }
     else {
@@ -70,7 +67,7 @@ __global__ void matxOpT2Kernel(Op op, index_t size0, index_t size1) {
   index_t idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
   index_t idy = static_cast<index_t>(blockIdx.y) * blockDim.y + threadIdx.y;
   if (idx * static_cast<index_t>(CapType::ept) < size1 && idy < size0) {
-    if constexpr (std::is_pointer_v<Op>) {
+    if constexpr (cuda::std::is_pointer_v<Op>) {
       (*op).template operator()<CapType>(idy, idx); 
     }
     else {
@@ -88,7 +85,7 @@ __global__ void matxOpT2StrideKernel(Op op, index_t size0, index_t size1) {
     for(index_t idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
         idx * static_cast<index_t>(CapType::ept) < size1;
         idx += blockDim.x * gridDim.x) {
-      if constexpr (std::is_pointer_v<Op>) {
+      if constexpr (cuda::std::is_pointer_v<Op>) {
         (*op).template operator()<CapType>(idy, idx); 
       }
       else {
@@ -104,7 +101,7 @@ __global__ void matxOpT3Kernel(Op op, index_t size0, index_t size1, index_t size
   index_t idy = static_cast<index_t>(blockIdx.y) * blockDim.y + threadIdx.y;
   index_t idz = static_cast<index_t>(blockIdx.z) * blockDim.z + threadIdx.z;
   if (idx * static_cast<index_t>(CapType::ept) < size2 && idy < size1 && idz < size0) {
-    if constexpr (std::is_pointer_v<Op>) {
+    if constexpr (cuda::std::is_pointer_v<Op>) {
       (*op).template operator()<CapType>(idz, idy, idx); 
     }
     else {
@@ -125,7 +122,7 @@ __global__ void matxOpT3StrideKernel(Op op, index_t size0, index_t size1, index_
       for(index_t idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
           idx * static_cast<index_t>(CapType::ept) < size2;
           idx += blockDim.x * gridDim.x) {
-        if constexpr (std::is_pointer_v<Op>) {
+        if constexpr (cuda::std::is_pointer_v<Op>) {
           (*op).template operator()<CapType>(idz, idy, idx); 
         }
         else {
@@ -144,7 +141,7 @@ __global__ void matxOpT4Kernel(Op op, index_t size0, index_t size1, index_t size
   index_t idz = nmy / size2;
   index_t idw = static_cast<index_t>(blockIdx.z) * blockDim.z + threadIdx.z;
   if (idx * static_cast<index_t>(CapType::ept) < size3 && idy < size2 && idz < size1 && idw < size0) {
-    if constexpr (std::is_pointer_v<Op>) {
+    if constexpr (cuda::std::is_pointer_v<Op>) {
       (*op).template operator()<CapType>(idw, idz, idy, idx); 
     }
     else {
@@ -169,7 +166,7 @@ __global__ void matxOpT4StrideKernel(Op op, index_t size0, index_t size1, index_
             idx * static_cast<index_t>(CapType::ept) < size3;
             idx += blockDim.x * gridDim.x) {
 
-          if constexpr (std::is_pointer_v<Op>) {
+          if constexpr (cuda::std::is_pointer_v<Op>) {
             (*op).template operator()<CapType>(idw, idz, idy, idx); 
           }
           else {
@@ -212,7 +209,7 @@ __global__ void matxOpTDKernel(Op op, const cuda::std::array<index_t, Op::Rank()
     }
     indices[Op::Rank()-1] = x_abs / mult;
 
-    if constexpr (std::is_pointer_v<Op>) {
+    if constexpr (cuda::std::is_pointer_v<Op>) {
       cuda::std::apply([&](auto... args){
         (*op)(args...);
       }, indices);

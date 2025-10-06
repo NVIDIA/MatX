@@ -39,6 +39,24 @@
 namespace matx{
 namespace detail {
 
+// Compute the next power of 2 >= n, capped at max_align
+constexpr size_t __MATX_HOST__ __MATX_DEVICE__ next_power_of_2(size_t n, size_t max_align = 128) {
+  if (n <= 1) return 1;
+  size_t power = 1;
+  while (power < n && power < max_align) {
+    power *= 2;
+  }
+  return power < max_align ? power : max_align;
+}
+
+// Compute appropriate alignment for Vector
+template <typename T, int N>
+constexpr size_t __MATX_HOST__ __MATX_DEVICE__ vector_alignment() {
+  // Use the larger of alignof(T) or next power of 2 of sizeof(T)*N, capped at 128
+  size_t natural_align = alignof(T);
+  size_t size_align = next_power_of_2(sizeof(T) * N, 128);
+  return natural_align > size_align ? natural_align : size_align;
+}
 
 template <typename T, int N>
 struct alignas(sizeof(T) * N) Vector {
@@ -52,7 +70,7 @@ struct alignas(sizeof(T) * N) Vector {
     }
   }
 
-  template <typename T2, std::enable_if_t<std::is_same_v<typename T2::matx_vec, bool> && T2::width == N, bool> = true>
+  template <typename T2, cuda::std::enable_if_t<cuda::std::is_same_v<typename T2::matx_vec, bool> && T2::width == N, bool> = true>
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Vector& operator=(const T2& v) {
     MATX_LOOP_UNROLL
     for (int i = 0; i < N; i++) {
@@ -90,10 +108,10 @@ struct alignas(sizeof(T) * N) Vector {
 };
 
 
-template <typename T, typename = void> struct is_vector : std::false_type {};
+template <typename T, typename = void> struct is_vector : cuda::std::false_type {};
 template <typename T>
-struct is_vector<T, std::void_t<typename T::matx_vec>>
-    : std::true_type {
+struct is_vector<T, cuda::std::void_t<typename T::matx_vec>>
+    : cuda::std::true_type {
 };
 
 

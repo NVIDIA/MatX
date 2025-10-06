@@ -33,7 +33,7 @@
 #pragma once
 
 #include "matx/core/defines.h"
-#include "matx/core/tensor_utils.h"
+#include "matx/core/operator_utils.h"
 #include <cuda/std/iterator>
 
 namespace matx {

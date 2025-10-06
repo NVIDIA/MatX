@@ -32,6 +32,7 @@
 
 #pragma once
 
+#include <cuda/std/array>
 #include <cuda/std/complex>
 #include <cuda/std/tuple>
 #include <cuda/std/cstddef>
@@ -39,6 +40,9 @@
 #include "matx/core/half.h"
 #include "matx/core/half_complex.h"
 #include "matx/core/operator_options.h"
+#ifndef __CUDACC_RTC__
+#include <complex>
+#endif
 
 
 
@@ -47,20 +51,6 @@
  */
 
 namespace matx {
-
-namespace detail {
-  template <int N, typename Executor, typename TupleType, typename... Ops>
-  void assign_tuple_tensors(const Executor &exec, TupleType &t, Ops... ops)
-  {
-    if constexpr (N < sizeof...(Ops)) {
-      auto in_tup = cuda::std::make_tuple(ops...);
-      if (!cuda::std::get<N>(t).isSameView(cuda::std::get<N>(in_tup))) {
-        (cuda::std::get<N>(t) = cuda::std::get<N>(in_tup)).run(exec);
-        assign_tuple_tensors<N + 1>(exec, t, ops...);
-      }
-    }
-  }
-};
 
 enum {
   matxNoRank = -1
@@ -96,7 +86,7 @@ inline constexpr bool is_noshape_v = detail::is_noshape<T>::value;
  */
 template< class T >
 struct remove_cvref {
-    using type = cuda::std::remove_cv_t<std::remove_reference_t<T>>; ///< Type after removal
+    using type = cuda::std::remove_cv_t<cuda::std::remove_reference_t<T>>; ///< Type after removal
 };  
 
 template <typename T>
@@ -115,7 +105,7 @@ struct is_mtie_impl<T, cuda::std::void_t<typename T::mtie_type>> : cuda::std::tr
 };
 }
 
-template <typename T> constexpr bool is_mtie()
+template <typename T> constexpr __MATX_HOST__ __MATX_DEVICE__ bool is_mtie()
 {
   return detail::is_mtie_impl<typename remove_cvref<T>::type>::value;
 }
@@ -176,7 +166,7 @@ struct is_matx_transform_op_impl<T, cuda::std::void_t<typename remove_cvref_t<T>
  * 
  * @tparam T Type to test
  */
-template <typename T> constexpr bool is_matx_transform_op()
+template <typename T> constexpr __MATX_HOST__ __MATX_DEVICE__ bool is_matx_transform_op()
 {
   return detail::is_matx_transform_op_impl<typename remove_cvref<T>::type>::value;
 }
@@ -208,7 +198,7 @@ struct is_matx_set_op_impl<T, cuda::std::void_t<typename T::matx_setop>> : cuda:
  * 
  * @tparam T Type to test
  */
-template <typename T> constexpr bool is_matx_set_op()
+template <typename T> constexpr __MATX_HOST__ __MATX_DEVICE__ bool is_matx_set_op()
 {
   return detail::is_matx_set_op_impl<typename remove_cvref<T>::type>::value;
 }
@@ -232,7 +222,7 @@ struct is_matx_op_lvalue_impl<T, cuda::std::void_t<typename T::matxoplvalue>> : 
  * 
  * @tparam T Type to test
  */
-template <typename T> constexpr bool is_matx_op_lvalue()
+template <typename T> constexpr __MATX_HOST__ __MATX_DEVICE__ bool is_matx_op_lvalue()
 {
   return detail::is_matx_op_lvalue_impl<T>::value;
 }
@@ -376,10 +366,6 @@ template <typename T> struct is_complex : cuda::std::false_type {
 template <> struct is_complex<cuda::std::complex<float>> : cuda::std::true_type {
 };
 template <> struct is_complex<cuda::std::complex<double>> : cuda::std::true_type {
-};
-template <> struct is_complex<std::complex<float>> : cuda::std::true_type {
-};
-template <> struct is_complex<std::complex<double>> : cuda::std::true_type {
 };
 template <> struct is_complex<matxFp16Complex> : cuda::std::true_type {
 };
@@ -529,7 +515,7 @@ inline constexpr bool is_complex_half_v = detail::is_complex_half<T>::value;
  * @tparam T Type to test
  * @return True if half precision floating point
  */
-template <typename T> constexpr inline bool IsHalfType()
+template <typename T> constexpr inline __MATX_HOST__ __MATX_DEVICE__ bool IsHalfType()
 {
   return cuda::std::is_same_v<T, matxFp16> || cuda::std::is_same_v<T, matxBf16>;
 }
@@ -601,7 +587,7 @@ struct extract_value_type_impl<T, typename cuda::std::enable_if_t<is_matx_op<T>(
  * @tparam T Type to extract from
  */
 template <typename T>
-using extract_value_type_t = typename detail::extract_value_type_impl<std::remove_cv_t<T>>::value_type;
+using extract_value_type_t = typename detail::extract_value_type_impl<cuda::std::remove_cv_t<T>>::value_type;
 
 /**
  * @brief Promote half precision floating point value to fp32, or leave untouched if not half
@@ -691,14 +677,14 @@ using convert_half_to_matx_half_t = typename convert_half_to_matx_half<T>::type;
 
 
 template <class T, cuda::std::size_t N, cuda::std::size_t... I>
-constexpr cuda::std::array<std::remove_cv_t<T>, N>
+constexpr __MATX_HOST__ __MATX_DEVICE__ cuda::std::array<cuda::std::remove_cv_t<T>, N>
     to_array_impl(T (&a)[N], cuda::std::index_sequence<I...>)
 {
     return { {a[I]...} };
 }
 
 template <class T, cuda::std::size_t N>
-constexpr cuda::std::array<std::remove_cv_t<T>, N> to_array(T (&a)[N])
+constexpr __MATX_HOST__ __MATX_DEVICE__ cuda::std::array<cuda::std::remove_cv_t<T>, N> to_array(T (&a)[N])
 {
     return to_array_impl(a, cuda::std::make_index_sequence<N>{});
 }
@@ -711,7 +697,7 @@ struct complex_from_scalar {
 };
 
 template <typename T> 
-struct complex_from_scalar<T, typename cuda::std::enable_if_t<std::is_same_v<float, T> || cuda::std::is_same_v<double, T>>> {
+struct complex_from_scalar<T, typename cuda::std::enable_if_t<cuda::std::is_same_v<float, T> || cuda::std::is_same_v<double, T>>> {
   using type = cuda::std::complex<T>;
 };
 
@@ -729,6 +715,20 @@ template <typename T> using complex_from_scalar_t = typename complex_from_scalar
 template <class T> struct identity {
   using type = typename cuda::std::conditional_t<IsHalfType<T>(), float, T>;
 };
+
+
+template <class C>
+struct cuda_complex_type_of
+    : identity<cuda::std::complex<cuda::std::conditional_t<is_complex_half_v<C>, float,
+                                               typename C::value_type>>> {
+};
+
+template <class C>
+using matx_convert_cuda_complex_type =
+    typename cuda::std::conditional_t<!is_complex_v<C>, identity<C>,
+                                cuda_complex_type_of<C>>::type;                                
+
+#ifndef __CUDACC_RTC__
 template <class C>
 struct complex_type_of
     : identity<std::complex<cuda::std::conditional_t<is_complex_half_v<C>, float,
@@ -736,21 +736,10 @@ struct complex_type_of
 };
 
 template <class C>
-struct cuda_complex_type_of
-    : identity<cuda::std::complex<std::conditional_t<is_complex_half_v<C>, float,
-                                               typename C::value_type>>> {
-};
-
-template <class C>
 using matx_convert_complex_type =
     typename cuda::std::conditional_t<!is_complex_v<C>, identity<C>,
                                 complex_type_of<C>>::type;
-
-template <class C>
-using matx_convert_cuda_complex_type =
-    typename cuda::std::conditional_t<!is_complex_v<C>, identity<C>,
-                                cuda_complex_type_of<C>>::type;                                
-
+#endif
 
 template <class T, class = void> struct value_type {
   using type = T;
@@ -771,7 +760,7 @@ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) pp_get(Ts&&... ts) {
 }
 
 template <cuda::std::size_t ... Is>
-constexpr auto index_sequence_rev(cuda::std::index_sequence<Is...> const &)
+constexpr __MATX_HOST__ __MATX_DEVICE__ auto index_sequence_rev(cuda::std::index_sequence<Is...> const &)
    -> decltype( cuda::std::index_sequence<sizeof...(Is) -1U - Is...>{} );
 
 template <cuda::std::size_t N>
@@ -798,7 +787,7 @@ __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto select_tuple(Tuple&& tuple, c
 }
 
 template <typename... T, cuda::std::enable_if_t<((is_tensor_view_v<T>) && ...), bool> = true>
-constexpr bool TensorTypesMatch() {
+constexpr __MATX_HOST__ __MATX_DEVICE__ bool TensorTypesMatch() {
   using first_type = cuda::std::tuple_element_t<0, cuda::std::tuple<T...>>;
   return ((std::is_same_v<typename first_type::value_type, typename T::value_type>) && ...);
 }
@@ -889,6 +878,15 @@ namespace detail {
 #endif
   template <typename T> inline constexpr bool is_std_array_v = detail::is_std_array<remove_cvref_t<T>>::value;
 
+template <typename T, typename = void>
+struct is_matx_jit_class : cuda::std::bool_constant<is_matx_op<T>()> {};
+
+template <typename T>
+struct is_matx_jit_class<T, cuda::std::void_t<typename remove_cvref_t<T>::emits_jit_str>>
+    : cuda::std::true_type {};
+
+template <typename T>
+inline constexpr bool is_matx_jit_class_v = is_matx_jit_class<remove_cvref_t<T>>::value;
   
 }  
 

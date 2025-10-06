@@ -175,8 +175,8 @@ public:
   
 #ifdef MATX_EN_JIT
   struct JIT_Storage {
-    mutable typename detail::inner_storage_t<detail::base_type_t<T>> out_;
-    mutable typename detail::inner_storage_t<detail::base_type_t<Op>> op_;  
+    mutable typename detail::inner_storage_or_self_t<detail::base_type_t<T>> out_;
+    mutable typename detail::inner_storage_or_self_t<detail::base_type_t<Op>> op_;  
   };
 
   JIT_Storage ToJITStorage() const {
@@ -192,27 +192,31 @@ public:
     const std::string func_name = get_jit_class_name();
     return cuda::std::make_tuple(
        func_name, 
-       std::string("template <typename T, typename Op> " + func_name + "  {\n") + 
+       std::string("template <typename T, typename Op> struct " + func_name + "  {\n") + 
+           "  using value_type = typename T::value_type;\n" +
+           "  using matxop = bool;\n" +
            "  struct JIT_Storage {\n" +
-           "    mutable typename detail::inner_storage_t<detail::base_type_t<T>> out_;\n" +
-           "    mutable typename detail::inner_storage_t<detail::base_type_t<Op>> op_;\n" +
+           "    mutable typename detail::inner_storage_or_self_t<detail::base_type_t<T>> out_;\n" +
+           "    mutable typename detail::inner_storage_or_self_t<detail::base_type_t<Op>> op_;\n" +
            "  };\n" +
-           "  JIT_Storage storage_;\n" +
+          "   mutable typename detail::base_type_t<T> out_;\n" +
+          "   mutable typename detail::base_type_t<Op> op_;\n" +
            "  template <typename CapType, typename... Is>\n" +
            "  __MATX_INLINE__ __MATX_DEVICE__  decltype(auto) operator()(Is... indices) const\n" +
-           "  {\n" +
-           "    const auto in_val = detail::get_value<CapType>(storage_.op_, indices...);\n" +
-           "    using out_type = decltype(storage_.out_.template operator()<CapType>(indices...));\n" +
-           "    if ((threadIdx.x * CapType::ept) >= Size(Rank() - 1)) {\n" +
-           "      return detail::GetJitSentinelValue<CapType, value_type>();\n" +
-           "    }\n" +
-           "    if (storage_.out_.Rank() == 0 || threadIdx.x < storage_.out_.Size(storage_.out_.Rank() - 1)) {\n" +
-           "      if constexpr (!is_vector_v<decltype(in_val)> && is_vector_v<out_type>) {\n" +
-           "        Vector<remove_cvref_t<decltype(in_val)>, static_cast<size_t>(CapType::ept)> vec{in_val};\n" +
-           "        storage_.out_.template operator()<CapType>(indices...) = vec;\n" +
-           "      }\n" +
+          "  {\n" +
+          "    auto in_val = op_.template operator()<CapType>(indices...);\n" +
+          "    using out_type = decltype(out_.template operator()<CapType>(indices...));\n" +
+          "    using in_val_type = decltype(in_val);\n" +
+          "    if ((threadIdx.x * static_cast<int>(CapType::ept)) >= Size(Rank() - 1)) {\n" +
+          "      return detail::GetJitSentinelValue<CapType, value_type>();\n" +
+          "    }\n" +
+          "    if (out_.Rank() == 0 || threadIdx.x < out_.Size(out_.Rank() - 1)) {\n" +
+          "      if constexpr (!is_vector_v<in_val_type> && is_vector_v<out_type>) {\n" +
+          "        Vector<remove_cvref_t<in_val_type>, static_cast<size_t>(CapType::ept)> vec{in_val};\n" +
+          "        out_.template operator()<CapType>(indices...) = vec;\n" +
+          "      }\n" +
            "      else {\n" +
-           "        storage_.out_.template operator()<CapType>(indices...) = in_val;\n" +
+           "        out_.template operator()<CapType>(indices...) = in_val;\n" +
            "      }\n" +
            "    }\n" +
            "    return in_val;\n" +
@@ -227,7 +231,7 @@ public:
            "       return 1;\n" +
            "     }\n" +
            "     else {\n" +
-           "       return storage_.out_.Size(dim);\n" +
+           "       return out_.Size(dim);\n" +
            "     }\n" + 
            "   }\n" +
            "};\n"

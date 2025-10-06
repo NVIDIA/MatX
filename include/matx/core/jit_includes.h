@@ -36,3 +36,6 @@
 // parsed on the device, and try to keep this minimal to avoid unnecessary dependencies.
 #include "matx/core/defines.h"
 #include "matx/core/type_utils_both.h"
+#include "matx/core/vector.h"
+#include "matx/operators/scalar_internal.h"
+#include "matx/core/operator_utils.h"

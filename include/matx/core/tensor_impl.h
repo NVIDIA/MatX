@@ -140,27 +140,32 @@ class tensor_impl_t {
     }        
 
     __MATX_INLINE__ auto get_jit_op_str() const {
+      // Note tensors are considered a leaf type, so we do not make JIT_Storage like we do for all other operators. This is because
+      // the inner type is just a plain pointer and has no operator() defined on it.
       const std::string class_name = get_jit_class_name();
       return cuda::std::make_tuple(
          class_name, 
-         std::string("class " + class_name + "  {\n") + 
+         std::string("struct " + class_name + "  {\n") + 
              "  static constexpr int RANK = " + std::to_string(Rank()) + ";\n" +
              "  using T = " + detail::type_to_string<T>() + ";\n" +
              "  using value_type = T;\n" +
-             "  struct JIT_Storage {\n" +
-             "    T *ldata_;\n" +
-             "  };\n" +
+             "  using matxop = bool;\n" +
+             "  using stride_type = " +  detail::type_to_string<stride_type>() + ";\n" +
+             "  T *ldata_;\n" +       
+            //  "  struct JIT_Storage {\n" +
+            //  "    T *ldata_;\n" +
+            //  "  };\n" +
              "  constexpr static cuda::std::array<index_t, " + std::to_string(Rank()) + "> strides_ = { " + detail::array_to_string(desc_.Strides()) + " };\n" +
              "  constexpr static cuda::std::array<index_t, " + std::to_string(Rank()) + "> sizes_ = { " + detail::array_to_string(desc_.Shape()) + " };\n" +
-             "  Storage storage_;\n" +
+             //"  JIT_Storage storage_;\n" +
              "  template <typename CapType, int I = 0, typename ...Is>\n" +
              "  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type GetVal([[maybe_unused]] cuda::std::tuple<Is...> tup)  {\n" +
              "    if constexpr (I < sizeof...(Is)) {\n" +
              "      if constexpr (CapType::ept != detail::ElementsPerThread::ONE && I == sizeof...(Is) - 1) {\n" +
-             "        return GetVal<CapType, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(this->desc_.Stride(I) * static_cast<index_t>(CapType::ept));\n" +
+             "        return GetVal<CapType, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(strides_[I] * static_cast<index_t>(CapType::ept));\n" +
              "      }\n" +
              "      else {\n" +
-             "        return GetVal<CapType, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(this->desc_.Stride(I));\n" +
+             "        return GetVal<CapType, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(strides_[I]);\n" +
              "      }\n" +
              "    }\n" +
              "    else {\n" +
@@ -171,10 +176,10 @@ class tensor_impl_t {
              "  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type GetValC([[maybe_unused]] const cuda::std::tuple<Is...> tup) const {\n" +
              "    if constexpr (I < sizeof...(Is)) {\n" +
              "      if constexpr (CapType::ept != detail::ElementsPerThread::ONE && I == sizeof...(Is) - 1) {\n" +
-             "        return GetValC<CapType, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(this->desc_.Stride(I) * static_cast<index_t>(CapType::ept));\n" +
+             "        return GetValC<CapType, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(strides_[I] * static_cast<index_t>(CapType::ept));\n" +
              "      }\n" +
              "      else {\n" +
-             "        return GetValC<CapType, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(this->desc_.Stride(I));\n" +
+             "        return GetValC<CapType, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(strides_[I]);\n" +
              "      }\n" +
              "    }\n" +
              "    else {\n" +
@@ -186,23 +191,22 @@ class tensor_impl_t {
              "    static_assert(sizeof...(Is) == M, \"Number of indices of operator() must match rank of tensor\");\n" +
             "     constexpr int EPT_int = static_cast<int>(CapType::ept);\n" +
             "     if constexpr (CapType::ept == detail::ElementsPerThread::ONE) {\n" +
-            "       return storage_.ldata_[GetValC<CapType, 0, Is...>(cuda::std::make_tuple(indices...))];\n" +
+            "       return ldata_[GetValC<CapType, 0, Is...>(cuda::std::make_tuple(indices...))];\n" +
             "     } else if constexpr (EPT_int * sizeof(T) <= MAX_VEC_WIDTH_BYTES ) {\n" +
-            "       return *reinterpret_cast<detail::Vector<T, EPT_int>*>(storage_.ldata_ + GetValC<CapType, 0, Is...>(cuda::std::make_tuple(indices...)));\n" +
+            "       return *reinterpret_cast<detail::Vector<T, EPT_int>*>(ldata_ + GetValC<CapType, 0, Is...>(cuda::std::make_tuple(indices...)));\n" +
             "     } else {\n" +
             "       detail::Vector<T, EPT_int> vec;\n" +
-            "       vec.load<EPT_int>(storage_.ldata_ + GetValC<CapType, 0, Is...>(cuda::std::make_tuple(indices...)));\n" +
+            "       vec.load<EPT_int>(ldata_ + GetValC<CapType, 0, Is...>(cuda::std::make_tuple(indices...)));\n" +
             "       return vec;\n" +
             "     }\n" +
              "  }\n" +
              "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank()\n" +
              "  {\n" +
-             "    return OpA::Rank();\n" +
+             "    return " + std::to_string(Rank()) + ";\n" +
              "  }\n" +
              "  constexpr __MATX_INLINE__  __MATX_DEVICE__ index_t Size(int dim) const\n" +
              "  {\n" +
-             "    constexpr index_t dim_ = dim;\n" +
-             "    return sizes_[dim_];\n " +
+             "    return sizes_[dim];\n " +
              "  }\n" +
              "};\n"
       );

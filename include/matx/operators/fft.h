@@ -84,7 +84,7 @@ namespace matx
 
 #ifdef MATX_EN_JIT
         struct JIT_Storage {
-          typename detail::inner_storage_t<detail::base_type_t<OpA>> a_;
+          typename detail::inner_storage_or_self_t<detail::base_type_t<OpA>> a_;
         };
 
         JIT_Storage ToJITStorage() const {
@@ -170,11 +170,15 @@ namespace matx
           const std::string class_name = get_jit_class_name();
           return cuda::std::make_tuple(
              class_name, 
-             std::string("template <typename OpA> class " + class_name + "  {\n") + 
+             std::string(
+                 " template <typename OpA> struct " + class_name + "  {\n" +
+                 "  using input_type = typename OpA::value_type;\n" +
+                 "  using matxop = bool;\n" +
+                 "  using value_type = cuda::std::conditional_t<is_complex_v<input_type>, input_type, typename scalar_to_complex<input_type>::ctype>;\n" +
                  "  struct JIT_Storage {\n" +
-                 "    typename detail::inner_storage_t<detail::base_type_t<OpA>> a_;\n" +
+                 "    typename detail::inner_storage_or_self_t<detail::base_type_t<OpA>> a_;\n" +
                  "  };\n" +
-                 "  JIT_Storage storage_;\n" +
+                 "  typename detail::base_type_t<OpA> a_;\n" +
                  "  constexpr static cuda::std::array<index_t, " + std::to_string(Rank()) + "> out_dims_ = { " + 
                  detail::array_to_string(out_dims_) + " };\n" +
                  "  constexpr static unsigned int fft_size_ = " + std::to_string(fft_size_) + ";\n" +
@@ -182,7 +186,8 @@ namespace matx
                  "  template <typename CapType, typename... Is>\n" +
                  "  __MATX_INLINE__ __MATX_DEVICE__  decltype(auto) operator()(Is... indices) const\n" +
                  "  {\n" +
-                 "    return detail::RunDxFFT1D<input_type, CapType, fft_size, fft_forward>(storage_.a_, indices...);\n" +
+                 "    //return detail::RunDxFFT1D<input_type, CapType, fft_size, fft_forward>(a_, indices...);\n" +
+                 "    return a_.template operator()<CapType>(indices...);\n" +
                  "  }\n" +
                  "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank()\n" +
                  "  {\n" +
@@ -190,10 +195,9 @@ namespace matx
                  "  }\n" +
                  "  constexpr __MATX_INLINE__  __MATX_DEVICE__ index_t Size(int dim) const\n" +
                  "  {\n" +
-                 "    constexpr index_t dim_ = dim;\n" +
-                 "    return out_dims_[dim_];\n " +
+                 "    return out_dims_[dim];\n " +
                  "  }\n" +    
-                 "};\n"
+                 "};\n")
           );
         }
 #endif

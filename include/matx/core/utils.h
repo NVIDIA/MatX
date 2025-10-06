@@ -321,6 +321,9 @@ __MATX_INLINE__ __MATX_HOST__  std::string type_to_string()
   else if constexpr (std::is_same_v<T, cuda::std::complex<double>>) {
     return "cuda::std::complex<double>";
   }
+  else if constexpr (std::is_same_v<T, index_t>) {
+    return "index_t";
+  }
   // fallback: use typeid if available, or unknown
   else {
     return "unknown";

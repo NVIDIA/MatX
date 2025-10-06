@@ -366,6 +366,12 @@ constexpr cusparseIndexType_t MatXTypeToCuSparseIndexType() {
   }
 }
 
+template <> struct is_complex<std::complex<float>> : cuda::std::true_type {
+};
+template <> struct is_complex<std::complex<double>> : cuda::std::true_type {
+};
+
+
 }
 
 } // end namespace matx

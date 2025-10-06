@@ -106,9 +106,9 @@ namespace matx
 
 #ifdef MATX_EN_JIT
         struct JIT_Storage {
-          typename detail::inner_storage_t<detail::base_type_t<I1>> in1_;
-          typename detail::inner_storage_t<detail::base_type_t<I2>> in2_;
-          typename detail::inner_storage_t<detail::base_type_t<Op>> op_;
+          typename detail::inner_storage_or_self_t<detail::base_type_t<I1>> in1_;
+          typename detail::inner_storage_or_self_t<detail::base_type_t<I2>> in2_;
+          typename detail::inner_storage_or_self_t<detail::base_type_t<Op>> op_;
         };
 
         JIT_Storage ToJITStorage() const {
@@ -173,24 +173,28 @@ namespace matx
         const std::string func_name = get_jit_class_name();
         return cuda::std::make_tuple(
            func_name, 
-           std::string("template <typename I1, typename I2> " + func_name + "  {\n") + 
-               "  struct JIT_Storage {\n" +
-               "    typename detail::inner_storage_t<detail::base_type_t<I1>> in1_;\n" +
-               "    typename detail::inner_storage_t<detail::base_type_t<I2>> in2_;\n" +
-               "    typename detail::inner_storage_t<detail::base_type_t<Op>> op_;\n" +
+           std::string("template <typename I1, typename I2, typename Op> struct " + func_name + "  {\n") + 
+               "  using value_type = typename Op::value_type;\n" +
+               "  using matxop = bool;\n" +
+               "  struct JIT_Storage {\n" + 
+               "    typename detail::inner_storage_or_self_t<detail::base_type_t<I1>> in1_;\n" +
+               "    typename detail::inner_storage_or_self_t<detail::base_type_t<I2>> in2_;\n" +
+               "    typename detail::inner_storage_or_self_t<detail::base_type_t<Op>> op_;\n" +
                "  };\n" +
                "  constexpr static cuda::std::array<index_t, " + std::to_string(Rank()) + "> out_dims_ = { " + 
                detail::array_to_string(out_dims_) + " };\n" +
-               "  JIT_Storage storage_;\n" +
+               "  typename detail::base_type_t<I1> in1_;\n" +
+               "  typename detail::base_type_t<I2> in2_;\n" +
+               "  typename detail::base_type_t<Op> op_;\n" +
                "  template <typename CapType, typename... Is>\n" +
                "  __MATX_INLINE__ __MATX_DEVICE__  decltype(auto) operator()(Is... indices) const\n" +
                "  {\n" +
-               "    if ((threadIdx.x * CapType::ept) >= Size(Rank() - 1)) {\n" +
+               "    if ((threadIdx.x * static_cast<int>(CapType::ept)) >= Size(Rank() - 1)) {\n" +
                "      return detail::GetJitSentinelValue<CapType, value_type>();\n" +
                "    }\n" +
-               "    auto i1 = get_value<CapType>(storage_.in1_, indices...);\n" +
-               "    auto i2 = get_value<CapType>(storage_.in2_, indices...);\n" +
-               "    return storage_.op_.template operator()<CapType>(i1, i2);\n" + 
+               "    auto i1 = get_value<CapType>(in1_, indices...);\n" + 
+               "    auto i2 = get_value<CapType>(in2_, indices...);\n" +
+               "    return op_.template operator()<CapType>(i1, i2);\n" + 
                "  }\n" +
                "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank()\n" +
                "  {\n" +
@@ -198,8 +202,7 @@ namespace matx
                "  }\n" +
                "  constexpr __MATX_INLINE__  __MATX_DEVICE__ index_t Size(int dim) const\n" +
                "  {\n" +
-               "    constexpr index_t dim_ = dim;\n" +
-               "    return out_dims_[dim_];\n " +
+               "    return out_dims_[dim];\n " +
                "  }\n" +          
                "};\n"
         );
@@ -213,7 +216,9 @@ namespace matx
           // No need to use combine_capabilities here since we're just returning a string.
           const auto lhs_jit_name = detail::get_operator_capability<Cap>(in1_, in);
           const auto rhs_jit_name = detail::get_operator_capability<Cap>(in2_, in);
-          return get_jit_class_name() + "<" + lhs_jit_name + "," + rhs_jit_name + ">";
+          const auto op_jit_name = detail::get_operator_capability<Cap>(op_, in);
+          printf("binary type query: %s, %s, %s\n", lhs_jit_name.c_str(), rhs_jit_name.c_str(), op_jit_name.c_str());
+          return get_jit_class_name() + "<" + lhs_jit_name + "," + rhs_jit_name + "," + op_jit_name + ">";
         }
         else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
           // Get the key/value pair from get_jit_op_str()
@@ -227,6 +232,7 @@ namespace matx
           // Also handle child operators
           detail::get_operator_capability<Cap>(in1_, in);
           detail::get_operator_capability<Cap>(in2_, in);
+          detail::get_operator_capability<Cap>(op_, in);
           
           // Always return true for now
           return true;
