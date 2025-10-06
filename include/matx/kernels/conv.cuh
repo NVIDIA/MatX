@@ -21,15 +21,25 @@ namespace matx_conv1d_detail {
 };
 using namespace matx_conv1d_detail;
 
+/**
+ * @brief Convolution/Correlation mode
+ *
+ * Specifies how the output size is determined and which elements are kept.
+ */
 typedef enum {
-  MATX_C_MODE_FULL, // Default. Keep all elements of ramp up/down
-  MATX_C_MODE_SAME, // Only keep elements where entire filter was present
-  MATX_C_MODE_VALID
+  MATX_C_MODE_FULL,  ///< Keep all elements including ramp-up/down (output size = N + M - 1)
+  MATX_C_MODE_SAME,  ///< Keep only elements where entire filter was present (output size = max(N, M))
+  MATX_C_MODE_VALID  ///< Keep only elements with full overlap (output size = max(N, M) - min(N, M) + 1)
 } matxConvCorrMode_t;
 
+/**
+ * @brief Convolution/Correlation method
+ *
+ * Specifies the algorithm to use for computing convolution or correlation.
+ */
 typedef enum {
-  MATX_C_METHOD_DIRECT,
-  MATX_C_METHOD_FFT
+  MATX_C_METHOD_DIRECT, ///< Direct convolution using sliding window approach
+  MATX_C_METHOD_FFT     ///< FFT-based convolution using the convolution theorem
 } matxConvCorrMethod_t;
 
 #ifdef __CUDACC__

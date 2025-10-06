@@ -8,6 +8,15 @@ Perform a 2D inverse FFT. Batching is supported for any tensor with a rank highe
 
 .. doxygenfunction:: ifft2(const OpA &a, FFTNorm norm = FFTNorm::BACKWARD)
 .. doxygenfunction:: ifft2(const OpA &a, const int32_t (&axis)[2], FFTNorm norm = FFTNorm::BACKWARD)
+
+FFT Normalization
+~~~~~~~~~~~~~~~~~
+
+The ``norm`` parameter specifies how the FFT and inverse FFT are scaled:
+
+- ``FFTNorm::BACKWARD``: FFT is unscaled, inverse FFT is scaled by 1/N (default)
+- ``FFTNorm::FORWARD``: FFT is scaled by 1/N, inverse FFT is unscaled
+- ``FFTNorm::ORTHO``: Both FFT and inverse FFT are scaled by 1/sqrt(N)
   
 Examples
 ~~~~~~~~

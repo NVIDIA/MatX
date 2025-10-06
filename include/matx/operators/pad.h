@@ -43,11 +43,11 @@ namespace matx
   /**
    * @brief Padding mode
    *
-   * The padding mode to use for the pad operator. The default value is MATX_PAD_MODE_CONSTANT.
+   * Specifies the padding mode to use for the pad operator.
    */
   enum PadMode {
-    MATX_PAD_MODE_CONSTANT, ///<Constant padding mode. All padding elements will be set to the user-provided pad_value.
-    MATX_PAD_MODE_EDGE ///<Edge padding mode. All padding elements will be set to the edge values of the original operator.
+    MATX_PAD_MODE_CONSTANT, ///< Constant padding mode. All padding elements will be set to the user-provided pad_value.
+    MATX_PAD_MODE_EDGE ///< Edge padding mode. All padding elements will be set to the edge values of the original operator.
   };
 
   namespace detail {
