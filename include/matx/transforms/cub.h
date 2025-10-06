@@ -54,8 +54,12 @@ namespace matx {
 /**
  * @brief Direction for sorting
  *
+ * Specifies whether to sort in ascending or descending order.
  */
-typedef enum { SORT_DIR_ASC, SORT_DIR_DESC } SortDirection_t;
+typedef enum { 
+  SORT_DIR_ASC,  ///< Sort in ascending order (smallest to largest)
+  SORT_DIR_DESC  ///< Sort in descending order (largest to smallest)
+} SortDirection_t;
 
 // define of dimension size for when the cub segemented sort
 // is outperformed by the radixSort

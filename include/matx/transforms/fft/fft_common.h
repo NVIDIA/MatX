@@ -34,10 +34,15 @@
 
 namespace matx {
 
+/**
+ * @brief FFT normalization mode
+ *
+ * Specifies how the FFT and inverse FFT are scaled/normalized.
+ */
 enum class FFTNorm {
-  BACKWARD, /// fft is unscaled, ifft is 1/N
-  FORWARD, /// fft is scaled 1/N, ifft is not scaled
-  ORTHO /// fft is scaled 1/sqrt(N), ifft is scaled 1/sqrt(N)
+  BACKWARD, ///< FFT is unscaled, inverse FFT is scaled by 1/N
+  FORWARD, ///< FFT is scaled by 1/N, inverse FFT is unscaled
+  ORTHO ///< Both FFT and inverse FFT are scaled by 1/sqrt(N)
 };
 
 namespace detail {
