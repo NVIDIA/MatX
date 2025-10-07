@@ -229,6 +229,23 @@ public:
     }
   }
 
+  // Helper to convert indices array to string
+  template <size_t RANK>
+  static std::string Index2Str(const cuda::std::array<index_t, RANK>& indices)
+  {
+    if constexpr (RANK == 0) {
+      return "0";
+    }
+    else {
+      std::string result = std::to_string(indices[0]);
+      for (size_t i = 1; i < RANK; i++) {
+        result += "/" + std::to_string(indices[i]);
+      }
+      return result;
+    }
+  }
+
+  // Legacy overloads for backward compatibility
   static std::string Index2Str(index_t x) { return std::to_string(x); }
 
   static std::string Index2Str(index_t x, index_t y)
@@ -322,6 +339,37 @@ public:
     return {in.real(), in.imag()};
   }
 
+  /**
+   * @brief Converts an absolute (flat) index to multi-dimensional indices
+   * 
+   * Local utility function to avoid circular header dependencies
+   *
+   * @param op Operator or tensor
+   * @param abs Absolute/flat index
+   * @return cuda::std::array of indices
+   */
+  template <typename Op>
+  static auto AbsToIdx(const Op &op, index_t abs) {
+    constexpr int RANK = Op::Rank();
+    cuda::std::array<index_t, RANK> indices;
+
+    for (int idx = 0; idx < RANK; idx++) {
+      if (idx == RANK-1) {
+        indices[RANK-1] = abs;
+      }
+      else {
+        index_t prod = 1;
+        for (int i = idx + 1; i < RANK; i++) {
+          prod *= op.Size(i);
+        }
+        indices[idx] = abs / prod;
+        abs = abs % prod;
+      }
+    }
+
+    return indices;
+  }
+
   template <typename TensorType>
   void NumpyToTensorView(TensorType &ten,
                          const std::string fname)
@@ -336,7 +384,6 @@ public:
   {
     using T = typename TensorType::value_type;
     constexpr int RANK = TensorType::Rank();
-    static_assert(RANK <=5, "NumpyToTensorView only supports max(RANK) = 5 at the moment.");
 
     using ntype = matx_convert_complex_type<T>;
     auto ften = pybind11::array_t<ntype>(np_ten);
@@ -345,36 +392,14 @@ public:
       ten() = ConvertComplex(ften.at());
     }
     else {
-      for (index_t s1 = 0; s1 < ten.Size(0); s1++) {
-        if constexpr (RANK > 1) {
-          for (index_t s2 = 0; s2 < ten.Size(1); s2++) {
-            if constexpr (RANK > 2) {
-              for (index_t s3 = 0; s3 < ten.Size(2); s3++) {
-                if constexpr (RANK > 3) {
-                  for (index_t s4 = 0; s4 < ten.Size(3); s4++) {
-                    if constexpr (RANK > 4) {
-                      for (index_t s5 = 0; s5 < ten.Size(4); s5++) {
-                        ten(s1, s2, s3, s4, s5) = ConvertComplex(ften.at(s1, s2, s3, s4, s5));
-                      }
-                    }
-                    else {
-                      ten(s1, s2, s3, s4) = ConvertComplex(ften.at(s1, s2, s3, s4));
-                    }
-                  }
-                }
-                else {
-                  ten(s1, s2, s3) = ConvertComplex(ften.at(s1, s2, s3));
-                }
-              }
-            }
-            else {
-              ten(s1, s2) = ConvertComplex(ften.at(s1, s2));
-            }
-          }
-        }
-        else {
-          ten(s1) = ConvertComplex(ften.at(s1));
-        }
+      // Iterate through all elements
+      for (index_t i = 0; i < ten.TotalSize(); i++) {
+        auto indices = AbsToIdx(ten, i);
+        
+        // Use cuda::std::apply to expand indices and access both arrays
+        cuda::std::apply([&](auto&&... idx) {
+          ten(idx...) = ConvertComplex(ften.at(idx...));
+        }, indices);
       }
     }
   }
@@ -412,37 +437,14 @@ public:
     if constexpr (is_matx_type<tensor_type>()) {
       auto ften = pybind11::array_t<ntype, pybind11::array::c_style | pybind11::array::forcecast>(ten.Shape());
 
-      for (index_t s1 = 0; s1 < ten.Size(0); s1++) {
-        if constexpr (RANK > 1) {
-          for (index_t s2 = 0; s2 < ten.Size(1); s2++) {
-            if constexpr (RANK > 2) {
-              for (index_t s3 = 0; s3 < ten.Size(2); s3++) {
-                if constexpr (RANK > 3) {
-                  for (index_t s4 = 0; s4 < ten.Size(3); s4++) {
-                    if constexpr (RANK > 4) {
-                      for (index_t s5 = 0; s5 < ten.Size(4); s5++) {
-                        ften.mutable_at(s1, s2, s3, s4, s5) =
-                            ConvertComplex(ten(s1, s2, s3, s4, s5));
-                      }
-                    } else {
-                      ften.mutable_at(s1, s2, s3, s4) =
-                          ConvertComplex(ten(s1, s2, s3, s4));
-                    }
-                  }
-                }
-                else {
-                  ften.mutable_at(s1, s2, s3) = ConvertComplex(ten(s1, s2, s3));
-                }
-              }
-            }
-            else {
-              ften.mutable_at(s1, s2) = ConvertComplex(ten(s1, s2));
-            }
-          }
-        }
-        else {
-          ften.mutable_at(s1) = ConvertComplex(ten(s1));
-        }
+      // Iterate through all elements
+      for (index_t i = 0; i < ten.TotalSize(); i++) {
+        auto indices = AbsToIdx(ten, i);
+        
+        // Use cuda::std::apply to expand indices and access both arrays
+        cuda::std::apply([&](auto&&... idx) {
+          ften.mutable_at(idx...) = ConvertComplex(ten(idx...));
+        }, indices);
       }
 
       return ften;      
@@ -489,54 +491,29 @@ public:
       auto file_val = ften.at();
       auto ten_val = ConvertComplex(ten());
       if (!CompareVals(ten_val, file_val, thresh, fname, debug)) {
-        return TestFailResult<ctype>{Index2Str(0), "0", ten_val, file_val,
+        return TestFailResult<ctype>{Index2Str(0), fname, ten_val, file_val,
                                      thresh};
       }
     }
     else {
-      for (index_t s1 = 0; s1 < ten.Size(0); s1++) {
-        if constexpr (RANK > 1) {
-          for (index_t s2 = 0; s2 < ten.Size(1); s2++) {
-            if constexpr (RANK > 2) {
-              for (index_t s3 = 0; s3 < ten.Size(2); s3++) {
-                if constexpr (RANK > 3) {
-                  for (index_t s4 = 0; s4 < ten.Size(3); s4++) {
-                    auto file_val = ften.at(s1, s2, s3, s4);
-                    auto ten_val = ConvertComplex(ten(s1, s2, s3, s4));
-                    if (!CompareVals(ten_val, file_val, thresh, fname, debug)) {
-                      return TestFailResult<ctype>{Index2Str(s1, s2, s3, s4),
-                                                   fname, ten_val, file_val,
-                                                   thresh};
-                    }
-                  }
-                }
-                else {
-                  auto file_val = ften.at(s1, s2, s3);
-                  auto ten_val = ConvertComplex(ten(s1, s2, s3));
-                  if (!CompareVals(ten_val, file_val, thresh, fname, debug)) {
-                    return TestFailResult<ctype>{Index2Str(s1, s2, s3), fname,
-                                                 ten_val, file_val, thresh};
-                  }
-                }
-              }
-            }
-            else {
-              auto file_val = ften.at(s1, s2);
-              auto ten_val = ConvertComplex(ten(s1, s2));
-              if (!CompareVals(ten_val, file_val, thresh, fname, debug)) {
-                return TestFailResult<ctype>{Index2Str(s1, s2), fname, ten_val,
-                                             file_val, thresh};
-              }
-            }
-          }
-        }
-        else {
-          auto file_val = ften.at(s1);
-          auto ten_val = ConvertComplex(ten(s1));
-          if (!CompareVals(ten_val, file_val, thresh, fname, debug)) {
-            return TestFailResult<ctype>{Index2Str(s1), fname, ten_val,
-                                         file_val, thresh};
-          }
+      // Iterate through all elements
+      for (index_t i = 0; i < ten.TotalSize(); i++) {
+        auto indices = AbsToIdx(ten, i);
+        
+        // Use cuda::std::apply to expand indices and compare values
+        auto comparison_failed = cuda::std::apply([&](auto&&... idx) {
+          auto file_val = ften.at(idx...);
+          auto ten_val = ConvertComplex(ten(idx...));
+          return !CompareVals(ten_val, file_val, thresh, fname, debug) ? 
+                 std::make_optional(std::make_pair(ten_val, file_val)) : 
+                 std::nullopt;
+        }, indices);
+        
+        if (comparison_failed) {
+          return TestFailResult<ctype>{Index2Str(indices), fname, 
+                                       comparison_failed->first, 
+                                       comparison_failed->second,
+                                       thresh};
         }
       }
     }
