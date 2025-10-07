@@ -312,11 +312,7 @@ namespace matx {
         using seq = offset_sequence_t<sizeof...(Is) - RANK, cuda::std::make_index_sequence<RANK>>;
         auto tup = cuda::std::make_tuple(indices...);
         auto sliced_tup = select_tuple(std::forward<decltype(tup)>(tup), seq{});
-#ifdef __CUDACC_RTC__         
-        return cuda::std::apply([&] __host__ __device__ (auto... args) {
-#else 
-        return cuda::std::apply([&] (auto... args) {    
-#endif                
+        return cuda::std::apply([&] (auto... args) {                 
           return cuda::std::forward<T>(i).template operator()<CapType>(args...);
         }, sliced_tup);
       }

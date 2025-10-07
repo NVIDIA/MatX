@@ -326,6 +326,11 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, cons
   
   std::string kernel_name = get_kernel_name(op, stride);
   std::string cache_key = kernel_name + "_" + kernel_op_type;
+
+  printf("DEBUG: nvrtc_compile_and_run called with operator type: %s\n", typeid(op).name());
+  const auto ltoir_query_input = detail::LTOIRQueryInput{ept};
+  auto ltoir = detail::get_operator_capability<OperatorCapability::GENERATE_LTOIR>(op, ltoir_query_input);
+  printf("DEBUG: LTOIR capability result: %s\n", ltoir ? "true" : "false");  
   
   CUfunction kernel_func;
   
@@ -381,6 +386,7 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, cons
     options.push_back("-include=matx/core/jit_includes.h");
     options.push_back("-include=matx_generated_code_hdr");
     options.push_back("-include=matx_class_strings");
+    options.push_back("-default-device");
     
     std::vector<const char*> opts;
     for (const auto& opt : options) {
@@ -406,9 +412,11 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, cons
     }
     
     // Get the lowered (mangled) kernel name
-    const char* lowered_name;
-    NVRTC_CHECK(nvrtcGetLoweredName(prog, kernel_name_expr.c_str(), &lowered_name));
-    printf("DEBUG: Lowered kernel name: %s\n", lowered_name);
+    const char* lowered_name_ptr;
+    NVRTC_CHECK(nvrtcGetLoweredName(prog, kernel_name_expr.c_str(), &lowered_name_ptr));
+    // Copy the lowered name before destroying the program
+    std::string lowered_name(lowered_name_ptr);
+    printf("DEBUG: Lowered kernel name: %s\n", lowered_name.c_str());
     
     // Get PTX
     size_t ptx_size;
@@ -424,7 +432,7 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, cons
     CUDA_CHECK(cuModuleLoadDataEx(&module, ptx.data(), 0, nullptr, nullptr));
     
     // Get kernel function using the lowered name
-    CUDA_CHECK(cuModuleGetFunction(&kernel_func, module, lowered_name));
+    CUDA_CHECK(cuModuleGetFunction(&kernel_func, module, lowered_name.c_str()));
     
     // Cache the kernel
     kernel_cache[cache_key] = kernel_func;
