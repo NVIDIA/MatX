@@ -32,6 +32,8 @@
 
 #pragma once
 
+#define FFT_DX_FUNC_PREFIX "fft_cufftdx_func"
+
 #ifdef __CUDACC__
 
 #include "matx/core/operator_options.h"
@@ -88,93 +90,7 @@ namespace matx {
     using type = __nv_bfloat16;
   };    
 
-  /**
-   * @brief Checks if a given Block FFT configuration is supported by cuFFTDx.
-   *
-   * Based on the table and notes at: https://docs.nvidia.com/cuda/cufftdx/requirements_func.html#supported-functionality
-   *
-   * @param arch_cc The CUDA compute capability (e.g., 70, 75, 80, 86, 90).
-   * @param precision The data precision (HALF, FLOAT, DOUBLE).
-   * @param fft_size The size of the FFT.
-   * @return True if the configuration is supported, false otherwise.
-   */
-  template <typename T>
-  __MATX_INLINE__ __MATX_HOST__  bool IsDxBlockFFTSupported(
-      int arch_cc,
-      index_t fft_size,
-      FFTType fft_type)
-  {
-      if (fft_size < 0) { // FFT sizes are non-negative.
-          return false;
-      }
 
-      // Don't fuse non-C2C for now
-      if (fft_type != FFTType::C2C) {
-        return false;
-      }
-
-      // If not covered by the general rule, check "selected FFT sizes" from the normal table.
-      // Min size in table is 2.
-      if (fft_size < 2) {
-            // Only covered if fft_size was 0 or 1 AND met the max_size_fp64_for_arch/2 rule above.
-            // Otherwise, sizes < 2 are not in the explicit table ranges.
-          return false;
-      }
-
-      if constexpr (cuda::std::is_same_v<T, matxFp16Complex> || 
-                    cuda::std::is_same_v<T, matxBf16Complex> || 
-                    cuda::std::is_same_v<T, cuda::std::complex<float>>) {
-            if (arch_cc == 75) return (fft_size <= 16384);
-            if (arch_cc == 70 || arch_cc == 72 || arch_cc == 86 || arch_cc == 89) return (fft_size <= 24389);
-            if (arch_cc == 80 || arch_cc == 87 || arch_cc == 90) return (fft_size <= 32768);
-      }
-      else if constexpr (std::is_same_v<T, cuda::std::complex<double>>) {
-            if (arch_cc == 75) return (fft_size <= 8192);
-            if (arch_cc == 70 || arch_cc == 72 || arch_cc == 86 || arch_cc == 89) return (fft_size <= 12167);
-            if (arch_cc == 80 || arch_cc == 87 || arch_cc == 90) return (fft_size <= 16384);
-      }
-
-
-      return false; // Default if architecture or specific configuration not explicitly supported by table logic
-  }
-
-#ifdef __CUDA_ARCH__
-  template <typename input_type, typename CapType, typename Op, typename... Is>
-  __MATX_INLINE__ __MATX_DEVICE__ auto RunDxFFT1D(const Op &op, Is... indices) {
-    static constexpr unsigned int fft_size = jit_fft1_params_t<0>::fft_size;
-    static constexpr bool fft_forward = jit_fft1_params_t<0>::fft_forward;
-
-    // If it's a half precision type we don't use value_type
-    using precision = typename fft_precision<input_type>::type;  
-    using input_type_converted = typename detail::convert_matx_type_t<input_type>;
-
-    extern __shared__  Vector<input_type_converted, static_cast<int>(CapType::ept)> thread_data[];
-    thread_data[threadIdx.x] = op.template operator()<CapType>(indices...);
-    __syncthreads();
-
-    if constexpr (fft_forward) {
-      using FFT = decltype(cufftdx::Block() + cufftdx::Size<fft_size>() + cufftdx::Type<cufftdx::fft_type::c2c>() +
-                  cufftdx::Direction<cufftdx::fft_direction::forward>() + cufftdx::Precision<precision>() +
-                  cufftdx::FFTsPerBlock<1>() + cufftdx::SM<__CUDA_ARCH__>() + cufftdx::ElementsPerThread<static_cast<int>(CapType::ept)>());
-      
-      FFT().execute(&thread_data[0]);
-    }
-    else { // IFFT
-      using FFT = decltype(cufftdx::Block() + cufftdx::Size<fft_size>() + cufftdx::Type<cufftdx::fft_type::c2c>() +
-                  cufftdx::Direction<cufftdx::fft_direction::inverse>() + cufftdx::Precision<precision>() +
-                  cufftdx::FFTsPerBlock<1>() + cufftdx::SM<__CUDA_ARCH__>() + cufftdx::ElementsPerThread<static_cast<int>(CapType::ept)>());
-      
-      FFT().execute(&thread_data[0]);
-      // IFFTs get normalized to match Python
-      #pragma unroll
-      for (int i = 0; i < static_cast<int>(CapType::ept); i++) {
-        thread_data[threadIdx.x].data[i] = thread_data[threadIdx.x].data[i] / static_cast<precision>(fft_size);
-      }
-    }
-
-    return thread_data[threadIdx.x];  
-  }
-#endif
 
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__) && !defined(__CUDACC_RTC__) && !defined(__CUDA_ARCH__)
   template <typename InputType>
@@ -244,7 +160,7 @@ namespace matx {
       }
 
       static std::string GetSymbolName(index_t fft_size, FFTType fft_type, FFTDirection direction, int cc) {
-        std::string symbol_name = "fft_cufftdx_";
+        std::string symbol_name;
         symbol_name += std::to_string(fft_size);
         symbol_name += "_T";
         symbol_name += std::to_string(static_cast<int>(fft_type));
@@ -313,7 +229,7 @@ namespace matx {
         return static_cast<int>(block_dim[0]);
       }
 
-      static bool GenerateLTOIR(index_t fft_size, FFTType fft_type, FFTDirection direction, ElementsPerThread ept) {
+      static bool GenerateLTOIR(index_t fft_size, FFTType fft_type, FFTDirection direction, ElementsPerThread ept, std::vector<std::string> &ltoir_symbols) {
                 // Specify arch to compile to. This should eventually be pulled from the handle, but there's no way to do that currently
         int major = 0;
         int minor = 0;
@@ -323,13 +239,15 @@ namespace matx {
         cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device);
         long long int cc = major * 100 + minor;
 
-        const auto symbol_name = GetSymbolName(fft_size, fft_type, direction, static_cast<int>(cc));
+        const auto symbol_name = std::string(FFT_DX_FUNC_PREFIX) + "_" + GetSymbolName(fft_size, fft_type, direction, static_cast<int>(cc));
+        ltoir_symbols.push_back(symbol_name);
         LTOIRData ltoir;
 
         if (detail::GetCache().GetLTOIRCachedBytes(symbol_name) != nullptr) {
-          printf("LTOIR found in cache\n");
+          printf("LTOIR found in cache with size %zd\n", detail::GetCache().GetLTOIRCachedBytes(symbol_name)->length);
           return true;
         }
+
         printf("fft_size %lld fft_type %d direction %d cc %d symbol_name %s\n", fft_size, static_cast<int>(fft_type), static_cast<int>(direction), static_cast<int>(cc), symbol_name.c_str());
         auto handle = Init(fft_size, fft_type, direction);
         LIBMATHDX_CHECK(cufftdxSetOperatorInt64(handle, CUFFTDX_OPERATOR_ELEMENTS_PER_THREAD, static_cast<long long int>(ept)));
@@ -348,14 +266,78 @@ namespace matx {
 
         LIBMATHDX_CHECK(commondxGetCodeLTOIR(code, ltoir.length, ltoir.data));
 
-        detail::GetCache().StoreLTOIRCachedBytes(symbol_name, ltoir.data, ltoir.length);
-        LIBMATHDX_CHECK(commondxDestroyCode(code));
-
-
         printf("Function %s\n", symbol_name.c_str());        
         printf("LTOIR size %zd\n", ltoir.length);
+        printf("LTOIR first 8 bytes: %02x %02x %02x %02x %02x %02x %02x %02x\n",
+               static_cast<unsigned char>(ltoir.data[0]),
+               static_cast<unsigned char>(ltoir.data[1]),
+               static_cast<unsigned char>(ltoir.data[2]),
+               static_cast<unsigned char>(ltoir.data[3]),
+               static_cast<unsigned char>(ltoir.data[4]),
+               static_cast<unsigned char>(ltoir.data[5]),
+               static_cast<unsigned char>(ltoir.data[6]),
+               static_cast<unsigned char>(ltoir.data[7]));
+        
+        // Check LTOIR format - note that cuFFTDx may generate various formats
+        // (LLVM bitcode 'BC', NVVM IR, or other LTOIR formats)
+        if (ltoir.length >= 4) {
+          bool is_llvm_bc = (static_cast<unsigned char>(ltoir.data[0]) == 0x42 && 
+                            static_cast<unsigned char>(ltoir.data[1]) == 0x43);
+          if (is_llvm_bc) {
+            printf("LTOIR format: LLVM bitcode (BC)\n");
+          } else {
+            printf("LTOIR format: Other (first bytes: %02x %02x %02x %02x)\n",
+                   static_cast<unsigned char>(ltoir.data[0]),
+                   static_cast<unsigned char>(ltoir.data[1]),
+                   static_cast<unsigned char>(ltoir.data[2]),
+                   static_cast<unsigned char>(ltoir.data[3]));
+          }
+        }
+
+        detail::GetCache().StoreLTOIRCachedBytes(symbol_name, ltoir.data, ltoir.length);
+        
+        // CRITICAL: Set to nullptr after transferring ownership to cache to prevent double-free
+        // The cache now owns this memory, so we must not let LTOIRData destructor free it
+        ltoir.data = nullptr;
+        ltoir.length = 0;
+        
+        LIBMATHDX_CHECK(commondxDestroyCode(code));
     
         return true;
+      }
+
+      static const char* GetFuncStr() {
+          return  R"(
+            using input_type = %s;
+            [[maybe_unused]] static constexpr int fft_size = %d;
+            [[maybe_unused]] static constexpr int fft_forward = %d;
+            [[maybe_unused]] static constexpr int fft_norm = %d;
+            [[maybe_unused]] static constexpr int fft_type = %d;
+      
+            // If it's a half precision type we don't use value_type
+            using input_type_converted = typename detail::convert_matx_type_t<input_type>;
+      
+            extern __shared__  Vector<input_type_converted, static_cast<int>(CapType::ept)> thread_data[];
+            thread_data[threadIdx.x] = a_.template operator()<CapType>(indices...);
+            __syncthreads();
+      
+            %s(reinterpret_cast<input_type_converted*>(&thread_data[0]));
+      
+            if constexpr (fft_norm == 2) { // ORTHO
+              #pragma unroll
+              for (int i = 0; i < static_cast<int>(CapType::ept); i++) {        
+                thread_data[threadIdx.x].data[i] = thread_data[threadIdx.x].data[i] * static_cast<precision>(1.f / cuda::std::sqrt(fft_size));
+              }
+            }
+            else if constexpr ((fft_norm == 1 && fft_forward) || (fft_norm == 0 && !fft_forward)) {
+              #pragma unroll
+              for (int i = 0; i < static_cast<int>(CapType::ept); i++) {        
+                thread_data[threadIdx.x].data[i] = thread_data[threadIdx.x].data[i] * static_cast<precision>(1.f / fft_size);
+              }
+            }
+      
+            return thread_data[threadIdx.x];  
+        )";        
       }
   };
 

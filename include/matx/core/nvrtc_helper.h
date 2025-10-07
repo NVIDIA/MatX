@@ -63,6 +63,7 @@
   #include <fstream>
   #include <sstream>
   #include <unordered_map>
+  #include <matx/core/cache.h>  
 #else
   #define JITIFY_ENABLE_NVTX 1
   #define JITIFY_VERBOSE_ERRORS 1
@@ -77,6 +78,7 @@
 #include "matx/executors/jit_kernel.h"
 //#include "matx/core/type_utils.h"
 #include <filesystem>
+#include <nvJitLink.h>
 #include <source_location>
 #include <vector>
 #include <string>
@@ -160,6 +162,27 @@ std::vector<std::string> __MATX_HOST__ __MATX_INLINE__ get_preprocessor_options(
       std::exit(EXIT_FAILURE);                                                 \
     }                                                                          \
   } while (0)
+
+  #ifndef NVJITLINK_CHECK
+  #define NVJITLINK_CHECK(handle, ans)                                                                                   \
+      do {                                                                                                               \
+          nvJitLinkResult result = (ans);                                                                                \
+          if (result != NVJITLINK_SUCCESS) {                                                                             \
+              fprintf(stderr, "nvJitLink error: %d on %s:%d\n", (int)result, __FILE__, __LINE__);                        \
+              size_t lsize;                                                                                              \
+              result = nvJitLinkGetErrorLogSize(handle, &lsize);                                                         \
+              if (result == NVJITLINK_SUCCESS && lsize > 0) {                                                            \
+                  std::vector<char> log(lsize);                                                                          \
+                  result = nvJitLinkGetErrorLog(handle, log.data());                                                     \
+                  if (result == NVJITLINK_SUCCESS) {                                                                     \
+                      fprintf(stderr, "%s\n", log.data());                                                               \
+                  }                                                                                                      \
+              }                                                                                                          \
+              abort();                                                                                                   \
+          }                                                                                                              \
+      } while (0)
+  #endif // NVJITLINK_CHECK
+  
 
 // Read file contents into a string
 std::string read_file_contents(const std::string& filepath) {
@@ -328,9 +351,7 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, cons
   std::string cache_key = kernel_name + "_" + kernel_op_type;
 
   printf("DEBUG: nvrtc_compile_and_run called with operator type: %s\n", typeid(op).name());
-  const auto ltoir_query_input = detail::LTOIRQueryInput{ept};
-  auto ltoir = detail::get_operator_capability<OperatorCapability::GENERATE_LTOIR>(op, ltoir_query_input);
-  printf("DEBUG: LTOIR capability result: %s\n", ltoir ? "true" : "false");  
+
   
   CUfunction kernel_func;
   
@@ -387,12 +408,14 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, cons
     options.push_back("-include=matx_generated_code_hdr");
     options.push_back("-include=matx_class_strings");
     options.push_back("-default-device");
-    
+    options.push_back("--relocatable-device-code=true");
+    options.push_back("-dlto");
+
     std::vector<const char*> opts;
     for (const auto& opt : options) {
       opts.push_back(opt.c_str());
     }
-    
+
     // Compile the program
     nvrtcResult compile_result = nvrtcCompileProgram(prog, static_cast<int>(opts.size()), opts.data());
     
@@ -417,19 +440,67 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, cons
     // Copy the lowered name before destroying the program
     std::string lowered_name(lowered_name_ptr);
     printf("DEBUG: Lowered kernel name: %s\n", lowered_name.c_str());
+
+    // Compile any LTO-IR required for expression:
+    auto ltoir_query_input = detail::LTOIRQueryInput{};
+    ltoir_query_input.ept = ept;
+    auto ltoir_result = detail::get_operator_capability<OperatorCapability::GENERATE_LTOIR>(op, ltoir_query_input);
+    printf("DEBUG: LTOIR capability result: %s\n", ltoir_result ? "true" : "false");          
     
-    // Get PTX
-    size_t ptx_size;
-    NVRTC_CHECK(nvrtcGetPTXSize(prog, &ptx_size));
-    std::vector<char> ptx(ptx_size);
-    NVRTC_CHECK(nvrtcGetPTX(prog, ptx.data()));
-    
-    // Destroy the program
+    size_t lto_size = 0;
+    NVRTC_CHECK(nvrtcGetLTOIRSize(prog, &lto_size));
+    std::vector<char> compiled_code(lto_size);
+    NVRTC_CHECK(nvrtcGetLTOIR(prog, compiled_code.data()));
     NVRTC_CHECK(nvrtcDestroyProgram(&prog));
+
+
+    // Link and LTO-IR files if needed
+    nvJitLinkHandle handle {};
+    std::vector<std::string> link_options = { "-lto", std::string("-arch=sm_") + std::string(NVRTC_CUDA_ARCH) };
+
+    std::vector<const char*> lto_opts;
+    for (const auto& o : link_options) {
+        lto_opts.emplace_back(o.c_str());
+    }
+    NVJITLINK_CHECK(handle, nvJitLinkCreate(&handle, static_cast<int>(lto_opts.size()), lto_opts.data()));
+
+    // First add all our LTO-IR from the operator
+    for (const auto& lto : ltoir_query_input.ltoir_symbols) {
+      const auto ltoir_ptr = detail::GetCache().GetLTOIRCachedBytes(lto);
+      if (ltoir_ptr == nullptr) {
+        std::string error_msg = "LTOIR not found in cache: " + lto;
+        MATX_THROW(matxInvalidParameter, error_msg);
+      }
+
+      printf("Adding LTOIR for symbol %s, size=%zu bytes, first 4 bytes: %02x %02x %02x %02x\n", 
+             lto.c_str(), ltoir_ptr->length, 
+             static_cast<unsigned char>(ltoir_ptr->data[0]), 
+             static_cast<unsigned char>(ltoir_ptr->data[1]), 
+             static_cast<unsigned char>(ltoir_ptr->data[2]), 
+             static_cast<unsigned char>(ltoir_ptr->data[3]));
+      
+      // Validate that the data looks like LTOIR (LLVM bitcode typically starts with 'BC')
+      if (ltoir_ptr->length < 4) {
+        printf("WARNING: LTOIR data for %s is too small (%zu bytes)\n", lto.c_str(), ltoir_ptr->length);
+      }
+      
+      NVJITLINK_CHECK(handle, nvJitLinkAddData(handle, NVJITLINK_INPUT_LTOIR, ltoir_ptr->data, ltoir_ptr->length, lto.c_str()));
+    }    
+
+    // Add main program LTO-IR
+    NVJITLINK_CHECK(handle, nvJitLinkAddData(handle, NVJITLINK_INPUT_LTOIR, compiled_code.data(), lto_size, "main"));
+    NVJITLINK_CHECK(handle, nvJitLinkComplete(handle));
+
+    size_t cubin_size = 0;
+    NVJITLINK_CHECK(handle, nvJitLinkGetLinkedCubinSize(handle, &cubin_size));
+    std::vector<char> cubin(cubin_size);
+    NVJITLINK_CHECK(handle, nvJitLinkGetLinkedCubin(handle, cubin.data()));
+    NVJITLINK_CHECK(handle, nvJitLinkDestroy(&handle));
+
     
     // Load PTX into CUDA module
     CUmodule module;
-    CUDA_CHECK(cuModuleLoadDataEx(&module, ptx.data(), 0, nullptr, nullptr));
+    CUDA_CHECK(cuModuleLoadDataEx(&module, cubin.data(), 0, nullptr, nullptr));
     
     // Get kernel function using the lowered name
     CUDA_CHECK(cuModuleGetFunction(&kernel_func, module, lowered_name.c_str()));

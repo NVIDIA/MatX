@@ -358,6 +358,20 @@ template <class T>
 inline constexpr bool is_cuda_complex_v = detail::is_cuda_complex<remove_cvref_t<T>>::value;
 
 
+namespace detail {
+  template <typename T, typename = void> struct is_cuda_executor : cuda::std::false_type {};
+  
+  template <typename T>
+  struct is_cuda_executor<T, cuda::std::void_t<typename T::cuda_executor>> : cuda::std::true_type {};
+}
+
+/**
+  * @brief Determine if a type is a device executor
+  * 
+  * @tparam T Type to test
+  */
+template <typename T> 
+inline constexpr bool is_cuda_executor_v = detail::is_cuda_executor<typename remove_cvref<T>::type>::value;
 
 
 namespace detail {

@@ -166,11 +166,35 @@ namespace matx
           return symbol_name;
         }
 
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__) && !defined(__CUDACC_RTC__) && !defined(__CUDA_ARCH__)    
         __MATX_INLINE__ auto get_jit_op_str() const {
           const std::string class_name = get_jit_class_name();
+          detail::FFTDirection dir = std::is_same_v<FFTDirection, detail::fft_t> ? 
+                                            detail::FFTDirection::FORWARD : 
+                                            detail::FFTDirection::BACKWARD;   
+
+          const std::string fft_func_name = std::string(FFT_DX_FUNC_PREFIX) + "_" + cuFFTDxHelper<typename OpA::value_type>::GetSymbolName(
+            fft_size_, 
+            DeduceFFTTransformType<typename scalar_to_complex<typename OpA::value_type>::ctype, value_type>(), 
+            dir, 
+            GetComputeCapability());
+
+          char fft_func_code[8192];
+          sprintf(fft_func_code, cuFFTDxHelper<typename OpA::value_type>::GetFuncStr(),
+            detail::type_to_string<input_type>().c_str(),
+            fft_size_,
+            std::is_same_v<FFTDirection, detail::fft_t> ? 1 : 0,
+            static_cast<int>(norm_),
+            static_cast<int>(DeduceFFTTransformType<typename scalar_to_complex<typename OpA::value_type>::ctype, value_type>()),
+            fft_func_name.c_str()
+          );
+
+          
+
           return cuda::std::make_tuple(
              class_name, 
              std::string(
+                 " extern \"C\" __device__ void " + fft_func_name + "(" + detail::type_to_string<input_type>() + "*);\n" +
                  " template <typename OpA> struct " + class_name + "  {\n" +
                  "  using input_type = typename OpA::value_type;\n" +
                  "  using matxop = bool;\n" +
@@ -180,14 +204,11 @@ namespace matx
                  "  };\n" +
                  "  typename detail::base_type_t<OpA> a_;\n" +
                  "  constexpr static cuda::std::array<index_t, " + std::to_string(Rank()) + "> out_dims_ = { " + 
-                 detail::array_to_string(out_dims_) + " };\n" +
-                 "  constexpr static unsigned int fft_size_ = " + std::to_string(fft_size_) + ";\n" +
-                 "  constexpr static bool fft_forward_ = " + std::to_string(static_cast<bool>(std::is_same_v<FFTDirection, detail::fft_t>)) + ";\n" +
+                 detail::array_to_string(out_dims_) + " };\n" +             
                  "  template <typename CapType, typename... Is>\n" +
                  "  __MATX_INLINE__ __MATX_DEVICE__  decltype(auto) operator()(Is... indices) const\n" +
                  "  {\n" +
-                 "    //return detail::RunDxFFT1D<input_type, CapType, fft_size, fft_forward>(a_, indices...);\n" +
-                 "    return a_.template operator()<CapType>(indices...);\n" +
+                 "    " + std::string(fft_func_code) + "\n" +
                  "  }\n" +
                  "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank()\n" +
                  "  {\n" +
@@ -200,31 +221,21 @@ namespace matx
                  "};\n")
           );
         }
+#endif         
 #endif
 
         template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
 #ifdef __CUDA_ARCH__
-        if constexpr (CapType::jit) {
-          if ((threadIdx.x * CapType::ept) >= Size(Rank() - 1)) {
-            printf("threadIdx.x %d, CapType::ept %d, Size(Rank() - 1) %lld\n", threadIdx.x, static_cast<int>(CapType::ept), Size(Rank() - 1));
-            return detail::GetJitSentinelValue<CapType, value_type>();
+          if constexpr (CapType::jit) {
+            if ((threadIdx.x * CapType::ept) >= Size(Rank() - 1)) {
+              printf("threadIdx.x %d, CapType::ept %d, Size(Rank() - 1) %lld\n", threadIdx.x, static_cast<int>(CapType::ept), Size(Rank() - 1));
+              return detail::GetJitSentinelValue<CapType, value_type>();
+            }
           }
-        }
 #endif
-          // cuFFTDx Doesn't support CapType::ept == 1
-          if constexpr (CapType::ept == detail::ElementsPerThread::ONE) {
-            return tmp_out_.template operator()<CapType>(indices...);
-          }
-          else {
-#if defined(__CUDA_ARCH__) && defined(__CUDACC_RTC__)
-            return detail::RunDxFFT1D<input_type, CapType>(a_, indices...);
-            //return tmp_out_.template operator()<CapType>(indices...);
-#else
-            return tmp_out_.template operator()<CapType>(indices...);
-#endif
-          }
+          return tmp_out_.template operator()<CapType>(indices...);
         }
 
         template <typename... Is>
@@ -273,7 +284,8 @@ namespace matx
 #endif
             return combine_capabilities<Cap>(supported, detail::get_operator_capability<Cap>(a_, in));      
           }
-          else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {           
+          else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {       
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__) && !defined(__CUDACC_RTC__) && !defined(__CUDA_ARCH__)                 
             // Get the capability string and add to map
             const auto [key, value] = get_jit_op_str();
       
@@ -284,7 +296,8 @@ namespace matx
             
             // Also handle child operators
             detail::get_operator_capability<Cap>(a_, in);
-            
+
+#endif
             // Always return true for now
             return true;
           }
@@ -321,7 +334,7 @@ namespace matx
             printf("GENERATE_LTOIR\n");
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__) && !defined(__CUDACC_RTC__) && !defined(__CUDA_ARCH__)
             return combine_capabilities<Cap>(
-                cuFFTDxHelper<typename OpA::value_type>::GenerateLTOIR(fft_size_, FFTType::C2C, dir, in.ept), 
+                cuFFTDxHelper<typename OpA::value_type>::GenerateLTOIR(fft_size_, FFTType::C2C, dir, in.ept, in.ltoir_symbols), 
                 detail::get_operator_capability<Cap>(a_, in));
 #else
             return combine_capabilities<Cap>(capability_attributes<Cap>::default_value, detail::get_operator_capability<Cap>(a_, in));

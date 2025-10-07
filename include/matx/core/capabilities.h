@@ -50,6 +50,11 @@ namespace detail {
   using BlockDimType = int;
 
 
+  struct LTOIRQueryInput {
+    std::vector<std::string> ltoir_symbols;
+    ElementsPerThread ept;
+  };  
+
   // Enum for different operator capabilities
   enum class OperatorCapability {
     NONE,

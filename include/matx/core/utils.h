@@ -68,7 +68,7 @@ __MATX_INLINE__ int GetComputeCapabilityMinor() {
 }
 
 __MATX_INLINE__ int GetComputeCapability() {
-    return GetComputeCapabilityMajor() * 10 + GetComputeCapabilityMinor();
+    return GetComputeCapabilityMajor() * 100 + GetComputeCapabilityMinor();
 }
 
 __MATX_INLINE__ bool IsHopperOrAbove() {

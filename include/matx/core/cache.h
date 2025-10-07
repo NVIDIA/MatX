@@ -46,6 +46,8 @@
 #include <cstring>
 
 #include "matx/core/error.h"
+#include "matx/core/allocator.h"
+#include "matx/core/type_utils_both.h"
 
 namespace matx {
 namespace detail {
@@ -287,6 +289,31 @@ public:
     if (!file.read(buffer, size)) {
       free(buffer);
       return nullptr;
+    }
+    
+    // Basic validation: check if data looks reasonable (not all zeros, has some content)
+    // Note: LTOIR format may vary (LLVM bitcode 'BC', NVVM IR, compressed, etc.)
+    // so we don't validate specific magic bytes, just sanity check
+    if (size >= 4) {
+      // Check if it looks like garbage (all same byte pattern often indicates corruption)
+      bool looks_corrupt = (buffer[0] == buffer[1] && buffer[1] == buffer[2] && 
+                           buffer[2] == buffer[3] && buffer[0] == 0);
+      if (looks_corrupt) {
+        printf("WARNING: Cached LTOIR file '%s' appears corrupted (all zeros)\n", filename.c_str());
+        free(buffer);
+        try {
+          std::filesystem::remove(cache_file);
+        } catch (...) {
+          // Ignore deletion failures
+        }
+        return nullptr;
+      }
+    }
+    
+    // IMPORTANT: Reserve space to prevent rehashing which would invalidate existing pointers
+    // Reserve space for at least 32 more entries to reduce rehashing probability
+    if (ltoir_cache.size() >= ltoir_cache.bucket_count() * static_cast<size_t>(ltoir_cache.max_load_factor()) - 1) {
+      ltoir_cache.reserve(ltoir_cache.size() + 32);
     }
     
     ltoir_cache[filename] = LTOIRData{buffer, static_cast<size_t>(size)};

@@ -183,9 +183,6 @@ namespace detail {
     ElementsPerThread ept;
   };
 
-  struct LTOIRQueryInput {
-    ElementsPerThread ept;
-  };  
 }
 
 };
