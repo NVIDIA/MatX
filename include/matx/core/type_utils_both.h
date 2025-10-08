@@ -916,6 +916,43 @@ inline constexpr bool is_matx_jit_class_v = is_matx_jit_class<remove_cvref_t<T>>
   
 }  
 
+namespace detail {
+  template <typename T> 
+  struct inner_precision {
+    using type = T;
+  };
+
+  template <> 
+  struct inner_precision<cuda::std::complex<float>> {
+    using type = float;
+  };  
+
+  template <> 
+  struct inner_precision<cuda::std::complex<double>> {
+    using type = double;
+  };  
+  
+  template <> 
+  struct inner_precision<matxFp16> {
+    using type = __half;
+  };
+  
+  template <> 
+  struct inner_precision<matxBf16> {
+    using type = __nv_bfloat16;
+  };
+  
+  template <> 
+  struct inner_precision<matxFp16Complex> {
+    using type = __half;
+  };
+  
+  template <> 
+  struct inner_precision<matxBf16Complex> {
+    using type = __nv_bfloat16;
+  };  
+}
+
 
 } // end namespace matx
 

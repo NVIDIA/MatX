@@ -42,6 +42,7 @@
 #include <cuda/std/__algorithm/max.h>
 #include <cuda/std/array>
 #include <string>
+#include <set>
 
 namespace matx {
 
@@ -51,7 +52,7 @@ namespace detail {
 
 
   struct LTOIRQueryInput {
-    std::vector<std::string> ltoir_symbols;
+    std::set<std::string> ltoir_symbols;
     ElementsPerThread ept;
   };  
 

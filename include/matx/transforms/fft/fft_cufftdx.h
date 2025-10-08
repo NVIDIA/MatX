@@ -55,42 +55,6 @@
 namespace matx {
   namespace detail {
 
-  template <typename T> 
-  struct fft_precision {
-    using type = T;
-  };
-
-  template <> 
-  struct fft_precision<cuda::std::complex<float>> {
-    using type = float;
-  };  
-
-  template <> 
-  struct fft_precision<cuda::std::complex<double>> {
-    using type = double;
-  };  
-  
-  template <> 
-  struct fft_precision<matxFp16> {
-    using type = __half;
-  };
-  
-  template <> 
-  struct fft_precision<matxBf16> {
-    using type = __nv_bfloat16;
-  };
-  
-  template <> 
-  struct fft_precision<matxFp16Complex> {
-    using type = __half;
-  };
-  
-  template <> 
-  struct fft_precision<matxBf16Complex> {
-    using type = __nv_bfloat16;
-  };    
-
-
 
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__) && !defined(__CUDACC_RTC__) && !defined(__CUDA_ARCH__)
   template <typename InputType>
@@ -229,7 +193,7 @@ namespace matx {
         return static_cast<int>(block_dim[0]);
       }
 
-      static bool GenerateLTOIR(index_t fft_size, FFTType fft_type, FFTDirection direction, ElementsPerThread ept, std::vector<std::string> &ltoir_symbols) {
+      static bool GenerateLTOIR(index_t fft_size, FFTType fft_type, FFTDirection direction, ElementsPerThread ept, std::set<std::string> &ltoir_symbols) {
                 // Specify arch to compile to. This should eventually be pulled from the handle, but there's no way to do that currently
         int major = 0;
         int minor = 0;
@@ -240,7 +204,7 @@ namespace matx {
         long long int cc = major * 100 + minor;
 
         const auto symbol_name = std::string(FFT_DX_FUNC_PREFIX) + "_" + GetSymbolName(fft_size, fft_type, direction, static_cast<int>(cc));
-        ltoir_symbols.push_back(symbol_name);
+        ltoir_symbols.insert(symbol_name);
         LTOIRData ltoir;
 
         if (detail::GetCache().GetLTOIRCachedBytes(symbol_name) != nullptr) {
@@ -316,6 +280,7 @@ namespace matx {
       
             // If it's a half precision type we don't use value_type
             using input_type_converted = typename detail::convert_matx_type_t<input_type>;
+            using precision = typename detail::inner_precision<input_type>::type;
       
             extern __shared__  Vector<input_type_converted, static_cast<int>(CapType::ept)> thread_data[];
             thread_data[threadIdx.x] = a_.template operator()<CapType>(indices...);
