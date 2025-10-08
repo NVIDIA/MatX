@@ -180,7 +180,7 @@ public:
   };
 
   JIT_Storage ToJITStorage() const {
-    return JIT_Storage{out_.ToJITStorage(), op_.ToJITStorage()};
+    return JIT_Storage{detail::to_jit_storage(out_), detail::to_jit_storage(op_)};
   }
 
   __MATX_INLINE__ std::string get_jit_class_name() const {
@@ -195,12 +195,8 @@ public:
        std::string("template <typename T, typename Op> struct " + func_name + "  {\n") + 
            "  using value_type = typename T::value_type;\n" +
            "  using matxop = bool;\n" +
-           "  struct JIT_Storage {\n" +
-           "    mutable typename detail::inner_storage_or_self_t<detail::base_type_t<T>> out_;\n" +
-           "    mutable typename detail::inner_storage_or_self_t<detail::base_type_t<Op>> op_;\n" +
-           "  };\n" +
-          "   mutable typename detail::base_type_t<T> out_;\n" +
-          "   mutable typename detail::base_type_t<Op> op_;\n" +
+          "   mutable typename detail::inner_storage_or_self_t<detail::base_type_t<T>> out_;\n" +
+          "   mutable typename detail::inner_storage_or_self_t<detail::base_type_t<Op>> op_;\n" +
            "  template <typename CapType, typename... Is>\n" +
            "  __MATX_INLINE__ __MATX_DEVICE__  decltype(auto) operator()(Is... indices) const\n" +
           "  {\n" +

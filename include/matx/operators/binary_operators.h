@@ -112,7 +112,7 @@ namespace matx
         };
 
         JIT_Storage ToJITStorage() const {
-          return JIT_Storage{in1_.ToJITStorage(), in2_.ToJITStorage(), op_.ToJITStorage()};
+          return JIT_Storage{detail::to_jit_storage(in1_), detail::to_jit_storage(in2_), detail::to_jit_storage(op_)};
         }        
 #endif        
 
@@ -176,16 +176,11 @@ namespace matx
            std::string("template <typename I1, typename I2, typename Op> struct " + func_name + "  {\n") + 
                "  using value_type = typename Op::value_type;\n" +
                "  using matxop = bool;\n" +
-               "  struct JIT_Storage {\n" + 
-               "    typename detail::inner_storage_or_self_t<detail::base_type_t<I1>> in1_;\n" +
-               "    typename detail::inner_storage_or_self_t<detail::base_type_t<I2>> in2_;\n" +
-               "    typename detail::inner_storage_or_self_t<detail::base_type_t<Op>> op_;\n" +
-               "  };\n" +
                "  constexpr static cuda::std::array<index_t, " + std::to_string(Rank()) + "> out_dims_ = { " + 
                detail::array_to_string(out_dims_) + " };\n" +
-               "  typename detail::base_type_t<I1> in1_;\n" +
-               "  typename detail::base_type_t<I2> in2_;\n" +
-               "  typename detail::base_type_t<Op> op_;\n" +
+               "  typename detail::inner_storage_or_self_t<detail::base_type_t<I1>> in1_;\n" +
+               "  typename detail::inner_storage_or_self_t<detail::base_type_t<I2>> in2_;\n" +
+               "  typename detail::inner_storage_or_self_t<detail::base_type_t<Op>> op_;\n" +
                "  template <typename CapType, typename... Is>\n" +
                "  __MATX_INLINE__ __MATX_DEVICE__  decltype(auto) operator()(Is... indices) const\n" +
                "  {\n" +

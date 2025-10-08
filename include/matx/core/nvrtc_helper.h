@@ -410,6 +410,7 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, cons
     options.push_back("-default-device");
     options.push_back("--relocatable-device-code=true");
     options.push_back("-dlto");
+    options.push_back("-G");
 
     std::vector<const char*> opts;
     for (const auto& opt : options) {
@@ -521,10 +522,12 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, cons
   if (dynamic_shmem_size > static_shared_size) {
     CUDA_CHECK(cuFuncSetAttribute(kernel_func, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, dynamic_shmem_size));
   }
+
+  auto storage = op.ToJITStorage();
   
   // Prepare kernel arguments
   void* args[Op::Rank() + 1];
-  args[0] = &op;
+  args[0] = &storage;
   if constexpr (Op::Rank() >= 1) {
     args[1] = const_cast<void*>(reinterpret_cast<const void*>(&sa[0]));
   }

@@ -88,7 +88,7 @@ namespace matx
         };
 
         JIT_Storage ToJITStorage() const {
-          return JIT_Storage{a_.ToJITStorage()};
+          return JIT_Storage{detail::to_jit_storage(a_)};
         }
 #endif             
         
@@ -199,10 +199,7 @@ namespace matx
                  "  using input_type = typename OpA::value_type;\n" +
                  "  using matxop = bool;\n" +
                  "  using value_type = cuda::std::conditional_t<is_complex_v<input_type>, input_type, typename scalar_to_complex<input_type>::ctype>;\n" +
-                 "  struct JIT_Storage {\n" +
-                 "    typename detail::inner_storage_or_self_t<detail::base_type_t<OpA>> a_;\n" +
-                 "  };\n" +
-                 "  typename detail::base_type_t<OpA> a_;\n" +
+                 "  typename detail::inner_storage_or_self_t<detail::base_type_t<OpA>> a_;\n" +
                  "  constexpr static cuda::std::array<index_t, " + std::to_string(Rank()) + "> out_dims_ = { " + 
                  detail::array_to_string(out_dims_) + " };\n" +             
                  "  template <typename CapType, typename... Is>\n" +

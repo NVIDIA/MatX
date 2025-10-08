@@ -189,16 +189,28 @@ class tensor_impl_t {
              "  template <typename CapType, int M = RANK, typename... Is>\n" +
              "  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) const noexcept" + "{\n" +
              "    static_assert(sizeof...(Is) == M, \"Number of indices of operator() must match rank of tensor\");\n" +
-            "     constexpr int EPT_int = static_cast<int>(CapType::ept);\n" +
-            "     if constexpr (CapType::ept == detail::ElementsPerThread::ONE) {\n" +
-            "       return ldata_[GetValC<CapType, 0, Is...>(cuda::std::make_tuple(indices...))];\n" +
-            "     } else if constexpr (EPT_int * sizeof(T) <= MAX_VEC_WIDTH_BYTES ) {\n" +
-            "       return *reinterpret_cast<detail::Vector<T, EPT_int>*>(ldata_ + GetValC<CapType, 0, Is...>(cuda::std::make_tuple(indices...)));\n" +
-            "     } else {\n" +
-            "       detail::Vector<T, EPT_int> vec;\n" +
-            "       vec.load<EPT_int>(ldata_ + GetValC<CapType, 0, Is...>(cuda::std::make_tuple(indices...)));\n" +
-            "       return vec;\n" +
-            "     }\n" +
+             "     constexpr int EPT_int = static_cast<int>(CapType::ept);\n" +
+             "     if constexpr (CapType::ept == detail::ElementsPerThread::ONE) {\n" +
+             "       return ldata_[GetValC<CapType, 0, Is...>(cuda::std::make_tuple(indices...))];\n" +
+             "     } else if constexpr (EPT_int * sizeof(T) <= MAX_VEC_WIDTH_BYTES ) {\n" +
+             "       return *reinterpret_cast<detail::Vector<T, EPT_int>*>(ldata_ + GetValC<CapType, 0, Is...>(cuda::std::make_tuple(indices...)));\n" +
+             "     } else {\n" +
+             "       detail::Vector<T, EPT_int> vec;\n" +
+             "       vec.load<EPT_int>(ldata_ + GetValC<CapType, 0, Is...>(cuda::std::make_tuple(indices...)));\n" +
+             "       return vec;\n" +
+             "     }\n" +
+             "  }\n" +
+             "  template <typename CapType, int M = RANK, typename... Is,\n" +
+             "            cuda::std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>\n" +
+             "  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) noexcept\n" +
+             "  {\n" +
+             "    static_assert(sizeof...(Is) == M, \"Number of indices of operator() must match rank of tensor\");\n" +
+             "    constexpr int EPT_int = static_cast<int>(CapType::ept);\n" +
+             "    if constexpr (CapType::ept == detail::ElementsPerThread::ONE) {\n" +
+             "      return ldata_[GetVal<CapType, 0, Is...>(cuda::std::make_tuple(indices...))];\n" +
+             "    } else {\n" +
+             "      return *reinterpret_cast<detail::Vector<T, EPT_int>*>(ldata_ + GetVal<CapType, 0, Is...>(cuda::std::make_tuple(indices...)));\n" +
+             "    }\n" +
              "  }\n" +
              "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank()\n" +
              "  {\n" +

@@ -136,6 +136,21 @@ namespace matx {
       }
     }
   }
+
+  namespace detail {
+    #ifdef MATX_EN_JIT
+    // Helper function to convert to JIT storage
+    // If T has ToJITStorage(), call it; otherwise return the value as-is (for scalars)
+    template <typename T>
+    __MATX_INLINE__ __MATX_HOST__ decltype(auto) to_jit_storage(const T& val) {
+      if constexpr (has_to_jit_storage_v<T>) {
+        return val.ToJITStorage();
+      } else {
+        return val;
+      }
+    }
+    #endif  
+  }
 }; 
 #endif
 

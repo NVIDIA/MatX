@@ -434,6 +434,18 @@ namespace detail {
   >;
 }
 
+namespace detail {
+  // Helper to check if a type has ToJITStorage method
+  template <typename, typename = void>
+  struct has_to_jit_storage : cuda::std::false_type {};
+
+  template <typename T>
+  struct has_to_jit_storage<T, cuda::std::void_t<decltype(cuda::std::declval<T>().ToJITStorage())>> 
+    : cuda::std::true_type {};
+
+  template <typename T>
+  inline constexpr bool has_to_jit_storage_v = has_to_jit_storage<T>::value;
+}
 
 
 /**

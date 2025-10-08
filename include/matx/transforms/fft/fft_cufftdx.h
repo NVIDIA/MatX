@@ -335,7 +335,7 @@ namespace matx {
                 thread_data[threadIdx.x].data[i] = thread_data[threadIdx.x].data[i] * static_cast<precision>(1.f / fft_size);
               }
             }
-      
+
             return thread_data[threadIdx.x];  
         )";        
       }
