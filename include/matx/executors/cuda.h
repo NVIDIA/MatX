@@ -167,6 +167,7 @@ namespace matx
           
           // Determine block size for register calculation
           if (use_jit) {
+            printf("JIIIIIT\n");
             const auto block_query = detail::BlockSizeQueryInput{current_ept};
             const auto shm_query = detail::ShmQueryInput{current_ept};
             block_size = detail::get_operator_capability<detail::OperatorCapability::BLOCK_DIM>(op, block_query);
@@ -363,6 +364,7 @@ namespace matx
 
 #ifdef MATX_EN_JIT
             bool use_jit = detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op) && Op::Rank() <= 4;
+            printf("Using JIT: %d\n", use_jit);
             if (use_jit) {
               auto ept_type = detail::EPTQueryInput{true};
               const auto jit_ept_bounds = detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(op, ept_type); 

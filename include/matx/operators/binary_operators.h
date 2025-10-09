@@ -207,6 +207,7 @@ namespace matx
       template <OperatorCapability Cap, typename InType>
       __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
         if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+#ifdef MATX_EN_JIT
           printf("binary type query\n");
           // No need to use combine_capabilities here since we're just returning a string.
           const auto lhs_jit_name = detail::get_operator_capability<Cap>(in1_, in);
@@ -214,8 +215,12 @@ namespace matx
           const auto op_jit_name = detail::get_operator_capability<Cap>(op_, in);
           printf("binary type query: %s, %s, %s\n", lhs_jit_name.c_str(), rhs_jit_name.c_str(), op_jit_name.c_str());
           return get_jit_class_name() + "<" + lhs_jit_name + "," + rhs_jit_name + "," + op_jit_name + ">";
+#else
+          return "";
+#endif
         }
         else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+#ifdef MATX_EN_JIT
           // Get the key/value pair from get_jit_op_str()
           const auto [key, value] = get_jit_op_str();
           
@@ -231,6 +236,9 @@ namespace matx
           
           // Always return true for now
           return true;
+#else
+          return false;
+#endif
         }         
         else {
           auto self_has_cap = capability_attributes<Cap>::default_value;

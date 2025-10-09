@@ -212,6 +212,54 @@ public:
   }
 
   /**
+   * @brief Convert a C++ type string into a valid filename
+   * 
+   * Takes a complex C++ type string (with templates, namespaces, etc.) and converts
+   * it into a safe filename that can be used for caching cubin/LTOIR files.
+   * The function creates a deterministic hash-based filename to handle arbitrary
+   * type complexity while keeping filenames short and filesystem-safe.
+   * 
+   * @param kernel_op_type The C++ type string to convert
+   * @return std::string A safe filename derived from the type string
+   */
+  __MATX_INLINE__ std::string TypeStringToFilename(const std::string& kernel_op_type) {
+#ifndef __CUDACC_RTC__
+    // Compute a hash of the full type string for uniqueness
+    std::hash<std::string> hasher;
+    size_t hash_value = hasher(kernel_op_type);
+    
+    // Convert hash to hex string for filename
+    char hash_str[17]; // 16 hex chars + null terminator
+    snprintf(hash_str, sizeof(hash_str), "%016zx", hash_value);
+    
+    // Extract a prefix from the type string for readability
+    // Find the first template or operator name
+    std::string prefix;
+    size_t first_bracket = kernel_op_type.find('<');
+    if (first_bracket != std::string::npos && first_bracket > 0) {
+      // Use the first operator/class name before the first '<'
+      prefix = kernel_op_type.substr(0, std::min(first_bracket, size_t(32)));
+    } else {
+      // No templates, use first 32 chars
+      prefix = kernel_op_type.substr(0, std::min(kernel_op_type.length(), size_t(32)));
+    }
+    
+    // Clean the prefix to remove any invalid filename characters
+    for (char& c : prefix) {
+      if (c == '<' || c == '>' || c == ':' || c == '/' || c == '\\' || 
+          c == '|' || c == '?' || c == '*' || c == '"' || c == ' ' || c == ',') {
+        c = '_';
+      }
+    }
+    
+    // Combine prefix with hash for a readable yet unique filename
+    return prefix + "_" + std::string(hash_str) + ".cubin";
+#else
+    return "";
+#endif
+  }
+
+  /**
    * @brief Helper function to determine the cache directory path
    * 
    * @return std::string The cache directory path, or empty string if unavailable
@@ -377,6 +425,78 @@ public:
     // In RTC mode, caching is not available
     free(data);
     return false;
+#endif
+  }
+
+  /**
+   * @brief Store metadata string (like lowered kernel name) for a cached cubin
+   * 
+   * Stores a metadata string (e.g., lowered kernel name) in a .meta file alongside
+   * the cached cubin file. The metadata file has the same name as the cubin but with
+   * ".meta" appended.
+   * 
+   * @param filename The cubin filename (e.g., "kernel_abc123.cubin")
+   * @param metadata The metadata string to store (e.g., lowered kernel name)
+   * @return true if successfully stored, false otherwise
+   */
+  __MATX_INLINE__ bool StoreLTOIRMetadata(const std::string& filename, const std::string& metadata) {
+#ifndef __CUDACC_RTC__
+    std::string cache_dir = GetKernelCacheDirectory();
+    if (cache_dir.empty()) {
+      return false;
+    }
+    
+    try {
+      std::filesystem::create_directories(cache_dir);
+      std::filesystem::path meta_file = std::filesystem::path(cache_dir) / (filename + ".meta");
+      std::ofstream file(meta_file);
+      if (file.is_open()) {
+        file << metadata;
+        file.close();
+        return true;
+      }
+    } catch (...) {
+      // Ignore write failures
+    }
+    return false;
+#else
+    return false;
+#endif
+  }
+
+  /**
+   * @brief Retrieve metadata string for a cached cubin
+   * 
+   * Loads the metadata string from the .meta file associated with a cached cubin.
+   * 
+   * @param filename The cubin filename (e.g., "kernel_abc123.cubin")
+   * @return The metadata string if found, or empty string if not found
+   */
+  __MATX_INLINE__ std::string GetLTOIRMetadata(const std::string& filename) {
+#ifndef __CUDACC_RTC__
+    std::string cache_dir = GetKernelCacheDirectory();
+    if (cache_dir.empty()) {
+      return "";
+    }
+    
+    try {
+      std::filesystem::path meta_file = std::filesystem::path(cache_dir) / (filename + ".meta");
+      if (!std::filesystem::exists(meta_file)) {
+        return "";
+      }
+      
+      std::ifstream file(meta_file);
+      if (file.is_open()) {
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+        return buffer.str();
+      }
+    } catch (...) {
+      // Ignore read failures
+    }
+    return "";
+#else
+    return "";
 #endif
   }
 

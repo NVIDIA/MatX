@@ -338,9 +338,13 @@ namespace matx
 #endif
           }    
           else if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+#ifdef MATX_EN_JIT
             // No need to use combine_capabilities here since we're just returning a string.
             const auto inner_op_jit_name = detail::get_operator_capability<Cap>(a_, in);
             return get_jit_class_name() + "<" + inner_op_jit_name + ">";
+#else
+            return "";
+#endif
           }                
           else {
             // 1. Determine if the binary operation ITSELF intrinsically has this capability.

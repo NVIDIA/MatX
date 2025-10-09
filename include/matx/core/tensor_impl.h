@@ -1308,10 +1308,15 @@ MATX_IGNORE_WARNING_POP_GCC
         return cuda::std::array<detail::ElementsPerThread, 2>{detail::ElementsPerThread::ONE, ept};
       }
       else if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+#ifdef MATX_EN_JIT
         // No need to use combine_capabilities here since we're just returning a string.
         return get_jit_class_name();
+#else
+        return "";
+#endif
       } 
       else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+#ifdef MATX_EN_JIT
         const auto [key, value] = get_jit_op_str();
       
         // Insert into the map if the key doesn't exist
@@ -1320,6 +1325,9 @@ MATX_IGNORE_WARNING_POP_GCC
         }
 
         return true;
+#else
+        return false;
+#endif
       }
       else {
         return detail::capability_attributes<Cap>::default_value;

@@ -200,7 +200,7 @@ public:
            "  template <typename CapType, typename... Is>\n" +
            "  __MATX_INLINE__ __MATX_DEVICE__  decltype(auto) operator()(Is... indices) const\n" +
           "  {\n" +
-          "    auto in_val = op_.template operator()<CapType>(indices...);\n" +
+          "    auto in_val = detail::get_value<CapType>(op_, indices...);\n" +
           "    using out_type = decltype(out_.template operator()<CapType>(indices...));\n" +
           "    using in_val_type = decltype(in_val);\n" +
           "    if ((threadIdx.x * static_cast<int>(CapType::ept)) >= Size(Rank() - 1)) {\n" +
@@ -267,12 +267,17 @@ public:
   template <detail::OperatorCapability Cap, typename InType>
   __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
     if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+#ifdef MATX_EN_JIT       
       // No need to use combine_capabilities here since we're just returning a string.
       const auto lhs_jit_name = detail::get_operator_capability<Cap>(out_, in);
       const auto rhs_jit_name = detail::get_operator_capability<Cap>(op_, in);
       return get_jit_class_name() + "<" + lhs_jit_name + "," + rhs_jit_name + ">";
+#else
+      return "";
+#endif
     }  
     else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+#ifdef MATX_EN_JIT
       // Get the key/value pair from get_jit_op_str()
       const auto [key, value] = get_jit_op_str();
       
@@ -287,6 +292,9 @@ public:
       
       // Always return true for now
       return true;
+#else
+      return false;
+#endif
     }      
     else {
       auto self_has_cap = capability_attributes<Cap>::default_value;

@@ -16,6 +16,10 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     tensor_t<TestType, 1> av{{size}};
     tensor_t<TestType, 1> av2{{size}};
     tensor_t<TestType, 1> avo{{size}};
+
+    tensor_t<TestType, 2> av2d{{20000,size}};
+    tensor_t<TestType, 2> av22d{{20000, size}};
+    tensor_t<TestType, 2> avo2d{{20000, size}};    
     printf("avo data %p\n", avo.Data());
 
     //(av = random<TestType>(av.Shape(), UNIFORM)).run(exec);
@@ -85,13 +89,19 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
         {9.9267e-01f,8.8892e-01f},
         {6.9642e-01f,7.2175e-01f},
         {2.4719e-01f,3.5031e-01f},
-        {7.0281e-01f,9.4431e-01f}});      
+        {7.0281e-01f,9.4431e-01f}});     
+      
     print(av);
     print(av2);
 
-    (avo = 5.0f * ifft(fft(av) * fft(av2))).run(exec);
+    (av2d = av).run(exec);
+    (av22d = av2).run(exec);
 
-    print(avo);
+    //(avo = 5.0f * ifft(fft(av) * fft(av2))).run(exec);
+    for (int i = 0; i < 1; i++) 
+    (avo2d = 5.0f * ifft(fft(av2d) * fft(av22d))).run(exec);
+
+    print(avo2d, 1, 0);
   }
 
   MATX_EXIT_HANDLER();

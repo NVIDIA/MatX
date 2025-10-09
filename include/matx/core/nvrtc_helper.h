@@ -339,7 +339,6 @@ inline std::string qualify_jit_type_names(const std::string& type_str) {
 
 template <typename Op, typename SizeArray>
 auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, const SizeArray &sa, dim3 &blocks, dim3 &threads, ElementsPerThread ept, bool stride, int dynamic_shmem_size, int osize) {
-#ifdef MATX_USE_PURE_NVRTC
   // Pure NVRTC implementation
   static std::unordered_map<std::string, CUfunction> kernel_cache;
   
@@ -354,10 +353,40 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, cons
 
   
   CUfunction kernel_func;
+  std::string lowered_name;
+  const auto cubin_filename = detail::GetCache().TypeStringToFilename(kernel_op_type);
   
-  // Check if kernel is already compiled and cached
+  // Check if kernel is already compiled and cached in memory
   auto it = kernel_cache.find(cache_key);
   if (it == kernel_cache.end()) {
+    // Not in memory cache, check disk cache
+    auto cached_cubin_ptr = detail::GetCache().GetLTOIRCachedBytes(cubin_filename);
+    
+    if (cached_cubin_ptr != nullptr) {
+      // Found cached cubin on disk, try to load metadata
+      lowered_name = detail::GetCache().GetLTOIRMetadata(cubin_filename);
+      
+      if (!lowered_name.empty()) {
+        printf("DEBUG: Loading cached kernel for type: %s\n", kernel_op_type.c_str());
+        printf("DEBUG: Cached lowered name: %s\n", lowered_name.c_str());
+        
+        // Load the cached cubin into a CUDA module
+        CUmodule module;
+        CUDA_CHECK(cuModuleLoadDataEx(&module, cached_cubin_ptr->data, 0, nullptr, nullptr));
+        
+        // Get kernel function using the cached lowered name
+        CUDA_CHECK(cuModuleGetFunction(&kernel_func, module, lowered_name.c_str()));
+        
+        // Cache the kernel in memory for future use
+        kernel_cache[cache_key] = kernel_func;
+        
+        // Skip compilation since we loaded from cache
+        goto launch_kernel;
+      } else {
+        printf("DEBUG: Found cached cubin but no metadata, recompiling\n");
+      }
+    }
+    
     printf("DEBUG: Compiling kernel with NVRTC for type: %s\n", kernel_op_type.c_str());
     
     // Read jit_includes.h content
@@ -416,7 +445,6 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, cons
     for (const auto& opt : options) {
       opts.push_back(opt.c_str());
     }
-
     // Compile the program
     nvrtcResult compile_result = nvrtcCompileProgram(prog, static_cast<int>(opts.size()), opts.data());
     
@@ -439,7 +467,7 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, cons
     const char* lowered_name_ptr;
     NVRTC_CHECK(nvrtcGetLoweredName(prog, kernel_name_expr.c_str(), &lowered_name_ptr));
     // Copy the lowered name before destroying the program
-    std::string lowered_name(lowered_name_ptr);
+    lowered_name = std::string(lowered_name_ptr);
     printf("DEBUG: Lowered kernel name: %s\n", lowered_name.c_str());
 
     // Compile any LTO-IR required for expression:
@@ -498,8 +526,12 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, cons
     NVJITLINK_CHECK(handle, nvJitLinkGetLinkedCubin(handle, cubin.data()));
     NVJITLINK_CHECK(handle, nvJitLinkDestroy(&handle));
 
+    // Store the entire linked kernel to the cache along with the lowered name
+    detail::GetCache().StoreLTOIRCachedBytes(cubin_filename, static_cast<const char*>(cubin.data()), cubin_size);
+    detail::GetCache().StoreLTOIRMetadata(cubin_filename, lowered_name);
+
     
-    // Load PTX into CUDA module
+    // Load LTO-IR into CUDA module
     CUmodule module;
     CUDA_CHECK(cuModuleLoadDataEx(&module, cubin.data(), 0, nullptr, nullptr));
     
@@ -509,9 +541,11 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, cons
     // Cache the kernel
     kernel_cache[cache_key] = kernel_func;
   } else {
+    // Found in memory cache
     kernel_func = it->second;
   }
   
+launch_kernel:
   // Get device attributes
   int device;
   cudaGetDevice(&device);
@@ -549,89 +583,6 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, cons
                             nullptr,  // stream
                             args,
                             nullptr));
-  
-#else
-  // Jitify implementation (original code)
-  using jitify2::get_cuda_include_dir, jitify2::Program, jitify2::ProgramCache;
-  using jitify2::reflection::Template, jitify2::reflection::Type;  
-
-#ifndef MATX_EN_JIT_PREPROCESSING  
-  static ProgramCache<> cache(
-      100,
-      *Program(name, std::string(matxKernelStr))
-           // Preprocess source code and load all included headers.
-           ->preprocess(get_preprocessor_options()));
-#else          
-  static ProgramCache<> cache(
-      100,
-      *_workspaces_MatX_include_matx_core_jit_includes_h_jit);
-#endif
-
-printf("ALL SOURCE :%s\n", _workspaces_MatX_include_matx_core_jit_includes_h_jit->source().c_str());
-const auto t = _workspaces_MatX_include_matx_core_jit_includes_h_jit->header_sources();
-for (const auto& [key, value] : t) {
-  printf("HEADER: %s:%s\n", key.c_str(), value.c_str());
-}
-
-  const auto all_jit_classes_string = get_all_jit_classes_string(op);
-
-  printf("DEBUG: nvrtc_compile_and_run called with operator type: %s\n", typeid(op).name());
-  const auto ltoir_query_input = detail::LTOIRQueryInput{ept};
-  auto ltoir = detail::get_operator_capability<OperatorCapability::GENERATE_LTOIR>(op, ltoir_query_input);
-  printf("DEBUG: LTOIR capability result: %s\n", ltoir ? "true" : "false");
-
-  auto capstr = generate_capability_params_string(op, ept, false, osize, threads.x);
-  std::cout << "DEBUG: Capability string: " << capstr << std::endl;
-  auto tstr = jitify2::reflection::reflect_template<Op>();
-  printf("DEBUG: Template string: %s\n", tstr.c_str());
-
-  const auto kernel_op_type = detail::get_operator_capability<OperatorCapability::JIT_TYPE_QUERY>(op);
-  printf("DEBUG: Kernel op type: %s\n", kernel_op_type.c_str());
-  auto kernel = cache
-  .get_kernel(Template(get_kernel_name(op, stride)).instantiate({kernel_op_type}), 
-  {}, 
-  {{"matx_class_strings", all_jit_classes_string}, {"matx_generated_code_hdr", capstr}}, {"-include=matx_generated_code_hdr", "-include=matx_class_strings"});    
-
-  int device;
-  cudaGetDevice(&device);
-  int static_shared_size;
-  cudaDeviceGetAttribute(&static_shared_size, cudaDevAttrMaxSharedMemoryPerBlock, device);
-  
-  // Need to set dynamic shared memory size if it is greater than the static shared memory size
-  if (dynamic_shmem_size > static_shared_size) {
-    kernel->set_attribute(CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, dynamic_shmem_size);
-  }      
-
-  // Configure the kernel launch.
-  if constexpr (Op::Rank() == 0) {
-    kernel->configure(blocks, threads, dynamic_shmem_size)
-          // Launch the kernel.
-          ->launch(op);
-  }
-  else if constexpr (Op::Rank() == 1) {
-    kernel->configure(blocks, threads, dynamic_shmem_size)
-          // Launch the kernel.
-          ->launch(op, sa[0]);
-  }
-  else if constexpr (Op::Rank() == 2) {
-  kernel->configure(blocks, threads, dynamic_shmem_size)
-          // Launch the kernel.
-          ->launch(op, sa[0], sa[1]);
-  }
-  else if constexpr (Op::Rank() == 3) {
-    kernel->configure(blocks, threads, dynamic_shmem_size)
-          // Launch the kernel.
-          ->launch(op, sa[0], sa[1], sa[2]);
-  }
-  else if constexpr (Op::Rank() == 4) {
-    kernel->configure(blocks, threads, dynamic_shmem_size)
-          // Launch the kernel.
-          ->launch(op, sa[0], sa[1], sa[2], sa[3]);
-  }    
-  else {
-    MATX_THROW(matxInvalidParameter, "Rank not supported");
-  }
-#endif
 }
 
 }
