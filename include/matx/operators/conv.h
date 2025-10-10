@@ -56,7 +56,8 @@ namespace matx
         PermDims perm_;
         cuda::std::array<index_t, max_rank> out_dims_;
         mutable detail::tensor_impl_t<out_t, max_rank> tmp_out_;
-        mutable out_t *ptr = nullptr; 
+        mutable out_t *ptr = nullptr;
+        mutable bool prerun_done_ = false; 
 
         static constexpr int MAX_MIN_DIMENSION_DIRECT = 1024;
 
@@ -196,10 +197,15 @@ namespace matx
         template <typename ShapeType, typename Executor>
         __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
         {
+          if (prerun_done_) {
+            return;
+          }
+
           InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));  
 
           detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
 
+          prerun_done_ = true;
           Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
         }
 
