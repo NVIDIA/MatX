@@ -212,9 +212,8 @@ template <typename T>
 auto make_tensor( [[maybe_unused]] const std::initializer_list<detail::no_size_t> t,
                   matxMemorySpace_t space = MATX_MANAGED_MEMORY,
                   cudaStream_t stream = 0) {
-  cuda::std::array<index_t, 0> shape;
-
-  return make_tensor<T, decltype(shape)>(std::move(shape), space, stream);
+  using shape_t = cuda::std::array<index_t, 0>;
+  return make_tensor<T, shape_t>(shape_t{}, space, stream);
 }
 
 /**
@@ -434,7 +433,7 @@ auto make_tensor( const index_t (&shape)[RANK],
  * @returns New tensor
  **/
 template <typename T, typename ShapeType, typename Allocator,
-  std::enable_if_t<!is_matx_shape_v<ShapeType> && !is_matx_descriptor_v<ShapeType> && 
+  std::enable_if_t<!is_matx_shape_v<ShapeType> && !is_matx_descriptor_v<ShapeType> &&
                    !std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
 auto make_tensor( ShapeType &&shape,
                   Allocator&& alloc) {
@@ -450,7 +449,7 @@ auto make_tensor( ShapeType &&shape,
  * Create a tensor with custom allocator using existing tensor reference
  *
  * @param tensor
- *   Tensor object to store newly-created tensor into  
+ *   Tensor object to store newly-created tensor into
  * @param shape
  *   Shape of tensor as C-array
  * @param alloc
@@ -471,14 +470,14 @@ void make_tensor( TensorType &tensor,
  * Create a tensor with custom allocator using existing tensor reference and conforming shape
  *
  * @param tensor
- *   Tensor object to store newly-created tensor into  
+ *   Tensor object to store newly-created tensor into
  * @param shape
  *   Shape of tensor (tuple, array, etc.)
  * @param alloc
  *   Custom allocator (PMR allocator, custom allocator pointer, etc.)
  **/
 template <typename TensorType, typename ShapeType, typename Allocator,
-  std::enable_if_t<is_tensor_view_v<TensorType> && 
+  std::enable_if_t<is_tensor_view_v<TensorType> &&
                    !std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
 void make_tensor( TensorType &tensor,
                   ShapeType &&shape,
@@ -645,7 +644,7 @@ template <typename TensorType,
 auto make_tensor( TensorType &tensor,
                   const DLManagedTensor dlp_tensor) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  
+
   using T = typename TensorType::value_type;
   const DLTensor &dt = dlp_tensor.dl_tensor;
 
@@ -657,17 +656,17 @@ auto make_tensor( TensorType &tensor,
       switch (dt.dtype.bits) {
         case 128: {
           [[maybe_unused]] constexpr bool same = std::is_same_v<T, cuda::std::complex<double>>;
-          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch"); 
+          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch");
           break;
         }
         case 64: {
-          [[maybe_unused]] constexpr bool same = std::is_same_v<T, cuda::std::complex<float>>;     
-          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch"); 
+          [[maybe_unused]] constexpr bool same = std::is_same_v<T, cuda::std::complex<float>>;
+          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch");
           break;
         }
         case 32: {
           [[maybe_unused]] constexpr bool same = std::is_same_v<T, matxFp16Complex> || std::is_same_v<T, matxBf16Complex>;
-          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch"); 
+          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch");
           break;
         }
         default:
@@ -675,86 +674,86 @@ auto make_tensor( TensorType &tensor,
       }
       break;
     }
-    
+
     case kDLFloat: {
       switch (dt.dtype.bits) {
         case 64: {
           [[maybe_unused]] constexpr bool same = std::is_same_v<T, double>;
-          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch"); 
+          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch");
           break;
         }
         case 32: {
           [[maybe_unused]] constexpr bool same = std::is_same_v<T, float>;
-          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch"); 
+          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch");
           break;
-        }           
+        }
         case 16: {
           [[maybe_unused]] constexpr bool same = std::is_same_v<T, matxFp16> || std::is_same_v<T, matxBf16>;
-          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch"); 
+          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch");
           break;
         }
         default:
           MATX_THROW(matxInvalidSize, "Invalid float size from DLPack");
       }
-      break;      
+      break;
     }
     case kDLInt: {
       switch (dt.dtype.bits) {
         case 64: {
           [[maybe_unused]] constexpr bool same = std::is_same_v<T, int64_t>;
-          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch"); 
+          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch");
           break;
         }
         case 32: {
           [[maybe_unused]] constexpr bool same = std::is_same_v<T, int32_t>;
-          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch"); 
+          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch");
           break;
         }
         case 16: {
           [[maybe_unused]] constexpr bool same = std::is_same_v<T, int16_t>;
-          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch"); 
+          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch");
           break;
         }
         case 8: {
           [[maybe_unused]] constexpr bool same = std::is_same_v<T, int8_t>;
-          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch"); 
+          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch");
           break;
-        }                          
+        }
         default:
           MATX_THROW(matxInvalidSize, "Invalid signed integer size from DLPack");
       }
-      break;    
+      break;
     }
     case kDLUInt: {
       switch (dt.dtype.bits) {
         case 64: {
           [[maybe_unused]] constexpr bool same = std::is_same_v<T, uint64_t>;
-          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch"); 
+          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch");
           break;
         }
         case 32: {
           [[maybe_unused]] constexpr bool same = std::is_same_v<T, uint32_t>;
-          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch"); 
+          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch");
           break;
         }
         case 16: {
           [[maybe_unused]] constexpr bool same = std::is_same_v<T, uint16_t>;
-          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch"); 
+          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch");
           break;
         }
         case 8: {
           [[maybe_unused]] constexpr bool same = std::is_same_v<T, uint8_t>;
-          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch"); 
+          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch");
           break;
-        }            
+        }
         default:
           MATX_THROW(matxInvalidSize, "Invalid unsigned integer size from DLPack");
       }
-      break; 
+      break;
     }
     case kDLBool: {
       [[maybe_unused]] constexpr bool same = std::is_same_v<T, bool>;
-      MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch"); 
+      MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch");
       break;
     }
   }
@@ -769,7 +768,7 @@ auto make_tensor( TensorType &tensor,
 
   auto tmp = make_tensor<typename TensorType::value_type, TensorType::Rank()>(
           reinterpret_cast<typename TensorType::value_type*>(dt.data), shape, strides, false);
-  tensor.Shallow(tmp);  
+  tensor.Shallow(tmp);
 }
 
 } // namespace matx
