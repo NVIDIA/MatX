@@ -234,7 +234,6 @@ struct RandomOperatorOutputIterator {
     return self_type{t_, offset_ + offset};
   }
 
-
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ reference operator[](difference_type offset) const
   {
     return *self_type{t_, offset_ + offset};
@@ -380,7 +379,6 @@ struct RandomOperatorThrustIterator {
   {
     return self_type{t_, offset_ + offset};
   }
-
 
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ reference operator[](difference_type offset) const
   {
@@ -542,6 +540,12 @@ struct EndOffset {
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ self_type operator+(difference_type offset) const
   {
     return self_type{size_, offset_ + offset};
+  }
+
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ self_type& operator+=(difference_type offset)
+  {
+    offset_ += offset;
+    return *this;
   }
 
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type operator[](difference_type offset) const
