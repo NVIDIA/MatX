@@ -82,6 +82,28 @@ public:
         return ::testing::AssertionFailure();
       }
     }
+    else if constexpr (matx::is_quaternion_v<T1>) {
+      if (fabs(static_cast<float>(a.w()) - static_cast<float>(b.w())) > delta) {
+        std::cout << "Failed in match: " << static_cast<float>(a.w())
+                  << " != " << static_cast<float>(b.w()) << "\n";
+        return ::testing::AssertionFailure();
+      }
+      if (fabs(static_cast<float>(a.x()) - static_cast<float>(b.x())) > delta) {
+        std::cout << "Failed in match: " << static_cast<float>(a.x())
+                  << " != " << static_cast<float>(b.x()) << "\n";
+        return ::testing::AssertionFailure();
+      }
+      if (fabs(static_cast<float>(a.y()) - static_cast<float>(b.y())) > delta) {
+        std::cout << "Failed in match: " << static_cast<float>(a.y())
+                  << " != " << static_cast<float>(b.y()) << "\n";
+        return ::testing::AssertionFailure();
+      }
+      if (fabs(static_cast<float>(a.z()) - static_cast<float>(b.z())) > delta) {
+        std::cout << "Failed in match: " << static_cast<float>(a.z())
+                  << " != " << static_cast<float>(b.z()) << "\n";
+        return ::testing::AssertionFailure();
+      }
+    }
     else if constexpr (is_matx_half_v<T1> || is_half_v<T1>) {
       if (fabs(static_cast<float>(a) - static_cast<float>(b)) > delta) {
         std::cout << "Failed in match: " << static_cast<float>(a)

@@ -45,6 +45,7 @@
 #include "matx/executors/host.h"
 #include "matx/core/half.h"
 #include "matx/core/half_complex.h"
+#include "matx/core/quaternion.h"
 
 /**
  * Defines type traits for host and device compilers. This file should be includable by
@@ -469,8 +470,20 @@ template <> struct scalar_to_complex<matxFp16>  {
 template <> struct scalar_to_complex<matxBf16>  {
   using ctype = matxBf16Complex;
 };
-}
 
+template <typename T> struct is_quaternion : std::false_type {
+};
+#ifdef MATX_ENABLE_CUTLASS
+template <typename T> struct is_quaternion<matx::quaternion<T>> : std::true_type {
+};
+#endif
+}
+/**
+ * @brief Determine if a type is a quaternion type (any type supported)
+ * 
+ * @tparam T Type to test
+ */
+template <class T> inline constexpr bool is_quaternion_v = detail::is_quaternion<remove_cvref_t<T>>::value;
 
 /**
  * @brief Get the inner value_type of the container
@@ -763,7 +776,8 @@ struct is_matx_type
           bool, std::is_same_v<matxFp16, std::remove_cv_t<T>> ||
                     std::is_same_v<matxBf16, std::remove_cv_t<T>> ||
                     std::is_same_v<matxFp16Complex, std::remove_cv_t<T>> ||
-                    std::is_same_v<matxBf16Complex, std::remove_cv_t<T>>> {
+                    std::is_same_v<matxBf16Complex, std::remove_cv_t<T>> ||
+                    is_quaternion_v<remove_cvref_t<T>>> {
 };
 }
 
