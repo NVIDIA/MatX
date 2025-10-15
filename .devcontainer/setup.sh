@@ -1,6 +1,6 @@
 #!/bin/bash
 if [ ! -v MATX_VERSION_TAG ]; then
-   MATX_VERSION_TAG="12.9.1_ubuntu24.04"
+   MATX_VERSION_TAG="13.0.1_ubuntu24.04"
 fi
 
 if [ ! -v MATX_REPO ]; then
