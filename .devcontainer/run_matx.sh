@@ -64,6 +64,7 @@ docker run --platform=$MATX_PLATFORM \
     -v /dev/hugepages:/dev/hugepages \
     -v /usr/src:/usr/src \
     -v /lib/modules:/lib/modules \
+    -v /home/cburdick/nfs/MatX:/workspace/MatX \
     --userns=host \
     --ipc=host \
     $MATX_REPO$MATX_IMAGE_NAME:$MATX_VERSION_TAG-$TARGETARCH fixuid /bin/bash -c "$CMDS"

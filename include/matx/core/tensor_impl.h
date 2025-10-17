@@ -193,30 +193,30 @@ class tensor_impl_t {
              "    \n" +
              "    if constexpr (rank == 1) {\n" +
              "        if constexpr (EPT != detail::ElementsPerThread::ONE) {\n" +
-             "          return idx[0] * (this->desc_.Stride(0) * EPT_int);\n" +
+             "          return idx[0] * (strides_[0] * EPT_int);\n" +
              "      } else {\n" +
-             "        return idx[0] * this->desc_.Stride(0);\n" +
+             "        return idx[0] * strides_[0];\n" +
              "      }\n" +
              "    }\n" +
              "    else if constexpr (rank == 2) {\n" +
              "      if constexpr (EPT != detail::ElementsPerThread::ONE) {\n" +
-             "        return idx[0] * this->desc_.Stride(0) + idx[1] * (this->desc_.Stride(1) * EPT_int);\n" +
+             "        return idx[0] * strides_[0] + idx[1] * (strides_[1] * EPT_int);\n" +
              "      } else {\n" +
-             "        return idx[0] * this->desc_.Stride(0) + idx[1] * this->desc_.Stride(1);\n" +
+             "        return idx[0] * strides_[0] + idx[1] * strides_[1];\n" +
              "      }\n" +
              "    }\n" +
              "    else if constexpr (rank == 3) {\n" +
              "      if constexpr (EPT != detail::ElementsPerThread::ONE) {\n" +
-             "        return idx[0] * this->desc_.Stride(0) + idx[1] * this->desc_.Stride(1) + idx[2] * (this->desc_.Stride(2) * EPT_int);\n" +
+             "        return idx[0] * strides_[0] + idx[1] * strides_[1] + idx[2] * (strides_[2] * EPT_int);\n" +
              "      } else {\n" +
-             "        return idx[0] * this->desc_.Stride(0) + idx[1] * this->desc_.Stride(1) + idx[2] * this->desc_.Stride(2);\n" +
+             "        return idx[0] * strides_[0] + idx[1] * strides_[1] + idx[2] * strides_[2];\n" +
              "      }\n" +
              "    }\n" +
              "    else if constexpr (rank == 4) {\n" +
              "      if constexpr (EPT != detail::ElementsPerThread::ONE) {\n" +
-             "        return idx[0] * this->desc_.Stride(0) + idx[1] * this->desc_.Stride(1) + idx[2] * this->desc_.Stride(2) + idx[3] * (this->desc_.Stride(3) * EPT_int);\n" +
+             "        return idx[0] * strides_[0] + idx[1] * strides_[1] + idx[2] * strides_[2] + idx[3] * (strides_[3] * EPT_int);\n" +
              "      } else {\n" +
-             "        return idx[0] * this->desc_.Stride(0) + idx[1] * this->desc_.Stride(1) + idx[2] * this->desc_.Stride(2) + idx[3] * this->desc_.Stride(3);\n" +
+             "        return idx[0] * strides_[0] + idx[1] * strides_[1] + idx[2] * strides_[2] + idx[3] * strides_[3];\n" +
              "      }\n" +
              "    }\n" +
              "    else {\n" +
@@ -224,8 +224,9 @@ class tensor_impl_t {
              "      return GetValC<EPT, 0, Is...>(cuda::std::make_tuple(indices...));\n" +
              "    }\n" +
              "  }\n" +                         
-             "  template <typename CapType, int M = RANK, typename... Is>\n" +
-             "  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) const noexcept" + "{\n" +
+             "  template <typename CapType, int M = RANK, typename... Is,\n" +
+             "            cuda::std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>\n" +
+             "  __MATX_INLINE__  __MATX_DEVICE__ decltype(auto) operator()(Is... indices) const noexcept" + "{\n" +
              "    static_assert(sizeof...(Is) == M, \"Number of indices of operator() must match rank of tensor\");\n" +
              "     constexpr int EPT_int = static_cast<int>(CapType::ept);\n" +
              "     if constexpr (CapType::ept == detail::ElementsPerThread::ONE) {\n" +
@@ -240,7 +241,7 @@ class tensor_impl_t {
              "  }\n" +
              "  template <typename CapType, int M = RANK, typename... Is,\n" +
              "            cuda::std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>\n" +
-             "  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) noexcept\n" +
+             "  __MATX_INLINE__  __MATX_DEVICE__ decltype(auto) operator()(Is... indices) noexcept\n" +
              "  {\n" +
              "    static_assert(sizeof...(Is) == M, \"Number of indices of operator() must match rank of tensor\");\n" +
              "    constexpr int EPT_int = static_cast<int>(CapType::ept);\n" +
@@ -249,6 +250,13 @@ class tensor_impl_t {
              "    } else {\n" +
              "      return *reinterpret_cast<detail::Vector<T, EPT_int>*>(ldata_ + GetVal<CapType, 0, Is...>(cuda::std::make_tuple(indices...)));\n" +
              "    }\n" +
+             "  }\n" +
+             "  template <typename CapType, int M = RANK, typename... Is>\n" +
+             "  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T* data_ptr(index_t block_idx, index_t ttl_threads) const noexcept\n" +
+             "  {\n"
+             "    //const index_t offset = GetOffsetOptimized<CapType::ept>(indices...);\n" +
+             "    //return ldata_ + offset;\n" +
+             "    return ldata_ + block_idx * ttl_threads * static_cast<index_t>(CapType::ept);\n" +
              "  }\n" +
              "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank()\n" +
              "  {\n" +
@@ -1264,6 +1272,29 @@ MATX_IGNORE_WARNING_POP_GCC
       }
     }
 
+    /**
+     * Return a pointer to the tensor's data at the specified indices
+     *
+     * @param indices
+     *   Indices of tensor
+     *
+     * @returns pointer to value at given index
+     */
+    template <typename CapType, int M = RANK, typename... Is>
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T* data_ptr(Is... indices) const noexcept
+    {
+      static_assert(sizeof...(Is) == M, "Number of indices of data_ptr must match rank of tensor");
+      if constexpr (!is_sparse_data_v<TensorData>) {
+        constexpr int EPT_int = static_cast<int>(CapType::ept);
+        const index_t offset = GetOffsetOptimized<CapType::ept>(indices...);
+        return data_.ldata_ + offset;
+      }
+      else {
+        // For sparse tensor, this is not supported
+        return nullptr;
+      }
+    }
+
     template <int M = RANK, typename... Is>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) const noexcept
     {
@@ -1388,7 +1419,8 @@ MATX_IGNORE_WARNING_POP_GCC
           // Curently, this is only true for vector types (e.g., double3) and we use one EPT for these cases.
           return cuda::std::array<detail::ElementsPerThread, 2>{detail::ElementsPerThread::ONE, detail::ElementsPerThread::ONE};
         } else {
-          int width = MAX_VEC_WIDTH_BYTES / sizeof(T);
+          //int width = MAX_VEC_WIDTH_BYTES / sizeof(T);
+          int width = 32; // Set to the max ILP if possible and let the dispatch routine reduce it if needed. This lets the 
           while (width > 1) {
             if (((Lsize() % width) == 0) &&                                       // Last dim is a multiple of vector load size
               ((reinterpret_cast<uintptr_t>(data_.ldata_) % (sizeof(T) * width)) == 0)) {
@@ -1400,6 +1432,18 @@ MATX_IGNORE_WARNING_POP_GCC
 
           return cuda::std::array<detail::ElementsPerThread, 2>{detail::ElementsPerThread::ONE, static_cast<detail::ElementsPerThread>(width)};
         }
+      }
+      else if constexpr (Cap == OperatorCapability::MAX_EPT_VEC_LOAD) {
+        int vec = MAX_VEC_WIDTH_BYTES / sizeof(T);
+        // Round down to next lower power of two
+        // (if already a power of two, remains unchanged)
+        // For vec = 0, will stay zero (avoid infinite loop)
+        int power = 1;
+        while (power * 2 <= vec) {
+          power *= 2;
+        }
+        printf("Max EPT for vector load is %d\n", power);
+        return power;
       }
       else if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
 #ifdef MATX_EN_JIT

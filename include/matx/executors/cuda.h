@@ -158,9 +158,17 @@ namespace matx
         MATX_CUDA_CHECK(cudaDeviceGetAttribute(&regs_per_multiprocessor, cudaDevAttrMaxRegistersPerMultiprocessor, 0));
 
         const auto jit_query_in = detail::EPTQueryInput{use_jit};
-        const auto ept_bounds = detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(op, jit_query_in);  
+        auto ept_bounds = detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(op, jit_query_in);  
         printf("ept_bounds %d %d\n", static_cast<int>(ept_bounds[0]), static_cast<int>(ept_bounds[1]));
-        
+
+        // If we don't need async loads we don't want ILP to be higher than an individual vector load
+        bool async_loads_requested = detail::get_operator_capability<detail::OperatorCapability::ASYNC_LOADS_REQUESTED>(op);
+        if (!async_loads_requested) {
+          int max_vec_load = detail::get_operator_capability<detail::OperatorCapability::MAX_EPT_VEC_LOAD>(op);
+          printf("Async loads not needed. Adjusting max EPT to %d from %d\n", max_vec_load, static_cast<int>(ept_bounds[1]));
+          ept_bounds[1] = static_cast<detail::ElementsPerThread>(cuda::std::min(static_cast<int>(ept_bounds[1]), max_vec_load));
+        }
+
         // Start with maximum EPT and work down
         auto current_ept = ept_bounds[1];
         auto min_ept = ept_bounds[0];
@@ -194,8 +202,8 @@ namespace matx
           bool shm_viable = (shm_size * 2) < max_dynamic_shm;
           
           if (shm_viable && register_viable) {
-            printf("Selected EPT %d: registers %d, shm_size %d, block_size %d, groups_per_block %d\n", 
-                   static_cast<int>(current_ept), attr.numRegs, shm_size, block_size, groups_per_block);
+            printf("Selected EPT %d: jits %d registers %d, shm_size %d, block_size %d, groups_per_block %d\n", 
+                   static_cast<int>(current_ept), use_jit, attr.numRegs, shm_size, block_size, groups_per_block);
             return cuda::std::make_tuple(current_ept, shm_size, block_size, groups_per_block);
           }
           else {
@@ -492,7 +500,7 @@ namespace matx
               auto [best_ept, shm_size, block_size, groups_per_block] = find_best_launch_params(op, kernel_provider, 0, true);
                       
               bool stride    = detail::get_grid_dims_jit<Op::Rank()>(blocks, threads, sizes, static_cast<int>(best_ept), groups_per_block, block_size, true);            
-              printf("shm_size %d stride %d  best_ept %d\n", shm_size, stride, static_cast<int>(best_ept));
+              printf("shm_size %d stride %d  best_ept %d blocks %d %d %d\n", shm_size, stride, static_cast<int>(best_ept), blocks.x, threads.x, threads.y);
               const int osize = op.Rank() == 0 ? 1 : static_cast<int>(op.Size(op.Rank() - 1));
               detail::nvrtc_compile_and_run("output.cu", op, sizes, blocks, threads, best_ept, stride, shm_size, osize);
             }

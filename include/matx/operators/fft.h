@@ -181,8 +181,14 @@ namespace matx
             int cc = major * 100 + minor;          
             dx_fft_helper_.set_fft_size(fft_size_);
             dx_fft_helper_.set_fft_type(DeduceFFTTransformType<typename scalar_to_complex<typename OpA::value_type>::ctype, value_type>());
-            dx_fft_helper_.set_direction(cuda::std::is_same_v<FFTDirection, detail::fft_t> ? detail::FFTDirection::FORWARD : detail::FFTDirection::BACKWARD);
+            dx_fft_helper_.set_direction(Direction);
             dx_fft_helper_.set_cc(cc);
+
+            bool contiguous = false;
+            if constexpr (is_tensor_view_v<OpA>) {
+              contiguous = a_.IsContiguous();
+            }
+            dx_fft_helper_.set_contiguous_input(contiguous);
           #endif
         }
 
@@ -193,7 +199,7 @@ namespace matx
           symbol_name += "_T";
           symbol_name += std::to_string(static_cast<int>(DeduceFFTTransformType<typename scalar_to_complex<typename OpA::value_type>::ctype, value_type>()));
           symbol_name += "_D";
-          symbol_name += std::is_same_v<FFTDirection, detail::fft_t> ? std::string("F") : std::string("B");
+          symbol_name += Direction == detail::FFTDirection::FORWARD ? std::string("F") : std::string("B");
 
           return symbol_name;
         }
@@ -201,26 +207,9 @@ namespace matx
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__) && !defined(__CUDACC_RTC__) && !defined(__CUDA_ARCH__)    
         __MATX_INLINE__ auto get_jit_op_str() const {
           const std::string class_name = get_jit_class_name();
-          detail::FFTDirection dir = std::is_same_v<FFTDirection, detail::fft_t> ? 
-                                            detail::FFTDirection::FORWARD : 
-                                            detail::FFTDirection::BACKWARD;   
 
           const std::string fft_func_name = std::string(FFT_DX_FUNC_PREFIX) + "_" + dx_fft_helper_.GetSymbolName();
-          const int ffts_per_block = dx_fft_helper_.GetFFTsPerBlock();
-
-          char fft_func_code[8192];
-          sprintf(fft_func_code, dx_fft_helper_.GetFuncStr(),
-            detail::type_to_string<input_type>().c_str(),
-            fft_size_,
-            ffts_per_block,
-            std::is_same_v<FFTDirection, detail::fft_t> ? 1 : 0,
-            static_cast<int>(norm_),
-            static_cast<int>(DeduceFFTTransformType<typename scalar_to_complex<typename OpA::value_type>::ctype, value_type>()),
-            fft_func_name.c_str()
-          );
-
-          
-
+         
           return cuda::std::make_tuple(
              class_name, 
              std::string(
@@ -235,7 +224,7 @@ namespace matx
                  "  template <typename CapType, typename... Is>\n" +
                  "  __MATX_INLINE__ __MATX_DEVICE__  decltype(auto) operator()(Is... indices) const\n" +
                  "  {\n" +
-                 "    " + std::string(fft_func_code) + "\n" +
+                 "    " + dx_fft_helper_.GetFuncStr(fft_func_name, static_cast<int>(norm_)) + "\n" +
                  "  }\n" +
                  "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank()\n" +
                  "  {\n" +
@@ -282,10 +271,6 @@ namespace matx
 
         template <OperatorCapability Cap, typename InType>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
-          [[maybe_unused]] detail::FFTDirection dir = std::is_same_v<FFTDirection, detail::fft_t> ? 
-                                            detail::FFTDirection::FORWARD : 
-                                            detail::FFTDirection::BACKWARD;      
-
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__) && !defined(__CUDACC_RTC__) && !defined(__CUDA_ARCH__)
           // Branch with cuFFTDx support
           if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
@@ -366,9 +351,19 @@ namespace matx
 #else
             return "";
 #endif
-          }                
+          }
+          else if constexpr (Cap == OperatorCapability::ASYNC_LOADS_REQUESTED) {
+            // If this is a contiguous tensor input we want to do an async load so that we decrease register pressure. 
+            // and increase bandwidth on newer architectures
+            bool async_loads_requested = false;
+            if constexpr (is_tensor_view_v<OpA>) {
+              if (a_.IsContiguous()) {
+                async_loads_requested = true;
+              }
+            }
+            return combine_capabilities<Cap>(async_loads_requested, detail::get_operator_capability<Cap>(a_, in));
+          }
           else {
-            // 1. Determine if the binary operation ITSELF intrinsically has this capability.
             auto self_has_cap = capability_attributes<Cap>::default_value;
             return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
           }

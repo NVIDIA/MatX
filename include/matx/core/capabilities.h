@@ -69,6 +69,8 @@ namespace detail {
     JIT_TYPE_QUERY, // Result is the type of JIT code to generate for the operator.
     GROUPS_PER_BLOCK, // Result is the number of groups per block required for the operator.(ie FFTs per block)
     SET_GROUPS_PER_BLOCK, // Set the number of groups per block for the operator.
+    ASYNC_LOADS_REQUESTED, // Whether the operator requires asynchronous loads.
+    MAX_EPT_VEC_LOAD, // The maximum EPT for a vector load.
     // Add more capabilities as needed
   };
 
@@ -130,6 +132,15 @@ namespace detail {
     static constexpr bool or_identity = false;
     static constexpr bool and_identity = true;
   };  
+
+  template <>
+  struct capability_attributes<OperatorCapability::ASYNC_LOADS_REQUESTED> {
+    using type = bool;
+    using input_type = VoidCapabilityType;
+    static constexpr bool default_value = false;
+    static constexpr bool or_identity = false;
+    static constexpr bool and_identity = true;
+  };    
 
   template <>
   struct capability_attributes<OperatorCapability::GROUPS_PER_BLOCK> {
@@ -204,6 +215,14 @@ namespace detail {
     static constexpr int max_identity = 0;
   };    
 
+  template <>
+  struct capability_attributes<OperatorCapability::MAX_EPT_VEC_LOAD> {
+    using type = int;
+    using input_type = VoidCapabilityType;
+    static constexpr int default_value = 32;
+    static constexpr int min_identity = 32;
+    static constexpr int max_identity = 1;
+  };    
 
 
   template <OperatorCapability Cap, typename OperatorType, typename InType>
@@ -238,6 +257,8 @@ namespace detail {
     switch (cap) {
       case OperatorCapability::SUPPORTS_JIT:
         return CapabilityQueryType::AND_QUERY; // If any sub-operator supports JIT, the expression might be JIT-able.
+      case OperatorCapability::ASYNC_LOADS_REQUESTED:
+        return CapabilityQueryType::OR_QUERY; // If any sub-operator requires asynchronous loads, the expression might require asynchronous loads.
       case OperatorCapability::ELEMENTS_PER_THREAD:
         return CapabilityQueryType::RANGE_QUERY; // The expression should use the range of elements per thread of its children.
       case OperatorCapability::SET_ELEMENTS_PER_THREAD:
@@ -246,6 +267,8 @@ namespace detail {
         return CapabilityQueryType::AND_QUERY; // The expression should use the range of groups per block of its children.
       case OperatorCapability::GROUPS_PER_BLOCK:
         return CapabilityQueryType::RANGE_QUERY; // The expression should use the range of groups per block of its children.
+      case OperatorCapability::MAX_EPT_VEC_LOAD:
+        return CapabilityQueryType::MIN_QUERY; // The expression should use the minimum EPT for a vector load of its children.
       case OperatorCapability::JIT_CLASS_QUERY:
         return CapabilityQueryType::AND_QUERY; // The expression should succeed if all its children succeed.
       case OperatorCapability::JIT_TYPE_QUERY:

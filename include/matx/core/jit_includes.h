@@ -39,3 +39,5 @@
 #include "matx/core/vector.h"
 #include "matx/operators/scalar_internal.h"
 #include "matx/core/operator_utils.h"
+#include <cuda/barrier>
+#include <cub/block/block_load_to_shared.cuh>

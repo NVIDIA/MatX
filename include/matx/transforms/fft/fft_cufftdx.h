@@ -64,6 +64,7 @@ namespace matx {
       ElementsPerThread current_elements_per_thread_ = ElementsPerThread::INVALID;
       int ffts_per_block_ = 1;
       int cc_;
+      bool contiguous_input_;
     public:
       // Constructor
       cuFFTDxHelper() = default;
@@ -75,6 +76,8 @@ namespace matx {
       ElementsPerThread get_current_elements_per_thread() const { return current_elements_per_thread_; }
       int get_ffts_per_block() const { return ffts_per_block_; }
       int get_cc() const { return cc_; }
+      bool get_contiguous_input() const { return contiguous_input_; }
+
 
       // Setters
       void set_fft_size(index_t size) { fft_size_ = size; }
@@ -83,6 +86,7 @@ namespace matx {
       void set_current_elements_per_thread(ElementsPerThread ept) { current_elements_per_thread_ = ept; }
       void set_ffts_per_block(int ffts_per_block) { ffts_per_block_ = ffts_per_block; }
       void set_cc(int cc) { cc_ = cc; }
+      void set_contiguous_input(bool contiguous_input) { contiguous_input_ = contiguous_input; }
 
       cufftdxDescriptor GeneratePlan() const {
         cufftdxDescriptor h_;
@@ -179,6 +183,8 @@ namespace matx {
 
         long long int shared_memory_size = 0;
         LIBMATHDX_CHECK(cufftdxGetTraitInt64(handle, CUFFTDX_TRAIT_SHARED_MEMORY_SIZE, &shared_memory_size));
+        shared_memory_size = static_cast<long long int>(current_elements_per_thread_) * sizeof(InputType) * static_cast<long long int>(ffts_per_block_);
+        printf("Shared memory size %lld\n", shared_memory_size);
         return static_cast<int>(shared_memory_size);
       }
 
@@ -205,10 +211,10 @@ namespace matx {
       int GetBlockDim() const {
         auto handle = GeneratePlan();
         cuda::std::array<long long int, 3> block_dim = { 0, 0, 0 };
-        LIBMATHDX_CHECK(cufftdxSetOperatorInt64(handle, CUFFTDX_OPERATOR_ELEMENTS_PER_THREAD, static_cast<long long int>(current_elements_per_thread_)));
 
         LIBMATHDX_CHECK(
             cufftdxGetTraitInt64s(handle, cufftdxTraitType::CUFFTDX_TRAIT_BLOCK_DIM, block_dim.size(), block_dim.data()));
+            printf("Block dim %lld %lld %lld\n", block_dim[0], block_dim[1], block_dim[2]);
         return static_cast<int>(block_dim[0]);
       }
 
@@ -217,8 +223,10 @@ namespace matx {
 
         // How many FFTs per Block is *suggested*?
         long long int sfpb = 0;
-        LIBMATHDX_CHECK(cufftdxGetTraitInt64(handle, CUFFTDX_TRAIT_SUGGESTED_FFTS_PER_BLOCK, &sfpb));   
-    
+        
+        LIBMATHDX_CHECK(cufftdxGetTraitInt64(handle, CUFFTDX_TRAIT_SUGGESTED_FFTS_PER_BLOCK, &sfpb));
+
+        printf("Getting FFTs per block %lld elements per thread %d\n", sfpb, (int)current_elements_per_thread_);
         return static_cast<int>(sfpb);
       }
 
@@ -288,26 +296,67 @@ namespace matx {
         return true;
       }
 
-      const char* GetFuncStr() {
-          return  R"(
-            using input_type = %s;
-            [[maybe_unused]] static constexpr int fft_size = %d;
-            [[maybe_unused]] static constexpr int ffts_per_block = %d;            
-            [[maybe_unused]] static constexpr int fft_forward = %d;
-            [[maybe_unused]] static constexpr int fft_norm = %d;
-            [[maybe_unused]] static constexpr int fft_type = %d;
+      std::string GetFuncStr(const std::string &fft_func_name, int fft_norm) {
+          int fft_forward = (direction_ == FFTDirection::FORWARD) ? 1 : 0;
+          
+          std::string result = R"(
+            using input_type = )";
+          result += detail::type_to_string<InputType>();
+          result += R"(;
+            [[maybe_unused]] static constexpr int fft_size = )";
+          result += std::to_string(static_cast<int>(fft_size_));
+          result += R"(;
+            [[maybe_unused]] static constexpr int ffts_per_block = )";
+          result += std::to_string(ffts_per_block_);
+          result += R"(;            
+            [[maybe_unused]] static constexpr int fft_forward = )";
+          result += std::to_string(fft_forward);
+          result += R"(;
+            [[maybe_unused]] static constexpr int fft_norm = )";
+          result += std::to_string(fft_norm);
+          result += R"(;
+            [[maybe_unused]] static constexpr int fft_type = )";
+          result += std::to_string(static_cast<int>(fft_type_));
+          result += R"(;
+            [[maybe_unused]] static constexpr int contiguous_input = )";
+          result += std::to_string(contiguous_input_);
+          result += R"(;
 
             const int local_fft_id = threadIdx.y;
       
             // If it's a half precision type we don't use value_type
             using input_type_converted = typename detail::convert_matx_type_t<input_type>;
             using precision = typename detail::inner_precision<input_type>::type;
+            constexpr int total_threads_per_block = CapType::block_size * ffts_per_block;
+
+            // using BlockLoadToShm = cub::detail::BlockLoadToShared<total_threads_per_block>;
+            // using TempStorage       = BlockLoadToShm::TempStorage;
+             using VecType = Vector<input_type_converted, static_cast<int>(CapType::ept)>;
+            // constexpr size_t to_copy   = sizeof(input_type) * static_cast<int>(CapType::ept) * static_cast<int>(total_threads_per_block);
+
+            // constexpr int buff_align = BlockLoadToShm::template SharedBufferAlignBytes<VecType>();
+            // constexpr int buff_size  = BlockLoadToShm::template SharedBufferSizeBytes<VecType>(total_threads_per_block);            
       
-            extern __shared__  Vector<input_type_converted, static_cast<int>(CapType::ept)> thread_data[];
-            thread_data[local_fft_id * blockDim.x + threadIdx.x] = a_.template operator()<CapType>(indices...);
-            __syncthreads();
+            extern  __shared__  VecType thread_data[];
+
+            // if constexpr (contiguous_input) {
+            //   __shared__ TempStorage temp_storage;
+            //   BlockLoadToShm load_to_shared(temp_storage);
+            //   cuda::std::span<const VecType> gmem_src(reinterpret_cast<const VecType*>(a_.template data_ptr<CapType>(blockIdx.x, blockDim.x * blockDim.y)), total_threads_per_block);
+            //   cuda::std::span<VecType> smem_dst_buff(thread_data, total_threads_per_block);
+            //   auto smem_dst = load_to_shared.CopyAsync(smem_dst_buff, gmem_src);
+            //   load_to_shared.Commit();
+            //   load_to_shared.Wait();
+            // }
+            // else {
+              thread_data[local_fft_id * blockDim.x + threadIdx.x] = a_.template operator()<CapType>(indices...);
+              __syncthreads();            
+            //}
+
       
-            %s(reinterpret_cast<input_type_converted*>(&thread_data[local_fft_id * blockDim.x]));
+            )";
+          result += fft_func_name;
+          result += R"((reinterpret_cast<input_type_converted*>(&thread_data[local_fft_id * blockDim.x]));
       
             if constexpr (fft_norm == 2) { // ORTHO
               #pragma unroll
@@ -323,7 +372,9 @@ namespace matx {
             }
 
             return thread_data[local_fft_id * blockDim.x + threadIdx.x];  
-        )";        
+        )";
+
+          return result;
       }
   };
 
