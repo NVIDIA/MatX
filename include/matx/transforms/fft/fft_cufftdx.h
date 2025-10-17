@@ -332,14 +332,14 @@ namespace matx {
             // using BlockLoadToShm = cub::detail::BlockLoadToShared<total_threads_per_block>;
             // using TempStorage       = BlockLoadToShm::TempStorage;
              using VecType = Vector<input_type_converted, static_cast<int>(CapType::ept)>;
-            // constexpr size_t to_copy   = sizeof(input_type) * static_cast<int>(CapType::ept) * static_cast<int>(total_threads_per_block);
+            constexpr size_t to_copy   = sizeof(input_type) * static_cast<int>(CapType::ept) * static_cast<int>(total_threads_per_block);
 
             // constexpr int buff_align = BlockLoadToShm::template SharedBufferAlignBytes<VecType>();
             // constexpr int buff_size  = BlockLoadToShm::template SharedBufferSizeBytes<VecType>(total_threads_per_block);            
       
             extern  __shared__  VecType thread_data[];
 
-            // if constexpr (contiguous_input) {
+            if constexpr (contiguous_input) {
             //   __shared__ TempStorage temp_storage;
             //   BlockLoadToShm load_to_shared(temp_storage);
             //   cuda::std::span<const VecType> gmem_src(reinterpret_cast<const VecType*>(a_.template data_ptr<CapType>(blockIdx.x, blockDim.x * blockDim.y)), total_threads_per_block);
@@ -347,11 +347,15 @@ namespace matx {
             //   auto smem_dst = load_to_shared.CopyAsync(smem_dst_buff, gmem_src);
             //   load_to_shared.Commit();
             //   load_to_shared.Wait();
-            // }
-            // else {
+              cuda::barrier<cuda::thread_scope_block> bar;
+              init(&bar, 1);            
+              cuda::memcpy_async(thread_data,     reinterpret_cast<const VecType*>(a_.template data_ptr<CapType>(blockIdx.x, blockDim.x * blockDim.y)),      to_copy, bar);              
+              bar.arrive_and_wait();
+            }
+            else {
               thread_data[local_fft_id * blockDim.x + threadIdx.x] = a_.template operator()<CapType>(indices...);
               __syncthreads();            
-            //}
+            }
 
       
             )";
