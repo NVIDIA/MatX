@@ -299,7 +299,7 @@ if (MATX_EN_CUTENSOR)
 endif()
 
 if (MATX_EN_CUDSS)
-    set(cuDSS_VERSION 0.4.0.2)
+    set(cuDSS_VERSION 0.7.0.20)
     include(cmake/FindcuDSS.cmake)
     target_compile_definitions(matx INTERFACE MATX_EN_CUDSS)
     target_link_libraries(matx INTERFACE cuDSS::cuDSS)

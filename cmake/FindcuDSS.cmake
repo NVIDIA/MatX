@@ -79,14 +79,14 @@ else()
 endif()
 
 if(NOT cuDSS_FOUND)
-  set(cuDSS_FILENAME libcuDSS-linux-x86_64-${cuDSS_VERSION}-archive)
+  set(cuDSS_FILENAME libcuDSS-linux-x86_64-${cuDSS_VERSION}_cuda${CUDAToolkit_VERSION_MAJOR}-archive)
 
   message(STATUS "cuDSS not found. Downloading library. By continuing this download you accept to the license terms of cuDSS")
 
   CPMAddPackage(
     NAME cuDSS
     VERSION ${cuDSS_VERSION}
-    URL https://developer.download.nvidia.com/compute/cudss/redist/libcudss/linux-x86_64/libcudss-linux-x86_64-${cuDSS_VERSION}_cuda12-archive.tar.xz
+    URL https://developer.download.nvidia.com/compute/cudss/redist/libcudss/linux-x86_64/libcudss-linux-x86_64-${cuDSS_VERSION}_cuda${CUDAToolkit_VERSION_MAJOR}-archive.tar.xz
     DOWNLOAD_ONLY YES 
   )
       
