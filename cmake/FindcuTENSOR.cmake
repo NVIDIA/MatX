@@ -86,12 +86,12 @@ if(NOT cuTENSOR_FOUND)
   CPMAddPackage(
     NAME cutensor
     VERSION ${CUTENSOR_VERSION}
-    URL https://developer.download.nvidia.com/compute/cutensor/redist/libcutensor/linux-x86_64/libcutensor-linux-x86_64-${CUTENSOR_VERSION}-archive.tar.xz
+    URL https://developer.download.nvidia.com/compute/cutensor/redist/libcutensor/linux-x86_64/libcutensor-linux-x86_64-${CUTENSOR_VERSION}_cuda${CUDAToolkit_VERSION_MAJOR}-archive.tar.xz
     # Eigen's CMakelists are not intended for library use
     DOWNLOAD_ONLY YES 
   )
       
-  set(cuTENSOR_LIBRARY ${cutensor_SOURCE_DIR}/lib/${CUDAToolkit_VERSION_MAJOR}/libcutensor.so)
+  set(cuTENSOR_LIBRARY ${cutensor_SOURCE_DIR}/lib/libcutensor.so)
   set(cuTENSOR_INCLUDE_DIR ${cutensor_SOURCE_DIR}/include) 
 
 

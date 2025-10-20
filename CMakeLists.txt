@@ -283,8 +283,8 @@ endif()
 
 # Get the tensor libraries if we need them
 if (MATX_EN_CUTENSOR)
-    set(CUTENSORNET_VERSION 24.03.0.4)
-    set(CUTENSOR_VERSION 2.0.1.2)
+    set(CUTENSORNET_VERSION 25.09.1.12)
+    set(CUTENSOR_VERSION 2.3.1.0)
 
     include(cmake/FindcuTENSOR.cmake)
     include(cmake/FindcuTensorNet.cmake)
