@@ -93,7 +93,7 @@ Stage0 += shell(commands=[
 
 pip_packages=[
     'breathe',
-    'cupy-cuda12x',
+    'cupy-cuda13x',
     'hpccm',
     'numpy',
     'pandas',
