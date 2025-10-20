@@ -3,6 +3,7 @@ set(OPERATOR_TEST_FILES
   advanced_op_test.cu
   advanced_remap_test.cu
   angle_test.cu
+  apply_test.cu
   at_test.cu
   base_op_test.cu
   broadcast_test.cu

@@ -172,9 +172,35 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   cudaEventRecord(stop, stream);
   exec.sync();
   cudaEventElapsedTime(&time_ms, start, stop);
-
   printf("Time with custom operator = %.2fms per iteration\n",
-         time_ms / num_iterations);
+    time_ms / num_iterations);
+
+  auto bs_lambda = [] __device__ (auto K,
+                                  auto S,
+                                  auto V,
+                                  auto r,
+                                  auto T) {
+      auto VsqrtT = V * sqrt(T);
+      auto d1 = (log(S / K) + (r + 0.5f * V * V) * T) / VsqrtT ;
+      auto d2 = d1 - VsqrtT;
+      auto cdf_d1 = normcdf(d1);
+      auto cdf_d2 = normcdf(d2);
+      auto expRT = exp(-1.f * r * T);
+  
+      return S * cdf_d1 - K * expRT * cdf_d2; 
+  };
+
+  cudaEventRecord(start, stream);
+  for (uint32_t i = 0; i < num_iterations; i++) {
+    (output_tensor = matx::apply(bs_lambda, K_tensor, S_tensor, V_tensor, r_tensor, T_tensor)).run(exec);
+  }
+  cudaEventRecord(stop, stream);
+  exec.sync();
+  cudaEventElapsedTime(&time_ms, start, stop);
+  printf("Time with lambda = %.2fms per iteration\n",
+    time_ms / num_iterations);
+
+
 
   cudaEventDestroy(start);
   cudaEventDestroy(stop);
