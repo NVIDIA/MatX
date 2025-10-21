@@ -44,7 +44,7 @@
   #include "matx/transforms/fft/fft_fftw.h"
 #endif  
 
-#ifdef MATX_EN_MATHDX
+#if defined(MATX_EN_MATHDX) && defined (__CUDACC__)
   #include "cuComplex.h"
   #include "matx/transforms/fft/fft_cufftdx.h"
 #endif
@@ -171,7 +171,7 @@ namespace matx
             }
           }
 
-          #if defined(MATX_EN_MATHDX) && defined(__CUDACC__) && !defined(__CUDACC_RTC__) && !defined(__CUDA_ARCH__)
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
             int major = 0;
             int minor = 0;
             int device;
@@ -189,10 +189,10 @@ namespace matx
               contiguous = a_.IsContiguous();
             }
             dx_fft_helper_.set_contiguous_input(contiguous);
-          #endif
+#endif
         }
 
-#ifdef MATX_EN_MATHDX
+#if defined(MATX_EN_MATHDX) && defined (__CUDACC__)
         __MATX_INLINE__ std::string get_jit_class_name() const {
           std::string symbol_name = "JITFFTOp_";
           symbol_name += std::to_string(fft_size_);
@@ -269,7 +269,7 @@ namespace matx
 
         template <OperatorCapability Cap, typename InType>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
-#if defined(MATX_EN_MATHDX)
+#if defined(MATX_EN_MATHDX) && defined (__CUDACC__)
           // Branch with cuFFTDx support
           if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
             return combine_capabilities<Cap>(dx_fft_helper_.GetShmRequired(), detail::get_operator_capability<Cap>(a_, in));

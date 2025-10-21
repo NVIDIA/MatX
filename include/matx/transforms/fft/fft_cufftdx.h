@@ -37,6 +37,7 @@
 
 #include "matx/core/operator_options.h"
 #include "matx/core/capabilities.h"
+#include "matx/core/log.h"
 #include <libcufftdx.h>
 
 #define LIBMATHDX_CHECK(ans)                                                                                           \
@@ -179,7 +180,7 @@ namespace matx {
         long long int shared_memory_size = 0;
         LIBMATHDX_CHECK(cufftdxGetTraitInt64(handle, CUFFTDX_TRAIT_SHARED_MEMORY_SIZE, &shared_memory_size));
         shared_memory_size = static_cast<long long int>(current_elements_per_thread_) * sizeof(InputType) * static_cast<long long int>(ffts_per_block_);
-        //printf("Shared memory size %lld\n", shared_memory_size);
+        MATX_LOG_DEBUG("Shared memory size {}", shared_memory_size);
         return static_cast<int>(shared_memory_size);
       }
 
@@ -209,7 +210,7 @@ namespace matx {
 
         LIBMATHDX_CHECK(
             cufftdxGetTraitInt64s(handle, cufftdxTraitType::CUFFTDX_TRAIT_BLOCK_DIM, block_dim.size(), block_dim.data()));
-            //printf("Block dim %lld %lld %lld\n", block_dim[0], block_dim[1], block_dim[2]);
+        MATX_LOG_DEBUG("Block dim {} {} {}", block_dim[0], block_dim[1], block_dim[2]);
         return static_cast<int>(block_dim[0]);
       }
 
@@ -221,7 +222,7 @@ namespace matx {
         
         LIBMATHDX_CHECK(cufftdxGetTraitInt64(handle, CUFFTDX_TRAIT_SUGGESTED_FFTS_PER_BLOCK, &sfpb));
 
-        //printf("Getting FFTs per block %lld elements per thread %d\n", sfpb, (int)current_elements_per_thread_);
+        MATX_LOG_DEBUG("Getting FFTs per block {} elements per thread {}", sfpb, static_cast<int>(current_elements_per_thread_));
         return static_cast<int>(sfpb);
       }
 
@@ -231,7 +232,7 @@ namespace matx {
         ltoir_symbols.insert(symbol_name);        
 
         if (detail::GetCache().GetLTOIRCachedBytes(symbol_name) != nullptr) {
-          //printf("LTOIR found in cache with size %zd\n", detail::GetCache().GetLTOIRCachedBytes(symbol_name)->length);
+          MATX_LOG_DEBUG("LTOIR found in cache with size {}", detail::GetCache().GetLTOIRCachedBytes(symbol_name)->length);
           return true;
         }
 
@@ -251,32 +252,32 @@ namespace matx {
 
         LIBMATHDX_CHECK(commondxGetCodeLTOIR(code, ltoir.length, ltoir.data));
 
-        // printf("Function %s\n", symbol_name.c_str());        
-        // printf("LTOIR size %zd\n", ltoir.length);
-        // printf("LTOIR first 8 bytes: %02x %02x %02x %02x %02x %02x %02x %02x\n",
-        //        static_cast<unsigned char>(ltoir.data[0]),
-        //        static_cast<unsigned char>(ltoir.data[1]),
-        //        static_cast<unsigned char>(ltoir.data[2]),
-        //        static_cast<unsigned char>(ltoir.data[3]),
-        //        static_cast<unsigned char>(ltoir.data[4]),
-        //        static_cast<unsigned char>(ltoir.data[5]),
-        //        static_cast<unsigned char>(ltoir.data[6]),
-        //        static_cast<unsigned char>(ltoir.data[7]));
+        MATX_LOG_DEBUG("Function {}", symbol_name);        
+        MATX_LOG_DEBUG("LTOIR size {}", ltoir.length);
+        MATX_LOG_TRACE("LTOIR first 8 bytes: {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
+               static_cast<unsigned char>(ltoir.data[0]),
+               static_cast<unsigned char>(ltoir.data[1]),
+               static_cast<unsigned char>(ltoir.data[2]),
+               static_cast<unsigned char>(ltoir.data[3]),
+               static_cast<unsigned char>(ltoir.data[4]),
+               static_cast<unsigned char>(ltoir.data[5]),
+               static_cast<unsigned char>(ltoir.data[6]),
+               static_cast<unsigned char>(ltoir.data[7]));
         
         // Check LTOIR format - note that cuFFTDx may generate various formats
         // (LLVM bitcode 'BC', NVVM IR, or other LTOIR formats)
         if (ltoir.length >= 4) {
-          //bool is_llvm_bc = (static_cast<unsigned char>(ltoir.data[0]) == 0x42 && 
-          //                  static_cast<unsigned char>(ltoir.data[1]) == 0x43);
-          // if (is_llvm_bc) {
-          //   printf("LTOIR format: LLVM bitcode (BC)\n");
-          // } else {
-          //   printf("LTOIR format: Other (first bytes: %02x %02x %02x %02x)\n",
-          //          static_cast<unsigned char>(ltoir.data[0]),
-          //          static_cast<unsigned char>(ltoir.data[1]),
-          //          static_cast<unsigned char>(ltoir.data[2]),
-          //          static_cast<unsigned char>(ltoir.data[3]));
-          // }
+          bool is_llvm_bc = (static_cast<unsigned char>(ltoir.data[0]) == 0x42 && 
+                            static_cast<unsigned char>(ltoir.data[1]) == 0x43);
+          if (is_llvm_bc) {
+            MATX_LOG_TRACE("LTOIR format: LLVM bitcode (BC)");
+          } else {
+            MATX_LOG_TRACE("LTOIR format: Other (first bytes: {:02x} {:02x} {:02x} {:02x})",
+                   static_cast<unsigned char>(ltoir.data[0]),
+                   static_cast<unsigned char>(ltoir.data[1]),
+                   static_cast<unsigned char>(ltoir.data[2]),
+                   static_cast<unsigned char>(ltoir.data[3]));
+          }
         }
 
         detail::GetCache().StoreLTOIRCachedBytes(symbol_name, ltoir.data, ltoir.length);

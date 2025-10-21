@@ -107,7 +107,8 @@ namespace matx
             // Check if operator supports JIT
             // Force rank 2 or lower to account for weirdness when we have multiple groups per block
             bool use_jit = detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op) && Op::Rank() <= 2;
-            
+
+            MATX_LOG_DEBUG("Using JIT: {}", use_jit);
             if (!use_jit) {
               MATX_THROW(matxInvalidParameter, "Operator does not support JIT compilation. Use cudaExecutor instead.");
             }
@@ -230,7 +231,8 @@ namespace matx
             auto [best_ept, shm_size, block_size, groups_per_block] = detail::find_best_launch_params(op, kernel_provider, 0, true);
                     
             bool stride = detail::get_grid_dims_jit<Op::Rank()>(blocks, threads, sizes, static_cast<int>(best_ept), groups_per_block, block_size, true);            
-            //printf("shm_size %d stride %d  best_ept %d blocks %d %d %d\n", shm_size, stride, static_cast<int>(best_ept), blocks.x, threads.x, threads.y);
+            MATX_LOG_DEBUG("Shm size {}, Stride {}, estimated EPT {}, blocks {}x{}x{} threads {}x{}x{}", 
+                shm_size, stride, static_cast<int>(best_ept), blocks.x, blocks.y, blocks.z, threads.x, threads.y, threads.z);
             const int osize = op.Rank() == 0 ? 1 : static_cast<int>(op.Size(op.Rank() - 1));
             detail::nvrtc_compile_and_run("output.cu", op, sizes, blocks, threads, best_ept, stride, shm_size, osize);
           }

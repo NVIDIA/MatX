@@ -59,6 +59,7 @@
 #include <sstream>
 #include <unordered_map>
 #include <matx/core/cache.h>  
+#include <matx/core/log.h>
 
 #include "matx/executors/jit_kernel.h"
 #include <filesystem>
@@ -118,8 +119,7 @@ std::vector<std::string> __MATX_HOST__ __MATX_INLINE__ get_preprocessor_options(
   do {                                                                         \
     nvrtcResult result = call;                                                 \
     if (result != NVRTC_SUCCESS) {                                             \
-      std::cerr << "NVRTC error at " << __FILE__ << ":" << __LINE__            \
-                << ": " << nvrtcGetErrorString(result) << std::endl;           \
+      MATX_LOG_ERROR("NVRTC error: {}", nvrtcGetErrorString(result));          \
       std::exit(EXIT_FAILURE);                                                 \
     }                                                                          \
   } while (0)
@@ -131,8 +131,7 @@ std::vector<std::string> __MATX_HOST__ __MATX_INLINE__ get_preprocessor_options(
     if (result != CUDA_SUCCESS) {                                              \
       const char* errStr;                                                      \
       cuGetErrorString(result, &errStr);                                       \
-      std::cerr << "CUDA error at " << __FILE__ << ":" << __LINE__             \
-                << ": " << errStr << std::endl;                                \
+      MATX_LOG_ERROR("CUDA error: {}", errStr);                                \
       std::exit(EXIT_FAILURE);                                                 \
     }                                                                          \
   } while (0)
@@ -142,14 +141,14 @@ std::vector<std::string> __MATX_HOST__ __MATX_INLINE__ get_preprocessor_options(
       do {                                                                                                               \
           nvJitLinkResult result = (ans);                                                                                \
           if (result != NVJITLINK_SUCCESS) {                                                                             \
-              fprintf(stderr, "nvJitLink error: %d on %s:%d\n", (int)result, __FILE__, __LINE__);                        \
+              MATX_LOG_ERROR("nvJitLink error: {}", static_cast<int>(result));                                           \
               size_t lsize;                                                                                              \
               result = nvJitLinkGetErrorLogSize(handle, &lsize);                                                         \
               if (result == NVJITLINK_SUCCESS && lsize > 0) {                                                            \
                   std::vector<char> log(lsize);                                                                          \
                   result = nvJitLinkGetErrorLog(handle, log.data());                                                     \
                   if (result == NVJITLINK_SUCCESS) {                                                                     \
-                      fprintf(stderr, "%s\n", log.data());                                                               \
+                      MATX_LOG_ERROR("nvJitLink log: {}", log.data());                                                   \
                   }                                                                                                      \
               }                                                                                                          \
               abort();                                                                                                   \
@@ -162,7 +161,7 @@ std::vector<std::string> __MATX_HOST__ __MATX_INLINE__ get_preprocessor_options(
 std::string read_file_contents(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
-        std::cerr << "Failed to open file: " << filepath << std::endl;
+        MATX_LOG_ERROR("Failed to open file: {}", filepath);
         return "";
     }
     std::stringstream buffer;
@@ -322,8 +321,7 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, cons
   std::string kernel_name = get_kernel_name(op, stride);
   std::string cache_key = kernel_name + "_" + kernel_op_type;
 
-  // printf("DEBUG: nvrtc_compile_and_run called with operator type: %s\n", typeid(op).name());
-
+  MATX_LOG_DEBUG("nvrtc_compile_and_run called with operator type: {}", typeid(op).name());
   
   CUfunction kernel_func;
   std::string lowered_name;
@@ -340,8 +338,8 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, cons
       lowered_name = detail::GetCache().GetLTOIRMetadata(cubin_filename);
       
       if (!lowered_name.empty()) {
-        // printf("DEBUG: Loading cached kernel for type: %s\n", kernel_op_type.c_str());
-        // printf("DEBUG: Cached lowered name: %s\n", lowered_name.c_str());
+        MATX_LOG_DEBUG("Loading cached kernel for type: {}", kernel_op_type);
+        MATX_LOG_DEBUG("Cached lowered name: {}", lowered_name);
         
         // Load the cached cubin into a CUDA module
         CUmodule module;
@@ -356,11 +354,11 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, cons
         // Skip compilation since we loaded from cache
         goto launch_kernel;
       } else {
-        // printf("DEBUG: Found cached cubin but no metadata, recompiling\n");
+        MATX_LOG_DEBUG("Found cached cubin but no metadata, recompiling");
       }
     }
     
-    // printf("DEBUG: Compiling kernel with NVRTC for type: %s\n", kernel_op_type.c_str());
+    MATX_LOG_DEBUG("Compiling kernel with NVRTC for type: {}", kernel_op_type);
     
     // Read jit_includes.h content
     std::string jit_includes_path = get_jit_includes_path();
@@ -384,9 +382,9 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, cons
     };
 
     // Print the contents of each include for debugging
-    // printf("DEBUG: jit_includes.h content:\n%s\n", jit_includes_content.c_str());
-    // printf("DEBUG: matx_generated_code_hdr content:\n%s\n", capstr.c_str());
-    // printf("DEBUG: matx_class_strings content:\n%s\n", all_jit_classes_string.c_str());
+    MATX_LOG_TRACE("jit_includes.h content:\n{}", jit_includes_content);
+    MATX_LOG_TRACE("matx_generated_code_hdr content:\n{}", capstr);
+    MATX_LOG_TRACE("matx_class_strings content:\n{}", all_jit_classes_string);
     
     // Create NVRTC program with headers
     nvrtcProgram prog;
@@ -398,7 +396,7 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, cons
     // Note: The matxKernelStr kernels only take ONE template parameter (Op), not two
     std::string qualified_kernel_op_type = qualify_jit_type_names(kernel_op_type);
     std::string kernel_name_expr = kernel_name + "<" + qualified_kernel_op_type + ">";
-    // printf("DEBUG: Kernel name expression: %s\n", kernel_name_expr.c_str());
+    MATX_LOG_DEBUG("Kernel name expression: {}", kernel_name_expr);
     NVRTC_CHECK(nvrtcAddNameExpression(prog, kernel_name_expr.c_str()));
     
     // Get compilation options
@@ -427,11 +425,11 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, cons
     if (log_size > 1) {
       std::vector<char> log(log_size);
       NVRTC_CHECK(nvrtcGetProgramLog(prog, log.data()));
-      // printf("NVRTC Compilation log:\n%s\n", log.data());
+      MATX_LOG_DEBUG("NVRTC Compilation log:\n{}", log.data());
     }
     
     if (compile_result != NVRTC_SUCCESS) {
-      std::cerr << "NVRTC compilation failed!" << std::endl;
+      MATX_LOG_ERROR("NVRTC compilation failed!");
       nvrtcDestroyProgram(&prog);
       MATX_THROW(matxInvalidParameter, "NVRTC compilation failed");
     }
@@ -441,13 +439,13 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, cons
     NVRTC_CHECK(nvrtcGetLoweredName(prog, kernel_name_expr.c_str(), &lowered_name_ptr));
     // Copy the lowered name before destroying the program
     lowered_name = std::string(lowered_name_ptr);
-    // printf("DEBUG: Lowered kernel name: %s\n", lowered_name.c_str());
+    MATX_LOG_DEBUG("Lowered kernel name: {}", lowered_name);
 
     // Compile any LTO-IR required for expression:
     auto ltoir_query_input = detail::LTOIRQueryInput{};
     ltoir_query_input.ept = ept;
     auto ltoir_result = detail::get_operator_capability<OperatorCapability::GENERATE_LTOIR>(op, ltoir_query_input);
-    // printf("DEBUG: LTOIR capability result: %s\n", ltoir_result ? "true" : "false");          
+    MATX_LOG_DEBUG("LTOIR capability result: {}", ltoir_result);          
     
     size_t lto_size = 0;
     NVRTC_CHECK(nvrtcGetLTOIRSize(prog, &lto_size));
@@ -474,16 +472,16 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, cons
         MATX_THROW(matxInvalidParameter, error_msg);
       }
 
-      // printf("Adding LTOIR for symbol %s, size=%zu bytes, first 4 bytes: %02x %02x %02x %02x\n", 
-      //        lto.c_str(), ltoir_ptr->length, 
-      //        static_cast<unsigned char>(ltoir_ptr->data[0]), 
-      //        static_cast<unsigned char>(ltoir_ptr->data[1]), 
-      //        static_cast<unsigned char>(ltoir_ptr->data[2]), 
-      //        static_cast<unsigned char>(ltoir_ptr->data[3]));
+      MATX_LOG_TRACE("Adding LTOIR for symbol {}, size={} bytes, first 4 bytes: {:02x} {:02x} {:02x} {:02x}", 
+             lto, ltoir_ptr->length, 
+             static_cast<unsigned char>(ltoir_ptr->data[0]), 
+             static_cast<unsigned char>(ltoir_ptr->data[1]), 
+             static_cast<unsigned char>(ltoir_ptr->data[2]), 
+             static_cast<unsigned char>(ltoir_ptr->data[3]));
       
       // Validate that the data looks like LTOIR (LLVM bitcode typically starts with 'BC')
       if (ltoir_ptr->length < 4) {
-        // printf("WARNING: LTOIR data for %s is too small (%zu bytes)\n", lto.c_str(), ltoir_ptr->length);
+        MATX_LOG_WARN("LTOIR data for {} is too small ({} bytes)", lto, ltoir_ptr->length);
       }
       
       NVJITLINK_CHECK(handle, nvJitLinkAddData(handle, NVJITLINK_INPUT_LTOIR, ltoir_ptr->data, ltoir_ptr->length, lto.c_str()));

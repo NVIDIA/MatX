@@ -48,6 +48,7 @@
 #include "matx/core/error.h"
 #include "matx/core/allocator.h"
 #include "matx/core/type_utils_both.h"
+#include "matx/core/log.h"
 
 namespace matx {
 namespace detail {
@@ -286,12 +287,20 @@ public:
     const char* env_cache_dir = std::getenv("MATX_CACHE_DIR");
     if (env_cache_dir) {
       cache_dir = env_cache_dir;
+      MATX_LOG_DEBUG("Using cache directory from MATX_CACHE_DIR: {}", cache_dir);
     } else {
       const char* home = std::getenv("HOME");
       if (home) {
         cache_dir = std::string(home) + "/.matx/kernel_cache";
         // Create the directory if it doesn't exist
-        std::filesystem::create_directories(cache_dir);
+        try {
+          std::filesystem::create_directories(cache_dir);
+          MATX_LOG_DEBUG("Created cache directory: {}", cache_dir);
+        } catch (const std::exception& e) {
+          MATX_LOG_ERROR("Failed to create cache directory {}: {}", cache_dir, e.what());
+        }
+      } else {
+        MATX_LOG_WARN("No HOME environment variable set, cache directory unavailable");
       }
     }
     return cache_dir;
@@ -317,36 +326,44 @@ public:
     // First check the in-memory cache
     auto it = ltoir_cache.find(filename);
     if (it != ltoir_cache.end()) {
+      MATX_LOG_DEBUG("Cache HIT (memory) for: {}", filename);
       return &it->second;
     }
     
     // Determine cache directory
     std::string cache_dir = GetKernelCacheDirectory();
     if (cache_dir.empty()) {
+      MATX_LOG_DEBUG("Cache MISS for {}: no cache directory available", filename);
       return nullptr; // No cache directory available
     }
     
     // Check if file exists in cache directory
     std::filesystem::path cache_file = std::filesystem::path(cache_dir) / filename;
     if (!std::filesystem::exists(cache_file)) {
+      MATX_LOG_DEBUG("Cache MISS (disk) for: {}", filename);
       return nullptr;
     }
     
     // Read file contents
     std::ifstream file(cache_file, std::ios::binary | std::ios::ate);
     if (!file.is_open()) {
+      MATX_LOG_ERROR("Failed to open cached file: {}", cache_file.string());
       return nullptr;
     }
     
     std::streamsize size = file.tellg();
     file.seekg(0, std::ios::beg);
     
+    MATX_LOG_DEBUG("Cache HIT (disk) for: {}, size: {} bytes", filename, size);
+    
     char* buffer = static_cast<char*>(malloc(size));
     if (!buffer) {
+      MATX_LOG_ERROR("Failed to allocate {} bytes for cache file: {}", size, filename);
       return nullptr;
     }
     
     if (!file.read(buffer, size)) {
+      MATX_LOG_ERROR("Failed to read cache file: {}", filename);
       free(buffer);
       return nullptr;
     }
@@ -359,12 +376,13 @@ public:
       bool looks_corrupt = (buffer[0] == buffer[1] && buffer[1] == buffer[2] && 
                            buffer[2] == buffer[3] && buffer[0] == 0);
       if (looks_corrupt) {
-        printf("WARNING: Cached LTOIR file '%s' appears corrupted (all zeros)\n", filename.c_str());
+        MATX_LOG_WARN("Cached LTOIR file '{}' appears corrupted (all zeros), removing", filename);
         free(buffer);
         try {
           std::filesystem::remove(cache_file);
-        } catch (...) {
-          // Ignore deletion failures
+          MATX_LOG_DEBUG("Removed corrupted cache file: {}", filename);
+        } catch (const std::exception& e) {
+          MATX_LOG_ERROR("Failed to remove corrupted cache file {}: {}", filename, e.what());
         }
         return nullptr;
       }
@@ -395,12 +413,14 @@ public:
    */
   __MATX_INLINE__ bool StoreLTOIRCachedBytes(const std::string& filename, char* data, size_t length) {
     if (!data || length == 0) {
+      MATX_LOG_ERROR("Cannot store empty data for: {}", filename);
       return false;
     }
     
     try {
       // Store the raw pointer and length in an LTOIRData struct
       ltoir_cache[filename] = LTOIRData{data, length};
+      MATX_LOG_DEBUG("Stored {} bytes in memory cache for: {}", length, filename);
       
       // Also store to disk for persistence
       std::string cache_dir = GetKernelCacheDirectory();
@@ -415,16 +435,21 @@ public:
           if (file.is_open()) {
             file.write(data, length);
             file.close();
+            MATX_LOG_DEBUG("Stored {} bytes to disk cache: {}", length, cache_file.string());
+          } else {
+            MATX_LOG_WARN("Failed to open file for writing: {}", cache_file.string());
           }
           // Note: We don't fail if disk write fails, as in-memory cache is still valid
-        } catch (...) {
+        } catch (const std::exception& e) {
+          MATX_LOG_WARN("Failed to write to disk cache for {}: {}", filename, e.what());
           // Ignore disk write failures - in-memory cache is still valid
         }
       }
       
       return true;
-    } catch (...) {
+    } catch (const std::exception& e) {
       // Handle any failures - free the data since we couldn't store it
+      MATX_LOG_ERROR("Failed to store cache data for {}: {}", filename, e.what());
       free(data);
       return false;
     }
@@ -444,6 +469,7 @@ public:
   __MATX_INLINE__ bool StoreLTOIRMetadata(const std::string& filename, const std::string& metadata) {
     std::string cache_dir = GetKernelCacheDirectory();
     if (cache_dir.empty()) {
+      MATX_LOG_DEBUG("Cannot store metadata for {}: no cache directory", filename);
       return false;
     }
     
@@ -454,10 +480,13 @@ public:
       if (file.is_open()) {
         file << metadata;
         file.close();
+        MATX_LOG_DEBUG("Stored metadata for {}: {}", filename, metadata);
         return true;
+      } else {
+        MATX_LOG_ERROR("Failed to open metadata file for writing: {}", meta_file.string());
       }
-    } catch (...) {
-      // Ignore write failures
+    } catch (const std::exception& e) {
+      MATX_LOG_ERROR("Failed to store metadata for {}: {}", filename, e.what());
     }
     return false;
   }
@@ -473,12 +502,14 @@ public:
   __MATX_INLINE__ std::string GetLTOIRMetadata(const std::string& filename) {
     std::string cache_dir = GetKernelCacheDirectory();
     if (cache_dir.empty()) {
+      MATX_LOG_DEBUG("Cannot get metadata for {}: no cache directory", filename);
       return "";
     }
     
     try {
       std::filesystem::path meta_file = std::filesystem::path(cache_dir) / (filename + ".meta");
       if (!std::filesystem::exists(meta_file)) {
+        MATX_LOG_DEBUG("No metadata file found for: {}", filename);
         return "";
       }
       
@@ -486,10 +517,14 @@ public:
       if (file.is_open()) {
         std::stringstream buffer;
         buffer << file.rdbuf();
-        return buffer.str();
+        std::string metadata = buffer.str();
+        MATX_LOG_DEBUG("Retrieved metadata for {}: {}", filename, metadata);
+        return metadata;
+      } else {
+        MATX_LOG_ERROR("Failed to open metadata file: {}", meta_file.string());
       }
-    } catch (...) {
-      // Ignore read failures
+    } catch (const std::exception& e) {
+      MATX_LOG_ERROR("Failed to retrieve metadata for {}: {}", filename, e.what());
     }
     return "";
   }
@@ -508,6 +543,7 @@ public:
    */
   __MATX_INLINE__ bool StoreLTOIRCachedBytes(const std::string& filename, const char* data, size_t size) {
     if (!data || size == 0) {
+      MATX_LOG_ERROR("Cannot store empty data for: {}", filename);
       return false;
     }
     
@@ -515,12 +551,14 @@ public:
       // Create a new buffer and copy the data
       char* buffer = static_cast<char*>(malloc(size));
       if (!buffer) {
+        MATX_LOG_ERROR("Failed to allocate {} bytes for: {}", size, filename);
         return false;
       }
       std::memcpy(buffer, data, size);
       
       // Store in the cache with size information
       ltoir_cache[filename] = LTOIRData{buffer, size};
+      MATX_LOG_DEBUG("Stored {} bytes (copy) in memory cache for: {}", size, filename);
       
       // Also store to disk for persistence
       std::string cache_dir = GetKernelCacheDirectory();
@@ -535,15 +573,20 @@ public:
           if (file.is_open()) {
             file.write(data, size);
             file.close();
+            MATX_LOG_DEBUG("Stored {} bytes (copy) to disk cache: {}", size, cache_file.string());
+          } else {
+            MATX_LOG_WARN("Failed to open file for writing: {}", cache_file.string());
           }
           // Note: We don't fail if disk write fails, as in-memory cache is still valid
-        } catch (...) {
+        } catch (const std::exception& e) {
+          MATX_LOG_WARN("Failed to write to disk cache for {}: {}", filename, e.what());
           // Ignore disk write failures - in-memory cache is still valid
         }
       }
       
       return true;
-    } catch (...) {
+    } catch (const std::exception& e) {
+      MATX_LOG_ERROR("Failed to store cache data for {}: {}", filename, e.what());
       // Handle any allocation or copy failures
       return false;
     }

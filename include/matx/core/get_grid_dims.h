@@ -279,7 +279,7 @@ inline bool get_grid_dims_jit(dim3 &blocks, dim3 &threads, const cuda::std::arra
     MATX_THROW(matxInvalidParameter, "Rank not supported");
   } 
 
-  //printf("blocks %d %d %d threads %d %d %d\n", blocks.x, blocks.y, blocks.z, threads.x, threads.y, threads.z);
+  MATX_LOG_DEBUG("Blocks {}x{}x{} Threads {}x{}x{}", blocks.x, blocks.y, blocks.z, threads.x, threads.y, threads.z);
   return stride;
 }
 } // end namespace detail
