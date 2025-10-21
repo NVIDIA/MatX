@@ -154,28 +154,28 @@ class tensor_impl_t {
              "  T *ldata_;\n" +       
              "  constexpr static cuda::std::array<index_t, " + std::to_string(Rank()) + "> strides_ = { " + detail::array_to_string(desc_.Strides()) + " };\n" +
              "  constexpr static cuda::std::array<index_t, " + std::to_string(Rank()) + "> sizes_ = { " + detail::array_to_string(desc_.Shape()) + " };\n" +
-             "  template <typename CapType, int I = 0, typename ...Is>\n" +
+             "  template <detail::ElementsPerThread EPT, int I = 0, typename ...Is>\n" +
              "  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type GetVal([[maybe_unused]] cuda::std::tuple<Is...> tup)  {\n" +
              "    if constexpr (I < sizeof...(Is)) {\n" +
-             "      if constexpr (CapType::ept != detail::ElementsPerThread::ONE && I == sizeof...(Is) - 1) {\n" +
-             "        return GetVal<CapType, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(strides_[I] * static_cast<index_t>(CapType::ept));\n" +
+             "      if constexpr (EPT != detail::ElementsPerThread::ONE && I == sizeof...(Is) - 1) {\n" +
+             "        return GetVal<EPT, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(strides_[I] * static_cast<index_t>(EPT));\n" +
              "      }\n" +
              "      else {\n" +
-             "        return GetVal<CapType, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(strides_[I]);\n" +
+             "        return GetVal<EPT, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(strides_[I]);\n" +
              "      }\n" +
              "    }\n" +
              "    else {\n" +
              "      return 0;\n" +
              "    }\n" +
              "  }\n" +
-             "  template <typename CapType, int I = 0, typename ...Is>\n" +
+             "  template <detail::ElementsPerThread EPT, int I = 0, typename ...Is>\n" +
              "  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type GetValC([[maybe_unused]] const cuda::std::tuple<Is...> tup) const {\n" +
              "    if constexpr (I < sizeof...(Is)) {\n" +
-             "      if constexpr (CapType::ept != detail::ElementsPerThread::ONE && I == sizeof...(Is) - 1) {\n" +
-             "        return GetValC<CapType, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(strides_[I] * static_cast<index_t>(CapType::ept));\n" +
+             "      if constexpr (EPT != detail::ElementsPerThread::ONE && I == sizeof...(Is) - 1) {\n" +
+             "        return GetValC<EPT, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(strides_[I] * static_cast<index_t>(EPT));\n" +
              "      }\n" +
              "      else {\n" +
-             "        return GetValC<CapType, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(strides_[I]);\n" +
+             "        return GetValC<EPT, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(strides_[I]);\n" +
              "      }\n" +
              "    }\n" +
              "    else {\n" +
@@ -226,13 +226,14 @@ class tensor_impl_t {
              "  __MATX_INLINE__  __MATX_DEVICE__ decltype(auto) operator()(Is... indices) const noexcept" + "{\n" +
              "    static_assert(sizeof...(Is) == M, \"Number of indices of operator() must match rank of tensor\");\n" +
              "     constexpr int EPT_int = static_cast<int>(CapType::ept);\n" +
+             "     const index_t offset = GetOffsetOptimized<CapType::ept>(indices...);\n" +
              "     if constexpr (CapType::ept == detail::ElementsPerThread::ONE) {\n" +
-             "       return ldata_[GetValC<CapType, 0, Is...>(cuda::std::make_tuple(indices...))];\n" +
+             "       return ldata_[offset];\n" +
              "     } else if constexpr (EPT_int * sizeof(T) <= MAX_VEC_WIDTH_BYTES ) {\n" +
-             "       return *reinterpret_cast<detail::Vector<T, EPT_int>*>(ldata_ + GetValC<CapType, 0, Is...>(cuda::std::make_tuple(indices...)));\n" +
+             "       return *reinterpret_cast<detail::Vector<T, EPT_int>*>(ldata_ + offset);\n" +
              "     } else {\n" +
              "       detail::Vector<T, EPT_int> vec;\n" +
-             "       vec.load<EPT_int>(ldata_ + GetValC<CapType, 0, Is...>(cuda::std::make_tuple(indices...)));\n" +
+             "       vec.template load<EPT_int>(ldata_ + offset);\n" +
              "       return vec;\n" +
              "     }\n" +
              "  }\n" +
@@ -242,10 +243,11 @@ class tensor_impl_t {
              "  {\n" +
              "    static_assert(sizeof...(Is) == M, \"Number of indices of operator() must match rank of tensor\");\n" +
              "    constexpr int EPT_int = static_cast<int>(CapType::ept);\n" +
+             "    const index_t offset = GetOffsetOptimized<CapType::ept>(indices...);\n" +
              "    if constexpr (CapType::ept == detail::ElementsPerThread::ONE) {\n" +
-             "      return ldata_[GetVal<CapType, 0, Is...>(cuda::std::make_tuple(indices...))];\n" +
+             "      return ldata_[offset];\n" +
              "    } else {\n" +
-             "      return *reinterpret_cast<detail::Vector<T, EPT_int>*>(ldata_ + GetVal<CapType, 0, Is...>(cuda::std::make_tuple(indices...)));\n" +
+             "      return *reinterpret_cast<detail::Vector<T, EPT_int>*>(ldata_ + offset);\n" +
              "    }\n" +
              "  }\n" +
              "  template <typename CapType, int M = RANK, typename... Is>\n" +
@@ -1156,15 +1158,15 @@ MATX_IGNORE_WARNING_POP_GCC
       return desc_.IsContiguous();
     }
 
-    template <typename CapType, int I = 0, typename ...Is>
+    template <typename detail::ElementsPerThread EPT, int I = 0, typename ...Is>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type GetVal([[maybe_unused]] cuda::std::tuple<Is...> tup)  {
       if constexpr (I < sizeof...(Is)) {
 MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
-        if constexpr (CapType::ept != detail::ElementsPerThread::ONE && I == sizeof...(Is) - 1) {
-          return GetVal<CapType, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(this->desc_.Stride(I) * static_cast<index_t>(CapType::ept));
+        if constexpr (EPT != detail::ElementsPerThread::ONE && I == sizeof...(Is) - 1) {
+          return GetVal<EPT, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(this->desc_.Stride(I) * static_cast<index_t>(EPT));
         }
         else {
-          return GetVal<CapType, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(this->desc_.Stride(I));
+          return GetVal<EPT, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(this->desc_.Stride(I));
         }
 MATX_IGNORE_WARNING_POP_GCC
       }

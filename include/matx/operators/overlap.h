@@ -99,13 +99,6 @@ namespace matx
         template <typename CapType>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i0, index_t i1) const
         {
-#ifdef __CUDA_ARCH__
-        if constexpr (CapType::jit) {
-          if ((threadIdx.x * CapType::ept) >= Size(Rank() - 1)) {
-            return detail::GetJitSentinelValue<CapType, value_type>();
-          }
-        }
-#endif
           return get_impl<CapType>(cuda::std::as_const(op_), i0*s_[0] + i1);
         }
 
@@ -117,13 +110,6 @@ namespace matx
         template <typename CapType>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i0, index_t i1)
         {
-#ifdef __CUDA_ARCH__
-        if constexpr (CapType::jit) {
-          if ((threadIdx.x * CapType::ept) >= Size(Rank() - 1)) {
-            return detail::GetJitSentinelValue<CapType, value_type>();
-          }
-        }
-#endif
           return get_impl<CapType>(cuda::std::forward<decltype(op_)>(op_), i0*s_[0] + i1);
         }
 

@@ -35,9 +35,7 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
-#ifndef __CUDACC_RTC__
 #include "matx/transforms/convert/sparse2sparse_cusparse.h"
-#endif
 
 namespace matx {
 namespace detail {
@@ -75,7 +73,6 @@ public:
     return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
   }
 
-#ifndef __CUDACC_RTC__
   template <typename Out, typename Executor>
   void Exec([[maybe_unused]] Out &&out, [[maybe_unused]] Executor &&ex) const {
     if constexpr (is_sparse_tensor_v<OpA> && is_sparse_tensor_v<Out>) {
@@ -86,7 +83,6 @@ public:
                  "Cannot use sparse2sparse on dense operands");
     }
   }
-#endif
 };
 
 } // end namespace detail

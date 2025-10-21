@@ -86,13 +86,6 @@ namespace matx
         template <typename CapType>
         inline __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
         {
-#ifdef __CUDA_ARCH__
-        if constexpr (CapType::jit) {
-          if ((threadIdx.x * CapType::ept) >= Size(0)) {
-            return detail::GetJitSentinelValue<CapType, value_type>();
-          }
-        }
-#endif
           return detail::ApplyGeneratorVecFunc<CapType, FreqType>([this](index_t idx) { 
             if (method_ == ChirpMethod::CHIRP_METHOD_LINEAR) {
               return cuda::std::cos(2.0f * M_PI * (f0_ * sop_(idx) + 0.5f * ((f1_ - f0_) / t1_) * sop_(idx) * sop_(idx)));
@@ -154,13 +147,6 @@ namespace matx
         template <typename CapType>
         inline __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(index_t i) const
         {
-#ifdef __CUDA_ARCH__
-        if constexpr (CapType::jit) {
-          if ((threadIdx.x * CapType::ept) >= Size(0)) {
-            return detail::GetJitSentinelValue<CapType, value_type>();
-          }
-        }
-#endif
           return detail::ApplyGeneratorVecFunc<CapType, value_type>([this](index_t idx) { 
             if (method_ == ChirpMethod::CHIRP_METHOD_LINEAR) {
               FreqType real = cuda::std::cos(2.0f * M_PI * (f0_ * sop_(idx) + 0.5f * ((f1_ - f0_) / t1_) * sop_(idx) * sop_(idx)));

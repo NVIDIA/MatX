@@ -229,7 +229,7 @@ void ambgfun_impl(AMFTensor &amf, XTensor &x,
   auto y_normdiv_v = x_normdiv_v.View();
 
   if constexpr (!std::is_same_v<YTensor, EmptyY>) {
-    ry.Reset(y.value().Data(), y.value().Shape());
+    ry.Reset(y.Data(), y.Shape());
     y_normdiv_v.Shallow(make_tensor<T1>(y_normdiv_v.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream));
     auto y_norm_v = make_tensor<float>({}, MATX_ASYNC_DEVICE_MEMORY, stream);
 

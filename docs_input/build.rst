@@ -197,11 +197,10 @@ By default, all of these options are OFF.
     - ``-DMATX_MULTI_GPU=ON``
   * - Disable CUB Caching
     - ``-DMATX_DISABLE_CUB_CACHE=ON``
-  * - Enable MathDx Support
-    - ``-DMATX_EN_MATHDX=ON``
   * - Enable NVIDIA MathDx support for kernel fusion
-    - ``-DMATX_EN_PYBIND11=ON``
+    - ``-DMATX_EN_MATHDX=ON``
   * - Enable pybind11 Support. This option is usually not explicitly set, but is enabled by other options.
+    - ``-DMATX_EN_PYBIND11=ON``
 
 
 NVTX Flags

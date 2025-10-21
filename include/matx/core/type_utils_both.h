@@ -516,7 +516,14 @@ struct is_matx_shape<T, cuda::std::void_t<typename T::matx_shape>>
 };
 }
 
-
+/**
+ * @brief Determine if a type is a MatX shape type
+ * 
+ * @tparam T Type to test
+ */
+ template <typename T>
+ inline constexpr bool is_matx_shape_v = detail::is_matx_shape<typename remove_cvref<T>::type>::value;
+ 
 
 namespace detail {
 template <typename T>
@@ -809,13 +816,13 @@ template<typename Tuple, cuda::std::size_t... Ints>
 __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto select_tuple(Tuple&& tuple, cuda::std::index_sequence<Ints...>)
 {
  return cuda::std::tuple<cuda::std::tuple_element_t<Ints, Tuple>...>(
-    cuda::std::get<Ints>(std::forward<Tuple>(tuple))...);
+    cuda::std::get<Ints>(cuda::std::forward<Tuple>(tuple))...);
 }
 
 template <typename... T, cuda::std::enable_if_t<((is_tensor_view_v<T>) && ...), bool> = true>
 constexpr __MATX_HOST__ __MATX_DEVICE__ bool TensorTypesMatch() {
   using first_type = cuda::std::tuple_element_t<0, cuda::std::tuple<T...>>;
-  return ((std::is_same_v<typename first_type::value_type, typename T::value_type>) && ...);
+  return ((cuda::std::is_same_v<typename first_type::value_type, typename T::value_type>) && ...);
 }
 
 struct no_permute_t{};

@@ -133,14 +133,6 @@ namespace matx
       template <typename CapType, typename... Is, std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>
       __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ decltype(auto) operator()(Is... indices) const
       {
-#ifdef __CUDA_ARCH__
-        if constexpr (CapType::jit) {
-          if ((threadIdx.x * CapType::ept) >= Size(Rank() - 1)) {
-            return detail::GetJitSentinelValue<CapType, value_type>();
-          }
-        }
-#endif
-
         const auto &lhs = in1_;
         const auto &rhs = in2_;
         const auto i1 = get_value<CapType>(lhs, indices...);
@@ -188,7 +180,7 @@ namespace matx
                "  template <typename CapType, typename... Is>\n" +
                "  __MATX_INLINE__ __MATX_DEVICE__  decltype(auto) operator()(Is... indices) const\n" +
                "  {\n" +
-               "    if ((threadIdx.x * static_cast<int>(CapType::ept)) >= Size(Rank() - 1)) {\n" +
+               "    if ((threadIdx.x * static_cast<int>(CapType::ept)) > Size(Rank() - 1)) {\n" +
                "      return detail::GetJitSentinelValue<CapType, value_type>();\n" +
                "    }\n" +
                "    auto i1 = get_value<CapType>(in1_, indices...);\n" + 

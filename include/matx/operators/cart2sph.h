@@ -67,13 +67,6 @@ namespace matx
         template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
         {
-#ifdef __CUDA_ARCH__
-        if constexpr (CapType::jit) {
-          if ((threadIdx.x * CapType::ept) >= Size(Rank() - 1)) {
-            return detail::GetJitSentinelValue<CapType, value_type>();
-          }
-        }
-#endif
           if constexpr (CapType::ept == ElementsPerThread::ONE) {
             auto x = get_value<CapType>(x_, indices...);
             auto y = get_value<CapType>(y_, indices...);

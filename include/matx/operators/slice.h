@@ -118,16 +118,6 @@ namespace matx
             const decltype(dims_) &dims,
             Is... indices)
         {   
-#ifdef __CUDA_ARCH__
-          // If this is a CUDA kernel we can potentially pass more threads through to inner operators than we need to return. 
-          // It's UB to not return a value from all threads, so we return a sentinel value for inactive threads.
-          if constexpr (CapType::jit) {
-            if ((threadIdx.x * CapType::ept) >= op.Size(op.Rank() - 1)) {                    
-              return detail::GetJitSentinelValue<CapType, value_type>();
-            }
-          }
-#endif
-          
           if constexpr (CapType::ept == ElementsPerThread::ONE) {
             static_assert(sizeof...(Is)==Rank());
             static_assert((cuda::std::is_convertible_v<Is, index_t> && ... ));

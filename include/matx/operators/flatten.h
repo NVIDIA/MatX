@@ -60,13 +60,6 @@ namespace matx
         template <typename CapType, typename Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is id0) const 
         {
-#ifdef __CUDA_ARCH__
-        if constexpr (CapType::jit) {
-          if ((threadIdx.x * CapType::ept) >= Size(0)) {
-            return detail::GetJitSentinelValue<CapType, value_type>();
-          }
-        }
-#endif
           if constexpr (CapType::ept == ElementsPerThread::ONE) {
             return *RandomOperatorIterator{op1_, id0};
           } else {
@@ -83,13 +76,6 @@ namespace matx
         template <typename CapType, typename Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is id0) 
         {
-#ifdef __CUDA_ARCH__
-        if constexpr (CapType::jit) {
-          if ((threadIdx.x * CapType::ept) >= Size(0)) {
-            return detail::GetJitSentinelValue<CapType, value_type>();
-          }
-        }
-#endif
           if constexpr (CapType::ept == ElementsPerThread::ONE) {
             return *RandomOperatorOutputIterator{op1_, id0};
           } else {

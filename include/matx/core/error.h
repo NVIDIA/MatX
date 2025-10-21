@@ -115,7 +115,6 @@ namespace matx
     return "Unknown";
   }
 
-#ifndef __CUDACC_RTC__
   namespace detail {
   struct matxException : public std::exception
   {
@@ -258,12 +257,7 @@ namespace matx
       MATX_THROW(matxInvalidSize, "Incompatible operator sizes"); \
     } \
   }
-#else
-  // If we have code trying to assert on the device (like in a constructor), do nothing here
-  #define MATX_ASSERT(a, error) {}
-  #define MATX_ASSERT_STR(a, error, str) {}
-  #define MATX_ASSERT_STR_EXP(a, expected, error, str) {}  
-#endif // JITIFY
+
 
 #define MATX_STATIC_ASSERT(a, error)    \
   {                                     \

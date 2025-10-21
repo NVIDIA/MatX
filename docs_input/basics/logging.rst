@@ -542,11 +542,3 @@ Running with different log levels:
    export MATX_LOG_FUNC=1
    ./my_app
    # Includes all DEBUG messages plus function names
-
-See Also
-========
-
-- :ref:`error_handling`
-- :ref:`profiling`
-- :ref:`debugging`
-

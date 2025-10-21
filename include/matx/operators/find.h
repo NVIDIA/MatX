@@ -35,9 +35,7 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
-#ifndef __CUDACC_RTC__
 #include "matx/transforms/cub.h"
-#endif
 
 namespace matx {
 
@@ -82,7 +80,6 @@ namespace detail {
         return a_.Size(dim);
       }
       
-#ifndef __CUDACC_RTC__
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
         static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 2 outputs on find(). ie: (mtie(O, num_found) = find(A, sel))");     
@@ -97,7 +94,6 @@ namespace detail {
           a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
       }
-#endif
   };
 }
 

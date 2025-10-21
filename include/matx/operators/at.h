@@ -58,14 +58,6 @@ namespace matx
         template <typename CapType, typename... Is2>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()([[maybe_unused]] Is2... indices) const
         {
-#ifdef __CUDA_ARCH__          
-          if constexpr (CapType::jit) {
-            if ((threadIdx.x * CapType::ept) >= op_.Size(op_.Rank() - 1)) {
-              return detail::GetJitSentinelValue<CapType, value_type>();
-            }
-          }
-#endif
-
           if constexpr (CapType::ept == ElementsPerThread::ONE) {
             return op_.template operator()<CapType>(idx_);
           }
@@ -87,7 +79,7 @@ namespace matx
             return combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(op_, in));
           } else {
             auto self_has_cap = capability_attributes<Cap>::default_value;
-            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_, in), detail::get_operator_capability<Cap>(idx_, in));
+            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_, in));
           }
         }
 

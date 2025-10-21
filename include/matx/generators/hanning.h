@@ -53,13 +53,6 @@ namespace matx
         template <typename CapType>
         inline __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
         {
-#ifdef __CUDA_ARCH__
-        if constexpr (CapType::jit) {
-          if ((threadIdx.x * CapType::ept) >= Size(0)) {
-            return detail::GetJitSentinelValue<CapType, value_type>();
-          }
-        }
-#endif
           return detail::ApplyGeneratorVecFunc<CapType, T>([this](index_t idx) { return T(0.5) * (1 - cuda::std::cos(T(2 * M_PI) * T(idx) / T(size_ - 1))); }, i);
         }
 

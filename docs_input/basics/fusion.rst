@@ -65,10 +65,8 @@ the following options must be enabled: ``-DMATX_EN_MATHDX=ON``. Once enabled, th
 in supported situations. If the expression cannot be JIT compiled, the JITExecutor will fall back to the normal non-JIT path.
 
 While JIT compilation can provide a large performance boost, there are two overheads that occur when using JIT compilation:
-- The first pass to JIT the code takes time. The first time a ``run()`` statement is executed on a new operator, MatX identifies 
-  this and performs JIT compilation. Depending on the complexity of the operator, this could be anywhere from milliseconds to 
-  seconds to complete. Once finished, MatX will cache the compiled kernel so that subsequent runs of the same operator will 
-  not require JIT compilation.
+- The first pass to JIT the code takes time. The first time a ``run()`` statement is executed on a new operator, MatX identifies this and performs JIT compilation. Depending on the complexity of the operator, this could be anywhere from milliseconds to seconds to complete. Once finished, MatX will cache the compiled kernel so that subsequent runs of the same operator will not require JIT compilation.
+- A lookup is done to find kernels that have already been compiled. This is a small overhead and may not be noticeable.
 
 As mentioned above, there is no difference in syntax between MatX statements that perform JIT compilation and those that do not. The executor 
 is the only change, just as it would be with a host executor. For example, in the following code:

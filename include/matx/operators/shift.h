@@ -83,13 +83,6 @@ namespace matx
             ShiftType shiftin,
             Is... indices)
         {
-#ifdef __CUDA_ARCH__
-        if constexpr (CapType::jit) {
-          if ((threadIdx.x * CapType::ept) >= op.Size(op.Rank() - 1)) {
-            return detail::GetJitSentinelValue<CapType, value_type>();
-          }
-        }
-#endif
           if constexpr (CapType::ept == ElementsPerThread::ONE) {
             cuda::std::array idx{indices...};
             index_t shift = -get_value<CapType>(shiftin, indices...);

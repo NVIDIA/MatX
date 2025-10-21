@@ -53,13 +53,6 @@ namespace matx
         template <typename CapType>
         inline __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
         {
-#ifdef __CUDA_ARCH__
-        if constexpr (CapType::jit) {
-          if ((threadIdx.x * CapType::ept) >= Size(0)) {
-            return detail::GetJitSentinelValue<CapType, value_type>();
-          }
-        }
-#endif
           return detail::ApplyGeneratorVecFunc<CapType, T>([this](index_t idx) { return 1 - cuda::std::abs(((2*T(idx))/(T(size_ - 1))) - 1); }, i);
         }
 
@@ -121,6 +114,9 @@ namespace matx
   template <int Dim, int RANK, typename T = float>
     inline auto bartlett(const index_t (&s)[RANK])
     {
+      for (int i = 0; i < RANK; i++) {
+        MATX_ASSERT_STR(s[i] > 0, matxInvalidSize, "All dimensions must be greater than 0");
+      }
       return bartlett<Dim>(detail::to_array(s));
     }
 

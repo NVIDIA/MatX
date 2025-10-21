@@ -47,23 +47,16 @@ namespace matx
 
         __MATX_INLINE__ std::string str() const { return "blackman"; }
 
-        inline __MATX_HOST__ __MATX_DEVICE__ Blackman(index_t size) : size_(size){};
+        __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Blackman(index_t size) : size_(size){};
 
         template <typename CapType>
-        inline __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
+        __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
         {
-#ifdef __CUDA_ARCH__
-        if constexpr (CapType::jit) {
-          if ((threadIdx.x * CapType::ept) >= Size(0)) {
-            return detail::GetJitSentinelValue<CapType, value_type>();
-          }
-        }
-#endif
           return detail::ApplyGeneratorVecFunc<CapType, T>([this](index_t idx) { return T(.42) - T(.5) * cuda::std::cos(T(2 * M_PI) * T(idx) / T(size_ - 1))
                     + T(.08) * cuda::std::cos(T(4 * M_PI) * T(idx) / T(size_ - 1)); }, i);
         }
 
-        inline __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
+        __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
         {
           return this->operator()<DefaultCapabilities>(i);
         }

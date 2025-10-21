@@ -114,20 +114,6 @@ namespace detail {
         return 0;
       }
 
-      template <OperatorCapability Cap, typename OpsTuple>
-      __MATX_INLINE__ __MATX_HOST__ auto get_combined_ops_capability(const OpsTuple& ops_tuple) const {
-        return cuda::std::apply([](const auto&... ops) {
-          return combine_capabilities<Cap>(detail::get_operator_capability<Cap>(ops)...);
-        }, ops_tuple);
-      }
-
-      template <OperatorCapability Cap, typename InType, typename OpsTuple>
-      __MATX_INLINE__ __MATX_HOST__ auto get_combined_ops_capability(const InType &in, const OpsTuple& ops_tuple) const {
-        return cuda::std::apply([&in](const auto&... ops) {
-          return combine_capabilities<Cap>(detail::get_operator_capability<Cap>(ops, in)...);
-        }, ops_tuple);
-      }
-
       template <OperatorCapability Cap, typename InType>
       __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
         auto self_has_cap = capability_attributes<Cap>::default_value;

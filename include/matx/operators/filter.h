@@ -36,9 +36,7 @@
 #include "matx/core/type_utils.h"
 #include "matx/core/nvtx.h"
 #include "matx/core/operator_utils.h"
-#ifndef __CUDACC_RTC__
 #include "matx/transforms/filter.h"
-#endif
 
 namespace matx
 {
@@ -80,13 +78,6 @@ namespace detail {
       // This should never be called - but updated to follow pattern
       template <typename CapType, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
-#ifdef __CUDA_ARCH__
-        if constexpr (CapType::jit) {
-          if ((threadIdx.x * CapType::ept) >= Size(Rank() - 1)) {
-            return detail::GetJitSentinelValue<CapType, typename OpA::value_type>();
-          }
-        }
-#endif
         return tmp_out_.template operator()<CapType>(indices...);
       }
 
@@ -101,7 +92,6 @@ namespace detail {
         return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
       }
 
-#ifndef __CUDACC_RTC__
       __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
@@ -147,7 +137,6 @@ namespace detail {
 
         matxFree(ptr);
       }        
-#endif
   };
 }
 

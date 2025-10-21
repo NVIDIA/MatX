@@ -57,11 +57,13 @@ namespace matx {
   
 
 namespace detail {
+// Use matx_executor trait to identify executors instead of specific types.
 
-template <typename T> struct is_executor : std::false_type {};
-template <> struct is_executor<cudaExecutor> : std::true_type {};
-template <> struct is_executor<CUDAJITExecutor> : std::true_type {};
-template <ThreadsMode MODE> struct is_executor<HostExecutor<MODE>> : std::true_type {};
+template <typename T, typename = void>
+struct is_executor : std::false_type {};
+
+template <typename T>
+struct is_executor<T, std::void_t<typename T::matx_executor>> : std::true_type {};
 }
 
 /**
@@ -111,6 +113,19 @@ inline constexpr bool is_host_executor_v = detail::is_host_executor<typename rem
 template <typename T> 
 inline constexpr bool is_select_threads_host_executor_v = detail::is_select_threads_host_executor<remove_cvref_t<T>>::value;
 
+namespace detail {
+template <typename T> struct is_std_complex : std::false_type {};
+template <typename T> struct is_std_complex<std::complex<T>> : std::true_type {};
+}
+
+/**
+ * @brief Determine if a type is a std::complex variant
+ * 
+ * @tparam T Type to test
+ */
+template <typename T>
+inline constexpr bool is_std_complex_v = detail::is_std_complex<typename std::remove_cv<typename std::remove_reference<T>::type>::type>::value;
+
 
 namespace detail {
 template<typename T> struct is_smart_ptr : std::false_type {};
@@ -124,16 +139,6 @@ template<typename T> struct is_smart_ptr<std::unique_ptr<T>> : std::true_type {}
  * @tparam T Type to test
  */
 template <typename T> inline constexpr bool is_smart_ptr_v = detail::is_smart_ptr<T>::value;
-
-
-/**
- * @brief Determine if a type is a MatX shape type
- * 
- * @tparam T Type to test
- */
-template <typename T>
-inline constexpr bool is_matx_shape_v = detail::is_matx_shape<typename remove_cvref<T>::type>::value;
-
 
 namespace detail {
 template <typename T, typename = void>

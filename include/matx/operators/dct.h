@@ -29,7 +29,6 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
-#ifndef __CUDACC_RTC__
 #pragma once
 
 #include <cstdint>
@@ -60,13 +59,6 @@ public:
   template <typename CapType>
   __MATX_DEVICE__ inline void operator()(index_t idx)
   {
-#ifdef __CUDA_ARCH__
-        if constexpr (CapType::jit) {
-          if ((threadIdx.x * CapType::ept) >= Size(0)) {
-            return;
-          }
-        }
-#endif
     const auto in_val = get_value<CapType>(in_, idx);
     if constexpr(CapType::ept == ElementsPerThread::ONE) {
       out_(idx) = static_cast<value_type>(
@@ -144,4 +136,3 @@ void dct(OutputTensor &out, const InputTensor &in,
 }
 
 }; // namespace matx
-#endif

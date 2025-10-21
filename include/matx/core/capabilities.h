@@ -48,9 +48,6 @@ namespace matx {
 
 namespace detail {
 
-  using BlockDimType = int;
-
-
   struct LTOIRQueryInput {
     std::set<std::string> ltoir_symbols;
     ElementsPerThread ept;
@@ -154,11 +151,12 @@ namespace detail {
 
   template <>
   struct capability_attributes<OperatorCapability::BLOCK_DIM> {
-    using type = int; // min/max elements per thread
+    using type = cuda::std::array<int, 2>; // min/max elements per thread
     using input_type = VoidCapabilityType;
-    static constexpr int default_value = 1024; // Example: 1 element per thread by default
-    static constexpr int min_identity = 1024;
-    static constexpr int max_identity = 1024;
+    static constexpr int invalid = -1;
+    static constexpr cuda::std::array<int, 2> default_value = {1, 1024}; // Example: 1 element per thread by default
+    static constexpr cuda::std::array<int, 2> min_identity = {1024, 1};
+    static constexpr cuda::std::array<int, 2> max_identity = {1, 1024};
   };  
 
   template <>
@@ -229,7 +227,7 @@ namespace detail {
   __MATX_INLINE__ __MATX_HOST__ typename capability_attributes<Cap>::type
   get_operator_capability(const OperatorType& op, InType& in) {
     static_assert(std::is_same_v<remove_cvref_t<InType>, typename capability_attributes<Cap>::input_type>, "Input type mismatch");
-    if constexpr (is_matx_jit_class_v<OperatorType>) {
+    if constexpr (is_matx_op<OperatorType>()) {
       return op.template get_capability<Cap, InType>(in);
     } else {
       // Default capabilities for non-MatX ops
@@ -249,7 +247,7 @@ namespace detail {
   get_operator_capability(const OperatorType& op) {
     VoidCapabilityType void_type{};
     return get_operator_capability<Cap>(op, void_type);
-  }  
+  }     
 
 
   // Helper function to get the query type associated with a capability
@@ -277,7 +275,7 @@ namespace detail {
       case OperatorCapability::DYN_SHM_SIZE:
         return CapabilityQueryType::MAX_QUERY; // The expression should use the maximum dynamic shared memory size of its children.
       case OperatorCapability::BLOCK_DIM:
-        return CapabilityQueryType::MIN_QUERY; // The expression should use the minimum block size supported by all operators.
+        return CapabilityQueryType::RANGE_QUERY; // The expression should use the minimum block size supported by all operators.
       case OperatorCapability::GENERATE_LTOIR:
         return CapabilityQueryType::AND_QUERY; // The expression should generate LTOIR code if all its children generate it.
       default:
@@ -310,6 +308,7 @@ namespace detail {
                                   capability_attributes<Cap>::and_identity :
                                   capability_attributes<Cap>::or_identity;
       } else if constexpr (std::is_same_v<CapType, int> || is_scoped_enum_v<CapType>) {
+        MATX_IGNORE_WARNING_PUSH_GCC("-Wduplicated-branches")
         if (query_type == CapabilityQueryType::MIN_QUERY) {
           children_aggregated_val = capability_attributes<Cap>::min_identity;
         } else if (query_type == CapabilityQueryType::MAX_QUERY) {
@@ -319,23 +318,12 @@ namespace detail {
           // This path needs clear definition if other query types are used for int.
           children_aggregated_val = capability_attributes<Cap>::default_value; // Fallback
         }
-      } else if constexpr (std::is_same_v<CapType, BlockDimType>) {
-        if (query_type == CapabilityQueryType::MIN_QUERY) {
-          children_aggregated_val = capability_attributes<Cap>::min_identity;
-        } else {
-          children_aggregated_val = capability_attributes<Cap>::default_value; // Fallback
-        }
+        MATX_IGNORE_WARNING_POP_GCC
       } else if constexpr (std::is_same_v<CapType, std::string>) {
         children_aggregated_val = capability_attributes<Cap>::default_value;
       } else {
-        // Check if it's a cuda::std::array<T, 2> for RANGE_QUERY
-        if (query_type == CapabilityQueryType::RANGE_QUERY) {
-          // For RANGE_QUERY with no children, use the default_value as identity
-          children_aggregated_val = capability_attributes<Cap>::default_value;
-        } else {
-          // Fallback for other types, should be defined in capability_attributes
-          children_aggregated_val = capability_attributes<Cap>::default_value; // Fallback
-        }
+        // Fallback for other types, should be defined in capability_attributes
+        children_aggregated_val = capability_attributes<Cap>::default_value;
       }
     } else { // One or more children
       if constexpr (std::is_same_v<CapType, bool>) {
@@ -360,18 +348,6 @@ namespace detail {
               cuda::std::initializer_list<CapType> values = {child_vals...};
               for (CapType val : values) {
                   children_aggregated_val = static_cast<CapType>(cuda::std::max(static_cast<int>(children_aggregated_val), static_cast<int>(val)));
-              }
-          } else {
-              // Not implemented for other query types.
-              MATX_ASSERT_STR(false, matxInvalidParameter, "Not implemented for other query types.");
-          }
-      } else if constexpr (std::is_same_v<CapType, BlockDimType>) {
-          if (query_type == CapabilityQueryType::MIN_QUERY) {
-              children_aggregated_val = capability_attributes<Cap>::min_identity;
-              // For BLOCK_DIM, we only care about the third element (index 2)
-              cuda::std::initializer_list<CapType> values = {child_vals...};
-              for (const CapType& val : values) {
-                  children_aggregated_val[2] = cuda::std::min(children_aggregated_val[2], val[2]);
               }
           } else {
               // Not implemented for other query types.
@@ -446,16 +422,6 @@ namespace detail {
             MATX_ASSERT_STR(false, matxInvalidParameter, "Not implemented for other query types.");
             return self_val;
         }
-    } else if constexpr (std::is_same_v<CapType, BlockDimType>) {
-        if (query_type == CapabilityQueryType::MIN_QUERY) {
-            CapType result = self_val;
-            // For BLOCK_DIM, we only care about the third element (index 2)
-            result[2] = cuda::std::min(self_val[2], children_aggregated_val[2]);
-            return result;
-        } else {
-            MATX_ASSERT_STR(false, matxInvalidParameter, "Not implemented for other query types.");
-            return self_val;
-        }
     } else if constexpr (std::is_same_v<CapType, std::string>) {
         if (query_type == CapabilityQueryType::STR_CAT_QUERY) {
             return self_val + children_aggregated_val;
@@ -490,6 +456,20 @@ namespace detail {
         }
     }
   }
+
+  template <OperatorCapability Cap, typename OpsTuple>
+  __MATX_INLINE__ __MATX_HOST__ auto get_combined_ops_capability(const OpsTuple& ops_tuple) {
+    return cuda::std::apply([](const auto&... ops) {
+      return combine_capabilities<Cap>(detail::get_operator_capability<Cap>(ops)...);
+    }, ops_tuple);
+  }
+
+  template <OperatorCapability Cap, typename InType, typename OpsTuple>
+  __MATX_INLINE__ __MATX_HOST__ auto get_combined_ops_capability(const InType &in, const OpsTuple& ops_tuple) {
+    return cuda::std::apply([&in](const auto&... ops) {
+      return combine_capabilities<Cap>(detail::get_operator_capability<Cap>(ops, in)...);
+    }, ops_tuple);
+  }     
 
 #endif
 

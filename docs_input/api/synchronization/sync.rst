@@ -3,10 +3,8 @@
 sync
 ====
 
-Wait for any code running on an executor to complete.
-
-.. doxygenfunction:: matx::cudaExecutor::sync()
-.. doxygenfunction:: matx::HostExecutor::sync()
+Wait for any code running on an executor to complete. For CUDA executors this typically synchronizes 
+the stream backing the executor, while host executors wait until the calling thread completes.
 
 Examples
 ~~~~~~~~

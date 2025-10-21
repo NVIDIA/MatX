@@ -144,13 +144,6 @@ namespace matx
       template <typename CapType, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is) const
       {
-#ifdef __CUDA_ARCH__
-        if constexpr (CapType::jit) {
-          if ((threadIdx.x * CapType::ept) >= Size(Rank() - 1)) {
-            return detail::GetJitSentinelValue<CapType, value_type>();
-          }
-        }
-#endif
         if constexpr (CapType::ept == ElementsPerThread::ONE) {
           cuda::std::array<index_t, sizeof...(Is)> indices = {{is...}};
           return get_impl<CapType, 0, sizeof...(Ts)>(indices);
@@ -171,13 +164,6 @@ namespace matx
       template <typename CapType, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is)
       {
-#ifdef __CUDA_ARCH__
-        if constexpr (CapType::jit) {
-          if ((threadIdx.x * CapType::ept) >= Size(Rank() - 1)) {
-            return detail::GetJitSentinelValue<CapType, value_type>();
-          }
-        }
-#endif
         if constexpr (CapType::ept == ElementsPerThread::ONE) {
           cuda::std::array<index_t, sizeof...(Is)> indices = {{is...}};
           return get_impl<CapType, 0, sizeof...(Ts)>(indices);
@@ -198,13 +184,11 @@ namespace matx
       __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType & in) const {
         if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
           const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
-          auto all_ops_cap = get_combined_ops_capability<Cap>(in, cuda::std::make_index_sequence<sizeof...(Ts)>{});
-          return combine_capabilities<Cap>(my_cap, all_ops_cap);
+          return combine_capabilities<Cap>(my_cap, get_combined_ops_capability<Cap>(in, ops_));
         } else {
           auto self_has_cap = capability_attributes<Cap>::default_value;
           // static_assert(sizeof...(Ts) > 1, ...); ensures ops_ is not empty.
-          auto all_ops_cap = get_combined_ops_capability<Cap>(in, cuda::std::make_index_sequence<sizeof...(Ts)>{});
-          return combine_capabilities<Cap>(self_has_cap, all_ops_cap);
+          return combine_capabilities<Cap>(self_has_cap, get_combined_ops_capability<Cap>(in, ops_));
         }
       }
 
@@ -281,15 +265,9 @@ namespace matx
       cuda::std::tuple<typename detail::base_type_t<Ts> ...> ops_;
       index_t size_;
       int axis_;
-
-      template<OperatorCapability Cap, typename InType, size_t... Is>
-      __MATX_INLINE__ __MATX_HOST__ auto get_combined_ops_capability(const InType &in, cuda::std::index_sequence<Is...>) const {
-        return combine_capabilities<Cap>(detail::get_operator_capability<Cap>(cuda::std::get<Is>(ops_),in)...);
-      }
     }; // end class ConcatOp
   } // end namespace detail
 
-#ifndef __CUDACC_RTC__
   /**
    * @brief ConcatOp multiple operators along a dimension
    *
@@ -307,5 +285,4 @@ namespace matx
 
       return detail::ConcatOp<Ts...>{axis, ts...};
     }
-#endif
 } // end namespace matx

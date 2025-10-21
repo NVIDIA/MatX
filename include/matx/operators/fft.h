@@ -38,6 +38,7 @@
 #include "matx/core/utils.h"
 #include "matx/operators/base_operator.h"
 #include "matx/core/operator_options.h"
+#include "matx/core/log.h"
 
 #include "matx/transforms/fft/fft_cuda.h"
 #ifdef MATX_EN_CPU_FFT
@@ -241,13 +242,6 @@ namespace matx
         template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-#ifdef __CUDA_ARCH__
-          if constexpr (CapType::jit) {
-            if ((threadIdx.x * CapType::ept) >= Size(Rank() - 1)) {
-              return detail::GetJitSentinelValue<CapType, value_type>();
-            }
-          }
-#endif
           return tmp_out_.template operator()<CapType>(indices...);
         }
 
@@ -272,7 +266,9 @@ namespace matx
 #if defined(MATX_EN_MATHDX) && defined (__CUDACC__)
           // Branch with cuFFTDx support
           if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
-            return combine_capabilities<Cap>(dx_fft_helper_.GetShmRequired(), detail::get_operator_capability<Cap>(a_, in));
+            auto result = combine_capabilities<Cap>(dx_fft_helper_.GetShmRequired(), detail::get_operator_capability<Cap>(a_, in));
+            MATX_LOG_DEBUG("DYN_SHM_SIZE: {}", result);
+            return result;
           }
           else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
             bool supported = true;
@@ -286,7 +282,9 @@ namespace matx
               supported = dx_fft_helper_.IsSupported();
             }
 
-            return combine_capabilities<Cap>(supported, detail::get_operator_capability<Cap>(a_, in));      
+            auto result = combine_capabilities<Cap>(supported, detail::get_operator_capability<Cap>(a_, in));
+            MATX_LOG_DEBUG("SUPPORTS_JIT: {}", result);
+            return result;      
           }
           else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
             // Get the capability string and add to map
@@ -301,6 +299,7 @@ namespace matx
             detail::get_operator_capability<Cap>(a_, in);
 
             // Always return true for now
+            MATX_LOG_DEBUG("JIT_CLASS_QUERY: true");
             return true;
           }
           else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
@@ -308,43 +307,62 @@ namespace matx
               // Currently MatX only attempts to use the "best" EPT as returned by cuFFTDx. In the future we may
               // try other EPT values that yield different SHM values.
               if (dx_fft_helper_.IsSupported()) {
-                return combine_capabilities<Cap>(dx_fft_helper_.GetEPTs(), detail::get_operator_capability<Cap>(a_, in));
+                auto result = combine_capabilities<Cap>(dx_fft_helper_.GetEPTs(), detail::get_operator_capability<Cap>(a_, in));
+                MATX_LOG_DEBUG("ELEMENTS_PER_THREAD (JIT supported): [{},{}]", static_cast<int>(result[0]), static_cast<int>(result[1]));
+                return result;
               }
               else {
                 // If we're asking for JIT and the parameters aren't supported, return invalid EPT
                 const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::INVALID, ElementsPerThread::INVALID};
-                return combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(a_, in));                
+                auto result = combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(a_, in));
+                MATX_LOG_DEBUG("ELEMENTS_PER_THREAD (JIT unsupported): [{},{}]", static_cast<int>(result[0]), static_cast<int>(result[1]));
+                return result;                
               }
             }
             else {
-              return combine_capabilities<Cap>(capability_attributes<Cap>::default_value, detail::get_operator_capability<Cap>(a_, in));
+              auto result = combine_capabilities<Cap>(capability_attributes<Cap>::default_value, detail::get_operator_capability<Cap>(a_, in));
+              MATX_LOG_DEBUG("ELEMENTS_PER_THREAD (non-JIT): [{},{}]", static_cast<int>(result[0]), static_cast<int>(result[1]));
+              return result;
             }
           }
           else if constexpr (Cap == OperatorCapability::GROUPS_PER_BLOCK) {
             const int ffts_per_block = dx_fft_helper_.GetFFTsPerBlock();
             cuda::std::array<int, 2> groups_per_block = {ffts_per_block, ffts_per_block};
-            return combine_capabilities<Cap>(groups_per_block, detail::get_operator_capability<Cap>(a_, in));
+            auto result = combine_capabilities<Cap>(groups_per_block, detail::get_operator_capability<Cap>(a_, in));
+            MATX_LOG_DEBUG("GROUPS_PER_BLOCK: [{},{}]", result[0], result[1]);
+            return result;
           }
           else if constexpr (Cap == OperatorCapability::SET_ELEMENTS_PER_THREAD) {
             dx_fft_helper_.set_current_elements_per_thread(in.ept);
-            return combine_capabilities<Cap>(capability_attributes<Cap>::default_value, detail::get_operator_capability<Cap>(a_, in));
+            auto result = combine_capabilities<Cap>(capability_attributes<Cap>::default_value, detail::get_operator_capability<Cap>(a_, in));
+            MATX_LOG_DEBUG("SET_ELEMENTS_PER_THREAD: {}", result);
+            return result;
           }
           else if constexpr (Cap == OperatorCapability::SET_GROUPS_PER_BLOCK) {
             dx_fft_helper_.set_ffts_per_block(in.groups_per_block);
-            return combine_capabilities<Cap>(capability_attributes<Cap>::default_value, detail::get_operator_capability<Cap>(a_, in));
+            auto result = combine_capabilities<Cap>(capability_attributes<Cap>::default_value, detail::get_operator_capability<Cap>(a_, in));
+            MATX_LOG_DEBUG("SET_GROUPS_PER_BLOCK: {}", result);
+            return result;
           }
           else if constexpr (Cap == OperatorCapability::BLOCK_DIM) {
-            return combine_capabilities<Cap>(dx_fft_helper_.GetBlockDim(), detail::get_operator_capability<Cap>(a_, in));
+            auto result = dx_fft_helper_.GetBlockDim();
+            MATX_LOG_DEBUG("cuFFTDx block dim: {}", result);
+            const auto my_block = cuda::std::array<int, 2>{result, result};
+            return combine_capabilities<Cap>(my_block, detail::get_operator_capability<Cap>(a_, in));
           }
           else if constexpr (Cap == OperatorCapability::GENERATE_LTOIR) {
-            return combine_capabilities<Cap>(
+            auto result = combine_capabilities<Cap>(
                 dx_fft_helper_.GenerateLTOIR(in.ltoir_symbols), 
                 detail::get_operator_capability<Cap>(a_, in));
+            MATX_LOG_DEBUG("GENERATE_LTOIR: {}", result);
+            return result;
           }    
           else if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
             // No need to use combine_capabilities here since we're just returning a string.
             const auto inner_op_jit_name = detail::get_operator_capability<Cap>(a_, in);
-            return get_jit_class_name() + "<" + inner_op_jit_name + ">";
+            auto result = get_jit_class_name() + "<" + inner_op_jit_name + ">";
+            MATX_LOG_DEBUG("JIT_TYPE_QUERY: {}", result);
+            return result;
           }
           else if constexpr (Cap == OperatorCapability::ASYNC_LOADS_REQUESTED) {
             // If this is a contiguous tensor input we want to do an async load so that we decrease register pressure. 
@@ -355,25 +373,32 @@ namespace matx
                 async_loads_requested = true;
               }
             }
-            return combine_capabilities<Cap>(async_loads_requested, detail::get_operator_capability<Cap>(a_, in));
+            auto result = combine_capabilities<Cap>(async_loads_requested, detail::get_operator_capability<Cap>(a_, in));
+            MATX_LOG_DEBUG("ASYNC_LOADS_REQUESTED: {}", result);
+            return result;
           }
           else {
             auto self_has_cap = capability_attributes<Cap>::default_value;
-            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
+            auto result = combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
+            return result;
           }
 #else
           // Branch without cuFFTDx support
           if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
             bool supported = false;
-            return combine_capabilities<Cap>(supported, detail::get_operator_capability<Cap>(a_, in));      
+            auto result = combine_capabilities<Cap>(supported, detail::get_operator_capability<Cap>(a_, in));
+            MATX_LOG_DEBUG("SUPPORTS_JIT (no cuFFTDx): {}", result);
+            return result;      
           } 
           else if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+            MATX_LOG_DEBUG("JIT_TYPE_QUERY (no cuFFTDx): \"\"");
             return "";
           }                
           else {
             // 1. Determine if the binary operation ITSELF intrinsically has this capability.
             auto self_has_cap = capability_attributes<Cap>::default_value;
-            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
+            auto result = combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
+            return result;
           }
 #endif
         }
@@ -702,13 +727,6 @@ namespace matx
         template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-#ifdef __CUDA_ARCH__
-        if constexpr (CapType::jit) {
-          if ((threadIdx.x * CapType::ept) >= Size(Rank() - 1)) {
-            return detail::GetJitSentinelValue<CapType, value_type>();
-          }
-        }
-#endif
           return tmp_out_.template operator()<CapType>(indices...);
         }
 
@@ -752,7 +770,8 @@ namespace matx
         __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
           // 1. Determine if the binary operation ITSELF intrinsically has this capability.
           auto self_has_cap = capability_attributes<Cap>::default_value;
-          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
+          auto result = combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
+          return result;
         }
 
         template <typename ShapeType, typename Executor>

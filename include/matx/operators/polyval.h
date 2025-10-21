@@ -63,13 +63,6 @@ namespace matx
         template <typename CapType>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(index_t idx) const
         {
-#ifdef __CUDA_ARCH__
-        if constexpr (CapType::jit) {
-          if ((threadIdx.x * CapType::ept) >= Size(0)) {
-            return detail::GetJitSentinelValue<CapType, value_type>();
-          }
-        }
-#endif
           if constexpr (CapType::ept == ElementsPerThread::ONE) {
             // Horner's method for computing polynomial
             value_type ttl{get_value<CapType>(coeffs_, 0)};

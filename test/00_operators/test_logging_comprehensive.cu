@@ -114,6 +114,7 @@ TEST_F(LoggingComprehensiveTest, FileOutput) {
 TEST_F(LoggingComprehensiveTest, LogFormat) {
   setenv("MATX_LOG_LEVEL", "INFO", 1);
   setenv("MATX_LOG_DEST", test_log_file_.c_str(), 1);
+  setenv("MATX_LOG_FUNC", "1", 1);
   detail::Logger::instance().reinitialize();
   
   MATX_LOG_INFO("Format test message");
@@ -146,24 +147,24 @@ TEST_F(LoggingComprehensiveTest, LogLevelFiltering) {
   setenv("MATX_LOG_DEST", test_log_file_.c_str(), 1);
   detail::Logger::instance().reinitialize();
   
-  MATX_LOG_TRACE("Should not appear");
-  MATX_LOG_DEBUG("Should not appear either");
-  MATX_LOG_INFO("Also should not appear");
-  MATX_LOG_WARN("Should appear");
-  MATX_LOG_ERROR("Should also appear");
+  MATX_LOG_TRACE("TRACE level message");
+  MATX_LOG_DEBUG("DEBUG level message");
+  MATX_LOG_INFO("INFO level message");
+  MATX_LOG_WARN("WARN level message");
+  MATX_LOG_ERROR("ERROR level message");
   
   std::this_thread::sleep_for(std::chrono::milliseconds(100));
   
   std::string contents = ReadFileContents(test_log_file_);
   
   // Verify lower levels don't appear
-  EXPECT_FALSE(ContainsPattern(contents, "Should not appear"));
-  EXPECT_FALSE(ContainsPattern(contents, "Should not appear either"));
-  EXPECT_FALSE(ContainsPattern(contents, "Also should not appear"));
+  EXPECT_FALSE(ContainsPattern(contents, "TRACE level message"));
+  EXPECT_FALSE(ContainsPattern(contents, "DEBUG level message"));
+  EXPECT_FALSE(ContainsPattern(contents, "INFO level message"));
   
   // Verify WARN and above appear
-  EXPECT_TRUE(ContainsPattern(contents, "Should appear"));
-  EXPECT_TRUE(ContainsPattern(contents, "Should also appear"));
+  EXPECT_TRUE(ContainsPattern(contents, "WARN level message"));
+  EXPECT_TRUE(ContainsPattern(contents, "ERROR level message"));
   EXPECT_TRUE(ContainsPattern(contents, "[WARN]"));
   EXPECT_TRUE(ContainsPattern(contents, "[ERROR]"));
 }

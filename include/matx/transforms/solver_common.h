@@ -57,6 +57,7 @@ namespace matx {
   using lapack_int_t = index_t;
 #endif
 
+#include "matx/core/operator_options.h"
 
 namespace detail {
 

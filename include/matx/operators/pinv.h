@@ -35,9 +35,7 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
-#ifndef __CUDACC_RTC__
 #include "matx/transforms/pinv.h"
-#endif
 
 namespace matx {
   
@@ -74,13 +72,6 @@ namespace detail {
       template <typename CapType, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
       {
-#ifdef __CUDA_ARCH__
-        if constexpr (CapType::jit) {
-          if ((threadIdx.x * CapType::ept) >= Size(Rank() - 1)) {
-            return detail::GetJitSentinelValue<CapType, value_type>();
-          }
-        }
-#endif
         return tmp_out_.template operator()<CapType>(indices...);
       }
 
@@ -106,12 +97,10 @@ namespace detail {
         return out_dims_[dim];
       }
 
-#ifndef __CUDACC_RTC__
       __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
-        printf("pinv exec\n");
         pinv_impl(cuda::std::get<0>(out), a_, ex, rcond_);
       }
 
@@ -147,7 +136,6 @@ namespace detail {
 
         matxFree(ptr);
       }
-#endif
   };
 }
 

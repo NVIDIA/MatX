@@ -62,13 +62,6 @@ namespace matx
         template <typename CapType, typename Op, typename Idx, typename... Is>
         static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, const Idx &idx, index_t i)
         {    
-#ifdef __CUDA_ARCH__
-        if constexpr (CapType::jit) {
-          if ((threadIdx.x * CapType::ept) >= idx.Size(0)) {
-            return detail::GetJitSentinelValue<CapType, value_type>();
-          }
-        }
-#endif
           if constexpr (CapType::ept == ElementsPerThread::ONE) {
             auto arrs = detail::GetIdxFromAbs(op, get_value<CapType>(idx, i));
             return get_value<CapType>(op, arrs);          
@@ -78,27 +71,31 @@ namespace matx
         }
 
         template <typename CapType, typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i) const 
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is) const 
         {
-          return get_impl<CapType>(cuda::std::as_const(op_), idx_, i);
+          static_assert(sizeof...(Is) == 1, "select() operator must be called with exactly one index");
+          return get_impl<CapType>(cuda::std::as_const(op_), idx_, is...);
         }
 
         template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i) const 
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is) const 
         {
-          return this->operator()<DefaultCapabilities>(i);
+          static_assert(sizeof...(Is) == 1, "select() operator must be called with exactly one index");
+          return this->operator()<DefaultCapabilities>(is...);
         }
 
-        template <typename CapType, typename... Is, std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i)
+        template <typename CapType, typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is)
         {
-          return get_impl<CapType>(cuda::std::forward<decltype(op_)>(op_), idx_, i);
+          static_assert(sizeof...(Is) == 1, "select() operator must be called with exactly one index");
+          return get_impl<CapType>(cuda::std::forward<decltype(op_)>(op_), idx_, is...);
         }
 
-        template <typename... Is, std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i)
+        template <typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is)
         {
-          return this->operator()<DefaultCapabilities>(i);
+          static_assert(sizeof...(Is) == 1, "select() operator must be called with exactly one index");
+          return this->operator()<DefaultCapabilities>(is...);
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -140,14 +137,14 @@ namespace matx
             const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
             return combine_capabilities<Cap>(
               my_cap,
-            detail::get_operator_capability<Cap>(op_, in),
+              detail::get_operator_capability<Cap>(op_, in),
               detail::get_operator_capability<Cap>(idx_, in)
             );
           } else {
             auto self_has_cap = capability_attributes<Cap>::default_value;
             return combine_capabilities<Cap>(
               self_has_cap,
-            detail::get_operator_capability<Cap>(op_, in),
+              detail::get_operator_capability<Cap>(op_, in),
               detail::get_operator_capability<Cap>(idx_, in)
             );
           }

@@ -140,13 +140,6 @@ namespace matx
         template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-#ifdef __CUDA_ARCH__
-        if constexpr (CapType::jit) {
-          if ((threadIdx.x * CapType::ept) >= Size(Rank() - 1)) {
-            return detail::GetJitSentinelValue<CapType, value_type>();
-          }
-        }
-#endif
           return tmp_out_.template operator()<CapType>(indices...);
         }
 
@@ -157,15 +150,18 @@ namespace matx
         }     
 
         template <OperatorCapability Cap, typename InType>
-        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType&) const {
-          // 1. Determine if the binary operation ITSELF intrinsically has this capability.
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
           if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
             const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
-            return my_cap;
+            auto a_cap = detail::get_operator_capability<Cap>(a_, in);
+            auto b_cap = detail::get_operator_capability<Cap>(b_, in);
+            return combine_capabilities<Cap>(my_cap, a_cap, b_cap);
           }
-          else {
-            return capability_attributes<Cap>::default_value;
-          }
+          
+          auto self_has_cap = capability_attributes<Cap>::default_value;
+          auto a_cap = detail::get_operator_capability<Cap>(a_, in);
+          auto b_cap = detail::get_operator_capability<Cap>(b_, in);
+          return combine_capabilities<Cap>(self_has_cap, a_cap, b_cap);
         }
 
         template <OperatorCapability Cap>
@@ -374,13 +370,6 @@ namespace detail {
       template <typename CapType, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
       {
-#ifdef __CUDA_ARCH__
-        if constexpr (CapType::jit) {
-          if ((threadIdx.x * CapType::ept) >= Size(Rank() - 1)) {
-            return detail::GetJitSentinelValue<CapType, value_type>();
-          }
-        }
-#endif
         return tmp_out_(indices...);
       }
 

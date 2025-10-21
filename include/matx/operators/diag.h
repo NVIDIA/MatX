@@ -66,13 +66,6 @@ namespace matx
         template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-#ifdef __CUDA_ARCH__
-          if constexpr (CapType::jit) {
-            if ((threadIdx.x * CapType::ept) >= Size(Rank() - 1)) {
-              return detail::GetJitSentinelValue<CapType, value_type>();
-            }
-          }
-#endif
           if constexpr (CapType::ept == ElementsPerThread::ONE) {
             static_assert(RANK != 0, "Cannot make get diagonals from 0D tensor");
             using tt = typename cuda::std::common_type_t<Is...>;

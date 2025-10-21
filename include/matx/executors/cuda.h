@@ -88,10 +88,11 @@ namespace matx
 
           // Parameters passed by value in CUDA are limited to CUDA_MAX_VAL_PARAM. If the user exceeds this, we 
           // need to error out and have them break up the statement
-          MATX_STATIC_ASSERT((sizeof(op) + sizeof(index_t) * Op::Rank()) <= detail::CUDA_MAX_VAL_PARAM, 
-              "Parameter buffer to device is limited to " + std::to_string(detail::CUDA_MAX_VAL_PARAM) + "B. "
-              "Please break up your operator statement into multiple executions to limit the size of the parameters");
-
+          if ((sizeof(op) + sizeof(index_t) * Op::Rank()) > detail::CUDA_MAX_VAL_PARAM) {
+            MATX_THROW(matxInvalidParameter, 
+                "Parameter buffer to device is limited to " + std::to_string(detail::CUDA_MAX_VAL_PARAM) + "B. "
+                "Please break up your operator statement into multiple executions to limit the size of the parameters");
+          }
           cuda::std::array<index_t, Op::Rank()> sizes;
           for (int i = 0; i < Op::Rank(); i++) {
             sizes[i] = op.Size(i);
@@ -100,7 +101,9 @@ namespace matx
           if constexpr (Op::Rank() <= 4) {
             // Create kernel provider for non-JIT
             auto kernel_provider = [&](detail::ElementsPerThread ept) {
-              bool stride = detail::get_grid_dims<Op::Rank()>(blocks, threads, sizes, static_cast<int>(ept), 256);
+              dim3 local_blocks = 1;
+              dim3 local_threads = 1;
+              bool stride = detail::get_grid_dims<Op::Rank()>(local_blocks, local_threads, sizes, static_cast<int>(ept), 256);
               
               // Return appropriate kernel function pointer based on EPT, rank, and stride
               switch (ept) {

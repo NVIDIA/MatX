@@ -68,7 +68,7 @@ namespace matx
             return "ambgfun(" + get_type_str(x_) + ")";
           }
           else {
-            return "ambgfun(" + get_type_str(x_) + ")";
+            return "ambgfun(" + get_type_str(x_) + "," + get_type_str(y_) + ")";
           }
         }
 
@@ -97,13 +97,6 @@ namespace matx
         template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-#ifdef __CUDA_ARCH__
-        if constexpr (CapType::jit) {
-          if ((threadIdx.x * CapType::ept) >= Size(Rank() - 1)) {
-            return detail::GetJitSentinelValue<CapType, typename decltype(tmp_out_)::value_type>();
-          }
-        }
-#endif
           return tmp_out_.template operator()<CapType>(indices...);
         }
 
@@ -117,7 +110,13 @@ namespace matx
         __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
           // No specific capabilities enforced
           auto self_has_cap = capability_attributes<Cap>::default_value;
-          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(x_, in), detail::get_operator_capability<Cap>(y_, in));
+          if constexpr (std::is_same_v<OpY, EmptyY>) {
+            // Single-input ambgfun: only combine capabilities from x_
+            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(x_, in));
+          } else {
+            // Two-input ambgfun: combine capabilities from both x_ and y_
+            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(x_, in), detail::get_operator_capability<Cap>(y_, in));
+          }
         }          
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()

@@ -59,16 +59,6 @@ namespace detail {
       template <typename CapType, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
       {
-#ifdef __CUDA_ARCH__
-        if constexpr (CapType::jit) {
-          if ((threadIdx.x * CapType::ept) >= Size(Rank() - 1)) {
-            if constexpr (WHICH == 0 || WHICH == 2)
-              return detail::GetJitSentinelValue<CapType, typename OpA::value_type>();
-            else
-              return detail::GetJitSentinelValue<CapType, int>();
-          }
-        }
-#endif
         auto get_scalar = [this](const auto &x){
           [[maybe_unused]] int rexp;        
           if constexpr (is_cuda_complex_v<value_type>) {

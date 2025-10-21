@@ -117,6 +117,7 @@ __attribute__ ((visibility ("default")))
 #endif
 inline cuda::std::atomic<CacheId> CacheIdCounter{0};
 inline std::recursive_mutex cache_mtx; ///< Mutex protecting updates from map
+inline std::recursive_mutex ltoir_mutex; ///< Mutex protecting LTOIR cache operations
 
 template<typename CacheType>
 __attribute__ ((visibility ("default")))
@@ -323,6 +324,8 @@ public:
   * @return LTOIRData* Pointer to cached data structure if found, nullptr otherwise
   */
   __MATX_INLINE__ LTOIRData* GetLTOIRCachedBytes(const std::string& filename) {
+    [[maybe_unused]] std::lock_guard<std::recursive_mutex> lock(ltoir_mutex);
+    
     // First check the in-memory cache
     auto it = ltoir_cache.find(filename);
     if (it != ltoir_cache.end()) {
@@ -362,10 +365,12 @@ public:
       return nullptr;
     }
     
+    // Use RAII to ensure buffer is freed if any exception occurs before ownership transfer
+    std::unique_ptr<char, decltype(&free)> buffer_guard(buffer, &free);
+    
     if (!file.read(buffer, size)) {
       MATX_LOG_ERROR("Failed to read cache file: {}", filename);
-      free(buffer);
-      return nullptr;
+      return nullptr;  // buffer_guard automatically frees buffer
     }
     
     // Basic validation: check if data looks reasonable (not all zeros, has some content)
@@ -377,7 +382,7 @@ public:
                            buffer[2] == buffer[3] && buffer[0] == 0);
       if (looks_corrupt) {
         MATX_LOG_WARN("Cached LTOIR file '{}' appears corrupted (all zeros), removing", filename);
-        free(buffer);
+        // buffer_guard will automatically free buffer
         try {
           std::filesystem::remove(cache_file);
           MATX_LOG_DEBUG("Removed corrupted cache file: {}", filename);
@@ -390,11 +395,13 @@ public:
     
     // IMPORTANT: Reserve space to prevent rehashing which would invalidate existing pointers
     // Reserve space for at least 32 more entries to reduce rehashing probability
+    // Note: reserve() may throw, but buffer_guard ensures buffer is freed
     if (ltoir_cache.size() >= ltoir_cache.bucket_count() * static_cast<size_t>(ltoir_cache.max_load_factor()) - 1) {
       ltoir_cache.reserve(ltoir_cache.size() + 32);
     }
     
-    ltoir_cache[filename] = LTOIRData{buffer, static_cast<size_t>(size)};
+    // Transfer ownership to LTOIRData (release from buffer_guard)
+    ltoir_cache[filename] = LTOIRData{buffer_guard.release(), static_cast<size_t>(size)};
     
     return &ltoir_cache[filename];
   }
@@ -417,12 +424,14 @@ public:
       return false;
     }
     
+    [[maybe_unused]] std::lock_guard<std::recursive_mutex> lock(ltoir_mutex);
+    
     try {
-      // Store the raw pointer and length in an LTOIRData struct
-      ltoir_cache[filename] = LTOIRData{data, length};
-      MATX_LOG_DEBUG("Stored {} bytes in memory cache for: {}", length, filename);
+      // Use RAII to manage ownership until all operations complete successfully
+      std::unique_ptr<char, decltype(&free)> data_guard(data, &free);
       
-      // Also store to disk for persistence
+      // Write to disk first (before transferring ownership to map)
+      // This way if disk write throws, data_guard will clean up automatically
       std::string cache_dir = GetKernelCacheDirectory();
       if (!cache_dir.empty()) {
         try {
@@ -446,11 +455,14 @@ public:
         }
       }
       
+      // Transfer ownership to LTOIRData only after disk operations complete
+      ltoir_cache[filename] = LTOIRData{data_guard.release(), length};
+      MATX_LOG_DEBUG("Stored {} bytes in memory cache for: {}", length, filename);
+      
       return true;
     } catch (const std::exception& e) {
-      // Handle any failures - free the data since we couldn't store it
+      // Handle any failures - data_guard or map destructor will free the data
       MATX_LOG_ERROR("Failed to store cache data for {}: {}", filename, e.what());
-      free(data);
       return false;
     }
   }
@@ -547,6 +559,8 @@ public:
       return false;
     }
     
+    [[maybe_unused]] std::lock_guard<std::recursive_mutex> lock(ltoir_mutex);
+    
     try {
       // Create a new buffer and copy the data
       char* buffer = static_cast<char*>(malloc(size));
@@ -599,6 +613,8 @@ public:
    * @return Size of the cached data in bytes, or 0 if not found
    */
   __MATX_INLINE__ size_t GetLTOIRCachedBytesLength(const std::string& filename) {
+    [[maybe_unused]] std::lock_guard<std::recursive_mutex> lock(ltoir_mutex);
+    
     auto it = ltoir_cache.find(filename);
     if (it != ltoir_cache.end()) {
       return it->second.length;
@@ -613,6 +629,8 @@ public:
    * @return true if the key exists in the cache, false otherwise
    */
   __MATX_INLINE__ bool HasLTOIRCachedBytes(const std::string& filename) {
+    [[maybe_unused]] std::lock_guard<std::recursive_mutex> lock(ltoir_mutex);
+    
     return ltoir_cache.find(filename) != ltoir_cache.end();
   }
 
@@ -623,6 +641,8 @@ public:
    * @return true if the key was found and removed, false if it didn't exist
    */
   __MATX_INLINE__ bool RemoveLTOIRCachedBytes(const std::string& filename) {
+    [[maybe_unused]] std::lock_guard<std::recursive_mutex> lock(ltoir_mutex);
+    
     auto it = ltoir_cache.find(filename);
     if (it != ltoir_cache.end()) {
       ltoir_cache.erase(it);

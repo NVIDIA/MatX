@@ -35,11 +35,9 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
-#ifndef __CUDACC_RTC__
-  #include "matx/transforms/svd/svd_cuda.h"
-  #ifdef MATX_EN_CPU_SOLVER
-    #include "matx/transforms/svd/svd_lapack.h"
-  #endif
+#include "matx/transforms/svd/svd_cuda.h"
+#ifdef MATX_EN_CPU_SOLVER
+  #include "matx/transforms/svd/svd_lapack.h"
 #endif
 namespace matx {
 
@@ -78,7 +76,6 @@ namespace detail {
         }
       }
 
-#ifndef __CUDACC_RTC__
       // TODO: Handle SVDMode::NONE case better to not require U & VT
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
@@ -97,7 +94,6 @@ namespace detail {
           a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
       }
-#endif
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
       {

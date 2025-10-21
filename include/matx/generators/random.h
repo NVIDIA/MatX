@@ -287,7 +287,6 @@ namespace detail {
           return cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
         } 
         else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
-          printf("random returning false\n");
           return false;
         }  
         else {        
@@ -385,13 +384,6 @@ namespace detail {
       template <typename CapType, typename... Is>
       __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator()([[maybe_unused]] Is... indices) const
       {
-#ifdef __CUDA_ARCH__
-        if constexpr (CapType::jit) {
-          if ((threadIdx.x * CapType::ept) >= Size(Rank() - 1)) {
-            return detail::GetJitSentinelValue<CapType, value_type>();
-          }
-        }
-#endif
         Vector<T, static_cast<int>(CapType::ept)> val;
 #ifdef __CUDA_ARCH__
         MATX_LOOP_UNROLL

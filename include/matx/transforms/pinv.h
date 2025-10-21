@@ -143,8 +143,7 @@ void pinv_impl(OutputTensor &out,
     make_tensor(s_mask, sShape, MATX_HOST_MALLOC_MEMORY);
     make_tensor(ut, utShape, MATX_HOST_MALLOC_MEMORY);
   }
-printf("here\n");
-print(transpose_matrix(conj(a)));
+
   svd_impl(v, s, ut, transpose_matrix(conj(a)), exec, SVDMode::REDUCED);
 
   // discard small singular values

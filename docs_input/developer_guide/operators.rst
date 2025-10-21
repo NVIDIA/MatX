@@ -132,10 +132,10 @@ Going back to the `lcollapse` example, the operator class `LCollapseOp` is defin
         }
       }
 
-      template <ElementsPerThread EPT, typename Op, typename... Is>
+      template <typename CapType, typename Op, typename... Is>
       static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, Is... indices)
       {
-        if constexpr (EPT == ElementsPerThread::ONE) {
+        if constexpr (CapType::ept == ElementsPerThread::ONE) {
           // indices coming in
           cuda::std::array<index_t, Rank()> in{indices...};  // index coming in
           cuda::std::array<index_t, T1::Rank()> out;         // index going out
@@ -155,35 +155,35 @@ Going back to the `lcollapse` example, the operator class `LCollapseOp` is defin
             ind /= op.Size(d);
           }
 
-          return get_value<EPT>(cuda::std::forward<Op>(op), out);
+          return get_value<CapType>(cuda::std::forward<Op>(op), out);
         }
         else {
-          return Vector<value_type, static_cast<index_t>(EPT)>{};
+          return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
         }
       }   
 
       template <typename Op, typename... Is>
       static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, Is... indices)
       {
-        return get_impl<detail::ElementsPerThread::ONE>(cuda::std::forward<Op>(op), indices...);
+        return get_impl<DefaultCapabilities>(cuda::std::forward<Op>(op), indices...);
       }
 
-      template <ElementsPerThread EPT, typename... Is>
+      template <typename CapType, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
       {
-        return get_impl<EPT>(cuda::std::as_const(op_), indices...);
+        return get_impl<CapType>(cuda::std::as_const(op_), indices...);
       }
 
-      template <ElementsPerThread EPT, typename... Is>
+      template <typename CapType, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
       {
-        return get_impl<EPT>(cuda::std::forward<decltype(op_)>(op_), indices...);
+        return get_impl<CapType>(cuda::std::forward<decltype(op_)>(op_), indices...);
       }
 
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
       {
-        return get_impl<ElementsPerThread::ONE>(cuda::std::as_const(op_), indices...);
+        return get_impl<DefaultCapabilities>(cuda::std::as_const(op_), indices...);
       } 
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -229,13 +229,14 @@ Going back to the `lcollapse` example, the operator class `LCollapseOp` is defin
         }
       }
 
-      template <OperatorCapability Cap>
-      __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+      template <OperatorCapability Cap, typename InType>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
         if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-          return ElementsPerThread::ONE;
+          const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+          return combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(op_, in));
         } else {
           auto self_has_cap = capability_attributes<Cap>::default_value;
-          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
+          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_, in));
         }
       }      
   };
@@ -321,10 +322,10 @@ The next functions are the most important functions in the operator:
 
 .. code-block:: cpp
 
-  template <ElementsPerThread EPT, typename Op, typename... Is>
+  template <typename CapType, typename Op, typename... Is>
   static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, Is... indices)
   {
-    if constexpr (EPT == ElementsPerThread::ONE) {
+    if constexpr (CapType::ept == ElementsPerThread::ONE) {
       // indices coming in
       cuda::std::array<index_t, Rank()> in{indices...};  // index coming in
       cuda::std::array<index_t, T1::Rank()> out;         // index going out
@@ -344,52 +345,52 @@ The next functions are the most important functions in the operator:
         ind /= op.Size(d);
       }
 
-      return get_value<EPT>(cuda::std::forward<Op>(op), out);
+      return get_value<CapType>(cuda::std::forward<Op>(op), out);
     }
     else {
-      return Vector<value_type, static_cast<index_t>(EPT)>{};
+      return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
     }
   }
 
   template <typename Op, typename... Is>
   static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, Is... indices)
   {
-    return get_impl<detail::ElementsPerThread::ONE>(cuda::std::forward<Op>(op), indices...);
+    return get_impl<DefaultCapabilities>(cuda::std::forward<Op>(op), indices...);
   }  
 
 The `get_impl` function is used by the executor to get values from the operator at specified indices. Usually `get_impl` is only implemented 
 in operators where `operator()` would duplicate this code. Instead, we make one accessor function called `get_impl` that various versions of 
-`operator()` call. The `ElementsPerThread` template parameter is used to specify the number of elements per thread that are being accessed. This 
-value could be compiled with EPT values that the operator does not support, but it will not be called with unsupported values. `EPT` should be 
-used as a parameter to `get_value` to ensure the correct vectorization is used. Note there is also a version of `get_impl` that does not take
-an `ElementsPerThread` parameter, and is used in the default path where vectorization is not used.
+`operator()` call. The `CapType` template parameter is used to specify the capability of the operator at compile-time. This 
+contains values like ``ept`` that specify how many elements per thread the operator can process. `CapType` should be 
+used as a parameter to `get_value` to ensure the correct capabilities are forwarded. Note there is also a version of `get_impl` that does not take
+a `CapType` parameter, and is used in the default path where capabilities are not specified explicitly.
 
 The various versions of `operator()` are defined as follows:
 
 .. code-block:: cpp
 
-  template <ElementsPerThread EPT, typename... Is>
+  template <typename CapType, typename... Is>
   __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
   {
-    return get_impl<EPT>(cuda::std::as_const(op_), indices...);
+    return get_impl<CapType>(cuda::std::as_const(op_), indices...);
   }
 
-  template <ElementsPerThread EPT, typename... Is>
+  template <typename CapType, typename... Is>
   __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
   {
-    return get_impl<EPT>(cuda::std::forward<decltype(op_)>(op_), indices...);
+    return get_impl<CapType>(cuda::std::forward<decltype(op_)>(op_), indices...);
   }
 
   template <typename... Is>
   __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
   {
-    return get_impl<ElementsPerThread::ONE>(cuda::std::as_const(op_), indices...);
+    return get_impl<DefaultCapabilities>(cuda::std::as_const(op_), indices...);
   }
 
   template <typename... Is>
   __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
   {
-    return get_impl<ElementsPerThread::ONE>(cuda::std::forward<decltype(op_)>(op_), indices...);
+    return get_impl<DefaultCapabilities>(cuda::std::forward<decltype(op_)>(op_), indices...);
   }
 
 `operator()` is defined on both the host and device, and is used by the executor to get values from this operator at specified indices. Most operators 
@@ -398,7 +399,7 @@ it's also valid to only specify `operator()` with a fixed number of indices. In 
 
 Sometimes there is a `const` and a non-`const` version of `operator()` defined. If the operator will never be written to as an lvalue, 
 it's valid to only define the `const` version. Either way, the non-`const` version should call the `const` version with a cast as shown above to combine 
-code in `get_impl`. As with `get_impl` above, `operator()` also needs a version without the `ElementsPerThread` parameter when the fallback path is used.
+code in `get_impl`. As with `get_impl` above, `operator()` also needs a version without the `CapType` parameter when the fallback path is used.
 
 .. note::
   Since `operator()` may be called on both the host and device, it's important to make sure that it's as performant as possible. Using extra stack memory, 

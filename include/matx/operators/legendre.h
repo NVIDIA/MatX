@@ -102,13 +102,6 @@ namespace matx
         template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
         {
-#ifdef __CUDA_ARCH__
-        if constexpr (CapType::jit) {
-          if ((threadIdx.x * CapType::ept) >= Size(Rank() - 1)) {
-            return detail::GetJitSentinelValue<CapType, value_type>();
-          }
-        }
-#endif
           if constexpr (CapType::ept == ElementsPerThread::ONE) {
             cuda::std::array<index_t, Rank()> inds{indices...};
             cuda::std::array<index_t, T3::Rank()> xinds{};
@@ -176,16 +169,16 @@ namespace matx
             const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
             return combine_capabilities<Cap>(
               my_cap,
-            detail::get_operator_capability<Cap>(n_, in),
-            detail::get_operator_capability<Cap>(m_, in),
+              detail::get_operator_capability<Cap>(n_, in),
+              detail::get_operator_capability<Cap>(m_, in),
               detail::get_operator_capability<Cap>(in_, in)
             );
           } else {
             auto self_has_cap = capability_attributes<Cap>::default_value;
             return combine_capabilities<Cap>(
               self_has_cap,
-            detail::get_operator_capability<Cap>(n_, in),
-            detail::get_operator_capability<Cap>(m_, in),
+              detail::get_operator_capability<Cap>(n_, in),
+              detail::get_operator_capability<Cap>(m_, in),
               detail::get_operator_capability<Cap>(in_, in)
             );
           }

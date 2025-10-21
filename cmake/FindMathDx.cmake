@@ -53,12 +53,16 @@ if(NOT MathDx_NO_CONFIG)
   endif()
 endif()
 
-find_path(MathDx_INCLUDE_DIR NAMES MathDx.h )
+find_path(MathDx_INCLUDE_DIR NAMES MathDx.h)
 
-set(MathDx_IS_HEADER_ONLY TRUE)
+# Search for the MathDx library
+find_library(MathDx_LIBRARY 
+  NAMES MathDx mathdx
+  HINTS ${MathDx_DIR}
+  PATH_SUFFIXES lib lib64
+)
 
 include(${CMAKE_ROOT}/Modules/FindPackageHandleStandardArgs.cmake)
-
 
 find_package_handle_standard_args(MathDx
                                   REQUIRED_VARS MathDx_LIBRARY MathDx_INCLUDE_DIR
@@ -130,9 +134,9 @@ if(DEFINED LIBMATHDX_PLATFORM)
     NO_DEFAULT_PATH
   )
   
-  # Set include directories
+  # Set include directories (in both local and parent scope)
   set(LIBMATHDX_INCLUDE_DIR "${LIBMATHDX_ROOT}/include")
-  set(LIBMATHDX_INCLUDE_DIR "${LIBMATHDX_ROOT}/include" PARENT_SCOPE)
+  set(LIBMATHDX_INCLUDE_DIR "${LIBMATHDX_INCLUDE_DIR}" PARENT_SCOPE)
   
   if(LIBMATHDX_LIBRARY AND EXISTS ${LIBMATHDX_INCLUDE_DIR})
     message(STATUS "Found libmathdx library: ${LIBMATHDX_LIBRARY}")

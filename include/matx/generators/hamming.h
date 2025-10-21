@@ -53,13 +53,6 @@ namespace matx
         template <typename CapType>
         inline __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const 
         {
-#ifdef __CUDA_ARCH__
-        if constexpr (CapType::jit) {
-          if ((threadIdx.x * CapType::ept) >= Size(0)) {
-            return detail::GetJitSentinelValue<CapType, value_type>();
-          }
-        }
-#endif
           return detail::ApplyGeneratorVecFunc<CapType, T>([this](index_t idx) { return T(.54) - T(.46) * cuda::std::cos(T(2 * M_PI) * T(idx) / T(size_ - 1)); }, i);
         }
 
@@ -123,6 +116,7 @@ namespace matx
     inline auto hamming(const index_t (&s)[RANK])
     {
       const auto shape = detail::to_array(s);
+      MATX_ASSERT_STR(shape[Dim] > 0, matxInvalidParameter, "Dimension size must be greater than 0");
       return hamming<Dim, decltype(shape), T>(std::forward<decltype(shape)>(shape));
     }
 } // end namespace matx

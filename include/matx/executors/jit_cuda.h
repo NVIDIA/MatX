@@ -94,19 +94,21 @@ namespace matx
 
           // Parameters passed by value in CUDA are limited to CUDA_MAX_VAL_PARAM. If the user exceeds this, we 
           // need to error out and have them break up the statement
-          MATX_STATIC_ASSERT((sizeof(op) + sizeof(index_t) * Op::Rank()) <= detail::CUDA_MAX_VAL_PARAM, 
-              "Parameter buffer to device is limited to " + std::to_string(detail::CUDA_MAX_VAL_PARAM) + "B. "
-              "Please break up your operator statement into multiple executions to limit the size of the parameters");
+          if ((sizeof(op) + sizeof(index_t) * Op::Rank()) > detail::CUDA_MAX_VAL_PARAM) {
+            MATX_THROW(matxInvalidParameter, 
+                "Parameter buffer to device is limited to " + std::to_string(detail::CUDA_MAX_VAL_PARAM) + "B. "
+                "Please break up your operator statement into multiple executions to limit the size of the parameters");
+          }
 
           cuda::std::array<index_t, Op::Rank()> sizes;
           for (int i = 0; i < Op::Rank(); i++) {
             sizes[i] = op.Size(i);
           }   
 
-          if constexpr (Op::Rank() <= 4) {
+          if constexpr (Op::Rank() <= 2) {
             // Check if operator supports JIT
             // Force rank 2 or lower to account for weirdness when we have multiple groups per block
-            bool use_jit = detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op) && Op::Rank() <= 2;
+            bool use_jit = detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op);
 
             MATX_LOG_DEBUG("Using JIT: {}", use_jit);
             if (!use_jit) {
@@ -121,7 +123,9 @@ namespace matx
             
             // Create kernel provider for JIT
             auto kernel_provider = [&](detail::ElementsPerThread ept) {
-              bool stride = detail::get_grid_dims_jit<Op::Rank()>(blocks, threads, sizes, static_cast<int>(ept), 1024, true);
+              dim3 local_blocks = 1;
+              dim3 local_threads = 1;
+              bool stride = detail::get_grid_dims_jit<Op::Rank()>(local_blocks, local_threads, sizes, static_cast<int>(ept), 1024, true);
               
               // Return appropriate kernel function pointer based on EPT, rank, and stride
               switch (ept) {
@@ -217,8 +221,7 @@ namespace matx
                     return stride ? (const void*)detail::matxOpT3StrideKernel<detail::CapabilityParams<detail::ElementsPerThread::ONE, false>, Op> 
                                   : (const void*)detail::matxOpT3Kernel<detail::CapabilityParams<detail::ElementsPerThread::ONE, false>, Op>;
                   } else if constexpr (Op::Rank() == 4) {
-                    return stride ? (const void*)detail::matxOpT4StrideKernel<detail::CapabilityParams<detail::ElementsPerThread::ONE, false>, Op> 
-                                  : (const void*)detail::matxOpT4Kernel<detail::CapabilityParams<detail::ElementsPerThread::ONE, false>, Op>;
+                    return (const void*)detail::matxOpT4Kernel<detail::CapabilityParams<detail::ElementsPerThread::ONE, false>, Op>;
                   }
                   break;
                 default:
@@ -227,6 +230,7 @@ namespace matx
               return (const void*)nullptr;
             };
 
+            MATX_LOG_DEBUG("Finding best launch parameters for JIT");
             // Find the best launch parameters
             auto [best_ept, shm_size, block_size, groups_per_block] = detail::find_best_launch_params(op, kernel_provider, 0, true);
                     
@@ -237,7 +241,7 @@ namespace matx
             detail::nvrtc_compile_and_run("output.cu", op, sizes, blocks, threads, best_ept, stride, shm_size, osize);
           }
           else {
-            MATX_THROW(matxInvalidParameter, "JIT compilation only supports operators with Rank <= 4");
+            MATX_THROW(matxInvalidParameter, "JIT compilation only supports operators with Rank <= 2 currently");
           }            
 #else
           MATX_ASSERT_STR(false, matxInvalidParameter, "Cannot call device executor using host compiler");

@@ -75,12 +75,9 @@ public:
   using op_type = Op;
   using matx_setop = bool;
 
-#ifndef __CUDACC_RTC__
   __MATX_INLINE__ const std::string str() const {
     return get_type_str(out_) + "=" + get_type_str(op_);
   }
-#endif
-
 
   auto &get_lhs() {
     return out_;
@@ -135,13 +132,6 @@ public:
   template <typename CapType, typename... Is>
   __MATX_DEVICE__ __MATX_HOST__ inline decltype(auto) operator()(Is... indices) const noexcept
   {
-#ifdef __CUDA_ARCH__
-        if constexpr (CapType::jit) {
-          if ((threadIdx.x * CapType::ept) >= Size(Rank() - 1)) {
-            return detail::GetJitSentinelValue<CapType, value_type>();
-          }
-        }
-#endif
     const auto in_val = detail::get_value<CapType>(op_, indices...);
     using out_type = decltype(out_.template operator()<CapType>(indices...));
 

@@ -173,7 +173,7 @@ inline bool get_grid_dims(dim3 &blocks, dim3 &threads, const cuda::std::array<in
 
 // For JIT code we want to use a grid-stride loop always
 template <int RANK>
-inline bool get_grid_dims_jit(dim3 &blocks, dim3 &threads, const cuda::std::array<index_t, RANK> &sizes, uint32_t ept, int groups_per_block,
+inline bool get_grid_dims_jit(dim3 &blocks, dim3 &threads, const cuda::std::array<index_t, RANK> &sizes, index_t ept, int groups_per_block,
                           int max_cta_size = 1024, bool force_size = false)
 {
   bool stride = false;
@@ -184,6 +184,7 @@ inline bool get_grid_dims_jit(dim3 &blocks, dim3 &threads, const cuda::std::arra
   blocks.x = 1;  
   blocks.y = 1;
   blocks.z = 1;    
+
   // Dynamic logic to pick thread block size.
   //   Fill in order x, y, z up to 1024 threads
   if constexpr (RANK == 0) {
@@ -215,12 +216,13 @@ inline bool get_grid_dims_jit(dim3 &blocks, dim3 &threads, const cuda::std::arra
 
     // If we have multiple groups per block, we need to adjust the block size
     if (threads.y > 1) {
-      blocks.x = static_cast<int>((static_cast<int64_t>(sizes[0]) + static_cast<int>(threads.y) - 1) / static_cast<int>(threads.y));
+      blocks.x = static_cast<int>((static_cast<int64_t>(sizes[0]) + static_cast<int64_t>(threads.y) - 1) / static_cast<int64_t>(threads.y));
     }
     else {
       blocks.x = static_cast<int>(sizes[0]);
     }
   }  
+  // We don't support JIT with rank 3 or higher yet
   // else if constexpr (RANK == 3) {
   //   if (!force_size) {
   //     while (nt < max_cta_size) {
@@ -279,7 +281,7 @@ inline bool get_grid_dims_jit(dim3 &blocks, dim3 &threads, const cuda::std::arra
     MATX_THROW(matxInvalidParameter, "Rank not supported");
   } 
 
-  MATX_LOG_DEBUG("Blocks {}x{}x{} Threads {}x{}x{}", blocks.x, blocks.y, blocks.z, threads.x, threads.y, threads.z);
+  MATX_LOG_DEBUG("Blocks {}x{}x{} Threads {}x{}x{} groups_per_block={}", blocks.x, blocks.y, blocks.z, threads.x, threads.y, threads.z, groups_per_block);
   return stride;
 }
 } // end namespace detail

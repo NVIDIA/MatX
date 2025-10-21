@@ -71,13 +71,6 @@ namespace matx
         template <typename CapType, typename Op, typename... Is>
         static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, Is... indices)
         {
-#ifdef __CUDA_ARCH__
-          if constexpr (CapType::jit) {
-            if ((threadIdx.x * CapType::ept) >= op.Size(op.Rank() - 1)) {
-              return detail::GetJitSentinelValue<CapType, value_type>();
-            }
-          }
-#endif
           if constexpr (CapType::ept == ElementsPerThread::ONE) {
             // indices coming in
             cuda::std::array<index_t, Rank()> in{indices...};  // index coming in
@@ -250,13 +243,6 @@ namespace matx
         template <typename CapType, typename Op, typename... Is>
         static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, Is... indices)
         {      
-#ifdef __CUDA_ARCH__
-          if constexpr (CapType::jit) {
-            if ((threadIdx.x * CapType::ept) >= op.Size(op.Rank() - 1)) {
-              return detail::GetJitSentinelValue<CapType, value_type>();
-            }
-          }
-#endif
           if constexpr (CapType::ept == ElementsPerThread::ONE) {
             // indices coming in
             cuda::std::array<index_t, Rank()> in{indices...};  // index coming in

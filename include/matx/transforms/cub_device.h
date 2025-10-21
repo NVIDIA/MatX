@@ -49,17 +49,6 @@ namespace detail {
     PRODUCT
   };
 
-  template <typename Op, ElementsPerThread ept>
-  __MATX_INLINE__ __MATX_DEVICE__ auto RunBlockReduce(const Op &op) {
-    using reduce_type = typename Op::value_type;
-    using BlockReduce = cub::BlockReduce<reduce_type, blockDim.x>;
-
-    __shared__ typename BlockReduce::TempStorage temp_storage;
-
-    reduce_type thread_data[static_cast<int>(ept)];
-    reduce_type aggregate = BlockReduce(temp_storage).Sum(thread_data);    
-    return aggregate;
-  }
 
   template <typename CapType>
   struct BlockSort {

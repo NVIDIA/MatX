@@ -124,13 +124,6 @@ namespace matx
       template <typename CapType, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is) const
       {
-#ifdef __CUDA_ARCH__
-        if constexpr (CapType::jit) {
-          if ((threadIdx.x * CapType::ept) >= Size(Rank() - 1)) {
-            return detail::GetJitSentinelValue<CapType, value_type>();
-          }
-        }
-#endif
         if constexpr (CapType::ept == ElementsPerThread::ONE) {
           cuda::std::array<index_t, RANK + 1> indices = {{is...}};
           cuda::std::array<index_t, RANK> indices_o;
@@ -204,10 +197,10 @@ namespace matx
       __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
         if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
           const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
-          return combine_capabilities<Cap>(my_cap, get_combined_ops_capability<Cap>(ops_, in));
+          return combine_capabilities<Cap>(my_cap, get_combined_ops_capability<Cap>(in, ops_));
         } else {
           auto self_has_cap = capability_attributes<Cap>::default_value;
-          return combine_capabilities<Cap>(self_has_cap, get_combined_ops_capability<Cap>(ops_, in));
+          return combine_capabilities<Cap>(self_has_cap, get_combined_ops_capability<Cap>(in, ops_));
         }
       }
 
@@ -215,28 +208,6 @@ namespace matx
       cuda::std::tuple<typename detail::base_type_t<Ts> ...> ops_;
       index_t size_;    
       int axis_;
-
-      template <OperatorCapability Cap, size_t I = 0>
-      __MATX_INLINE__ __MATX_HOST__ auto get_combined_ops_capability(const cuda::std::tuple<typename detail::base_type_t<Ts>...>& ops) const {
-        if constexpr (I == sizeof...(Ts)) {
-          return capability_attributes<Cap>::default_value;
-        } else {
-          auto current_cap = detail::get_operator_capability<Cap>(cuda::std::get<I>(ops));
-          auto rest_cap = get_combined_ops_capability<Cap, I + 1>(ops);
-          return combine_capabilities<Cap>(current_cap, rest_cap);
-        }
-      }
-
-      template <OperatorCapability Cap, typename InType, size_t I = 0>
-      __MATX_INLINE__ __MATX_HOST__ auto get_combined_ops_capability(const cuda::std::tuple<typename detail::base_type_t<Ts>...>& ops, const InType& in) const {
-        if constexpr (I == sizeof...(Ts)) {
-          return capability_attributes<Cap>::default_value;
-        } else {
-          auto current_cap = detail::get_operator_capability<Cap>(cuda::std::get<I>(ops), in);
-          auto rest_cap = get_combined_ops_capability<Cap, InType, I + 1>(ops, in);
-          return combine_capabilities<Cap>(current_cap, rest_cap);
-        }
-      }
     }; // end class StackOp
   } // end namespace detail
 

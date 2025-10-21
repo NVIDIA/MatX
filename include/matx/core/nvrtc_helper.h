@@ -30,24 +30,6 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
-/**
- * @file nvrtc_helper.h
- * 
- * This file provides runtime compilation support for MatX through two backends:
- * 
- * 1. Jitify (default): A wrapper around NVRTC that handles header dependencies automatically
- * 2. Pure NVRTC: Direct use of NVIDIA's Runtime Compilation API
- * 
- * To enable pure NVRTC mode, define MATX_USE_PURE_NVRTC before including this header:
- *   #define MATX_USE_PURE_NVRTC
- * 
- * Pure NVRTC mode:
- * - Uses matx/core/jit_includes.h as the primary include for transitive dependencies
- * - Treats all_jit_classes_string and capstr as additional header strings
- * - Compiles kernels using NVRTC API and caches them for reuse
- * - Requires CUDA Driver API for kernel loading and execution
- */
-
 #pragma once
 
 #ifdef MATX_EN_JIT
@@ -67,6 +49,7 @@
 #include <source_location>
 #include <vector>
 #include <string>
+#include <mutex>
 
 
 namespace matx {
@@ -132,6 +115,16 @@ std::vector<std::string> __MATX_HOST__ __MATX_INLINE__ get_preprocessor_options(
       const char* errStr;                                                      \
       cuGetErrorString(result, &errStr);                                       \
       MATX_LOG_ERROR("CUDA error: {}", errStr);                                \
+      std::exit(EXIT_FAILURE);                                                 \
+    }                                                                          \
+  } while (0)
+
+// Helper function to check CUDA Runtime API errors
+#define CUDA_RT_CHECK(call)                                                    \
+  do {                                                                         \
+    cudaError_t result = call;                                                 \
+    if (result != cudaSuccess) {                                               \
+      MATX_LOG_ERROR("CUDA Runtime error: {}", cudaGetErrorString(result));    \
       std::exit(EXIT_FAILURE);                                                 \
     }                                                                          \
   } while (0)
@@ -238,12 +231,6 @@ std::string generate_capability_params_string([[maybe_unused]] const Op &op, Ele
   
   std::string jit_str = JIT ? "true" : "false";
 
-  // std::string jit_caps_str = "";
-  // if (detail::get_operator_capability<OperatorCapability::SUPPORTS_JIT>(op)) {
-  //   const auto jit_query_input = detail::JITQueryInput{EPT};
-  //   jit_caps_str = detail::get_operator_capability<OperatorCapability::JIT_CLASS_QUERY>(op, jit_query_input);
-  // }
-
   std::string final_str =  
          "namespace matx { namespace detail {\n"
          "template <ElementsPerThread EPT, bool JIT>\n"
@@ -255,8 +242,7 @@ std::string generate_capability_params_string([[maybe_unused]] const Op &op, Ele
          "};\n"
          "using CurrentCapabilities = CapabilityParams<" + ept_str + ", " + jit_str + ">;\n"
          "} }\n";
-
-  //final_str += std::string(matxKernelStr);       
+   
   return final_str;
 }
 
@@ -312,7 +298,14 @@ inline std::string qualify_jit_type_names(const std::string& type_str) {
 template <typename Op, typename SizeArray>
 auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, const SizeArray &sa, dim3 &blocks, dim3 &threads, ElementsPerThread ept, bool stride, int dynamic_shmem_size, int osize) {
   // Pure NVRTC implementation
-  static std::unordered_map<std::string, CUfunction> kernel_cache;
+  // Cache both module and function to prevent resource leaks
+  // CUmodule must remain loaded for CUfunction to be valid
+  struct CachedKernel {
+    CUmodule module;
+    CUfunction function;
+  };
+  static std::unordered_map<std::string, CachedKernel> kernel_cache;
+  static std::mutex kernel_cache_mutex;
   
   const auto all_jit_classes_string = get_all_jit_classes_string(op);
   auto capstr = generate_capability_params_string(op, ept, false, osize, threads.x);
@@ -328,9 +321,18 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, cons
   const auto cubin_filename = detail::GetCache().TypeStringToFilename(kernel_op_type);
   
   // Check if kernel is already compiled and cached in memory
-  auto it = kernel_cache.find(cache_key);
-  if (it == kernel_cache.end()) {
-    // Not in memory cache, check disk cache
+  {
+    std::lock_guard<std::mutex> lock(kernel_cache_mutex);
+    auto it = kernel_cache.find(cache_key);
+    if (it != kernel_cache.end()) {
+      // Found in memory cache - use cached function (module is already loaded)
+      kernel_func = it->second.function;
+      goto launch_kernel;
+    }
+  }
+  
+  // Not in memory cache, check disk cache (outside lock to minimize critical section)
+  {
     auto cached_cubin_ptr = detail::GetCache().GetLTOIRCachedBytes(cubin_filename);
     
     if (cached_cubin_ptr != nullptr) {
@@ -348,8 +350,12 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, cons
         // Get kernel function using the cached lowered name
         CUDA_CHECK(cuModuleGetFunction(&kernel_func, module, lowered_name.c_str()));
         
-        // Cache the kernel in memory for future use
-        kernel_cache[cache_key] = kernel_func;
+        // Cache both module and function to prevent resource leak
+        // Module must stay loaded for function to remain valid
+        {
+          std::lock_guard<std::mutex> lock(kernel_cache_mutex);
+          kernel_cache[cache_key] = CachedKernel{module, kernel_func};
+        }
         
         // Skip compilation since we loaded from cache
         goto launch_kernel;
@@ -363,6 +369,7 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, cons
     // Read jit_includes.h content
     std::string jit_includes_path = get_jit_includes_path();
     std::string jit_includes_content = read_file_contents(jit_includes_path);
+    //MATX_ASSERT_STR(jit_includes_content == "", matxInvalidParameter, "Failed to read jit_includes.h");
     
     // Construct the main kernel source that includes headers by name
     // This matches the Jitify approach where headers are included via -include directives
@@ -509,22 +516,25 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, cons
     // Get kernel function using the lowered name
     CUDA_CHECK(cuModuleGetFunction(&kernel_func, module, lowered_name.c_str()));
     
-    // Cache the kernel
-    kernel_cache[cache_key] = kernel_func;
-  } else {
-    // Found in memory cache
-    kernel_func = it->second;
+    // Cache both module and function to prevent resource leak
+    // Module must stay loaded for function to remain valid
+    {
+      std::lock_guard<std::mutex> lock(kernel_cache_mutex);
+      kernel_cache[cache_key] = CachedKernel{module, kernel_func};
+    }
   }
   
 launch_kernel:
   // Get device attributes
   int device;
-  cudaGetDevice(&device);
+  CUDA_RT_CHECK(cudaGetDevice(&device));
   int static_shared_size;
-  cudaDeviceGetAttribute(&static_shared_size, cudaDevAttrMaxSharedMemoryPerBlock, device);
+  CUDA_RT_CHECK(cudaDeviceGetAttribute(&static_shared_size, cudaDevAttrMaxSharedMemoryPerBlock, device));
 
   // Set dynamic shared memory if needed
   if (dynamic_shmem_size > static_shared_size) {
+    MATX_LOG_DEBUG("Requested dynamic shared memory ({} bytes) exceeds static shared memory ({}) for kernel, using dynamic shared memory", 
+                   dynamic_shmem_size, static_shared_size);
     CUDA_CHECK(cuFuncSetAttribute(kernel_func, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, dynamic_shmem_size));
   }
 
@@ -546,6 +556,8 @@ launch_kernel:
     args[4] = const_cast<void*>(reinterpret_cast<const void*>(&sa[3]));
   }
   
+  MATX_LOG_DEBUG("Launching kernel with grid=({}, {}, {}), block=({}, {}, {}), dynamic_shmem_size={} bytes",
+                 blocks.x, blocks.y, blocks.z, threads.x, threads.y, threads.z, dynamic_shmem_size);
   // Launch kernel
   CUDA_CHECK(cuLaunchKernel(kernel_func,
                             blocks.x, blocks.y, blocks.z,

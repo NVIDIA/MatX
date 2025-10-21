@@ -66,12 +66,13 @@ private:
 
 public:
   using matxop = bool;
+  using value_type = typename I1::value_type;
 
   BlackScholes(I1 K, I1 V, I1 S, I1 r, I1 T)
       : V_(V), S_(S), K_(K), r_(r), T_(T)  {}
 
   template <typename CapType>
-  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ void operator()(index_t idx) const
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t idx) const
   {
     auto V = V_(idx);
     auto K = K_(idx);
@@ -99,8 +100,8 @@ public:
 
   template <detail::OperatorCapability Cap, typename InType>
   __MATX_INLINE__ __MATX_HOST__ auto get_capability(const InType& in) const {
-    if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-      const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+    if constexpr (Cap == detail::OperatorCapability::ELEMENTS_PER_THREAD) {
+      const auto my_cap = cuda::std::array<detail::ElementsPerThread, 2>{detail::ElementsPerThread::ONE, detail::ElementsPerThread::ONE};
       return detail::combine_capabilities<Cap>(my_cap, 
         detail::get_operator_capability<Cap>(V_, in), 
         detail::get_operator_capability<Cap>(S_, in), 

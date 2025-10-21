@@ -154,9 +154,11 @@ namespace detail
     constexpr int min_occupancy = 2;
     int groups_per_block = 1;        
     int max_dynamic_shm, max_threads_per_block, regs_per_multiprocessor;
-    MATX_CUDA_CHECK(cudaDeviceGetAttribute(&max_dynamic_shm, cudaDevAttrMaxSharedMemoryPerBlock , 0));
-    MATX_CUDA_CHECK(cudaDeviceGetAttribute(&max_threads_per_block, cudaDevAttrMaxThreadsPerBlock, 0));
-    MATX_CUDA_CHECK(cudaDeviceGetAttribute(&regs_per_multiprocessor, cudaDevAttrMaxRegistersPerMultiprocessor, 0));
+    int dev;
+    MATX_CUDA_CHECK(cudaGetDevice(&dev));
+    MATX_CUDA_CHECK(cudaDeviceGetAttribute(&max_dynamic_shm, cudaDevAttrMaxSharedMemoryPerBlock , dev));
+    MATX_CUDA_CHECK(cudaDeviceGetAttribute(&max_threads_per_block, cudaDevAttrMaxThreadsPerBlock, dev));
+    MATX_CUDA_CHECK(cudaDeviceGetAttribute(&regs_per_multiprocessor, cudaDevAttrMaxRegistersPerMultiprocessor, dev));
 
     const auto jit_query_in = detail::EPTQueryInput{use_jit};
     auto ept_bounds = detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(op, jit_query_in);  
@@ -166,6 +168,7 @@ namespace detail
     if (!async_loads_requested) {
       int max_vec_load = detail::get_operator_capability<detail::OperatorCapability::MAX_EPT_VEC_LOAD>(op);
       ept_bounds[1] = static_cast<detail::ElementsPerThread>(cuda::std::min(static_cast<int>(ept_bounds[1]), max_vec_load));
+      MATX_LOG_DEBUG("Async loads not needed. Max EPT for vector load: {}", max_vec_load);
     }
 
     // Start with maximum EPT and work down
@@ -173,6 +176,7 @@ namespace detail
     auto min_ept = ept_bounds[0];
     
     while (current_ept >= min_ept) {
+      MATX_LOG_TRACE("Finding best launch params: current_ept {}, min_ept {}", static_cast<int>(current_ept), static_cast<int>(min_ept));
       int shm_size = 0; // Default to no shm since non-JIT doesn't use any
       // Get kernel function pointer for this EPT and check register usage (if available)
       auto kernel_func = kernel_provider(current_ept);
@@ -187,27 +191,31 @@ namespace detail
       // Determine block size for register calculation
       if (use_jit) {
         const auto group_range = detail::get_operator_capability<detail::OperatorCapability::GROUPS_PER_BLOCK>(op);
-        groups_per_block = group_range[0];            
+        groups_per_block = group_range[0];
+        const int total_batches = static_cast<int>(TotalSize(op) / op.Size(0));
+        // If we don't have enough batches then fix this to the smaller amount
+        groups_per_block = cuda::std::min(groups_per_block, total_batches);
         const auto set_groups_per_block_query = detail::SetGroupsPerBlockQueryInput{groups_per_block};
         const auto set_groups_per_block = detail::get_operator_capability<detail::OperatorCapability::SET_GROUPS_PER_BLOCK>(op, set_groups_per_block_query);            
-        block_size = detail::get_operator_capability<detail::OperatorCapability::BLOCK_DIM>(op);
+        // Use the max block size for now
+        block_size = detail::get_operator_capability<detail::OperatorCapability::BLOCK_DIM>(op)[1];
         shm_size = detail::get_operator_capability<detail::OperatorCapability::DYN_SHM_SIZE>(op);
       }
       
-      // Check register pressure constraint: numRegs * block_size * 2 < regsPerMultiprocessor
-      register_viable = (attr.numRegs * block_size * min_occupancy) < regs_per_multiprocessor;
+      // Check register pressure constraint
+      register_viable = (attr.numRegs * block_size * min_occupancy) <= regs_per_multiprocessor;
       
       // Check dynamic shared memory constraint
       bool shm_viable = (shm_size * 2) < max_dynamic_shm;
       
       if (shm_viable && register_viable) {
-        // printf("Selected EPT %d: jits %d registers %d, shm_size %d, block_size %d, groups_per_block %d\n", 
-        //        static_cast<int>(current_ept), use_jit, attr.numRegs, shm_size, block_size, groups_per_block);
+        MATX_LOG_DEBUG("Selected EPT {}: jits {}, registers {}, shm_size {}, block_size {}, groups_per_block {}", 
+                       static_cast<int>(current_ept), use_jit, attr.numRegs, shm_size, block_size, groups_per_block);
         return cuda::std::make_tuple(current_ept, shm_size, block_size, groups_per_block);
       }
       else {
-        // printf("EPT %d failed constraints: shm_viable %d (%d of %d), register_viable %d (regs=%d) block size %d, groups_per_block %d\n",
-        //        static_cast<int>(current_ept), shm_viable, shm_size, max_dynamic_shm, register_viable, attr.numRegs, block_size, groups_per_block);
+        MATX_LOG_DEBUG("EPT {} failed constraints: shm_viable {} ({} of {}), register_viable {} (regs={}) block size {}, groups_per_block {}",
+                       static_cast<int>(current_ept), shm_viable, shm_size, max_dynamic_shm, register_viable, attr.numRegs, block_size, groups_per_block);
       }
 
       // Cut EPT in half

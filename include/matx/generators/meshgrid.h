@@ -49,7 +49,6 @@ namespace matx
         public:
           using matxop = bool;
           using value_type = typename T1::value_type;
-          //typedef typename T1::value_type value_type;
 
           __MATX_INLINE__ std::string str() const { return "meshgrid"; }
 
@@ -62,15 +61,13 @@ namespace matx
 
           template <typename CapType, typename... Is>
           __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const {
-#ifdef __CUDA_ARCH__
-            if constexpr (CapType::jit) {
-              if ((threadIdx.x * CapType::ept) >= Size(Rank() - 1)) {
-                return detail::GetJitSentinelValue<CapType, value_type>();
-              }
-            }
-#endif
-            cuda::std::array<index_t, RANK> idx = {indices...};
-            return idx[idx_];
+
+            cuda::std::array<index_t, Rank()> inds{indices...};
+            // get index for the axis
+            auto ind = inds[AXIS];
+            // look up value for the axis
+            auto val = get_value<CapType>(t1_, ind);
+            return val;
           }
 
           template <OperatorCapability Cap, typename InType>

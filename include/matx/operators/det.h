@@ -35,9 +35,7 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
-#ifndef __CUDACC_RTC__
   #include "matx/transforms/det.h"
-#endif
 
 namespace matx {
 namespace detail {
@@ -78,7 +76,6 @@ namespace detail {
       {
         return OpA::Rank();
       }
-#ifndef __CUDACC_RTC__
       __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void InnerPreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
@@ -117,7 +114,6 @@ namespace detail {
       {
         return a_.Size(dim);
       }
-#endif
   };
 }
 

@@ -179,8 +179,9 @@ namespace matx {
 
         long long int shared_memory_size = 0;
         LIBMATHDX_CHECK(cufftdxGetTraitInt64(handle, CUFFTDX_TRAIT_SHARED_MEMORY_SIZE, &shared_memory_size));
-        shared_memory_size = static_cast<long long int>(current_elements_per_thread_) * sizeof(InputType) * static_cast<long long int>(ffts_per_block_);
-        MATX_LOG_DEBUG("Shared memory size {}", shared_memory_size);
+        MATX_LOG_DEBUG("Shared memory size from cuFFTDx: {}", shared_memory_size);
+        shared_memory_size = static_cast<long long int>(current_elements_per_thread_) * sizeof(InputType) * static_cast<long long int>(ffts_per_block_) + shared_memory_size;
+        MATX_LOG_DEBUG("Shared memory size computed: {}", shared_memory_size);
         return static_cast<int>(shared_memory_size);
       }
 
@@ -280,7 +281,11 @@ namespace matx {
           }
         }
 
-        detail::GetCache().StoreLTOIRCachedBytes(symbol_name, ltoir.data, ltoir.length);
+        if (!detail::GetCache().StoreLTOIRCachedBytes(symbol_name, ltoir.data, ltoir.length)) {
+          free(ltoir.data);
+          MATX_LOG_ERROR("Failed to store LTOIR cached bytes for: {}", symbol_name);
+          return false;
+        }
         
         // CRITICAL: Set to nullptr after transferring ownership to cache to prevent double-free
         // The cache now owns this memory, so we must not let LTOIRData destructor free it
@@ -361,13 +366,13 @@ namespace matx {
             if constexpr (fft_norm == 2) { // ORTHO
               #pragma unroll
               for (int i = 0; i < static_cast<int>(CapType::ept); i++) {        
-                thread_data[local_fft_id * blockDim.x + threadIdx.x].data[i] = thread_data[local_fft_id * blockDim.x + threadIdx.x].data[i] * static_cast<precision>(1.f / cuda::std::sqrt(fft_size));
+                thread_data[local_fft_id * blockDim.x + threadIdx.x].data[i] = thread_data[local_fft_id * blockDim.x + threadIdx.x].data[i] * static_cast<precision>(1.f) / static_cast<precision>(cuda::std::sqrt(fft_size));
               }
             }
             else if constexpr ((fft_norm == 1 && fft_forward) || (fft_norm == 0 && !fft_forward)) {
               #pragma unroll
               for (int i = 0; i < static_cast<int>(CapType::ept); i++) {        
-                thread_data[local_fft_id * blockDim.x + threadIdx.x].data[i] = thread_data[local_fft_id * blockDim.x + threadIdx.x].data[i] * static_cast<precision>(1.f / fft_size);
+                thread_data[local_fft_id * blockDim.x + threadIdx.x].data[i] = thread_data[local_fft_id * blockDim.x + threadIdx.x].data[i] * static_cast<precision>(1.f) / static_cast<precision>(fft_size);
               }
             }
 
