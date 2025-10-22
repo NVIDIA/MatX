@@ -283,8 +283,8 @@ endif()
 
 # Get the tensor libraries if we need them
 if (MATX_EN_CUTENSOR)
-    set(CUTENSORNET_VERSION 24.03.0.4)
-    set(CUTENSOR_VERSION 2.0.1.2)
+    set(CUTENSORNET_VERSION 25.09.1.12)
+    set(CUTENSOR_VERSION 2.3.1.0)
 
     include(cmake/FindcuTENSOR.cmake)
     include(cmake/FindcuTensorNet.cmake)
@@ -299,7 +299,7 @@ if (MATX_EN_CUTENSOR)
 endif()
 
 if (MATX_EN_CUDSS)
-    set(cuDSS_VERSION 0.4.0.2)
+    set(cuDSS_VERSION 0.7.0.20)
     include(cmake/FindcuDSS.cmake)
     target_compile_definitions(matx INTERFACE MATX_EN_CUDSS)
     target_link_libraries(matx INTERFACE cuDSS::cuDSS)
