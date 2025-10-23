@@ -78,6 +78,7 @@ option(MATX_DISABLE_CUB_CACHE "Disable caching for CUB allocations" ON)
 option(MATX_EN_COVERAGE OFF "Enable code coverage reporting")
 option(MATX_EN_COMPLEX_OP_NAN_CHECKS "Enable full NaN/Inf handling for complex multiplication and division" OFF)
 option(MATX_EN_CUDA_LINEINFO "Enable line information for CUDA kernels via -lineinfo nvcc flag" OFF)
+option(MATX_EN_EXTENDED_LAMBDA "Enable extended lambda support for device/host lambdas" ON)
 
 set(MATX_EN_PYBIND11 OFF CACHE BOOL "Enable pybind11 support")
 
@@ -146,6 +147,11 @@ endif()
 # Hack because CMake doesn't have short circult evaluation
 if (NOT CMAKE_BUILD_TYPE OR "${CMAKE_BUILD_TYPE}" STREQUAL "Debug" OR MATX_EN_CUDA_LINEINFO)
     set(MATX_CUDA_FLAGS ${MATX_CUDA_FLAGS} -lineinfo)
+endif()
+
+# Enable extended lambda support for device/host lambdas (required for apply operator)
+if (MATX_EN_EXTENDED_LAMBDA)
+    set(MATX_CUDA_FLAGS ${MATX_CUDA_FLAGS} --extended-lambda)
 endif()
 
 # Set preferred compiler warning flags. nvc++ doesn't support most warnings
