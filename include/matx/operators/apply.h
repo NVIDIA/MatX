@@ -71,11 +71,7 @@ namespace matx
         template <ElementsPerThread EPT, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          if constexpr (EPT == ElementsPerThread::ONE) {
-            return apply_impl(cuda::std::index_sequence_for<Ops...>{}, indices...);
-          } else {
-            return Vector<value_type, static_cast<size_t>(EPT)>();
-          }
+          return apply_impl<EPT>(cuda::std::index_sequence_for<Ops...>{}, indices...);
         }
 
         template <typename... Is>
@@ -86,12 +82,8 @@ namespace matx
 
         template <OperatorCapability Cap>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
-          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-            return ElementsPerThread::ONE;
-          } else {
-            auto self_has_cap = capability_attributes<Cap>::default_value;
-            return combine_capabilities_tuple<Cap>(self_has_cap, ops_, cuda::std::index_sequence_for<Ops...>{});
-          }
+          auto self_has_cap = capability_attributes<Cap>::default_value;
+          return combine_capabilities_tuple<Cap>(self_has_cap, ops_, cuda::std::index_sequence_for<Ops...>{});
         }
 
         template <typename ShapeType, typename Executor>
@@ -126,11 +118,28 @@ namespace matx
         cuda::std::tuple<typename detail::base_type_t<Ops>...> ops_;
         cuda::std::array<index_t, first_op_type::Rank()> sizes_;
         // Helper to apply the lambda function to all operators
-        template <size_t... Is, typename... Indices>
+        template <ElementsPerThread EPT, size_t... Is, typename... Indices>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) apply_impl(
             cuda::std::index_sequence<Is...>, Indices... indices) const
         {
-          return func_(cuda::std::get<Is>(ops_)(indices...)...);
+          using out_type = decltype(cuda::std::get<0>(ops_).template operator()<EPT>(indices...));
+          if constexpr (is_vector_v<out_type>) {
+            // Each operator returns a vector, so call operator() once per operator to get the vectors
+            auto op_results = cuda::std::make_tuple(cuda::std::get<Is>(ops_).template operator()<EPT>(indices...)...);
+            
+            // Deduce the result type by calling func_ on scalar elements
+            using result_element_type = decltype(func_(cuda::std::get<Is>(op_results).data[0]...));
+            Vector<result_element_type, static_cast<int>(EPT)> result;
+            
+            // Unroll loop to call func_ on each element of the vectors
+            MATX_LOOP_UNROLL
+            for (int i = 0; i < static_cast<int>(EPT); i++) {
+              result.data[i] = func_(cuda::std::get<Is>(op_results).data[i]...);
+            }
+            return result;
+          } else {
+            return func_(cuda::std::get<Is>(ops_).template operator()<EPT>(indices...)...);
+          }
         }
 
         // Helper to call PreRun on all operators
