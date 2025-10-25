@@ -19,7 +19,7 @@ else:
     raise RuntimeError("Unsupported platform")
 
 Stage0 = hpccm.Stage()
-Stage0 += baseimage(image='nvidia/cuda:12.9.1-devel-ubuntu24.04', _as='devel', _distro="ubuntu24")
+Stage0 += baseimage(image='nvidia/cuda:13.0.1-devel-ubuntu24.04', _as='devel', _distro="ubuntu24")
 
 Stage0 += packages(ospackages=[
     'bison',
@@ -93,7 +93,7 @@ Stage0 += shell(commands=[
 
 pip_packages=[
     'breathe',
-    'cupy-cuda12x',
+    'cupy-cuda13x',
     'hpccm',
     'numpy',
     'pandas',
