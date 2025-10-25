@@ -48,11 +48,12 @@ using namespace matx;
  * boilerplate code around the original expression. This custom operator can then be used either alone or inside
  * other arithmetic expressions, and only a single load is issues for each tensor.
  *
- * This example uses the Black-Scholes equtation to demonstrate three ways to implement the equation in MatX, and
- * shows the performance difference between them. The three ways are:
- * 1. Using a custom operator
- * 2. Using a lambda function via apply()
- * 3. Using a MatX expression
+ * This example uses the Black-Scholes equtation to demonstrate four ways to implement the equation in MatX, and
+ * shows the performance difference between them. The four ways are:
+ * 1. Using a MatX expression
+ * 2. Using a custom operator
+ * 3. Using a lambda function via apply()
+ * 4. Using a lambda function via apply_idx()
  *
  * Which method to use depends on the use case, but the lambda function is preferred for simplicity and readability.
  */
@@ -152,6 +153,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   tensor_t<dtype, 1> output_tensor{{input_size}};
   tensor_t<dtype, 1> output_tensor2{{input_size}};
   tensor_t<dtype, 1> output_tensor3{{input_size}};
+  tensor_t<dtype, 1> output_tensor4{{input_size}};
 
   (K_tensor = random<float>({input_size}, UNIFORM)).run();
   (S_tensor = random<float>({input_size}, UNIFORM)).run();
@@ -218,10 +220,44 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   exec.sync();
 
   cudaEventElapsedTime(&time_ms, start, stop);
-  printf("Time with lambda = %.2fms per iteration\n",
+  printf("Time with apply() lambda = %.2fms per iteration\n",
     time_ms / num_iterations);
 
-  // Verify all 3 outputs match within 1e-6 using operator() (Managed Memory)
+  auto bs_idx_lambda = [] __device__ (auto idx,
+                                      auto K,
+                                      auto S,
+                                      auto V,
+                                      auto r,
+                                      auto T) {
+      auto i = idx[0];
+      auto K_val = K(i);
+      auto S_val = S(i);
+      auto V_val = V(i);
+      auto r_val = r(i);
+      auto T_val = T(i);
+      auto VsqrtT = V_val * sqrt(T_val);
+      auto d1 = (log(S_val / K_val) + (r_val + 0.5f * V_val * V_val) * T_val) / VsqrtT ;
+      auto d2 = d1 - VsqrtT;
+      auto cdf_d1 = normcdf(d1);
+      auto cdf_d2 = normcdf(d2);
+      auto expRT = exp(-1.f * r_val * T_val);
+  
+      return S_val * cdf_d1 - K_val * expRT * cdf_d2; 
+  };
+
+  cudaEventRecord(start, stream);
+  for (uint32_t i = 0; i < num_iterations; i++) {
+    (output_tensor4 = matx::apply_idx(bs_idx_lambda, K_tensor, S_tensor, V_tensor, r_tensor, T_tensor)).run(exec);
+  }
+  
+  cudaEventRecord(stop, stream);
+  exec.sync();
+
+  cudaEventElapsedTime(&time_ms, start, stop);
+  printf("Time with apply_idx() lambda = %.2fms per iteration\n",
+    time_ms / num_iterations);
+
+  // Verify all 4 outputs match within 1e-6 using operator() (Managed Memory)
   bool all_match = true;
   constexpr float tol = 1e-6f;
   auto n = K_tensor.Size(0);
@@ -230,8 +266,10 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     float v1 = output_tensor(i);
     float v2 = output_tensor2(i);
     float v3 = output_tensor3(i);
-    if (fabsf(v1 - v2) > tol || fabsf(v1 - v3) > tol || fabsf(v2 - v3) > tol) {
-      printf("Mismatch at idx %lld: v1=%.8f v2=%.8f v3=%.8f\n", i, v1, v2, v3);
+    float v4 = output_tensor4(i);
+    if (fabsf(v1 - v2) > tol || fabsf(v1 - v3) > tol || fabsf(v1 - v4) > tol || 
+        fabsf(v2 - v3) > tol || fabsf(v2 - v4) > tol || fabsf(v3 - v4) > tol) {
+      printf("Mismatch at idx %lld: v1=%.8f v2=%.8f v3=%.8f v4=%.8f\n", i, v1, v2, v3, v4);
       all_match = false;
       break;
     }

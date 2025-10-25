@@ -38,28 +38,32 @@
 namespace matx
 {
   /**
-   * ApplyOp applies a custom lambda function to one or more input operators.
+   * ApplyIdxOp applies a custom lambda function to one or more input operators,
+   * passing the indices as a cuda::std::array along with the operators themselves.
    * The lambda function is called for each element during operator evaluation.
    * The rank of the operator matches the rank of the first input operator, and
    * the size is also taken from the first input operator.
    */
   namespace detail {
     template <typename Func, typename... Ops>
-    class ApplyOp : public BaseOp<ApplyOp<Func, Ops...>>
+    class ApplyIdxOp : public BaseOp<ApplyIdxOp<Func, Ops...>>
     {
       public:
         using matxop = bool;
         
         // Deduce value_type from the lambda function's return type
         using first_op_type = cuda::std::tuple_element_t<0, cuda::std::tuple<Ops...>>;
-        using value_type = decltype(cuda::std::declval<Func>()(cuda::std::declval<typename Ops::value_type>()...));
-        using self_type = ApplyOp<Func, Ops...>;
+        static constexpr int RANK = first_op_type::Rank();
+        using value_type = decltype(cuda::std::declval<Func>()(
+            cuda::std::declval<cuda::std::array<index_t, RANK>>(),
+            cuda::std::declval<Ops>()...));
+        using self_type = ApplyIdxOp<Func, Ops...>;
 
-        __MATX_INLINE__ std::string str() const { return "apply()"; }
+        __MATX_INLINE__ std::string str() const { return "apply_idx()"; }
 
-        __MATX_INLINE__ ApplyOp(Func func, const Ops&... ops) : func_(func), ops_(detail::base_type_t<Ops>(ops)...)
+        __MATX_INLINE__ ApplyIdxOp(Func func, const Ops&... ops) : func_(func), ops_(detail::base_type_t<Ops>(ops)...)
         {
-          static_assert(sizeof...(Ops) > 0, "ApplyOp requires at least one input operator");
+          static_assert(sizeof...(Ops) > 0, "ApplyIdxOp requires at least one input operator");
           
           // Initialize sizes from the first operator
           constexpr int rank = Rank();
@@ -82,6 +86,9 @@ namespace matx
 
         template <OperatorCapability Cap>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            return ElementsPerThread::ONE;
+          }
           auto self_has_cap = capability_attributes<Cap>::default_value;
           return combine_capabilities_tuple<Cap>(self_has_cap, ops_, cuda::std::index_sequence_for<Ops...>{});
         }
@@ -110,35 +117,45 @@ namespace matx
           return sizes_[dim];
         }
 
-        ~ApplyOp() = default;
-        ApplyOp(const ApplyOp &rhs) = default;
+        ~ApplyIdxOp() = default;
+        ApplyIdxOp(const ApplyIdxOp &rhs) = default;
 
       private:
         Func func_;
         cuda::std::tuple<typename detail::base_type_t<Ops>...> ops_;
         cuda::std::array<index_t, first_op_type::Rank()> sizes_;
-        // Helper to apply the lambda function to all operators
+        
+        // Helper to apply the lambda function with indices and operators
         template <ElementsPerThread EPT, size_t... Is, typename... Indices>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) apply_impl(
             cuda::std::index_sequence<Is...>, Indices... indices) const
         {
-          using out_type = decltype(cuda::std::get<0>(ops_).template operator()<EPT>(indices...));
-          if constexpr (is_vector_v<out_type>) {
-            // Each operator returns a vector, so call operator() once per operator to get the vectors
-            auto op_results = cuda::std::make_tuple(cuda::std::get<Is>(ops_).template operator()<EPT>(indices...)...);
-            
-            // Deduce the result type by calling func_ on scalar elements
-            using result_element_type = decltype(func_(cuda::std::get<Is>(op_results).data[0]...));
+          if constexpr (EPT == ElementsPerThread::ONE) {
+            // Scalar case: single element access
+            cuda::std::array<index_t, sizeof...(Indices)> idx_array{static_cast<index_t>(indices)...};
+            return func_(idx_array, cuda::std::get<Is>(ops_)...);
+          } else {
+            // Vector case: multiple elements per thread
+            // Deduce the result element type by calling func_ once
+            // Note that this path is disabled for now since apply_idx can't swizzle with vectors
+            cuda::std::array<index_t, sizeof...(Indices)> idx_array{static_cast<index_t>(indices)...};
+            using result_element_type = decltype(func_(idx_array, cuda::std::get<Is>(ops_)...));
             Vector<result_element_type, static_cast<int>(EPT)> result;
+
+            // Adjust the last index to the EPT value. The user's lambda function does not know whether we're
+            // using vectorization or not so we need to adjust the index ourselves.
+            idx_array[sizeof...(Indices) - 1] *= static_cast<int>(EPT);
             
-            // Unroll loop to call func_ on each element of the vectors
+            // Unroll loop to call func_ on each element of the vector
+            // For multi-dimensional indices, only the last index varies
             MATX_LOOP_UNROLL
             for (int i = 0; i < static_cast<int>(EPT); i++) {
-              result.data[i] = func_(cuda::std::get<Is>(op_results).data[i]...);
+              result.data[i] = func_(idx_array, cuda::std::get<Is>(ops_)...);
+              if constexpr (sizeof...(Indices) > 0) {
+                idx_array[sizeof...(Indices) - 1]++;
+              }
             }
             return result;
-          } else {
-            return func_(cuda::std::get<Is>(ops_).template operator()<EPT>(indices...)...);
           }
         }
 
@@ -172,11 +189,12 @@ namespace matx
   }
 
   /**
-   * @brief Apply a custom lambda function or functor to one or more operators
+   * @brief Apply a custom lambda function or functor to one or more operators with index access
    * 
-   * The apply operator allows applying a custom lambda function or functor to one or more input
-   * operators. The function is called for each element position, and receives
-   * the values from all input operators at that position.
+   * The apply_idx operator allows applying a custom lambda function or functor to one or more input
+   * operators, where the lambda receives the current indices as a cuda::std::array along with
+   * the operators themselves. This allows the lambda to access elements at any position, not just
+   * the current element position.
    * 
    * The resulting operator has the same rank as the first input operator, and its
    * size matches the size of the first input operator. The value type is deduced from
@@ -186,41 +204,50 @@ namespace matx
    * @tparam Ops Input operator types (one or more operators)
    * 
    * @param func Lambda function or functor to apply. Can be __host__, __device__, or both.
-   *             The function signature should accept value_type from each input operator.
-   *             Note: Using __host__ __device__ lambdas requires the --extended-lambda compiler flag.
-   *             For complex scenarios, consider using functors instead of lambdas.
+   *             The function signature should accept a cuda::std::array<index_t, RANK> followed
+   *             by the input operators themselves (not their values).
+   *             Note: Inline __device__ lambdas work in regular code (e.g., main()) but NOT in
+   *             Google Test fixtures due to private method restrictions. Use functors for tests.
+   *             Requires --extended-lambda compiler flag.
    * @param ops Input operators (one or more)
    * 
-   * @return ApplyOp operator that applies the function element-wise
+   * @return ApplyIdxOp operator that applies the function element-wise
    * 
-   * Example using a lambda:
+   * Example using an inline lambda (works in main(), not in test fixtures):
    * @code
-   * auto t1 = make_tensor<float>({10, 10});
-   * auto t2 = make_tensor<float>({10, 10});
-   * auto result = make_tensor<float>({10, 10});
-   * 
-   * // Apply a custom function that adds and squares
-   * auto my_func = [] __device__ (float a, float b) { return (a + b) * (a + b); };
-   * (result = apply(my_func, t1, t2)).run();
-   * @endcode
-   * 
-   * Example using a functor:
-   * @code
-   * struct SquareFunctor {
-   *   template<typename T>
-   *   __host__ __device__ auto operator()(T x) const { return x * x; }
-   * };
-   * 
    * auto t_in = make_tensor<float>({10});
    * auto t_out = make_tensor<float>({10});
-   * (t_out = apply(SquareFunctor{}, t_in)).run();
+   * 
+   * auto stencil = [] __device__ (auto idx, auto op) {
+   *   auto i = idx[0];
+   *   // Access current and neighboring elements
+   *   if (i == 0 || i == op.Size(0) - 1) return op(i);
+   *   return (op(i-1) + op(i) + op(i+1)) / 3.0f;
+   * };
+   * (t_out = apply_idx(stencil, t_in)).run();
+   * @endcode
+   * 
+   * Example using a functor (works everywhere including tests):
+   * @code
+   * struct StencilFunctor {
+   *   template<typename Op>
+   *   __host__ __device__ auto operator()(cuda::std::array<index_t, 1> idx, const Op& op) const {
+   *     auto i = idx[0];
+   *     if (i == 0 || i == op.Size(0) - 1) return op(i);
+   *     return (op(i-1) + op(i) + op(i+1)) / 3.0f;
+   *   }
+   * };
+   * auto t_in = make_tensor<float>({10});
+   * auto t_out = make_tensor<float>({10});
+   * (t_out = apply_idx(StencilFunctor{}, t_in)).run();
    * @endcode
    */
   template <typename Func, typename... Ops>
-  auto __MATX_INLINE__ apply(Func func, const Ops&... ops)
+  auto __MATX_INLINE__ apply_idx(Func func, const Ops&... ops)
   {
-    return detail::ApplyOp<Func, Ops...>(func, ops...);
+    return detail::ApplyIdxOp<Func, Ops...>(func, ops...);
   }
 
 } // end namespace matx
+
 

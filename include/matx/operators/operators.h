@@ -133,4 +133,5 @@
 #include "matx/operators/all.h"
 #include "matx/operators/any.h"
 #include "matx/operators/apply.h"
+#include "matx/operators/apply_idx.h"
 #include "matx/operators/argsort.h"
