@@ -191,7 +191,7 @@ struct has_index_cmp_op<T, std::void_t<typename T::index_cmp_op>>
 
 /**
  * @brief Determine if a type defines `using index_cmp_op = bool;`
- * 
+ *
  * @tparam T Type to test
  */
 template <typename T>
