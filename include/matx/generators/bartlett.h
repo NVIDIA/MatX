@@ -50,15 +50,15 @@ namespace matx
 
         inline __MATX_HOST__ __MATX_DEVICE__ Bartlett(index_t size) : size_(size){};
 
-        template <detail::ElementsPerThread EPT>
+        template <typename CapType>
         inline __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
         {
-          return detail::ApplyGeneratorVecFunc<EPT, T>([this](index_t idx) { return 1 - cuda::std::abs(((2*T(idx))/(T(size_ - 1))) - 1); }, i);
+          return detail::ApplyGeneratorVecFunc<CapType, T>([this](index_t idx) { return 1 - cuda::std::abs(((2*T(idx))/(T(size_ - 1))) - 1); }, i);
         }
 
         inline __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(i);
+          return this->operator()<DefaultCapabilities>(i);
         }
 
         constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size([[maybe_unused]] int dim) const
@@ -86,7 +86,7 @@ namespace matx
    * Returns values for a Bartlett window across the selected dimension.
    */
   template <int Dim, typename ShapeType, typename T = float,
-           std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+           std::enable_if_t<!cuda::std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
              inline auto bartlett(ShapeType &&s)
              {
                constexpr int RANK = cuda::std::tuple_size<std::decay_t<ShapeType>>::value;
@@ -114,6 +114,9 @@ namespace matx
   template <int Dim, int RANK, typename T = float>
     inline auto bartlett(const index_t (&s)[RANK])
     {
+      for (int i = 0; i < RANK; i++) {
+        MATX_ASSERT_STR(s[i] > 0, matxInvalidSize, "All dimensions must be greater than 0");
+      }
       return bartlett<Dim>(detail::to_array(s));
     }
 

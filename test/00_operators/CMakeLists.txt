@@ -52,6 +52,8 @@ set(OPERATOR_TEST_FILES
   sph2cart_test.cu
   square_copy_transpose_test.cu
   stack_test.cu
+  test_logging.cu
+  test_logging_comprehensive.cu
   toeplitz_test.cu
   transpose_test.cu
   trig_funcs_test.cu

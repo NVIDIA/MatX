@@ -56,11 +56,11 @@ namespace detail {
 
       };
 
-      template <ElementsPerThread EPT, typename... Is>
-      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
+      template <typename CapType, typename... Is>
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
       {
-        auto get_scalar = [](const auto &x){
-          [[maybe_unused]] int rexp;
+        auto get_scalar = [this](const auto &x){
+          [[maybe_unused]] int rexp;        
           if constexpr (is_cuda_complex_v<value_type>) {
             if constexpr (std::is_same_v<float, typename value_type::value_type>) {
               if constexpr (WHICH == 0) { // real fractional
@@ -113,13 +113,13 @@ namespace detail {
           }
         };
 
-        const auto val = get_value<EPT>(a_, indices...);
-        if constexpr (EPT == ElementsPerThread::ONE) {
+        const auto val = get_value<CapType>(a_, indices...);
+        if constexpr (CapType::ept == ElementsPerThread::ONE) {
           return get_scalar(val);
         } else {
-          Vector<remove_cvref_t<decltype(get_scalar(val.data[0]))>, static_cast<int>(EPT)> out;
+          Vector<remove_cvref_t<decltype(get_scalar(val.data[0]))>, static_cast<size_t>(CapType::ept)> out;
           MATX_LOOP_UNROLL
-          for (index_t i = 0; i < static_cast<int>(EPT); i++) {
+          for (index_t i = 0; i < static_cast<index_t>(CapType::ept); i++) {
             out.data[i] = get_scalar(val.data[i]);
           }
           return out;
@@ -128,7 +128,7 @@ namespace detail {
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
       {
-        return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+        return this->operator()<DefaultCapabilities>(indices...);
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -157,10 +157,10 @@ namespace detail {
         return a_.Size(dim);
       }
 
-      template <OperatorCapability Cap>
-      __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+      template <OperatorCapability Cap, typename InType>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
         auto self_has_cap = capability_attributes<Cap>::default_value;
-        return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_));
+        return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
       }
 
   };

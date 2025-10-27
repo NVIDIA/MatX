@@ -73,20 +73,30 @@ namespace detail {
 
       __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
-      template <ElementsPerThread EPT, typename... Is>
+      template <typename CapType, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
-        return tmp_out_.template operator()<EPT>(indices...);
+        return tmp_out_.template operator()<CapType>(indices...);
       };
 
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
-        return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+        return this->operator()<DefaultCapabilities>(indices...);
       };
 
-      template <OperatorCapability Cap>
-      __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+      template <OperatorCapability Cap, typename InType>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
         auto self_has_cap = capability_attributes<Cap>::default_value;
-        return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_));
+        return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
+      }
+
+      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
+      {
+        return out_dims_[dim];
+      }
+
+      static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+      {
+        return OpA::Rank();
       }
 
       template <typename Out, typename Executor>
@@ -94,11 +104,6 @@ namespace detail {
         static_assert(is_cuda_executor_v<Executor>, "hist() only supports the CUDA executor currently"); 
 
         hist_impl(cuda::std::get<0>(out), a_, lower_, upper_, num_levels_, ex.getStream());
-      }
-
-      static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
-      {
-        return OpA::Rank();
       }
 
       template <typename ShapeType, typename Executor>
@@ -133,12 +138,6 @@ namespace detail {
 
         matxFree(ptr);
       }        
-
-      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
-      {
-        return out_dims_[dim];
-      }
-
   };
 }
 

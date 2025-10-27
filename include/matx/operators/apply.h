@@ -68,22 +68,22 @@ namespace matx
           }
         }
 
-        template <ElementsPerThread EPT, typename... Is>
+        template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          return apply_impl<EPT>(cuda::std::index_sequence_for<Ops...>{}, indices...);
+          return apply_impl<CapType>(cuda::std::index_sequence_for<Ops...>{}, indices...);
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+          return this->operator()<DefaultCapabilities>(indices...);
         }
 
-        template <OperatorCapability Cap>
-        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
           auto self_has_cap = capability_attributes<Cap>::default_value;
-          return combine_capabilities_tuple<Cap>(self_has_cap, ops_, cuda::std::index_sequence_for<Ops...>{});
+          return combine_capabilities<Cap>(self_has_cap, get_combined_ops_capability<Cap>(in, ops_));
         }
 
         template <typename ShapeType, typename Executor>
@@ -118,27 +118,27 @@ namespace matx
         cuda::std::tuple<typename detail::base_type_t<Ops>...> ops_;
         cuda::std::array<index_t, first_op_type::Rank()> sizes_;
         // Helper to apply the lambda function to all operators
-        template <ElementsPerThread EPT, size_t... Is, typename... Indices>
+        template <typename CapType, size_t... Is, typename... Indices>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) apply_impl(
             cuda::std::index_sequence<Is...>, Indices... indices) const
         {
-          using out_type = decltype(cuda::std::get<0>(ops_).template operator()<EPT>(indices...));
+          using out_type = decltype(cuda::std::get<0>(ops_).template operator()<CapType>(indices...));
           if constexpr (is_vector_v<out_type>) {
             // Each operator returns a vector, so call operator() once per operator to get the vectors
-            auto op_results = cuda::std::make_tuple(cuda::std::get<Is>(ops_).template operator()<EPT>(indices...)...);
+            auto op_results = cuda::std::make_tuple(cuda::std::get<Is>(ops_).template operator()<CapType>(indices...)...);
             
             // Deduce the result type by calling func_ on scalar elements
             using result_element_type = decltype(func_(cuda::std::get<Is>(op_results).data[0]...));
-            Vector<result_element_type, static_cast<int>(EPT)> result;
+            Vector<result_element_type, static_cast<int>(CapType::ept)> result;
             
             // Unroll loop to call func_ on each element of the vectors
             MATX_LOOP_UNROLL
-            for (int i = 0; i < static_cast<int>(EPT); i++) {
+            for (int i = 0; i < static_cast<int>(CapType::ept); i++) {
               result.data[i] = func_(cuda::std::get<Is>(op_results).data[i]...);
             }
             return result;
           } else {
-            return func_(cuda::std::get<Is>(ops_).template operator()<EPT>(indices...)...);
+            return func_(cuda::std::get<Is>(ops_).template operator()<CapType>(indices...)...);
           }
         }
 
@@ -158,15 +158,6 @@ namespace matx
         {
           ((is_matx_op<Ops>() && (cuda::std::get<Is>(ops_).PostRun(cuda::std::forward<ShapeType>(shape), 
                                                                     cuda::std::forward<Executor>(ex)), true)), ...);
-        }
-
-        // Helper to combine capabilities from all operators
-        template <OperatorCapability Cap, typename CapType, typename OpsTuple, size_t... Is>
-        __MATX_INLINE__ __MATX_HOST__ auto combine_capabilities_tuple(
-            CapType self_has_cap, const OpsTuple& ops_tuple, cuda::std::index_sequence<Is...>) const
-        {
-          return combine_capabilities<Cap>(self_has_cap, 
-                                           detail::get_operator_capability<Cap>(cuda::std::get<Is>(ops_tuple))...);
         }
     };
   }

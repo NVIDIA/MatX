@@ -47,18 +47,18 @@ namespace matx
 
         __MATX_INLINE__ std::string str() const { return "blackman"; }
 
-        inline __MATX_HOST__ __MATX_DEVICE__ Blackman(index_t size) : size_(size){};
+        __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Blackman(index_t size) : size_(size){};
 
-        template <detail::ElementsPerThread EPT>
-        inline __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
+        template <typename CapType>
+        __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
         {
-          return detail::ApplyGeneratorVecFunc<EPT, T>([this](index_t idx) { return T(.42) - T(.5) * cuda::std::cos(T(2 * M_PI) * T(idx) / T(size_ - 1))
+          return detail::ApplyGeneratorVecFunc<CapType, T>([this](index_t idx) { return T(.42) - T(.5) * cuda::std::cos(T(2 * M_PI) * T(idx) / T(size_ - 1))
                     + T(.08) * cuda::std::cos(T(4 * M_PI) * T(idx) / T(size_ - 1)); }, i);
         }
 
-        inline __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
+        __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(i);
+          return this->operator()<DefaultCapabilities>(i);
         }
 
         constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size([[maybe_unused]] int dim) const
@@ -86,7 +86,7 @@ namespace matx
    * Returns values for a Blackman window across the selected dimension.
    */
   template <int Dim, typename ShapeType, typename T = float,
-           std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+           std::enable_if_t<!cuda::std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
              inline auto blackman(ShapeType &&s)
              {
                constexpr int RANK = cuda::std::tuple_size<std::decay_t<ShapeType>>::value;

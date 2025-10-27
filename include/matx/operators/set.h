@@ -33,10 +33,13 @@
 #pragma once
 
 #include <type_traits>
-
+#include <string>
+#include <unordered_map>
 #include "matx/core/error.h"
 #include "matx/core/type_utils.h"
 #include "matx/core/tensor_utils.h"
+#include "matx/core/capabilities.h"
+#include "matx/core/operator_utils.h"
 
 namespace matx {
 template <typename T, int RANK, typename Desc> class tensor_t; ///< Tensor detail type
@@ -105,49 +108,128 @@ public:
     }
   }
 
+
   // Workaround for nvcc bug. It won't allow the dual if constexpr branch workaround inside of lambda
   // functions, so we have to make a separate one.
-  template <ElementsPerThread EPT, typename... Ts>
+  template <typename CapType, typename... Ts>
   __MATX_DEVICE__ __MATX_HOST__ inline auto _internal_mapply(Ts&&... args) const noexcept {
-    const auto r = detail::get_value<EPT>(op_, args...);
+    const auto r = detail::get_value<CapType>(op_, args...);
     out_(args...) = r;
     return r;
   }
 
-  template <ElementsPerThread EPT, typename ShapeType>
+  template <typename CapType, typename ShapeType>
   __MATX_DEVICE__ __MATX_HOST__ inline decltype(auto) operator()(cuda::std::array<ShapeType, T::Rank()> idx) const noexcept
   {
     auto res = cuda::std::apply([&](auto &&...args)  {
-        return _internal_mapply<EPT>(args...);
+        return _internal_mapply<CapType>(args...);
       }, idx
     );
 
     return res;
   }
 
-  template <ElementsPerThread EPT, typename... Is>
+  template <typename CapType, typename... Is>
   __MATX_DEVICE__ __MATX_HOST__ inline decltype(auto) operator()(Is... indices) const noexcept
   {
-    //auto &&out = out_(indices...);
-    //out = detail::get_value<EPT>(op_, indices...);
-    const auto in_val = detail::get_value<EPT>(op_, indices...);
-    using out_type = decltype(out_.template operator()<EPT>(indices...));
-    if constexpr (!is_vector_v<decltype(in_val)> && is_vector_v<out_type>) {
-      Vector<remove_cvref_t<decltype(in_val)>, static_cast<size_t>(EPT)> vec{in_val};
-      out_.template operator()<EPT>(indices...) = vec;
-    }
-    else {
-      out_.template operator()<EPT>(indices...) = in_val;
-    }
-    return in_val;
+    const auto in_val = detail::get_value<CapType>(op_, indices...);
+    using out_type = decltype(out_.template operator()<CapType>(indices...));
 
-    //return out_(indices...);
-  }  
+#ifdef __CUDA_ARCH__    
+    // If we get a scalar on the input and a vector output, construct a vector of these scalars to write out
+    if constexpr (CapType::jit) {
+      if (out_.Rank() == 0 || threadIdx.x < out_.Size(out_.Rank() - 1)) {
+        if constexpr (!is_vector_v<decltype(in_val)> && is_vector_v<out_type>) {
+          Vector<remove_cvref_t<decltype(in_val)>, static_cast<size_t>(CapType::ept)> vec{in_val};
+          out_.template operator()<CapType>(indices...) = vec;
+        }
+        else {
+          out_.template operator()<CapType>(indices...) = in_val;
+        }
+      }
+      return in_val;      
+    }
+    else 
+#endif    
+    {
+      if constexpr (!is_vector_v<decltype(in_val)> && is_vector_v<out_type>) {
+        Vector<remove_cvref_t<decltype(in_val)>, static_cast<size_t>(CapType::ept)> vec{in_val};
+        out_.template operator()<CapType>(indices...) = vec;
+      }
+      else {
+        out_.template operator()<CapType>(indices...) = in_val;
+      }
+      return in_val;
+    }
+  } 
+  
+#ifdef MATX_EN_JIT
+  struct JIT_Storage {
+    mutable typename detail::inner_storage_or_self_t<detail::base_type_t<T>> out_;
+    mutable typename detail::inner_storage_or_self_t<detail::base_type_t<Op>> op_;  
+  };
+
+  JIT_Storage ToJITStorage() const {
+    return JIT_Storage{detail::to_jit_storage(out_), detail::to_jit_storage(op_)};
+  }
+
+  __MATX_INLINE__ std::string get_jit_class_name() const {
+    std::string symbol_name = "JITSetOp";
+    return symbol_name;
+  }
+
+  __MATX_INLINE__ auto get_jit_op_str() const {
+    const std::string func_name = get_jit_class_name();
+    return cuda::std::make_tuple(
+       func_name, 
+       std::string("template <typename T, typename Op> struct " + func_name + "  {\n") + 
+           "  using value_type = typename T::value_type;\n" +
+           "  using matxop = bool;\n" +
+          "   mutable typename detail::inner_storage_or_self_t<detail::base_type_t<T>> out_;\n" +
+          "   mutable typename detail::inner_storage_or_self_t<detail::base_type_t<Op>> op_;\n" +
+           "  template <typename CapType, typename... Is>\n" +
+           "  __MATX_INLINE__ __MATX_DEVICE__  decltype(auto) operator()(Is... indices) const\n" +
+          "  {\n" +
+          "    auto in_val = detail::get_value<CapType>(op_, indices...);\n" +
+          "    using out_type = decltype(out_.template operator()<CapType>(indices...));\n" +
+          "    using in_val_type = decltype(in_val);\n" +
+          "    if ((threadIdx.x * static_cast<int>(CapType::ept)) >= Size(Rank() - 1)) {\n" +
+          "      return detail::GetJitSentinelValue<CapType, value_type>();\n" +
+          "    }\n" +
+          "    if (out_.Rank() == 0 || threadIdx.x < out_.Size(out_.Rank() - 1)) {\n" +
+          "      if constexpr (!is_vector_v<in_val_type> && is_vector_v<out_type>) {\n" +
+          "        Vector<remove_cvref_t<in_val_type>, static_cast<size_t>(CapType::ept)> vec{in_val};\n" +
+          "        out_.template operator()<CapType>(indices...) = vec;\n" +
+          "      }\n" +
+           "      else {\n" +
+           "        out_.template operator()<CapType>(indices...) = in_val;\n" +
+           "      }\n" +
+           "    }\n" +
+           "    return in_val;\n" +
+           "  }\n" +
+           "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank()\n" +
+           "  {\n" +
+           "    return T::Rank();\n" +
+           "  }\n" +
+           "  constexpr __MATX_INLINE__  __MATX_DEVICE__ index_t Size(int dim) const\n" +
+           "  {\n" +
+           "     if constexpr (T::Rank() == 0) {\n" +
+           "       return 1;\n" +
+           "     }\n" +
+           "     else {\n" +
+           "       return out_.Size(dim);\n" +
+           "     }\n" + 
+           "   }\n" +
+           "};\n"
+    );
+  }      
+#endif  
+
 
   template <typename... Is>
   __MATX_DEVICE__ __MATX_HOST__ inline decltype(auto) operator()(Is... indices) const noexcept  
   {
-    return (*this).template operator()<detail::ElementsPerThread::ONE>(indices...);
+    return (*this).template operator()<DefaultCapabilities>(indices...);
   }
 
   template <typename ShapeType, typename Executor>
@@ -172,13 +254,46 @@ public:
     }
   }
 
-  template <detail::OperatorCapability Cap>
-  __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
-    auto self_has_cap = capability_attributes<Cap>::default_value;
-    return combine_capabilities<Cap>(self_has_cap, 
-                                      detail::get_operator_capability<Cap>(out_),
-                                      detail::get_operator_capability<Cap>(op_));
-  }  
+  template <detail::OperatorCapability Cap, typename InType>
+  __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
+    if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+#ifdef MATX_EN_JIT       
+      // No need to use combine_capabilities here since we're just returning a string.
+      const auto lhs_jit_name = detail::get_operator_capability<Cap>(out_, in);
+      const auto rhs_jit_name = detail::get_operator_capability<Cap>(op_, in);
+      return get_jit_class_name() + "<" + lhs_jit_name + "," + rhs_jit_name + ">";
+#else
+      return "";
+#endif
+    }  
+    else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+#ifdef MATX_EN_JIT
+      // Get the key/value pair from get_jit_op_str()
+      const auto [key, value] = get_jit_op_str();
+      
+      // Insert into the map if the key doesn't exist
+      if (in.find(key) == in.end()) {
+        in[key] = value;
+      }
+      
+      // Also handle child operators
+      detail::get_operator_capability<Cap>(out_, in);
+      detail::get_operator_capability<Cap>(op_, in);
+      
+      // Always return true for now
+      return true;
+#else
+      return false;
+#endif
+    }      
+    else {
+      auto self_has_cap = capability_attributes<Cap>::default_value;
+
+      return combine_capabilities<Cap>(self_has_cap, 
+                                      detail::get_operator_capability<Cap>(out_, in),
+                                      detail::get_operator_capability<Cap>(op_, in));
+    }
+  }
 
   // Used as a shortcut where the RHS is an executor and LHS is a tensor. In this case we
   // want to avoid the RHS from allocating any temporary output memory, so we call
@@ -218,8 +333,12 @@ public:
    */
   constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
   {
-    static_assert(T::Rank() >= 1, "Size function only works on tensors of rank 1 and higher");
-    return out_.Size(dim);
+    if constexpr (T::Rank() == 0) {
+      return 1;
+    }
+    else {
+      return out_.Size(dim);
+    }
   }
 };
 

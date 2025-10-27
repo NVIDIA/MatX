@@ -33,7 +33,8 @@
 #pragma once
 
 #include "matx/core/defines.h"
-#include "matx/core/tensor_utils.h"
+#include "matx/core/operator_utils.h"
+#include <cuda/std/iterator>
 
 namespace matx {
 /**
@@ -53,7 +54,7 @@ struct RandomOperatorIterator {
   using stride_type = index_t;
   using pointer = value_type*;
   using reference = value_type&;
-  using iterator_category = std::random_access_iterator_tag;
+  using iterator_category = cuda::std::random_access_iterator_tag;
   using difference_type = index_t;
   using OperatorBaseType = typename detail::base_type_t<OperatorType>;
 
@@ -196,7 +197,7 @@ struct RandomOperatorOutputIterator {
   using stride_type = index_t;
   using pointer = value_type*;
   using reference = value_type&;
-  using iterator_category = std::random_access_iterator_tag;
+  using iterator_category = cuda::std::random_access_iterator_tag;
   using difference_type = index_t;
   using OperatorBaseType = typename detail::base_type_t<OperatorType>;
 
@@ -342,7 +343,7 @@ struct RandomOperatorThrustIterator {
   using pointer = cuda::std::remove_const_t<value_type>*;
   using reference = cuda::std::remove_const_t<value_type>&;
   using const_reference = cuda::std::remove_const_t<value_type>&;
-  using iterator_category = std::random_access_iterator_tag;
+  using iterator_category = cuda::std::random_access_iterator_tag;
   using difference_type = index_t;
   using OperatorBaseType = typename detail::base_type_t<OperatorType>;
 
@@ -461,7 +462,7 @@ struct BeginOffset {
   using stride_type = index_t;
   using pointer = value_type*;
   using reference = value_type;
-  using iterator_category = std::random_access_iterator_tag;
+  using iterator_category = cuda::std::random_access_iterator_tag;
   using difference_type = index_t;
 
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ BeginOffset(const OperatorType &t) : size_(t.Size(t.Rank() - 1)), offset_(0) { }
@@ -520,7 +521,7 @@ struct EndOffset {
   using stride_type = index_t;
   using pointer = value_type*;
   using reference = value_type;
-  using iterator_category = std::random_access_iterator_tag;
+  using iterator_category = cuda::std::random_access_iterator_tag;
   using difference_type = index_t;
 
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ EndOffset(const OperatorType &t) : size_(t.Size(t.Rank() - 1)), offset_(0) { }
@@ -565,6 +566,7 @@ __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t operator-(const RandomOper
   return a.offset_ - b.offset_;
 }
 
+#ifndef __CUDACC_RTC__
 
 template <typename Op>
 auto  __MATX_INLINE__ __MATX_HOST__  cbegin(Op &&op) {
@@ -585,5 +587,7 @@ template <typename Op>
 auto  __MATX_INLINE__ __MATX_HOST__  end(Op &&op) {
   return RandomOperatorOutputIterator{static_cast<typename detail::base_type_t<Op>>(op), TotalSize(op)};
 }
+
+#endif
 
 };

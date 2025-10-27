@@ -29,7 +29,6 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
-
 #pragma once
 
 #include <cstdint>
@@ -57,35 +56,38 @@ private:
 public:
   dctOp(Out out, I in, index_t N) : out_(out), in_(in), N_(N) {}
 
-  template <ElementsPerThread EPT>
+  template <typename CapType>
   __MATX_DEVICE__ inline void operator()(index_t idx)
-  { 
-    const auto in_val = get_value<EPT>(in_, idx);
-    if constexpr(EPT == ElementsPerThread::ONE) {
+  {
+    const auto in_val = get_value<CapType>(in_, idx);
+    if constexpr(CapType::ept == ElementsPerThread::ONE) {
       out_(idx) = static_cast<value_type>(
-          in_val.real() * cuda::std::cos(static_cast<value_type>(-1 * M_PI) * idx / (static_cast<value_type>(2.0f) * N_)) -
-          in_val.imag() * cuda::std::sin(static_cast<value_type>(-1 * M_PI) * idx / (static_cast<value_type>(2.0f) * N_)));
+        in_val.real() * cuda::std::cos(static_cast<value_type>(-1 * M_PI) * idx / (static_cast<value_type>(2.0f) * N_)) -
+        in_val.imag() * cuda::std::sin(static_cast<value_type>(-1 * M_PI) * idx / (static_cast<value_type>(2.0f) * N_)));
     }
   }
 
   __MATX_DEVICE__ inline void operator()(index_t idx)
   {
-    this->operator()<detail::ElementsPerThread::ONE>(idx);
+    this->operator()<DefaultCapabilities>(idx);
   }
 
-  template <OperatorCapability Cap>
-  __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+  template <OperatorCapability Cap, typename InType>
+  __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const
+  {
     if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-      return ElementsPerThread::ONE;
+      const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+      return combine_capabilities<Cap>(my_cap, 
+        detail::get_operator_capability<Cap>(out_, in), 
+        detail::get_operator_capability<Cap>(in_, in));
     }
     else {
       auto self_has_cap = capability_attributes<Cap>::default_value;
       return combine_capabilities<Cap>(self_has_cap, 
-        detail::get_operator_capability<Cap>(out_),
-        detail::get_operator_capability<Cap>(in_));
+        detail::get_operator_capability<Cap>(out_, in), 
+        detail::get_operator_capability<Cap>(in_, in));
     }
   }
-
 
   constexpr __MATX_HOST__ __MATX_DEVICE__ inline index_t Size(int i) const
   {

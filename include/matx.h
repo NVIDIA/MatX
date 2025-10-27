@@ -42,6 +42,7 @@
 // the behavior of other headers.
 #include "matx/core/defines.h"
 #include "matx/core/error.h"
+#include "matx/core/log.h"
 #include "matx/file_io/file_io.h"
 #include "matx/core/half_complex.h"
 #include "matx/core/half.h"

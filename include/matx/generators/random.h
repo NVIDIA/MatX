@@ -281,15 +281,20 @@ namespace detail {
         }
       }
 
-      template <OperatorCapability Cap>
-      __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+      template <OperatorCapability Cap, typename InType>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
         if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-          return ElementsPerThread::ONE; // Fix this to support vectorization
-        } else {
+          return cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+        } 
+        else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+          return false;
+        }  
+        else {        
           auto self_has_cap = capability_attributes<Cap>::default_value;
           return self_has_cap;
         }
       }
+
 
       // Constructor for randFloatParams
       __MATX_INLINE__ RandomOp(ShapeType &&s, uint64_t seed, randFloatParams<inner_t> params) :
@@ -376,13 +381,13 @@ namespace detail {
        * @tparam Is Index type
        * @param indices Index values
        */
-      template <ElementsPerThread EPT, typename... Is>
+      template <typename CapType, typename... Is>
       __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator()([[maybe_unused]] Is... indices) const
       {
-        Vector<T, static_cast<int>(EPT)> val;
+        Vector<T, static_cast<int>(CapType::ept)> val;
 #ifdef __CUDA_ARCH__
         MATX_LOOP_UNROLL
-        for (int i = 0; i < static_cast<int>(EPT); ++i) {
+        for (int i = 0; i < static_cast<int>(CapType::ept); ++i) {
           if constexpr (
                        std::is_same_v<T, float>  ||
                        std::is_same_v<T, double> ||
@@ -394,7 +399,8 @@ namespace detail {
               get_random(val.data[i], &states_[0], fParams_.dist_);
             }
             else {
-              get_random(val.data[i], &states_[static_cast<int>(EPT) * GetValC<0, Is...>(cuda::std::make_tuple(indices...)) + i], fParams_.dist_);
+              get_random(val.data[i], &states_[static_cast<int>(CapType::ept) * GetValC<0, Is...>(cuda::std::make_tuple(indices...)) + i], fParams_.dist_);
+             // printf("%f\n", val.data[i].real());
             }
 
             val.data[i] = fParams_.alpha_ * val.data[i] + fParams_.beta_;
@@ -410,8 +416,8 @@ namespace detail {
               get_randomi(val.data[i], &states_[0], iParams_.min_, iParams_.max_);
             }
             else {
-              get_randomi(val.data[i], &states_[static_cast<int>(EPT) * GetValC<0, Is...>(cuda::std::make_tuple(indices...)) + i], iParams_.min_, iParams_.max_);
-            }
+              get_randomi(val.data[i], &states_[static_cast<int>(CapType::ept) * GetValC<0, Is...>(cuda::std::make_tuple(indices...)) + i], iParams_.min_, iParams_.max_);
+            }          
           }
         }
 
@@ -426,45 +432,45 @@ namespace detail {
 
           if (fParams_.dist_ == UNIFORM) {
             if constexpr (std::is_same_v<T, float>) {
-              curandGenerateUniform(gen_, &val.data[0], static_cast<int>(EPT));
+              curandGenerateUniform(gen_, &val.data[0], static_cast<int>(CapType::ept));
             }
             else if constexpr (std::is_same_v<T, double>) {
-              curandGenerateUniformDouble(gen_, &val.data[0], static_cast<int>(EPT));
+              curandGenerateUniformDouble(gen_, &val.data[0], static_cast<int>(CapType::ept));
             }
             else if constexpr (std::is_same_v<T, cuda::std::complex<float>>) {
-              curandGenerateUniform(gen_, reinterpret_cast<float*>(&val.data[0]), static_cast<int>(EPT) * 2);
+              curandGenerateUniform(gen_, reinterpret_cast<float*>(&val.data[0]), static_cast<int>(CapType::ept) * 2);
             }
             else if constexpr (std::is_same_v<T, cuda::std::complex<double>>) {
-              curandGenerateUniformDouble(gen_, reinterpret_cast<double*>(&val.data[0]), static_cast<int>(EPT) * 2);
+              curandGenerateUniformDouble(gen_, reinterpret_cast<double*>(&val.data[0]), static_cast<int>(CapType::ept) * 2);
             }
 
             MATX_LOOP_UNROLL
-            for (int i = 0; i < static_cast<int>(EPT); ++i) {
+            for (int i = 0; i < static_cast<int>(CapType::ept); ++i) {
               val.data[i] = fParams_.alpha_ * val.data[i] + fParams_.beta_;
             }
           }
           else if (fParams_.dist_ == NORMAL) {
             if constexpr (std::is_same_v<T, float>) {
-              curandGenerateNormal(gen_, &val.data[0], static_cast<int>(EPT), fParams_.beta_, fParams_.alpha_);
+              curandGenerateNormal(gen_, &val.data[0], static_cast<int>(CapType::ept), fParams_.beta_, fParams_.alpha_);
             }
             else if constexpr (std::is_same_v<T, double>) {
-              curandGenerateNormalDouble(gen_, &val.data[0], static_cast<int>(EPT), fParams_.beta_, fParams_.alpha_);
+              curandGenerateNormalDouble(gen_, &val.data[0], static_cast<int>(CapType::ept), fParams_.beta_, fParams_.alpha_);
             }
             else if constexpr (std::is_same_v<T, cuda::std::complex<float>>) {
-              curandGenerateNormal(gen_, reinterpret_cast<float*>(&val.data[0]), static_cast<int>(EPT) * 2, fParams_.beta_, fParams_.alpha_);
+              curandGenerateNormal(gen_, reinterpret_cast<float*>(&val.data[0]), static_cast<int>(CapType::ept) * 2, fParams_.beta_, fParams_.alpha_);
             }
             else if constexpr (std::is_same_v<T, cuda::std::complex<double>>) {
-              curandGenerateNormalDouble(gen_, reinterpret_cast<double*>(&val.data[0]), static_cast<int>(EPT) * 2, fParams_.beta_, fParams_.alpha_);
+              curandGenerateNormalDouble(gen_, reinterpret_cast<double*>(&val.data[0]), static_cast<int>(CapType::ept) * 2, fParams_.beta_, fParams_.alpha_);
             }
 
             MATX_LOOP_UNROLL
-            for (int i = 0; i < static_cast<int>(EPT); ++i) {
+            for (int i = 0; i < static_cast<int>(CapType::ept); ++i) {
               val.data[i] = fParams_.alpha_ * val.data[i] + fParams_.beta_;
             }
           }
           else {
             MATX_LOOP_UNROLL
-            for (int i = 0; i < static_cast<int>(EPT); ++i) {
+            for (int i = 0; i < static_cast<int>(CapType::ept); ++i) {
               val.data[i] = 0;
             }
           }
@@ -477,7 +483,7 @@ namespace detail {
                          )
         {
           MATX_LOOP_UNROLL
-          for (int i = 0; i < static_cast<int>(EPT); ++i) {
+          for (int i = 0; i < static_cast<int>(CapType::ept); ++i) {
             float fScale;
             curandGenerateUniform(gen_, &fScale, 1);
 
@@ -488,7 +494,7 @@ namespace detail {
           }
         }
 #endif
-        if constexpr (EPT == ElementsPerThread::ONE) {
+        if constexpr (CapType::ept == ElementsPerThread::ONE) {
           return val.data[0];
         }
         else {
@@ -522,7 +528,7 @@ namespace detail {
    * @return Random number operator
    */
   template <typename T, typename ShapeType, typename LowerType = typename inner_op_type_t<T>::type,
-           std::enable_if_t<!std::is_array_v<remove_cvref_t<ShapeType>>, bool> = true>
+           std::enable_if_t<!cuda::std::is_array_v<remove_cvref_t<ShapeType>>, bool> = true>
   __MATX_INLINE__ auto random(ShapeType &&s, Distribution_t dist, uint64_t seed = 0, LowerType alpha = 1, LowerType beta = 0)
   {
     static_assert(
@@ -578,7 +584,7 @@ namespace detail {
    * @return Random number operator
    */
   template <typename T, typename ShapeType, typename LowerType = typename inner_op_type_t<T>::type,
-           std::enable_if_t<!std::is_array_v<remove_cvref_t<ShapeType>>, bool> = true>
+           std::enable_if_t<!cuda::std::is_array_v<remove_cvref_t<ShapeType>>, bool> = true>
   __MATX_INLINE__ auto randomi(ShapeType &&s, uint64_t seed = 0, LowerType min = 0, LowerType max = 100)
   {
     static_assert(

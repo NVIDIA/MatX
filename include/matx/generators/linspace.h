@@ -68,17 +68,29 @@ namespace matx
           }
         }
 
-        template <detail::OperatorCapability Cap>
-        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
           if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-            return ElementsPerThread::ONE;
+            const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+            return my_cap;
           } else {          
             auto self_has_cap = detail::capability_attributes<Cap>::default_value;
             return self_has_cap;
           }
         }
 
-        template <detail::ElementsPerThread EPT, typename... Is>
+        template <OperatorCapability Cap>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability_proc() const {
+          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+            return my_cap;
+          } else {          
+            auto self_has_cap = detail::capability_attributes<Cap>::default_value;
+            return self_has_cap;
+          }
+        }
+
+        template <typename CapType, typename... Is>
         __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(Is... indices) const { 
           static_assert(sizeof...(indices) == NUM_RC, "Number of indices incorrect in linspace");
           cuda::std::array idx{indices...};
@@ -95,7 +107,7 @@ namespace matx
 
         template <typename... Is>
         __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(Is... indices) const { 
-          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+          return this->operator()<DefaultCapabilities>(indices...);
         }
 
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
@@ -197,7 +209,7 @@ namespace matx
    * @return Operator with linearly-spaced values 
    */
   template <int Dim, typename ShapeType, typename T,
-           std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+           std::enable_if_t<!cuda::std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
   [[deprecated("Use matx::linspace(T first, T last, index_t count, int axis = 0) instead.")]]           
   inline auto linspace(ShapeType &&s, T first, T last)
   {

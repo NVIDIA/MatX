@@ -50,15 +50,15 @@ namespace matx
 
         inline __MATX_HOST__ __MATX_DEVICE__ Hanning(index_t size) : size_(size){};
 
-        template <detail::ElementsPerThread EPT>
+        template <typename CapType>
         inline __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
         {
-          return detail::ApplyGeneratorVecFunc<EPT, T>([this](index_t idx) { return T(0.5) * (1 - cuda::std::cos(T(2 * M_PI) * T(idx) / T(size_ - 1))); }, i);
+          return detail::ApplyGeneratorVecFunc<CapType, T>([this](index_t idx) { return T(0.5) * (1 - cuda::std::cos(T(2 * M_PI) * T(idx) / T(size_ - 1))); }, i);
         }
 
         inline __MATX_HOST__ __MATX_DEVICE__ T operator()(index_t i) const
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(i);
+          return this->operator()<DefaultCapabilities>(i);
         }
 
         constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size([[maybe_unused]] int dim) const
@@ -86,7 +86,7 @@ namespace matx
    * Returns values for a Hanning window across the selected dimension.
    */
   template <int Dim, typename ShapeType, typename T = float,
-           std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+           std::enable_if_t<!cuda::std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
              inline auto hanning(ShapeType &&s)
              {
                constexpr int RANK = cuda::std::tuple_size<std::decay_t<ShapeType>>::value;

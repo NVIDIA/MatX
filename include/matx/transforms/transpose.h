@@ -98,7 +98,7 @@ namespace matx
         transpose_kernel_oop<<<grid, block, shm, stream>>>(out, in);
       }
 #else
-     MATX_THROW(matxNotSupported, "Transpose not supported on host");
+     MATX_THROW(matxNotSupported, "Transpose not supported on host with a CUDA executor");
 #endif    
     };
   

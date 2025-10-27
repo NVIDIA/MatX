@@ -32,6 +32,7 @@
 
 #pragma once
 #include "matx.h"
+#include "matx/core/capabilities.h"
 #include <memory>
 #include <stdint.h>
 
@@ -48,6 +49,7 @@ using namespace matx;
  */
 template <class O, class I1, class I2, class I3, class I4>
 class calcDets : public BaseOp<calcDets<O, I1, I2, I3, I4>> {
+
 private:
   O out_;
   I1 xpow_;
@@ -56,6 +58,9 @@ private:
   I4 pfa_;
 
 public:
+  using matxop = bool;
+  using value_type = typename O::value_type;
+  using calc_dets_xform_op = bool;
 
   /**
    * @brief Construct a new calcDets object
@@ -78,15 +83,16 @@ public:
    * @param idy Y position
    * @param idx X position
    */
-  template <detail::ElementsPerThread EPT>
+  template <typename CapType>
   __device__ inline void operator()(index_t idz, index_t idy, index_t idx)
   {
-    if constexpr (EPT == detail::ElementsPerThread::ONE) {
+    if constexpr (CapType::ept == detail::ElementsPerThread::ONE) {
       typename I1::type xpow = xpow_(idz, idy, idx);
       typename I2::type ba = ba_(idz, idy, idx);
       typename I2::type norm = norm_(idz, idy, idx);
       typename I2::type alpha = norm * (cuda::std::powf(pfa_, -1.0f / norm) - 1.f);
       out_(idz, idy, idx) = (xpow > alpha * ba) ? 1 : 0;
+
     }
   }
 
@@ -111,18 +117,32 @@ public:
     return O::Rank();
   }
 
-  template <detail::OperatorCapability Cap>
-  __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+
+  template <detail::OperatorCapability Cap, typename InType>
+  __MATX_INLINE__ __MATX_HOST__ auto get_capability(const InType &in) const {
     if constexpr (Cap == detail::OperatorCapability::ELEMENTS_PER_THREAD) {
-      return detail::ElementsPerThread::ONE;
+      const auto my_cap = cuda::std::array<detail::ElementsPerThread, 2>{detail::ElementsPerThread::ONE, detail::ElementsPerThread::ONE};
+      auto g = combine_capabilities<Cap>(my_cap, 
+        detail::get_operator_capability<Cap>(xpow_, in),
+        detail::get_operator_capability<Cap>(ba_, in),
+        detail::get_operator_capability<Cap>(norm_, in),
+        detail::get_operator_capability<Cap>(pfa_, in)
+      );
+      MATX_LOG_DEBUG("get_capability {} {}", static_cast<int>(g[0]), static_cast<int>(g[1]));
+      return combine_capabilities<Cap>(my_cap, 
+        detail::get_operator_capability<Cap>(xpow_, in),
+        detail::get_operator_capability<Cap>(ba_, in),
+        detail::get_operator_capability<Cap>(norm_, in),
+        detail::get_operator_capability<Cap>(pfa_, in)
+      );
     }
     else {
       auto self_has_cap = detail::capability_attributes<Cap>::default_value;
       return detail::combine_capabilities<Cap>(self_has_cap, 
-        detail::get_operator_capability<Cap>(xpow_),
-        detail::get_operator_capability<Cap>(ba_),
-        detail::get_operator_capability<Cap>(norm_),
-        detail::get_operator_capability<Cap>(pfa_)
+        detail::get_operator_capability<Cap>(xpow_, in),
+        detail::get_operator_capability<Cap>(ba_, in),
+        detail::get_operator_capability<Cap>(norm_, in),
+        detail::get_operator_capability<Cap>(pfa_, in)
       );
     }
   }       
@@ -263,7 +283,6 @@ public:
     auto waveformFull = slice(waveformView, {0}, {numSamplesRnd});
 
     auto x = inputView;
-
     // create waveform (assuming waveform is the same for every pulse)
     // this allows us to precompute waveform in frequency domain
     // Apply a Hamming window to the waveform to suppress sidelobes. Other

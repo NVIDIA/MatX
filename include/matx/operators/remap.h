@@ -66,10 +66,10 @@ namespace matx
 	      __MATX_INLINE__ RemapOp(const T &op, IdxType idx) : op_(op), idx_(idx) {};
 
         // Only supports one element per thread
-        template <ElementsPerThread EPT, typename Op, typename Idx, typename... Is>
+        template <typename CapType, typename Op, typename Idx, typename... Is>
         static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, const Idx &idx, Is... indices)
         {
-          if constexpr (EPT == ElementsPerThread::ONE) {
+          if constexpr (CapType::ept == ElementsPerThread::ONE) {
             static_assert(sizeof...(Is) == Rank());
             static_assert((std::is_convertible_v<Is, index_t> && ... ));
 
@@ -77,40 +77,40 @@ namespace matx
 
             // remap current index for dim
             if constexpr (IdxType::Rank() == 0) {
-              ind[DIM] = get_value<EPT>(idx);
+              ind[DIM] = get_value<CapType>(idx);
             } else {
-              ind[DIM] = get_value<EPT>(idx, ind[DIM]);
+              ind[DIM] = get_value<CapType>(idx, ind[DIM]);
             }
 
-            return get_value<EPT>(cuda::std::forward<Op>(op), ind);
+            return get_value<CapType>(cuda::std::forward<Op>(op), ind);
 
           } else {
-            return Vector<value_type, static_cast<size_t>(EPT)>{};
+            return Vector<value_type, static_cast<size_t>(CapType::ept)>{};
           }
         }
 
-        template <ElementsPerThread EPT, typename... Is>
+        template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          return get_impl<EPT>(cuda::std::as_const(op_), idx_, indices...);
+          return get_impl<CapType>(cuda::std::as_const(op_), idx_, indices...);
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+          return this->operator()<DefaultCapabilities>(indices...);
         }
 
-        template <ElementsPerThread EPT, typename... Is>
+        template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
-          return get_impl<EPT>(cuda::std::forward<decltype(op_)>(op_), idx_, indices...);
+          return get_impl<CapType>(cuda::std::forward<decltype(op_)>(op_), idx_, indices...);
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+          return this->operator()<DefaultCapabilities>(indices...);
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -146,16 +146,21 @@ namespace matx
           }
         }
 
-        template <OperatorCapability Cap>
-        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
           if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-            return ElementsPerThread::ONE;
+            const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+            return combine_capabilities<Cap>(
+              my_cap,
+              detail::get_operator_capability<Cap>(op_, in),
+              detail::get_operator_capability<Cap>(idx_, in)
+            );
           } else {
             auto self_has_cap = capability_attributes<Cap>::default_value;
             return combine_capabilities<Cap>(
               self_has_cap,
-              detail::get_operator_capability<Cap>(op_),
-              detail::get_operator_capability<Cap>(idx_)
+              detail::get_operator_capability<Cap>(op_, in),
+              detail::get_operator_capability<Cap>(idx_, in)
             );
           }
         }

@@ -34,31 +34,7 @@
 
 namespace matx {
 
-/**
- * @brief FFT normalization mode
- *
- * Specifies how the FFT and inverse FFT are scaled/normalized.
- */
-enum class FFTNorm {
-  BACKWARD, ///< FFT is unscaled, inverse FFT is scaled by 1/N
-  FORWARD, ///< FFT is scaled by 1/N, inverse FFT is unscaled
-  ORTHO ///< Both FFT and inverse FFT are scaled by 1/sqrt(N)
-};
-
 namespace detail {
-
-  static constexpr int MAX_FFT_RANK = 2;
-
-  enum class FFTType {
-    C2C,
-    R2C,
-    C2R,
-  };
-
-  enum class FFTDirection {
-    FORWARD,
-    BACKWARD
-  };
     
   template <typename OutputTensor, typename InputTensor, typename Executor>
   __MATX_INLINE__ auto  GetFFTInputView([[maybe_unused]] OutputTensor &o,
@@ -200,5 +176,6 @@ namespace detail {
     }
   }
 }
+
 
 };

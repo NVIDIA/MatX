@@ -32,6 +32,8 @@
 
 #pragma once
 
+#ifndef __CUDACC_RTC__
+
 #include <cstdio>
 #include <exception>
 #include <sstream>
@@ -40,6 +42,7 @@
 #endif
 
 #include "matx/core/stacktrace.h"
+#endif
 
 namespace matx
 {
@@ -165,7 +168,7 @@ namespace matx
     throw matx::detail::matxException(e, str, __FILE__, __LINE__); \
   }
 
-#ifndef NDEBUG
+#if !defined(NDEBUG) && !defined(__CUDA_ARCH__)
   #define MATX_ASSERT(a, error) \
   {                           \
     if ((a) != true)          \
@@ -207,6 +210,7 @@ namespace matx
   {                                           \
     static_assert((a), #error ": " #str);     \
   }
+
 
 #define MATX_CUDA_CHECK(e)                                      \
   do {                                                          \
@@ -252,6 +256,17 @@ namespace matx
       std::cerr << ")" << std::endl; \
       MATX_THROW(matxInvalidSize, "Incompatible operator sizes"); \
     } \
+  }
+
+
+#define MATX_STATIC_ASSERT(a, error)    \
+  {                                     \
+    static_assert((a), #error ": " #a); \
+  }
+
+#define MATX_STATIC_ASSERT_STR(a, error, str) \
+  {                                           \
+    static_assert((a), #error ": " #str);       \
   }
 
 } // end namespace matx

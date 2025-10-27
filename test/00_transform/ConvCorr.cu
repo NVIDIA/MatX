@@ -30,6 +30,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
+#if defined(CUDART_VERSION) && CUDART_VERSION >= 13000
+
 #include "assert.h"
 #include "matx.h"
 #include "test_types.h"
@@ -854,3 +856,5 @@ TYPED_TEST(CorrelationConvolution2DTestFloatTypes, Conv2Axis)
 //   MATX_TEST_ASSERT_COMPARE(pb, ccv, "c_op_complex_corr_swap", 0.01);
 //   MATX_EXIT_HANDLER();
 // }
+
+#endif

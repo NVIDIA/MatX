@@ -92,10 +92,10 @@ namespace matx
         MATX_ASSERT_STR(after_ >= 0, matxInvalidParameter, "pad after size must be non-negative");
       }
 
-      template <ElementsPerThread EPT, typename Op, typename... Is>
+      template <typename CapType, typename Op, typename... Is>
       static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(
           Op&& op, int axis, index_t before, const value_type& pad_value, PadMode mode, Is... indices) {
-        if constexpr (EPT == ElementsPerThread::ONE) {
+        if constexpr (CapType::ept == ElementsPerThread::ONE) {
           cuda::std::array<index_t, sizeof...(Is)> ind_array = {{indices...}};
           index_t idx = ind_array[axis];
           index_t op_size = op.Size(axis);
@@ -113,45 +113,46 @@ namespace matx
             // Original tensor region - adjust index to remove padding offset
             ind_array[axis] = idx - before;
           }
-          return value_type(get_value<EPT>(cuda::std::forward<Op>(op), ind_array));
+          return value_type(get_value<CapType>(cuda::std::forward<Op>(op), ind_array));
         } else {
-          return Vector<value_type, static_cast<index_t>(EPT)>{};
+          return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
         }
       }
 
-      template <ElementsPerThread EPT, typename... Is>
+      template <typename CapType, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is) const
       {
-        return get_impl<EPT>(cuda::std::as_const(op_), axis_, before_, pad_value_, mode_, is...);
+        return get_impl<CapType>(cuda::std::as_const(op_), axis_, before_, pad_value_, mode_, is...);
       }
 
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is) const
       {
-        return this->operator()<detail::ElementsPerThread::ONE>(is...);
+        return this->operator()<detail::DefaultCapabilities>(is...);
       }
 
-      template <ElementsPerThread EPT, typename... Is>
+      template <typename CapType, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is)
       {
-        return get_impl<EPT>(cuda::std::forward<decltype(op_)>(op_), axis_, before_, pad_value_, mode_, is...);
+        return get_impl<CapType>(cuda::std::forward<decltype(op_)>(op_), axis_, before_, pad_value_, mode_, is...);
       }
 
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is)
       {
-        return this->operator()<detail::ElementsPerThread::ONE>(is...);
+        return this->operator()<detail::DefaultCapabilities>(is...);
       }
 
-      template <OperatorCapability Cap>
-      __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+      template <OperatorCapability Cap, typename InType>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
         if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
           // With padding, vectorized access would be problematic in cases where the padding is
           // not a multiple of the vector size.
-          return ElementsPerThread::ONE;
+          const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+          return combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(op_, in));
         } else {
           auto self_has_cap = capability_attributes<Cap>::default_value;
-          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
+          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_, in));
         }
       }
 

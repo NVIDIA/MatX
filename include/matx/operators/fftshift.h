@@ -55,50 +55,51 @@ namespace matx
           static_assert(Rank() >= 1, "1D FFT shift must have a rank 1 operator or higher");
         };
 
-        template <ElementsPerThread EPT, typename Op, typename... Is>
+        template <typename CapType, typename Op, typename... Is>
         static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, Is... indices)
         { 
-          if constexpr (EPT == ElementsPerThread::ONE) {
+          if constexpr (CapType::ept == ElementsPerThread::ONE) {
             cuda::std::array idx{indices...};
             idx[Rank() - 1] = (idx[Rank() - 1] + (op.Size(Rank()-1) + 1) / 2) % op.Size(Rank()-1);
-            return get_value<EPT>(cuda::std::forward<Op>(op), idx);
+            return get_value<CapType>(cuda::std::forward<Op>(op), idx);
           } else {
-            return Vector<value_type, static_cast<index_t>(EPT)>{};
+            return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
           }
         }  
 
-        template <ElementsPerThread EPT, typename... Is>
+        template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
         {
-          return get_impl<EPT>(cuda::std::as_const(op_), indices...);
+          return get_impl<CapType>(cuda::std::as_const(op_), indices...);
         }    
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+          return this->operator()<DefaultCapabilities>(indices...);
         }
 
-        template <ElementsPerThread EPT, typename... Is>
+        template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
-          return get_impl<EPT>(cuda::std::forward<decltype(op_)>(op_), indices...);
+          return get_impl<CapType>(cuda::std::forward<decltype(op_)>(op_), indices...);
         }         
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+          return this->operator()<DefaultCapabilities>(indices...);
         }
 
-        template <OperatorCapability Cap>
-        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
           if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-            return ElementsPerThread::ONE;
+            const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+            return combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(op_, in));
           }
           else {
             auto self_has_cap = capability_attributes<Cap>::default_value;
-            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
+            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_, in));
           }
         }
 
@@ -160,37 +161,40 @@ namespace matx
         using matxop = bool;
         using value_type = typename T1::value_type;
 
+        __MATX_INLINE__ std::string str() const { return "fftshift(" + op_.str() + ")"; }
+
         __MATX_INLINE__ FFTShift2DOp(const T1 &op) : op_(op){
           static_assert(Rank() >= 2, "2D FFT shift must have a rank 2 operator or higher");
         };
 
-        template <ElementsPerThread EPT, typename... Is>
+        template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
         {
-          if constexpr (EPT == ElementsPerThread::ONE) {
+          if constexpr (CapType::ept == ElementsPerThread::ONE) {
             auto tup = cuda::std::make_tuple(indices...);
             cuda::std::get<Rank()-2>(tup) = (cuda::std::get<Rank()-2>(tup) + (Size(Rank()-2) + 1) / 2) % Size(Rank()-2);
             cuda::std::get<Rank()-1>(tup) = (cuda::std::get<Rank()-1>(tup) + (Size(Rank()-1) + 1) / 2) % Size(Rank()-1);
-            return cuda::std::apply([&](auto &&...call_args){ return op_.template operator()<EPT>(call_args...); }, tup);
+            return cuda::std::apply([&](auto &&...call_args){ return op_.template operator()<CapType>(call_args...); }, tup);
           } else {
-            return Vector<value_type, static_cast<index_t>(EPT)>{};
+            return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
           }
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+          return this->operator()<DefaultCapabilities>(indices...);
         }
 
-        template <OperatorCapability Cap>
-        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
           if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-            return ElementsPerThread::ONE;
+            const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+            return combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(op_, in));
           }
           else {
             auto self_has_cap = capability_attributes<Cap>::default_value;
-            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
+            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_, in));
           }
         }
 
@@ -256,32 +260,33 @@ namespace matx
           static_assert(Rank() >= 1, "1D IFFT shift must have a rank 1 operator or higher");
         };
 
-        template <ElementsPerThread EPT, typename... Is>
+        template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
         { 
-          if constexpr (EPT == ElementsPerThread::ONE) {
+          if constexpr (CapType::ept == ElementsPerThread::ONE) {
             auto tup = cuda::std::make_tuple(indices...);
             cuda::std::get<Rank()-1>(tup) = (cuda::std::get<Rank()-1>(tup) + (Size(Rank()-1)) / 2) % Size(Rank()-1);
-            return cuda::std::apply([&](auto &&...call_args){ return op_.template operator()<EPT>(call_args...); }, tup);
+            return cuda::std::apply([&](auto &&...call_args){ return op_.template operator()<CapType>(call_args...); }, tup);
           } else {
-            return Vector<value_type, static_cast<index_t>(EPT)>{};
+            return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
           }
         } 
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+          return this->operator()<DefaultCapabilities>(indices...);
         }
 
-        template <OperatorCapability Cap>
-        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
           if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-            return ElementsPerThread::ONE;
+            const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+            return combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(op_, in));
           }
           else {
             auto self_has_cap = capability_attributes<Cap>::default_value;
-            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
+            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_, in));
           }
         }
 
@@ -347,33 +352,34 @@ namespace matx
           static_assert(Rank() >= 2, "2D IFFT shift must have a rank 2 operator or higher");
         };
 
-        template <ElementsPerThread EPT, typename... Is>
+        template <typename CapType, typename... Is>
           __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
         {
-          if constexpr (EPT == ElementsPerThread::ONE) {
+          if constexpr (CapType::ept == ElementsPerThread::ONE) {
             auto tup = cuda::std::make_tuple(indices...);
             cuda::std::get<Rank()-2>(tup) = (cuda::std::get<Rank()-2>(tup) + (Size(Rank()-2)) / 2) % Size(Rank()-2);
             cuda::std::get<Rank()-1>(tup) = (cuda::std::get<Rank()-1>(tup) + (Size(Rank()-1)) / 2) % Size(Rank()-1);
-            return cuda::std::apply([&](auto &&...call_args){ return op_.template operator()<EPT>(call_args...); }, tup);
+            return cuda::std::apply([&](auto &&...call_args){ return op_.template operator()<CapType>(call_args...); }, tup);
           } else {
-            return Vector<value_type, static_cast<index_t>(EPT)>{};
+            return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
           }
         }   
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+          return this->operator()<DefaultCapabilities>(indices...);
         }
 
-        template <OperatorCapability Cap>
-        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
           if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-            return ElementsPerThread::ONE;
+            const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+            return combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(op_, in));
           }
           else {
             auto self_has_cap = capability_attributes<Cap>::default_value;
-            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
+            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_, in));
           }
         }
 

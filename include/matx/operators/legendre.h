@@ -99,10 +99,10 @@ namespace matx
           static_assert(get_rank<T2>() <= 1, "legendre op:  m must be a scalar, rank 0 or 1 operator");
         }
 
-        template <ElementsPerThread EPT, typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
+        template <typename CapType, typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
         {
-          if constexpr (EPT == ElementsPerThread::ONE) {
+          if constexpr (CapType::ept == ElementsPerThread::ONE) {
             cuda::std::array<index_t, Rank()> inds{indices...};
             cuda::std::array<index_t, T3::Rank()> xinds{};
 
@@ -111,13 +111,13 @@ namespace matx
 
             // compute n
             index_t nind = inds[axis1];
-            int n = get_value<ElementsPerThread::ONE>(n_, nind);
-
-            // compute m
+            int n = get_value<DefaultCapabilities>(n_, nind);
+            
+            // compute m 
             index_t mind = inds[axis2];
-            int m = get_value<ElementsPerThread::ONE>(m_, mind);
-
-            if(axis1>axis2)
+            int m = get_value<DefaultCapabilities>(m_, mind);
+            
+            if(axis1>axis2) 
               cuda::std::swap(axis1, axis2);
 
             // compute indices for x
@@ -139,11 +139,11 @@ namespace matx
               }
             };
 
-            auto x = get_value<ElementsPerThread::ONE>(in_, xinds);
-            if constexpr (EPT != ElementsPerThread::ONE) {
-              Vector<value_type, static_cast<int>(EPT)> ret;
+            auto x = get_value<DefaultCapabilities>(in_, xinds);
+            if constexpr (CapType::ept != ElementsPerThread::ONE) {
+              Vector<value_type, static_cast<int>(CapType::ept)> ret;
               MATX_LOOP_UNROLL
-              for (int e = 0; e < static_cast<int>(EPT); ++e) {
+              for (int e = 0; e < static_cast<int>(CapType::ept); ++e) {
                 ret.data[e] = lret(GetVectorVal(n, e), GetVectorVal(m, e), GetVectorVal(x, e));
               }
 
@@ -153,27 +153,33 @@ namespace matx
               return lret(n, m, x);
             }
           } else {
-            return Vector<value_type, static_cast<int>(EPT)>{};
+            return Vector<value_type, static_cast<int>(CapType::ept)>{};
           }
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+          return this->operator()<DefaultCapabilities>(indices...);
         }
 
-        template <OperatorCapability Cap>
-        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
           if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-            return ElementsPerThread::ONE;
+            const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+            return combine_capabilities<Cap>(
+              my_cap,
+              detail::get_operator_capability<Cap>(n_, in),
+              detail::get_operator_capability<Cap>(m_, in),
+              detail::get_operator_capability<Cap>(in_, in)
+            );
           } else {
             auto self_has_cap = capability_attributes<Cap>::default_value;
             return combine_capabilities<Cap>(
               self_has_cap,
-            detail::get_operator_capability<Cap>(n_),
-            detail::get_operator_capability<Cap>(m_),
-              detail::get_operator_capability<Cap>(in_)
+              detail::get_operator_capability<Cap>(n_, in),
+              detail::get_operator_capability<Cap>(m_, in),
+              detail::get_operator_capability<Cap>(in_, in)
             );
           }
         }

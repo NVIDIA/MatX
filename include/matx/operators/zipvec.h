@@ -84,47 +84,52 @@ namespace matx
         }
       }
 
-      template <ElementsPerThread EPT, typename Ops, typename... Is>
+      template <typename CapType, typename Ops, typename... Is>
       static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Ops&& ops, Is... is) {
-        return cuda::std::apply([&](auto&&... op) {
-          using scalar_type = typename AggregateToVec<typename Ts::value_type...>::common_type;
-          return value_type{ static_cast<scalar_type>(op(cuda::std::forward<Is>(is)...))... };
-        }, cuda::std::forward<Ops>(ops));
+        if constexpr (CapType::ept == ElementsPerThread::ONE) {
+          return cuda::std::apply([&](auto&&... op) {
+            using scalar_type = typename AggregateToVec<typename Ts::value_type...>::common_type;
+            return value_type{ static_cast<scalar_type>(op.template operator()<CapType>(cuda::std::forward<Is>(is)...))... };
+          }, cuda::std::forward<Ops>(ops));
+        } else {
+          return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
+        }
       }
 
-      template <ElementsPerThread EPT, typename... Is>
+      template <typename CapType, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is) const
       {
-        return get_impl<EPT>(cuda::std::as_const(ops_), cuda::std::forward<Is>(is)...);
+        return get_impl<CapType>(cuda::std::as_const(ops_), cuda::std::forward<Is>(is)...);
       }
 
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is) const
       {
-        return get_impl<ElementsPerThread::ONE>(cuda::std::as_const(ops_), cuda::std::forward<Is>(is)...);
+        return get_impl<DefaultCapabilities>(cuda::std::as_const(ops_), cuda::std::forward<Is>(is)...);
       }
 
-      template <ElementsPerThread EPT, typename... Is>
+      template <typename CapType, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is)
       {
-        return get_impl<EPT>(ops_, cuda::std::forward<Is>(is)...);
+        return get_impl<CapType>(ops_, cuda::std::forward<Is>(is)...);
       }
 
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is)
       {
-        return get_impl<ElementsPerThread::ONE>(ops_, cuda::std::forward<Is>(is)...);
+        return get_impl<DefaultCapabilities>(ops_, cuda::std::forward<Is>(is)...);
       }
 
-      template <OperatorCapability Cap>
-      __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+      template <OperatorCapability Cap, typename InType>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
         if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
           // For now, we do not support vectorization. We could support it, but it will require some
           // rework of the assumptions used in the matx::Vector class.
-          return ElementsPerThread::ONE;
+          const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+          return combine_capabilities<Cap>(my_cap, get_combined_ops_capability<Cap>(in, ops_));
         } else {
           auto self_has_cap = capability_attributes<Cap>::default_value;
-          return self_has_cap;
+          return combine_capabilities<Cap>(self_has_cap, get_combined_ops_capability<Cap>(in, ops_));
         }
       }
 

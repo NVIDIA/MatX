@@ -44,43 +44,46 @@ namespace matx
         private:
           T1 t1_;
           cuda::std::array<index_t, RANK> shape_;
+          int idx_;
 
         public:
           using matxop = bool;
           using value_type = typename T1::value_type;
-          //typedef typename T1::value_type value_type;
 
           __MATX_INLINE__ std::string str() const { return "meshgrid"; }
 
-          __MATX_INLINE__ MeshGridOp(T1 t1, cuda::std::array<index_t, RANK> shape) : t1_(t1), shape_(shape) {
+          __MATX_INLINE__ MeshGridOp(T1 t1, cuda::std::array<index_t, RANK> shape, int idx) : t1_(t1), shape_(shape), idx_(idx) {
             static_assert(shape.size() == RANK );
             static_assert(is_matx_op<T1>());
           }
 
-          template <detail::OperatorCapability Cap>
-          __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
-            if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-              return ElementsPerThread::ONE;
-            } else {            
-              auto self_has_cap = detail::capability_attributes<Cap>::default_value;
-              return detail::combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(t1_));
-            }
-          }
 
-          template <detail::ElementsPerThread EPT, typename... Is>
+
+          template <typename CapType, typename... Is>
           __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const {
 
             cuda::std::array<index_t, Rank()> inds{indices...};
             // get index for the axis
             auto ind = inds[AXIS];
             // look up value for the axis
-            auto val = get_value<EPT>(t1_, ind);
+            auto val = get_value<CapType>(t1_, ind);
             return val;
           }
 
+          template <OperatorCapability Cap, typename InType>
+          __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
+            if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+              const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+              return combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(t1_, in));
+            } else {            
+              auto self_has_cap = detail::capability_attributes<Cap>::default_value;
+              return detail::combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(t1_, in));
+            }
+          }          
+
           template <typename... Is>
           __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const {
-            return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+            return this->operator()<DefaultCapabilities>(indices...);
           }
 
           __MATX_INLINE__  __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const {
@@ -120,7 +123,7 @@ namespace matx
         }
 
         // return one meshgrid operator per rank
-        return cuda::std::tuple{ permute(MeshGridOp<Ts, RANK, I>{ts, shape}, perm)...};
+        return cuda::std::tuple{ permute(MeshGridOp<Ts, RANK, I>{ts, shape, I}, perm)...};
       }
 
   } // end namespace detail

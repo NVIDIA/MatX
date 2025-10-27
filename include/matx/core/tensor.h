@@ -32,13 +32,11 @@
 
 #pragma once
 
-#include <cinttypes>
+
 #include <cstdint>
-#include <atomic>
 #include <iomanip>
-#include <numeric>
-#include <memory>
 #include <type_traits>
+#include <cuda/std/numeric>
 
 #include "matx/core/allocator.h"
 #include "matx/core/error.h"
@@ -48,6 +46,8 @@
 #include "matx/core/dlpack.h"
 #include "matx/core/tie.h"
 #include "matx/kernels/utility.cuh"
+
+
 
 // forward declare
 namespace matx {
@@ -273,6 +273,7 @@ public:
   {
     const typename detail::base_type_t<T2> &op_base = op;
     return detail::set(*this, op_base);
+    //return detail::set(static_cast<detail::tensor_impl_t<T, RANK, Desc>&>(*this), op_base);
   }
 
   /**
@@ -918,8 +919,8 @@ MATX_LOOP_UNROLL
 
     static_assert(RANK >= 2, "Only tensors of rank 2 and higher can be permuted.");
     int32_t tdims[RANK];
-    std::iota(std::begin(tdims), std::end(tdims), 0);
-    std::swap(tdims[RANK - 2], tdims[RANK - 1]);
+    cuda::std::iota(std::begin(tdims), std::end(tdims), 0);
+    cuda::std::swap(tdims[RANK - 2], tdims[RANK - 1]);
     return Permute(tdims);
   }
 

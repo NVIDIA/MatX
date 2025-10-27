@@ -49,7 +49,7 @@ namespace detail {
       // type cuda::std::complex<float> and the filter has type double, out_t
       // will be cuda::std::complex<double>.
       using out_t = cuda::std::common_type_t<
-        complex_from_scalar_t<typename OpA::value_type>, complex_from_scalar_t<typename FilterType::value_type>>;
+        ::matx::detail::complex_from_scalar_t<typename OpA::value_type>, ::matx::detail::complex_from_scalar_t<typename FilterType::value_type>>;
       typename detail::base_type_t<OpA> a_;
       FilterType f_;
       index_t num_channels_;
@@ -79,38 +79,38 @@ namespace detail {
         out_dims_[Rank() - 1] = num_channels;
       }
 
-      __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
-
       // Const versions
-      template <ElementsPerThread EPT, typename... Is>
+      template <typename CapType, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
-        return tmp_out_.template operator()<EPT>(indices...);
+        return tmp_out_.template operator()<CapType>(indices...);
       }
 
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
-        return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+        return this->operator()<DefaultCapabilities>(indices...);
       }
 
 
-      template <OperatorCapability Cap>
-      __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+      template <OperatorCapability Cap, typename InType>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
         auto self_has_cap = capability_attributes<Cap>::default_value;
         return combine_capabilities<Cap>(self_has_cap, 
-                                           detail::get_operator_capability<Cap>(a_),
-                                           detail::get_operator_capability<Cap>(f_));
+                                           detail::get_operator_capability<Cap>(a_, in),
+                                           detail::get_operator_capability<Cap>(f_, in));
       }
+
+      static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+      {
+        return OpA::Rank() + 1;
+      }
+
+      __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
         static_assert(is_cuda_executor_v<Executor>, "channelize_poly() only supports the CUDA executor currently");
 
         channelize_poly_impl(cuda::std::get<0>(out), a_, f_, num_channels_, decimation_factor_, ex.getStream());
-      }
-
-      static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
-      {
-        return OpA::Rank() + 1;
       }
 
       template <typename ShapeType, typename Executor>
@@ -158,7 +158,6 @@ namespace detail {
       {
         return out_dims_[dim];
       }
-
   };
 }
 

@@ -29,108 +29,53 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
-
 #pragma once
 
+#include "matx/core/capabilities.h"
 #include "matx/core/defines.h"
 #include "matx/executors/host.h"
-#include "matx/executors/kernel.h"
 #include "matx/core/capabilities.h"
+#include "matx/core/get_grid_dims.h"
+#include "matx/executors/kernel.h"
+#include "matx/executors/cuda_executor_common.h"
+#include <cuda/std/array>
+#include <utility>
+#include <vector>
 
 namespace matx
 {
 
   /**
-   * @brief Executes operators on the host on a CUDA-enabled device
+   * @brief Executes operators on a CUDA-enabled device (non-JIT path)
    * 
-   * Optionally takes a stream for asynchronous execution
+   * Optionally takes a stream for asynchronous execution.
+   * This executor uses pre-compiled kernels without JIT compilation.
+   * For JIT-based execution, use CUDAJit executor.
    * 
    */
-  class cudaExecutor {
+  class cudaExecutor : public detail::CudaExecutorBase {
     public:
-      using cuda_executor = bool;  // signal this is a GPU executor
-      using matx_executor = bool; ///< Type trait indicating this is an executor
       /**
        * @brief Construct a new cudaExecutor with a stream
        * 
        * @param stream CUDA stream
        * @param profiling Whether to enable profiling
        */
-      cudaExecutor(cudaStream_t stream, bool profiling = false) : stream_(stream), profiling_(profiling) {
-        if (profiling_) {
-          MATX_CUDA_CHECK(cudaEventCreate(&start_));
-          MATX_CUDA_CHECK(cudaEventCreate(&stop_));
-        }
-      }
+      cudaExecutor(cudaStream_t stream, bool profiling = false) 
+        : detail::CudaExecutorBase(stream, profiling) {}
 
-      cudaExecutor(int stream, bool profiling = false) : stream_(reinterpret_cast<cudaStream_t>(stream)), profiling_(profiling) {
-        if (profiling_) {
-          MATX_CUDA_CHECK(cudaEventCreate(&start_));
-          MATX_CUDA_CHECK(cudaEventCreate(&stop_));
-        }
-      }
+      cudaExecutor(int stream, bool profiling = false) 
+        : detail::CudaExecutorBase(stream, profiling) {}
 
       /**
        * @brief Construct a new cudaExecutor object using the default stream
        * 
        */
-      cudaExecutor() : stream_(0), profiling_(false) {
-        if (profiling_) {
-          MATX_CUDA_CHECK(cudaEventCreate(&start_));
-          MATX_CUDA_CHECK(cudaEventCreate(&stop_));
-        }
-      }
+      cudaExecutor() : detail::CudaExecutorBase() {}
 
-      ~cudaExecutor() {
-        if (profiling_) {
-          cudaEventDestroy(start_);
-          cudaEventDestroy(stop_);
-        }
-      }
-
-      /**
-       * @brief Returns stream associated with executor
-      */
-      auto getStream() const { return stream_; }
-
-      /**
-       * @brief Synchronize the cuda executor's stream
-       * 
-       */
-      void sync() { cudaStreamSynchronize(stream_); }
-
-      /**
-       * @brief Start a timer for profiling workload
-       */
-      void start_timer() { 
-        if (profiling_) {
-          cudaEventRecord(start_, stream_); 
-        }
-      }
-
-      /**
-       * @brief Stop a timer for profiling workload
-       */      
-      void stop_timer() { 
-        if (profiling_) {
-          cudaEventRecord(stop_, stream_); 
-        }
-      }
-
-      /**
-       * @brief Get the time in milliseconds between start_timer and stop_timer. 
-       * This will block until the event is synchronized
-       */
-      float get_time_ms() {
-        MATX_ASSERT_STR(profiling_, matxInvalidParameter, "Profiling not enabled when using get_time_ms()");
-        float time;
-        cudaEventSynchronize(stop_);
-        cudaEventElapsedTime(&time, start_, stop_);
-        return time;
-      }
       
       /**
-       * Execute an operator on a device
+       * Execute an operator on a device (non-JIT path)
        * 
        * @tparam Op Operator type
        * @param op value
@@ -138,150 +83,231 @@ namespace matx
       template <typename Op>
         void Exec(const Op &op) const {
 #ifdef __CUDACC__      
-          dim3 threads, blocks;  
+          dim3 threads = 1;
+          dim3 blocks = 1;  
 
-          // Parameters passed by value in CUDA are limited to 4096B. If the user exceeds this, we 
+          // Parameters passed by value in CUDA are limited to CUDA_MAX_VAL_PARAM. If the user exceeds this, we 
           // need to error out and have them break up the statement
-          MATX_STATIC_ASSERT((sizeof(op) + sizeof(index_t) * Op::Rank()) <= CUDA_MAX_VAL_PARAM, 
-              "Parameter buffer to device is limited to 4096B. Please break up your operator statement into multiple executions to limit the size of the parameters");
+          if ((sizeof(op) + sizeof(index_t) * Op::Rank()) > detail::CUDA_MAX_VAL_PARAM) {
+            MATX_THROW(matxInvalidParameter, 
+                "Parameter buffer to device is limited to " + std::to_string(detail::CUDA_MAX_VAL_PARAM) + "B. "
+                "Please break up your operator statement into multiple executions to limit the size of the parameters");
+          }
+          cuda::std::array<index_t, Op::Rank()> sizes;
+          for (int i = 0; i < Op::Rank(); i++) {
+            sizes[i] = op.Size(i);
+          }   
 
-          const auto max_ept = detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(op);         
+          if constexpr (Op::Rank() <= 4) {
+            // Create kernel provider for non-JIT
+            auto kernel_provider = [&](detail::ElementsPerThread ept) {
+              dim3 local_blocks = 1;
+              dim3 local_threads = 1;
+              bool stride = detail::get_grid_dims<Op::Rank()>(local_blocks, local_threads, sizes, static_cast<int>(ept), 256);
+              
+              // Return appropriate kernel function pointer based on EPT, rank, and stride
+              switch (ept) {
+                case detail::ElementsPerThread::THIRTY_TWO:
+                  if constexpr (Op::Rank() == 0) {
+                    return (const void*)detail::matxOpT0Kernel<detail::CapabilityParams<detail::ElementsPerThread::THIRTY_TWO, false>, Op>;
+                  } else if constexpr (Op::Rank() == 1) {
+                    return (const void*)detail::matxOpT1Kernel<detail::CapabilityParams<detail::ElementsPerThread::THIRTY_TWO, false>, Op>;
+                  } else if constexpr (Op::Rank() == 2) {
+                    return stride ? (const void*)detail::matxOpT2StrideKernel<detail::CapabilityParams<detail::ElementsPerThread::THIRTY_TWO, false>, Op> 
+                                  : (const void*)detail::matxOpT2Kernel<detail::CapabilityParams<detail::ElementsPerThread::THIRTY_TWO, false>, Op>;
+                  } else if constexpr (Op::Rank() == 3) {
+                    return stride ? (const void*)detail::matxOpT3StrideKernel<detail::CapabilityParams<detail::ElementsPerThread::THIRTY_TWO, false>, Op> 
+                                  : (const void*)detail::matxOpT3Kernel<detail::CapabilityParams<detail::ElementsPerThread::THIRTY_TWO, false>, Op>;
+                  } else if constexpr (Op::Rank() == 4) {
+                    return stride ? (const void*)detail::matxOpT4StrideKernel<detail::CapabilityParams<detail::ElementsPerThread::THIRTY_TWO, false>, Op> 
+                                  : (const void*)detail::matxOpT4Kernel<detail::CapabilityParams<detail::ElementsPerThread::THIRTY_TWO, false>, Op>;
+                  }
+                  break;
+                case detail::ElementsPerThread::SIXTEEN:
+                  if constexpr (Op::Rank() == 0) {
+                    return (const void*)detail::matxOpT0Kernel<detail::CapabilityParams<detail::ElementsPerThread::SIXTEEN, false>, Op>;
+                  } else if constexpr (Op::Rank() == 1) {
+                    return (const void*)detail::matxOpT1Kernel<detail::CapabilityParams<detail::ElementsPerThread::SIXTEEN, false>, Op>;
+                  } else if constexpr (Op::Rank() == 2) {
+                    return stride ? (const void*)detail::matxOpT2StrideKernel<detail::CapabilityParams<detail::ElementsPerThread::SIXTEEN, false>, Op> 
+                                  : (const void*)detail::matxOpT2Kernel<detail::CapabilityParams<detail::ElementsPerThread::SIXTEEN, false>, Op>;
+                  } else if constexpr (Op::Rank() == 3) {
+                    return stride ? (const void*)detail::matxOpT3StrideKernel<detail::CapabilityParams<detail::ElementsPerThread::SIXTEEN, false>, Op> 
+                                  : (const void*)detail::matxOpT3Kernel<detail::CapabilityParams<detail::ElementsPerThread::SIXTEEN, false>, Op>;
+                  } else if constexpr (Op::Rank() == 4) {
+                    return stride ? (const void*)detail::matxOpT4StrideKernel<detail::CapabilityParams<detail::ElementsPerThread::SIXTEEN, false>, Op> 
+                                  : (const void*)detail::matxOpT4Kernel<detail::CapabilityParams<detail::ElementsPerThread::SIXTEEN, false>, Op>;
+                  }
+                  break;
+                case detail::ElementsPerThread::EIGHT:
+                  if constexpr (Op::Rank() == 0) {
+                    return (const void*)detail::matxOpT0Kernel<detail::CapabilityParams<detail::ElementsPerThread::EIGHT, false>, Op>;
+                  } else if constexpr (Op::Rank() == 1) {
+                    return (const void*)detail::matxOpT1Kernel<detail::CapabilityParams<detail::ElementsPerThread::EIGHT, false>, Op>;
+                  } else if constexpr (Op::Rank() == 2) {
+                    return stride ? (const void*)detail::matxOpT2StrideKernel<detail::CapabilityParams<detail::ElementsPerThread::EIGHT, false>, Op> 
+                                  : (const void*)detail::matxOpT2Kernel<detail::CapabilityParams<detail::ElementsPerThread::EIGHT, false>, Op>;
+                  } else if constexpr (Op::Rank() == 3) {
+                    return stride ? (const void*)detail::matxOpT3StrideKernel<detail::CapabilityParams<detail::ElementsPerThread::EIGHT, false>, Op> 
+                                  : (const void*)detail::matxOpT3Kernel<detail::CapabilityParams<detail::ElementsPerThread::EIGHT, false>, Op>;
+                  } else if constexpr (Op::Rank() == 4) {
+                    return stride ? (const void*)detail::matxOpT4StrideKernel<detail::CapabilityParams<detail::ElementsPerThread::EIGHT, false>, Op> 
+                                  : (const void*)detail::matxOpT4Kernel<detail::CapabilityParams<detail::ElementsPerThread::EIGHT, false>, Op>;
+                  }
+                  break;
+                case detail::ElementsPerThread::FOUR:
+                  if constexpr (Op::Rank() == 0) {
+                    return (const void*)detail::matxOpT0Kernel<detail::CapabilityParams<detail::ElementsPerThread::FOUR, false>, Op>;
+                  }else if constexpr (Op::Rank() == 1) {
+                    return (const void*)detail::matxOpT1Kernel<detail::CapabilityParams<detail::ElementsPerThread::FOUR, false>, Op>;
+                  } else if constexpr (Op::Rank() == 2) {
+                    return stride ? (const void*)detail::matxOpT2StrideKernel<detail::CapabilityParams<detail::ElementsPerThread::FOUR, false>, Op> 
+                                  : (const void*)detail::matxOpT2Kernel<detail::CapabilityParams<detail::ElementsPerThread::FOUR, false>, Op>;
+                  } else if constexpr (Op::Rank() == 3) {
+                    return stride ? (const void*)detail::matxOpT3StrideKernel<detail::CapabilityParams<detail::ElementsPerThread::FOUR, false>, Op> 
+                                  : (const void*)detail::matxOpT3Kernel<detail::CapabilityParams<detail::ElementsPerThread::FOUR, false>, Op>;
+                  } else if constexpr (Op::Rank() == 4) {
+                    return stride ? (const void*)detail::matxOpT4StrideKernel<detail::CapabilityParams<detail::ElementsPerThread::FOUR, false>, Op> 
+                                  : (const void*)detail::matxOpT4Kernel<detail::CapabilityParams<detail::ElementsPerThread::FOUR, false>, Op>;
+                  }
+                  break;
+                case detail::ElementsPerThread::TWO:
+                  if constexpr (Op::Rank() == 0) {
+                    return (const void*)detail::matxOpT0Kernel<detail::CapabilityParams<detail::ElementsPerThread::TWO, false>, Op>;
+                  } else if constexpr (Op::Rank() == 1) {
+                    return (const void*)detail::matxOpT1Kernel<detail::CapabilityParams<detail::ElementsPerThread::TWO, false>, Op>;
+                  } else if constexpr (Op::Rank() == 2) {
+                    return stride ? (const void*)detail::matxOpT2StrideKernel<detail::CapabilityParams<detail::ElementsPerThread::TWO, false>, Op> 
+                                  : (const void*)detail::matxOpT2Kernel<detail::CapabilityParams<detail::ElementsPerThread::TWO, false>, Op>;
+                  } else if constexpr (Op::Rank() == 3) {
+                    return stride ? (const void*)detail::matxOpT3StrideKernel<detail::CapabilityParams<detail::ElementsPerThread::TWO, false>, Op> 
+                                  : (const void*)detail::matxOpT3Kernel<detail::CapabilityParams<detail::ElementsPerThread::TWO, false>, Op>;
+                  } else if constexpr (Op::Rank() == 4) {
+                    return stride ? (const void*)detail::matxOpT4StrideKernel<detail::CapabilityParams<detail::ElementsPerThread::TWO, false>, Op> 
+                                  : (const void*)detail::matxOpT4Kernel<detail::CapabilityParams<detail::ElementsPerThread::TWO, false>, Op>;
+                  }
+                  break;
+                case detail::ElementsPerThread::ONE:
+                  if constexpr (Op::Rank() == 0) {
+                    return (const void*)detail::matxOpT0Kernel<detail::CapabilityParams<detail::ElementsPerThread::ONE, false>, Op>;
+                  } else if constexpr (Op::Rank() == 1) {
+                    return (const void*)detail::matxOpT1Kernel<detail::CapabilityParams<detail::ElementsPerThread::ONE, false>, Op>;
+                  } else if constexpr (Op::Rank() == 2) {
+                    return stride ? (const void*)detail::matxOpT2StrideKernel<detail::CapabilityParams<detail::ElementsPerThread::ONE, false>, Op> 
+                                  : (const void*)detail::matxOpT2Kernel<detail::CapabilityParams<detail::ElementsPerThread::ONE, false>, Op>;
+                  } else if constexpr (Op::Rank() == 3) {
+                    return stride ? (const void*)detail::matxOpT3StrideKernel<detail::CapabilityParams<detail::ElementsPerThread::ONE, false>, Op> 
+                                  : (const void*)detail::matxOpT3Kernel<detail::CapabilityParams<detail::ElementsPerThread::ONE, false>, Op>;
+                  } else if constexpr (Op::Rank() == 4) {
+                    return stride ? (const void*)detail::matxOpT4StrideKernel<detail::CapabilityParams<detail::ElementsPerThread::ONE, false>, Op> 
+                                  : (const void*)detail::matxOpT4Kernel<detail::CapabilityParams<detail::ElementsPerThread::ONE, false>, Op>;
+                  }
+                  break;
+                default:
+                  return (const void*)nullptr;
+              }
+              return (const void*)nullptr;
+            };
 
-          if constexpr (Op::Rank() == 0) {
-            threads = 1;
-            blocks = 1;
-            detail::matxOpT0Kernel<<<blocks, threads, 0, stream_>>>(op);
+            // Find the best launch parameters
+            auto [best_ept, shm_size, block_size, groups_per_block] = detail::find_best_launch_params(op, kernel_provider, 256, false);
+
+            // Helper lambda to handle kernel dispatch. This is templated on the EPT
+            // type since that's what the kernels are templated on.
+            auto dispatch_kernel = [&]<detail::ElementsPerThread EPT>(auto&& kernel_handler) {
+              int max_tpb = 256;
+
+              bool stride = detail::get_grid_dims<Op::Rank()>(blocks, threads, sizes, static_cast<int>(EPT), max_tpb);
+
+              using CapType = detail::CapabilityParams<EPT, false>;
+              
+              if constexpr (Op::Rank() == 0) {
+                kernel_handler([&]() {
+                  detail::matxOpT0Kernel<CapType><<<blocks, threads, 0, stream_>>>(op);
+                });
+              }
+              else if constexpr (Op::Rank() == 1) {
+                kernel_handler([&]() {
+                  detail::matxOpT1Kernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0]);
+                });
+              }
+              else if constexpr (Op::Rank() == 2) {
+                if (stride) {
+                  kernel_handler([&]() {
+                    detail::matxOpT2StrideKernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
+                  });
+                } else {
+                  kernel_handler([&]() {
+                    detail::matxOpT2Kernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
+                  });
+                }
+              }
+              else if constexpr (Op::Rank() == 3) {
+                if (stride) {
+                  kernel_handler([&]() {
+                    detail::matxOpT3StrideKernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
+                  });
+                } else {
+                  kernel_handler([&]() {
+                    detail::matxOpT3Kernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
+                  });
+                }
+              }
+              else if constexpr (Op::Rank() == 4) {
+                if (stride) {
+                  kernel_handler([&]() {
+                    detail::matxOpT4StrideKernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
+                  });
+                } else {
+                  kernel_handler([&]() {
+                    detail::matxOpT4Kernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
+                  });
+                }
+              }
+            };
+
+            // Helper lambda to launch kernel
+            auto launch_kernel = [&]<detail::ElementsPerThread EPT>() {
+              dispatch_kernel.template operator()<EPT>([&](auto launch_func) {
+                launch_func();
+              });
+            };
+
+            // Launch the correct kernel based on the best EPT found
+            switch (best_ept) {
+              case detail::ElementsPerThread::THIRTY_TWO:
+                launch_kernel.template operator()<detail::ElementsPerThread::THIRTY_TWO>();
+                break;
+              case detail::ElementsPerThread::SIXTEEN:
+                launch_kernel.template operator()<detail::ElementsPerThread::SIXTEEN>();
+                break;
+              case detail::ElementsPerThread::EIGHT:
+                launch_kernel.template operator()<detail::ElementsPerThread::EIGHT>();
+                break;
+              case detail::ElementsPerThread::FOUR:
+                launch_kernel.template operator()<detail::ElementsPerThread::FOUR>();
+                break;
+              case detail::ElementsPerThread::TWO:
+                launch_kernel.template operator()<detail::ElementsPerThread::TWO>();
+                break;
+              case detail::ElementsPerThread::ONE:
+                launch_kernel.template operator()<detail::ElementsPerThread::ONE>();
+                break;
+              default:
+                MATX_THROW(matxInvalidParameter, "No kernel found for this operator");
+            }
           }
           else {
-            cuda::std::array<index_t, Op::Rank()> sizes;
-            for (int i = 0; i < Op::Rank(); i++) {
-              sizes[i] = op.Size(i);
-            }        
-
-            bool stride = detail::get_grid_dims<Op::Rank()>(blocks, threads, sizes, static_cast<int>(max_ept), 256);
-            if constexpr (Op::Rank() == 1) {
-              if (max_ept == detail::ElementsPerThread::ONE) {
-                detail::matxOpT1Kernel<detail::ElementsPerThread::ONE><<<blocks, threads, 0, stream_>>>(op, sizes[0]);
-              } else if (max_ept == detail::ElementsPerThread::TWO) {
-                detail::matxOpT1Kernel<detail::ElementsPerThread::TWO><<<blocks, threads, 0, stream_>>>(op, sizes[0]);
-              } else if (max_ept == detail::ElementsPerThread::FOUR) {
-                detail::matxOpT1Kernel<detail::ElementsPerThread::FOUR><<<blocks, threads, 0, stream_>>>(op, sizes[0]);
-              } else if (max_ept == detail::ElementsPerThread::EIGHT) {
-                detail::matxOpT1Kernel<detail::ElementsPerThread::EIGHT><<<blocks, threads, 0, stream_>>>(op, sizes[0]);
-              } else if (max_ept == detail::ElementsPerThread::SIXTEEN) {
-                detail::matxOpT1Kernel<detail::ElementsPerThread::SIXTEEN><<<blocks, threads, 0, stream_>>>(op, sizes[0]);
-              } else if (max_ept == detail::ElementsPerThread::THIRTY_TWO) {
-                detail::matxOpT1Kernel<detail::ElementsPerThread::THIRTY_TWO><<<blocks, threads, 0, stream_>>>(op, sizes[0]);
-              }
-            }
-            else if constexpr (Op::Rank() == 2) {
-              if(stride) {
-                if (max_ept == detail::ElementsPerThread::ONE) {
-                  detail::matxOpT2StrideKernel<detail::ElementsPerThread::ONE><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
-                } else if (max_ept == detail::ElementsPerThread::TWO) {
-                  detail::matxOpT2StrideKernel<detail::ElementsPerThread::TWO><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
-                } else if (max_ept == detail::ElementsPerThread::FOUR) {
-                  detail::matxOpT2StrideKernel<detail::ElementsPerThread::FOUR><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
-                } else if (max_ept == detail::ElementsPerThread::EIGHT) {
-                  detail::matxOpT2StrideKernel<detail::ElementsPerThread::EIGHT><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
-                } else if (max_ept == detail::ElementsPerThread::SIXTEEN) {
-                  detail::matxOpT2StrideKernel<detail::ElementsPerThread::SIXTEEN><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
-                } else if (max_ept == detail::ElementsPerThread::THIRTY_TWO) {
-                  detail::matxOpT2StrideKernel<detail::ElementsPerThread::THIRTY_TWO><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
-                }
-              } else {
-                if (max_ept == detail::ElementsPerThread::ONE) {
-                  detail::matxOpT2Kernel<detail::ElementsPerThread::ONE><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
-                } else if (max_ept == detail::ElementsPerThread::TWO) {
-                  detail::matxOpT2Kernel<detail::ElementsPerThread::TWO><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
-                } else if (max_ept == detail::ElementsPerThread::FOUR) {
-                  detail::matxOpT2Kernel<detail::ElementsPerThread::FOUR><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
-                } else if (max_ept == detail::ElementsPerThread::EIGHT) {
-                  detail::matxOpT2Kernel<detail::ElementsPerThread::EIGHT><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
-                } else if (max_ept == detail::ElementsPerThread::SIXTEEN) {
-                  detail::matxOpT2Kernel<detail::ElementsPerThread::SIXTEEN><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
-                } else if (max_ept == detail::ElementsPerThread::THIRTY_TWO) {
-                  detail::matxOpT2Kernel<detail::ElementsPerThread::THIRTY_TWO><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
-                }
-              }
-            }
-            else if constexpr (Op::Rank() == 3) {
-              if(stride) {
-                if (max_ept == detail::ElementsPerThread::ONE) {
-                  detail::matxOpT3StrideKernel<detail::ElementsPerThread::ONE><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
-                } else if (max_ept == detail::ElementsPerThread::TWO) {
-                  detail::matxOpT3StrideKernel<detail::ElementsPerThread::TWO><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
-                } else if (max_ept == detail::ElementsPerThread::FOUR) {
-                  detail::matxOpT3StrideKernel<detail::ElementsPerThread::FOUR><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
-                } else if (max_ept == detail::ElementsPerThread::EIGHT) {
-                  detail::matxOpT3StrideKernel<detail::ElementsPerThread::EIGHT><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
-                } else if (max_ept == detail::ElementsPerThread::SIXTEEN) {
-                  detail::matxOpT3StrideKernel<detail::ElementsPerThread::SIXTEEN><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
-                } else if (max_ept == detail::ElementsPerThread::THIRTY_TWO) {
-                  detail::matxOpT3StrideKernel<detail::ElementsPerThread::THIRTY_TWO><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
-                }
-              } else {
-                if (max_ept == detail::ElementsPerThread::ONE) {
-                  detail::matxOpT3Kernel<detail::ElementsPerThread::ONE><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
-                } else if (max_ept == detail::ElementsPerThread::TWO) {
-                  detail::matxOpT3Kernel<detail::ElementsPerThread::TWO><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
-                } else if (max_ept == detail::ElementsPerThread::FOUR) {
-                  detail::matxOpT3Kernel<detail::ElementsPerThread::FOUR><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
-                } else if (max_ept == detail::ElementsPerThread::EIGHT) {
-                  detail::matxOpT3Kernel<detail::ElementsPerThread::EIGHT><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
-                } else if (max_ept == detail::ElementsPerThread::SIXTEEN) {
-                  detail::matxOpT3Kernel<detail::ElementsPerThread::SIXTEEN><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
-                } else if (max_ept == detail::ElementsPerThread::THIRTY_TWO) {
-                  detail::matxOpT3Kernel<detail::ElementsPerThread::THIRTY_TWO><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
-                }
-              }
-            }
-            else if constexpr (Op::Rank() == 4) {
-              if(stride) {
-                if (max_ept == detail::ElementsPerThread::ONE) {
-                  detail::matxOpT4StrideKernel<detail::ElementsPerThread::ONE><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
-                } else if (max_ept == detail::ElementsPerThread::TWO) {
-                  detail::matxOpT4StrideKernel<detail::ElementsPerThread::TWO><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
-                } else if (max_ept == detail::ElementsPerThread::FOUR) {
-                  detail::matxOpT4StrideKernel<detail::ElementsPerThread::FOUR><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
-                } else if (max_ept == detail::ElementsPerThread::EIGHT) {
-                  detail::matxOpT4StrideKernel<detail::ElementsPerThread::EIGHT><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
-                } else if (max_ept == detail::ElementsPerThread::SIXTEEN) {
-                  detail::matxOpT4StrideKernel<detail::ElementsPerThread::SIXTEEN><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
-                } else if (max_ept == detail::ElementsPerThread::THIRTY_TWO) {
-                  detail::matxOpT4StrideKernel<detail::ElementsPerThread::THIRTY_TWO><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
-                }
-              } else {
-                if (max_ept == detail::ElementsPerThread::ONE) {
-                  detail::matxOpT4Kernel<detail::ElementsPerThread::ONE><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
-                } else if (max_ept == detail::ElementsPerThread::TWO) {
-                  detail::matxOpT4Kernel<detail::ElementsPerThread::TWO><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
-                } else if (max_ept == detail::ElementsPerThread::FOUR) {
-                  detail::matxOpT4Kernel<detail::ElementsPerThread::FOUR><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
-                } else if (max_ept == detail::ElementsPerThread::EIGHT) {
-                  detail::matxOpT4Kernel<detail::ElementsPerThread::EIGHT><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
-                } else if (max_ept == detail::ElementsPerThread::SIXTEEN) {
-                  detail::matxOpT4Kernel<detail::ElementsPerThread::SIXTEEN><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
-                } else if (max_ept == detail::ElementsPerThread::THIRTY_TWO) {
-                  detail::matxOpT4Kernel<detail::ElementsPerThread::THIRTY_TWO><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
-                }
-              }
-            }        
-            else {
-              index_t dims = std::accumulate(std::begin(sizes) + 1, std::end(sizes), 1, std::multiplies<index_t>());
-              detail::matxOpTDKernel<<<blocks, threads, 0, stream_>>>(op, sizes, dims);
-            } 
-          }
+            auto ept_type = detail::EPTQueryInput{false};
+            const auto ept_bounds = detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(op, ept_type);              
+            bool stride = detail::get_grid_dims<Op::Rank()>(blocks, threads, sizes, static_cast<int>(ept_bounds[1]), 1024);   
+            index_t dims = cuda::std::accumulate(cuda::std::begin(sizes) + 1, cuda::std::end(sizes), 1, cuda::std::multiplies<index_t>());
+            detail::matxOpTDKernel<<<blocks, threads, 0, stream_>>>(op, sizes, dims);
+          }            
 #else
           MATX_ASSERT_STR(false, matxInvalidParameter, "Cannot call device executor using host compiler");
 #endif    
         }
-
-    private:
-      cudaStream_t stream_;
-      bool profiling_;
-      cudaEvent_t start_;
-      cudaEvent_t stop_;
   };
 
   using CUDAExecutor = cudaExecutor; // Alias to make it consistent with host mode

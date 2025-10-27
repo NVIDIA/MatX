@@ -89,13 +89,13 @@ namespace matx
         }        
       }
 
-        template <ElementsPerThread EPT>
+        template <typename CapType>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i, index_t j) const
         {
-          if constexpr (EPT == ElementsPerThread::ONE) {
+          if constexpr (CapType::ept == ElementsPerThread::ONE) {
             if (j > i) {
               if constexpr (is_matx_op<T2>()) {
-                auto val = get_value<EPT>(op2_, j - i);
+                auto val = get_value<CapType>(op2_, j - i);
               return val;
               }
               else {
@@ -105,7 +105,7 @@ namespace matx
             }
             else {
               if constexpr (is_matx_op<T1>()) {
-                auto val = get_value<EPT>(op1_, i - j);
+                auto val = get_value<CapType>(op1_, i - j);
                 return val;
               }
               else {
@@ -114,23 +114,26 @@ namespace matx
               }          
             }
           } else {
-            return Vector<value_type, static_cast<index_t>(EPT)>{};
+            return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
           }
         }
 
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i, index_t j) const
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(i, j);
+          return this->operator()<DefaultCapabilities>(i, j);
         }
 
-        template <OperatorCapability Cap>
-        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
           if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-            return ElementsPerThread::ONE;
+            const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+            auto op1_cap = detail::get_operator_capability<Cap>(op1_, in);
+            auto op2_cap = detail::get_operator_capability<Cap>(op2_, in);
+            return combine_capabilities<Cap>(my_cap, op1_cap, op2_cap);
           } else {
             auto self_has_cap = capability_attributes<Cap>::default_value;
-            auto op1_cap = detail::get_operator_capability<Cap>(op1_);
-            auto op2_cap = detail::get_operator_capability<Cap>(op2_);
+            auto op1_cap = detail::get_operator_capability<Cap>(op1_, in);
+            auto op2_cap = detail::get_operator_capability<Cap>(op2_, in);
             return combine_capabilities<Cap>(self_has_cap, op1_cap, op2_cap);
           }
         }
@@ -216,7 +219,7 @@ namespace matx
    * @returns
    *   New operator of the kronecker product
    */
-  template <typename Op, std::enable_if_t<!std::is_array_v<typename remove_cvref<Op>::type>, bool> = true>
+  template <typename Op, std::enable_if_t<!cuda::std::is_array_v<typename remove_cvref<Op>::type>, bool> = true>
   auto __MATX_INLINE__ toeplitz(const Op &c)
   {
     if constexpr (is_complex_v<typename Op::value_type>) {
@@ -271,8 +274,8 @@ namespace matx
    * @returns
    *   New operator of the kronecker product
    */
-  template <typename COp, typename ROp, std::enable_if_t< !std::is_array_v<typename remove_cvref<COp>::type> && 
-                                                          !std::is_array_v<typename remove_cvref<ROp>::type>, 
+  template <typename COp, typename ROp, std::enable_if_t< !cuda::std::is_array_v<typename remove_cvref<COp>::type> && 
+                                                          !cuda::std::is_array_v<typename remove_cvref<ROp>::type>, 
                                                           bool> = true>
   auto __MATX_INLINE__ toeplitz(const COp &c, const ROp &r)
   {

@@ -72,25 +72,28 @@ namespace matx
           }
         }
 
-        template <ElementsPerThread EPT, typename... Is>
+        template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          return apply_impl<EPT>(cuda::std::index_sequence_for<Ops...>{}, indices...);
+          return apply_impl<CapType>(cuda::std::index_sequence_for<Ops...>{}, indices...);
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+          return this->operator()<DefaultCapabilities>(indices...);
         }
 
-        template <OperatorCapability Cap>
-        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
           if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-            return ElementsPerThread::ONE;
+            const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+            return 
+                combine_capabilities<Cap>(my_cap, get_combined_ops_capability<Cap>(in, ops_));
+          } else {
+            auto self_has_cap = capability_attributes<Cap>::default_value;
+            return combine_capabilities<Cap>(self_has_cap, get_combined_ops_capability<Cap>(in, ops_));
           }
-          auto self_has_cap = capability_attributes<Cap>::default_value;
-          return combine_capabilities_tuple<Cap>(self_has_cap, ops_, cuda::std::index_sequence_for<Ops...>{});
         }
 
         template <typename ShapeType, typename Executor>
@@ -126,11 +129,11 @@ namespace matx
         cuda::std::array<index_t, first_op_type::Rank()> sizes_;
         
         // Helper to apply the lambda function with indices and operators
-        template <ElementsPerThread EPT, size_t... Is, typename... Indices>
+        template <typename CapType, size_t... Is, typename... Indices>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) apply_impl(
             cuda::std::index_sequence<Is...>, Indices... indices) const
         {
-          if constexpr (EPT == ElementsPerThread::ONE) {
+          if constexpr (CapType::ept == ElementsPerThread::ONE) {
             // Scalar case: single element access
             cuda::std::array<index_t, sizeof...(Indices)> idx_array{static_cast<index_t>(indices)...};
             return func_(idx_array, cuda::std::get<Is>(ops_)...);
@@ -140,16 +143,16 @@ namespace matx
             // Note that this path is disabled for now since apply_idx can't swizzle with vectors
             cuda::std::array<index_t, sizeof...(Indices)> idx_array{static_cast<index_t>(indices)...};
             using result_element_type = decltype(func_(idx_array, cuda::std::get<Is>(ops_)...));
-            Vector<result_element_type, static_cast<int>(EPT)> result;
+            Vector<result_element_type, static_cast<int>(CapType::ept)> result;
 
             // Adjust the last index to the EPT value. The user's lambda function does not know whether we're
             // using vectorization or not so we need to adjust the index ourselves.
-            idx_array[sizeof...(Indices) - 1] *= static_cast<int>(EPT);
+            idx_array[sizeof...(Indices) - 1] *= static_cast<int>(CapType::ept);
             
             // Unroll loop to call func_ on each element of the vector
             // For multi-dimensional indices, only the last index varies
             MATX_LOOP_UNROLL
-            for (int i = 0; i < static_cast<int>(EPT); i++) {
+            for (int i = 0; i < static_cast<int>(CapType::ept); i++) {
               result.data[i] = func_(idx_array, cuda::std::get<Is>(ops_)...);
               if constexpr (sizeof...(Indices) > 0) {
                 idx_array[sizeof...(Indices) - 1]++;

@@ -43,7 +43,7 @@ namespace matx
    * Returns the current tensor index for the given dimension.
    */
   namespace detail {
-      class IndexOp : public BaseOp<IndexOp>
+    class IndexOp : public BaseOp<IndexOp>
     {
       private:
         int dim_;
@@ -55,21 +55,21 @@ namespace matx
         __MATX_INLINE__ std::string str() const { return "index()"; } 
         __MATX_INLINE__ IndexOp(int dim) : dim_(dim){};  
 
-        template <ElementsPerThread EPT, typename... Is>
+        template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
         {
-          if constexpr (EPT == ElementsPerThread::ONE) {
+          if constexpr (CapType::ept == ElementsPerThread::ONE) {
             cuda::std::array<index_t, sizeof...(Is)> inds{indices...};
             return inds[dim_];
           } else {
-            return Vector<value_type, static_cast<index_t>(EPT)>{};
+            return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
           }
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+          return this->operator()<DefaultCapabilities>(indices...);
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -81,12 +81,24 @@ namespace matx
           return index_t(0);
         }
 
-        template <OperatorCapability Cap>
-        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType&) const {
           if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-            return ElementsPerThread::ONE;
+            const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+            return my_cap;
           } else {
             return capability_attributes<Cap>::default_value;
+          }
+        }
+
+        template <OperatorCapability Cap>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability_proc() const {
+          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+            return my_cap;
+          } else {        
+            auto self_has_cap = detail::capability_attributes<Cap>::default_value;
+            return self_has_cap;
           }
         }
     };

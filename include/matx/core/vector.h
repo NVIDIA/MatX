@@ -34,7 +34,7 @@
 
 #include <cuda/std/array>
 #include <cuda/std/__algorithm/fill.h>
-#include <matx/core/type_utils.h>
+#include <matx/core/type_utils_both.h>
 
 namespace matx{
 namespace detail {
@@ -45,36 +45,36 @@ constexpr size_t __MATX_HOST__ __MATX_DEVICE__ alignment_by_type() {
   // Some vector types allow alignments lower than sizeof(T) to maintain power-of-two alignments. This is particularly
   // important for types where sizeof(T) > MAX_VEC_WIDTH_BYTES as we would not be able to load a single element
   // with one load instruction if we assume that the alignment is sizeof(T).
-  if constexpr (std::is_same_v<T, char3> || std::is_same_v<T, uchar3>) {
+  if constexpr (cuda::std::is_same_v<T, char3> || cuda::std::is_same_v<T, uchar3>) {
     return 1;
-  } else if constexpr (std::is_same_v<T, short3> || std::is_same_v<T, ushort3>) {
+  } else if constexpr (cuda::std::is_same_v<T, short3> || cuda::std::is_same_v<T, ushort3>) {
     return 2;
-  } else if constexpr (std::is_same_v<T, int3> || std::is_same_v<T, uint3>) {
+  } else if constexpr (cuda::std::is_same_v<T, int3> || cuda::std::is_same_v<T, uint3>) {
     return 4;
-  } else if constexpr (std::is_same_v<T, long3> || std::is_same_v<T, ulong3>) {
+  } else if constexpr (cuda::std::is_same_v<T, long3> || cuda::std::is_same_v<T, ulong3>) {
     return sizeof(long) == sizeof(int) ? 4 : 8;
 #if CUDART_VERSION >= 13000
-  } else if constexpr (std::is_same_v<T, long4_32a> || std::is_same_v<T, ulong4_32a>) {
+  } else if constexpr (cuda::std::is_same_v<T, long4_32a> || cuda::std::is_same_v<T, ulong4_32a>) {
 #else
-  } else if constexpr (std::is_same_v<T, long4> || std::is_same_v<T, ulong4>) {
+  } else if constexpr (cuda::std::is_same_v<T, long4> || cuda::std::is_same_v<T, ulong4>) {
 #endif
     return 16;
-  } else if constexpr (std::is_same_v<T, longlong3> || std::is_same_v<T, ulonglong3>) {
+  } else if constexpr (cuda::std::is_same_v<T, longlong3> || cuda::std::is_same_v<T, ulonglong3>) {
     return 8;
 #if CUDART_VERSION >= 13000
-  } else if constexpr (std::is_same_v<T, longlong4_32a> || std::is_same_v<T, ulonglong4_32a>) {
+  } else if constexpr (cuda::std::is_same_v<T, longlong4_32a> || cuda::std::is_same_v<T, ulonglong4_32a>) {
 #else
-  } else if constexpr (std::is_same_v<T, longlong4> || std::is_same_v<T, ulonglong4>) {
+  } else if constexpr (cuda::std::is_same_v<T, longlong4> || cuda::std::is_same_v<T, ulonglong4>) {
 #endif
     return 16;
-  } else if constexpr (std::is_same_v<T, float3>) {
+  } else if constexpr (cuda::std::is_same_v<T, float3>) {
     return 4;
-  } else if constexpr (std::is_same_v<T, double3>) {
+  } else if constexpr (cuda::std::is_same_v<T, double3>) {
     return 8;
 #if CUDART_VERSION >= 13000
-  } else if constexpr (std::is_same_v<T, double4_32a>) {
+  } else if constexpr (cuda::std::is_same_v<T, double4_32a>) {
 #else
-  } else if constexpr (std::is_same_v<T, double4>) {
+  } else if constexpr (cuda::std::is_same_v<T, double4>) {
 #endif
     return 16;
   } else {
@@ -87,8 +87,9 @@ struct alignas(alignment_by_type<T>() * N) Vector {
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Vector() {}
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Vector(T v) { Fill(v); }
 
-  template <typename T2, std::enable_if_t<std::is_same_v<typename T2::matx_vec, bool> && T2::width == N, bool> = true>
+  template <typename T2, cuda::std::enable_if_t<cuda::std::is_same_v<typename T2::matx_vec, bool> && T2::width == N, bool> = true>
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Vector& operator=(const T2& v) {
+    MATX_LOOP_UNROLL
     for (int i = 0; i < N; i++) {
       data[i] = v.data[i];
     }
@@ -135,34 +136,15 @@ struct alignas(alignment_by_type<T>() * N) Vector {
 };
 
 
-template <typename T, typename = void> struct is_vector : std::false_type {};
+template <typename T, typename = void> struct is_vector : cuda::std::false_type {};
 template <typename T>
-struct is_vector<T, std::void_t<typename T::matx_vec>>
-    : std::true_type {
+struct is_vector<T, cuda::std::void_t<typename T::matx_vec>>
+    : cuda::std::true_type {
 };
 
 
 template< class T >
 inline constexpr bool is_vector_v = detail::is_vector<typename remove_cvref<T>::type>::value;
-
-
-template <typename T, int EPT, typename = void>
-struct vector_or_scalar_impl {
-  using type = Vector<T, EPT>;
-};
-
-template <typename T, int EPT>
-struct vector_or_scalar_impl<T, EPT, std::enable_if_t<is_vector_v<T> && EPT != 1>> {
-  using type = T;
-};
-
-template <typename T, int EPT>
-struct vector_or_scalar_impl<T, EPT, std::enable_if_t<!is_vector_v<T> && EPT == 1>> {
-  using type = T;
-};
-
-template <typename T, int EPT>
-using vector_or_scalar_t = typename vector_or_scalar_impl<T, EPT>::type;
 
 
 

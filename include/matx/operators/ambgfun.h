@@ -35,6 +35,8 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
+#include "matx/core/operator_options.h"
+
 #include "matx/transforms/ambgfun.h"
 
 namespace matx
@@ -62,11 +64,11 @@ namespace matx
         using ambgfun_xform_op = bool;
 
         __MATX_INLINE__ std::string str() const { 
-          if (y_) {
-            return "ambgfun(" + get_type_str(x_) + "," + get_type_str(x_)  + ")";
+          if constexpr (std::is_same_v<OpY, EmptyY>) {
+            return "ambgfun(" + get_type_str(x_) + ")";
           }
           else {
-            return "ambgfun(" + get_type_str(x_) + ")";
+            return "ambgfun(" + get_type_str(x_) + "," + get_type_str(y_) + ")";
           }
         }
 
@@ -91,25 +93,30 @@ namespace matx
           }
         }
 
-        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }   
 
-        template <ElementsPerThread EPT, typename... Is>
+        template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          return tmp_out_.template operator()<EPT>(indices...);
+          return tmp_out_.template operator()<CapType>(indices...);
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          return tmp_out_.template operator()<detail::ElementsPerThread::ONE>(indices...);
+          return tmp_out_.template operator()<DefaultCapabilities>(indices...);
         }
         
-        template <OperatorCapability Cap>
-        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
           // No specific capabilities enforced
           auto self_has_cap = capability_attributes<Cap>::default_value;
-          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(x_), detail::get_operator_capability<Cap>(y_));
+          if constexpr (std::is_same_v<OpY, EmptyY>) {
+            // Single-input ambgfun: only combine capabilities from x_
+            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(x_, in));
+          } else {
+            // Two-input ambgfun: combine capabilities from both x_ and y_
+            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(x_, in), detail::get_operator_capability<Cap>(y_, in));
+          }
         }          
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -120,6 +127,8 @@ namespace matx
         {
           return out_dims_[dim];
         }
+
+        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }   
 
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
@@ -167,7 +176,7 @@ namespace matx
           }
 
           matxFree(ptr); 
-        }            
+        }
     };
   }
 
@@ -208,7 +217,7 @@ __MATX_INLINE__ auto ambgfun(const XTensor &x,
                     float cut_val = 0.0)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  return detail::AmbgFunOp(x, std::make_optional(y), fs, cut, cut_val);
+  return detail::AmbgFunOp(x, y, fs, cut, cut_val);
 }
 
 /**
@@ -241,7 +250,7 @@ __MATX_INLINE__ auto ambgfun(const XTensor &x,
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   
-  std::optional<XTensor> nil = std::nullopt;
+  detail::EmptyY nil;
   return detail::AmbgFunOp(x, nil, fs, cut, cut_val);
 }
 

@@ -92,12 +92,12 @@ namespace matx
 
 
       // Non-const path returns references where available (used for LHS writes)
-      template <ElementsPerThread EPT, int I = 0, int N>
+      template <typename CapType, int I = 0, int N>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(cuda::std::array<index_t,RANK> &indices) {
         if constexpr ( I == N ) {
           // This should never happen, but we return a fake value from the first tuple element anyways
           auto &op = cuda::std::get<0>(ops_);
-          return cuda::std::apply([&](auto &&...call_args) -> decltype(auto) { return op.template operator()<EPT>(call_args...); }, indices);
+          return cuda::std::apply([&](auto &&...call_args) -> decltype(auto) { return op.template operator()<CapType>(call_args...); }, indices);
         } else {
           auto &op = cuda::std::get<I>(ops_);
           auto idx = indices[axis_];
@@ -105,26 +105,26 @@ namespace matx
           // If in range of this operator
           if(idx < size) {
             // evaluate operator
-            return cuda::std::apply([&](auto &&...call_args) -> decltype(auto) { return op.template operator()<EPT>(call_args...); }, indices);
+            return cuda::std::apply([&](auto &&...call_args) -> decltype(auto) { return op.template operator()<CapType>(call_args...); }, indices);
           } else {
             // otherwise remove this operator and recurse
             indices[axis_] -= size;
-            return get_impl<EPT, I+1, N>(indices);
+            return get_impl<CapType, I+1, N>(indices);
           }
         }
       }
 
       // Const path: unify scalar return type to value_type to avoid ref/value conflicts
-      template <ElementsPerThread EPT, int I = 0, int N>
+      template <typename CapType, int I = 0, int N>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto get_impl(cuda::std::array<index_t,RANK> &indices) const {
         using return_t = cuda::std::conditional_t<
-            (EPT == ElementsPerThread::ONE),
+            (CapType::ept == ElementsPerThread::ONE),
             value_type,
-            Vector<value_type, static_cast<index_t>(EPT)>>;
+            Vector<value_type, static_cast<index_t>(CapType::ept)>>;
         if constexpr ( I == N ) {
           const auto &op = cuda::std::get<0>(ops_);
           return cuda::std::apply([&](auto &&...call_args) -> return_t {
-            return op.template operator()<EPT>(call_args...);
+            return op.template operator()<CapType>(call_args...);
           }, indices);
         } else {
           const auto &op = cuda::std::get<I>(ops_);
@@ -132,24 +132,24 @@ namespace matx
           auto size = op.Size(axis_);
           if(idx < size) {
             return cuda::std::apply([&](auto &&...call_args) -> return_t {
-              return op.template operator()<EPT>(call_args...);
+              return op.template operator()<CapType>(call_args...);
             }, indices);
           } else {
             indices[axis_] -= size;
-            return get_impl<EPT, I+1, N>(indices);
+            return get_impl<CapType, I+1, N>(indices);
           }
         }
       }
 
-      template <ElementsPerThread EPT, typename... Is>
+      template <typename CapType, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is) const
       {
-        if constexpr (EPT == ElementsPerThread::ONE) {
+        if constexpr (CapType::ept == ElementsPerThread::ONE) {
           cuda::std::array<index_t, sizeof...(Is)> indices = {{is...}};
-          return get_impl<EPT, 0, sizeof...(Ts)>(indices);
+          return get_impl<CapType, 0, sizeof...(Ts)>(indices);
         }
         else {
-          return Vector<value_type, static_cast<index_t>(EPT)>{};
+          return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
         }
       }
 
@@ -158,38 +158,37 @@ namespace matx
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is) const
       {
-        return this->operator()<detail::ElementsPerThread::ONE>(is...);
+        return this->operator()<DefaultCapabilities>(is...);
       }
 
-      template <ElementsPerThread EPT, typename... Is>
+      template <typename CapType, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is)
       {
-        if constexpr (EPT == ElementsPerThread::ONE) {
+        if constexpr (CapType::ept == ElementsPerThread::ONE) {
           cuda::std::array<index_t, sizeof...(Is)> indices = {{is...}};
-          return get_impl<EPT, 0, sizeof...(Ts)>(indices);
+          return get_impl<CapType, 0, sizeof...(Ts)>(indices);
         }
         else {
-          return Vector<value_type, static_cast<index_t>(EPT)>{};
+          return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
         }
       }
 
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is)
       {
-        return this->operator()<detail::ElementsPerThread::ONE>(is...);
+        return this->operator()<DefaultCapabilities>(is...);
       }
 
 
-      template <OperatorCapability Cap>
-      __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+      template <OperatorCapability Cap, typename InType>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType & in) const {
         if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-          return ElementsPerThread::ONE;
+          const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+          return combine_capabilities<Cap>(my_cap, get_combined_ops_capability<Cap>(in, ops_));
         } else {
           auto self_has_cap = capability_attributes<Cap>::default_value;
-          return self_has_cap;
           // static_assert(sizeof...(Ts) > 1, ...); ensures ops_ is not empty.
-          // auto all_ops_cap = get_combined_ops_capability<Cap>(cuda::std::make_index_sequence<sizeof...(Ts)>{});
-          // return combine_capabilities<Cap>(self_has_cap, all_ops_cap);
+          return combine_capabilities<Cap>(self_has_cap, get_combined_ops_capability<Cap>(in, ops_));
         }
       }
 

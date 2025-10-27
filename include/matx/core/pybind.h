@@ -272,7 +272,7 @@ public:
   {
     // All this ugly stuff is because there is no cuda::std::cout support
     // complex
-    if constexpr (is_complex_v<T1> || is_complex_v<T2>) {
+    if constexpr (is_complex_v<T1> || is_complex_v<T2> || is_std_complex_v<T1> || is_std_complex_v<T2>) {
       if (debug) {
         printf("FileName=%s Vector=%f%+f File=%f%+f\n", name.c_str(),
                static_cast<double>(ut_data.real()),

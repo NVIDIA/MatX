@@ -58,18 +58,28 @@ namespace matx
         }
       };
 
-      template <detail::OperatorCapability Cap>
-      __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+      template <OperatorCapability Cap, typename InType>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
         if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-          return ElementsPerThread::ONE;
-        } else {
-          auto self_has_cap = detail::capability_attributes<Cap>::default_value;
-          return self_has_cap;
+          const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+          return my_cap;
+        } else {        
+          return detail::capability_attributes<Cap>::default_value;
+        }
+      }
+
+      template <OperatorCapability Cap>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability_proc() const {
+        if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+          const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+          return my_cap;
+        } else {        
+          return detail::capability_attributes<Cap>::default_value;
         }
       }
 
       // Does not support vectorization yet
-      template <detail::ElementsPerThread EPT, typename... Is>
+      template <typename CapType, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const {
         if (((pp_get<0>(indices...) == indices) && ...)) {
           return T(val_);
@@ -81,7 +91,7 @@ namespace matx
 
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const {
-        return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+        return this->operator()<DefaultCapabilities>(indices...);
       }
 
       constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const
@@ -119,7 +129,7 @@ namespace matx
    * @param val Value to return
    *
    */
-  template <typename T = int, std::enable_if_t<std::is_arithmetic_v<T>, bool> = true>
+  template <typename T = int, std::enable_if_t<cuda::std::is_arithmetic_v<T>, bool> = true>
   inline auto diag(T val)
   {
     return detail::Diag<T, detail::NoShape>(detail::NoShape{}, T(val));
@@ -137,7 +147,7 @@ namespace matx
    *
    */
   template <typename T = int, typename ShapeType,
-  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type> &&
+  std::enable_if_t<!cuda::std::is_array_v<typename remove_cvref<ShapeType>::type> &&
                    !is_matx_op<ShapeType>(), bool> = true>
   inline auto diag(ShapeType &&s, T val)
   {
@@ -176,7 +186,7 @@ namespace matx
    *
    */
   template <typename T = int, typename ShapeType,
-  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+  std::enable_if_t<!cuda::std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
   inline auto eye(ShapeType &&s)
   {
     return detail::Diag<T, ShapeType>(std::forward<ShapeType>(s), T(1));

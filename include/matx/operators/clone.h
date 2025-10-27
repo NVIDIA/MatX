@@ -86,10 +86,10 @@ MATX_IGNORE_WARNING_POP_GCC
 
         }
 
-        template <ElementsPerThread EPT, typename Op, typename Dims, typename... Is>
+        template <typename CapType, typename Op, typename Dims, typename... Is>
         static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, const Dims &dims, Is... indices)
         {
-          if constexpr (EPT == ElementsPerThread::ONE) {
+          if constexpr (CapType::ept == ElementsPerThread::ONE) {
   MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
             cuda::std::array<index_t, Rank()> sind{indices...};
             cuda::std::array<index_t, T::Rank()> gind;
@@ -101,10 +101,10 @@ MATX_IGNORE_WARNING_POP_GCC
               gind[i] = sind[idx];
             }
 
-            return get_value<EPT>(cuda::std::forward<Op>(op), gind);
+            return get_value<CapType>(cuda::std::forward<Op>(op), gind);
           }
           else {
-            return Vector<value_type, static_cast<index_t>(EPT)>{};
+            return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
           }
         }
 
@@ -114,28 +114,28 @@ MATX_IGNORE_WARNING_POP_GCC
           return get_impl<detail::ElementsPerThread::ONE>(cuda::std::forward<Op>(op), dims, indices...);
         }
 
-        template <ElementsPerThread EPT, typename... Is>
+        template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          return get_impl<EPT>(cuda::std::as_const(op_), dims_, indices...);
+          return get_impl<CapType>(cuda::std::as_const(op_), dims_, indices...);
         }
 
-        template <ElementsPerThread EPT, typename... Is>
+        template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
-          return get_impl<EPT>(cuda::std::forward<decltype(op_)>(op_), dims_, indices...);
+          return get_impl<CapType>(cuda::std::forward<decltype(op_)>(op_), dims_, indices...);
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+          return this->operator()<DefaultCapabilities>(indices...);
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
-          return this->operator()<detail::ElementsPerThread::ONE>(indices...);
+          return this->operator()<DefaultCapabilities>(indices...);
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -163,14 +163,15 @@ MATX_IGNORE_WARNING_POP_GCC
           }
         }
 
-        template <OperatorCapability Cap>
-        __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
           if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-            return ElementsPerThread::ONE;
+            const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+            return combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(op_, in));
           }
           else {
             auto self_has_cap = capability_attributes<Cap>::default_value;
-            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_));
+            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_, in));
           }
         }
     };

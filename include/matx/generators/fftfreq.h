@@ -54,16 +54,16 @@ namespace matx
           d_ = d;
         }
 
-        template <detail::ElementsPerThread EPT>
+        template <typename CapType>
         __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t idx) const {
-          return detail::ApplyGeneratorVecFunc<EPT, T>([this](index_t i) {
+          return detail::ApplyGeneratorVecFunc<CapType, T>([this](index_t i) {
             index_t offset = i >= (n_+1)/2 ? -n_ : 0;
             return static_cast<T>(i + offset) / (d_*(T)n_);
           }, idx);
         }
 
         __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t idx) const {
-          return this->operator()<detail::ElementsPerThread::ONE>(idx);
+          return this->operator()<DefaultCapabilities>(idx);
         }
 
         constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size([[maybe_unused]] int dim) const

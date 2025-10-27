@@ -34,7 +34,6 @@
 
 
 #include "matx/core/type_utils.h"
-#include "matx/operators/base_operator.h"
 #include "matx/operators/permute.h"
 #include "matx/transforms/reduce.h"
 
@@ -68,14 +67,14 @@ namespace detail {
 
       __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
-      template <ElementsPerThread EPT, typename... Is>
+      template <typename CapType, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
-        return tmp_out_.template operator()<EPT>(indices...);
+        return tmp_out_.template operator()<CapType>(indices...);
       };
 
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
-        return tmp_out_.template operator()<detail::ElementsPerThread::ONE>(indices...);
+        return tmp_out_.template operator()<DefaultCapabilities>(indices...);
       };
 
       template <typename Out, typename Executor>
@@ -83,11 +82,11 @@ namespace detail {
         any_impl(cuda::std::get<0>(out), a_, ex);
       }
 
-      template <OperatorCapability Cap>
-      __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
+      template <OperatorCapability Cap, typename InType>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
         // No specific capabilities enforced
         auto self_has_cap = capability_attributes<Cap>::default_value;
-        return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_));
+        return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
       }      
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
