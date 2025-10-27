@@ -37,6 +37,7 @@
 #include <cuda/std/tuple>
 #include <cuda/std/cstddef>
 #include <cuda/std/type_traits>
+#include <cuda/std/utility>
 #include "matx/core/half.h"
 #include "matx/core/half_complex.h"
 #include "matx/core/operator_options.h"
