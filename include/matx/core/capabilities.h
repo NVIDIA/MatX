@@ -68,6 +68,8 @@ namespace detail {
     SET_GROUPS_PER_BLOCK, // Set the number of groups per block for the operator.
     ASYNC_LOADS_REQUESTED, // Whether the operator requires asynchronous loads.
     MAX_EPT_VEC_LOAD, // The maximum EPT for a vector load.
+    ELEMENT_WISE, // Whether the operator is element-wise (safe with aliasing)
+    ALIASED_MEMORY, // Whether the operator's input and output pointers alias
     // Add more capabilities as needed
   };
 
@@ -134,6 +136,15 @@ namespace detail {
   struct capability_attributes<OperatorCapability::ASYNC_LOADS_REQUESTED> {
     using type = bool;
     using input_type = VoidCapabilityType;
+    static constexpr bool default_value = false;
+    static constexpr bool or_identity = false;
+    static constexpr bool and_identity = true;
+  };    
+
+  template <>
+  struct capability_attributes<OperatorCapability::ALIASED_MEMORY> {
+    using type = bool;
+    using input_type = AliasedMemoryQueryInput;
     static constexpr bool default_value = false;
     static constexpr bool or_identity = false;
     static constexpr bool and_identity = true;
@@ -266,6 +277,8 @@ namespace detail {
         return CapabilityQueryType::AND_QUERY; // The expression should use the range of groups per block of its children.
       case OperatorCapability::GROUPS_PER_BLOCK:
         return CapabilityQueryType::RANGE_QUERY; // The expression should use the range of groups per block of its children.
+      case OperatorCapability::ALIASED_MEMORY:
+        return CapabilityQueryType::OR_QUERY; // The expression should use the aliased memory of its children.
       case OperatorCapability::MAX_EPT_VEC_LOAD:
         return CapabilityQueryType::MIN_QUERY; // The expression should use the minimum EPT for a vector load of its children.
       case OperatorCapability::JIT_CLASS_QUERY:

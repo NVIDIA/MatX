@@ -168,6 +168,7 @@ namespace detail {
 
   // Input structure for types that require it
 
+  // Capabilities structures
 
   struct EPTQueryInput {
     bool jit;
@@ -185,6 +186,13 @@ namespace detail {
 
   struct SetGroupsPerBlockQueryInput {
     int groups_per_block;
+  };
+
+  struct AliasedMemoryQueryInput {
+    bool permutes_input_output;
+    bool is_prerun;
+    void *start_ptr;
+    void *end_ptr;
   };
 
 }

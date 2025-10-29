@@ -240,7 +240,7 @@ namespace matx
           return 
             detail::get_operator_capability<Cap>(in1_, in) +
             detail::get_operator_capability<Cap>(in2_, in);
-        }     
+        }   
         else {
           auto self_has_cap = capability_attributes<Cap>::default_value;
           return combine_capabilities<Cap>(self_has_cap, 

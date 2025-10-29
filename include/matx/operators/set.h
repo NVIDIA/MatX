@@ -134,33 +134,15 @@ public:
   {
     const auto in_val = detail::get_value<CapType>(op_, indices...);
     using out_type = decltype(out_.template operator()<CapType>(indices...));
-
-#ifdef __CUDA_ARCH__    
-    // If we get a scalar on the input and a vector output, construct a vector of these scalars to write out
-    if constexpr (CapType::jit) {
-      if (out_.Rank() == 0 || threadIdx.x < out_.Size(out_.Rank() - 1)) {
-        if constexpr (!is_vector_v<decltype(in_val)> && is_vector_v<out_type>) {
-          Vector<remove_cvref_t<decltype(in_val)>, static_cast<size_t>(CapType::ept)> vec{in_val};
-          out_.template operator()<CapType>(indices...) = vec;
-        }
-        else {
-          out_.template operator()<CapType>(indices...) = in_val;
-        }
-      }
-      return in_val;      
+    
+    if constexpr (!is_vector_v<decltype(in_val)> && is_vector_v<out_type>) {
+      Vector<remove_cvref_t<decltype(in_val)>, static_cast<size_t>(CapType::ept)> vec{in_val};
+      out_.template operator()<CapType>(indices...) = vec;
     }
-    else 
-#endif    
-    {
-      if constexpr (!is_vector_v<decltype(in_val)> && is_vector_v<out_type>) {
-        Vector<remove_cvref_t<decltype(in_val)>, static_cast<size_t>(CapType::ept)> vec{in_val};
-        out_.template operator()<CapType>(indices...) = vec;
-      }
-      else {
-        out_.template operator()<CapType>(indices...) = in_val;
-      }
-      return in_val;
+    else {
+      out_.template operator()<CapType>(indices...) = in_val;
     }
+    return in_val;
   } 
   
 #ifdef MATX_EN_JIT

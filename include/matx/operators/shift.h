@@ -134,12 +134,14 @@ namespace matx
             detail::get_operator_capability<Cap>(op_, in),
               detail::get_operator_capability<Cap>(shift_, in)
             );
+          } else if constexpr (Cap == OperatorCapability::ALIASED_MEMORY) {
+            auto in_copy = in;
+            in_copy.permutes_input_output = true;
+            return combine_capabilities<Cap>(detail::get_operator_capability<Cap>(op_, in_copy), detail::get_operator_capability<Cap>(shift_, in_copy));
           } else {
             auto self_has_cap = capability_attributes<Cap>::default_value;
             return combine_capabilities<Cap>(
-              self_has_cap,
-            detail::get_operator_capability<Cap>(op_, in),
-              detail::get_operator_capability<Cap>(shift_, in)
+              self_has_cap, detail::get_operator_capability<Cap>(op_, in), detail::get_operator_capability<Cap>(shift_, in)
             );
           }
         }

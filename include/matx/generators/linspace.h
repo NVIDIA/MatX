@@ -79,17 +79,6 @@ namespace matx
           }
         }
 
-        template <OperatorCapability Cap>
-        __MATX_INLINE__ __MATX_HOST__ auto get_capability_proc() const {
-          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-            const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
-            return my_cap;
-          } else {          
-            auto self_has_cap = detail::capability_attributes<Cap>::default_value;
-            return self_has_cap;
-          }
-        }
-
         template <typename CapType, typename... Is>
         __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(Is... indices) const { 
           static_assert(sizeof...(indices) == NUM_RC, "Number of indices incorrect in linspace");

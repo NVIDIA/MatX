@@ -130,7 +130,13 @@ namespace matx
             auto op1_cap = detail::get_operator_capability<Cap>(op1_, in);
             auto op2_cap = detail::get_operator_capability<Cap>(op2_, in);
             return combine_capabilities<Cap>(my_cap, op1_cap, op2_cap);
-          } else {
+          } 
+          else if constexpr (Cap == OperatorCapability::ALIASED_MEMORY) {
+            auto in_copy = in;
+            in_copy.permutes_input_output = true;
+            return combine_capabilities<Cap>(detail::get_operator_capability<Cap>(op1_, in_copy), detail::get_operator_capability<Cap>(op2_, in_copy));
+          }
+          else {
             auto self_has_cap = capability_attributes<Cap>::default_value;
             auto op1_cap = detail::get_operator_capability<Cap>(op1_, in);
             auto op2_cap = detail::get_operator_capability<Cap>(op2_, in);
