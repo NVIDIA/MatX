@@ -65,8 +65,8 @@ auto make_tensor( const index_t (&shape)[RANK],
  * @param shape Shape specification for the tensor
  * @returns New tensor
  **/
-template <typename T, typename ShapeType,
-  std::enable_if_t<!is_matx_descriptor_v<ShapeType> && !std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+template <typename T, typename ShapeType>
+  requires (!is_matx_descriptor<ShapeType> && !std::is_array_v<remove_cvref_t<ShapeType>>)
 auto make_tensor(Storage<T> storage, ShapeType &&shape) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
@@ -83,7 +83,8 @@ auto make_tensor(Storage<T> storage, ShapeType &&shape) {
  * @param space  memory space to allocate in.  Default is manged memory.
  * @param stream cuda stream to allocate in (only applicable to async allocations)
  **/
-template <typename TensorType, std::enable_if_t< is_tensor_view_v<TensorType>, bool> = true>
+template <typename TensorType>
+  requires is_tensor<TensorType>
 void make_tensor( TensorType &tensor,
                   const index_t (&shape)[TensorType::Rank()],
                   matxMemorySpace_t space = MATX_MANAGED_MEMORY,
@@ -126,10 +127,10 @@ auto make_tensor_p( const index_t (&shape)[RANK],
  * @returns New tensor
  *
  **/
-template <typename T, typename ShapeType,
-  std::enable_if_t< !is_matx_shape_v<ShapeType> &&
-                    !is_matx_descriptor_v<ShapeType> &&
-                    !std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+template <typename T, typename ShapeType>
+  requires (!is_matx_shape<ShapeType> &&
+            !is_matx_descriptor<ShapeType> &&
+            !std::is_array_v<remove_cvref_t<ShapeType>>)
 auto make_tensor( ShapeType &&shape,
                   matxMemorySpace_t space = MATX_MANAGED_MEMORY,
                   cudaStream_t stream = 0) {
@@ -158,8 +159,8 @@ auto make_tensor( ShapeType &&shape,
  * @returns New tensor
  *
  **/
-template <typename TensorType,typename ShapeType,
-  std::enable_if_t<is_tensor_view_v<TensorType> && !std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+template <typename TensorType, typename ShapeType>
+  requires (is_tensor<TensorType> && !std::is_array_v<remove_cvref_t<ShapeType>>)
 auto make_tensor( TensorType &tensor,
                   ShapeType &&shape,
                   matxMemorySpace_t space = MATX_MANAGED_MEMORY,
@@ -182,9 +183,9 @@ auto make_tensor( TensorType &tensor,
  * @returns Pointer to new tensor
  *
  **/
-template <typename T, typename ShapeType,
-  std::enable_if_t< !is_matx_shape_v<ShapeType> &&
-                    !std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+template <typename T, typename ShapeType>
+  requires (!is_matx_shape<ShapeType> &&
+            !std::is_array_v<remove_cvref_t<ShapeType>>)
 auto make_tensor_p( ShapeType &&shape,
                     matxMemorySpace_t space = MATX_MANAGED_MEMORY,
                     cudaStream_t stream = 0) {
@@ -225,8 +226,8 @@ auto make_tensor( [[maybe_unused]] const std::initializer_list<detail::no_size_t
  * @returns New tensor
  *
  **/
-template <typename TensorType,
-  std::enable_if_t<is_tensor_view_v<TensorType>, bool> = true>
+template <typename TensorType>
+  requires is_tensor<TensorType>
 auto make_tensor( TensorType &tensor,
                   matxMemorySpace_t space = MATX_MANAGED_MEMORY,
                   cudaStream_t stream = 0) {
@@ -285,8 +286,8 @@ auto make_tensor( T *data,
  *   Shape of tensor
  * @returns New tensor
  **/
-template <typename TensorType,
-  std::enable_if_t<is_tensor_view_v<TensorType>, bool> = true>
+template <typename TensorType>
+  requires is_tensor<TensorType>
 auto make_tensor( TensorType &tensor,
                   typename TensorType::value_type *data,
                   const index_t (&shape)[TensorType::Rank()]) {
@@ -307,8 +308,8 @@ auto make_tensor( TensorType &tensor,
  *    If this class owns memory of data
  * @returns New tensor
  **/
-template <typename T, typename ShapeType,
-  std::enable_if_t<!is_matx_descriptor_v<ShapeType> && !std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+template <typename T, typename ShapeType>
+  requires (!is_matx_descriptor<ShapeType> && !std::is_array_v<remove_cvref_t<ShapeType>>)
 auto make_tensor( T *data,
                   ShapeType &&shape,
                   bool owning = false) {
@@ -332,8 +333,8 @@ auto make_tensor( T *data,
  *   Shape of tensor
  * @returns New tensor
  **/
-template <typename TensorType,
-  std::enable_if_t<is_tensor_view_v<TensorType>, bool> = true>
+template <typename TensorType>
+  requires is_tensor<TensorType>
 auto make_tensor( TensorType &tensor,
                   typename TensorType::value_type *data,
                   typename TensorType::shape_container &&shape) {
@@ -369,8 +370,8 @@ auto make_tensor( T *ptr,
  *  Pointer to data
  * @returns New tensor
  **/
-template <typename TensorType,
-  std::enable_if_t<is_tensor_view_v<TensorType>, bool> = true>
+template <typename TensorType>
+  requires is_tensor<TensorType>
 auto make_tensor( TensorType &tensor,
                   typename TensorType::value_type *ptr) {
   auto tmp = make_tensor<typename TensorType::value_type>(ptr, false);
@@ -390,8 +391,8 @@ auto make_tensor( TensorType &tensor,
  *    If this class owns memory of data
  * @returns New tensor
  **/
-template <typename T, typename ShapeType,
-  std::enable_if_t<!is_matx_descriptor_v<ShapeType> && !std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+template <typename T, typename ShapeType>
+  requires (!is_matx_descriptor<ShapeType> && !std::is_array_v<remove_cvref_t<ShapeType>>)
 auto make_tensor_p( T *const data,
                     ShapeType &&shape,
                     bool owning = false) {
@@ -432,9 +433,9 @@ auto make_tensor( const index_t (&shape)[RANK],
  *   Custom allocator (PMR allocator, custom allocator pointer, etc.)
  * @returns New tensor
  **/
-template <typename T, typename ShapeType, typename Allocator,
-  std::enable_if_t<!is_matx_shape_v<ShapeType> && !is_matx_descriptor_v<ShapeType> &&
-                   !std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+template <typename T, typename ShapeType, typename Allocator>
+  requires (!is_matx_shape<ShapeType> && !is_matx_descriptor<ShapeType> &&
+            !std::is_array_v<remove_cvref_t<ShapeType>>)
 auto make_tensor( ShapeType &&shape,
                   Allocator&& alloc) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
@@ -455,8 +456,8 @@ auto make_tensor( ShapeType &&shape,
  * @param alloc
  *   Custom allocator (PMR allocator, custom allocator pointer, etc.)
  **/
-template <typename TensorType, typename Allocator,
-  std::enable_if_t<is_tensor_view_v<TensorType>, bool> = true>
+template <typename TensorType, typename Allocator>
+  requires is_tensor<TensorType>
 void make_tensor( TensorType &tensor,
                   const index_t (&shape)[TensorType::Rank()],
                   Allocator&& alloc) {
@@ -476,9 +477,9 @@ void make_tensor( TensorType &tensor,
  * @param alloc
  *   Custom allocator (PMR allocator, custom allocator pointer, etc.)
  **/
-template <typename TensorType, typename ShapeType, typename Allocator,
-  std::enable_if_t<is_tensor_view_v<TensorType> &&
-                   !std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+template <typename TensorType, typename ShapeType, typename Allocator>
+  requires (is_tensor<TensorType> &&
+            !std::is_array_v<remove_cvref_t<ShapeType>>)
 void make_tensor( TensorType &tensor,
                   ShapeType &&shape,
                   Allocator&& alloc) {
@@ -500,7 +501,8 @@ void make_tensor( TensorType &tensor,
  *    If this class owns memory of data
  * @returns New tensor
  **/
-template <typename T, typename D, std::enable_if_t<is_matx_descriptor_v<typename remove_cvref<D>::type>, bool> = true>
+template <typename T, typename D>
+  requires is_matx_descriptor<remove_cvref_t<D>>
 auto make_tensor( T* const data,
                   D &&desc,
                   bool owning = false) {
@@ -522,8 +524,8 @@ auto make_tensor( T* const data,
  *   Tensor descriptor (tensor_desc_t)
  * @returns New tensor
  **/
-template <typename TensorType,
-          std::enable_if_t<is_tensor_view_v<TensorType>, bool> = true>
+template <typename TensorType>
+  requires is_tensor<TensorType>
 auto make_tensor( TensorType &tensor,
                   typename TensorType::value_type* const data,
                   typename TensorType::desc_type &&desc) {
@@ -542,7 +544,8 @@ auto make_tensor( TensorType &tensor,
  * @param stream cuda stream to allocate in (only applicable to async allocations)
  * @returns New tensor
  **/
-template <typename T, typename D, std::enable_if_t<is_matx_descriptor_v<typename remove_cvref<D>::type>, bool> = true>
+template <typename T, typename D>
+  requires is_matx_descriptor<remove_cvref_t<D>>
 auto make_tensor( D &&desc,
                   matxMemorySpace_t space = MATX_MANAGED_MEMORY,
                   cudaStream_t stream = 0) {
@@ -563,8 +566,8 @@ auto make_tensor( D &&desc,
  * @param stream cuda stream to allocate in (only applicable to async allocations)
  * @returns New tensor
  **/
-template <typename TensorType,
-  std::enable_if_t<is_tensor_view_v<TensorType> && is_matx_descriptor_v<typename TensorType::desc_type>, bool> = true>
+template <typename TensorType>
+  requires (is_tensor<TensorType> && is_matx_descriptor<typename TensorType::desc_type>)
 auto make_tensor( TensorType &&tensor,
                   typename TensorType::desc_type &&desc,
                   matxMemorySpace_t space = MATX_MANAGED_MEMORY,
@@ -613,8 +616,8 @@ auto make_tensor( T *const data,
  *   Strides of tensor
  * @returns New tensor
  **/
-template <typename TensorType,
-  std::enable_if_t<is_tensor_view_v<TensorType>, bool> = true>
+template <typename TensorType>
+  requires is_tensor<TensorType>
 auto make_tensor( TensorType &tensor,
                   typename TensorType::value_type *const data,
                   const index_t (&shape)[TensorType::Rank()],
@@ -639,8 +642,8 @@ auto make_static_tensor() {
   return tensor_t<T, desc.Rank(), decltype(desc)>{std::move(storage), std::move(desc)};
 }
 
-template <typename TensorType,
-  std::enable_if_t<is_tensor_view_v<TensorType>, bool> = true>
+template <typename TensorType>
+  requires is_tensor<TensorType>
 auto make_tensor( TensorType &tensor,
                   const DLManagedTensor dlp_tensor) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)

@@ -37,9 +37,8 @@
 #include "matx/operators/scalar_ops.h"
 
 #define MATX_DEFINE_BINARY_OP(FUNCTION, TENSOR_OP)                        \
-  template <typename I1, typename I2,                                \
-            typename = typename std::enable_if_t<is_matx_op<I1>() or \
-                                                 is_matx_op<I2>()>>  \
+  template <typename I1, typename I2>                                \
+    requires (is_matx_op_c<I1> || is_matx_op_c<I2>)                 \
   [[nodiscard]] __MATX_INLINE__ auto FUNCTION(const I1 &i1, const I2 &i2)                   \
   {                                                                  \
     using I1Type = extract_value_type_t<I1>;                        \
@@ -62,13 +61,12 @@ namespace matx
    * @return Product result
    */
   template <typename T, typename S>
-    __MATX_INLINE__
-    typename std::enable_if_t<!std::is_same_v<T, S> && std::is_arithmetic_v<S>,
-             cuda::std::complex<T>>
-               __MATX_HOST__ __MATX_DEVICE__ operator*(const cuda::std::complex<T> &c, S n)
-               {
-                 return c * T(n);
-               }
+    requires (!std::is_same_v<T, S> && std::is_arithmetic_v<S>)
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ 
+  auto operator*(const cuda::std::complex<T> &c, S n) -> cuda::std::complex<T>
+  {
+    return c * T(n);
+  }
 
   /**
    * @brief Utility operator for multiplying scalars by a complex value
@@ -80,13 +78,12 @@ namespace matx
    * @return Product result
    */
   template <typename T, typename S>
-    __MATX_INLINE__
-    typename std::enable_if_t<!std::is_same_v<T, S> && std::is_arithmetic_v<S>,
-             cuda::std::complex<T>>
-               __MATX_HOST__ __MATX_DEVICE__ operator*(S n, const cuda::std::complex<T> &c)
-               {
-                 return T(n) * c;
-               }
+    requires (!std::is_same_v<T, S> && std::is_arithmetic_v<S>)
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ 
+  auto operator*(S n, const cuda::std::complex<T> &c) -> cuda::std::complex<T>
+  {
+    return T(n) * c;
+  }
 
 
   namespace detail {
@@ -130,7 +127,8 @@ namespace matx
         }
       }
 
-      template <typename CapType, typename... Is, std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>
+      template <typename CapType, typename... Is>
+        requires (cuda::std::conjunction_v<cuda::std::is_integral<Is>...>)
       __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ decltype(auto) operator()(Is... indices) const
       {
         const auto &lhs = in1_;
@@ -141,13 +139,15 @@ namespace matx
         return op_.template operator()<CapType>(i1, i2);
       }
 
-      template <typename... Is, std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>
+      template <typename... Is>
+        requires (cuda::std::conjunction_v<cuda::std::is_integral<Is>...>)
       __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ decltype(auto) operator()(Is... indices) const
       {
         return this->template operator()<DefaultCapabilities>(indices...);
       }      
 
-      template <typename CapType, typename ArrayType, std::enable_if_t<is_std_array_v<ArrayType>, bool> = true>
+      template <typename CapType, typename ArrayType>
+        requires is_std_array_c<ArrayType>
       __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator()(const ArrayType &idx) const noexcept
       {
         return cuda::std::apply([&](auto &&...args)  {

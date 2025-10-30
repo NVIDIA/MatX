@@ -107,7 +107,8 @@ public:
    * @param shape Shape object
    * @param stride Stride object
    */
-  template <typename S = ShapeContainer, std::enable_if_t<!cuda::std::is_array_v<ShapeContainer> && !cuda::std::is_array_v<StrideContainer>, bool> = true>
+  template <typename S = ShapeContainer>
+    requires (!cuda::std::is_array_v<ShapeContainer> && !cuda::std::is_array_v<StrideContainer>)
   __MATX_INLINE__  __MATX_DEVICE__ __MATX_HOST__ tensor_desc_t(ShapeContainer &&shape, StrideContainer &&stride)
       : shape_(std::forward<ShapeContainer>(shape)),
         stride_(std::forward<StrideContainer>(stride)) {
@@ -131,7 +132,8 @@ public:
    * @param shape
    *   Shape of tensor
    */
-  template <typename S2, std::enable_if_t<!cuda::std::is_array_v<typename remove_cvref<S2>::type> && !is_matx_descriptor_v<typename remove_cvref<S2>::type>, bool> = true>
+  template <typename S2>
+    requires (!cuda::std::is_array_v<remove_cvref_t<S2>> && !is_matx_descriptor<remove_cvref_t<S2>>)
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ tensor_desc_t(S2 &&shape)
   {
     InitFromShape(std::forward<S2>(shape));
@@ -162,7 +164,8 @@ public:
    * @param strides
    *   Strides of tensor
    */
-  template <typename S2, std::enable_if_t<!cuda::std::is_array_v<S2>, bool> = true>
+  template <typename S2>
+    requires (!cuda::std::is_array_v<S2>)
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ tensor_desc_t(S2 &&shape, const stride_type (&strides)[RANK]) :
       shape_(std::forward<S2>(shape)) {
     for (int i = 0; i < RANK; i++) {
@@ -180,7 +183,8 @@ public:
    * @param strides
    *   Strides of tensor
    */
-  template <std::enable_if_t<!cuda::std::is_array_v<StrideContainer>, bool> = true>
+  template <typename = void>
+    requires (!cuda::std::is_array_v<StrideContainer>)
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ tensor_desc_t(const shape_type (&shape)[RANK], StrideContainer &&strides) :
       stride_(std::forward<StrideContainer>(strides)) {
     for (int i = 0; i < RANK; i++) {

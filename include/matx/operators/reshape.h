@@ -185,9 +185,9 @@ MATX_LOOP_UNROLL
    * @param s  the size of each reshaped dimension
    * @return reshaped operator
    */
-  template <int RANK, typename T, typename ShapeType,
-           std::enable_if_t<!cuda::std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
-             __MATX_INLINE__ auto reshape(const T &op, ShapeType &&s)
+  template <int RANK, typename T, typename ShapeType>
+    requires (!cuda::std::is_array_v<remove_cvref_t<ShapeType>>)
+  __MATX_INLINE__ auto reshape(const T &op, ShapeType &&s)
   {
     return detail::ReshapeOp<RANK, T, ShapeType>(op, std::forward<ShapeType>(s));
   }

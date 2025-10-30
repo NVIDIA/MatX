@@ -65,10 +65,12 @@ struct RandomOperatorIterator {
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorIterator(const OperatorType &t, stride_type offset) : t_(t), offset_(offset) {}
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorIterator(OperatorType &&t, stride_type offset) : t_(t), offset_(offset) {}
 
-  template<typename T = OperatorType, std::enable_if_t<!std::is_same<T, OperatorBaseType>::value, bool> = true>
+  template<typename T = OperatorType>
+    requires (!std::is_same_v<T, OperatorBaseType>)
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorIterator(const OperatorBaseType &t, stride_type offset) : t_(t), offset_(offset) {}
 
-  template<typename T = OperatorType, std::enable_if_t<!std::is_same<T, OperatorBaseType>::value, bool> = true>
+  template<typename T = OperatorType>
+    requires (!std::is_same_v<T, OperatorBaseType>)
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorIterator(OperatorBaseType &&t, stride_type offset) : t_(t), offset_(offset) {}
 
   /**
@@ -208,10 +210,12 @@ struct RandomOperatorOutputIterator {
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorOutputIterator(const OperatorType &t, stride_type offset) : t_(t), offset_(offset) {}
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorOutputIterator(OperatorType &&t, stride_type offset) : t_(t), offset_(offset) {}
 
-  template<typename T = OperatorType, std::enable_if_t<!std::is_same<T, OperatorBaseType>::value, bool> = true>
+  template<typename T = OperatorType>
+    requires (!std::is_same_v<T, OperatorBaseType>)
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorOutputIterator(const OperatorBaseType &t, stride_type offset) : t_(t), offset_(offset) {}
 
-  template<typename T = OperatorType, std::enable_if_t<!std::is_same<T, OperatorBaseType>::value, bool> = true>
+  template<typename T = OperatorType>
+    requires (!std::is_same_v<T, OperatorBaseType>)
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorOutputIterator(OperatorBaseType &&t, stride_type offset) : t_(t), offset_(offset) {}
 
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ reference operator*()
@@ -354,10 +358,12 @@ struct RandomOperatorThrustIterator {
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorThrustIterator(const OperatorType &t, stride_type offset) : t_(t), offset_(offset) {}
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorThrustIterator(OperatorType &&t, stride_type offset) : t_(t), offset_(offset) {}
 
-  template<typename T = OperatorType, std::enable_if_t<!std::is_same<T, OperatorBaseType>::value, bool> = true>
+  template<typename T = OperatorType>
+    requires (!std::is_same_v<T, OperatorBaseType>)
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorThrustIterator(const OperatorBaseType &t, stride_type offset) : t_(t), offset_(offset) {}
 
-  template<typename T = OperatorType, std::enable_if_t<!std::is_same<T, OperatorBaseType>::value, bool> = true>
+  template<typename T = OperatorType>
+    requires (!std::is_same_v<T, OperatorBaseType>)
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorThrustIterator(OperatorBaseType &&t, stride_type offset) : t_(t), offset_(offset) {}
 
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ reference operator*() const

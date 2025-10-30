@@ -113,7 +113,8 @@ namespace matx
 
 
 #ifndef DOXYGEN_ONLY
-  template <typename Op, typename... Is, std::enable_if_t<((std::is_integral_v<Is>) && ...), bool> = true>
+  template <typename Op, typename... Is>
+    requires ((std::is_integral_v<Is>) && ...)
 #else
   template <typename Op, typename... Is>
 #endif

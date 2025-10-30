@@ -99,16 +99,21 @@ namespace detail {
 
   using DefaultCapabilities = CapabilityParams<ElementsPerThread::ONE, false>;  
   
-  // C++17-compatible trait to detect scoped enums
+  // Concept to detect scoped enums
+  template<typename T>
+  concept is_scoped_enum_c = cuda::std::is_enum_v<T> && 
+                             !cuda::std::is_convertible_v<T, cuda::std::underlying_type_t<T>>;
+
+  // Legacy struct for backwards compatibility
   template<typename T, typename = void>
   struct is_scoped_enum : cuda::std::false_type {};
 
   template<typename T>
-  struct is_scoped_enum<T, cuda::std::enable_if_t<cuda::std::is_enum_v<T>>> 
-      : cuda::std::bool_constant<!cuda::std::is_convertible_v<T, cuda::std::underlying_type_t<T>>> {};
+    requires is_scoped_enum_c<T>
+  struct is_scoped_enum<T> : cuda::std::true_type {};
 
   template<typename T>
-  constexpr bool is_scoped_enum_v = is_scoped_enum<T>::value;
+  constexpr bool is_scoped_enum_v = is_scoped_enum_c<T>;
 
   // Trait to get default values and identities based on capability
   template <OperatorCapability Cap>

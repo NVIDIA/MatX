@@ -69,7 +69,8 @@ struct mtie : public BaseOp<mtie<Ts...>>{
   mtie(Ts... ts) : ts_(ts...) {}
 
   // operator= to cover multiple return types using mtie in a run statement
-  template <typename RHS, std::enable_if_t<is_matx_transform_op<RHS>(), bool> = true>
+  template <typename RHS>
+    requires is_matx_transform_op_c<RHS>
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__  auto operator=(RHS &&rhs)
   {
     return cuda::std::apply([&](auto... args) {

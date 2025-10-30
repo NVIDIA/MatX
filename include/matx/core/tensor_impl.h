@@ -322,8 +322,8 @@ class tensor_impl_t {
      * @param shape
      *   Tensor shape
      */
-    template <typename ShapeType,
-              std::enable_if_t<!is_tensor_view_v<remove_cvref_t<ShapeType>> && !is_matx_descriptor_v<remove_cvref_t<ShapeType>>, bool> = true>
+    template <typename ShapeType>
+      requires (!is_tensor<remove_cvref_t<ShapeType>> && !is_matx_descriptor<remove_cvref_t<ShapeType>>)
     __MATX_INLINE__ tensor_impl_t(ShapeType &&shape) : desc_(std::forward<ShapeType>(shape))
     {
     }
@@ -352,7 +352,8 @@ class tensor_impl_t {
      * @param shape
      *   Sizes for each dimension. Length of sizes must match RANK
      */
-    template <typename ShapeType, std::enable_if_t<!is_matx_descriptor_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+    template <typename ShapeType>
+      requires (!is_matx_descriptor<remove_cvref_t<ShapeType>>)
     __MATX_INLINE__ tensor_impl_t(T *const ldata, ShapeType &&shape)
         : desc_(std::forward<ShapeType>(shape))
     {
@@ -399,7 +400,8 @@ class tensor_impl_t {
      */
 // gcc 14.1 incorrectly reports desc as uninitialized in some contexts
 MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
-    template <typename DescriptorType, std::enable_if_t<is_matx_descriptor_v<typename remove_cvref<DescriptorType>::type>, bool> = true>
+    template <typename DescriptorType>
+      requires is_matx_descriptor<remove_cvref_t<DescriptorType>>
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ tensor_impl_t(T *const ldata,
                     DescriptorType &&desc)
         : desc_{std::forward<DescriptorType>(desc)}
@@ -418,7 +420,8 @@ MATX_IGNORE_WARNING_POP_GCC
      * @param desc
      *   Tensor descriptor
      */
-    template <typename DescriptorType, std::enable_if_t<is_matx_descriptor_v<typename remove_cvref<DescriptorType>::type>, bool> = true>
+    template <typename DescriptorType>
+      requires is_matx_descriptor<remove_cvref_t<DescriptorType>>
     __MATX_INLINE__ tensor_impl_t(DescriptorType &&desc)
         : desc_{std::forward<DescriptorType>(desc)}
     {
@@ -1308,8 +1311,8 @@ MATX_IGNORE_WARNING_POP_GCC
      * @returns value at given index
      *
      */
-    template <typename CapType, int M = RANK, typename... Is,
-      std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>
+    template <typename CapType, int M = RANK, typename... Is>
+      requires (cuda::std::conjunction_v<cuda::std::is_integral<Is>...>)
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) noexcept
     {
       if constexpr (!is_sparse_data_v<TensorData>) {
@@ -1331,8 +1334,8 @@ MATX_IGNORE_WARNING_POP_GCC
       }
     }
 
-    template <int M = RANK, typename... Is,
-      std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>
+    template <int M = RANK, typename... Is>
+      requires (cuda::std::conjunction_v<cuda::std::is_integral<Is>...>)
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) noexcept
     {
       return this->template operator()<DefaultCapabilities>(indices...);
@@ -1592,13 +1595,13 @@ MATX_IGNORE_WARNING_POP_GCC
       data_.ldata_ = data;
     }
 
-    template <typename U = TensorData,
-          std::enable_if_t<is_sparse_data_v<U>, int> = 0>
+    template <typename U = TensorData>
+      requires is_sparse_data<U>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__  auto CRDData(int l) const noexcept {
       return data_.crd_[l];
     }
-    template <typename U = TensorData,
-          std::enable_if_t<is_sparse_data_v<U>, int> = 0>
+    template <typename U = TensorData>
+      requires is_sparse_data<U>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__  auto POSData(int l) const noexcept{
       return data_.pos_[l];
     }
@@ -1614,10 +1617,10 @@ MATX_IGNORE_WARNING_POP_GCC
     }
 
     template <typename U = TensorData>
-    auto SetSparseData(T* data,
+      requires is_sparse_data<U>
+    void SetSparseData(T* data,
                       typename U::crd_type* crd[U::LVL],
-                      typename U::pos_type* pos[U::LVL])
-        -> std::enable_if_t<is_sparse_data_v<U>, void> {
+                      typename U::pos_type* pos[U::LVL]) {
       data_.ldata_ = data;
       memcpy(data_.crd_, crd, U::LVL*sizeof(crd[0]));
       memcpy(data_.pos_, pos, U::LVL*sizeof(pos[0]));

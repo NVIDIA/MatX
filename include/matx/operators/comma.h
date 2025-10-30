@@ -130,7 +130,8 @@ namespace matx
    * @param r Right operator value
    * @return Result of comma operator
    */
-  template <typename T, typename S, std::enable_if_t<is_matx_op<T>() && is_matx_op<S>(), bool> = true>
+  template <typename T, typename S>
+    requires (is_matx_op_c<T> && is_matx_op_c<S>)
     __MATX_INLINE__ __MATX_HOST__ auto operator,(const T &l, const S &r)
     {
       return detail::CommaOp(l, r);

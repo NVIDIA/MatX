@@ -1392,7 +1392,8 @@ void __MATX_INLINE__ allclose(OutType dest, const InType1 &in1, const InType2 &i
  *   to 1 to give an unbiased estimate
  */
 #ifndef DOXYGEN_ONLY
-template <typename OutType, typename InType, typename Executor, std::enable_if_t<is_executor_t<Executor>(), bool> = true>
+template <typename OutType, typename InType, typename Executor>
+  requires is_executor<Executor>
 #else
 template <typename OutType, typename InType, typename Executor>
 #endif
@@ -1459,7 +1460,8 @@ void __MATX_INLINE__ var_impl(OutType dest, const InType &in, Executor &&exec, i
  *   to 1 to give an unbiased estimate
  */
 #ifndef DOXYGEN_ONLY
-template <typename OutType, typename InType, typename Executor, std::enable_if_t<is_executor_t<Executor>(), bool> = true>
+template <typename OutType, typename InType, typename Executor>
+  requires is_executor<Executor>
 #else
 template <typename OutType, typename InType, typename Executor>
 #endif
@@ -1489,7 +1491,8 @@ void __MATX_INLINE__ stdd_impl(OutType dest, InType &&in, Executor &&exec, int d
  *   Executor type
  */
 #ifndef DOXYGEN_ONLY
-template <typename OutType, typename InType, typename Executor, std::enable_if_t<is_executor_t<Executor>(), bool> = true>
+template <typename OutType, typename InType, typename Executor>
+  requires is_executor<Executor>
 #else
 template <typename OutType, typename InType, typename Executor>
 #endif

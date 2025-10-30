@@ -87,7 +87,8 @@ struct alignas(alignment_by_type<T>() * N) Vector {
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Vector() {}
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Vector(T v) { Fill(v); }
 
-  template <typename T2, cuda::std::enable_if_t<cuda::std::is_same_v<typename T2::matx_vec, bool> && T2::width == N, bool> = true>
+  template <typename T2>
+    requires (cuda::std::is_same_v<typename T2::matx_vec, bool> && T2::width == N)
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Vector& operator=(const T2& v) {
     MATX_LOOP_UNROLL
     for (int i = 0; i < N; i++) {
