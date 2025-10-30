@@ -57,7 +57,9 @@ namespace detail {
       using inv_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "inv()"; }
-      __MATX_INLINE__ InvOp(const OpA &a) : a_(a) {};
+      __MATX_INLINE__ InvOp(const OpA &a) : a_(a) {
+        MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
+      };
 
 
       template <typename CapType, typename... Is>

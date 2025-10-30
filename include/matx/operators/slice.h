@@ -108,6 +108,7 @@ namespace matx
             }
           }
           MATX_ASSERT_STR(d==Rank(), matxInvalidDim, "SliceOp: Number of dimensions without matxDropDim must equal new rank.");
+          MATX_LOG_TRACE("{} constructor: input_rank={}, output_rank={}", str(), T::Rank(), DIM);
         };
 
         template <typename CapType, typename Op, typename... Is>

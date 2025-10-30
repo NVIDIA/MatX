@@ -33,6 +33,7 @@
 #pragma once
 
 #include "matx/generators/linspace.h"
+#include "matx/core/log.h"
 
 namespace matx
 {
@@ -70,7 +71,11 @@ namespace matx
           f1_(f1),          
           t1_(t1),
           method_(method)
-        {}
+        {
+#ifndef __CUDA_ARCH__
+          MATX_LOG_TRACE("Chirp constructor: f0={}, f1={}, t1={}", f0, f1, t1);
+#endif
+        }
 
         template <OperatorCapability Cap, typename InType>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
@@ -131,7 +136,11 @@ namespace matx
           f1_(f1),
           t1_(t1),          
           method_(method)
-        {}
+        {
+#ifndef __CUDA_ARCH__
+          MATX_LOG_TRACE("ComplexChirp constructor: f0={}, f1={}, t1={}", f0, f1, t1);
+#endif
+        }
 
         template <OperatorCapability Cap, typename InType>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {

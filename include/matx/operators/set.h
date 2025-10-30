@@ -98,6 +98,7 @@ public:
    */
   inline set(T &out, const Op &op) : out_(out), op_(op)
   {
+    MATX_LOG_TRACE("{} constructor: rank={}", str(), T::Rank());
     static_assert(is_matx_op_lvalue<T>() == true, "Invalid operator on LHS of set/operator=");
     static_assert(!is_matx_transform_op<T>(), "Cannot use transform operator on LHS of assignment");
 

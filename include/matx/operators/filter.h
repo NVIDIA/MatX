@@ -65,6 +65,7 @@ namespace detail {
       }
       __MATX_INLINE__ FilterOp(const OpA &a, const cuda::std::array<FilterType, NR> h_rec,
             const cuda::std::array<FilterType, NNR> h_nonrec) : a_(a), h_rec_(h_rec), h_nonrec_(h_nonrec) { 
+        MATX_LOG_TRACE("{} constructor: rank={}, NR={}, NNR={}", str(), Rank(), NR, NNR);
         for (int r = 0; r < Rank(); r++) {
           out_dims_[r] = a_.Size(r);
         }              

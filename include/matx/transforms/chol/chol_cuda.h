@@ -303,8 +303,10 @@ void chol_impl(OutputTensor &&out, const ATensor &a,
   auto params = detail::matxDnCholCUDAPlan_t<OutputTensor, decltype(tmp_out)>::GetCholParams(tmp_out, uplo_cusolver, exec);
 
   using cache_val_type = detail::matxDnCholCUDAPlan_t<OutputTensor, decltype(tmp_out)>;
+  auto cache_id = detail::GetCacheIdFromType<detail::chol_cuda_cache_t>();
+  MATX_LOG_DEBUG("Cholesky transform: cache_id={}", cache_id);
   detail::GetCache().LookupAndExec<detail::chol_cuda_cache_t>(
-    detail::GetCacheIdFromType<detail::chol_cuda_cache_t>(),
+    cache_id,
     params,
     [&]() {
       return std::make_shared<cache_val_type>(tmp_out, exec, uplo_cusolver);

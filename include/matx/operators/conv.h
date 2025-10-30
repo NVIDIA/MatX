@@ -75,7 +75,7 @@ namespace matx
 
         __MATX_INLINE__ Conv1DOp(const OpA &A, const OpB &B, matxConvCorrMode_t mode, matxConvCorrMethod_t method, PermDims perm) : 
               a_(A), b_(B), mode_(mode), method_(method), perm_(perm) {
-
+          MATX_LOG_TRACE("{} constructor: mode={}, method={}", str(), static_cast<int>(mode), static_cast<int>(method));
           MATX_ASSERT_STR((!is_matx_type_v<typename OpA::value_type> && !is_matx_type_v<typename OpB::value_type>) || 
                           method == MATX_C_METHOD_DIRECT, 
             matxInvalidType, "FFT convolutions do not support half precision float currently");
@@ -304,7 +304,7 @@ namespace detail {
 
       __MATX_INLINE__ Conv2DOp(const OpA &A, const OpB &B, matxConvCorrMode_t mode, PermDims perm) : 
             a_(A), b_(B), mode_(mode), perm_(perm) {
-
+        MATX_LOG_TRACE("{} constructor: mode={}", str(), static_cast<int>(mode));
         // Currently when using the axis parameter the rank of inputs must be equal
         if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
           for (int r = 0; r < Rank(); r++) {

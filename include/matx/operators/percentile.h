@@ -61,6 +61,7 @@ namespace detail {
 
       __MATX_INLINE__ std::string str() const { return "percentile(" + get_type_str(a_) + ")"; }
       __MATX_INLINE__ PercentileOp(const OpA &a, unsigned char q, PercentileMethod method) : a_(a), q_(q), method_(method) {
+        MATX_LOG_TRACE("{} constructor: q={}, method={}", str(), static_cast<int>(q), static_cast<int>(method));
         for (int r = 0; r < ORank; r++) {
           out_dims_[r]    = (r == ORank - 1) ? 1 : a_.Size(r);
         }

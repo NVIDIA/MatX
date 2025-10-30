@@ -57,7 +57,7 @@ namespace detail {
 
       __MATX_INLINE__ std::string str() const { return "argminmax(" + get_type_str(a_) + ")"; }
       __MATX_INLINE__ ArgMinMaxOp(const OpA &a) : a_(a) {
-     
+        MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
       };
 
       template <typename... Is>

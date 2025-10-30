@@ -33,6 +33,7 @@
 #pragma once
 
 #include "matx/generators/generator1d.h"
+#include "matx/core/log.h"
 
 namespace matx
 {
@@ -47,7 +48,11 @@ namespace matx
 
         __MATX_INLINE__ std::string str() const { return "blackman"; }
 
-        __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Blackman(index_t size) : size_(size){};
+        __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Blackman(index_t size) : size_(size){
+#ifndef __CUDA_ARCH__
+          MATX_LOG_TRACE("Blackman constructor: size={}", size);
+#endif
+        };
 
         template <typename CapType>
         __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const

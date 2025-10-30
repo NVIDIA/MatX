@@ -593,8 +593,10 @@ void inv_impl(TensorTypeAInv &a_inv, const TensorTypeA &a,
   auto params = detail::matxInversePlan_t<TensorTypeAInv, TensorTypeA, ALGO>::GetInverseParams(a_inv, a, stream);
 
   using cache_val_type = detail::matxInversePlan_t<TensorTypeAInv, TensorTypeA, ALGO>;
+  auto cache_id = detail::GetCacheIdFromType<detail::inv_cache_t>();
+  MATX_LOG_DEBUG("Inverse transform: cache_id={}", cache_id);
   detail::GetCache().LookupAndExec<detail::inv_cache_t>(
-    detail::GetCacheIdFromType<detail::inv_cache_t>(),
+    cache_id,
     params,
     [&]() {
       return std::make_shared<cache_val_type>(a_inv, a, stream);

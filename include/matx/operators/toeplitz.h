@@ -76,6 +76,7 @@ namespace matx
 
         __MATX_INLINE__ ToeplitzOp(const T1 &op1, const T2 &op2) : op1_(op1), op2_(op2)
       {
+        MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
         if constexpr (is_matx_op<T1>()) {
           static_assert(T1::Rank() == 1, "toeplitz() operator input rank must be 1");
         }

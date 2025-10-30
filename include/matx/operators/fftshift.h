@@ -52,6 +52,7 @@ namespace matx
         __MATX_INLINE__ std::string str() const { return "fftshift(" + op_.str() + ")"; }
 
         __MATX_INLINE__ FFTShift1DOp(const T1 &op) : op_(op){
+          MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
           static_assert(Rank() >= 1, "1D FFT shift must have a rank 1 operator or higher");
         };
 
@@ -169,6 +170,7 @@ namespace matx
         __MATX_INLINE__ std::string str() const { return "fftshift(" + op_.str() + ")"; }
 
         __MATX_INLINE__ FFTShift2DOp(const T1 &op) : op_(op){
+          MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
           static_assert(Rank() >= 2, "2D FFT shift must have a rank 2 operator or higher");
         };
 

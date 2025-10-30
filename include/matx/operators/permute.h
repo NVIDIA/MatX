@@ -74,6 +74,7 @@ namespace matx
 
             dims_[i] = dims[i];
           }
+          MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
         }
 
         template <typename CapType, typename Op, typename Dims, typename... Is>

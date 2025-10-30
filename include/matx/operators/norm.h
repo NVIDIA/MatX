@@ -70,6 +70,7 @@ namespace matx
       }
 
       __MATX_INLINE__ NormOp(const OpA &op, NormOrder order) : a_(op), order_(order) {
+        MATX_LOG_TRACE("{} constructor: order={}", str(), static_cast<int>(order));
         if constexpr (std::is_same_v<NormType, detail::NormTypeVector>) {
           MATX_ASSERT_STR(order == NormOrder::NONE || order == NormOrder::L1 || order == NormOrder::L2, matxInvalidParameter,
             "Invalid norm order used for vector mode");

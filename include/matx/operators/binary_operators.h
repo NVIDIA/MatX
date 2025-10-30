@@ -123,6 +123,7 @@ namespace matx
 
       __MATX_INLINE__ matxBinaryOp(const I1 &in1, const I2 &in2, const Op &op) : in1_(in1), in2_(in2), op_(op)
       {
+        MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
         if constexpr (Rank() > 0)
         {
           MATX_ASSERT_COMPATIBLE_OP_SIZES(in1_);

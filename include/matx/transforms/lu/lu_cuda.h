@@ -292,8 +292,10 @@ void lu_impl(OutputTensor &&out, PivotTensor &&piv,
 
   // Get cache or new LU plan if it doesn't exist
   using cache_val_type = detail::matxDnLUCUDAPlan_t<OutputTensor, decltype(piv_new), decltype(a_new)>;
+  auto cache_id = detail::GetCacheIdFromType<detail::lu_cuda_cache_t>();
+  MATX_LOG_DEBUG("LU transform: cache_id={}", cache_id);
   detail::GetCache().LookupAndExec<detail::lu_cuda_cache_t>(
-    detail::GetCacheIdFromType<detail::lu_cuda_cache_t>(),
+    cache_id,
     params,
     [&]() {
       return std::make_shared<cache_val_type>(piv_new, tvt, exec);

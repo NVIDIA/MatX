@@ -58,6 +58,7 @@ public:
   using value_type = typename OpA::value_type;
 
   __MATX_INLINE__ Sparse2DenseOp(const OpA &a) : a_(a) {
+    MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
     for (int r = 0; r < Rank(); r++) {
       out_dims_[r] = a_.Size(r);
     }

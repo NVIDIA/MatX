@@ -33,6 +33,7 @@
 #pragma once
 
 #include "matx/generators/generator1d.h"
+#include "matx/core/log.h"
 
 namespace matx
 {
@@ -47,7 +48,11 @@ namespace matx
         using matxop = bool;        
 
 	      __MATX_INLINE__ std::string str() const { return "alternate"; }
-        __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Alternating(index_t size) : size_(size) {};
+        __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Alternating(index_t size) : size_(size) {
+#ifndef __CUDA_ARCH__
+          MATX_LOG_TRACE("Alternating constructor: size={}", size);
+#endif
+        };
 
         template <OperatorCapability Cap, typename InType>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {

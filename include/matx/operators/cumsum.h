@@ -64,6 +64,7 @@ namespace detail {
 
       __MATX_INLINE__ std::string str() const { return "cumsum()"; }
       __MATX_INLINE__ CumSumOp(const OpA &a) : a_(a) { 
+        MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
         for (int r = 0; r < Rank(); r++) {
           out_dims_[r] = a_.Size(r);
         }

@@ -58,7 +58,9 @@ namespace detail {
       using svd_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "svd(" + get_type_str(a_) + ")"; }
-      __MATX_INLINE__ SVDOp(const OpA &a, const SVDMode jobz, const SVDHostAlgo algo) : a_(a), jobz_(jobz), algo_(algo) { };
+      __MATX_INLINE__ SVDOp(const OpA &a, const SVDMode jobz, const SVDHostAlgo algo) : a_(a), jobz_(jobz), algo_(algo) {
+        MATX_LOG_TRACE("{} constructor: jobz={}, algo={}", str(), static_cast<int>(jobz), static_cast<int>(algo));
+      };
 
       // This should never be called
       template <typename... Is>
@@ -167,8 +169,9 @@ namespace detail {
       using svd_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "svdpi(" + get_type_str(a_) + ")"; }
-      __MATX_INLINE__ SVDPIOp(const OpA &a, const OpX &x, int iterations, index_t k) : a_(a), x_(x), iterations_(iterations), k_(k) 
-      { }
+      __MATX_INLINE__ SVDPIOp(const OpA &a, const OpX &x, int iterations, index_t k) : a_(a), x_(x), iterations_(iterations), k_(k)
+      {
+        MATX_LOG_TRACE("{} constructor: iterations={}, k={}", str(), iterations, k); }
 
       // This should never be called
       template <typename... Is>

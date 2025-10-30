@@ -257,8 +257,10 @@ void sparse2dense_impl(OutputTensorType &O, const InputTensorType &a,
 
   // Lookup and cache.
   using cache_val_type = detail::Sparse2DenseHandle_t<otype, atype>;
+  auto cache_id = detail::GetCacheIdFromType<detail::sparse2dense_cache_t>();
+  MATX_LOG_DEBUG("Sparse2Dense transform: cache_id={}", cache_id);
   detail::GetCache().LookupAndExec<detail::sparse2dense_cache_t>(
-      detail::GetCacheIdFromType<detail::sparse2dense_cache_t>(), params,
+      cache_id, params,
       [&]() { return std::make_shared<cache_val_type>(o, a, stream); },
       [&](std::shared_ptr<cache_val_type> cache_type) {
         cache_type->Exec(o, a);

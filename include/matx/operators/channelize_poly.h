@@ -68,7 +68,8 @@ namespace detail {
       __MATX_INLINE__ std::string str() const { return "channelize_poly(" + get_type_str(a_) + "," + get_type_str(f_) + ")";}
       __MATX_INLINE__ ChannelizePolyOp(const OpA &a, const FilterType &f, index_t num_channels, index_t decimation_factor) :
           a_(a), f_(f), num_channels_(num_channels), decimation_factor_(decimation_factor)
-      { 
+      {
+        MATX_LOG_TRACE("{} constructor: num_channels={}, decimation_factor={}", str(), num_channels, decimation_factor); 
         const index_t b_len = (a_.Size(OpA::Rank() - 1) + num_channels - 1) / num_channels;
 
         for (int r = 0; r < OpA::Rank()-1; r++) {

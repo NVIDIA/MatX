@@ -38,6 +38,7 @@
 #include "matx/core/operator_utils.h"
 #include "matx/core/capabilities.h"
 #include "matx/core/error.h"
+#include "matx/core/log.h"
 
 namespace matx
 {

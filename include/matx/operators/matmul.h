@@ -73,6 +73,7 @@ namespace matx
 
         __MATX_INLINE__ MatMulOp(const OpA &a, const OpB &b, float alpha, float beta, PermDims perm) : 
               a_(a), b_(b), alpha_(alpha), beta_(beta), perm_(perm) {
+          MATX_LOG_TRACE("{} constructor: alpha={}, beta={}", str(), alpha, beta);
           if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
             for (int r = 0; r < Rank(); r++) {
               if (r == Rank() - 2) {

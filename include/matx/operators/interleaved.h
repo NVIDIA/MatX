@@ -55,6 +55,7 @@ namespace matx
         __MATX_INLINE__ std::string str() const { return "interleaved(" + op_.str() + ")"; }
 
         __MATX_INLINE__ ComplexInterleavedOp(const T1 &op) : op_(op) {
+          MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
           static_assert(!is_complex_v<extract_value_type_t<T1>>, "Complex interleaved op only works on scalar input types");
           static_assert(Rank() > 0);
         };

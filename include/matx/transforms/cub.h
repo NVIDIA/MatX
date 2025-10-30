@@ -1502,8 +1502,10 @@ void sort_impl_inner(OutputTensor &a_out, const InputOperator &a,
                             detail::CUB_OP_RADIX_SORT>::GetCubParams(a_out, a, stream);
 
   using cache_val_type = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_RADIX_SORT, detail::SortParams_t>;
+  auto cache_id = detail::GetCacheIdFromType<detail::cub_cache_t>();
+  MATX_LOG_DEBUG("CUB radix sort transform: cache_id={}", cache_id);
   detail::GetCache().LookupAndExec<detail::cub_cache_t>(
-      detail::GetCacheIdFromType<detail::cub_cache_t>(),
+      cache_id,
       params,
       [&]() {
         return std::make_shared<cache_val_type>(a_out, a, p, stream);
@@ -1701,8 +1703,10 @@ void cub_reduce(OutputTensor &a_out, const InputOperator &a, typename InputOpera
                             detail::CUB_OP_REDUCE,
                             param_type>::GetCubParams(a_out, a, stream);
   using cache_val_type = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE, param_type>;
+  auto cache_id = detail::GetCacheIdFromType<detail::cub_cache_t>();
+  MATX_LOG_DEBUG("CUB reduce transform: cache_id={}", cache_id);
   detail::GetCache().LookupAndExec<detail::cub_cache_t>(
-    detail::GetCacheIdFromType<detail::cub_cache_t>(),
+    cache_id,
     params,
     [&]() {
       return std::make_shared<cache_val_type>(a_out, a, reduce_params, stream);
@@ -1751,8 +1755,10 @@ void cub_sum(OutputTensor &a_out, const InputOperator &a,
                             detail::CUB_OP_REDUCE_SUM>::GetCubParams(a_out, a, stream);
 
   using cache_val_type = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE_SUM, detail::EmptyParams_t>;
+  auto cache_id = detail::GetCacheIdFromType<detail::cub_cache_t>();
+  MATX_LOG_DEBUG("CUB reduce sum transform: cache_id={}", cache_id);
   detail::GetCache().LookupAndExec<detail::cub_cache_t>(
-      detail::GetCacheIdFromType<detail::cub_cache_t>(),
+      cache_id,
       params,
       [&]() {
         return std::make_shared<cache_val_type>(a_out, a, detail::EmptyParams_t{}, stream);
@@ -1796,8 +1802,10 @@ void cub_min(OutputTensor &a_out, const InputOperator &a,
                             detail::CUB_OP_REDUCE_MIN>::GetCubParams(a_out, a, stream);
 
   using cache_val_type = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE_MIN, detail::EmptyParams_t>;
+  auto cache_id = detail::GetCacheIdFromType<detail::cub_cache_t>();
+  MATX_LOG_DEBUG("CUB reduce min transform: cache_id={}", cache_id);
   detail::GetCache().LookupAndExec<detail::cub_cache_t>(
-      detail::GetCacheIdFromType<detail::cub_cache_t>(),
+      cache_id,
       params,
       [&]() {
         return std::make_shared<cache_val_type>(a_out, a, detail::EmptyParams_t{}, stream);
@@ -1842,8 +1850,10 @@ void cub_max(OutputTensor &a_out, const InputOperator &a,
                             detail::CUB_OP_REDUCE_MAX>::GetCubParams(a_out, a, stream);
 
   using cache_val_type = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE_MAX, detail::EmptyParams_t>;
+  auto cache_id = detail::GetCacheIdFromType<detail::cub_cache_t>();
+  MATX_LOG_DEBUG("CUB reduce max transform: cache_id={}", cache_id);
   detail::GetCache().LookupAndExec<detail::cub_cache_t>(
-      detail::GetCacheIdFromType<detail::cub_cache_t>(),
+      cache_id,
       params,
       [&]() {
         return std::make_shared<cache_val_type>(a_out, a, detail::EmptyParams_t{}, stream);
@@ -1907,8 +1917,10 @@ void cub_argreduce(OutputTensor &a_out, TensorIndexType &aidx_out, const InputOp
   #ifndef MATX_DISABLE_CUB_CACHE
     auto params = cache_val_type::GetCubParams(a_out_supported, aidx_out_supported, a_supported, detail::CUB_OP_SINGLE_ARG_REDUCE, stream);
 
+    auto cache_id = detail::GetCacheIdFromType<detail::cub_cache_t>();
+    MATX_LOG_DEBUG("CUB single arg reduce transform: cache_id={}", cache_id);
     detail::GetCache().LookupAndExec<detail::cub_cache_t>(
-        detail::GetCacheIdFromType<detail::cub_cache_t>(),
+        cache_id,
         params,
         [&]() {
           return std::make_shared<cache_val_type>(a_out_supported, aidx_out_supported, a_supported, reduce_params, stream);
@@ -1976,8 +1988,10 @@ void cub_dualargreduce(OutputTensor &a1_out,
   #ifndef MATX_DISABLE_CUB_CACHE
     auto params = cache_val_type::GetCubParams(a1_out, aidx1_out, a2_out, aidx2_out, a, detail::CUB_OP_DUAL_ARG_REDUCE, stream);
 
+    auto cache_id = detail::GetCacheIdFromType<detail::cub_cache_t>();
+    MATX_LOG_DEBUG("CUB dual arg reduce transform: cache_id={}", cache_id);
     detail::GetCache().LookupAndExec<detail::cub_cache_t>(
-        detail::GetCacheIdFromType<detail::cub_cache_t>(),
+        cache_id,
         params,
         [&]() {
           return std::make_shared<cache_val_type>(a1_out, aidx1_out, a2_out, aidx2_out, a, reduce_params, stream);
@@ -2256,8 +2270,10 @@ void cumsum_impl(OutputTensor &a_out, const InputOperator &a,
       detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_INC_SUM>::GetCubParams(a_out, a, stream);
 
   using cache_val_type = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_INC_SUM, detail::EmptyParams_t>;
+  auto cache_id = detail::GetCacheIdFromType<detail::cub_cache_t>();
+  MATX_LOG_DEBUG("CUB cumsum transform: cache_id={}", cache_id);
   detail::GetCache().LookupAndExec<detail::cub_cache_t>(
-      detail::GetCacheIdFromType<detail::cub_cache_t>(),
+      cache_id,
       params,
       [&]() {
         return std::make_shared<cache_val_type>(a_out, a, detail::EmptyParams_t{}, stream);
@@ -2353,8 +2369,10 @@ void hist_impl(OutputTensor &a_out, const InputOperator &a,
                             detail::CUB_OP_HIST_EVEN>::GetCubParams(a_out, a, stream);
 
   using cache_val_type = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_HIST_EVEN, param_type>;
+  auto cache_id = detail::GetCacheIdFromType<detail::cub_cache_t>();
+  MATX_LOG_DEBUG("CUB histogram transform: cache_id={}", cache_id);
   detail::GetCache().LookupAndExec<detail::cub_cache_t>(
-      detail::GetCacheIdFromType<detail::cub_cache_t>(),
+      cache_id,
       params,
       [&]() {
         return std::make_shared<cache_val_type>(a_out, a, hp, stream);
@@ -2494,8 +2512,10 @@ void find_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperator 
                             detail::CUB_OP_SELECT_VALS,
                             param_type>::GetCubParams(a_out, a, stream);
   using cache_val_type = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_SELECT_VALS, param_type>;
+  auto cache_id = detail::GetCacheIdFromType<detail::cub_cache_t>();
+  MATX_LOG_DEBUG("CUB find values transform: cache_id={}", cache_id);
   detail::GetCache().LookupAndExec<detail::cub_cache_t>(
-      detail::GetCacheIdFromType<detail::cub_cache_t>(),
+      cache_id,
       params,
       [&]() {
         return std::make_shared<cache_val_type>(a_out, a, cparams, stream);
@@ -2613,8 +2633,10 @@ void find_idx_impl(OutputTensor &a_out, CountTensor &num_found, const InputOpera
                             detail::CUB_OP_SELECT_IDX,
                             param_type>::GetCubParams(a_out, a, stream);
   using cache_val_type = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_SELECT_IDX, param_type>;
+  auto cache_id = detail::GetCacheIdFromType<detail::cub_cache_t>();
+  MATX_LOG_DEBUG("CUB find indices transform: cache_id={}", cache_id);
   detail::GetCache().LookupAndExec<detail::cub_cache_t>(
-      detail::GetCacheIdFromType<detail::cub_cache_t>(),
+      cache_id,
       params,
       [&]() {
         return std::make_shared<cache_val_type>(a_out, a, cparams, stream);
@@ -2732,8 +2754,10 @@ void unique_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperato
                             detail::CUB_OP_UNIQUE,
                             param_type>::GetCubParams(a_out, a, stream);
   using cache_val_type = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_UNIQUE, param_type>;
+  auto cache_id = detail::GetCacheIdFromType<detail::cub_cache_t>();
+  MATX_LOG_DEBUG("CUB unique transform: cache_id={}", cache_id);
   detail::GetCache().LookupAndExec<detail::cub_cache_t>(
-      detail::GetCacheIdFromType<detail::cub_cache_t>(),
+      cache_id,
       params,
       [&]() {
         return std::make_shared<cache_val_type>(a_out, a, cparams, stream);

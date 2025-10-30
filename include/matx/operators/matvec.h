@@ -67,7 +67,7 @@ namespace matx
 
         __MATX_INLINE__ MatVecOp(const OpA &A, const OpB &B, float alpha, float beta) : 
               a_(A), b_(B), alpha_(alpha), beta_(beta) {
-          
+          MATX_LOG_TRACE("{} constructor: alpha={}, beta={}", str(), alpha, beta);
           for (int r = 0; r < Rank(); r++) {
             out_dims_[r] = a_.Size(r);
           }

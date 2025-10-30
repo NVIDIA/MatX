@@ -95,6 +95,7 @@ namespace matx
         __MATX_INLINE__ std::string str() const { return "legendre(" + get_type_str(n_) + "," + get_type_str(m_) + "," + get_type_str(in_) + ")"; }
 
         __MATX_INLINE__ LegendreOp(const T1 &n, const T2 &m, const T3 &in, cuda::std::array<int,2> axis) : n_(n), m_(m), in_(in), axis_(axis) {
+          MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
           static_assert(get_rank<T1>() <= 1, "legendre op:  n must be a scalar, rank 0 or 1 operator");
           static_assert(get_rank<T2>() <= 1, "legendre op:  m must be a scalar, rank 0 or 1 operator");
         }

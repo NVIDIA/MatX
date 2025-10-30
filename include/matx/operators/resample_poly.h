@@ -66,7 +66,8 @@ namespace detail {
       __MATX_INLINE__ std::string str() const { return "resample_poly(" + get_type_str(a_) + "," + get_type_str(f_) + ")";}
       __MATX_INLINE__ ResamplePolyOp(const OpA &a, const FilterType &f, index_t up, index_t down) : 
           a_(a), f_(f), up_(up), down_(down) 
-      { 
+      {
+        MATX_LOG_TRACE("{} constructor: up={}, down={}", str(), up, down); 
         const index_t up_len = a_.Size(OpA::Rank() - 1) * up_;
         const index_t b_len = up_len / down_ + ((up_len % down_) ? 1 : 0);
 

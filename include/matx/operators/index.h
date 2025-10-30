@@ -53,7 +53,9 @@ namespace matx
         using value_type = index_t;
 
         __MATX_INLINE__ std::string str() const { return "index()"; } 
-        __MATX_INLINE__ IndexOp(int dim) : dim_(dim){};  
+        __MATX_INLINE__ IndexOp(int dim) : dim_(dim){
+          MATX_LOG_TRACE("{} constructor: dim={}", str(), dim);
+        };  
 
         template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 

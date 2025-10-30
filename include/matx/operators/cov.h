@@ -62,7 +62,7 @@ namespace matx
 
         __MATX_INLINE__ CovOp(const OpA &A) : 
               a_(A) {
-          
+          MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
           for (int r = 0; r < Rank(); r++) {
             out_dims_[r] = a_.Size(r);
           }

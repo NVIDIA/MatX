@@ -475,8 +475,10 @@ void qr_solver_impl(OutTensor &&out, TauTensor &&tau,
 
   // Get cache or new QR plan if it doesn't exist
   using cache_val_type = detail::matxDnQRCUDAPlan_t<OutTensor, decltype(tau_new), decltype(a_new)>;
+  auto cache_id = detail::GetCacheIdFromType<detail::qr_cuda_cache_t>();
+  MATX_LOG_DEBUG("QR transform (full): cache_id={}", cache_id);
   detail::GetCache().LookupAndExec<detail::qr_cuda_cache_t>(
-    detail::GetCacheIdFromType<detail::qr_cuda_cache_t>(),
+    cache_id,
     params,
     [&]() {
       return std::make_shared<cache_val_type>(tau_new, tvt, exec);
@@ -848,8 +850,10 @@ void qr_econ_impl(OutTensor &&out, RTensor &&out_r,
 
   // Get cache or new QR plan if it doesn't exist
   using cache_val_type = detail::matxDnEconQRCUDAPlan_t<OutTensor, RTensor, decltype(tau_new), decltype(a_new)>;
+  auto cache_id = detail::GetCacheIdFromType<detail::qr_cuda_cache_t>();
+  MATX_LOG_DEBUG("QR transform (economic): cache_id={}", cache_id);
   detail::GetCache().LookupAndExec<detail::qr_cuda_cache_t>(
-    detail::GetCacheIdFromType<detail::qr_cuda_cache_t>(),
+    cache_id,
     params,
     [&]() {
       return std::make_shared<cache_val_type>(tau_new, tvt, exec);

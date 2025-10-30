@@ -54,7 +54,9 @@ private:
   index_t N_;
 
 public:
-  dctOp(Out out, I in, index_t N) : out_(out), in_(in), N_(N) {}
+  dctOp(Out out, I in, index_t N) : out_(out), in_(in), N_(N) {
+    MATX_LOG_TRACE("dctOp constructor: N={}", N);
+  }
 
   template <typename CapType>
   __MATX_DEVICE__ inline void operator()(index_t idx)

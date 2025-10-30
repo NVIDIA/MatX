@@ -58,7 +58,9 @@ namespace detail {
       using einsum_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "einsum()"; }
-      __MATX_INLINE__ EinsumOp(const std::string &subscripts, const OpA&... ops) : subscripts_(subscripts), a_(ops...) { };
+      __MATX_INLINE__ EinsumOp(const std::string &subscripts, const OpA&... ops) : subscripts_(subscripts), a_(ops...) {
+        MATX_LOG_TRACE("{} constructor: subscripts=\"{}\"", str(), subscripts);
+      };
 
       // This should never be called
       template <typename... Is>

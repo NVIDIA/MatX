@@ -51,7 +51,9 @@ public:
   using tosparse_xform_op = bool;
   using value_type = typename OpA::value_type;
 
-  __MATX_INLINE__ Sparse2SparseOp(const OpA &a) : a_(a) {}
+  __MATX_INLINE__ Sparse2SparseOp(const OpA &a) : a_(a) {
+    MATX_LOG_TRACE("{} constructor: rank={}", str(), OpA::Rank());
+  }
 
   __MATX_INLINE__ std::string str() const {
     return "sparse2sparse(" + get_type_str(a_) + ")";

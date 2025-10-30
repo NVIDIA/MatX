@@ -61,7 +61,9 @@ namespace detail {
       using can_alias = bool; // Chol is allowed to use the same input/output memory
 
       __MATX_INLINE__ std::string str() const { return "chol()"; }
-      __MATX_INLINE__ CholOp(const OpA &a, SolverFillMode uplo) : a_(a), uplo_(uplo) { }
+      __MATX_INLINE__ CholOp(const OpA &a, SolverFillMode uplo) : a_(a), uplo_(uplo) {
+        MATX_LOG_TRACE("{} constructor: uplo={}", str(), static_cast<int>(uplo));
+      }
 
       // This should never be called
       template <typename... Is>

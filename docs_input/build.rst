@@ -201,6 +201,8 @@ By default, all of these options are OFF.
     - ``-DMATX_EN_MATHDX=ON``
   * - Enable pybind11 Support. This option is usually not explicitly set, but is enabled by other options.
     - ``-DMATX_EN_PYBIND11=ON``
+  * - Disable Exceptions
+    - ``-DMATX_DISABLE_EXCEPTIONS=ON``
 
 
 NVTX Flags

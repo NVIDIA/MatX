@@ -397,6 +397,7 @@ namespace matx {
         xq_(xq),
         method_(method)
       {
+        MATX_LOG_TRACE("{} constructor: method={}", str(), static_cast<int>(method));
         if (x_.Size(x_.Rank() - 1) != v_.Size(v_.Rank() - 1)) {
           MATX_THROW(matxInvalidSize, "interp1: sample points and values must have the same size in the last dimension");
         }

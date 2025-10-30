@@ -343,8 +343,10 @@ void sparse_matvec_impl(TensorTypeC &C, const TensorTypeA &a,
 
     // Lookup and cache.
     using cache_val_type = detail::MatVecCUSPARSEHandle_t<ctype, atype, btype>;
+    auto cache_id = detail::GetCacheIdFromType<detail::spmv_cusparse_cache_t>();
+    MATX_LOG_DEBUG("MatVec CUSPARSE transform: cache_id={}", cache_id);
     detail::GetCache().LookupAndExec<detail::spmv_cusparse_cache_t>(
-        detail::GetCacheIdFromType<detail::spmv_cusparse_cache_t>(), params,
+        cache_id, params,
         [&]() {
           return std::make_shared<cache_val_type>(c, a, b, stream, alpha, beta);
         },

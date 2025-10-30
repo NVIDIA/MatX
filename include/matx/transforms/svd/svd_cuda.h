@@ -1001,8 +1001,10 @@ void svd_impl(UTensor &&u, STensor &&s,
 
     // Get cache or new SVD plan if it doesn't exist
     using cache_val_type = detail::matxDnSVDCUDAPlan_t<decltype(u_in), decltype(s_new), decltype(vt_in), decltype(at_col_maj)>;
+    auto cache_id = detail::GetCacheIdFromType<detail::svd_cuda_cache_t>();
+    MATX_LOG_DEBUG("SVD transform (full): cache_id={}", cache_id);
     detail::GetCache().LookupAndExec<detail::svd_cuda_cache_t>(
-      detail::GetCacheIdFromType<detail::svd_cuda_cache_t>(),
+      cache_id,
       params,
       [&]() {
         return std::make_shared<cache_val_type>(u_in, s_new, vt_in, at_col_maj, method, exec, job_cusolver);
@@ -1039,8 +1041,10 @@ void svd_impl(UTensor &&u, STensor &&s,
 
     // Get cache or new SVD plan if it doesn't exist
     using cache_val_type = detail::matxDnSVDCUDAPlan_t<decltype(u_col_maj), decltype(s_new), decltype(vt_col_maj), decltype(tvt)>;
+    auto cache_id = detail::GetCacheIdFromType<detail::svd_cuda_cache_t>();
+    MATX_LOG_DEBUG("SVD transform (vectors): cache_id={}", cache_id);
     detail::GetCache().LookupAndExec<detail::svd_cuda_cache_t>(
-      detail::GetCacheIdFromType<detail::svd_cuda_cache_t>(),
+      cache_id,
       params,
       [&]() {
         return std::make_shared<cache_val_type>(u_col_maj, s_new, vt_col_maj, tvt, method, exec, job_cusolver);

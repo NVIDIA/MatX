@@ -83,7 +83,7 @@ MATX_IGNORE_WARNING_POP_GCC
             }
           }
           MATX_ASSERT(d == T::Rank(), matxInvalidDim);
-
+          MATX_LOG_TRACE("{} constructor: input_rank={}, output_rank={}", str(), T::Rank(), CRank);
         }
 
         template <typename CapType, typename Op, typename Dims, typename... Is>

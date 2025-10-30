@@ -74,7 +74,7 @@ namespace matx
 
         __MATX_INLINE__ AmbgFunOp(const OpX &x, const OpY &y, double fs, AMBGFunCutType_t cut, float cut_val) : 
               x_(x), y_(y), fs_(fs), cut_(cut), cut_val_(cut_val) {
-          
+          MATX_LOG_TRACE("{} constructor: fs={}, cut={}", str(), fs, static_cast<int>(cut));
           static_assert(OpX::Rank() == 1, "Input to ambgfun must be rank 1");                
           if (cut == AMBGFUN_CUT_TYPE_2D) {
             out_dims_[0] = 2 * x_.Size(0) - 1;

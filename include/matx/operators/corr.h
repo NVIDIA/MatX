@@ -71,7 +71,7 @@ namespace matx
 
         __MATX_INLINE__ CorrOp(const OpA &A, const OpB &B, matxConvCorrMode_t mode, [[maybe_unused]] matxConvCorrMethod_t method, PermDims perm) : 
               a_(A), b_(B), mode_(mode), method_(method), perm_(perm) {
-
+          MATX_LOG_TRACE("{} constructor: mode={}, method={}", str(), static_cast<int>(mode), static_cast<int>(method));
           // Currently when using the axis parameter the rank of inputs must be equal
           if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
             for (int r = 0; r < Rank(); r++) {

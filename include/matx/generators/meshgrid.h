@@ -32,6 +32,7 @@
 
 #pragma once
 #include "matx/operators/permute.h"
+#include "matx/core/log.h"
 
 namespace matx
 {
@@ -55,6 +56,7 @@ namespace matx
           __MATX_INLINE__ MeshGridOp(T1 t1, cuda::std::array<index_t, RANK> shape, int idx) : t1_(t1), shape_(shape), idx_(idx) {
             static_assert(shape.size() == RANK );
             static_assert(is_matx_op<T1>());
+            MATX_LOG_TRACE("MeshGridOp constructor: rank={}, axis={}, idx={}", RANK, AXIS, idx);
           }
 
 

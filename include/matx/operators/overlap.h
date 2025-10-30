@@ -65,7 +65,7 @@ namespace matx
         __MATX_INLINE__ std::string str() const { return "overlap(" + op_.str() + ")"; }
         __MATX_INLINE__ OverlapOp(const T &op, const cuda::std::array<shape_type, DIM> &windows,
                                       const cuda::std::array<shape_type, DIM> &strides) : op_(op) {
-
+          MATX_LOG_TRACE("{} constructor: dim={}, rank={}", str(), DIM, Rank());
           // This only works for 1D tensors going to 2D at the moment. Generalize to
           // higher dims later
           index_t window_size = windows[0];

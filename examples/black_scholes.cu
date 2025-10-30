@@ -150,16 +150,15 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   index_t input_size = 100'000'000;
   constexpr uint32_t num_iterations = 100;
   float time_ms;
-
-  tensor_t<dtype, 1> K_tensor{{input_size}};
-  tensor_t<dtype, 1> S_tensor{{input_size}};
-  tensor_t<dtype, 1> V_tensor{{input_size}};
-  tensor_t<dtype, 1> r_tensor{{input_size}};
-  tensor_t<dtype, 1> T_tensor{{input_size}};
-  tensor_t<dtype, 1> output_tensor{{input_size}};
-  tensor_t<dtype, 1> output_tensor2{{input_size}};
-  tensor_t<dtype, 1> output_tensor3{{input_size}};
-  tensor_t<dtype, 1> output_tensor4{{input_size}};
+  auto K_tensor = make_tensor<dtype>({input_size});
+  auto S_tensor = make_tensor<dtype>({input_size});
+  auto V_tensor = make_tensor<dtype>({input_size});
+  auto r_tensor = make_tensor<dtype>({input_size});
+  auto T_tensor = make_tensor<dtype>({input_size});
+  auto output_tensor = make_tensor<dtype>({input_size});
+  auto output_tensor2 = make_tensor<dtype>({input_size});
+  auto output_tensor3 = make_tensor<dtype>({input_size});
+  auto output_tensor4 = make_tensor<dtype>({input_size});
 
   (K_tensor = random<float>({input_size}, UNIFORM)).run();
   (S_tensor = random<float>({input_size}, UNIFORM)).run();
@@ -170,8 +169,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   cudaStream_t stream;
   cudaStreamCreate(&stream);
   cudaExecutor exec{stream};
-
-  //compute_black_scholes_matx(K_tensor, S_tensor, V_tensor, r_tensor, T_tensor, output_tensor, exec);
 
   cudaEvent_t start, stop;
   cudaEventCreate(&start);

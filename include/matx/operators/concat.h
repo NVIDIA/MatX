@@ -79,6 +79,7 @@ namespace matx
         static_assert(RANK > 0, "Cannot concatenate rank-0 tensors");
         static_assert(sizeof...(Ts) > 1, "Must have more than one tensor to concatenate");
         static_assert((... && (RANK == Ts::Rank())), "concatenated ops must have the same rank");
+        MATX_LOG_TRACE("{} constructor: rank={}, axis={}, num_tensors={}", str(), RANK, axis, sizeof...(Ts));
 
         for (int32_t i = 0; i < RANK; i++) {
           if(i == axis_) {

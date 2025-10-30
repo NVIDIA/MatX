@@ -33,6 +33,7 @@
 #pragma once
 
 #include "matx/core/error.h"
+#include "matx/core/log.h"
 #include <cuda/std/complex>
 #include <curand_kernel.h>
 #include <type_traits>
@@ -279,6 +280,8 @@ namespace detail {
         for (int i = RANK - 2; i >= 0; i--) {
           strides_[i] = strides_[i+1] * s[i+1];
         }
+        
+        MATX_LOG_TRACE("RandomOp constructor: rank={}, total_size={}, seed={}", RANK, total_size_, seed);
       }
 
       template <OperatorCapability Cap, typename InType>

@@ -33,6 +33,7 @@
 #pragma once
 
 #include "matx/generators/generator1d.h"
+#include "matx/core/log.h"
 #include <type_traits>
 
 namespace matx
@@ -48,7 +49,11 @@ namespace matx
 
         __MATX_INLINE__ std::string str() const { return "bartlett"; }
 
-        inline __MATX_HOST__ __MATX_DEVICE__ Bartlett(index_t size) : size_(size){};
+        inline __MATX_HOST__ __MATX_DEVICE__ Bartlett(index_t size) : size_(size){
+#ifndef __CUDA_ARCH__
+          MATX_LOG_TRACE("Bartlett constructor: size={}", size);
+#endif
+        };
 
         template <typename CapType>
         inline __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const

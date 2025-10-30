@@ -64,6 +64,7 @@ namespace detail {
       __MATX_INLINE__ std::string str() const { return "hist()"; }
       __MATX_INLINE__ HistOp(const OpA &a, typename OpA::value_type lower, typename OpA::value_type upper, int num_levels) : 
           a_(a), lower_(lower), upper_(upper), num_levels_(num_levels) { 
+        MATX_LOG_TRACE("{} constructor: num_levels={}", str(), num_levels);
         for (int r = 0; r < Rank(); r++) {
           out_dims_[r] = a_.Size(r);
         }

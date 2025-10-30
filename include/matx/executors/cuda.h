@@ -38,6 +38,7 @@
 #include "matx/core/get_grid_dims.h"
 #include "matx/executors/kernel.h"
 #include "matx/executors/cuda_executor_common.h"
+#include "matx/core/log.h"
 #include <cuda/std/array>
 #include <utility>
 #include <vector>
@@ -269,6 +270,9 @@ namespace matx
             // Helper lambda to launch kernel
             auto launch_kernel = [&]<detail::ElementsPerThread EPT>() {
               dispatch_kernel.template operator()<EPT>([&](auto launch_func) {
+                MATX_LOG_DEBUG("Launching CUDA kernel: rank={}, blocks=({},{},{}), threads=({},{},{}), EPT={}, stream={}", 
+                               Op::Rank(), blocks.x, blocks.y, blocks.z, threads.x, threads.y, threads.z, 
+                               static_cast<int>(EPT), reinterpret_cast<void*>(stream_));
                 launch_func();
               });
             };

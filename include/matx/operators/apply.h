@@ -59,6 +59,7 @@ namespace matx
 
         __MATX_INLINE__ ApplyOp(Func func, const Ops&... ops) : func_(func), ops_(detail::base_type_t<Ops>(ops)...)
         {
+          MATX_LOG_TRACE("{} constructor: num_ops={}", str(), sizeof...(Ops));
           static_assert(sizeof...(Ops) > 0, "ApplyOp requires at least one input operator");
           
           // Initialize sizes from the first operator

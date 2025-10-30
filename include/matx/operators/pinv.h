@@ -59,6 +59,7 @@ namespace detail {
 
       __MATX_INLINE__ std::string str() const { return "pinv()"; }
       __MATX_INLINE__ PinvOp(const OpA &a, float rcond) : a_(a), rcond_(rcond) {
+        MATX_LOG_TRACE("{} constructor: rcond={}", str(), rcond);
         for (int r = 0; r < Rank(); r++) {
           if (r >= Rank() - 2) {
             out_dims_[r] = (r == Rank() - 1) ? a_.Size(Rank() - 2) : a_.Size(Rank() - 1);

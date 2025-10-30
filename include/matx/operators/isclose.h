@@ -55,6 +55,7 @@ namespace matx
         __MATX_INLINE__ IsCloseOp(const Op1 &op1, const Op2 &op2, double rtol, double atol) :
           op1_(op1), op2_(op2), rtol_(static_cast<inner_type>(rtol)), atol_(static_cast<inner_type>(atol))
         {
+          MATX_LOG_TRACE("{} constructor: rtol={}, atol={}", str(), rtol, atol);
           static_assert(Op1::Rank() == Op2::Rank(), "Operator ranks must match in isclose()");
           MATX_ASSERT_COMPATIBLE_OP_SIZES(op1);
           MATX_ASSERT_COMPATIBLE_OP_SIZES(op2);

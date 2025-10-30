@@ -63,6 +63,7 @@ namespace matx
 
         __MATX_INLINE__ ShiftOp(const T1 &op, T2 shift) : op_(op), shift_(shift)
         {
+          MATX_LOG_TRACE("{} constructor: dim={}, rank={}", str(), DIM, Rank());
           static_assert(DIM < Rank(), "Dimension to shift must be less than rank of tensor");
 
           MATX_LOOP_UNROLL

@@ -57,7 +57,9 @@ namespace matx
 
         __MATX_INLINE__ std::string str() const { return "select(" + op_.str() + ")"; }
 
-        __MATX_INLINE__ SelectOp(const T &op, IdxType idx) : op_(op), idx_(idx) {};  
+        __MATX_INLINE__ SelectOp(const T &op, IdxType idx) : op_(op), idx_(idx) {
+          MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
+        };  
 
         template <typename CapType, typename Op, typename Idx, typename... Is>
         static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, const Idx &idx, index_t i)

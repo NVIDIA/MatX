@@ -63,6 +63,7 @@ namespace detail {
 
       __MATX_INLINE__ std::string str() const { return "sum(" + get_type_str(a_) + ")"; }
       __MATX_INLINE__ SumOp(const OpA &a) : a_(a) { 
+        MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
         for (int r = 0; r < ORank; r++) {
           out_dims_[r] = a_.Size(r);
         }
