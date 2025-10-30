@@ -68,7 +68,7 @@ namespace matx
 
   // Legacy struct for backward compatibility
   template<typename T>
-  struct has_allocator_interface : std::bool_constant<has_allocator_interface_c<T>> {};
+  struct has_allocator_interface : std::bool_constant<has_allocator_interface_any<T>> {};
 
   /**
    * @brief Unified storage class for both owning and non-owning pointers
