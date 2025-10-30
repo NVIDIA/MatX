@@ -2,6 +2,7 @@ set(OPERATOR_TEST_FILES
   abs2_test.cu
   advanced_op_test.cu
   advanced_remap_test.cu
+  aliased_memory_test.cu
   angle_test.cu
   apply_test.cu
   apply_idx_test.cu

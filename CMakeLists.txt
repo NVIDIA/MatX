@@ -80,6 +80,7 @@ option(MATX_EN_COMPLEX_OP_NAN_CHECKS "Enable full NaN/Inf handling for complex m
 option(MATX_EN_CUDA_LINEINFO "Enable line information for CUDA kernels via -lineinfo nvcc flag" OFF)
 option(MATX_EN_EXTENDED_LAMBDA "Enable extended lambda support for device/host lambdas" ON)
 option(MATX_EN_MATHDX "Enable MathDx support for kernel fusion" OFF)
+option(MATX_EN_UNSAFE_ALIAS_DETECTION "Enable aliased memory detection" OFF)
 
 set(MATX_EN_PYBIND11 OFF CACHE BOOL "Enable pybind11 support")
 
@@ -210,6 +211,10 @@ if (MATX_BUILD_32_BIT)
     target_compile_definitions(matx INTERFACE MATX_INDEX_32_BIT)
 else()
     set(MATX_NVPL_INT_TYPE "ilp64")
+endif()
+
+if (MATX_EN_UNSAFE_ALIAS_DETECTION)
+    target_compile_definitions(matx INTERFACE MATX_EN_UNSAFE_ALIAS_DETECTION)
 endif()
 
 # Host support

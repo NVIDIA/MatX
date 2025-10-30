@@ -81,7 +81,8 @@ namespace matx
           input_type,
           typename scalar_to_complex<input_type>::ctype>;
         using matx_transform_op = bool;
-        using fft_xform_op = bool;    
+        using fft_xform_op = bool;
+        using can_alias = bool; // FFTs can use same input/output memory
 
 #ifdef MATX_EN_JIT
         struct JIT_Storage {
@@ -393,7 +394,13 @@ namespace matx
           else if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
             MATX_LOG_DEBUG("JIT_TYPE_QUERY (no cuFFTDx): \"\"");
             return "";
-          }                
+          }
+          else if constexpr (Cap == OperatorCapability::ALIASED_MEMORY) {
+            MATX_LOG_DEBUG("ALIASED_MEMORY (no cuFFTDx): false");
+            // FFTs with cuFFT cannot have aliased memory errors since they allow the same input and output. Do not 
+            // pass this property on to the child operators.
+            return false;
+          }
           else {
             // 1. Determine if the binary operation ITSELF intrinsically has this capability.
             auto self_has_cap = capability_attributes<Cap>::default_value;

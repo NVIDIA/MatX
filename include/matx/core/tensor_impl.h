@@ -1462,6 +1462,49 @@ MATX_IGNORE_WARNING_POP_GCC
         return false;
 #endif
       }
+      else if constexpr (Cap == OperatorCapability::ALIASED_MEMORY) {
+        // Check if this tensor's memory overlaps with the query input range
+        static_assert(std::is_same_v<remove_cvref_t<InType>, detail::AliasedMemoryQueryInput>, 
+                      "ALIASED_MEMORY capability requires AliasedMemoryQueryInput");
+
+        // Rank 0 (scalars) don't need aliasing checks
+        if constexpr (Rank() == 0) {
+          return false;
+        }
+        else if constexpr (is_sparse_data_v<TensorData>) {
+          return false;
+        }
+        else {
+          // The logic to detect overlaps is as follows: If we have a complete overlap (first and last pointers are identical), 
+          // ie (a = a), then we need to check if the tensor is contiguous or if the input permutes the input and output. If either 
+          // of those are true then this will alias. Otherwise we have a partial overlap. For a partial overlap we always say this
+          // can alias.
+
+          // Get address of first element using operator()(0, 0, ...)
+          auto get_first = [this]<size_t... Is>(cuda::std::index_sequence<Is...>) {
+            return &(const_cast<tensor_impl_t*>(this)->operator()(static_cast<index_t>(Is*0)...));
+          };
+          void* tensor_start = static_cast<void*>(const_cast<T*>(get_first(cuda::std::make_index_sequence<Rank()>{})));
+          
+          // Get address of last element using operator()(Size(0)-1, Size(1)-1, ...)
+          auto get_last = [this]<size_t... Is>(cuda::std::index_sequence<Is...>) {
+            return &(const_cast<tensor_impl_t*>(this)->operator()(static_cast<index_t>(Size(Is)-1)...));
+          };
+          void* tensor_end = static_cast<void*>(static_cast<char*>(static_cast<void*>(const_cast<T*>(get_last(cuda::std::make_index_sequence<Rank()>{})))) + sizeof(T));
+
+          bool complete_overlap = tensor_start == in.start_ptr && tensor_end == in.end_ptr;
+          if (complete_overlap) {      
+            MATX_LOG_TRACE("Complete overlap of tensors. Contiguous: {}", IsContiguous());
+            return !IsContiguous() || in.permutes_input_output;
+          }
+          
+          // Check for overlap: two ranges [a1, a2) and [b1, b2) overlap if a1 < b2 && b1 < a2
+          bool overlaps = (tensor_start < in.end_ptr) && (in.start_ptr < tensor_end);
+          
+          MATX_LOG_TRACE("Overlap of tensors: {}", overlaps);
+          return overlaps;
+        }
+      }
       else {
         return detail::capability_attributes<Cap>::default_value;
       }

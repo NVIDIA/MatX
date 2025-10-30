@@ -174,6 +174,28 @@ template <typename T> constexpr __MATX_HOST__ __MATX_DEVICE__ bool is_matx_trans
 
 namespace detail {
 template <typename T, typename = void>
+struct has_can_alias_impl : cuda::std::false_type {
+};
+
+template <typename T>
+struct has_can_alias_impl<T, cuda::std::void_t<typename remove_cvref_t<T>::can_alias>> : cuda::std::true_type {
+};
+}
+
+/**
+ * @brief Determine if operator can alias
+ * 
+ * Returns true if the type is a transform operator and has the can_alias trait set
+ * 
+ * @tparam T Type to test
+ */
+template <typename T> constexpr __MATX_HOST__ __MATX_DEVICE__ bool can_alias()
+{
+  return is_matx_transform_op<T>() && detail::has_can_alias_impl<typename remove_cvref<T>::type>::value;
+}
+
+namespace detail {
+template <typename T, typename = void>
 struct has_matx_op_type : cuda::std::false_type {
 };
 

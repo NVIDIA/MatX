@@ -677,7 +677,7 @@ public:
               MatXTypeToCudaType<T1>(), &this->dspace, &this->hspace);
     }
     else {
-      int i_dspace;
+      int i_dspace = 0;
 
       if constexpr (std::is_same_v<float, T1>) {
         ret = cusolverDnSgesvdjBatched_bufferSize(

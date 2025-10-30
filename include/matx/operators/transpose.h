@@ -93,8 +93,15 @@ namespace detail {
 
       template <OperatorCapability Cap, typename InType>
       __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
-        auto self_has_cap = capability_attributes<Cap>::default_value;
-        return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
+        if constexpr (Cap == OperatorCapability::ALIASED_MEMORY) {
+          auto in_copy = in;
+          in_copy.permutes_input_output = true;
+          return combine_capabilities<Cap>(detail::get_operator_capability<Cap>(a_, in_copy));
+        }
+        else {
+          auto self_has_cap = capability_attributes<Cap>::default_value;
+          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
+        }
       }
 
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
