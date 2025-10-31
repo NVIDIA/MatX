@@ -72,10 +72,12 @@ namespace matx
         using self_type = NormalizeOp<OpA, DIM>;
 
         __MATX_INLINE__ NormalizeOp(const OpA &op, const NORMALIZE_RANGE method): op_(op), normalize_method(method) {
+          MATX_LOG_TRACE("{} constructor: method={}", str(), static_cast<int>(method));
           InitNormalize();
         }
 
         __MATX_INLINE__ NormalizeOp(const OpA &op, const NORMALIZE_RANGE method, const float p): op_(op), normalize_method(method),  p_(p){
+          MATX_LOG_TRACE("{} constructor: method={}, p={}", str(), static_cast<int>(method), p);
           MATX_ASSERT_STR(normalize_method == NORMALIZE_RANGE::NORM, matxInvalidParameter, "p value can be specified for only p-norm");
           InitNormalize();
         }

@@ -63,7 +63,9 @@ namespace matx
 
         __MATX_INLINE__ std::string str() const { return "remap(" + op_.str() + ")"; }
 
-	      __MATX_INLINE__ RemapOp(const T &op, IdxType idx) : op_(op), idx_(idx) {};
+	      __MATX_INLINE__ RemapOp(const T &op, IdxType idx) : op_(op), idx_(idx) {
+          MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
+        };
 
         // Only supports one element per thread
         template <typename CapType, typename Op, typename Idx, typename... Is>

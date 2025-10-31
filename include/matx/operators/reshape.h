@@ -77,6 +77,7 @@ namespace matx
           }
 
           MATX_ASSERT_STR(size == TotalSize(op_), matxInvalidSize, "ReshapeOp: TotalSize of reshape must match");
+          MATX_LOG_TRACE("{} constructor: rank={}, total_size={}", str(), Rank(), size);
         };
 
         template <typename CapType, typename Op, typename... Is>

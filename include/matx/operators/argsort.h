@@ -61,6 +61,7 @@ namespace detail {
 
       __MATX_INLINE__ std::string str() const { return "argsort()"; }
       __MATX_INLINE__ ArgsortOp(const OpA &a, const SortDirection_t dir) : a_(a), dir_(dir) { 
+        MATX_LOG_TRACE("{} constructor: rank={}, dir={}", str(), Rank(), static_cast<int>(dir));
         for (int r = 0; r < Rank(); r++) {
           out_dims_[r] = a_.Size(r);
         }

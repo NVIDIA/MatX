@@ -59,6 +59,7 @@ namespace matx
 
         __MATX_INLINE__ Cart2SphOp(const T1 &x, const T2 &y, const T3 &z) : x_(x), y_(y), z_(z)
       {
+        MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
         MATX_ASSERT_COMPATIBLE_OP_SIZES(x);
         MATX_ASSERT_COMPATIBLE_OP_SIZES(y);
         MATX_ASSERT_COMPATIBLE_OP_SIZES(z);

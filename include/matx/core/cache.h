@@ -192,11 +192,15 @@ public:
     auto &common_params_cache = rmap[key];
     auto cache_el = common_params_cache.find(params);
     if (cache_el == common_params_cache.end()) {
+      MATX_LOG_DEBUG("Cache MISS for transform: id={}, device={}, thread={}", 
+                     id, key.device_id, reinterpret_cast<void*>(std::hash<std::thread::id>{}(key.thread_id)));
       std::any tmp = mfun();
       common_params_cache.insert({params, tmp});
       efun(std::any_cast<decltype(mfun())>(tmp));
     }
     else {
+      MATX_LOG_DEBUG("Cache HIT for transform: id={}, device={}, thread={}", 
+                     id, key.device_id, reinterpret_cast<void*>(std::hash<std::thread::id>{}(key.thread_id)));
       efun(std::any_cast<decltype(mfun())>(cache_el->second));
     }
   }

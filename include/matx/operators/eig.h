@@ -60,7 +60,9 @@ namespace detail {
       using eig_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "eig()"; }
-      __MATX_INLINE__ EigOp(const OpA &a, EigenMode jobz, SolverFillMode uplo) : a_(a), jobz_(jobz), uplo_(uplo) { };
+      __MATX_INLINE__ EigOp(const OpA &a, EigenMode jobz, SolverFillMode uplo) : a_(a), jobz_(jobz), uplo_(uplo) {
+        MATX_LOG_TRACE("{} constructor: jobz={}, uplo={}", str(), static_cast<int>(jobz), static_cast<int>(uplo));
+      };
 
       // This should never be called
       template <typename... Is>

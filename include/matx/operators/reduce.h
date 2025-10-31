@@ -66,6 +66,7 @@ namespace matx
 
         __MATX_INLINE__ ReduceOp(const OpA &A, PermDims perm, ReductionOp rop, bool init) : 
               a_(A), perm_(perm), reduction_op_(rop), init_(init) {
+          MATX_LOG_TRACE("{} constructor: rop={}, init={}", str(), static_cast<int>(rop), init);
           for (int r = 0; r < ORank; r++) {
             out_dims_[r] = a_.Size(r);
           }

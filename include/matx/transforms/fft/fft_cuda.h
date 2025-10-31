@@ -706,8 +706,10 @@ __MATX_INLINE__ void fft_impl(OutputTensor o, const InputTensor i,
   params.stream = stream;
 
   using cache_val_type = detail::matxCUDAFFTPlan1D_t<decltype(out), decltype(in)>;
+  auto cache_id = detail::GetCacheIdFromType<detail::fft_cuda_cache_t>();
+  MATX_LOG_DEBUG("FFT1D forward transform: cache_id={}", cache_id);
   detail::GetCache().LookupAndExec<detail::fft_cuda_cache_t>(
-    detail::GetCacheIdFromType<detail::fft_cuda_cache_t>(),
+    cache_id,
     params,
     [&]() {
       return std::make_shared<cache_val_type>(out, in);
@@ -752,8 +754,10 @@ __MATX_INLINE__ void ifft_impl(OutputTensor o, const InputTensor i,
   params.stream = stream;
 
   using cache_val_type = detail::matxCUDAFFTPlan1D_t<decltype(out), decltype(in)>;
+  auto cache_id = detail::GetCacheIdFromType<detail::fft_cuda_cache_t>();
+  MATX_LOG_DEBUG("FFT1D inverse transform: cache_id={}", cache_id);
   detail::GetCache().LookupAndExec<detail::fft_cuda_cache_t>(
-    detail::GetCacheIdFromType<detail::fft_cuda_cache_t>(),
+    cache_id,
     params,
     [&]() {
       return std::make_shared<cache_val_type>(out, in);
@@ -793,8 +797,10 @@ __MATX_INLINE__ void fft2_impl(OutputTensor o, const InputTensor i, FFTNorm norm
   params.stream = stream;
 
   using cache_val_type = detail::matxCUDAFFTPlan2D_t<decltype(out), decltype(in)>;
+  auto cache_id = detail::GetCacheIdFromType<detail::fft_cuda_cache_t>();
+  MATX_LOG_DEBUG("FFT2D forward transform: cache_id={}", cache_id);
   detail::GetCache().LookupAndExec<detail::fft_cuda_cache_t>(
-    detail::GetCacheIdFromType<detail::fft_cuda_cache_t>(),
+    cache_id,
     params,
     [&]() {
       return std::make_shared<cache_val_type>(out, in);
@@ -835,8 +841,10 @@ __MATX_INLINE__ void ifft2_impl(OutputTensor o, const InputTensor i, FFTNorm nor
 
   // Get cache or new FFT plan if it doesn't exist
   using cache_val_type = detail::matxCUDAFFTPlan2D_t<decltype(out), decltype(in)>;
+  auto cache_id = detail::GetCacheIdFromType<detail::fft_cuda_cache_t>();
+  MATX_LOG_DEBUG("FFT2D inverse transform: cache_id={}", cache_id);
   detail::GetCache().LookupAndExec<detail::fft_cuda_cache_t>(
-    detail::GetCacheIdFromType<detail::fft_cuda_cache_t>(),
+    cache_id,
     params,
     [&]() {
       return std::make_shared<cache_val_type>(out, in);

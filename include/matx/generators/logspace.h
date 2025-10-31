@@ -33,6 +33,7 @@
 #pragma once
 
 #include "matx/generators/generator1d.h"
+#include "matx/core/log.h"
 #include <type_traits>
 
 namespace matx
@@ -67,6 +68,7 @@ namespace matx
           else {
             range_ = Range<T>{first, (last - first) / static_cast<T>(count - 1)};
           }
+          MATX_LOG_TRACE("Logspace constructor: first={}, last={}, count={}", first, last, count);
 #endif
         }
 

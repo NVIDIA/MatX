@@ -43,6 +43,7 @@
 
 #include "matx/core/error.h"
 #include "matx/core/nvtx.h"
+#include "matx/core/log.h"
 #include <cuda/std/functional>
 #include <cuda/std/__algorithm/max.h>
 
@@ -122,6 +123,9 @@ struct MemTracker {
 
     size_t bytes = iter->second.size;
 
+    MATX_LOG_DEBUG("Deallocating memory: ptr={}, {} bytes, space={}, remaining={} bytes", 
+                   ptr, bytes, static_cast<int>(iter->second.kind), matxMemoryStats.currentBytesAllocated - bytes);
+
     matxMemoryStats.currentBytesAllocated -= bytes;
 
     switch (iter->second.kind) {
@@ -187,6 +191,8 @@ struct MemTracker {
       }
     }
     
+    MATX_LOG_DEBUG("Allocating memory: {} bytes, space={}, stream={}", bytes, static_cast<int>(space), reinterpret_cast<void*>(stream));
+    
     switch (space) {
     case MATX_MANAGED_MEMORY:
       err = cudaMallocManaged(ptr, bytes);
@@ -213,6 +219,8 @@ struct MemTracker {
     if (*ptr == nullptr) {
       MATX_THROW(matxOutOfMemory, "Failed to allocate memory");
     }
+
+    MATX_LOG_DEBUG("Allocated memory: ptr={}, {} bytes, total_current={} bytes", *ptr, bytes, matxMemoryStats.currentBytesAllocated + bytes);
 
     [[maybe_unused]] std::unique_lock lck(memory_mtx);
     matxMemoryStats.currentBytesAllocated += bytes;

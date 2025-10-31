@@ -33,6 +33,7 @@
 #pragma once
 
 #include "matx/generators/generator1d.h"
+#include "matx/core/log.h"
 
 namespace matx
 {
@@ -52,6 +53,7 @@ namespace matx
         {
           n_ = n;
           d_ = d;
+          MATX_LOG_TRACE("FFTFreqOp constructor: n={}, d={}", n, d);
         }
 
         template <typename CapType>

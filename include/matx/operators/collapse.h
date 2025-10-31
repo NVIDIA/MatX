@@ -56,6 +56,7 @@ namespace matx
         {
           static_assert(DIM <= T1::Rank(),  "Collapse DIM must be less than or equal to Rank() of operator");
           static_assert(DIM > 1, "Must collapse multiple dims");
+          MATX_LOG_TRACE("{} constructor: input_rank={}, output_rank={}", str(), T1::Rank(), T1::Rank() - DIM + 1);
           static_assert(T1::Rank() >= 2, "Collapse must be called on operators with rank >= 2");
 
           // compute size of collapsed dimension

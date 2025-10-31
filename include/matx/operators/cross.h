@@ -66,6 +66,7 @@ namespace matx
 
         __MATX_INLINE__ std::string str() const { return "cross()"; }
         __MATX_INLINE__ CrossOp(const OpA &A, const OpB &B) : a_(A), b_(B) {
+          MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
           MATX_STATIC_ASSERT_STR(OpA::Rank() >= 1 && OpB::Rank() >= 1, matxInvalidDim, "Operators to cross() must have rank GTE one.");
 
           //dims other than the last are batched, so count R-->L, beginning one-left of the right-most dim

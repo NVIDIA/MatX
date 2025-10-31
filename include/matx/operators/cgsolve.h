@@ -65,7 +65,7 @@ namespace matx
 
         __MATX_INLINE__ CGSolveOp(const OpA &A, const OpB &B, double tol, int max_iters) : 
               a_(A), b_(B), tol_(tol), max_iters_(max_iters) {
-          
+          MATX_LOG_TRACE("{} constructor: tol={}, max_iters={}", str(), tol, max_iters);
           for (int r = 0; r < Rank(); r++) {
             out_dims_[r] = b_.Size(r);
           }

@@ -56,7 +56,9 @@ namespace matx
         value_type zval_;
 
         __MATX_INLINE__ std::string str() const { return "sign(" + get_type_str(op_) + ")"; }
-        __MATX_INLINE__ SignOp(const T &op, value_type zval) : op_(op), zval_(zval) {};
+        __MATX_INLINE__ SignOp(const T &op, value_type zval) : op_(op), zval_(zval) {
+          MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
+        };
 
         template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 

@@ -61,7 +61,9 @@ namespace matx
 
         __MATX_INLINE__ std::string str() const { return "reverse(" + op_.str() + ")"; }
 
-        __MATX_INLINE__ ReverseOp(const T1 &op) : op_(op){};
+        __MATX_INLINE__ ReverseOp(const T1 &op) : op_(op){
+          MATX_LOG_TRACE("{} constructor: rank={}", str(), DIM);
+        };
 
         template <typename CapType, typename Op, typename... Is>
         static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, Is... indices)

@@ -585,8 +585,10 @@ namespace cutensor {
 
     params.stream = stream;
 
+    auto cache_id = detail::GetCacheIdFromType<einsum_cache_t>();
+    MATX_LOG_DEBUG("Einsum transform: cache_id={}", cache_id);
     detail::GetCache().LookupAndExec<einsum_cache_t>(
-        detail::GetCacheIdFromType<einsum_cache_t>(),
+        cache_id,
         params,
         [&]() {
             return cuda::std::apply([&](auto&&... args) {

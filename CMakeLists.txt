@@ -81,6 +81,7 @@ option(MATX_EN_CUDA_LINEINFO "Enable line information for CUDA kernels via -line
 option(MATX_EN_EXTENDED_LAMBDA "Enable extended lambda support for device/host lambdas" ON)
 option(MATX_EN_MATHDX "Enable MathDx support for kernel fusion" OFF)
 option(MATX_EN_UNSAFE_ALIAS_DETECTION "Enable aliased memory detection" OFF)
+option(MATX_DISABLE_EXCEPTIONS "Disable C++ exceptions and log errors instead" OFF)
 
 set(MATX_EN_PYBIND11 OFF CACHE BOOL "Enable pybind11 support")
 
@@ -205,6 +206,9 @@ set(WARN_FLAGS ${WARN_FLAGS} $<$<COMPILE_LANGUAGE:CXX>:-Werror>)
 if (MATX_NVTX_FLAGS)
     add_definitions(-DMATX_NVTX_FLAGS)
     target_compile_definitions(matx INTERFACE MATX_NVTX_FLAGS)
+endif()
+if (MATX_DISABLE_EXCEPTIONS)
+    target_compile_definitions(matx INTERFACE MATX_DISABLE_EXCEPTIONS)
 endif()
 if (MATX_BUILD_32_BIT)
     set(MATX_NVPL_INT_TYPE "lp64")

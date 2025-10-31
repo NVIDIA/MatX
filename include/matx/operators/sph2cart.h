@@ -59,6 +59,7 @@ namespace matx
 
         __MATX_INLINE__ Sph2CartOp(const T1 &theta, const T2 &phi, const T3 &r) : theta_(theta), phi_(phi), r_(r)
       {
+        MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
         MATX_ASSERT_COMPATIBLE_OP_SIZES(theta);
         MATX_ASSERT_COMPATIBLE_OP_SIZES(phi);
         MATX_ASSERT_COMPATIBLE_OP_SIZES(r);

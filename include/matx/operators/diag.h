@@ -61,7 +61,9 @@ namespace matx
 
         __MATX_INLINE__ std::string str() const { return "diag(" + op_.str() + ")"; }
 
-        __MATX_INLINE__ DiagOp(const T1 &op, index_t k) : op_(op), k_(k) { }
+        __MATX_INLINE__ DiagOp(const T1 &op, index_t k) : op_(op), k_(k) {
+          MATX_LOG_TRACE("{} constructor: k={}", str(), k);
+        }
 
         template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const

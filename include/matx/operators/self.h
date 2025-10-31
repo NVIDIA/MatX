@@ -57,7 +57,9 @@ namespace matx
         
         __MATX_INLINE__ std::string str() const { return "self(" + op_.str() + ")"; }
         
-	      __MATX_INLINE__ SelfOp(const T1 &op) : op_(op) {}
+	      __MATX_INLINE__ SelfOp(const T1 &op) : op_(op) {
+          MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
+        }
 
         template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 

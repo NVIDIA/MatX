@@ -62,6 +62,7 @@ public:
   using value_type = typename OpA::value_type;
 
   __MATX_INLINE__ SolveOp(const OpA &a, const OpB &b) : a_(a), b_(b) {
+    MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
     for (int r = 0, rank = Rank(); r < rank; r++) {
       out_dims_[r] = b_.Size(r);
     }

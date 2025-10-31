@@ -66,6 +66,7 @@ namespace matx
         __MATX_INLINE__ std::string str() const { return "upsample(" + op_.str() + ")"; }
 
         __MATX_INLINE__ UpsampleOp(const T &op, int32_t dim, index_t n) : op_(op), dim_(dim), n_(n) {
+          MATX_LOG_TRACE("{} constructor: dim={}, n={}, rank={}", str(), dim, n, Rank());
         };
 
         template <typename CapType, typename... Is>

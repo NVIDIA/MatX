@@ -61,6 +61,7 @@ namespace detail {
 
       __MATX_INLINE__ std::string str() const { return "stdd(" + get_type_str(a_) + ")"; }
       __MATX_INLINE__ StddOp(const OpA &a, int ddof) : a_(a),  ddof_(ddof) { 
+        MATX_LOG_TRACE("{} constructor: rank={}, ddof={}", str(), Rank(), ddof);
         for (int r = 0; r < ORank; r++) {
           out_dims_[r] = a_.Size(r);
         }

@@ -56,7 +56,9 @@ namespace detail {
       using find_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "find()"; }
-      __MATX_INLINE__ FindOp(const OpA &a, SelectType sel) : a_(a), sel_(sel) { };
+      __MATX_INLINE__ FindOp(const OpA &a, SelectType sel) : a_(a), sel_(sel) {
+        MATX_LOG_TRACE("{} constructor", str());
+      };
 
       // This should never be called
       template <typename... Is>

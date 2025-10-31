@@ -61,6 +61,7 @@ namespace detail {
       __MATX_INLINE__ FindPeaksOp(const OpA &a, value_type height, 
                                                 value_type threshold) : 
                                                 a_(a), height_(height), threshold_(threshold) { 
+        MATX_LOG_TRACE("{} constructor: height={}, threshold={}", str(), height, threshold);
       }
 
       template <typename... Is>

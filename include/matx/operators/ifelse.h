@@ -77,6 +77,7 @@ namespace matx
       __MATX_INLINE__ IFELSEOp(const C1 &cond, const T1 &op1, const T2 &op2) :
                               cond_(cond), op1_(op1), op2_(op2)
     {
+      MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
       static_assert((!is_tensor_view_v<T1> && !is_tensor_view_v<T2>),
           "Only operator emmitters are allowed in IFELSE. Tensor views "
           "are not allowed");

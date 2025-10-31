@@ -32,6 +32,7 @@
 
 #pragma once
 
+#include "matx/core/log.h"
 
 namespace matx
 {
@@ -56,6 +57,7 @@ namespace matx
         if constexpr (!is_noshape_v<ShapeType>) {
           static_assert(Rank() > 1, "Diagonal generator must be used with an operator of rank 1 or higher");
         }
+        MATX_LOG_TRACE("Diag constructor: rank={}, val={}", Rank(), val);
       };
 
       template <OperatorCapability Cap, typename InType>

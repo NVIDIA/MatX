@@ -74,6 +74,7 @@ namespace matx
 
       __MATX_INLINE__ ZipVecOp(const Ts&... ts) : ops_(ts...)
       {
+        MATX_LOG_TRACE("{} constructor: num_ops={}, rank={}", str(), sizeof...(Ts), Rank());
         static_assert(sizeof...(Ts) > 0 && sizeof...(Ts) <= 4, "Must have between 1 and 4 operators for zipvec");
         static_assert((... && (RANK == Ts::Rank())), "zipped ops must have the same rank");
         // All ops must have the same scalar value type; that is enforced by AggregateToVecType

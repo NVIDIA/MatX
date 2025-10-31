@@ -72,6 +72,7 @@ namespace matx
               output_scale_mode_(output_scale_mode),
               fs_(fs)
         {
+          MATX_LOG_TRACE("{} constructor: nperseg={}, noverlap={}, nfft={}, fs={}", str(), nperseg, noverlap, nfft, fs);
           MATX_STATIC_ASSERT_STR(OpX::Rank() == 1, matxInvalidDim, "pwelch:  Only input rank of 1 is supported presently");
           for (int r = 0; r < OpX::Rank(); r++) {
             out_dims_[r] = nfft_;

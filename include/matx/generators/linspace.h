@@ -33,6 +33,7 @@
 #pragma once
 
 #include "matx/generators/range.h"
+#include "matx/core/log.h"
 
 namespace matx
 {
@@ -60,6 +61,7 @@ namespace matx
 
         inline LinspaceOp(const T (&firsts)[NUM_RC], const T (&lasts)[NUM_RC], index_t count, int axis) 
         {
+          MATX_LOG_TRACE("LinspaceOp constructor: NUM_RC={}, count={}, axis={}", NUM_RC, count, axis);
           axis_ = axis;
           count_ = count;
           for (int i = 0; i < NUM_RC; ++i) {

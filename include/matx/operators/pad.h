@@ -81,6 +81,7 @@ namespace matx
       __MATX_INLINE__ PadOp(const T& op, int axis, const PadSizeType& pad_sizes, const value_type& pad_value, PadMode mode = MATX_PAD_MODE_CONSTANT) 
         : op_(op), axis_(axis), pad_value_(pad_value), mode_(mode)
       {
+        MATX_LOG_TRACE("{} constructor: axis={}, mode={}", str(), axis, static_cast<int>(mode));
         static_assert(RANK > 0, "Cannot pad rank-0 tensors");
         MATX_ASSERT_STR(axis >= 0 && axis < RANK, matxInvalidDim, "pad axis must be >= 0 and less than the rank of the operator");
         MATX_ASSERT_STR(pad_sizes.size() == 2, matxInvalidParameter, "pad_sizes must contain exactly 2 elements [before, after]");

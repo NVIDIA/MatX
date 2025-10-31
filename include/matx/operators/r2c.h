@@ -53,6 +53,7 @@ namespace matx
         __MATX_INLINE__ std::string str() const { return "r2c(" + op_.str() + ")"; }
 
         __MATX_INLINE__ R2COp(const T1 &op, index_t orig) : op_(op), orig_size_(orig) {
+          MATX_LOG_TRACE("{} constructor: rank={}, orig_size={}", str(), Rank(), orig);
           static_assert(Rank() >= 1, "R2COp must have a rank 1 operator or higher");
         };
 

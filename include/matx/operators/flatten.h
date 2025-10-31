@@ -55,6 +55,7 @@ namespace matx
         __MATX_INLINE__ FlattenOp(const T1 &op1) : op1_(op1)
         {
           static_assert(T1::Rank() > 1, "flatten has no effect on tensors of rank 0 and 1");
+          MATX_LOG_TRACE("{} constructor: input_rank={}, output_rank=1", str(), T1::Rank());
         }
 
         template <typename CapType, typename Is>

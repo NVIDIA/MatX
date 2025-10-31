@@ -46,6 +46,83 @@
 #include <memory>
 #include <mutex>
 
+// Include MatX type traits and complex types for formatting support
+#include "matx/core/half.h"
+#include "matx/core/half_complex.h"
+#include <complex>
+#include <cuda/std/complex>
+
+// Helper for formatting complex types
+namespace matx {
+namespace detail {
+  // Generic helper to format any complex-like type with real() and imag() methods
+  template<typename ComplexType>
+  inline std::string format_complex(const ComplexType& c) {
+    return std::format("({:g}{:+g}j)", 
+                      static_cast<double>(c.real()), 
+                      static_cast<double>(c.imag()));
+  }
+}
+}
+
+// Formatter specializations for all types supported by MatX
+namespace std {
+  // Formatter for std::complex<T>
+  template<typename T>
+  struct formatter<std::complex<T>> {
+    constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+    
+    template<typename FormatContext>
+    auto format(const std::complex<T>& c, FormatContext& ctx) const {
+      return format_to(ctx.out(), "{}", matx::detail::format_complex(c));
+    }
+  };
+  
+  // Formatter for cuda::std::complex<T>
+  template<typename T>
+  struct formatter<cuda::std::complex<T>> {
+    constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+    
+    template<typename FormatContext>
+    auto format(const cuda::std::complex<T>& c, FormatContext& ctx) const {
+      return format_to(ctx.out(), "{}", matx::detail::format_complex(c));
+    }
+  };
+  
+  // Formatter for matxHalfComplex (fp16/bf16 complex)
+  template<typename T>
+  struct formatter<matx::matxHalfComplex<T>> {
+    constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+    
+    template<typename FormatContext>
+    auto format(const matx::matxHalfComplex<T>& c, FormatContext& ctx) const {
+      return format_to(ctx.out(), "{}", matx::detail::format_complex(c));
+    }
+  };
+  
+  // Formatter for matxFp16 (half-precision float)
+  template<>
+  struct formatter<matx::matxFp16> {
+    constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+    
+    template<typename FormatContext>
+    auto format(const matx::matxFp16& val, FormatContext& ctx) const {
+      return format_to(ctx.out(), "{:g}", static_cast<float>(val));
+    }
+  };
+  
+  // Formatter for matxBf16 (bfloat16)
+  template<>
+  struct formatter<matx::matxBf16> {
+    constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+    
+    template<typename FormatContext>
+    auto format(const matx::matxBf16& val, FormatContext& ctx) const {
+      return format_to(ctx.out(), "{:g}", static_cast<float>(val));
+    }
+  };
+}
+
 namespace matx {
 namespace detail {
 
@@ -139,7 +216,7 @@ private:
   std::mutex mutex_;
   bool show_function_;
   
-  Logger() : min_level_(LogLevel::OFF), output_stream_(&std::cout), show_function_(false) {
+  Logger() : min_level_(LogLevel::ERROR), output_stream_(&std::cout), show_function_(false) {
     // Read log level from environment
     const char* level_env = std::getenv("MATX_LOG_LEVEL");
     if (level_env) {

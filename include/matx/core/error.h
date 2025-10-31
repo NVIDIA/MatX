@@ -42,6 +42,7 @@
 #endif
 
 #include "matx/core/stacktrace.h"
+#include "matx/core/log.h"
 #endif
 
 namespace matx
@@ -150,6 +151,23 @@ namespace matx
   };
   }
 
+#ifdef MATX_DISABLE_EXCEPTIONS
+
+#define MATX_ENTER_HANDLER() {
+#define MATX_EXIT_HANDLER() }
+
+#define MATX_THROW(e, str_arg)                       \
+  do {                                               \
+    MATX_LOG_FATAL("matxException ({}: {}) - {}:{}", matxErrorString(e), str_arg, __FILE__, __LINE__); \
+    std::stringstream matx_stack_trace;              \
+    detail::printStackTrace(matx_stack_trace);       \
+    std::string matx_stack_str = matx_stack_trace.str(); \
+    MATX_LOG_FATAL("Stack Trace:\n{}", matx_stack_str); \
+    std::abort();                                    \
+  } while(0)
+
+#else
+
 #define MATX_ENTER_HANDLER() \
   try                        \
   {
@@ -158,8 +176,8 @@ namespace matx
   }                                                             \
   catch (matx::detail::matxException & e)                       \
   {                                                             \
-    fprintf(stderr, "%s\n", e.what());                          \
-    fprintf(stderr, "Stack Trace:\n%s", e.stack.str().c_str()); \
+    MATX_LOG_FATAL("{}", e.what());                             \
+    MATX_LOG_FATAL("Stack Trace:\n{}", e.stack.str());          \
     exit(1);                                                    \
   }
 
@@ -167,6 +185,8 @@ namespace matx
   {                                                  \
     throw matx::detail::matxException(e, str, __FILE__, __LINE__); \
   }
+
+#endif
 
 #if !defined(NDEBUG) && !defined(__CUDA_ARCH__)
   #define MATX_ASSERT(a, error) \
@@ -190,7 +210,7 @@ namespace matx
     auto tmp = a;                      \
     if ((tmp != expected))             \
     {                                  \
-      std::cout << #a ": " << str << "(" << tmp << " != " << expected << ")\n";\
+      MATX_LOG_ERROR("{}: {} ({} != {})", #a, str, static_cast<int>(tmp), static_cast<int>(expected)); \
       MATX_THROW(error, "");           \
     }                                  \
   }
@@ -217,7 +237,7 @@ namespace matx
     const auto e_ = (e);                                        \
     if (e_ != cudaSuccess)                                      \
     {                                                           \
-      fprintf(stderr, "%s:%d CUDA Error: %s (%d)\n", __FILE__,__LINE__, cudaGetErrorString(e_), e_); \
+      MATX_LOG_ERROR("{}:{} CUDA Error: {} ({})", __FILE__, __LINE__, cudaGetErrorString(e_), static_cast<int>(e_)); \
       MATX_THROW(matx::matxCudaError, cudaGetErrorString(e_));  \
     }                                                           \
   } while (0)
@@ -239,21 +259,22 @@ namespace matx
       compatible = (size == 0 || size == Size(i));                   \
     }                                                                \
     if (!compatible) { \
-      std::cerr << "Incompatible operator sizes: ("; \
+      std::string msg = "Incompatible operator sizes: ("; \
       for (int32_t i = 0; i < Rank(); i++) { \
-        std::cerr << Size(i); \
+        msg += std::to_string(Size(i)); \
         if (i != Rank() - 1) { \
-          std::cerr << ","; \
+          msg += ","; \
         } \
       } \
-      std::cerr << ") not compatible with ("; \
+      msg += ") not compatible with ("; \
       for (int32_t i = 0; i < Rank(); i++) { \
-        std::cerr << matx::detail::get_expanded_size<Rank()>(op, i); \
+        msg += std::to_string(matx::detail::get_expanded_size<Rank()>(op, i)); \
         if (i != Rank() - 1) { \
-          std::cerr << ","; \
+          msg += ","; \
         } \
       } \
-      std::cerr << ")" << std::endl; \
+      msg += ")"; \
+      MATX_LOG_ERROR("{}", msg); \
       MATX_THROW(matxInvalidSize, "Incompatible operator sizes"); \
     } \
   }

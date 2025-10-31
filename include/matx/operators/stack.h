@@ -75,6 +75,7 @@ namespace matx
 
       __MATX_INLINE__ StackOp(int axis, const Ts&... ts) : ops_(ts...), axis_(axis)
       {
+        MATX_LOG_TRACE("{} constructor: axis={}, num_tensors={}", str(), axis, sizeof...(Ts));
         static_assert(sizeof...(Ts) > 1, "Must have more than one tensor to stack");
         static_assert((... && (RANK == Ts::Rank())), "stacked ops must have the same rank");
 

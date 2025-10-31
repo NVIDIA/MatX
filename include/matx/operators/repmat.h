@@ -67,6 +67,7 @@ namespace matx
           {
             reps_[dim] = reps;
           }
+          MATX_LOG_TRACE("{} constructor: rank={}, reps={}", str(), DIM, reps);
         }
 
         __MATX_INLINE__ RepMatOp(const T1 &op, const cuda::std::array<index_t, DIM> reps) : op_(op)
@@ -75,6 +76,7 @@ namespace matx
           {
             reps_[dim] = reps[dim];
           }
+          MATX_LOG_TRACE("{} constructor: rank={}", str(), DIM);
         }
 
         __MATX_INLINE__ RepMatOp(const T1 &op, const index_t *reps) : op_(op)

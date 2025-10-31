@@ -68,7 +68,8 @@ namespace detail {
           else {
             out_dims_[r] = a_.Size(r);
           }
-        }        
+        }
+        MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
       }
 
       template <typename CapType, typename... Is>

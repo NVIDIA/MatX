@@ -55,7 +55,9 @@ namespace detail {
       using lu_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "lu()"; }
-      __MATX_INLINE__ LUOp(const OpA &a) : a_(a) { };
+      __MATX_INLINE__ LUOp(const OpA &a) : a_(a) {
+        MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
+      };
 
       // This should never be called
       template <typename... Is>

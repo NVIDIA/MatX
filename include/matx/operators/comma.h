@@ -49,6 +49,7 @@ namespace matx
       class CommaOp : public BaseOp<CommaOp<Op1, Op2>>{
         public:
           __MATX_HOST__ __MATX_INLINE__  CommaOp(const Op1 &op1, const Op2 &op2) : op1_(op1), op2_(op2) {
+            MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
             MATX_STATIC_ASSERT_STR(Op1::Rank() == Op2::Rank(), matxInvalidSize, 
                 "Chained expressions using the comma operator must match in rank");
             if constexpr ( Rank() > 0) {

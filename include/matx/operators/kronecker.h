@@ -61,6 +61,7 @@ namespace matx
 
         __MATX_INLINE__ KronOp(const T1 &op1, const T2 &op2) : op1_(op1), op2_(op2)
         {
+          MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
           static_assert(RankGTE(Rank(), 2), "Kronecker product must be used on tensors with rank 2 or higher");
         }        
 

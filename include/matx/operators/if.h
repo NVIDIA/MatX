@@ -70,6 +70,7 @@ namespace matx
        */
       __MATX_INLINE__ IFOP(const T1 &cond, const T2 &op) : cond_(cond), op_(op)
       {
+        MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
         static_assert((!is_tensor_view_v<T2>),
             "Only operator emmitters are allowed in IF. Tensor views are "
             "not allowed");

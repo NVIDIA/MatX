@@ -67,7 +67,7 @@ namespace matx
 
         __MATX_INLINE__ OuterOp(const OpA &A, const OpB &B, float alpha, float beta) : 
               a_(A), b_(B), alpha_(alpha), beta_(beta) {
-
+          MATX_LOG_TRACE("{} constructor: alpha={}, beta={}", str(), alpha, beta);
           out_dims_[RANK - 1] = b_.Size(OpB::Rank() - 1);
           out_dims_[RANK - 2] = a_.Size(OpA::Rank() - 1);
           if constexpr (remove_cvref_t<OpA>::Rank() >= remove_cvref_t<OpB>::Rank()) {

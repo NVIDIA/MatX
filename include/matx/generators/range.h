@@ -33,6 +33,7 @@
 #pragma once
 
 #include "matx/generators/generator1d.h"
+#include "matx/core/log.h"
 #include <type_traits>
 
 namespace matx
@@ -51,7 +52,9 @@ namespace matx
 
         __MATX_INLINE__ std::string str() const { return "range"; }
 
-        Range(T first, T step) : first_(first), step_(step) {}
+        Range(T first, T step) : first_(first), step_(step) {
+          MATX_LOG_TRACE("Range constructor: first={}, step={}", first, step);
+        }
 
         template <typename CapType>
         __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t idx) const

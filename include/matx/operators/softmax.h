@@ -63,6 +63,7 @@ namespace matx
 
         __MATX_INLINE__ SoftmaxOp(const OpA &A, PermDims perm) : 
               a_(A), perm_(perm) {
+          MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
           for (int r = 0; r < OpA::Rank(); r++) {
             out_dims_[r] = a_.Size(r);
           }          
