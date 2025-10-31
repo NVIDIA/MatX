@@ -12,7 +12,7 @@ import matxutil
 # Demonstrate dlpack consumption invalidates it for future use
 def dlp_usage_error():
   a = cp.empty((3,3), dtype=cp.float32)
-  dlp = a.toDlpack()
+  dlp = a.__dlpack__()
   assert(matxutil.check_dlpack_status(dlp) == 0)
   a2 = cp.from_dlpack(dlp) # causes dlp to become unused
   assert(matxutil.check_dlpack_status(dlp) != 0)
@@ -22,7 +22,7 @@ def dlp_usage_error():
 def scope_okay():
   a = cp.empty((3,3), dtype=cp.float32)
   a[1,1] = 2
-  dlp = a.toDlpack()
+  dlp = a.__dlpack__()
   assert(matxutil.check_dlpack_status(dlp) == 0)
   return dlp
 
@@ -67,9 +67,9 @@ with stream:
    b = cp.array([[1,2,3],[4,5,6],[7,8,9]], dtype=cp.float32)
    c = cp.empty(b.shape, dtype=b.dtype)
 
-   c_dlp = c.toDlpack()
-   a_dlp = a.toDlpack()
-   b_dlp = b.toDlpack()
+   c_dlp = c.__dlpack__(stream=stream.ptr)
+   a_dlp = a.__dlpack__(stream=stream.ptr)
+   b_dlp = b.__dlpack__(stream=stream.ptr)
    matxutil.add_float_2D(c_dlp, a_dlp, b_dlp, stream.ptr)
    stream.synchronize()
    print(f"Tensor a {a}")
