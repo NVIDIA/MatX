@@ -80,7 +80,7 @@ template <typename T, typename ShapeType,
 auto make_tensor(Storage<T> storage, ShapeType &&shape) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   
-  MATX_LOG_DEBUG("make_tensor<T,ShapeType>(storage, shape): ptr={}", storage.data());
+  MATX_LOG_DEBUG("make_tensor<T,ShapeType>(storage, shape): ptr={}", reinterpret_cast<const void*>(storage.data()));
 
   constexpr int RANK = static_cast<int>(cuda::std::tuple_size<typename remove_cvref<ShapeType>::type>::value);
   DefaultDescriptor<RANK> desc{std::forward<ShapeType>(shape)};
