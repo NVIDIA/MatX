@@ -309,7 +309,8 @@ namespace matx {
       * @param indices indices
       * @return Value after broadcasting
       */
-    template <typename CapType, typename T, typename... Is, cuda::std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>
+    template <typename CapType, typename T, typename... Is>
+      requires (cuda::std::conjunction_v<cuda::std::is_integral<Is>...>)
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_matx_value(T &&i, Is... indices)
     {
       constexpr int RANK = remove_cvref_t<T>::Rank();
@@ -354,7 +355,8 @@ namespace matx {
     }    
 
 
-    template <typename CapType, typename T, typename... Is, cuda::std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>
+    template <typename CapType, typename T, typename... Is>
+      requires (cuda::std::conjunction_v<cuda::std::is_integral<Is>...>)
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_value(T &&i, Is... indices)
     {
       if constexpr (is_matx_op<T>())

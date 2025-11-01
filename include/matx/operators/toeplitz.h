@@ -226,7 +226,8 @@ namespace matx
    * @returns
    *   New operator of the kronecker product
    */
-  template <typename Op, std::enable_if_t<!cuda::std::is_array_v<typename remove_cvref<Op>::type>, bool> = true>
+  template <typename Op>
+    requires (!cuda::std::is_array_v<remove_cvref_t<Op>>)
   auto __MATX_INLINE__ toeplitz(const Op &c)
   {
     if constexpr (is_complex_v<typename Op::value_type>) {
@@ -281,9 +282,9 @@ namespace matx
    * @returns
    *   New operator of the kronecker product
    */
-  template <typename COp, typename ROp, std::enable_if_t< !cuda::std::is_array_v<typename remove_cvref<COp>::type> && 
-                                                          !cuda::std::is_array_v<typename remove_cvref<ROp>::type>, 
-                                                          bool> = true>
+  template <typename COp, typename ROp>
+    requires (!cuda::std::is_array_v<remove_cvref_t<COp>> && 
+              !cuda::std::is_array_v<remove_cvref_t<ROp>>)
   auto __MATX_INLINE__ toeplitz(const COp &c, const ROp &r)
   {
     return detail::ToeplitzOp<COp, ROp>(c, r);

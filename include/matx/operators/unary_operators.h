@@ -39,8 +39,8 @@
 
 
 #define MATX_DEFINE_UNARY_OP(FUNCTION, TENSOR_OP)                   \
-  template <typename I1,                                            \
-            typename = typename std::enable_if_t<is_matx_op<I1>()>> \
+  template <typename I1>                                            \
+    requires is_matx_op_c<I1>                                       \
   [[nodiscard]] __MATX_INLINE__ auto FUNCTION(const I1 &i1)         \
   {                                                                 \
     using I1Type = extract_value_type_t<I1>;                        \
@@ -88,14 +88,16 @@ namespace matx
         }, idx);
     }
 
-    template <typename CapType, typename... Is, std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>
+    template <typename CapType, typename... Is>
+      requires (cuda::std::conjunction_v<cuda::std::is_integral<Is>...>)
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
     {
       auto i1 = get_value<CapType>(in1_, indices...);
       return op_.template operator()<CapType>(i1);
     }
 
-    template <typename... Is, std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>
+    template <typename... Is>
+      requires (cuda::std::conjunction_v<cuda::std::is_integral<Is>...>)
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
     {
       return this->template operator()<DefaultCapabilities>(indices...);

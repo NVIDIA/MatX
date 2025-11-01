@@ -515,11 +515,9 @@ namespace matx {
       }
     }
 
-    template <typename Op,
-    typename... Args,
-            std::enable_if_t<((std::is_integral_v<Args>)&&...) &&
-                                  (Op::Rank() == 0 || sizeof...(Args) > 0),
-                              bool> = true>
+    template <typename Op, typename... Args>
+      requires (((std::is_integral_v<Args>)&&...) &&
+                (Op::Rank() == 0 || sizeof...(Args) > 0))
     void DevicePrint(FILE*fp, [[maybe_unused]] const Op &op, [[maybe_unused]] Args... dims) {
   #ifdef __CUDACC__
       if constexpr (PRINT_ON_DEVICE) {
@@ -555,10 +553,9 @@ namespace matx {
      * @param op input Operator
      * @param dims Number of values to print for each dimension
      */
-    template <typename Op, typename... Args,
-              std::enable_if_t<((std::is_integral_v<Args>)&&...) &&
-                                    (Op::Rank() == 0 || sizeof...(Args) > 0),
-                                bool> = true>
+    template <typename Op, typename... Args>
+      requires (((std::is_integral_v<Args>)&&...) &&
+                (Op::Rank() == 0 || sizeof...(Args) > 0))
     void PrintData(FILE* fp, const Op &op, Args... dims) {
       MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
@@ -667,10 +664,9 @@ namespace matx {
    * @param dims Number of values to print for each dimension
    */
   #ifndef DOXYGEN_ONLY
-  template <typename Op, typename... Args,
-            std::enable_if_t<((std::is_integral_v<Args>)&&...) &&
-                                  (Op::Rank() == 0 || sizeof...(Args) > 0),
-                              bool> = true>
+  template <typename Op, typename... Args>
+    requires (((std::is_integral_v<Args>)&&...) &&
+              (Op::Rank() == 0 || sizeof...(Args) > 0))
   #else
   template <typename Op, typename... Args>
   #endif
@@ -704,8 +700,8 @@ namespace matx {
    * @param op Operator input
    * @param dims Bounds for printing
    */
-  template <typename Op, typename... Args,
-            std::enable_if_t<(Op::Rank() > 0 && sizeof...(Args) == 0), bool> = true>
+  template <typename Op, typename... Args>
+    requires (Op::Rank() > 0 && sizeof...(Args) == 0)
   void fprint(FILE* fp, const Op &op, [[maybe_unused]] Args... dims) {
     cuda::std::array<int, Op::Rank()> arr = {0};
     auto tp = cuda::std::tuple_cat(arr);
@@ -731,8 +727,8 @@ namespace matx {
    * @param op Operator input
    * @param dims Bounds for printing
    */
-  template <typename Op, typename... Args,
-            std::enable_if_t<(Op::Rank() > 0 && sizeof...(Args) == 0), bool> = true>
+  template <typename Op, typename... Args>
+    requires (Op::Rank() > 0 && sizeof...(Args) == 0)
   void print(const Op &op, [[maybe_unused]] Args... dims) {
     cuda::std::array<int, Op::Rank()> arr = {0};
     auto tp = cuda::std::tuple_cat(arr);
@@ -748,8 +744,8 @@ namespace matx {
    * @tparam Op Operator input type
    * @param op Operator input
    */
-  template <typename Op, typename... Args,
-            std::enable_if_t<(Op::Rank() > 0 && sizeof...(Args) > 0), bool> = true>
+  template <typename Op, typename... Args>
+    requires (Op::Rank() > 0 && sizeof...(Args) > 0)
   void print(const Op &op, [[maybe_unused]] Args... dims) {
     fprint(stdout, op, dims...);
   }
@@ -762,8 +758,8 @@ namespace matx {
    * @tparam Op Operator input type
    * @param op Operator input
    */
-  template <typename Op,
-          std::enable_if_t<(Op::Rank() == 0), bool> = true>
+  template <typename Op>
+    requires (Op::Rank() == 0)
   void print(const Op &op)
   {
     fprint(stdout, op);

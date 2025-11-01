@@ -43,34 +43,32 @@
 namespace matx
 {
   /**
-   * @brief SFINAE helper to detect duck-typed allocator interface
+   * @brief Concept to detect duck-typed allocator interface
    */
-  template<typename T, typename = void>
-  struct has_allocator_interface : std::false_type {};
-
-  /// @cond DOXYGEN_SHOULD_SKIP_THIS
-  // For allocator objects
   template<typename T>
-  struct has_allocator_interface<T, 
-    decltype(
-      std::declval<T>().allocate(std::declval<size_t>()),
-      std::declval<T>().deallocate(std::declval<void*>(), std::declval<size_t>()),
-      void()
-    )
-  > : std::true_type {};
-  /// @endcond
+  concept has_allocator_interface_c = requires(T alloc, size_t sz, void* ptr) {
+    { alloc.allocate(sz) } -> std::convertible_to<void*>;
+    { alloc.deallocate(ptr, sz) } -> std::same_as<void>;
+  };
 
-  /// @cond DOXYGEN_SHOULD_SKIP_THIS
-  // For allocator pointers
+  /**
+   * @brief Concept to detect duck-typed allocator pointer interface
+   */
   template<typename T>
-  struct has_allocator_interface<T*, 
-    decltype(
-      std::declval<T*>()->allocate(std::declval<size_t>()),
-      std::declval<T*>()->deallocate(std::declval<void*>(), std::declval<size_t>()),
-      void()
-    )
-  > : std::true_type {};
-  /// @endcond
+  concept has_allocator_ptr_interface_c = std::is_pointer_v<T> && requires(T alloc, size_t sz, void* ptr) {
+    { alloc->allocate(sz) } -> std::convertible_to<void*>;
+    { alloc->deallocate(ptr, sz) } -> std::same_as<void>;
+  };
+
+  /**
+   * @brief Combined concept for any allocator type
+   */
+  template<typename T>
+  concept has_allocator_interface_any = has_allocator_interface_c<T> || has_allocator_ptr_interface_c<T>;
+
+  // Legacy struct for backward compatibility
+  template<typename T>
+  struct has_allocator_interface : std::bool_constant<has_allocator_interface_any<T>> {};
 
   /**
    * @brief Unified storage class for both owning and non-owning pointers
@@ -108,8 +106,8 @@ namespace matx
     
     // Owning constructor with any allocator that has allocate/deallocate methods
     template<typename Allocator>
-    Storage(size_t size, Allocator&& alloc, 
-           typename std::enable_if_t<has_allocator_interface<std::decay_t<Allocator>>::value>* = nullptr)
+      requires has_allocator_interface_any<std::decay_t<Allocator>>
+    Storage(size_t size, Allocator&& alloc)
       : size_(size) {
       if (size == 0) {
         // For zero size, create empty storage without allocation

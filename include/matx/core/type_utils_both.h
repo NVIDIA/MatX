@@ -63,20 +63,17 @@ enum class MemoryLayout {
 };
 
 
-namespace detail {
-
-template <typename T>
-struct is_noshape : cuda::std::integral_constant<bool, cuda::std::is_same_v<NoShape, T>> {};
-};
-
-
 /**
- * @brief Determine if a type is a MatX half precision wrapper (either matxFp16 or matxBf16)
+ * @brief Determine if a type is NoShape
  * 
  * @tparam T Type to test
  */
 template <class T>
-inline constexpr bool is_noshape_v = detail::is_noshape<T>::value;
+concept is_noshape = cuda::std::is_same_v<detail::NoShape, T>;
+
+// Legacy variable for backwards compatibility
+template <class T>
+inline constexpr bool is_noshape_v = cuda::std::is_same_v<detail::NoShape, T>;
 
 
 
@@ -96,91 +93,87 @@ using remove_cvref_t = typename remove_cvref<T>::type;
 template <typename T, int RANK, typename Desc, typename Data> class tensor_impl_t;
 template <typename T, int RANK, typename Desc> class tensor_t;
 
-namespace detail {
-template <typename T, typename = void>
-struct is_mtie_impl : cuda::std::false_type {
+/**
+ * @brief Determine if a type is a MatX tie type
+ * 
+ * @tparam T Type to test
+ */
+template <typename T> 
+concept is_mtie_c = requires {
+  typename remove_cvref_t<T>::mtie_type;
 };
 
-template <typename T>
-struct is_mtie_impl<T, cuda::std::void_t<typename T::mtie_type>> : cuda::std::true_type {
-};
-}
-
-template <typename T> constexpr __MATX_HOST__ __MATX_DEVICE__ bool is_mtie()
+// Legacy function for backwards compatibility
+template <typename T> 
+constexpr __MATX_HOST__ __MATX_DEVICE__ bool is_mtie()
 {
-  return detail::is_mtie_impl<typename remove_cvref<T>::type>::value;
+  return requires { typename remove_cvref_t<T>::mtie_type; };
 }
 
-
-namespace detail {
-template <typename T, typename = void>
-struct is_matx_op_impl : cuda::std::false_type {
-};
-
-template <typename T>
-struct is_matx_op_impl<T, cuda::std::void_t<typename T::matxop>> : cuda::std::true_type {
-};
-}
 
 /**
  * @brief Determine if a type is a MatX operator
  * 
  * @tparam T Type to test
  */
-template <typename T> constexpr __MATX_HOST__ __MATX_DEVICE__ bool is_matx_op()
+template <typename T> 
+concept is_matx_op_c = requires {
+  typename remove_cvref_t<T>::matxop;
+};
+
+// Legacy function for backwards compatibility
+template <typename T> 
+constexpr __MATX_HOST__ __MATX_DEVICE__ bool is_matx_op()
 {
-  return detail::is_matx_op_impl<typename remove_cvref<T>::type>::value;
+  return requires { typename remove_cvref_t<T>::matxop; };
 }
 
-namespace detail {
-template <typename T, typename = void>
-struct is_matx_tensor_set_op_impl : cuda::std::false_type {
+/**
+ * @brief Determine if a type is a MatX tensor set operator
+ * 
+ * @tparam T Type to test
+ */
+template <typename T> 
+concept is_matx_tensor_set_op = requires {
+  typename remove_cvref_t<T>::tensor_type::tensor_view;
 };
 
-template <typename T>
-struct is_matx_tensor_set_op_impl<T, cuda::std::void_t<typename remove_cvref_t<T>::tensor_type::tensor_view>> : cuda::std::true_type {
+/**
+ * @brief Determine if a type is a MatX transform set operator
+ * 
+ * @tparam T Type to test
+ */
+template <typename T> 
+concept is_matx_transform_set_op = requires {
+  typename remove_cvref_t<T>::op_type::matx_transform_op;
 };
-}
-
-namespace detail {
-template <typename T, typename = void>
-struct is_matx_transform_set_op_impl : cuda::std::false_type {
-};
-
-template <typename T>
-struct is_matx_transform_set_op_impl<T, cuda::std::void_t<typename remove_cvref_t<T>::op_type::matx_transform_op>> : cuda::std::true_type {
-};
-}
-
-namespace detail {
-template <typename T, typename = void>
-struct is_matx_transform_op_impl : cuda::std::false_type {
-};
-
-template <typename T>
-struct is_matx_transform_op_impl<T, cuda::std::void_t<typename remove_cvref_t<T>::matx_transform_op>> : cuda::std::true_type {
-};
-}
 
 /**
  * @brief Determine if a type is a MatX transform operator
  * 
  * @tparam T Type to test
  */
-template <typename T> constexpr __MATX_HOST__ __MATX_DEVICE__ bool is_matx_transform_op()
+template <typename T> 
+concept is_matx_transform_op_c = requires {
+  typename remove_cvref_t<T>::matx_transform_op;
+};
+
+// Legacy function for backwards compatibility
+template <typename T> 
+constexpr __MATX_HOST__ __MATX_DEVICE__ bool is_matx_transform_op()
 {
-  return detail::is_matx_transform_op_impl<typename remove_cvref<T>::type>::value;
+  return requires { typename remove_cvref_t<T>::matx_transform_op; };
 }
 
-namespace detail {
-template <typename T, typename = void>
-struct has_can_alias_impl : cuda::std::false_type {
+/**
+ * @brief Determine if a type has can_alias trait
+ * 
+ * @tparam T Type to test
+ */
+template <typename T> 
+concept has_can_alias_c = requires {
+  typename remove_cvref_t<T>::can_alias;
 };
-
-template <typename T>
-struct has_can_alias_impl<T, cuda::std::void_t<typename remove_cvref_t<T>::can_alias>> : cuda::std::true_type {
-};
-}
 
 /**
  * @brief Determine if operator can alias
@@ -189,53 +182,39 @@ struct has_can_alias_impl<T, cuda::std::void_t<typename remove_cvref_t<T>::can_a
  * 
  * @tparam T Type to test
  */
-template <typename T> constexpr __MATX_HOST__ __MATX_DEVICE__ bool can_alias()
+template <typename T> 
+constexpr __MATX_HOST__ __MATX_DEVICE__ bool can_alias()
 {
-  return is_matx_transform_op<T>() && detail::has_can_alias_impl<typename remove_cvref<T>::type>::value;
+  return is_matx_transform_op<T>() && (requires { typename remove_cvref_t<T>::can_alias; });
 }
 
-namespace detail {
-template <typename T, typename = void>
-struct has_matx_op_type : cuda::std::false_type {
+/**
+ * @brief Determine if a type has op_type member
+ * 
+ * @tparam T Type to test
+ */
+template <typename T> 
+concept has_matx_op_type = requires {
+  typename T::op_type;
 };
 
-template <typename T>
-struct has_matx_op_type<T, cuda::std::void_t<typename T::op_type>> : cuda::std::true_type {
-};
-}
 
-
-
-namespace detail {
-template <typename T, typename = void>
-struct is_matx_set_op_impl : cuda::std::false_type {
-};
-
-template <typename T>
-struct is_matx_set_op_impl<T, cuda::std::void_t<typename T::matx_setop>> : cuda::std::true_type {
-};
-}
 
 /**
  * @brief Determine if a type is a MatX set operator
  * 
  * @tparam T Type to test
  */
-template <typename T> constexpr __MATX_HOST__ __MATX_DEVICE__ bool is_matx_set_op()
+template <typename T> 
+concept is_matx_set_op_c = requires {
+  typename remove_cvref_t<T>::matx_setop;
+};
+
+// Legacy function for backwards compatibility
+template <typename T> 
+constexpr __MATX_HOST__ __MATX_DEVICE__ bool is_matx_set_op()
 {
-  return detail::is_matx_set_op_impl<typename remove_cvref<T>::type>::value;
-}
-
-
-
-namespace detail {
-template <typename T, typename = void>
-struct is_matx_op_lvalue_impl : cuda::std::false_type {
-};
-
-template <typename T>
-struct is_matx_op_lvalue_impl<T, cuda::std::void_t<typename T::matxoplvalue>> : cuda::std::true_type {
-};
+  return requires { typename remove_cvref_t<T>::matx_setop; };
 }
 
 
@@ -245,15 +224,16 @@ struct is_matx_op_lvalue_impl<T, cuda::std::void_t<typename T::matxoplvalue>> : 
  * 
  * @tparam T Type to test
  */
-template <typename T> constexpr __MATX_HOST__ __MATX_DEVICE__ bool is_matx_op_lvalue()
-{
-  return detail::is_matx_op_lvalue_impl<T>::value;
-}
+template <typename T> 
+concept is_matx_op_lvalue_c = requires {
+  typename T::matxoplvalue;
+};
 
-namespace detail {
-template <typename T, typename = void> struct is_tensor_t : cuda::std::false_type {};
-template <typename T>
-struct is_tensor_t<T, cuda::std::void_t<typename T::tensor_t_type>> : cuda::std::true_type {};
+// Legacy function for backwards compatibility
+template <typename T> 
+constexpr __MATX_HOST__ __MATX_DEVICE__ bool is_matx_op_lvalue()
+{
+  return requires { typename T::matxoplvalue; };
 }
 
 /**
@@ -262,13 +242,13 @@ struct is_tensor_t<T, cuda::std::void_t<typename T::tensor_t_type>> : cuda::std:
  * @tparam T Type to test
  */
 template< class T >
-inline constexpr bool is_tensor_t_v = detail::is_tensor_t<typename remove_cvref<T>::type>::value;
+concept is_tensor_t = requires {
+  typename remove_cvref_t<T>::tensor_t_type;
+};
 
-namespace detail {
-template <typename T, typename = void> struct is_tensor_impl : cuda::std::false_type {};
-template <typename T>
-struct is_tensor_impl<T, cuda::std::void_t<typename T::tensor_impl>> : cuda::std::true_type {};
-}
+// Legacy variable for backwards compatibility
+template< class T >
+inline constexpr bool is_tensor_t_v = requires { typename remove_cvref_t<T>::tensor_t_type; };
 
 /**
  * @brief Determine if a type is a MatX tensor_impl_t
@@ -276,46 +256,53 @@ struct is_tensor_impl<T, cuda::std::void_t<typename T::tensor_impl>> : cuda::std
  * @tparam T Type to test
  */
 template< class T >
-inline constexpr bool is_tensor_impl_v = detail::is_tensor_impl<typename remove_cvref<T>::type>::value;
-
-namespace detail {
-template <typename T, typename = void> struct is_tensor_view : cuda::std::false_type {
+concept is_tensor_impl = requires {
+  typename remove_cvref_t<T>::tensor_impl;
 };
 
-template <typename T>
-struct is_tensor_view<T, cuda::std::void_t<typename T::tensor_view>>
-    : cuda::std::true_type {
-};
-}
+// Legacy variable for backwards compatibility
+template< class T >
+inline constexpr bool is_tensor_impl_v = requires { typename remove_cvref_t<T>::tensor_impl; };
 
 /**
- * @brief Determine if a type is a MatX tensor view type
+ * @brief Determine if a type is a MatX tensor
  * 
  * @tparam T Type to test
  */
 template< class T >
-inline constexpr bool is_tensor_view_v = detail::is_tensor_view<typename remove_cvref<T>::type>::value;
+concept is_tensor = requires {
+  typename remove_cvref_t<T>::tensor_view;
+};
 
+// Primary variable template
+template< class T >
+inline constexpr bool is_tensor_v = requires { typename remove_cvref_t<T>::tensor_view; };
+
+// Legacy alias for backwards compatibility
+template< class T >
+inline constexpr bool is_tensor_view_v = is_tensor_v<T>;
+
+/**
+ * @brief Determine if a type is a cuda::std::tuple
+ * 
+ * @tparam T Type to test
+ */
+template <typename T>
+concept is_tuple_c = requires {
+  typename cuda::std::tuple_size<T>::type;
+  requires cuda::std::tuple_size<T>::value >= 0;
+};
+
+// Legacy struct for backwards compatibility
 template <typename> struct is_tuple: cuda::std::false_type {};
 template <typename ...T> struct is_tuple<cuda::std::tuple<T...>>: cuda::std::true_type {};
 
 template <typename T>
-inline constexpr bool is_settable_xform_v = cuda::std::conjunction_v<detail::is_matx_set_op_impl<T>, 
-                                               detail::is_matx_transform_set_op_impl<T>>;
-                                               //detail::is_matx_tensor_set_op_impl<T>>; // Can be tuple also
+inline constexpr bool is_settable_xform_v = (requires { typename remove_cvref_t<T>::matx_setop; }) && 
+                                             (requires { typename remove_cvref_t<T>::op_type::matx_transform_op; });
 
 
 
-
-namespace detail {
-template <typename T, typename = void>
-struct is_matx_reduction_impl : cuda::std::false_type {
-};
-template <typename T>
-struct is_matx_reduction_impl<T, cuda::std::void_t<typename T::matx_reduce>>
-    : cuda::std::true_type {
-};
-}
 
 /**
  * @brief Determine if a type is a MatX reduction
@@ -323,17 +310,13 @@ struct is_matx_reduction_impl<T, cuda::std::void_t<typename T::matx_reduce>>
  * @tparam T Type to test
  */
 template <typename T>
-inline constexpr bool is_matx_reduction_v = detail::is_matx_reduction_impl<T>::value;
+concept is_matx_reduction = requires {
+  typename T::matx_reduce;
+};
 
-namespace detail {
-template <typename T, typename = void>
-struct is_matx_idx_reduction_impl : cuda::std::false_type {
-};
+// Legacy variable for backwards compatibility
 template <typename T>
-struct is_matx_idx_reduction_impl<T, cuda::std::void_t<typename T::matx_reduce_index>>
-    : cuda::std::true_type {
-};
-}
+inline constexpr bool is_matx_reduction_v = requires { typename T::matx_reduce; };
 
 /**
  * @brief Determine if a type is a MatX index reduction type
@@ -341,17 +324,13 @@ struct is_matx_idx_reduction_impl<T, cuda::std::void_t<typename T::matx_reduce_i
  * @tparam T Type to test
  */
 template <typename T>
-inline constexpr bool is_matx_index_reduction_v = detail::is_matx_idx_reduction_impl<T>::value;
+concept is_matx_index_reduction = requires {
+  typename T::matx_reduce_index;
+};
 
-namespace detail {
-template <typename T, typename = void>
-struct is_matx_no_cub_reduction_impl : cuda::std::false_type {
-};
+// Legacy variable for backwards compatibility
 template <typename T>
-struct is_matx_no_cub_reduction_impl<T, cuda::std::void_t<typename T::matx_no_cub_reduce>>
-    : cuda::std::true_type {
-};
-}
+inline constexpr bool is_matx_index_reduction_v = requires { typename T::matx_reduce_index; };
 
 /**
  * @brief Determine if a type is not allowed to use CUB for reductions
@@ -359,18 +338,16 @@ struct is_matx_no_cub_reduction_impl<T, cuda::std::void_t<typename T::matx_no_cu
  * @tparam T Type to test
  */
 template <typename T>
-inline constexpr bool is_matx_no_cub_reduction_v = detail::is_matx_no_cub_reduction_impl<T>::value;
-
-
-
-
-namespace detail {
-template <class T> struct is_cuda_complex : cuda::std::false_type {
+concept is_matx_no_cub_reduction = requires {
+  typename T::matx_no_cub_reduce;
 };
-template <class T>
-struct is_cuda_complex<cuda::std::complex<T>> : cuda::std::true_type {
-};
-}
+
+// Legacy variable for backwards compatibility
+template <typename T>
+inline constexpr bool is_matx_no_cub_reduction_v = requires { typename T::matx_no_cub_reduce; };
+
+
+
 
 /**
  * @brief Determine if a type is a cuda::std::complex variant
@@ -378,44 +355,51 @@ struct is_cuda_complex<cuda::std::complex<T>> : cuda::std::true_type {
  * @tparam T Type to test
  */
 template <class T>
-inline constexpr bool is_cuda_complex_v = detail::is_cuda_complex<remove_cvref_t<T>>::value;
+concept is_cuda_complex = requires {
+  typename remove_cvref_t<T>::value_type;
+  requires cuda::std::is_same_v<remove_cvref_t<T>, cuda::std::complex<typename remove_cvref_t<T>::value_type>>;
+};
 
+// Legacy variable for backwards compatibility
+template <class T>
+inline constexpr bool is_cuda_complex_v = requires {
+  typename remove_cvref_t<T>::value_type;
+  requires cuda::std::is_same_v<remove_cvref_t<T>, cuda::std::complex<typename remove_cvref_t<T>::value_type>>;
+};
 
-namespace detail {
-  template <typename T, typename = void> struct is_cuda_executor : cuda::std::false_type {};
-  
-  template <typename T>
-  struct is_cuda_executor<T, cuda::std::void_t<typename T::cuda_executor>> : cuda::std::true_type {};
-}
 
 /**
-  * @brief Determine if a type is a device executor
-  * 
-  * @tparam T Type to test
-  */
+ * @brief Determine if a type is a device executor
+ * 
+ * @tparam T Type to test
+ */
 template <typename T> 
-inline constexpr bool is_cuda_executor_v = detail::is_cuda_executor<typename remove_cvref<T>::type>::value;
+concept is_cuda_executor = requires {
+  typename remove_cvref_t<T>::cuda_executor;
+};
 
+// Legacy variable for backwards compatibility
+template <typename T> 
+inline constexpr bool is_cuda_executor_v = requires { typename remove_cvref_t<T>::cuda_executor; };
 
-namespace detail {
-template <typename T> struct is_complex : cuda::std::false_type {
-};
-template <> struct is_complex<cuda::std::complex<float>> : cuda::std::true_type {
-};
-template <> struct is_complex<cuda::std::complex<double>> : cuda::std::true_type {
-};
-template <> struct is_complex<matxFp16Complex> : cuda::std::true_type {
-};
-template <> struct is_complex<matxBf16Complex> : cuda::std::true_type {
-};
-}
 
 /**
  * @brief Determine if a type is a complex type (any type supported)
  * 
  * @tparam T Type to test
  */
-template <class T> inline constexpr bool is_complex_v = detail::is_complex<remove_cvref_t<T>>::value;
+template <class T> 
+concept is_complex = cuda::std::is_same_v<remove_cvref_t<T>, cuda::std::complex<float>> ||
+                     cuda::std::is_same_v<remove_cvref_t<T>, cuda::std::complex<double>> ||
+                     cuda::std::is_same_v<remove_cvref_t<T>, matxFp16Complex> ||
+                     cuda::std::is_same_v<remove_cvref_t<T>, matxBf16Complex>;
+
+// Legacy variable for backwards compatibility
+template <class T> 
+inline constexpr bool is_complex_v = cuda::std::is_same_v<remove_cvref_t<T>, cuda::std::complex<float>> ||
+                                     cuda::std::is_same_v<remove_cvref_t<T>, cuda::std::complex<double>> ||
+                                     cuda::std::is_same_v<remove_cvref_t<T>, matxFp16Complex> ||
+                                     cuda::std::is_same_v<remove_cvref_t<T>, matxBf16Complex>;
 
 namespace detail {
 template <typename T> struct scalar_to_complex {
@@ -437,14 +421,19 @@ template <> struct scalar_to_complex<matxBf16>  {
 
 // Primary template: fallback to T if no inner_storage member exists
 namespace detail {
-  template <typename, typename = void>
+  template <typename T>
+  concept has_jit_storage_type = requires {
+    typename T::JIT_Storage;
+  };
+
+  template <typename T>
   struct inner_storage_t {
     using type = void;
   };
 
-  // Specialization: if T has a member type 'inner_storage', use it
-  template <typename T>
-  struct inner_storage_t<T, cuda::std::void_t<typename T::JIT_Storage>> {
+  // Specialization: if T has a member type 'JIT_Storage', use it
+  template <has_jit_storage_type T>
+  struct inner_storage_t<T> {
     using type = typename T::JIT_Storage;
   };
 
@@ -459,15 +448,13 @@ namespace detail {
 
 namespace detail {
   // Helper to check if a type has ToJITStorage method
-  template <typename, typename = void>
-  struct has_to_jit_storage : cuda::std::false_type {};
+  template <typename T>
+  concept has_to_jit_storage = requires(T t) {
+    { t.ToJITStorage() };
+  };
 
   template <typename T>
-  struct has_to_jit_storage<T, cuda::std::void_t<decltype(cuda::std::declval<T>().ToJITStorage())>> 
-    : cuda::std::true_type {};
-
-  template <typename T>
-  inline constexpr bool has_to_jit_storage_v = has_to_jit_storage<T>::value;
+  inline constexpr bool has_to_jit_storage_v = has_to_jit_storage<T>;
 }
 
 
@@ -475,43 +462,44 @@ namespace detail {
  * @brief Get the inner value_type of the container
  * @tparam T Type to test
  */
-template <typename T, typename = void>
+template <typename T>
 struct inner_op_type_t {
   using type = T;
 };
 
-template <typename T>
-struct inner_op_type_t<T, typename cuda::std::enable_if_t<is_complex_v<T>>> { 
+template <is_complex T>
+struct inner_op_type_t<T> { 
   using type = typename T::value_type;
 };
 
-
-namespace detail {
-template <typename T> struct is_bf16_type : cuda::std::false_type {};
-template <> struct is_bf16_type<matxBf16Complex> : cuda::std::true_type {};
-template <> struct is_bf16_type<matxBf16> : cuda::std::true_type {};
-}
 
 /**
  * @brief Determine if a type is a BF16 type
  * 
  * @tparam T Type to test
  */
-template <class T> inline constexpr bool is_bf16_type_v = detail::is_bf16_type<T>::value;
+template <class T> 
+concept is_bf16_type = cuda::std::is_same_v<T, matxBf16Complex> ||
+                       cuda::std::is_same_v<T, matxBf16>;
 
-namespace detail {
-template <typename T> struct is_fp16_type : cuda::std::false_type {};
-template <> struct is_fp16_type<matxFp16Complex> : cuda::std::true_type {};
-template <> struct is_fp16_type<matxFp16> : cuda::std::true_type {};
-
-}
+// Legacy variable for backwards compatibility
+template <class T> 
+inline constexpr bool is_bf16_type_v = cuda::std::is_same_v<T, matxBf16Complex> ||
+                                       cuda::std::is_same_v<T, matxBf16>;
 
 /**
  * @brief Determine if a type is an FP16 type
  * 
  * @tparam T Type to test
  */
-template <class T> inline constexpr bool is_fp16_type_v = detail::is_fp16_type<T>::value;
+template <class T> 
+concept is_fp16_type = cuda::std::is_same_v<T, matxFp16Complex> ||
+                       cuda::std::is_same_v<T, matxFp16>;
+
+// Legacy variable for backwards compatibility
+template <class T> 
+inline constexpr bool is_fp16_type_v = cuda::std::is_same_v<T, matxFp16Complex> ||
+                                       cuda::std::is_same_v<T, matxFp16>;
 
 /**
  * @brief Determine if the inner type is an FP32 type
@@ -529,41 +517,34 @@ inline constexpr bool is_fp32_inner_type_v = cuda::std::is_same_v<typename inner
 template<typename T>
 inline constexpr bool is_fp64_inner_type_v = cuda::std::is_same_v<typename inner_op_type_t<T>::type, double>;
 
-namespace detail {
-template <typename T, typename = void>
-struct is_matx_shape : cuda::std::false_type {
-};
-template <typename T>
-struct is_matx_shape<T, cuda::std::void_t<typename T::matx_shape>>
-    : cuda::std::true_type {
-};
-}
-
 /**
  * @brief Determine if a type is a MatX shape type
  * 
  * @tparam T Type to test
  */
- template <typename T>
- inline constexpr bool is_matx_shape_v = detail::is_matx_shape<typename remove_cvref<T>::type>::value;
+template <typename T>
+concept is_matx_shape = requires {
+  typename remove_cvref_t<T>::matx_shape;
+};
+
+// Legacy variable for backwards compatibility
+template <typename T>
+inline constexpr bool is_matx_shape_v = requires { typename remove_cvref_t<T>::matx_shape; };
  
 
-namespace detail {
-template <typename T>
-struct is_complex_half
-    : cuda::std::integral_constant<
-          bool, cuda::std::is_same_v<matxFp16Complex, cuda::std::remove_cv_t<T>> ||
-                    cuda::std::is_same_v<matxBf16Complex, cuda::std::remove_cv_t<T>>> {
-};
-}
-
 /**
- * @brief Determine if a type is a MatX half precision wrapper (either matxFp16 or matxBf16)
+ * @brief Determine if a type is a complex half precision type
  * 
  * @tparam T Type to test
  */
 template <class T>
-inline constexpr bool is_complex_half_v = detail::is_complex_half<T>::value;
+concept is_complex_half = cuda::std::is_same_v<cuda::std::remove_cv_t<T>, matxFp16Complex> ||
+                          cuda::std::is_same_v<cuda::std::remove_cv_t<T>, matxBf16Complex>;
+
+// Legacy variable for backwards compatibility
+template <class T>
+inline constexpr bool is_complex_half_v = cuda::std::is_same_v<cuda::std::remove_cv_t<T>, matxFp16Complex> ||
+                                          cuda::std::is_same_v<cuda::std::remove_cv_t<T>, matxBf16Complex>;
 
 /**
  * @brief Tests if a type is a half precision floating point
@@ -576,47 +557,33 @@ template <typename T> constexpr inline __MATX_HOST__ __MATX_DEVICE__ bool IsHalf
   return cuda::std::is_same_v<T, matxFp16> || cuda::std::is_same_v<T, matxBf16>;
 }
 
-namespace detail {
-template <typename T>
-struct is_matx_half
-    : cuda::std::integral_constant<
-          bool, cuda::std::is_same_v<matxFp16, cuda::std::remove_cv_t<T>> ||
-                    cuda::std::is_same_v<matxBf16, cuda::std::remove_cv_t<T>>> {
-};
-}
 /**
  * @brief Determine if a type is a MatX half precision wrapper (either matxFp16 or matxBf16)
  * 
  * @tparam T Type to test
  */
 template <class T>
-inline constexpr bool is_matx_half_v = detail::is_matx_half<T>::value;
+concept is_matx_half = cuda::std::is_same_v<cuda::std::remove_cv_t<T>, matxFp16> ||
+                       cuda::std::is_same_v<cuda::std::remove_cv_t<T>, matxBf16>;
 
-namespace detail {
-template <typename T>
-struct is_half
-    : cuda::std::integral_constant<
-          bool, cuda::std::is_same_v<__half, cuda::std::remove_cv_t<T>> ||
-                    cuda::std::is_same_v<__nv_bfloat16, cuda::std::remove_cv_t<T>>> {
-};
-}
+// Legacy variable for backwards compatibility
+template <class T>
+inline constexpr bool is_matx_half_v = cuda::std::is_same_v<cuda::std::remove_cv_t<T>, matxFp16> ||
+                                       cuda::std::is_same_v<cuda::std::remove_cv_t<T>, matxBf16>;
+
 /**
  * @brief Determine if a type is half precision (either __half or __nv_bfloat16)
  * 
  * @tparam T Type to test
  */
-template <class T> inline constexpr bool is_half_v = detail::is_half<T>::value;
+template <class T> 
+concept is_half = cuda::std::is_same_v<cuda::std::remove_cv_t<T>, __half> ||
+                  cuda::std::is_same_v<cuda::std::remove_cv_t<T>, __nv_bfloat16>;
 
-namespace detail {
-template <typename T>
-struct is_matx_type
-    : cuda::std::integral_constant<
-          bool, cuda::std::is_same_v<matxFp16, cuda::std::remove_cv_t<T>> ||
-                    cuda::std::is_same_v<matxBf16, cuda::std::remove_cv_t<T>> ||
-                    cuda::std::is_same_v<matxFp16Complex, cuda::std::remove_cv_t<T>> ||
-                    cuda::std::is_same_v<matxBf16Complex, cuda::std::remove_cv_t<T>>> {
-};
-}
+// Legacy variable for backwards compatibility
+template <class T> 
+inline constexpr bool is_half_v = cuda::std::is_same_v<cuda::std::remove_cv_t<T>, __half> ||
+                                  cuda::std::is_same_v<cuda::std::remove_cv_t<T>, __nv_bfloat16>;
 
 /**
  * @brief Determine if a type is a MatX custom type (half precision wrappers)
@@ -624,15 +591,26 @@ struct is_matx_type
  * @tparam T Type to test
  */
 template <class T>
-inline constexpr bool is_matx_type_v = detail::is_matx_type<T>::value;
+concept is_matx_type = cuda::std::is_same_v<cuda::std::remove_cv_t<T>, matxFp16> ||
+                       cuda::std::is_same_v<cuda::std::remove_cv_t<T>, matxBf16> ||
+                       cuda::std::is_same_v<cuda::std::remove_cv_t<T>, matxFp16Complex> ||
+                       cuda::std::is_same_v<cuda::std::remove_cv_t<T>, matxBf16Complex>;
+
+// Legacy variable for backwards compatibility
+template <class T>
+inline constexpr bool is_matx_type_v = cuda::std::is_same_v<cuda::std::remove_cv_t<T>, matxFp16> ||
+                                       cuda::std::is_same_v<cuda::std::remove_cv_t<T>, matxBf16> ||
+                                       cuda::std::is_same_v<cuda::std::remove_cv_t<T>, matxFp16Complex> ||
+                                       cuda::std::is_same_v<cuda::std::remove_cv_t<T>, matxBf16Complex>;
 
 namespace detail {
-template <typename T, typename = void> struct extract_value_type_impl {
+template <typename T>
+struct extract_value_type_impl {
   using value_type = T;
 };
 
-template <typename T>
-struct extract_value_type_impl<T, typename cuda::std::enable_if_t<is_matx_op<T>()>> {
+template <is_matx_op_c T>
+struct extract_value_type_impl<T> {
   using value_type = typename T::value_type;
 };
 }
@@ -653,33 +631,19 @@ using extract_value_type_t = typename detail::extract_value_type_impl<cuda::std:
 template <typename T>
 using promote_half_t = typename cuda::std::conditional_t<is_half_v<T> || is_matx_half_v<T>, float, T>;
 
-namespace detail {
-template <typename T, typename = void>
-struct is_matx_descriptor : cuda::std::false_type {
-};
-template <typename T>
-struct is_matx_descriptor<T, cuda::std::void_t<typename T::matx_descriptor>>
-    : cuda::std::true_type {
-};
-}
-
 /**
  * @brief Determine if a type is a MatX descriptor
  * 
  * @tparam T Type to test
  */
 template <typename T>
-inline constexpr bool is_matx_descriptor_v = detail::is_matx_descriptor<typename remove_cvref<T>::type>::value;
+concept is_matx_descriptor = requires {
+  typename remove_cvref_t<T>::matx_descriptor;
+};
 
-namespace detail {
-template <typename T, typename = void>
-struct is_matx_static_descriptor : cuda::std::false_type {
-};
+// Legacy variable for backwards compatibility
 template <typename T>
-struct is_matx_static_descriptor<T, cuda::std::void_t<typename T::matx_static_descriptor>>
-    : cuda::std::true_type {
-};
-}
+inline constexpr bool is_matx_descriptor_v = requires { typename remove_cvref_t<T>::matx_descriptor; };
 
 /**
  * @brief Determine if a type is a MatX static descriptor
@@ -687,7 +651,13 @@ struct is_matx_static_descriptor<T, cuda::std::void_t<typename T::matx_static_de
  * @tparam T Type to test
  */
 template <typename T>
-inline constexpr bool is_matx_static_descriptor_v = detail::is_matx_static_descriptor<typename remove_cvref<T>::type>::value;
+concept is_matx_static_descriptor = requires {
+  typename remove_cvref_t<T>::matx_static_descriptor;
+};
+
+// Legacy variable for backwards compatibility
+template <typename T>
+inline constexpr bool is_matx_static_descriptor_v = requires { typename remove_cvref_t<T>::matx_static_descriptor; };
 
 
 namespace detail {
@@ -747,18 +717,20 @@ constexpr __MATX_HOST__ __MATX_DEVICE__ cuda::std::array<cuda::std::remove_cv_t<
 
 
 
-template <typename T, typename = void> 
+template <typename T> 
 struct complex_from_scalar {
   using type = T;
 };
 
 template <typename T> 
-struct complex_from_scalar<T, typename cuda::std::enable_if_t<cuda::std::is_same_v<float, T> || cuda::std::is_same_v<double, T>>> {
+  requires (cuda::std::is_same_v<float, T> || cuda::std::is_same_v<double, T>)
+struct complex_from_scalar<T> {
   using type = cuda::std::complex<T>;
 };
 
 template <typename T> 
-struct complex_from_scalar<T, typename cuda::std::enable_if_t<is_matx_half_v<T> || is_half_v<T> > > {
+  requires (is_matx_half<T> || is_half<T>)
+struct complex_from_scalar<T> {
   using type = matxHalfComplex<typename convert_half_to_matx_half<T>::type>;
 };
 
@@ -842,7 +814,8 @@ __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto select_tuple(Tuple&& tuple, c
     cuda::std::get<Ints>(cuda::std::forward<Tuple>(tuple))...);
 }
 
-template <typename... T, cuda::std::enable_if_t<((is_tensor_view_v<T>) && ...), bool> = true>
+template <typename... T>
+  requires ((is_tensor<T>) && ...)
 constexpr __MATX_HOST__ __MATX_DEVICE__ bool TensorTypesMatch() {
   using first_type = cuda::std::tuple_element_t<0, cuda::std::tuple<T...>>;
   return ((cuda::std::is_same_v<typename first_type::value_type, typename T::value_type>) && ...);
@@ -870,13 +843,13 @@ struct permute_rank<T1, no_permute_t> {
 template <typename T, int RANK, typename Storage, typename Desc> class tensor_t;
 template <typename T, int RANK, typename Desc, typename Data> class tensor_impl_t;
 // Traits for casting down to impl tensor conditionally
-template <typename T, typename = void> 
+template <typename T> 
 struct base_type {
   using type = T;
 };
 
-template <typename T> 
-struct base_type<T, typename cuda::std::enable_if_t<is_tensor_t_v<T>>> {
+template <is_tensor_t T> 
+struct base_type<T> {
   using type = tensor_impl_t<typename T::value_type, T::Rank(), typename T::desc_type, typename T::data_type>;
 };
 
@@ -884,40 +857,32 @@ template <typename T> using base_type_t = typename base_type<typename remove_cvr
 
 }
 
-namespace detail {
-template <typename T, typename = void>
-struct is_sparse_data : cuda::std::false_type {
-};
-template <typename T>
-struct is_sparse_data<T, cuda::std::void_t<typename T::sparse_data>>
-    : cuda::std::true_type {
-};
-}
-
-
 /**
  * @brief Determine if a type is a MatX sparse data type
  * 
  * @tparam T Type to test
  */
 template <typename T>
-inline constexpr bool is_sparse_data_v = detail::is_sparse_data<typename remove_cvref<T>::type>::value;
-namespace detail {
-template <typename T, typename = void>
-struct is_sparse_tensor : cuda::std::false_type {
+concept is_sparse_data = requires {
+  typename remove_cvref_t<T>::sparse_data;
 };
+
+// Legacy variable for backwards compatibility
 template <typename T>
-struct is_sparse_tensor<T, cuda::std::void_t<typename T::sparse_tensor>>
-    : cuda::std::true_type {
-};
-}
+inline constexpr bool is_sparse_data_v = requires { typename remove_cvref_t<T>::sparse_data; };
 /**
  * @brief Determine if a type is a MatX sparse tensor type
  * 
  * @tparam T Type to test
  */
 template <typename T>
-inline constexpr bool is_sparse_tensor_v = detail::is_sparse_tensor<typename remove_cvref<T>::type>::value;
+concept is_sparse_tensor = requires {
+  typename remove_cvref_t<T>::sparse_tensor;
+};
+
+// Legacy variable for backwards compatibility
+template <typename T>
+inline constexpr bool is_sparse_tensor_v = requires { typename remove_cvref_t<T>::sparse_tensor; };
 
 namespace detail {
 // Helpers for extracting types in the aliases
@@ -926,23 +891,49 @@ namespace detail {
   template <typename ...T> struct is_std_tuple<std::tuple<T...>>: cuda::std::true_type {};
 #endif
   template <typename ...T> struct is_std_tuple<cuda::std::tuple<T...>>: cuda::std::true_type {};
+}
 
+/**
+ * @brief Determine if a type is std::array or cuda::std::array
+ * 
+ * @tparam T Type to test
+ */
+template<typename T>
+concept is_std_array_c = requires {
+  typename remove_cvref_t<T>::value_type;
+  requires requires { remove_cvref_t<T>::size(); };
+  requires cuda::std::tuple_size<remove_cvref_t<T>>::value >= 0;
+};
+
+namespace detail {
   template<typename T> struct is_std_array : cuda::std::false_type {};
   template<typename T, size_t N> struct is_std_array<cuda::std::array<T, N>> : cuda::std::true_type {};
 #ifndef __CUDACC_RTC__  
   template<typename T, size_t N> struct is_std_array<std::array<T, N>> : cuda::std::true_type {};
 #endif
-  template <typename T> inline constexpr bool is_std_array_v = detail::is_std_array<remove_cvref_t<T>>::value;
+  template <typename T> inline constexpr bool is_std_array_v = is_std_array_c<T>;
 
+/**
+ * @brief Determine if a type is a MatX JIT class
+ * 
+ * @tparam T Type to test
+ */
+template <typename T>
+concept is_matx_jit_class = is_matx_op_c<T> || requires {
+  typename remove_cvref_t<T>::emits_jit_str;
+};
+
+// Legacy struct for backwards compatibility
 template <typename T, typename = void>
-struct is_matx_jit_class : cuda::std::bool_constant<is_matx_op<T>()> {};
+struct is_matx_jit_class_impl : cuda::std::bool_constant<is_matx_op_c<T>> {};
 
 template <typename T>
-struct is_matx_jit_class<T, cuda::std::void_t<typename remove_cvref_t<T>::emits_jit_str>>
+struct is_matx_jit_class_impl<T, cuda::std::void_t<typename remove_cvref_t<T>::emits_jit_str>>
     : cuda::std::true_type {};
 
 template <typename T>
-inline constexpr bool is_matx_jit_class_v = is_matx_jit_class<remove_cvref_t<T>>::value;
+inline constexpr bool is_matx_jit_class_v = (requires { typename remove_cvref_t<T>::matxop; }) || 
+                                            (requires { typename remove_cvref_t<T>::emits_jit_str; });
   
 }  
 

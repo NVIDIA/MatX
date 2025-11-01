@@ -199,8 +199,8 @@ namespace matx
    * @param last Last value
    * @return Operator with linearly-spaced values 
    */
-  template <int Dim, typename ShapeType, typename T,
-           std::enable_if_t<!cuda::std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+  template <int Dim, typename ShapeType, typename T>
+    requires (!cuda::std::is_array_v<remove_cvref_t<ShapeType>>)
   [[deprecated("Use matx::linspace(T first, T last, index_t count, int axis = 0) instead.")]]           
   inline auto linspace(ShapeType &&s, T first, T last)
   {

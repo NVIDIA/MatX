@@ -173,8 +173,8 @@ public:
    * @param s Shape object
    * @param desc Descriptor object
    */
-  template <typename D2 = Desc,
-            std::enable_if_t<is_matx_descriptor_v<typename remove_cvref<D2>::type>, bool> = true>
+  template <typename D2 = Desc>
+    requires is_matx_descriptor<remove_cvref_t<D2>>
   tensor_t(Storage<T> s, D2 &&desc) :
     detail::tensor_impl_t<T, RANK, Desc>{std::forward<D2>(desc)},
     storage_{std::move(s)}
@@ -204,8 +204,8 @@ public:
    * @param desc
    *   Tensor descriptor
    */
-  template <typename D2 = Desc, typename =
-    typename std::enable_if_t<is_matx_descriptor_v<D2>>>
+  template <typename D2 = Desc>
+    requires is_matx_descriptor<D2>
   __MATX_INLINE__ tensor_t(D2 &&desc) :
     detail::tensor_impl_t<T, RANK, D2>{std::forward<D2>(desc)},
     storage_{make_owning_storage<T>(this->desc_.TotalSize())}
@@ -938,8 +938,8 @@ MATX_LOOP_UNROLL
    * @param shape
    *   Shape of tensor
    */
-  template <typename ShapeType,
-      std::enable_if_t<!std::is_pointer_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+  template <typename ShapeType>
+    requires (!std::is_pointer_v<remove_cvref_t<ShapeType>>)
   __MATX_HOST__ __MATX_INLINE__ void
   Reset(T *const data, ShapeType &&shape) noexcept
   {
@@ -1110,7 +1110,8 @@ MATX_LOOP_UNROLL
    *   0 initializer list value
    *
    */
-  template <int M = RANK, std::enable_if_t<M == 0, bool> = true>
+  template <int M = RANK>
+    requires (M == 0)
   __MATX_INLINE__ __MATX_HOST__ void SetVals(T const &val)
   {
     static_assert(RANK == 0, "Single value in SetVals must be applied only to rank-0 tensor");
@@ -1131,9 +1132,8 @@ MATX_LOOP_UNROLL
    *   1D initializer list of values
    *
    */
-  template <int M = RANK, std::enable_if_t<(!is_cuda_complex_v<T> && M == 1) ||
-                                            (is_cuda_complex_v<T> && M == 0),
-                                            bool> = true>
+  template <int M = RANK>
+    requires ((!is_cuda_complex<T> && M == 1) || (is_cuda_complex<T> && M == 0))
   __MATX_INLINE__ __MATX_HOST__ void SetVals(const std::initializer_list<T> &vals)
   {
     static_assert(((!is_cuda_complex_v<T> && RANK == 1) || (is_cuda_complex_v<T> && RANK == 0)),
@@ -1164,9 +1164,8 @@ MATX_LOOP_UNROLL
    *   1D/2D initializer list of values
    *
    */
-  template <int M = RANK, std::enable_if_t<(!is_cuda_complex_v<T> && M == 2) ||
-                                               (is_cuda_complex_v<T> && M == 1),
-                                           bool> = true>
+  template <int M = RANK>
+    requires ((!is_cuda_complex<T> && M == 2) || (is_cuda_complex<T> && M == 1))
   __MATX_INLINE__ __MATX_HOST__ void
   SetVals(const std::initializer_list<const std::initializer_list<T>>
               &vals)
@@ -1204,9 +1203,8 @@ MATX_LOOP_UNROLL
    *   3D/2D initializer list of values
    *
    */
-  template <int M = RANK, std::enable_if_t<(!is_cuda_complex_v<T> && M == 3) ||
-                                               (is_cuda_complex_v<T> && M == 2),
-                                           bool> = true>
+  template <int M = RANK>
+    requires ((!is_cuda_complex<T> && M == 3) || (is_cuda_complex<T> && M == 2))
   __MATX_INLINE__ __MATX_HOST__ void
   SetVals(const std::initializer_list<
           const std::initializer_list<const std::initializer_list<T>>>
@@ -1248,9 +1246,8 @@ MATX_LOOP_UNROLL
    *   3D/4D initializer list of values
    *
    */
-  template <int M = RANK, std::enable_if_t<(!is_cuda_complex_v<T> && M == 4) ||
-                                               (is_cuda_complex_v<T> && M == 3),
-                                           bool> = true>
+  template <int M = RANK>
+    requires ((!is_cuda_complex<T> && M == 4) || (is_cuda_complex<T> && M == 3))
   __MATX_INLINE__ __MATX_HOST__ void
   SetVals(const std::initializer_list<const std::initializer_list<
               const std::initializer_list<const std::initializer_list<T>>>>
@@ -1301,8 +1298,8 @@ MATX_LOOP_UNROLL
    *   4D initializer list of values
    *
    */
-  template <int M = RANK,
-            std::enable_if_t<is_cuda_complex_v<T> && M == 4, bool> = true>
+  template <int M = RANK>
+    requires (is_cuda_complex<T> && M == 4)
   __MATX_INLINE__ __MATX_HOST__ void
   SetVals(const std::initializer_list<
           const std::initializer_list<const std::initializer_list<

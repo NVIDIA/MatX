@@ -142,7 +142,8 @@ static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto scalar_internal_cos(T 
   }
 }
 
-template <typename T, cuda::std::enable_if_t<cuda::std::is_floating_point_v<T> || is_matx_half_v<T>, bool> = true>
+template <typename T>
+  requires (cuda::std::is_floating_point_v<T> || is_matx_half<T>)
 static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto scalar_internal_expj(T v1) {
   if constexpr (is_matx_half_v<T>) {
     return matxHalfComplex<T>{scalar_internal_cos(v1), scalar_internal_sin(v1)};

@@ -90,9 +90,9 @@ namespace matx
    *
    * Returns values for a Blackman window across the selected dimension.
    */
-  template <int Dim, typename ShapeType, typename T = float,
-           std::enable_if_t<!cuda::std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
-             inline auto blackman(ShapeType &&s)
+  template <int Dim, typename ShapeType, typename T = float>
+    requires (!cuda::std::is_array_v<remove_cvref_t<ShapeType>>)
+  inline auto blackman(ShapeType &&s)
              {
                constexpr int RANK = cuda::std::tuple_size<std::decay_t<ShapeType>>::value;
                static_assert(RANK > Dim);

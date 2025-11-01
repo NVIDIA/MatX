@@ -56,45 +56,36 @@
 namespace matx {
   
 
-namespace detail {
-// Use matx_executor trait to identify executors instead of specific types.
-
-template <typename T, typename = void>
-struct is_executor : std::false_type {};
-
-template <typename T>
-struct is_executor<T, std::void_t<typename T::matx_executor>> : std::true_type {};
-}
-
 /**
  * @brief Determine if a type is a MatX executor
  * 
  * @tparam T Type to test
  */
 template <typename T> 
+concept is_executor = requires {
+  typename remove_cvref_t<T>::matx_executor;
+};
+
+// Legacy function for backwards compatibility
+template <typename T> 
 constexpr bool is_executor_t()
 {
-  return detail::is_executor<typename remove_cvref<T>::type>::value;
+  return requires { typename remove_cvref_t<T>::matx_executor; };
 }
 
-namespace detail {
-template <typename T> struct is_jit_cuda_executor : std::false_type {};
-template <> struct is_jit_cuda_executor<CUDAJITExecutor> : std::true_type {};
-}
+/**
+ * @brief Determine if a type is a CUDA JIT executor
+ * 
+ * @tparam T Type to test
+ */
+template <typename T> 
+concept is_jit_cuda_executor = std::is_same_v<remove_cvref_t<T>, CUDAJITExecutor>;
 
+// Legacy function for backwards compatibility
 template <typename T> 
 constexpr bool is_jit_cuda_executor_t()
 {
-  return detail::is_jit_cuda_executor<typename remove_cvref<T>::type>::value;
-}
-
-namespace detail {
-template <typename T, typename = void> struct is_host_executor : std::false_type {};
-template <typename T>
-struct is_host_executor<T, std::void_t<typename T::host_executor>> : std::true_type {};
-
-template<typename T> struct is_select_threads_host_executor : std::false_type {};
-template<> struct is_select_threads_host_executor<matx::SelectThreadsHostExecutor> : std::true_type {};
+  return std::is_same_v<remove_cvref_t<T>, CUDAJITExecutor>;
 }
 
 /**
@@ -103,7 +94,13 @@ template<> struct is_select_threads_host_executor<matx::SelectThreadsHostExecuto
  * @tparam T Type to test
  */
 template <typename T> 
-inline constexpr bool is_host_executor_v = detail::is_host_executor<typename remove_cvref<T>::type>::value;
+concept is_host_executor = requires {
+  typename remove_cvref_t<T>::host_executor;
+};
+
+// Legacy variable for backwards compatibility
+template <typename T> 
+inline constexpr bool is_host_executor_v = requires { typename remove_cvref_t<T>::host_executor; };
 
 /**
  * @brief Determine if a type is a select threads host executor
@@ -111,12 +108,11 @@ inline constexpr bool is_host_executor_v = detail::is_host_executor<typename rem
  * @tparam T Type to test
  */
 template <typename T> 
-inline constexpr bool is_select_threads_host_executor_v = detail::is_select_threads_host_executor<remove_cvref_t<T>>::value;
+concept is_select_threads_host_executor = std::is_same_v<remove_cvref_t<T>, matx::SelectThreadsHostExecutor>;
 
-namespace detail {
-template <typename T> struct is_std_complex : std::false_type {};
-template <typename T> struct is_std_complex<std::complex<T>> : std::true_type {};
-}
+// Legacy variable for backwards compatibility
+template <typename T> 
+inline constexpr bool is_select_threads_host_executor_v = std::is_same_v<remove_cvref_t<T>, matx::SelectThreadsHostExecutor>;
 
 /**
  * @brief Determine if a type is a std::complex variant
@@ -124,31 +120,34 @@ template <typename T> struct is_std_complex<std::complex<T>> : std::true_type {}
  * @tparam T Type to test
  */
 template <typename T>
-inline constexpr bool is_std_complex_v = detail::is_std_complex<typename std::remove_cv<typename std::remove_reference<T>::type>::type>::value;
+concept is_std_complex = requires {
+  requires std::is_same_v<remove_cvref_t<T>, std::complex<typename remove_cvref_t<T>::value_type>>;
+};
 
+// Legacy variable for backwards compatibility
+template <typename T>
+inline constexpr bool is_std_complex_v = requires { 
+  requires std::is_same_v<remove_cvref_t<T>, std::complex<typename remove_cvref_t<T>::value_type>>;
+};
 
-namespace detail {
-template<typename T> struct is_smart_ptr : std::false_type {};
-template<typename T> struct is_smart_ptr<std::shared_ptr<T>> : std::true_type {};
-template<typename T> struct is_smart_ptr<std::unique_ptr<T>> : std::true_type {};
-}
 
 /**
  * @brief Determine if a type is a smart pointer (unique or shared)
  * 
  * @tparam T Type to test
  */
-template <typename T> inline constexpr bool is_smart_ptr_v = detail::is_smart_ptr<T>::value;
-
-namespace detail {
-template <typename T, typename = void>
-struct is_matx_storage : std::false_type {
-};
 template <typename T>
-struct is_matx_storage<T, std::void_t<typename T::matx_storage>>
-    : std::true_type {
+concept is_smart_ptr = requires {
+  requires std::is_same_v<T, std::shared_ptr<typename T::element_type>> ||
+           std::is_same_v<T, std::unique_ptr<typename T::element_type>>;
 };
-}
+
+// Legacy variable for backwards compatibility
+template <typename T> 
+inline constexpr bool is_smart_ptr_v = requires {
+  requires std::is_same_v<T, std::shared_ptr<typename T::element_type>> ||
+           std::is_same_v<T, std::unique_ptr<typename T::element_type>>;
+};
 
 /**
  * @brief Determine if a type is a MatX storage type
@@ -156,17 +155,13 @@ struct is_matx_storage<T, std::void_t<typename T::matx_storage>>
  * @tparam T Type to test
  */
 template <typename T>
-inline constexpr bool is_matx_storage_v = detail::is_matx_storage<typename remove_cvref<T>::type>::value;
+concept is_matx_storage = requires {
+  typename remove_cvref_t<T>::matx_storage;
+};
 
-namespace detail {
-template <typename T, typename = void>
-struct is_matx_storage_container : std::false_type {
-};
+// Legacy variable for backwards compatibility
 template <typename T>
-struct is_matx_storage_container<T, std::void_t<typename T::matx_storage_container>>
-    : std::true_type {
-};
-}
+inline constexpr bool is_matx_storage_v = requires { typename remove_cvref_t<T>::matx_storage; };
 
 /**
  * @brief Determine if a type is a MatX storage container
@@ -174,20 +169,16 @@ struct is_matx_storage_container<T, std::void_t<typename T::matx_storage_contain
  * @tparam T Type to test
  */
 template <typename T>
-inline constexpr bool is_matx_storage_container_v = detail::is_matx_storage_container<typename remove_cvref<T>::type>::value;
+concept is_matx_storage_container = requires {
+  typename remove_cvref_t<T>::matx_storage_container;
+};
 
-
-
-
-// Detect presence of nested alias `index_cmp_op` and verify it equals bool
-namespace detail {
-template <typename T, typename = void>
-struct has_index_cmp_op : std::false_type {};
-
+// Legacy variable for backwards compatibility
 template <typename T>
-struct has_index_cmp_op<T, std::void_t<typename T::index_cmp_op>>
-    : std::bool_constant<std::is_same_v<typename T::index_cmp_op, bool>> {};
-}
+inline constexpr bool is_matx_storage_container_v = requires { typename remove_cvref_t<T>::matx_storage_container; };
+
+
+
 
 /**
  * @brief Determine if a type defines `using index_cmp_op = bool;`
@@ -195,7 +186,17 @@ struct has_index_cmp_op<T, std::void_t<typename T::index_cmp_op>>
  * @tparam T Type to test
  */
 template <typename T>
-inline constexpr bool has_index_cmp_op_v = detail::has_index_cmp_op<typename remove_cvref<T>::type>::value;
+concept has_index_cmp_op = requires {
+  typename remove_cvref_t<T>::index_cmp_op;
+  requires std::is_same_v<typename remove_cvref_t<T>::index_cmp_op, bool>;
+};
+
+// Legacy variable for backwards compatibility
+template <typename T>
+inline constexpr bool has_index_cmp_op_v = requires {
+  typename remove_cvref_t<T>::index_cmp_op;
+  requires std::is_same_v<typename remove_cvref_t<T>::index_cmp_op, bool>;
+};
 
 
 

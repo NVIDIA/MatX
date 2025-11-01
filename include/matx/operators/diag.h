@@ -193,7 +193,8 @@ namespace matx
 #ifdef DOXYGEN_ONLY
   auto __MATX_INLINE__ diag(const T1 &t, index_t k = 0) {
 #else
-  template <typename T1, std::enable_if_t<is_matx_op<T1>(), bool> = true>
+  template <typename T1>
+    requires is_matx_op_c<T1>
     auto __MATX_INLINE__ diag(T1 t, index_t k = 0) {
 #endif
       MATX_ASSERT_STR(T1::Rank() != 1 || k == 0, matxInvalidParameter,

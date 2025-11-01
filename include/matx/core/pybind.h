@@ -434,7 +434,7 @@ public:
 
     // If this is a half-precision type pybind/numpy doesn't support it, so we fall back to the
     // slow method where we convert everything
-    if constexpr (is_matx_type<tensor_type>()) {
+    if constexpr (is_matx_type_v<tensor_type>) {
       auto ften = pybind11::array_t<ntype, pybind11::array::c_style | pybind11::array::forcecast>(ten.Shape());
 
       // Iterate through all elements

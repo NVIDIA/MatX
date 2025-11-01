@@ -93,7 +93,8 @@ bool SizesMatch(const Op1 &op1, const Op2 &op2) {
 }
 
 
-template <int RANK, typename T, std::enable_if_t<!std::is_array_v<typename remove_cvref<T>::type>, bool> = true>
+template <int RANK, typename T>
+  requires (!std::is_array_v<remove_cvref_t<T>>)
 auto __MATX_INLINE__ getPermuteDims(T dims) {
   constexpr auto D = dims.size();
   cuda::std::array<int, RANK> perm;

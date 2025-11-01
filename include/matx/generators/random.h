@@ -368,12 +368,14 @@ namespace detail {
         }
       }
 
-      template <int I = 0, typename ...Is, std::enable_if_t<I == sizeof...(Is), bool> = true>
+      template <int I = 0, typename ...Is>
+        requires (I == sizeof...(Is))
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t GetValC(const cuda::std::tuple<Is...>) const {
         return 0;
       }
 
-      template <int I = 0, typename ...Is, std::enable_if_t<I < sizeof...(Is), bool> = true>
+      template <int I = 0, typename ...Is>
+        requires (I < sizeof...(Is))
       __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t GetValC(const cuda::std::tuple<Is...> tup) const {
         return GetValC<I+1, Is...>(tup) + cuda::std::get<I>(tup)*strides_[I];
       }
@@ -530,8 +532,8 @@ namespace detail {
    * @param beta Value to add to each number
    * @return Random number operator
    */
-  template <typename T, typename ShapeType, typename LowerType = typename inner_op_type_t<T>::type,
-           std::enable_if_t<!cuda::std::is_array_v<remove_cvref_t<ShapeType>>, bool> = true>
+  template <typename T, typename ShapeType, typename LowerType = typename inner_op_type_t<T>::type>
+    requires (!cuda::std::is_array_v<remove_cvref_t<ShapeType>>)
   __MATX_INLINE__ auto random(ShapeType &&s, Distribution_t dist, uint64_t seed = 0, LowerType alpha = 1, LowerType beta = 0)
   {
     static_assert(
@@ -586,8 +588,8 @@ namespace detail {
    * @param max max of generation range
    * @return Random number operator
    */
-  template <typename T, typename ShapeType, typename LowerType = typename inner_op_type_t<T>::type,
-           std::enable_if_t<!cuda::std::is_array_v<remove_cvref_t<ShapeType>>, bool> = true>
+  template <typename T, typename ShapeType, typename LowerType = typename inner_op_type_t<T>::type>
+    requires (!cuda::std::is_array_v<remove_cvref_t<ShapeType>>)
   __MATX_INLINE__ auto randomi(ShapeType &&s, uint64_t seed = 0, LowerType min = 0, LowerType max = 100)
   {
     static_assert(
