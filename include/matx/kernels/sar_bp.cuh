@@ -44,8 +44,6 @@
 #include "matx/core/type_utils.h"
 #include "matx/core/tensor_utils.h"
 
-#include "dblflt.h"
-
 namespace matx {
 
 #ifdef __CUDACC__
