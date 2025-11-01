@@ -88,17 +88,17 @@ inline void sar_bp_impl(OutImageType &out, const InitialImageType &initial_image
 
     if (params.compute_type == SarBpComputeType::Double) {
       cuda::std::complex<double> *phase_lut = static_cast<cuda::std::complex<double> *>(workspace);
-      SarBpFillPhaseLUT<double><<<lut_grid, lut_block, 0, stream>>>(phase_lut, params.center_frequency, params.del_r, range_profiles.Size(1));
+      SarBpFillPhaseLUT<double, double><<<lut_grid, lut_block, 0, stream>>>(phase_lut, params.center_frequency, params.del_r, range_profiles.Size(1));
       SarBp<SarBpComputeType::Double, OutImageType, InitialImageType, RangeProfilesType, PlatPosType, VoxLocType, RangeToMcpType, PhaseLUT><<<grid, block, 0, stream>>>(
         out, initial_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, dr_inv, phase_correction_partial, phase_lut);
     } else if (params.compute_type == SarBpComputeType::Mixed) {
-      cuda::std::complex<double> *phase_lut = static_cast<cuda::std::complex<double> *>(workspace);
-      SarBpFillPhaseLUT<double><<<lut_grid, lut_block, 0, stream>>>(phase_lut, params.center_frequency, params.del_r, range_profiles.Size(1));
+      cuda::std::complex<float> *phase_lut = static_cast<cuda::std::complex<float> *>(workspace);
+      SarBpFillPhaseLUT<double, float><<<lut_grid, lut_block, 0, stream>>>(phase_lut, params.center_frequency, params.del_r, range_profiles.Size(1));
       SarBp<SarBpComputeType::Mixed, OutImageType, InitialImageType, RangeProfilesType, PlatPosType, VoxLocType, RangeToMcpType, PhaseLUT><<<grid, block, 0, stream>>>(
         out, initial_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, dr_inv, phase_correction_partial, phase_lut);
     } else {
       cuda::std::complex<float> *phase_lut = static_cast<cuda::std::complex<float> *>(workspace);
-      SarBpFillPhaseLUT<float><<<lut_grid, lut_block, 0, stream>>>(phase_lut, static_cast<float>(params.center_frequency), static_cast<float>(params.del_r), range_profiles.Size(1));
+      SarBpFillPhaseLUT<float, float><<<lut_grid, lut_block, 0, stream>>>(phase_lut, static_cast<float>(params.center_frequency), static_cast<float>(params.del_r), range_profiles.Size(1));
       SarBp<SarBpComputeType::Float, OutImageType, InitialImageType, RangeProfilesType, PlatPosType, VoxLocType, RangeToMcpType, PhaseLUT><<<grid, block, 0, stream>>>(
         out, initial_image, range_profiles, platform_positions, voxel_locations, range_to_mcp,
         static_cast<float>(dr_inv), static_cast<float>(phase_correction_partial), phase_lut);

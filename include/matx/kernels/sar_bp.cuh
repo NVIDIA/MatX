@@ -44,6 +44,8 @@
 #include "matx/core/type_utils.h"
 #include "matx/core/tensor_utils.h"
 
+#include "dblflt.h"
+
 namespace matx {
 
 #ifdef __CUDACC__
@@ -54,7 +56,6 @@ __device__ inline strict_compute_t ComputeRangeToPixel(const PlatPosType &ant_po
 
     static_assert(std::is_same_v<plat_pos_t, double3> || std::is_same_v<plat_pos_t, double4> ||
         std::is_same_v<plat_pos_t, float3> || std::is_same_v<plat_pos_t, float4>, "ComputeRangeToPixel: plat_pos_t must be a 3D or 4D vector");
-
     const plat_pos_t ant_pos_p = ant_pos.operator()(pulse_idx);
     const strict_compute_t dx = static_cast<strict_compute_t>(px) - static_cast<strict_compute_t>(ant_pos_p.x);
     const strict_compute_t dy = static_cast<strict_compute_t>(py) - static_cast<strict_compute_t>(ant_pos_p.y);
@@ -67,8 +68,8 @@ __device__ inline strict_compute_t ComputeRangeToPixel(const PlatPosType &ant_po
     }
 }
 
-template <typename ComputeType>
-__global__ void SarBpFillPhaseLUT(cuda::std::complex<ComputeType> *phase_lut, ComputeType ref_freq, ComputeType dr, index_t num_range_bins)
+template <typename ComputeType, typename StorageType>
+__global__ void SarBpFillPhaseLUT(cuda::std::complex<StorageType> *phase_lut, ComputeType ref_freq, ComputeType dr, index_t num_range_bins)
 {
     const int tid = blockIdx.x * blockDim.x + threadIdx.x;
     if (tid >= num_range_bins) return;
@@ -79,11 +80,13 @@ __global__ void SarBpFillPhaseLUT(cuda::std::complex<ComputeType> *phase_lut, Co
     if constexpr (std::is_same_v<ComputeType, float>) {
         ComputeType sinx, cosx;
         ::sincosf(phase, &sinx, &cosx);
-        phase_lut[tid] = cuda::std::complex<ComputeType>(cosx, sinx);
+        phase_lut[tid] = cuda::std::complex<StorageType>(
+            static_cast<StorageType>(cosx), static_cast<StorageType>(sinx));
     } else {
         ComputeType sinx, cosx;
         ::sincos(phase, &sinx, &cosx);
-        phase_lut[tid] = cuda::std::complex<ComputeType>(cosx, sinx);
+        phase_lut[tid] = cuda::std::complex<StorageType>(
+            static_cast<StorageType>(cosx), static_cast<StorageType>(sinx));
     }
 }
 
@@ -91,12 +94,15 @@ __global__ void SarBpFillPhaseLUT(cuda::std::complex<ComputeType> *phase_lut, Co
 template <SarBpComputeType ComputeType>
 using strict_compute_param_t = typename std::conditional<ComputeType == SarBpComputeType::Double || ComputeType == SarBpComputeType::Mixed, double, float>::type;
 
+template <SarBpComputeType ComputeType>
+using loose_compute_param_t = typename std::conditional<ComputeType == SarBpComputeType::Double, double, float>::type;
+
 template <SarBpComputeType ComputeType, typename OutImageType, typename InitialImageType, typename RangeProfilesType, typename PlatPosType, typename VoxLocType, typename RangeToMcpType, bool PhaseLUT>
 __launch_bounds__(16*16)
 __global__ void SarBp(OutImageType output, const InitialImageType initial_image, const __grid_constant__ RangeProfilesType range_profiles, const __grid_constant__ PlatPosType platform_positions, const __grid_constant__ VoxLocType voxel_locations, const __grid_constant__ RangeToMcpType range_to_mcp,
                       strict_compute_param_t<ComputeType> dr_inv,
                       strict_compute_param_t<ComputeType> phase_correction_partial,
-                      cuda::std::complex<strict_compute_param_t<ComputeType>> *phase_lut)
+                      cuda::std::complex<loose_compute_param_t<ComputeType>> *phase_lut)
 {
     static_assert(is_complex_v<typename OutImageType::value_type>, "Output image must be complex");
     static_assert(is_complex_v<typename InitialImageType::value_type>, "Initial image must be complex");
@@ -146,11 +152,12 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
         }
     };
 
-    const auto get_matched_filter = [&phase_lut, &phase_correction_partial](strict_compute_t diffR, index_t bin_floor_int, loose_compute_t w) -> loose_complex_compute_t {
+    const loose_compute_t phase_correction_partial_loose = static_cast<loose_compute_t>(phase_correction_partial);
+    const auto get_matched_filter = [&phase_lut, &phase_correction_partial, &phase_correction_partial_loose](strict_compute_t diffR, index_t bin_floor_int, loose_compute_t w) -> loose_complex_compute_t {
         if constexpr (PhaseLUT) {
-            const strict_complex_compute_t base_phase = phase_lut[bin_floor_int];
+            const loose_complex_compute_t base_phase = phase_lut[bin_floor_int];
             float incr_sinx, incr_cosx;
-            __sincosf(phase_correction_partial * w, &incr_sinx, &incr_cosx);
+            __sincosf(phase_correction_partial_loose * w, &incr_sinx, &incr_cosx);
             return loose_complex_compute_t{
                 base_phase.real() * incr_cosx - base_phase.imag() * incr_sinx,
                 base_phase.real() * incr_sinx + base_phase.imag() * incr_cosx
