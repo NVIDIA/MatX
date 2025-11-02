@@ -48,7 +48,22 @@ namespace matx {
 
 #ifdef __CUDACC__
 
-template <typename PlatPosType, typename strict_compute_t, typename loose_compute_t>
+// Use two iterations of Newton-Raphson to compute the square root of a double. The
+// initial estimate is computed using a single-precision square root.
+static __device__ __forceinline__ double NewtonRaphsonSqrt(double x) {
+    const float est = sqrtf(static_cast<float>(x));
+    const float est_2_inv = __fdividef(1.0f, 2.0f * est);
+    const double est_f64 = static_cast<double>(est);
+    const double est_2_inv_f64 = static_cast<double>(est_2_inv);
+    const double NR_1 = est_f64 - (est_f64 * est_f64 - x) * est_2_inv_f64;
+    // Reuse est_2_inv_f64 in place of 1/(2*NR_1) for the second iteration.
+    // This is an approximation, but it is accurate enough for our purposes
+    // and avoids the need for a second division.
+    const double NR_2 = NR_1 - (NR_1 * NR_1 - x) * est_2_inv_f64;
+    return NR_2;
+}
+
+template <typename PlatPosType, SarBpComputeType ComputeType, typename strict_compute_t, typename loose_compute_t>
 __device__ inline strict_compute_t ComputeRangeToPixel(const PlatPosType &ant_pos, const index_t pulse_idx, const loose_compute_t px, const loose_compute_t py, const loose_compute_t z0) {
     using plat_pos_t = typename PlatPosType::value_type;
 
@@ -59,10 +74,14 @@ __device__ inline strict_compute_t ComputeRangeToPixel(const PlatPosType &ant_po
     const strict_compute_t dy = static_cast<strict_compute_t>(py) - static_cast<strict_compute_t>(ant_pos_p.y);
     const strict_compute_t dz = static_cast<strict_compute_t>(z0) - static_cast<strict_compute_t>(ant_pos_p.z);
 
-    if constexpr (std::is_same_v<strict_compute_t, float>) {
+    if constexpr (ComputeType == SarBpComputeType::Float) {
         return ::sqrtf(dx*dx + dy*dy + dz*dz);
     } else {
-        return ::sqrt(dx*dx + dy*dy + dz*dz);
+        if constexpr (ComputeType == SarBpComputeType::Mixed) {
+            return NewtonRaphsonSqrt(dx*dx + dy*dy + dz*dz);
+        } else {
+            return ::sqrt(dx*dx + dy*dy + dz*dz);
+        }
     }
 }
 
@@ -179,7 +198,7 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
     #pragma unroll 4
     for (index_t p = 0; p < num_pulses; ++p) {
         const strict_compute_t diffR =
-            ComputeRangeToPixel<PlatPosType, strict_compute_t, loose_compute_t>(platform_positions, p, px, py, pz) - r_to_mcp(p);
+            ComputeRangeToPixel<PlatPosType, ComputeType, strict_compute_t, loose_compute_t>(platform_positions, p, px, py, pz) - r_to_mcp(p);
         const loose_compute_t bin = static_cast<loose_compute_t>(diffR * dr_inv) + bin_offset;
         if (bin >= 0.0f && bin < max_bin_f) {
             loose_compute_t bin_floor, w;
