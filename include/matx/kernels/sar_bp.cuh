@@ -78,7 +78,12 @@ __device__ inline strict_compute_t ComputeRangeToPixel(const PlatPosType &ant_po
         return ::sqrtf(dx*dx + dy*dy + dz*dz);
     } else {
         if constexpr (ComputeType == SarBpComputeType::Mixed) {
+#if __CUDA_ARCH__ == 700 || __CUDA_ARCH__ == 800 || __CUDA_ARCH__ == 900 || __CUDA_ARCH__ == 1000
+            return ::sqrt(dx*dx + dy*dy + dz*dz);
+#else
+	    // Only use the Newton-Raphson approach on systems with reduced FP64 throughput
             return NewtonRaphsonSqrt(dx*dx + dy*dy + dz*dz);
+#endif
         } else {
             return ::sqrt(dx*dx + dy*dy + dz*dz);
         }
