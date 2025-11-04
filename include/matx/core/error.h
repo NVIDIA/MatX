@@ -147,7 +147,7 @@ namespace matx
       detail::printStackTrace(stack);
     }
 
-    const char *what() const throw() { return str; }
+    const char* what() const noexcept override { return str; }
   };
   }
 
