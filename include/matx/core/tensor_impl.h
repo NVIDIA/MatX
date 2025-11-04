@@ -1286,7 +1286,6 @@ MATX_IGNORE_WARNING_POP_GCC
     {
       static_assert(sizeof...(Is) == M, "Number of indices of data_ptr must match rank of tensor");
       if constexpr (!is_sparse_data_v<TensorData>) {
-        constexpr int EPT_int = static_cast<int>(CapType::ept);
         const index_t offset = GetOffsetOptimized<CapType::ept>(indices...);
         return data_.ldata_ + offset;
       }
