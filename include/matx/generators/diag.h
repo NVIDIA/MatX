@@ -50,6 +50,54 @@ namespace matx
       using matxop = bool;
       using value_type = T;
 
+#ifdef MATX_EN_JIT
+      struct JIT_Storage {
+        // No runtime members - all become constexpr
+      };
+
+      JIT_Storage ToJITStorage() const {
+        return JIT_Storage{};
+      }
+
+      __MATX_INLINE__ std::string get_jit_class_name() const {
+        std::string val_str;
+        if constexpr (std::is_floating_point_v<T>) {
+          val_str = std::format("{}", val_);
+        } else {
+          val_str = std::to_string(val_);
+        }
+        return std::format("JITDiagGen_rank{}_val{}", Rank(), val_str);
+      }
+
+      __MATX_INLINE__ auto get_jit_op_str() const {
+        std::string func_name = get_jit_class_name();
+        cuda::std::array<index_t, Rank()> out_dims_;
+        for (int i = 0; i < Rank(); ++i) {
+          out_dims_[i] = Size(i);
+        }
+        
+        return cuda::std::make_tuple(
+          func_name,
+          std::format("template <typename T> struct {} {{\n"
+              "  using value_type = T;\n"
+              "  using matxop = bool;\n"
+              "  constexpr static int Rank_ = {};\n"
+              "  constexpr static cuda::std::array<index_t, Rank_> out_dims_ = {{ {} }};\n"
+              "  constexpr static T val_ = static_cast<T>({});\n"
+              "  template <typename CapType, typename... Is>\n"
+              "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(Is... indices) const\n"
+              "  {{\n"
+              "    if (((pp_get<0>(indices...) == indices) && ...)) return T(val_);\n"
+              "    else return T(0.0f);\n"
+              "  }}\n"
+              "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return Rank_; }}\n"
+              "  constexpr __MATX_INLINE__ __MATX_DEVICE__ auto Size(int dim) const {{ return out_dims_[dim]; }}\n"
+              "}};\n",
+              func_name, Rank(), detail::array_to_string(out_dims_), val_)
+        );
+      }
+#endif
+
        __MATX_INLINE__ std::string str() const { return "diag"; }
 
       Diag(ShapeType &&s, T val) : s_(std::forward<ShapeType>(s)), val_(val)
@@ -62,7 +110,25 @@ namespace matx
 
       template <OperatorCapability Cap, typename InType>
       __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
-        if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+        if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+#ifdef MATX_EN_JIT
+          return get_jit_class_name() + "<" + type_to_string<T>() + ">";
+#else
+          return "";
+#endif
+        }
+        else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+#ifdef MATX_EN_JIT
+          const auto [key, value] = get_jit_op_str();
+          if (in.find(key) == in.end()) {
+            in[key] = value;
+          }
+          return true;
+#else
+          return false;
+#endif
+        }
+        else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
           const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
           return my_cap;
         } else {        

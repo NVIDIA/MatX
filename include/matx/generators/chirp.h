@@ -53,7 +53,7 @@ namespace matx
 
 
         private:
-        SpaceOp sop_;
+        mutable SpaceOp sop_;
         FreqType f0_;
         FreqType f1_;
         space_type t1_;
@@ -62,6 +62,51 @@ namespace matx
         public:
         using value_type = FreqType;
         using matxop = bool;
+
+#ifdef MATX_EN_JIT
+        struct JIT_Storage {
+          typename detail::inner_storage_or_self_t<SpaceOp> sop_;
+        };
+
+        JIT_Storage ToJITStorage() const {
+          return JIT_Storage{detail::to_jit_storage(sop_)};
+        }
+
+        __MATX_INLINE__ std::string get_jit_class_name() const {
+          return std::format("JITChirp_method{}_f0{}_f1{}_t1{}", static_cast<int>(method_), f0_, f1_, t1_);
+        }
+
+        __MATX_INLINE__ auto get_jit_op_str() const {
+          std::string func_name = get_jit_class_name();
+          
+          return cuda::std::make_tuple(
+            func_name,
+            std::format("template <typename SpaceOp, typename FreqType> struct {} {{\n"
+                "  using space_type = typename SpaceOp::value_type;\n"
+                "  using value_type = FreqType;\n"
+                "  using matxop = bool;\n"
+                "  constexpr static ChirpMethod method_ = static_cast<ChirpMethod>({});\n"
+                "  constexpr static FreqType f0_ = static_cast<FreqType>({});\n"
+                "  constexpr static FreqType f1_ = static_cast<FreqType>({});\n"
+                "  constexpr static space_type t1_ = static_cast<space_type>({});\n"
+                "  typename detail::inner_storage_or_self_t<SpaceOp> sop_;\n"
+                "  template <typename CapType>\n"
+                "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(index_t i) const\n"
+                "  {{\n"
+                "    return detail::ApplyGeneratorVecFunc<CapType, FreqType>([this](index_t idx) {{\n"
+                "      if (method_ == ChirpMethod::CHIRP_METHOD_LINEAR) {{\n"
+                "        return cuda::std::cos(2.0f * M_PI * (f0_ * sop_(idx) + 0.5f * ((f1_ - f0_) / t1_) * sop_(idx) * sop_(idx)));\n"
+                "      }}\n"
+                "      return 0.0;\n"
+                "    }}, i);\n"
+                "  }}\n"
+                "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return 1; }}\n"
+                "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size([[maybe_unused]] int dim) const {{ return sop_.Size(0); }}\n"
+                "}};\n",
+                func_name, static_cast<int>(method_), f0_, f1_, t1_)
+          );
+        }
+#endif
 
         __MATX_INLINE__ std::string str() const { return "chirp"; }
 
@@ -79,7 +124,30 @@ namespace matx
 
         template <OperatorCapability Cap, typename InType>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
-          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+          if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+#ifdef MATX_EN_JIT
+            const auto sop_jit_name = detail::get_operator_capability<Cap>(sop_, in);
+            return std::format("{}<{}>", get_jit_class_name(), sop_jit_name);
+#else
+            return "";
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+#ifdef MATX_EN_JIT
+            const auto [key, value] = get_jit_op_str();
+            if (in.find(key) == in.end()) {
+              in[key] = value;
+            }
+            detail::get_operator_capability<Cap>(sop_, in);
+            return true;
+#else
+            return false;
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
+            return detail::get_operator_capability<Cap>(sop_, in);
+          }
+          else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
             const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
             return detail::combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(sop_, in));
           } else {        
@@ -118,7 +186,7 @@ namespace matx
 
 
         private:
-        SpaceOp sop_;
+        mutable SpaceOp sop_;
         FreqType f0_;
         FreqType f1_;
         space_type t1_;
@@ -127,6 +195,53 @@ namespace matx
         public:
         using value_type = cuda::std::complex<FreqType>;
         using matxop = bool;
+
+#ifdef MATX_EN_JIT
+        struct JIT_Storage {
+          typename detail::inner_storage_or_self_t<SpaceOp> sop_;
+        };
+
+        JIT_Storage ToJITStorage() const {
+          return JIT_Storage{detail::to_jit_storage(sop_)};
+        }
+
+        __MATX_INLINE__ std::string get_jit_class_name() const {
+          return std::format("JITComplexChirp_method{}_f0{}_f1{}_t1{}", static_cast<int>(method_), f0_, f1_, t1_);
+        }
+
+        __MATX_INLINE__ auto get_jit_op_str() const {
+          std::string func_name = get_jit_class_name();
+          
+          return cuda::std::make_tuple(
+            func_name,
+            std::format("template <typename SpaceOp, typename FreqType> struct {} {{\n"
+                "  using space_type = typename SpaceOp::value_type;\n"
+                "  using value_type = cuda::std::complex<FreqType>;\n"
+                "  using matxop = bool;\n"
+                "  constexpr static ChirpMethod method_ = static_cast<ChirpMethod>({});\n"
+                "  constexpr static FreqType f0_ = static_cast<FreqType>({});\n"
+                "  constexpr static FreqType f1_ = static_cast<FreqType>({});\n"
+                "  constexpr static space_type t1_ = static_cast<space_type>({});\n"
+                "  typename detail::inner_storage_or_self_t<SpaceOp> sop_;\n"
+                "  template <typename CapType>\n"
+                "  __MATX_INLINE__ __MATX_DEVICE__ decltype(auto) operator()(index_t i) const\n"
+                "  {{\n"
+                "    return detail::ApplyGeneratorVecFunc<CapType, value_type>([this](index_t idx) {{\n"
+                "      if (method_ == ChirpMethod::CHIRP_METHOD_LINEAR) {{\n"
+                "        FreqType real = cuda::std::cos(2.0f * M_PI * (f0_ * sop_(idx) + 0.5f * ((f1_ - f0_) / t1_) * sop_(idx) * sop_(idx)));\n"
+                "        FreqType imag = -cuda::std::cos(2.0f * M_PI * (f0_ * sop_(idx) + 0.5f * ((f1_ - f0_) / t1_) * sop_(idx) * sop_(idx) + 90.0/360.0));\n"
+                "        return cuda::std::complex<FreqType>{{real, imag}};\n"
+                "      }}\n"
+                "      return cuda::std::complex<FreqType>{{0, 0}};\n"
+                "    }}, i);\n"
+                "  }}\n"
+                "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return 1; }}\n"
+                "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size([[maybe_unused]] int dim) const {{ return sop_.Size(0); }}\n"
+                "}};\n",
+                func_name, static_cast<int>(method_), f0_, f1_, t1_)
+          );
+        }
+#endif
         
 	__MATX_INLINE__ std::string str() const { return "cchirp"; }
         
@@ -144,7 +259,30 @@ namespace matx
 
         template <OperatorCapability Cap, typename InType>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
-          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+          if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+#ifdef MATX_EN_JIT
+            const auto sop_jit_name = detail::get_operator_capability<Cap>(sop_, in);
+            return std::format("{}<{}>", get_jit_class_name(), sop_jit_name);
+#else
+            return "";
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+#ifdef MATX_EN_JIT
+            const auto [key, value] = get_jit_op_str();
+            if (in.find(key) == in.end()) {
+              in[key] = value;
+            }
+            detail::get_operator_capability<Cap>(sop_, in);
+            return true;
+#else
+            return false;
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
+            return detail::get_operator_capability<Cap>(sop_, in);
+          }
+          else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
             const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
             return detail::combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(sop_, in));
           } else {        

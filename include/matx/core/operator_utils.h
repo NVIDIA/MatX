@@ -29,12 +29,13 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
-#ifndef __CUDACC_RTC__
+
 
 #pragma once
 
 #include "matx/core/type_utils_both.h"
-
+#include <cuda/std/__algorithm/copy.h>
+#ifndef __CUDACC_RTC__
 
 namespace matx {
   namespace detail {
@@ -74,7 +75,7 @@ namespace matx {
     __MATX_HOST__ __MATX_INLINE__ void AllocateTempTensor(TensorType &tensor, Executor &&ex, ShapeType &&shape, typename TensorType::value_type **ptr) {
 
       const auto ttl_size = cuda::std::accumulate(shape.begin(), shape.end(), static_cast<index_t>(1),
-                                  std::multiplies<index_t>()) * sizeof(typename TensorType::value_type);      
+                                  cuda::std::multiplies<index_t>()) * sizeof(typename TensorType::value_type);      
 
       if constexpr (is_cuda_executor_v<Executor>) {
         matxAlloc((void**)ptr, ttl_size, MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
@@ -106,7 +107,28 @@ namespace matx {
         }
       }
     }
+  }
 
+  namespace detail {
+    #ifdef MATX_EN_JIT
+    // Helper function to convert to JIT storage
+    // If T has ToJITStorage(), call it; otherwise return the value as-is (for scalars)
+    template <typename T>
+    __MATX_INLINE__ __MATX_HOST__ decltype(auto) to_jit_storage(const T& val) {
+      if constexpr (has_to_jit_storage_v<T>) {
+        return val.ToJITStorage();
+      } else {
+        return val;
+      }
+    }
+    #endif  
+  }
+}; 
+#endif
+
+// RTC and nvcc
+namespace matx {
+  namespace detail {
     template <typename CapType, typename T, typename Func>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto ApplyGeneratorVecFunc(const Func &func, index_t index) {
       if constexpr (CapType::ept == ElementsPerThread::ONE) {
@@ -135,29 +157,6 @@ namespace matx {
         return result;
       }
     }
-  }
-
-  namespace detail {
-    #ifdef MATX_EN_JIT
-    // Helper function to convert to JIT storage
-    // If T has ToJITStorage(), call it; otherwise return the value as-is (for scalars)
-    template <typename T>
-    __MATX_INLINE__ __MATX_HOST__ decltype(auto) to_jit_storage(const T& val) {
-      if constexpr (has_to_jit_storage_v<T>) {
-        return val.ToJITStorage();
-      } else {
-        return val;
-      }
-    }
-    #endif  
-  }
-}; 
-#endif
-
-// RTC and nvcc
-namespace matx {
-  namespace detail {
-
 
     template <typename CapType, typename ValueType>
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto GetJitSentinelValue() {

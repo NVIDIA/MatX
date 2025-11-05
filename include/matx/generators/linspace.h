@@ -48,6 +48,71 @@ namespace matx
         using value_type = T;
         using matxop = bool;
 
+#ifdef MATX_EN_JIT
+        struct JIT_Storage {
+          // No runtime members - all become constexpr
+        };
+
+        JIT_Storage ToJITStorage() const {
+          return JIT_Storage{};
+        }
+
+        __MATX_INLINE__ std::string get_jit_class_name() const {
+          return std::format("JITLinspace_axis{}_count{}_numrc{}", axis_, count_, NUM_RC);
+        }
+
+        __MATX_INLINE__ auto get_jit_op_str() const {
+          std::string func_name = get_jit_class_name();
+          
+          std::string steps_init = "{ ";
+          std::string firsts_init = "{ ";
+          for (int i = 0; i < NUM_RC; i++) {
+            steps_init += std::format("{}", steps_[i]);
+            firsts_init += std::format("{}", firsts_[i]);
+            if (i < NUM_RC - 1) {
+              steps_init += ", ";
+              firsts_init += ", ";
+            }
+          }
+          steps_init += " }";
+          firsts_init += " }";
+          
+          return cuda::std::make_tuple(
+            func_name,
+            std::format("template <typename T> struct {} {{\n"
+                "  using value_type = T;\n"
+                "  using matxop = bool;\n"
+                "  constexpr static int axis_ = {};\n"
+                "  constexpr static index_t count_ = {};\n"
+                "  constexpr static int NUM_RC = {};\n"
+                "  constexpr static cuda::std::array<T, NUM_RC> steps_ = {};\n"
+                "  constexpr static cuda::std::array<T, NUM_RC> firsts_ = {};\n"
+                "  template <typename CapType, typename... Is>\n"
+                "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(Is... indices) const\n"
+                "  {{\n"
+                "    cuda::std::array idx{{indices...}};\n"
+                "    if constexpr (sizeof...(indices) == 1) {{\n"
+                "      return firsts_[0] + steps_[0] * static_cast<T>(idx[0]);\n"
+                "    }} else {{\n"
+                "      if (axis_ == 0) {{\n"
+                "        return firsts_[idx[1]] + steps_[idx[1]] * static_cast<T>(idx[0]);\n"
+                "      }} else {{\n"
+                "        return firsts_[idx[0]] + steps_[idx[0]] * static_cast<T>(idx[1]);\n"
+                "      }}\n"
+                "    }}\n"
+                "  }}\n"
+                "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return (NUM_RC == 1) ? 1 : 2; }}\n"
+                "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const\n"
+                "  {{\n"
+                "    if constexpr (NUM_RC == 1) return count_;\n"
+                "    else return (dim != axis_) ? NUM_RC : count_;\n"
+                "  }}\n"
+                "}};\n",
+                func_name, axis_, count_, NUM_RC, steps_init, firsts_init)
+          );
+        }
+#endif
+
         __MATX_INLINE__ std::string str() const { return "linspace"; }
 
         static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { 
@@ -72,7 +137,25 @@ namespace matx
 
         template <OperatorCapability Cap, typename InType>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
-          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+          if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+#ifdef MATX_EN_JIT
+            return get_jit_class_name() + "<" + type_to_string<T>() + ">";
+#else
+            return "";
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+#ifdef MATX_EN_JIT
+            const auto [key, value] = get_jit_op_str();
+            if (in.find(key) == in.end()) {
+              in[key] = value;
+            }
+            return true;
+#else
+            return false;
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
             const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
             return my_cap;
           } else {          

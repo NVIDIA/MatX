@@ -70,6 +70,56 @@ namespace matx
         using matxop = bool;
         using value_type = NewType;
 
+#ifdef MATX_EN_JIT
+        struct JIT_Storage {
+          typename detail::inner_storage_or_self_t<detail::base_type_t<T>> op_;
+        };
+
+        JIT_Storage ToJITStorage() const {
+          return JIT_Storage{detail::to_jit_storage(op_)};
+        }
+
+        __MATX_INLINE__ std::string get_jit_class_name() const {
+          return "JITCastOp";
+        }
+
+        __MATX_INLINE__ auto get_jit_op_str() const {
+          std::string func_name = get_jit_class_name();
+          cuda::std::array<index_t, Rank()> out_dims_;
+          for (int i = 0; i < Rank(); ++i) {
+            out_dims_[i] = Size(i);
+          }
+          
+          return cuda::std::make_tuple(
+            func_name,
+            std::string("template <typename T, typename NewType> struct " + func_name + " {\n") +
+                "  using value_type = NewType;\n" +
+                "  using matxop = bool;\n" +
+                "  constexpr static cuda::std::array<index_t, " + std::to_string(Rank()) + "> out_dims_ = { " +
+                detail::array_to_string(out_dims_) + " };\n" +
+                "  typename detail::inner_storage_or_self_t<detail::base_type_t<T>> op_;\n" +
+                "  template <typename CapType, typename... Is>\n" +
+                "  __MATX_INLINE__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) const\n" +
+                "  {\n" +
+                "    if ((threadIdx.x * static_cast<int>(CapType::ept)) > Size(Rank() - 1)) {\n" +
+                "      return detail::GetJitSentinelValue<CapType, value_type>();\n" +
+                "    }\n" +
+                "    auto cast_func = [](const auto &val) { return static_cast<NewType>(val); };\n" +
+                "    return ApplyVecFunc<CapType, NewType>(cast_func, get_value<CapType>(op_, indices...));\n" +
+                "  }\n" +
+                "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank()\n" +
+                "  {\n" +
+                "    return detail::get_rank<T>();\n" +
+                "  }\n" +
+                "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const\n" +
+                "  {\n" +
+                "    return out_dims_[dim];\n" +
+                "  }\n" +
+                "};\n"
+          );
+        }
+#endif
+
 	      __MATX_INLINE__ std::string str() const { return as_type_str<NewType>() + "(" + op_.str() + ")"; }
         __MATX_INLINE__ CastOp(const T &op) : op_(op){
           MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
@@ -93,8 +143,33 @@ namespace matx
 
         template <OperatorCapability Cap, typename InType>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
-          auto self_has_cap = capability_attributes<Cap>::default_value;
-          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_, in));
+          if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+#ifdef MATX_EN_JIT
+            const auto op_jit_name = detail::get_operator_capability<Cap>(op_, in);
+            return get_jit_class_name() + "<" + op_jit_name + "," + detail::type_to_string<NewType>() + ">";
+#else
+            return "";
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+#ifdef MATX_EN_JIT
+            const auto [key, value] = get_jit_op_str();
+            if (in.find(key) == in.end()) {
+              in[key] = value;
+            }
+            detail::get_operator_capability<Cap>(op_, in);
+            return true;
+#else
+            return false;
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
+            return detail::get_operator_capability<Cap>(op_, in);
+          }
+          else {
+            auto self_has_cap = capability_attributes<Cap>::default_value;
+            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_, in));
+          }
         }
 
         template <typename ShapeType, typename Executor>
@@ -137,6 +212,63 @@ namespace matx
         static_assert(!is_complex_v<T2> && !is_complex_half_v<T2>, "T2 input operator cannot be complex");
         static_assert(is_complex_v<NewType> || is_complex_half_v<NewType>, "ComplexCastOp output type should be complex");
 
+#ifdef MATX_EN_JIT
+        struct JIT_Storage {
+          typename detail::inner_storage_or_self_t<detail::base_type_t<T1>> real_op_;
+          typename detail::inner_storage_or_self_t<detail::base_type_t<T2>> imag_op_;
+        };
+
+        JIT_Storage ToJITStorage() const {
+          return JIT_Storage{detail::to_jit_storage(real_op_), detail::to_jit_storage(imag_op_)};
+        }
+
+        __MATX_INLINE__ std::string get_jit_class_name() const {
+          return "JITComplexCastOp";
+        }
+
+        __MATX_INLINE__ auto get_jit_op_str() const {
+          std::string func_name = get_jit_class_name();
+          cuda::std::array<index_t, Rank()> out_dims_;
+          for (int i = 0; i < Rank(); ++i) {
+            out_dims_[i] = Size(i);
+          }
+          
+          return cuda::std::make_tuple(
+            func_name,
+            std::string("template <typename T1, typename T2, typename NewType> struct " + func_name + " {\n") +
+                "  using value_type = NewType;\n" +
+                "  using matxop = bool;\n" +
+                "  constexpr static cuda::std::array<index_t, " + std::to_string(Rank()) + "> out_dims_ = { " +
+                detail::array_to_string(out_dims_) + " };\n" +
+                "  typename detail::inner_storage_or_self_t<detail::base_type_t<T1>> real_op_;\n" +
+                "  typename detail::inner_storage_or_self_t<detail::base_type_t<T2>> imag_op_;\n" +
+                "  template <typename CapType, typename... Is>\n" +
+                "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(Is... indices) const\n" +
+                "  {\n" +
+                "    if ((threadIdx.x * static_cast<int>(CapType::ept)) > Size(Rank() - 1)) {\n" +
+                "      return detail::GetJitSentinelValue<CapType, value_type>();\n" +
+                "    }\n" +
+                "    auto cast_func = [](const auto &real, const auto &imag) {\n" +
+                "      using inner_type = typename inner_op_type_t<NewType>::type;\n" +
+                "      return NewType(static_cast<inner_type>(real),static_cast<inner_type>(imag));\n" +
+                "    };\n" +
+                "    const auto real_val = get_value<CapType>(real_op_, indices...);\n" +
+                "    const auto imag_val = get_value<CapType>(imag_op_, indices...);\n" +
+                "    return ApplyVecFunc<CapType, NewType>(cast_func, real_val, imag_val);\n" +
+                "  }\n" +
+                "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank()\n" +
+                "  {\n" +
+                "    return detail::get_rank<T1>();\n" +
+                "  }\n" +
+                "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const\n" +
+                "  {\n" +
+                "    return out_dims_[dim];\n" +
+                "  }\n" +
+                "};\n"
+          );
+        }
+#endif
+
 	      __MATX_INLINE__ std::string str() const { return as_type_str<NewType>() + "(" + real_op_.str() + "," + imag_op_.str() + ")"; }
         __MATX_INLINE__ ComplexCastOp(T1 real_op, T2 imag_op) : real_op_(real_op), imag_op_(imag_op) {
           MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
@@ -168,12 +300,41 @@ namespace matx
 
         template <OperatorCapability Cap, typename InType>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
-          auto self_has_cap = capability_attributes<Cap>::default_value;
-          return combine_capabilities<Cap>(
-            self_has_cap,
-            detail::get_operator_capability<Cap>(real_op_, in),
-            detail::get_operator_capability<Cap>(imag_op_, in)
-          );
+          if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+#ifdef MATX_EN_JIT
+            const auto real_jit_name = detail::get_operator_capability<Cap>(real_op_, in);
+            const auto imag_jit_name = detail::get_operator_capability<Cap>(imag_op_, in);
+            return get_jit_class_name() + "<" + real_jit_name + "," + imag_jit_name + ",NewType>";
+#else
+            return "";
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+#ifdef MATX_EN_JIT
+            const auto [key, value] = get_jit_op_str();
+            if (in.find(key) == in.end()) {
+              in[key] = value;
+            }
+            detail::get_operator_capability<Cap>(real_op_, in);
+            detail::get_operator_capability<Cap>(imag_op_, in);
+            return true;
+#else
+            return false;
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
+            return 
+              detail::get_operator_capability<Cap>(real_op_, in) +
+              detail::get_operator_capability<Cap>(imag_op_, in);
+          }
+          else {
+            auto self_has_cap = capability_attributes<Cap>::default_value;
+            return combine_capabilities<Cap>(
+              self_has_cap,
+              detail::get_operator_capability<Cap>(real_op_, in),
+              detail::get_operator_capability<Cap>(imag_op_, in)
+            );
+          }
         }
 
         template <typename ShapeType, typename Executor>

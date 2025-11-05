@@ -34,10 +34,13 @@
 
 // This file is used for jitify/NVRTC preprocessing. Do NOT include any files in here that can't be
 // parsed on the device, and try to keep this minimal to avoid unnecessary dependencies.
+#include <cuda/barrier>
+#include <cuda/std/__algorithm/min.h>
+#include <cuda/std/__algorithm/max.h>
 #include "matx/core/defines.h"
 #include "matx/core/type_utils_both.h"
 #include "matx/core/vector.h"
-#include "matx/operators/scalar_internal.h"
+//#include "matx/operators/scalar_internal.h"
+#include "matx/operators/scalar_ops.h"
 #include "matx/core/operator_utils.h"
-#include <cuda/barrier>
 #include <cub/block/block_load_to_shared.cuh>

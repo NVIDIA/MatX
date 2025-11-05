@@ -58,10 +58,34 @@ namespace matx
             else {
               return detail::capability_attributes<Cap>::default_value;
             }
-          } else {          
+          } 
+          else if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY || 
+                             Cap == OperatorCapability::JIT_CLASS_QUERY) {
+            // Forward JIT-related capabilities to the generator
+            return f_.template get_capability<Cap>(in);
+          }
+          else {          
             return detail::capability_attributes<Cap>::default_value;
           }
         }
+
+#ifdef MATX_EN_JIT
+        struct JIT_Storage {
+          // Empty storage - generator data is made constexpr in JIT code
+        };
+
+        JIT_Storage ToJITStorage() const {
+          return JIT_Storage{};
+        }
+
+        __MATX_INLINE__ std::string get_jit_class_name() const {
+          return f_.get_jit_class_name();
+        }
+
+        __MATX_INLINE__ auto get_jit_op_str() const {
+          return f_.get_jit_op_str();
+        }
+#endif
 
         template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const {

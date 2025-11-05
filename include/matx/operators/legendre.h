@@ -49,11 +49,54 @@ namespace matx
       class LegendreOp : public BaseOp<LegendreOp<T1,T2,T3>>
     {
       private:
-        typename detail::base_type_t<T1> n_;
-        typename detail::base_type_t<T2> m_;
-        typename detail::base_type_t<T3> in_;
+        mutable typename detail::base_type_t<T1> n_;
+        mutable typename detail::base_type_t<T2> m_;
+        mutable typename detail::base_type_t<T3> in_;
 
         cuda::std::array<int,2> axis_;
+
+#ifdef MATX_EN_JIT
+        struct JIT_Storage {
+          typename detail::inner_storage_or_self_t<detail::base_type_t<T1>> n_;
+          typename detail::inner_storage_or_self_t<detail::base_type_t<T2>> m_;
+          typename detail::inner_storage_or_self_t<detail::base_type_t<T3>> in_;
+        };
+
+        JIT_Storage ToJITStorage() const {
+          return JIT_Storage{detail::to_jit_storage(n_), detail::to_jit_storage(m_), detail::to_jit_storage(in_)};
+        }
+
+        __MATX_INLINE__ std::string get_jit_class_name() const {
+          return std::format("JITLegendre_axis{}_{}", axis_[0], axis_[1]);
+        }
+
+        __MATX_INLINE__ auto get_jit_op_str() const {
+          std::string func_name = get_jit_class_name();
+          cuda::std::array<index_t, Rank()> out_dims_;
+          for (int i = 0; i < Rank(); ++i) {
+            out_dims_[i] = Size(i);
+          }
+          
+          return cuda::std::make_tuple(
+            func_name,
+            std::format("template <typename T1, typename T2, typename T3> struct {} {{\n"
+                "  using value_type = typename T3::value_type;\n"
+                "  using matxop = bool;\n"
+                "  constexpr static int Rank_ = {};\n"
+                "  constexpr static cuda::std::array<int,2> axis_ = {{ {}, {} }};\n"
+                "  constexpr static cuda::std::array<index_t, Rank_> out_dims_ = {{ {} }};\n"
+                "  typename detail::inner_storage_or_self_t<detail::base_type_t<T1>> n_;\n"
+                "  typename detail::inner_storage_or_self_t<detail::base_type_t<T2>> m_;\n"
+                "  typename detail::inner_storage_or_self_t<detail::base_type_t<T3>> in_;\n"
+                "  template <typename CapType, typename... Is>\n"
+                "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(Is... indices) const {{ /* legendre logic */ }}\n"
+                "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return Rank_; }}\n"
+                "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const {{ return out_dims_[dim]; }}\n"
+                "}};\n",
+                func_name, Rank(), axis_[0], axis_[1], detail::array_to_string(out_dims_))
+          );
+        }
+#endif
 
         template<class TypeParam>
           static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ TypeParam legendre(int n, int m, TypeParam x) {
@@ -166,7 +209,36 @@ namespace matx
 
         template <OperatorCapability Cap, typename InType>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
-          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+          if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+#ifdef MATX_EN_JIT
+            const auto n_jit_name = detail::get_operator_capability<Cap>(n_, in);
+            const auto m_jit_name = detail::get_operator_capability<Cap>(m_, in);
+            const auto in_jit_name = detail::get_operator_capability<Cap>(in_, in);
+            return std::format("{}<{},{},{}>", get_jit_class_name(), n_jit_name, m_jit_name, in_jit_name);
+#else
+            return "";
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+#ifdef MATX_EN_JIT
+            const auto [key, value] = get_jit_op_str();
+            if (in.find(key) == in.end()) {
+              in[key] = value;
+            }
+            detail::get_operator_capability<Cap>(n_, in);
+            detail::get_operator_capability<Cap>(m_, in);
+            detail::get_operator_capability<Cap>(in_, in);
+            return true;
+#else
+            return false;
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
+            return detail::get_operator_capability<Cap>(n_, in) +
+                   detail::get_operator_capability<Cap>(m_, in) +
+                   detail::get_operator_capability<Cap>(in_, in);
+          }
+          else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
             const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
             return combine_capabilities<Cap>(
               my_cap,

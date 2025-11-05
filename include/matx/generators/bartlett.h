@@ -47,6 +47,40 @@ namespace matx
         using value_type = T;
         using matxop = bool;
 
+#ifdef MATX_EN_JIT
+        struct JIT_Storage {
+          // No runtime members - size_ is made constexpr
+        };
+
+        JIT_Storage ToJITStorage() const {
+          return JIT_Storage{};
+        }
+
+        __MATX_INLINE__ std::string get_jit_class_name() const {
+          return "JITBartlett_size" + std::to_string(size_);
+        }
+
+        __MATX_INLINE__ auto get_jit_op_str() const {
+          std::string func_name = get_jit_class_name();
+          
+          return cuda::std::make_tuple(
+            func_name,
+            std::string("template <typename T> struct " + func_name + " {\n") +
+                "  using value_type = T;\n" +
+                "  using matxop = bool;\n" +
+                "  constexpr static index_t size_ = " + std::to_string(size_) + ";\n" +
+                "  template <typename CapType>\n" +
+                "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(index_t i) const\n" +
+                "  {\n" +
+                "    return detail::ApplyGeneratorVecFunc<CapType, T>([](index_t idx) { return 1 - cuda::std::abs(((2*T(idx))/(T(size_ - 1))) - 1); }, i);\n" +
+                "  }\n" +
+                "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() { return 1; }\n" +
+                "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size([[maybe_unused]] int dim) const { return size_; }\n" +
+                "};\n"
+          );
+        }
+#endif
+
         __MATX_INLINE__ std::string str() const { return "bartlett"; }
 
         inline __MATX_HOST__ __MATX_DEVICE__ Bartlett(index_t size) : size_(size){
@@ -64,6 +98,31 @@ namespace matx
         inline __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
         {
           return this->operator()<DefaultCapabilities>(i);
+        }
+
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
+          if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+#ifdef MATX_EN_JIT
+            return get_jit_class_name() + "<" + type_to_string<T>() + ">";
+#else
+            return "";
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+#ifdef MATX_EN_JIT
+            const auto [key, value] = get_jit_op_str();
+            if (in.find(key) == in.end()) {
+              in[key] = value;
+            }
+            return true;
+#else
+            return false;
+#endif
+          }
+          else {
+            return capability_attributes<Cap>::default_value;
+          }
         }
 
         constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size([[maybe_unused]] int dim) const

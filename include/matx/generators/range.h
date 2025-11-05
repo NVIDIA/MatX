@@ -50,6 +50,49 @@ namespace matx
 
         Range() = default;
 
+#ifdef MATX_EN_JIT
+        struct JIT_Storage {
+          // No runtime members - all become constexpr
+        };
+
+        JIT_Storage ToJITStorage() const {
+          return JIT_Storage{};
+        }
+
+        __MATX_INLINE__ std::string get_jit_class_name() const {
+          auto float_to_str = [](auto v) {
+            std::string s = std::to_string(v);
+            std::replace(s.begin(), s.end(), '.', '_');
+            return s;
+          };
+          return "JITRange_first" + float_to_str(first_) + "_step" + float_to_str(step_);
+        }
+
+        __MATX_INLINE__ auto get_jit_op_str() const {
+          std::string func_name = get_jit_class_name();
+          
+          return cuda::std::make_tuple(
+            func_name,
+            std::format("template <typename T> struct {} {{\n"
+                "  using value_type = T;\n"
+                "  using matxop = bool;\n"
+                "  constexpr static T first_ = static_cast<T>({});\n"
+                "  constexpr static T step_ = static_cast<T>({});\n"
+                "  template <typename CapType>\n"
+                "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(index_t idx) const\n"
+                "  {{\n"
+                "    return detail::ApplyGeneratorVecFunc<CapType, T>([](index_t i) {{\n"
+                "      return first_ + T(static_cast<T>(i) * step_);\n"
+                "    }}, idx);\n"
+                "  }}\n"
+                "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return 1; }}\n"
+                "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size([[maybe_unused]] int dim) const {{ return index_t(0); }}\n"
+                "}};\n",
+                func_name, first_, step_)
+          );
+        }
+#endif
+
         __MATX_INLINE__ std::string str() const { return "range"; }
 
         Range(T first, T step) : first_(first), step_(step) {
@@ -76,6 +119,31 @@ MATX_IGNORE_WARNING_POP_GCC
         __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t idx) const
         {
           return this->operator()<DefaultCapabilities>(idx);
+        }
+
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
+          if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+#ifdef MATX_EN_JIT
+            return get_jit_class_name() + "<" + type_to_string<T>() + " >";
+#else
+            return "";
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+#ifdef MATX_EN_JIT
+            const auto [key, value] = get_jit_op_str();
+            if (in.find(key) == in.end()) {
+              in[key] = value;
+            }
+            return true;
+#else
+            return false;
+#endif
+          }
+          else {
+            return capability_attributes<Cap>::default_value;
+          }
         }
 
         constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size([[maybe_unused]] int dim) const

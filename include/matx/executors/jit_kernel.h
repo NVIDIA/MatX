@@ -90,8 +90,8 @@ namespace matx {\n\
     template <class Op>\n\
     __global__ void matxOpT3Kernel(Op op, matx::index_t size0, matx::index_t size1, matx::index_t size2) {\n\
       matx::index_t idx = threadIdx.x;\n\
-      matx::index_t idy = static_cast<matx::index_t>(blockIdx.x);\n\
-      matx::index_t idz = static_cast<matx::index_t>(blockIdx.y);\n\
+      matx::index_t idy = static_cast<matx::index_t>(blockIdx.x) * blockDim.y + threadIdx.y;\n\
+      matx::index_t idz = static_cast<matx::index_t>(blockIdx.y) * blockDim.z + threadIdx.z;\n\
       if (idx * static_cast<matx::index_t>(CurrentCapabilities::ept) < size2 && idy < size1 && idz < size0) {\n\
         if constexpr (cuda::std::is_pointer_v<Op>) {\n\
           (*op).template operator()<CurrentCapabilities>(idz, idy, idx);\n\
@@ -103,15 +103,14 @@ namespace matx {\n\
     \n\
     template <class Op>\n\
     __global__ void matxOpT3StrideKernel(Op op, matx::index_t size0, matx::index_t size1, matx::index_t size2) {\n\
-      for(index_t idz = static_cast<index_t>(blockIdx.z) * blockDim.z + threadIdx.z;\n\
+      matx::index_t idx = threadIdx.x;\n\
+      for(matx::index_t idz = static_cast<matx::index_t>(blockIdx.y) * blockDim.z + threadIdx.z;\n\
           idz < size0;\n\
-          idz += blockDim.z * gridDim.z) {\n\
-        for (index_t idy = static_cast<index_t>(blockIdx.y) * blockDim.y + threadIdx.y;\n\
+          idz += blockDim.z * gridDim.y) {\n\
+        for (matx::index_t idy = static_cast<matx::index_t>(blockIdx.x) * blockDim.y + threadIdx.y;\n\
             idy < size1;\n\
-            idy += blockDim.y * gridDim.y) {\n\
-          for(index_t idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;\n\
-              idx * static_cast<index_t>(CurrentCapabilities::ept) < size2;\n\
-              idx += blockDim.x * gridDim.x) {\n\
+            idy += blockDim.y * gridDim.x) {\n\
+          if (idx * static_cast<matx::index_t>(CurrentCapabilities::ept) < size2) {\n\
             if constexpr (cuda::std::is_pointer_v<Op>) {\n\
               (*op).template operator()<CurrentCapabilities>(idz, idy, idx);\n\
             }\n\
@@ -125,9 +124,10 @@ namespace matx {\n\
     template <class Op>\n\
     __global__ void matxOpT4Kernel(Op op, matx::index_t size0, matx::index_t size1, matx::index_t size2, matx::index_t size3) {\n\
       matx::index_t idx = threadIdx.x;\n\
-      matx::index_t idy = static_cast<matx::index_t>(blockIdx.x);\n\
-      matx::index_t idz = static_cast<matx::index_t>(blockIdx.y);\n\
-      matx::index_t idw = static_cast<matx::index_t>(blockIdx.z);\n\
+      matx::index_t nmy = static_cast<matx::index_t>(blockIdx.x) * blockDim.y + threadIdx.y;\n\
+      matx::index_t idy = nmy % size2;\n\
+      matx::index_t idz = nmy / size2;\n\
+      matx::index_t idw = static_cast<matx::index_t>(blockIdx.y) * blockDim.z + threadIdx.z;\n\
       if (idx * static_cast<matx::index_t>(CurrentCapabilities::ept) < size3 && idy < size2 && idz < size1 && idw < size0) {\n\
         if constexpr (cuda::std::is_pointer_v<Op>) {\n\
           (*op).template operator()<CurrentCapabilities>(idw, idz, idy, idx);\n\
@@ -140,16 +140,16 @@ namespace matx {\n\
     template <class Op>\n\
     __global__ void matxOpT4StrideKernel(Op op, matx::index_t size0, matx::index_t size1, matx::index_t size2, matx::index_t size3) {\n\
       matx::index_t idx = threadIdx.x;\n\
-      for(matx::index_t idw = static_cast<matx::index_t>(blockIdx.z);\n\
-            idw < size0;\n\
-            idw += gridDim.z) {\n\
-        for(matx::index_t idz = static_cast<matx::index_t>(blockIdx.y);\n\
-            idz < size1;\n\
-            idz += gridDim.y) {\n\
-          for (matx::index_t idy = static_cast<matx::index_t>(blockIdx.x);\n\
-              idy < size2;\n\
-              idy += gridDim.x) {\n\
-            if (idx * static_cast<matx::index_t>(CurrentCapabilities::ept) < size3 && idy < size2 && idz < size1 && idw < size0) {\n\
+      for(matx::index_t nmy = static_cast<matx::index_t>(blockIdx.x) * blockDim.y + threadIdx.y;\n\
+          nmy < size1 * size2;\n\
+          nmy += blockDim.y * gridDim.x) {\n\
+        matx::index_t idy = nmy % size2;\n\
+        matx::index_t idz = nmy / size2;\n\
+        if(idy < size2 && idz < size1) {\n\
+          for(matx::index_t idw = static_cast<matx::index_t>(blockIdx.y) * blockDim.z + threadIdx.z;\n\
+              idw < size0;\n\
+              idw += blockDim.z * gridDim.y) {\n\
+            if (idx * static_cast<matx::index_t>(CurrentCapabilities::ept) < size3) {\n\
               if constexpr (cuda::std::is_pointer_v<Op>) {\n\
                 (*op).template operator()<CurrentCapabilities>(idw, idz, idy, idx);\n\
               } else {\n\

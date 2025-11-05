@@ -328,8 +328,24 @@ namespace matx
             }
           }
           else if constexpr (Cap == OperatorCapability::GROUPS_PER_BLOCK) {
-            const int ffts_per_block = dx_fft_helper_.GetFFTsPerBlock();
-            cuda::std::array<int, 2> groups_per_block = {ffts_per_block, ffts_per_block};
+            int ffts_per_block_candidate;
+
+            if constexpr (RANK > 1) {
+              const int ffts_per_block = dx_fft_helper_.GetFFTsPerBlock();
+              const auto last_dim = a_.Size(a_.Rank() - 2);
+              int ffts_per_block_candidate = ffts_per_block;
+              // Try to find an ffts_per_block that evenly divides into last dimension size
+              // Decrease ffts_per_block until it divides evenly or until 1
+              while (ffts_per_block_candidate > 1 && (last_dim % ffts_per_block_candidate != 0)) {
+                --ffts_per_block_candidate;
+              }
+              MATX_LOG_DEBUG("GROUPS_PER_BLOCK from cuFFTDx: [{},{}]", ffts_per_block, ffts_per_block_candidate);
+            }
+            else {
+              ffts_per_block_candidate = 1;
+            }
+            
+            cuda::std::array<int, 2> groups_per_block = {ffts_per_block_candidate, ffts_per_block_candidate};
             auto result = combine_capabilities<Cap>(groups_per_block, detail::get_operator_capability<Cap>(a_, in));
             MATX_LOG_DEBUG("GROUPS_PER_BLOCK: [{},{}]", result[0], result[1]);
             return result;

@@ -33,10 +33,16 @@
 #pragma once
 
 #include "matx/operators/scalar_internal.h"
-#include <type_traits>
 #include <cuda/std/cmath>
 #include <cuda/std/__algorithm/min.h>
 #include <cuda/std/__algorithm/max.h>
+
+// Helper macro to conditionally generate code only in non-RTC mode
+#ifndef __CUDACC_RTC__
+#define MATX_IFNDEF_CUDACC_RTC(...) __VA_ARGS__
+#else
+#define MATX_IFNDEF_CUDACC_RTC(...)
+#endif
 
 namespace matx {
 namespace detail {
@@ -56,6 +62,7 @@ namespace detail {
       return cuda::std::FUNC(v1);    \
     } \
   } \
+  MATX_IFNDEF_CUDACC_RTC( \
   template <typename T> \
   static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto internal_##FUNC(T v1) { \
     if constexpr (is_vector_v<T>) {    \
@@ -81,15 +88,6 @@ namespace detail {
       return cuda::std::make_tuple( \
         class_name, \
         std::string( \
-          "template <typename T>\n" \
-          "static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto scalar_internal_" #FUNC "(T v1) {\n" \
-          "  if constexpr (is_matx_type_v<T>) {\n" \
-          "    return " #FUNC "(v1);\n" \
-          "  }\n" \
-          "  else {\n" \
-          "    return cuda::std::" #FUNC "(v1);\n" \
-          "  }\n" \
-          "}\n" \
           "template <typename T>\n" \
           "static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto internal_" #FUNC "(T v1) {\n" \
           "  if constexpr (is_vector_v<T>) {\n" \
@@ -121,17 +119,19 @@ namespace detail {
         return true; \
       } \
       else if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) { \
-        return get_jit_class_name(); \
+        return get_jit_class_name() + "<" + detail::type_to_string<T>() + ">"; \
       } \
       else { \
         return capability_attributes<Cap>::default_value; \
       } \
     } \
-  };
+  }; \
+  )
 
 // Unary operator with a custom function
 // The scalar_internal_FUNC implementation should be in scalar_internal.h
 #define MATX_UNARY_OP_GEN_NOFUNC(FUNC, OPNAME)                                        \
+  MATX_IFNDEF_CUDACC_RTC( \
   template <typename T> \
   static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto internal_##FUNC(T v1) { \
     if constexpr (is_vector_v<T>) {    \
@@ -188,13 +188,14 @@ namespace detail {
         return true; \
       } \
       else if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) { \
-        return get_jit_class_name(); \
+        return get_jit_class_name() + "<" + detail::type_to_string<T>() + ">"; \
       } \
       else { \
         return capability_attributes<Cap>::default_value; \
       } \
     } \
-  };  
+  }; \
+  )
 
 // Standard binary function
 #define MATX_BINARY_OP_GEN(FUNC, OPNAME)                                       \
@@ -207,6 +208,7 @@ namespace detail {
       return cuda::std::FUNC(v1, v2);    \
     } \
   } \
+  MATX_IFNDEF_CUDACC_RTC( \
   template <typename T1, typename T2> \
   static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto internal_##FUNC(T1 v1, T2 v2) { \
     if constexpr (is_vector_v<T1> || is_vector_v<T2>) {    \
@@ -232,15 +234,6 @@ namespace detail {
       return cuda::std::make_tuple( \
         class_name, \
         std::string( \
-          "template <typename T1, typename T2>\n" \
-          "static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto scalar_internal_" #FUNC "(T1 v1, T2 v2) {\n" \
-          "  if constexpr (is_matx_type_v<T1> || is_matx_type_v<T2>) {\n" \
-          "    return " #FUNC "(v1, v2);\n" \
-          "  }\n" \
-          "  else {\n" \
-          "    return cuda::std::" #FUNC "(v1, v2);\n" \
-          "  }\n" \
-          "}\n" \
           "template <typename T1, typename T2>\n" \
           "static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto internal_" #FUNC "(T1 v1, T2 v2) {\n" \
           "  if constexpr (is_vector_v<T1> || is_vector_v<T2>) {\n" \
@@ -272,19 +265,21 @@ namespace detail {
         return true; \
       } \
       else if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) { \
-        return get_jit_class_name(); \
+        return get_jit_class_name() + "<" + detail::type_to_string<T1>() + "," + detail::type_to_string<T2>() + ">"; \
       } \
       else { \
         return capability_attributes<Cap>::default_value; \
       } \
     } \
-  };
+  }; \
+  )
 
 #define MATX_BINARY_OP_GEN_OPERATOR(FUNC, OPNAME, OPSYM)                                       \
   template <typename T1, typename T2> \
   static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto scalar_internal_##FUNC(T1 v1, T2 v2) { \
     return v1 OPSYM v2; \
   } \
+  MATX_IFNDEF_CUDACC_RTC( \
   template <typename T1, typename T2> \
   static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto internal_##FUNC(T1 v1, T2 v2) { \
     if constexpr (is_vector_v<T1> || is_vector_v<T2>) {    \
@@ -310,10 +305,6 @@ namespace detail {
       return cuda::std::make_tuple( \
         class_name, \
         std::string( \
-          "template <typename T1, typename T2>\n" \
-          "static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto scalar_internal_" #FUNC "(T1 v1, T2 v2) {\n" \
-          "  return v1 " #OPSYM " v2;\n" \
-          "}\n" \
           "template <typename T1, typename T2>\n" \
           "static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto internal_" #FUNC "(T1 v1, T2 v2) {\n" \
           "  if constexpr (is_vector_v<T1> || is_vector_v<T2>) {\n" \
@@ -351,11 +342,13 @@ namespace detail {
         return capability_attributes<Cap>::default_value; \
       } \
     } \
-  };
+  }; \
+  )
 
 // Binary operator with a custom function
 // The scalar_internal_FUNC implementation should be in scalar_internal.h
 #define MATX_BINARY_OP_NOFUNC(FUNC, OPNAME)                                       \
+  MATX_IFNDEF_CUDACC_RTC( \
   template <typename T1, typename T2> \
   static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto internal_##FUNC(T1 v1, T2 v2) { \
     if constexpr (is_vector_v<T1> || is_vector_v<T2>) {    \
@@ -412,13 +405,14 @@ namespace detail {
         return true; \
       } \
       else if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) { \
-        return get_jit_class_name(); \
+        return get_jit_class_name() + "<" + detail::type_to_string<T1>() + "," + detail::type_to_string<T2>() + ">"; \
       } \
       else { \
         return capability_attributes<Cap>::default_value; \
       } \
     } \
-  };  
+  }; \
+  )
 
 
 

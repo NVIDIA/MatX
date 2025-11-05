@@ -337,6 +337,24 @@ __MATX_INLINE__ __MATX_HOST__  std::string type_to_string_c_name()
   else if constexpr (std::is_same_v<T, cuda::std::complex<double>>) {
     return "cuda_std_complex_double";
   }
+  else if constexpr (std::is_same_v<T, unsigned int>) {
+    return "unsigned_int";
+  }
+  else if constexpr (std::is_same_v<T, unsigned long>) {
+    return "unsigned_long";
+  }
+  else if constexpr (std::is_same_v<T, unsigned long long>) {
+    return "unsigned_long_long";
+  }
+  else if constexpr (std::is_same_v<T, unsigned short>) {
+    return "unsigned_short";
+  }
+  else if constexpr (std::is_same_v<T, unsigned char>) {
+    return "unsigned_char";
+  }
+  else if constexpr (std::is_same_v<T, long long>) {
+    return "long_long";
+  }
   else {
     return type_to_string<T>();
   }
