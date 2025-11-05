@@ -53,7 +53,7 @@ namespace matx
 
       private:
         using shape_type = index_t;
-        typename detail::base_type_t<T> op_;
+        mutable typename detail::base_type_t<T> op_;
         cuda::std::array<shape_type, DIM> sizes_;
         cuda::std::array<int32_t, DIM> dims_;
         cuda::std::array<shape_type, T::Rank()> starts_;
@@ -65,6 +65,48 @@ namespace matx
 
         static_assert(T::Rank()>0, "SliceOp: Rank of operator must be greater than 0.");
         static_assert(DIM<=T::Rank(), "SliceOp: DIM must be less than or equal to operator rank.");
+
+#ifdef MATX_EN_JIT
+        struct JIT_Storage {
+          typename detail::inner_storage_or_self_t<detail::base_type_t<T>> op_;
+        };
+
+        JIT_Storage ToJITStorage() const {
+          return JIT_Storage{detail::to_jit_storage(op_)};
+        }
+
+        __MATX_INLINE__ std::string get_jit_class_name() const {
+          std::string params_str;
+          for (int i = 0; i < DIM; i++) {
+            params_str += std::format("d{}_s{}_", dims_[i], sizes_[i]);
+          }
+          return std::format("JITSlice_{}", params_str);
+        }
+
+        __MATX_INLINE__ auto get_jit_op_str() const {
+          std::string func_name = get_jit_class_name();
+          
+          return cuda::std::make_tuple(
+            func_name,
+            std::format("template <typename T, typename StrideType> struct {} {{\n"
+                "  using value_type = typename T::value_type;\n"
+                "  using matxop = bool;\n"
+                "  constexpr static int DIM_ = {};\n"
+                "  constexpr static int OpRank_ = {};\n"
+                "  constexpr static cuda::std::array<index_t, DIM_> sizes_ = {{ {} }};\n"
+                "  constexpr static cuda::std::array<int32_t, DIM_> dims_ = {{ {} }};\n"
+                "  constexpr static cuda::std::array<index_t, OpRank_> starts_ = {{ {} }};\n"
+                "  typename detail::inner_storage_or_self_t<detail::base_type_t<T>> op_;\n"
+                "  StrideType strides_;\n"
+                "  template <typename CapType, typename... Is>\n"
+                "  __MATX_INLINE__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) const {{ /* slice logic */ }}\n"
+                "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return DIM_; }}\n"
+                "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int32_t dim) const {{ return sizes_[dim]; }}\n"
+                "}};\n",
+                func_name, DIM, T::Rank(), detail::array_to_string(sizes_), detail::array_to_string(dims_), detail::array_to_string(starts_))
+          );
+        }
+#endif
 
         __MATX_INLINE__ std::string str() const { return "slice(" + op_.str() + ")"; }
 
@@ -150,9 +192,32 @@ namespace matx
 
         template <OperatorCapability Cap, typename InType>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
+          if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+#ifdef MATX_EN_JIT
+            const auto op_jit_name = detail::get_operator_capability<Cap>(op_, in);
+            return std::format("{}<{}>", get_jit_class_name(), op_jit_name);
+#else
+            return "";
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+#ifdef MATX_EN_JIT
+            const auto [key, value] = get_jit_op_str();
+            if (in.find(key) == in.end()) {
+              in[key] = value;
+            }
+            detail::get_operator_capability<Cap>(op_, in);
+            return true;
+#else
+            return false;
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
+            return detail::get_operator_capability<Cap>(op_, in);
+          }
           // Just support 1 EPT in slice for now to get this thing out the door. Later on the logic should be similar
           // to the tensor's EPT logic if the input is a tensor
-          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+          else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
             const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
             return combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(op_, in));          
           } else {

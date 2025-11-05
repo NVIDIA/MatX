@@ -243,7 +243,7 @@ namespace detail {
   __MATX_INLINE__ __MATX_HOST__ typename capability_attributes<Cap>::type
   get_operator_capability(const OperatorType& op, InType& in) {
     static_assert(std::is_same_v<remove_cvref_t<InType>, typename capability_attributes<Cap>::input_type>, "Input type mismatch");
-    if constexpr (is_matx_op<OperatorType>()) {
+    if constexpr (is_matx_jit_class<OperatorType>) {
       return op.template get_capability<Cap, InType>(in);
     } else {
       // Default capabilities for non-MatX ops

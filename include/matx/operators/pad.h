@@ -40,16 +40,6 @@
 
 namespace matx
 {
-  /**
-   * @brief Padding mode
-   *
-   * Specifies the padding mode to use for the pad operator.
-   */
-  enum PadMode {
-    MATX_PAD_MODE_CONSTANT, ///< Constant padding mode. All padding elements will be set to the user-provided pad_value.
-    MATX_PAD_MODE_EDGE ///< Edge padding mode. All padding elements will be set to the edge values of the original operator.
-  };
-
   namespace detail {
     /**
    * PadOp operator
@@ -71,6 +61,70 @@ namespace matx
 
       // Scalar type of operation
       using value_type = typename T::value_type;
+
+#ifdef MATX_EN_JIT
+      struct JIT_Storage {
+        typename detail::inner_storage_or_self_t<detail::base_type_t<T>> op_;
+        value_type pad_value_;
+      };
+
+      JIT_Storage ToJITStorage() const {
+        return JIT_Storage{detail::to_jit_storage(op_), pad_value_};
+      }
+
+      __MATX_INLINE__ std::string get_jit_class_name() const {
+        return std::format("JITPad_axis{}_before{}_after{}_mode{}", 
+                          axis_, before_, after_, static_cast<int>(mode_));
+      }
+
+      __MATX_INLINE__ auto get_jit_op_str() const {
+        std::string func_name = get_jit_class_name();
+        cuda::std::array<index_t, RANK> out_dims_;
+        for (int i = 0; i < RANK; ++i) {
+          out_dims_[i] = Size(i);
+        }
+        
+        return cuda::std::make_tuple(
+          func_name,
+          std::format("template <typename T> struct {} {{\n"
+              "  using value_type = typename T::value_type;\n"
+              "  using matxop = bool;\n"
+              "  constexpr static int axis_ = {};\n"
+              "  constexpr static index_t before_ = {};\n"
+              "  constexpr static index_t after_ = {};\n"
+              "  constexpr static PadMode mode_ = static_cast<PadMode>({});\n"
+              "  constexpr static int Rank_ = {};\n"
+              "  constexpr static cuda::std::array<index_t, Rank_> out_dims_ = {{ {} }};\n"
+              "  typename detail::inner_storage_or_self_t<detail::base_type_t<T>> op_;\n"
+              "  value_type pad_value_;\n"
+              "  template <typename CapType, typename... Is>\n"
+              "  __MATX_INLINE__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) const\n"
+              "  {{\n"
+              "    if constexpr (CapType::ept == ElementsPerThread::ONE) {{\n"
+              "      cuda::std::array<index_t, sizeof...(Is)> ind_array = {{{{indices...}}}};\n"
+              "      index_t idx = ind_array[axis_];\n"
+              "      index_t op_size = out_dims_[axis_] - before_ - after_;\n"
+              "      if (idx < before_ || idx >= before_ + op_size) {{\n"
+              "        if (mode_ == MATX_PAD_MODE_EDGE) {{\n"
+              "          ind_array[axis_] = (idx < before_) ? 0 : (op_size - 1);\n"
+              "        }} else {{\n"
+              "          return value_type(pad_value_);\n"
+              "        }}\n"
+              "      }} else {{\n"
+              "        ind_array[axis_] = idx - before_;\n"
+              "      }}\n"
+              "      return value_type(get_value<CapType>(op_, ind_array));\n"
+              "    }} else {{\n"
+              "      return Vector<value_type, static_cast<index_t>(CapType::ept)>{{}};\n"
+              "    }}\n"
+              "  }}\n"
+              "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return Rank_; }}\n"
+              "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const {{ return out_dims_[dim]; }}\n"
+              "}};\n",
+              func_name, axis_, before_, after_, static_cast<int>(mode_), RANK, detail::array_to_string(out_dims_))
+        );
+      }
+#endif
 
       __MATX_INLINE__ std::string str() const {
         return "pad(" + op_.str() + ")";
@@ -146,7 +200,30 @@ namespace matx
 
       template <OperatorCapability Cap, typename InType>
       __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
-        if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+        if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+#ifdef MATX_EN_JIT
+          const auto op_jit_name = detail::get_operator_capability<Cap>(op_, in);
+          return std::format("{}<{}>", get_jit_class_name(), op_jit_name);
+#else
+          return "";
+#endif
+        }
+        else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+#ifdef MATX_EN_JIT
+          const auto [key, value] = get_jit_op_str();
+          if (in.find(key) == in.end()) {
+            in[key] = value;
+          }
+          detail::get_operator_capability<Cap>(op_, in);
+          return true;
+#else
+          return false;
+#endif
+        }
+        else if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
+          return detail::get_operator_capability<Cap>(op_, in);
+        }
+        else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
           // With padding, vectorized access would be problematic in cases where the padding is
           // not a multiple of the vector size.
           const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};

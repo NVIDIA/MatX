@@ -68,6 +68,17 @@ namespace matx
     using value_type = typename Op::value_type;
     using self_type = matxUnaryOp<I1, Op>;
 
+#ifdef MATX_EN_JIT
+    struct JIT_Storage {
+      typename detail::inner_storage_or_self_t<detail::base_type_t<I1>> in1_;
+      typename detail::inner_storage_or_self_t<detail::base_type_t<Op>> op_;
+    };
+
+    JIT_Storage ToJITStorage() const {
+      return JIT_Storage{detail::to_jit_storage(in1_), detail::to_jit_storage(op_)};
+    }
+#endif
+
     __MATX_INLINE__ const std::string str() const {
       return op_.str() + "(" + get_type_str(in1_) + ")";
     }
@@ -103,10 +114,81 @@ namespace matx
       return this->template operator()<DefaultCapabilities>(indices...);
     }
 
+    
+#ifdef MATX_EN_JIT
+    __MATX_INLINE__ std::string get_jit_class_name() const {
+      return "JITUnaryOp";
+    }
+
+    __MATX_INLINE__ auto get_jit_op_str() const {
+      std::string func_name = get_jit_class_name();
+      cuda::std::array<index_t, Rank()> out_dims_;
+      for (int i = 0; i < Rank(); ++i) {
+        out_dims_[i] = Size(i);
+      }
+      
+      return cuda::std::make_tuple(
+        func_name,
+        std::string("template <typename I1, typename Op> struct " + func_name + " {\n") +
+            "  using value_type = typename Op::value_type;\n" +
+            "  using matxop = bool;\n" +
+            "  constexpr static cuda::std::array<index_t, " + std::to_string(Rank()) + "> out_dims_ = { " +
+            detail::array_to_string(out_dims_) + " };\n" +
+            "  typename detail::inner_storage_or_self_t<detail::base_type_t<I1>> in1_;\n" +
+            "  typename detail::inner_storage_or_self_t<detail::base_type_t<Op>> op_;\n" +
+            "  template <typename CapType, typename... Is>\n" +
+            "  __MATX_INLINE__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) const\n" +
+            "  {\n" +
+            "    if ((threadIdx.x * static_cast<int>(CapType::ept)) > Size(Rank() - 1)) {\n" +
+            "      return detail::GetJitSentinelValue<CapType, value_type>();\n" +
+            "    }\n" +
+            "    auto i1 = get_value<CapType>(in1_, indices...);\n" +
+            "    return op_.template operator()<CapType>(i1);\n" +
+            "  }\n" +
+            "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank()\n" +
+            "  {\n" +
+            "    return detail::get_rank<I1>();\n" +
+            "  }\n" +
+            "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const\n" +
+            "  {\n" +
+            "    return out_dims_[dim];\n" +
+            "  }\n" +
+            "};\n"
+      );
+    }
+#endif
+
     template <OperatorCapability Cap, typename InType>
     __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
-      auto self_has_cap = capability_attributes<Cap>::default_value;
-      return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(in1_, in));
+      if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+#ifdef MATX_EN_JIT
+        const auto lhs_jit_name = detail::get_operator_capability<Cap>(in1_, in);
+        const auto op_jit_name = detail::get_operator_capability<Cap>(op_, in);
+        return get_jit_class_name() + "<" + lhs_jit_name + "," + op_jit_name + ">";
+#else
+        return "";
+#endif
+      }
+      else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+#ifdef MATX_EN_JIT
+        const auto [key, value] = get_jit_op_str();
+        if (in.find(key) == in.end()) {
+          in[key] = value;
+        }
+        detail::get_operator_capability<Cap>(in1_, in);
+        detail::get_operator_capability<Cap>(op_, in);
+        return true;
+#else
+        return false;
+#endif
+      }
+      else if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
+        return detail::get_operator_capability<Cap>(in1_, in);
+      }
+      else {
+        auto self_has_cap = capability_attributes<Cap>::default_value;
+        return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(in1_, in));
+      }
     }
 
     static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()

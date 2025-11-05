@@ -48,8 +48,8 @@ namespace matx {
 template <typename OperatorType, bool ConvertType = true>
 struct RandomOperatorIterator {
   using self_type = RandomOperatorIterator<OperatorType, ConvertType>;
-  using value_type = typename std::conditional_t<ConvertType, detail::convert_matx_type_t<typename OperatorType::value_type>, typename OperatorType::value_type>;
-  // using stride_type = std::conditional_t<is_tensor_view_v<OperatorType>, typename OperatorType::desc_type::stride_type,
+  using value_type = typename cuda::std::conditional_t<ConvertType, detail::convert_matx_type_t<typename OperatorType::value_type>, typename OperatorType::value_type>;
+  // using stride_type = cuda::std::conditional_t<is_tensor_view_v<OperatorType>, typename OperatorType::desc_type::stride_type,
   //                         index_t>;
   using stride_type = index_t;
   using pointer = value_type*;
@@ -66,7 +66,7 @@ struct RandomOperatorIterator {
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorIterator(OperatorType &&t, stride_type offset) : t_(t), offset_(offset) {}
 
   template<typename T = OperatorType>
-    requires (!std::is_same_v<T, OperatorBaseType>)
+    requires (!cuda::std::is_same_v<T, OperatorBaseType>)
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorIterator(const OperatorBaseType &t, stride_type offset) : t_(t), offset_(offset) {}
 
   template<typename T = OperatorType>
@@ -193,8 +193,8 @@ __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t operator-(const RandomOper
 template <typename OperatorType, bool ConvertType = true>
 struct RandomOperatorOutputIterator {
   using self_type = RandomOperatorOutputIterator<OperatorType, ConvertType>;
-  using value_type = typename std::conditional_t<ConvertType, detail::convert_matx_type_t<typename OperatorType::value_type>, typename OperatorType::value_type>;
-  // using stride_type = std::conditional_t<is_tensor_view_v<OperatorType>, typename OperatorType::desc_type::stride_type,
+  using value_type = typename cuda::std::conditional_t<ConvertType, detail::convert_matx_type_t<typename OperatorType::value_type>, typename OperatorType::value_type>;
+  // using stride_type = cuda::std::conditional_t<is_tensor_view_v<OperatorType>, typename OperatorType::desc_type::stride_type,
   //                         index_t>;
   using stride_type = index_t;
   using pointer = value_type*;
@@ -211,11 +211,11 @@ struct RandomOperatorOutputIterator {
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorOutputIterator(OperatorType &&t, stride_type offset) : t_(t), offset_(offset) {}
 
   template<typename T = OperatorType>
-    requires (!std::is_same_v<T, OperatorBaseType>)
+    requires (!cuda::std::is_same_v<T, OperatorBaseType>)
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorOutputIterator(const OperatorBaseType &t, stride_type offset) : t_(t), offset_(offset) {}
 
   template<typename T = OperatorType>
-    requires (!std::is_same_v<T, OperatorBaseType>)
+    requires (!cuda::std::is_same_v<T, OperatorBaseType>)
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorOutputIterator(OperatorBaseType &&t, stride_type offset) : t_(t), offset_(offset) {}
 
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ reference operator*()
@@ -338,10 +338,10 @@ template <typename OperatorType, bool ConvertType = true>
 struct RandomOperatorThrustIterator {
   using self_type = RandomOperatorThrustIterator<OperatorType, ConvertType>;
   using const_strip_type = remove_cvref_t<typename OperatorType::value_type>;
-  using value_type = typename std::conditional_t<ConvertType,
+  using value_type = typename cuda::std::conditional_t<ConvertType,
               detail::convert_matx_type_t<const_strip_type>,
               const_strip_type>;
-  // using stride_type = std::conditional_t<is_tensor_view_v<OperatorType>, typename OperatorType::desc_type::stride_type,
+  // using stride_type = cuda::std::conditional_t<is_tensor_view_v<OperatorType>, typename OperatorType::desc_type::stride_type,
   //                         index_t>;
   using stride_type = index_t;
   using pointer = cuda::std::remove_const_t<value_type>*;
@@ -359,11 +359,11 @@ struct RandomOperatorThrustIterator {
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorThrustIterator(OperatorType &&t, stride_type offset) : t_(t), offset_(offset) {}
 
   template<typename T = OperatorType>
-    requires (!std::is_same_v<T, OperatorBaseType>)
+    requires (!cuda::std::is_same_v<T, OperatorBaseType>)
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorThrustIterator(const OperatorBaseType &t, stride_type offset) : t_(t), offset_(offset) {}
 
   template<typename T = OperatorType>
-    requires (!std::is_same_v<T, OperatorBaseType>)
+    requires (!cuda::std::is_same_v<T, OperatorBaseType>)
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorThrustIterator(OperatorBaseType &&t, stride_type offset) : t_(t), offset_(offset) {}
 
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ reference operator*() const
@@ -463,7 +463,7 @@ template <typename OperatorType>
 struct BeginOffset {
   using self_type = BeginOffset<OperatorType>;
   using value_type = index_t;
-  // using stride_type = std::conditional_t<is_tensor_view_v<OperatorType>, typename OperatorType::desc_type::stride_type,
+  // using stride_type = cuda::std::conditional_t<is_tensor_view_v<OperatorType>, typename OperatorType::desc_type::stride_type,
   //                         index_t>;
   using stride_type = index_t;
   using pointer = value_type*;
@@ -522,7 +522,7 @@ template <typename OperatorType>
 struct EndOffset {
   using self_type = EndOffset<OperatorType>;
   using value_type = index_t;
-  // using stride_type = std::conditional_t<is_tensor_view_v<OperatorType>, typename OperatorType::desc_type::stride_type,
+  // using stride_type = cuda::std::conditional_t<is_tensor_view_v<OperatorType>, typename OperatorType::desc_type::stride_type,
   //                         index_t>;
   using stride_type = index_t;
   using pointer = value_type*;

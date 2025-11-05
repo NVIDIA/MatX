@@ -52,6 +52,46 @@ namespace matx
         using matxop = bool;
         using value_type = index_t;
 
+#ifdef MATX_EN_JIT
+        struct JIT_Storage {
+          // No runtime members - dim_ is made constexpr
+        };
+
+        JIT_Storage ToJITStorage() const {
+          return JIT_Storage{};
+        }
+
+        __MATX_INLINE__ std::string get_jit_class_name() const {
+          return std::format("JITIndex_dim{}", dim_);
+        }
+
+        __MATX_INLINE__ auto get_jit_op_str() const {
+          std::string func_name = get_jit_class_name();
+          
+          return cuda::std::make_tuple(
+            func_name,
+            std::format("struct {} {{\n"
+                "  using value_type = index_t;\n"
+                "  using matxop = bool;\n"
+                "  constexpr static int dim_ = {};\n"
+                "  template <typename CapType, typename... Is>\n"
+                "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(Is... indices) const\n"
+                "  {{\n"
+                "    if constexpr (CapType::ept == ElementsPerThread::ONE) {{\n"
+                "      cuda::std::array<index_t, sizeof...(Is)> inds{{indices...}};\n"
+                "      return inds[dim_];\n"
+                "    }} else {{\n"
+                "      return Vector<value_type, static_cast<index_t>(CapType::ept)>{{}};\n"
+                "    }}\n"
+                "  }}\n"
+                "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return matxNoRank; }}\n"
+                "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size([[maybe_unused]] int dim) const {{ return index_t(0); }}\n"
+                "}};\n",
+                func_name, dim_)
+          );
+        }
+#endif
+
         __MATX_INLINE__ std::string str() const { return "index()"; } 
         __MATX_INLINE__ IndexOp(int dim) : dim_(dim){
           MATX_LOG_TRACE("{} constructor: dim={}", str(), dim);
@@ -84,8 +124,26 @@ namespace matx
         }
 
         template <OperatorCapability Cap, typename InType>
-        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType&) const {
-          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
+          if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+#ifdef MATX_EN_JIT
+            return get_jit_class_name();
+#else
+            return "";
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+#ifdef MATX_EN_JIT
+            const auto [key, value] = get_jit_op_str();
+            if (in.find(key) == in.end()) {
+              in[key] = value;
+            }
+            return true;
+#else
+            return false;
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
             const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
             return my_cap;
           } else {

@@ -48,8 +48,8 @@ namespace matx
     class CrossOp : public BaseOp<CrossOp<OpA, OpB>>
     {
       private:
-        typename detail::base_type_t<OpA> a_;
-        typename detail::base_type_t<OpB> b_;
+        mutable typename detail::base_type_t<OpA> a_;
+        mutable typename detail::base_type_t<OpB> b_;
 
         static constexpr int32_t out_rank = cuda::std::max(OpA::Rank(), OpB::Rank());
         static constexpr int32_t min_rank = cuda::std::min(OpA::Rank(), OpB::Rank());
@@ -63,6 +63,44 @@ namespace matx
       public:
         using matxop = bool;
         using value_type = typename OpA::value_type;
+
+#ifdef MATX_EN_JIT
+        struct JIT_Storage {
+          typename detail::inner_storage_or_self_t<detail::base_type_t<OpA>> a_;
+          typename detail::inner_storage_or_self_t<detail::base_type_t<OpB>> b_;
+        };
+
+        JIT_Storage ToJITStorage() const {
+          return JIT_Storage{detail::to_jit_storage(a_), detail::to_jit_storage(b_)};
+        }
+
+        __MATX_INLINE__ std::string get_jit_class_name() const {
+          return std::format("JITCross_a{}d_b{}d", isA2D_ ? 2 : 3, isB2D_ ? 2 : 3);
+        }
+
+        __MATX_INLINE__ auto get_jit_op_str() const {
+          std::string func_name = get_jit_class_name();
+          
+          return cuda::std::make_tuple(
+            func_name,
+            std::format("template <typename OpA, typename OpB> struct {} {{\n"
+                "  using value_type = typename OpA::value_type;\n"
+                "  using matxop = bool;\n"
+                "  constexpr static int Rank_ = {};\n"
+                "  constexpr static bool isA2D_ = {};\n"
+                "  constexpr static bool isB2D_ = {};\n"
+                "  constexpr static cuda::std::array<index_t, Rank_> out_dims_ = {{ {} }};\n"
+                "  typename detail::inner_storage_or_self_t<detail::base_type_t<OpA>> a_;\n"
+                "  typename detail::inner_storage_or_self_t<detail::base_type_t<OpB>> b_;\n"
+                "  template <typename CapType, typename... Is>\n"
+                "  __MATX_INLINE__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) const {{ /* cross product logic */ }}\n"
+                "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return Rank_; }}\n"
+                "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const {{ return out_dims_[dim]; }}\n"
+                "}};\n",
+                func_name, out_rank, isA2D_, isB2D_, detail::array_to_string(out_dims_))
+          );
+        }
+#endif
 
         __MATX_INLINE__ std::string str() const { return "cross()"; }
         __MATX_INLINE__ CrossOp(const OpA &A, const OpB &B) : a_(A), b_(B) {
@@ -164,7 +202,33 @@ namespace matx
 
         template <OperatorCapability Cap, typename InType>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
-          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+          if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+#ifdef MATX_EN_JIT
+            const auto a_jit_name = detail::get_operator_capability<Cap>(a_, in);
+            const auto b_jit_name = detail::get_operator_capability<Cap>(b_, in);
+            return std::format("{}<{},{}>", get_jit_class_name(), a_jit_name, b_jit_name);
+#else
+            return "";
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+#ifdef MATX_EN_JIT
+            const auto [key, value] = get_jit_op_str();
+            if (in.find(key) == in.end()) {
+              in[key] = value;
+            }
+            detail::get_operator_capability<Cap>(a_, in);
+            detail::get_operator_capability<Cap>(b_, in);
+            return true;
+#else
+            return false;
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
+            return detail::get_operator_capability<Cap>(a_, in) +
+                   detail::get_operator_capability<Cap>(b_, in);
+          }
+          else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
             const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
             return combine_capabilities<Cap>(
               my_cap,

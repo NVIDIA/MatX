@@ -79,6 +79,7 @@ option(MATX_EN_COVERAGE OFF "Enable code coverage reporting")
 option(MATX_EN_COMPLEX_OP_NAN_CHECKS "Enable full NaN/Inf handling for complex multiplication and division" OFF)
 option(MATX_EN_CUDA_LINEINFO "Enable line information for CUDA kernels via -lineinfo nvcc flag" OFF)
 option(MATX_EN_EXTENDED_LAMBDA "Enable extended lambda support for device/host lambdas" ON)
+option(MATX_EN_JIT "Enable CUDA JIT compilation support via NVRTC" OFF)
 option(MATX_EN_MATHDX "Enable MathDx support for kernel fusion" OFF)
 option(MATX_EN_UNSAFE_ALIAS_DETECTION "Enable aliased memory detection" OFF)
 option(MATX_DISABLE_EXCEPTIONS "Disable C++ exceptions and log errors instead" OFF)
@@ -316,11 +317,9 @@ if (MATX_EN_CUTENSOR)
     target_link_libraries(matx INTERFACE "-Wl,--disable-new-dtags")
 endif()
 
-if (MATX_EN_MATHDX)
-    set(MathDx_VERSION 25.06)
-    set(MathDx_NANO 0)
-    include(cmake/FindMathDx.cmake)
-    target_compile_definitions(matx INTERFACE MATX_EN_MATHDX)
+# Enable JIT compilation support
+if (MATX_EN_JIT OR MATX_EN_MATHDX)
+    message(STATUS "Enabling JIT compilation support via NVRTC")
     target_compile_definitions(matx INTERFACE MATX_EN_JIT)
     
     # Add NVRTC configuration as compiler definitions
@@ -331,6 +330,16 @@ if (MATX_EN_MATHDX)
     target_compile_definitions(matx INTERFACE NVRTC_CUDA_ARCH="${NVRTC_CUDA_ARCH}")
     target_compile_definitions(matx INTERFACE NVRTC_CXX_STANDARD="${CMAKE_CXX_STANDARD}")
     
+    # Link NVRTC library
+    target_link_libraries(matx INTERFACE CUDA::nvrtc)
+endif()
+
+if (MATX_EN_MATHDX)
+    set(MathDx_VERSION 25.06)
+    set(MathDx_NANO 0)
+    include(cmake/FindMathDx.cmake)
+    target_compile_definitions(matx INTERFACE MATX_EN_MATHDX)
+    
     # Link libmathdx if available
     if(TARGET libmathdx::libmathdx)
         target_link_libraries(matx INTERFACE libmathdx::libmathdx)
@@ -338,7 +347,7 @@ if (MATX_EN_MATHDX)
     endif()
     
     # Link mathdx components
-    target_link_libraries(matx INTERFACE mathdx::cufftdx CUDA::nvrtc)
+    target_link_libraries(matx INTERFACE mathdx::cufftdx)
 endif()
 
 if (MATX_EN_CUDSS)

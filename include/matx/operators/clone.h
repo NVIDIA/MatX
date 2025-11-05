@@ -52,6 +52,64 @@ namespace matx
 
         using value_type = typename T::value_type;
 
+#ifdef MATX_EN_JIT
+        struct JIT_Storage {
+          typename detail::inner_storage_or_self_t<detail::base_type_t<T>> op_;
+        };
+
+        JIT_Storage ToJITStorage() const {
+          return JIT_Storage{detail::to_jit_storage(op_)};
+        }
+
+        __MATX_INLINE__ std::string get_jit_class_name() const {
+          std::string sizes_str, dims_str;
+          for (size_t i = 0; i < CRank; i++) {
+            sizes_str += std::to_string(sizes_[i]);
+            if (i < CRank - 1) sizes_str += "_";
+          }
+          for (size_t i = 0; i < T::Rank(); i++) {
+            dims_str += std::to_string(dims_[i]);
+            if (i < T::Rank() - 1) dims_str += "_";
+          }
+          return std::format("JITClone_sizes{}_dims{}", sizes_str, dims_str);
+        }
+
+        __MATX_INLINE__ auto get_jit_op_str() const {
+          std::string func_name = get_jit_class_name();
+          
+          return cuda::std::make_tuple(
+            func_name,
+            std::format("template <typename T> struct {} {{\n"
+                "  using value_type = typename T::value_type;\n"
+                "  using matxop = bool;\n"
+                "  constexpr static int Rank_ = {};\n"
+                "  constexpr static int OpRank_ = {};\n"
+                "  constexpr static cuda::std::array<index_t, Rank_> sizes_ = {{ {} }};\n"
+                "  constexpr static cuda::std::array<index_t, OpRank_> dims_ = {{ {} }};\n"
+                "  typename detail::inner_storage_or_self_t<detail::base_type_t<T>> op_;\n"
+                "  template <typename CapType, typename... Is>\n"
+                "  __MATX_INLINE__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) const\n"
+                "  {{\n"
+                "    if constexpr (CapType::ept == ElementsPerThread::ONE) {{\n"
+                "      cuda::std::array<index_t, Rank_> sind{{indices...}};\n"
+                "      cuda::std::array<index_t, OpRank_> gind;\n"
+                "      for(int i = 0; i < OpRank_; i++) {{\n"
+                "        auto idx = dims_[i];\n"
+                "        gind[i] = sind[idx];\n"
+                "      }}\n"
+                "      return get_value<CapType>(op_, gind);\n"
+                "    }} else {{\n"
+                "      return Vector<value_type, static_cast<index_t>(CapType::ept)>{{}};\n"
+                "    }}\n"
+                "  }}\n"
+                "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return Rank_; }}\n"
+                "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const {{ return sizes_[dim]; }}\n"
+                "}};\n",
+                func_name, CRank, T::Rank(), detail::array_to_string(sizes_), detail::array_to_string(dims_))
+          );
+        }
+#endif
+
         __MATX_INLINE__ std::string str() const { return "clone(" + op_.str() + ")"; }
 
         __MATX_INLINE__ CloneOp(const T &op, cuda::std::array<index_t, CRank> shape) : op_(op) {
@@ -165,7 +223,30 @@ MATX_IGNORE_WARNING_POP_GCC
 
         template <OperatorCapability Cap, typename InType>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
-          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+          if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+#ifdef MATX_EN_JIT
+            const auto op_jit_name = detail::get_operator_capability<Cap>(op_, in);
+            return std::format("{}<{}>", get_jit_class_name(), op_jit_name);
+#else
+            return "";
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+#ifdef MATX_EN_JIT
+            const auto [key, value] = get_jit_op_str();
+            if (in.find(key) == in.end()) {
+              in[key] = value;
+            }
+            detail::get_operator_capability<Cap>(op_, in);
+            return true;
+#else
+            return false;
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
+            return detail::get_operator_capability<Cap>(op_, in);
+          }
+          else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
             const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
             return combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(op_, in));
           }

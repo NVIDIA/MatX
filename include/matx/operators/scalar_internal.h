@@ -271,12 +271,12 @@ static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto scalar_internal_atan2(
 
 template <typename T1, typename T2>
 static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto scalar_internal_max(T1 v1, T2 v2) {
-  return cuda::std::max(v1, v2);
+  return (v1 > v2) ? v1 : v2;
 }
 
 template <typename T1, typename T2>
 static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto scalar_internal_min(T1 v1, T2 v2) {
-  return cuda::std::min(v1, v2);
+  return (v1 < v2) ? v1 : v2;
 }
 
 } // namespace detail

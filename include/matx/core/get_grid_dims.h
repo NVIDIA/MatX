@@ -185,6 +185,10 @@ inline bool get_grid_dims_jit(dim3 &blocks, dim3 &threads, const cuda::std::arra
   blocks.y = 1;
   blocks.z = 1;    
 
+  if (RANK > 1) {
+    MATX_ASSERT_STR_EXP(sizes[sizes.size() - 2] % groups_per_block, 0, matxInvalidParameter, "Second to last dimension must be divisible by groups_per_block");
+  }
+
   // Dynamic logic to pick thread block size.
   //   Fill in order x, y, z up to 1024 threads
   if constexpr (RANK == 0) {
@@ -216,70 +220,80 @@ inline bool get_grid_dims_jit(dim3 &blocks, dim3 &threads, const cuda::std::arra
 
     // If we have multiple groups per block, we need to adjust the block size
     if (threads.y > 1) {
-      blocks.x = static_cast<int>((static_cast<int64_t>(sizes[0]) + static_cast<int64_t>(threads.y) - 1) / static_cast<int64_t>(threads.y));
+      blocks.x = static_cast<int>(static_cast<int64_t>(sizes[0]) / static_cast<int64_t>(threads.y));
     }
     else {
       blocks.x = static_cast<int>(sizes[0]);
     }
+  }
+  else if constexpr (RANK == 3) {
+    if (!force_size) {
+      while (nt < max_cta_size) {
+        if (static_cast<index_t>(threads.x) * ept < sizes[2]) {
+          threads.x *= 2;
+        }
+
+        nt *= 2;
+      }
+    }
+
+    // If we have multiple groups per block, we need to adjust the block size
+    if (threads.y > 1) {
+      blocks.x = static_cast<int>(static_cast<int64_t>(sizes[1]) / static_cast<int64_t>(threads.y));
+    }
+    else {
+      blocks.x = static_cast<int>(sizes[1]);
+    }    
+
+    // launch as many blocks as necessary
+    blocks.y = static_cast<int>(sizes[0]);
+    
+    if(blocks.x > 65535) {
+      blocks.x = 65535;
+      stride = true;
+    }
+    if(blocks.y > 65535) {
+      blocks.y = 65535;
+      stride = true;
+    }
+
   }  
-  // We don't support JIT with rank 3 or higher yet
-  // else if constexpr (RANK == 3) {
-  //   if (!force_size) {
-  //     while (nt < max_cta_size) {
-  //       if (static_cast<index_t>(threads.x) * ept < sizes[2]) {
-  //         threads.x *= 2;
-  //       }
+  else if constexpr (RANK == 4) {
+    if (!force_size) {
+      while (nt < max_cta_size) {
+        if (static_cast<index_t>(threads.x) * ept < sizes[3]) {
+          threads.x *= 2;
+      }
 
-  //       nt *= 2;
-  //     }
-  //   }
-
-  //   // launch as many blocks as necessary
-  //   blocks.x = static_cast<int>(sizes[1]);
-  //   blocks.y = static_cast<int>(sizes[0]);
+        nt *= 2;
+      }
+    }
     
-  //   if(blocks.x > 65535) {
-  //     blocks.x = 65535;
-  //     stride = true;
-  //   }
-  //   if(blocks.y > 65535) {
-  //     blocks.y = 65535;
-  //     stride = true;
-  //   }
+    // If we have multiple groups per block, we need to adjust the block size
+    if (threads.y > 1) {
+      blocks.x = static_cast<int>(static_cast<int64_t>(sizes[2]) / static_cast<int64_t>(threads.y));
+    }
+    else {
+      blocks.x = static_cast<int>(sizes[2]);
+    }  
 
-  // }  
-  // else if constexpr (RANK == 4) {
-  //   if (!force_size) {
-  //     while (nt < max_cta_size) {
-  //       if (static_cast<index_t>(threads.x) * ept < sizes[3]) {
-  //         threads.x *= 2;
-  //     }
-
-  //       nt *= 2;
-  //     }
-  //   }
+    // launch as many blocks as necessary
+    blocks.y = static_cast<int>(sizes[1]);
+    blocks.z = static_cast<int>(sizes[0]);
     
-  //   // launch as many blocks as necessary
-  //   blocks.x = static_cast<int>(sizes[2]);
-  //   blocks.y = static_cast<int>(sizes[1]);
-  //   blocks.z = static_cast<int>(sizes[0]);
-    
-  //   if(blocks.x > 65535) {
-  //     blocks.x = 65535;
-  //     stride = true;
-  //   }
-  //   if(blocks.y > 65535) {
-  //     blocks.y = 65535;
-  //     stride = true;
-  //   }
-  //   if(blocks.z > 65535) {
-  //     blocks.z = 65535;
-  //     stride = true;
-  //   }    
-  // }  
-  else {
-    MATX_THROW(matxInvalidParameter, "Rank not supported");
-  } 
+    if(blocks.x > 65535) {
+      blocks.x = 65535;
+      stride = true;
+    }
+    if(blocks.y > 65535) {
+      blocks.y = 65535;
+      stride = true;
+    }
+    if(blocks.z > 65535) {
+      blocks.z = 65535;
+      stride = true;
+    }    
+  }  
 
   MATX_LOG_DEBUG("Blocks {}x{}x{} Threads {}x{}x{} groups_per_block={}", blocks.x, blocks.y, blocks.z, threads.x, threads.y, threads.z, groups_per_block);
   return stride;

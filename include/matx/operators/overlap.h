@@ -51,7 +51,7 @@ namespace matx
 
       private:
         using shape_type = index_t;
-        typename detail::base_type_t<T> op_;
+        mutable typename detail::base_type_t<T> op_;
         cuda::std::array<int32_t, DIM> dims_;
         cuda::std::array<shape_type, DIM+1> n_;
         cuda::std::array<shape_type, DIM+1> s_;
@@ -61,6 +61,47 @@ namespace matx
         using matxoplvalue = bool;
 
         static_assert(DIM == 1, "overlap() only supports input rank 1 currently");
+
+#ifdef MATX_EN_JIT
+        struct JIT_Storage {
+          typename detail::inner_storage_or_self_t<detail::base_type_t<T>> op_;
+        };
+
+        JIT_Storage ToJITStorage() const {
+          return JIT_Storage{detail::to_jit_storage(op_)};
+        }
+
+        __MATX_INLINE__ std::string get_jit_class_name() const {
+          return std::format("JITOverlap_n0{}_n1{}_s0{}_s1{}", n_[0], n_[1], s_[0], s_[1]);
+        }
+
+        __MATX_INLINE__ auto get_jit_op_str() const {
+          std::string func_name = get_jit_class_name();
+          
+          return cuda::std::make_tuple(
+            func_name,
+            std::format("template <typename T> struct {} {{\n"
+                "  using value_type = typename T::value_type;\n"
+                "  using matxop = bool;\n"
+                "  constexpr static cuda::std::array<index_t, 2> n_ = {{ {}, {} }};\n"
+                "  constexpr static cuda::std::array<index_t, 2> s_ = {{ {}, {} }};\n"
+                "  typename detail::inner_storage_or_self_t<detail::base_type_t<T>> op_;\n"
+                "  template <typename CapType>\n"
+                "  __MATX_INLINE__ __MATX_DEVICE__ decltype(auto) operator()(index_t i0, index_t i1) const\n"
+                "  {{\n"
+                "    if constexpr (CapType::ept == ElementsPerThread::ONE) {{\n"
+                "      return get_value<CapType>(op_, i0*s_[0] + i1);\n"
+                "    }} else {{\n"
+                "      return Vector<value_type, static_cast<index_t>(CapType::ept)>{{}};\n"
+                "    }}\n"
+                "  }}\n"
+                "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return 2; }}\n"
+                "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int32_t dim) const {{ return n_[dim]; }}\n"
+                "}};\n",
+                func_name, n_[0], n_[1], s_[0], s_[1])
+          );
+        }
+#endif
 
         __MATX_INLINE__ std::string str() const { return "overlap(" + op_.str() + ")"; }
         __MATX_INLINE__ OverlapOp(const T &op, const cuda::std::array<shape_type, DIM> &windows,
@@ -157,7 +198,30 @@ namespace matx
 
         template <OperatorCapability Cap, typename InType>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
-          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+          if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+#ifdef MATX_EN_JIT
+            const auto op_jit_name = detail::get_operator_capability<Cap>(op_, in);
+            return std::format("{}<{}>", get_jit_class_name(), op_jit_name);
+#else
+            return "";
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+#ifdef MATX_EN_JIT
+            const auto [key, value] = get_jit_op_str();
+            if (in.find(key) == in.end()) {
+              in[key] = value;
+            }
+            detail::get_operator_capability<Cap>(op_, in);
+            return true;
+#else
+            return false;
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
+            return detail::get_operator_capability<Cap>(op_, in);
+          }
+          else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
             const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
             return combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(op_, in));
           } else {

@@ -34,7 +34,6 @@
 
 
 #include "matx/core/type_utils.h"
-#include "matx/core/iterator.h"
 #include "matx/operators/base_operator.h"
 
 namespace matx
@@ -44,11 +43,52 @@ namespace matx
       class FlattenOp : public BaseOp<FlattenOp<T1>>
     {
       private:
-        typename detail::base_type_t<T1> op1_;
+        mutable typename detail::base_type_t<T1> op1_;
 
       public:
         using matxop = bool;
         using value_type = typename T1::value_type;
+
+#ifdef MATX_EN_JIT
+        struct JIT_Storage {
+          typename detail::inner_storage_or_self_t<detail::base_type_t<T1>> op1_;
+        };
+
+        JIT_Storage ToJITStorage() const {
+          return JIT_Storage{detail::to_jit_storage(op1_)};
+        }
+
+        __MATX_INLINE__ std::string get_jit_class_name() const {
+          return std::format("JITFlatten_size{}", Size(0));
+        }
+
+        __MATX_INLINE__ auto get_jit_op_str() const {
+          std::string func_name = get_jit_class_name();
+          
+          return cuda::std::make_tuple(
+            func_name,
+            std::format("template <typename T> struct {} {{\n"
+                "  using value_type = typename T::value_type;\n"
+                "  using matxop = bool;\n"
+                "  constexpr static index_t size_ = {};\n"
+                "  typename detail::inner_storage_or_self_t<detail::base_type_t<T>> op1_;\n"
+                "  template <typename CapType, typename Is>\n"
+                "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(Is id0) const\n"
+                "  {{\n"
+                "    if constexpr (CapType::ept == ElementsPerThread::ONE) {{\n"
+                "      const auto arr = detail::GetIdxFromAbs(op1_, id0);\n"
+                "      return value_type(get_value<CapType>(op1_, arr));\n"
+                "    }} else {{\n"
+                "      return Vector<value_type, static_cast<index_t>(CapType::ept)>{{}};\n"
+                "    }}\n"
+                "  }}\n"
+                "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return 1; }}\n"
+                "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size([[maybe_unused]] int dim) const {{ return size_; }}\n"
+                "}};\n",
+                func_name, Size(0))
+          );
+        }
+#endif
 
         __MATX_INLINE__ std::string str() const { return "flatten(" + op1_.str() + ")"; }
  
@@ -58,14 +98,20 @@ namespace matx
           MATX_LOG_TRACE("{} constructor: input_rank={}, output_rank=1", str(), T1::Rank());
         }
 
-        template <typename CapType, typename Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is id0) const 
-        {
+        template <typename CapType, typename Op, typename Is>
+        static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto get_impl(Op&& op, Is id0) {
           if constexpr (CapType::ept == ElementsPerThread::ONE) {
-            return *RandomOperatorIterator{op1_, id0};
+            const auto arr = detail::GetIdxFromAbs(op, id0);
+            return value_type(get_value<CapType>(cuda::std::forward<Op>(op), arr));
           } else {
             return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
           }
+        }
+
+        template <typename CapType, typename Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is id0) const 
+        {
+          return get_impl<CapType>(cuda::std::as_const(op1_), id0);
         }
 
         template <typename Is>
@@ -77,11 +123,7 @@ namespace matx
         template <typename CapType, typename Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is id0) 
         {
-          if constexpr (CapType::ept == ElementsPerThread::ONE) {
-            return *RandomOperatorOutputIterator{op1_, id0};
-          } else {
-            return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
-          }
+          return get_impl<CapType>(cuda::std::forward<decltype(op1_)>(op1_), id0);
         }
 
         template <typename Is>
@@ -125,7 +167,30 @@ namespace matx
 
         template <OperatorCapability Cap, typename InType>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
-          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+          if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+#ifdef MATX_EN_JIT
+            const auto op_jit_name = detail::get_operator_capability<Cap>(op1_, in);
+            return std::format("{}<{}>", get_jit_class_name(), op_jit_name);
+#else
+            return "";
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+#ifdef MATX_EN_JIT
+            const auto [key, value] = get_jit_op_str();
+            if (in.find(key) == in.end()) {
+              in[key] = value;
+            }
+            detail::get_operator_capability<Cap>(op1_, in);
+            return true;
+#else
+            return false;
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
+            return detail::get_operator_capability<Cap>(op1_, in);
+          }
+          else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
             const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
             return combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(op1_, in));
           } else {

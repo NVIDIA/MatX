@@ -47,13 +47,79 @@ namespace matx
       class SignOp : public BaseOp<SignOp<T>>
     {
       private:
-        typename detail::base_type_t<T> op_;
+        mutable typename detail::base_type_t<T> op_;
 
       public:
         using matxop = bool;
         using value_type = typename T::value_type;
 
         value_type zval_;
+
+#ifdef MATX_EN_JIT
+        struct JIT_Storage {
+          typename detail::inner_storage_or_self_t<detail::base_type_t<T>> op_;
+          value_type zval_;
+        };
+
+        JIT_Storage ToJITStorage() const {
+          return JIT_Storage{detail::to_jit_storage(op_), zval_};
+        }
+
+        __MATX_INLINE__ std::string get_jit_class_name() const {
+          return "JITSign";
+        }
+
+        __MATX_INLINE__ auto get_jit_op_str() const {
+          std::string func_name = get_jit_class_name();
+          cuda::std::array<index_t, Rank()> out_dims_;
+          for (int i = 0; i < Rank(); ++i) {
+            out_dims_[i] = Size(i);
+          }
+          
+          return cuda::std::make_tuple(
+            func_name,
+            std::format("template <typename T> struct {} {{\n"
+                "  using value_type = typename T::value_type;\n"
+                "  using matxop = bool;\n"
+                "  constexpr static int Rank_ = {};\n"
+                "  constexpr static cuda::std::array<index_t, Rank_> out_dims_ = {{ {} }};\n"
+                "  typename detail::inner_storage_or_self_t<detail::base_type_t<T>> op_;\n"
+                "  value_type zval_;\n"
+                "  template <typename CapType, typename... Is>\n"
+                "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(Is... indices) const\n"
+                "  {{\n"
+                "    if constexpr (CapType::ept == ElementsPerThread::ONE) {{\n"
+                "      auto v = get_value<CapType>(op_,indices...);\n"
+                "      auto set_val = [this](auto vl) {{\n"
+                "        if constexpr (is_complex_v<value_type>) {{\n"
+                "          if (vl == value_type(0)) return zval_;\n"
+                "          else return vl / abs(vl);\n"
+                "        }} else {{\n"
+                "          if (vl < 0) return value_type(-1);\n"
+                "          else if (vl > 0) return value_type(1);\n"
+                "          else return zval_;\n"
+                "        }}\n"
+                "      }};\n"
+                "      if constexpr (CapType::ept == ElementsPerThread::ONE) {{\n"
+                "        return set_val(v);\n"
+                "      }} else {{\n"
+                "        Vector<value_type, static_cast<int>(CapType::ept)> ret;\n"
+                "        for (int e = 0; e < static_cast<int>(CapType::ept); ++e) {{\n"
+                "          ret.data[e] = set_val(GetVectorVal(v, e));\n"
+                "        }}\n"
+                "        return ret;\n"
+                "      }}\n"
+                "    }} else {{\n"
+                "      return Vector<value_type, static_cast<index_t>(CapType::ept)>{{}};\n"
+                "    }}\n"
+                "  }}\n"
+                "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return Rank_; }}\n"
+                "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const {{ return out_dims_[dim]; }}\n"
+                "}};\n",
+                func_name, Rank(), detail::array_to_string(out_dims_))
+          );
+        }
+#endif
 
         __MATX_INLINE__ std::string str() const { return "sign(" + get_type_str(op_) + ")"; }
         __MATX_INLINE__ SignOp(const T &op, value_type zval) : op_(op), zval_(zval) {
@@ -107,7 +173,30 @@ namespace matx
 
         template <OperatorCapability Cap, typename InType>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
-          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+          if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+#ifdef MATX_EN_JIT
+            const auto op_jit_name = detail::get_operator_capability<Cap>(op_, in);
+            return std::format("{}<{}>", get_jit_class_name(), op_jit_name);
+#else
+            return "";
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+#ifdef MATX_EN_JIT
+            const auto [key, value] = get_jit_op_str();
+            if (in.find(key) == in.end()) {
+              in[key] = value;
+            }
+            detail::get_operator_capability<Cap>(op_, in);
+            return true;
+#else
+            return false;
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
+            return detail::get_operator_capability<Cap>(op_, in);
+          }
+          else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
             const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
             return combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(op_, in));
           } else {

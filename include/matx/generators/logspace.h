@@ -47,6 +47,45 @@ namespace matx
         using value_type = T;
         using matxop = bool;
 
+#ifdef MATX_EN_JIT
+        struct JIT_Storage {
+          typename detail::inner_storage_or_self_t<Range<T>> range_;
+        };
+
+        JIT_Storage ToJITStorage() const {
+          return JIT_Storage{detail::to_jit_storage(range_)};
+        }
+
+        __MATX_INLINE__ std::string get_jit_class_name() const {
+          return "JITLogspace";
+        }
+
+        __MATX_INLINE__ auto get_jit_op_str() const {
+          std::string func_name = get_jit_class_name();
+          
+          return cuda::std::make_tuple(
+            func_name,
+            std::format("template <typename T> struct {} {{\n"
+                "  using value_type = T;\n"
+                "  using matxop = bool;\n"
+                "  Range<T> range_;\n"
+                "  template <typename CapType>\n"
+                "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(index_t idx) const\n"
+                "  {{\n"
+                "    auto range_val = range_.template operator()<CapType>(idx);\n"
+                "    auto log_func = [](const auto &val) {{\n"
+                "      return cuda::std::pow(10, val);\n"
+                "    }};\n"
+                "    return detail::ApplyVecFunc<CapType, value_type>(log_func, range_val);\n"
+                "  }}\n"
+                "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return 1; }}\n"
+                "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size([[maybe_unused]] int dim) const {{ return index_t(0); }}\n"
+                "}};\n",
+                func_name)
+          );
+        }
+#endif
+
         __MATX_INLINE__ std::string str() const { return "logspace"; }
 	
         inline Logspace(T first, T last, index_t count)
@@ -91,7 +130,26 @@ namespace matx
 
         template <OperatorCapability Cap, typename InType>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
-          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+          if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+#ifdef MATX_EN_JIT
+            const auto range_jit_name = detail::get_operator_capability<Cap>(range_, in);
+            return "JITLogspace<" + range_jit_name + ">";
+#else
+            return "";
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+#ifdef MATX_EN_JIT
+            detail::get_operator_capability<Cap>(range_, in);
+            return true;
+#else
+            return false;
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
+            return detail::get_operator_capability<Cap>(range_, in);
+          }
+          else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
             const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
             return my_cap;
           } else {          
