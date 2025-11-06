@@ -152,12 +152,13 @@ endif()
 
 # Hack because CMake doesn't have short circult evaluation
 if (NOT CMAKE_BUILD_TYPE OR "${CMAKE_BUILD_TYPE}" STREQUAL "Debug" OR MATX_EN_CUDA_LINEINFO)
-    set(MATX_CUDA_FLAGS ${MATX_CUDA_FLAGS} -lineinfo)
+    # Propagate -lineinfo to all MatX consumers
+    target_compile_options(matx INTERFACE $<$<COMPILE_LANGUAGE:CUDA>:-lineinfo>)
 endif()
 
 # Enable extended lambda support for device/host lambdas (required for apply operator)
 if (MATX_EN_EXTENDED_LAMBDA)
-    set(MATX_CUDA_FLAGS ${MATX_CUDA_FLAGS} --extended-lambda)
+    target_compile_options(matx INTERFACE $<$<COMPILE_LANGUAGE:CUDA>:--extended-lambda>)
 endif()
 
 # Set preferred compiler warning flags. nvc++ doesn't support most warnings
