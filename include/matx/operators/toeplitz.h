@@ -84,7 +84,18 @@ namespace matx
                 "  typename detail::inner_storage_or_self_t<detail::base_type_t<T1>> op1_;\n"
                 "  typename detail::inner_storage_or_self_t<detail::base_type_t<T2>> op2_;\n"
                 "  template <typename CapType>\n"
-                "  __MATX_INLINE__ __MATX_DEVICE__ decltype(auto) operator()(index_t i, index_t j) const {{ /* toeplitz logic */ }}\n"
+                "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(index_t i, index_t j) const {{\n"
+                "    if constexpr (CapType::ept == ElementsPerThread::ONE) {{\n"
+                "      if (j > i) {{\n"
+                "        return get_value<CapType>(op2_, j - i);\n"
+                "      }}\n"
+                "      else {{\n"
+                "        return get_value<CapType>(op1_, i - j);\n"
+                "      }}\n"
+                "    }} else {{\n"
+                "      return Vector<value_type, static_cast<index_t>(CapType::ept)>{{}};\n"
+                "    }}\n"
+                "  }}\n"
                 "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return 2; }}\n"
                 "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const {{ return (dim == 0) ? size1_ : size2_; }}\n"
                 "}};\n",
@@ -172,6 +183,15 @@ namespace matx
             return std::format("{}<{},{}>", get_jit_class_name(), op1_jit_name, op2_jit_name);
 #else
             return "";
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+#ifdef MATX_EN_JIT
+            return combine_capabilities<Cap>(true, 
+              detail::get_operator_capability<Cap>(op1_, in),
+              detail::get_operator_capability<Cap>(op2_, in));
+#else
+            return false;
 #endif
           }
           else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {

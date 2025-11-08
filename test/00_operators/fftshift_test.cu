@@ -33,6 +33,15 @@ TYPED_TEST(OperatorTestsFloatNonHalf, FFTShiftWithTransform)
   {
     const int N1 = 3;
     const int N2 = 4;
+    
+    // Skip if using JIT executor but expression doesn't support JIT
+    if constexpr (is_cuda_jit_executor_v<ExecType>) {
+      auto test_t3 = make_tensor<complex_type>({N1});
+      auto test_expr = fftshift1D(fft(test_t3));
+      if (!jit_supported(test_expr)) {
+        GTEST_SKIP();
+      }
+    }
 
     auto t3 = make_tensor<complex_type>({N1});
     auto t4 = make_tensor<complex_type>({N2});
@@ -94,6 +103,15 @@ TYPED_TEST(OperatorTestsFloatNonHalf, FFTShiftWithTransform)
   // check correctness here, but there are fftshift2D correctness tests elsewhere.
   if constexpr (is_complex_v<TestType>) {
     [[maybe_unused]] const int N = 4;
+
+    // Skip if using JIT executor but expression doesn't support JIT
+    if constexpr (is_cuda_jit_executor_v<ExecType>) {
+      auto test_x = make_tensor<complex_type>({N,N});
+      auto test_expr = fftshift2D(fft2(test_x));
+      if (!jit_supported(test_expr)) {
+        GTEST_SKIP();
+      }
+    }
 
     auto x = make_tensor<complex_type>({N,N});
     auto X = make_tensor<complex_type>({N,N});

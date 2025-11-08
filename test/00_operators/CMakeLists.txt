@@ -25,12 +25,21 @@ set(OPERATOR_TEST_FILES
   frexp_test.cu
   frexpc_test.cu
   get_string_test.cu
+  ifelse_test.cu  
   interleaved_test.cu
   interp_test.cu
   isclose_test.cu
   isnaninf_test.cu
   legendre_test.cu
-  operator_func_test.cu
+  operator_func_boolean_test.cu
+  operator_func_complex_test.cu
+  operator_func_div_complex_test.cu
+  operator_func_float_noncomplex_test.cu
+  operator_func_integral_test.cu
+  operator_func_nd_test.cu
+  operator_func_numeric_noncomplex_test.cu
+  operator_func_numeric_test.cu
+  operator_func_r2c_test.cu
   overlap_test.cu
   pad_test.cu
   permute_test.cu

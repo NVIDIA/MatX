@@ -221,11 +221,11 @@ static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto scalar_internal_not(T 
 template <typename T>
 static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto scalar_internal_isnan(T v1) {
   using conversionType = typename matx::detail::value_promote_t<T>;
-  if constexpr(!std::is_floating_point_v<conversionType>) {
+  if constexpr(!cuda::std::is_floating_point_v<conversionType>) {
       return false;
   }
 
-  using castType = matx::detail::matx_convert_complex_type<T>;
+  using castType = matx::detail::matx_convert_cuda_complex_type<T>;
   if constexpr(is_complex_v<T>) {
     return cuda::std::isnan(static_cast<typename castType::value_type>(v1.real())) || cuda::std::isnan(static_cast<typename castType::value_type>(v1.imag()));
   } else {
@@ -236,11 +236,11 @@ static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto scalar_internal_isnan(
 template <typename T>
 static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto scalar_internal_isinf(T v1) {
   using conversionType = typename matx::detail::value_promote_t<T>;
-  if constexpr(!std::is_floating_point_v<conversionType>) {
+  if constexpr(!cuda::std::is_floating_point_v<conversionType>) {
     return false;
   }
 
-  using castType = matx::detail::matx_convert_complex_type<T>;
+  using castType = matx::detail::matx_convert_cuda_complex_type<T>;
   if constexpr(is_complex_v<T>) {
     return cuda::std::isinf(static_cast<typename castType::value_type>(v1.real())) || cuda::std::isinf(static_cast<typename castType::value_type>(v1.imag()));
   } else {

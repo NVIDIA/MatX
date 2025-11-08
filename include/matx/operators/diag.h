@@ -90,7 +90,37 @@ namespace matx
                 "  constexpr static cuda::std::array<index_t, OutRank_> out_dims_ = {{ {} }};\n"
                 "  typename detail::inner_storage_or_self_t<detail::base_type_t<T>> op_;\n"
                 "  template <typename CapType, typename... Is>\n"
-                "  __MATX_INLINE__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) const {{ /* diag logic */ }}\n"
+                "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(Is... indices) const {{\n"
+                "    if constexpr (CapType::ept == ElementsPerThread::ONE) {{\n"
+                "      if constexpr (RANK_ == 1) {{\n"
+                "        cuda::std::array<index_t, 2> idx{{indices...}};\n"
+                "        if (idx[0] == idx[1]) {{\n"
+                "          return get_value<CapType>(op_, cuda::std::array<index_t, 1>{{idx[0]}});\n"
+                "        }}\n"
+                "        else {{\n"
+                "          return static_cast<value_type>(0);\n"
+                "        }}\n"
+                "      }}\n"
+                "      else {{\n"
+                "        cuda::std::array<index_t, sizeof...(Is)> idx{{indices...}};\n"
+                "        cuda::std::array<index_t, RANK_> tmp;\n"
+                "        for (int i = 0; i < RANK_ - 2; i++) {{\n"
+                "          tmp[i] = idx[i];\n"
+                "        }}\n"
+                "        if (k_ < 0) {{\n"
+                "          tmp[RANK_ - 1] = idx[RANK_ - 2];\n"
+                "          tmp[RANK_ - 2] = idx[RANK_ - 2] - k_;\n"
+                "        }}\n"
+                "        else {{\n"
+                "          tmp[RANK_ - 2] = idx[RANK_ - 2];\n"
+                "          tmp[RANK_ - 1] = idx[RANK_ - 2] + k_;\n"
+                "        }}\n"
+                "        return get_value<CapType>(op_, tmp);\n"
+                "      }}\n"
+                "    }} else {{\n"
+                "      return Vector<value_type, static_cast<index_t>(CapType::ept)>{{}};\n"
+                "    }}\n"
+                "  }}\n"
                 "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return OutRank_; }}\n"
                 "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const {{ return out_dims_[dim]; }}\n"
                 "}};\n",
@@ -165,6 +195,13 @@ namespace matx
             return std::format("{}<{}>", get_jit_class_name(), op_jit_name);
 #else
             return "";
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+#ifdef MATX_EN_JIT
+            return combine_capabilities<Cap>(true, detail::get_operator_capability<Cap>(op_, in));
+#else
+            return false;
 #endif
           }
           else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {

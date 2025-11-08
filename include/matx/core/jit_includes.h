@@ -34,9 +34,9 @@
 
 // This file is used for jitify/NVRTC preprocessing. Do NOT include any files in here that can't be
 // parsed on the device, and try to keep this minimal to avoid unnecessary dependencies.
-#include <cuda/barrier>
 #include <cuda/std/__algorithm/min.h>
 #include <cuda/std/__algorithm/max.h>
+#include <cuda/barrier>
 #include "matx/core/defines.h"
 #include "matx/core/type_utils_both.h"
 #include "matx/core/vector.h"

@@ -32,6 +32,8 @@
 
 #pragma once
 
+#include <cuda/std/cstdint>
+#include <cuda/std/bit>
 #include <cuda/std/cmath>
 #include <cuda/std/type_traits>
 
@@ -40,6 +42,83 @@
 #include "matx/core/defines.h"
 
 namespace matx {
+
+// Constexpr helper functions for float to half conversion
+namespace detail {
+
+/**
+ * @brief Constexpr conversion from float to FP16 bits
+ * 
+ * @param f Input float value
+ * @return uint16_t FP16 bit representation
+ */
+constexpr __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ uint16_t float_to_fp16_bits(float f) {
+  // Use bit_cast for constexpr context
+  uint32_t bits = cuda::std::bit_cast<uint32_t>(f);
+  
+  uint32_t sign = (bits >> 16) & 0x8000;
+  int32_t exponent = static_cast<int32_t>(((bits >> 23) & 0xff)) - 127 + 15;
+  uint32_t mantissa = (bits >> 13) & 0x3ff;
+  
+  // Handle special cases
+  if (exponent <= 0) {
+    // Subnormal or zero
+    if (exponent < -10) {
+      // Too small, flush to zero
+      return static_cast<uint16_t>(sign);
+    }
+    // Subnormal
+    mantissa = (mantissa | 0x400) >> (1 - exponent);
+    return static_cast<uint16_t>(sign | mantissa);
+  } else if (exponent >= 0x1f) {
+    // Overflow to infinity or NaN
+    if (exponent == 0x1f + (127 - 15) && mantissa != 0) {
+      // NaN
+      return static_cast<uint16_t>(sign | 0x7e00 | (mantissa != 0 ? 0x200 : 0));
+    }
+    // Infinity
+    return static_cast<uint16_t>(sign | 0x7c00);
+  }
+  
+  return static_cast<uint16_t>(sign | (static_cast<uint32_t>(exponent) << 10) | mantissa);
+}
+
+/**
+ * @brief Constexpr conversion from float to BF16 bits
+ * 
+ * @param f Input float value
+ * @return uint16_t BF16 bit representation (top 16 bits of float)
+ */
+constexpr __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ uint16_t float_to_bf16_bits(float f) {
+  // BF16 is just the top 16 bits of a float32
+  // With rounding to nearest even
+  uint32_t bits = cuda::std::bit_cast<uint32_t>(f);
+  
+  // Round to nearest even
+  uint32_t rounding_bias = 0x00007FFF + ((bits >> 16) & 1);
+  bits += rounding_bias;
+  uint16_t result = static_cast<uint16_t>(bits >> 16);
+  
+  return result;
+}
+
+/**
+ * @brief Helper to convert float to half type at compile time
+ * 
+ * @tparam T The target half type (__half or __nv_bfloat16)
+ * @param f Input float value
+ * @return T Half-precision value
+ */
+template <typename T>
+constexpr __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T float_to_half_constexpr(float f) {
+  if constexpr (cuda::std::is_same_v<T, __half>) {
+    return cuda::std::bit_cast<__half>(float_to_fp16_bits(f));
+  } else {
+    return cuda::std::bit_cast<__nv_bfloat16>(float_to_bf16_bits(f));
+  }
+}
+
+} // namespace detail
 
 /**
  * Template class for half precison numbers (__half and __nv_bfloat16). CUDA
@@ -64,12 +143,49 @@ template <typename T> struct alignas(sizeof(T)) matxHalf {
   __MATX_INLINE__ matxHalf(const matxHalf<T> &x_) noexcept = default;
 
   /**
-   * @brief Copy constructor from arbitrary type
+   * @brief Constexpr constructor from float
+   *
+   * @param f Float value to convert
+   */
+  constexpr __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf(float f) noexcept
+      : x(detail::float_to_half_constexpr<T>(f))
+  {
+  }
+
+  /**
+   * @brief Constexpr constructor from double
+   *
+   * @param d Double value to convert
+   */
+  constexpr __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf(double d) noexcept
+      : x(detail::float_to_half_constexpr<T>(static_cast<float>(d)))
+  {
+  }
+
+  /**
+   * @brief Constructor from integral types (constexpr)
+   *
+   * @tparam T2 Integral type to copy from
+   * @param x_ Value to copy
+   */
+  template <typename T2, 
+            cuda::std::enable_if_t<cuda::std::is_integral_v<T2>, int> = 0>
+  constexpr __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf(T2 x_) noexcept
+      : x(detail::float_to_half_constexpr<T>(static_cast<float>(x_)))
+  {
+  }
+
+  /**
+   * @brief Copy constructor from arbitrary type (non-constexpr for non-arithmetic types)
    *
    * @tparam T2 Type to copy from
    * @param x_ Value to copy
    */
-  template <typename T2>
+  template <typename T2, 
+            cuda::std::enable_if_t<
+                !cuda::std::is_same_v<cuda::std::decay_t<T2>, float> &&
+                !cuda::std::is_same_v<cuda::std::decay_t<T2>, double> &&
+                !cuda::std::is_integral_v<T2>, int> = 0>
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalf(const T2 &x_) noexcept
       : x(static_cast<float>(x_))
   {
@@ -1316,3 +1432,38 @@ using matxFp16 = matxHalf<__half>; ///< Alias for fp16
 using matxBf16 = matxHalf<__nv_bfloat16>; ///< Alias for bf16
 
 }; // namespace matx
+
+#ifndef __CUDACC_RTC__
+// Add std::formatter specializations for matxFp16 and matxBf16
+#include <format>
+
+namespace std {
+
+/**
+ * @brief std::formatter specialization for matxFp16
+ * 
+ * Enables matxFp16 to work with std::format by converting to float
+ */
+template <>
+struct formatter<matx::matxFp16> : formatter<float> {
+  template <typename FormatContext>
+  auto format(const matx::matxFp16& val, FormatContext& ctx) const {
+    return formatter<float>::format(static_cast<float>(val), ctx);
+  }
+};
+
+/**
+ * @brief std::formatter specialization for matxBf16
+ * 
+ * Enables matxBf16 to work with std::format by converting to float
+ */
+template <>
+struct formatter<matx::matxBf16> : formatter<float> {
+  template <typename FormatContext>
+  auto format(const matx::matxBf16& val, FormatContext& ctx) const {
+    return formatter<float>::format(static_cast<float>(val), ctx);
+  }
+};
+
+} // namespace std
+#endif

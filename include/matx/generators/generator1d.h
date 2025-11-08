@@ -60,7 +60,8 @@ namespace matx
             }
           } 
           else if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY || 
-                             Cap == OperatorCapability::JIT_CLASS_QUERY) {
+                             Cap == OperatorCapability::JIT_CLASS_QUERY ||
+                             Cap == OperatorCapability::SUPPORTS_JIT) {
             // Forward JIT-related capabilities to the generator
             return f_.template get_capability<Cap>(in);
           }

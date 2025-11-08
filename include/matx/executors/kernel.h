@@ -154,7 +154,7 @@ template <typename CapType, class Op>
 __global__ void matxOpT4StrideKernel(Op op, index_t size0, index_t size1, index_t size2, index_t size3) {
 
   for(index_t nmy = static_cast<index_t>(blockIdx.y) * blockDim.y + threadIdx.y;
-      nmy < size2 * size3;
+      nmy < size1 * size2;
       nmy += blockDim.y * gridDim.y) {
     index_t idy = nmy % size2;
     index_t idz = nmy / size2;

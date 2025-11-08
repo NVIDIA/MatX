@@ -99,7 +99,29 @@ namespace matx
                 "  typename detail::inner_storage_or_self_t<detail::base_type_t<T>> op_;\n"
                 "  StrideType strides_;\n"
                 "  template <typename CapType, typename... Is>\n"
-                "  __MATX_INLINE__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) const {{ /* slice logic */ }}\n"
+                "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(Is... indices) const {{\n"
+                "    if constexpr (CapType::ept == ElementsPerThread::ONE) {{\n"
+                "      cuda::std::array<index_t, OpRank_> ind = starts_;\n"
+                "      cuda::std::array<index_t, DIM_> inds{{indices...}};\n"
+                "      MATX_LOOP_UNROLL\n"
+                "      for (int32_t i = 0; i < OpRank_; i++) {{\n"
+                "        MATX_LOOP_UNROLL\n"
+                "        for(int32_t j = 0; j < DIM_; j++) {{\n"
+                "          if(dims_[j] == i) {{\n"
+                "            if constexpr (!cuda::std::is_same_v<NoStride, StrideType>) {{\n"
+                "              ind[i] = starts_[j] + inds[j] * strides_[i];\n"
+                "            }}\n"
+                "            else {{\n"
+                "              ind[i] = starts_[j] + inds[j];\n"
+                "            }}\n"
+                "          }}\n"
+                "        }}\n"
+                "      }}\n"
+                "      return get_value<CapType>(op_, ind);\n"
+                "    }} else {{\n"
+                "      return Vector<value_type, static_cast<index_t>(CapType::ept)>{{}};\n"
+                "    }}\n"
+                "  }}\n"
                 "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return DIM_; }}\n"
                 "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int32_t dim) const {{ return sizes_[dim]; }}\n"
                 "}};\n",
@@ -198,6 +220,13 @@ namespace matx
             return std::format("{}<{}>", get_jit_class_name(), op_jit_name);
 #else
             return "";
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+#ifdef MATX_EN_JIT
+            return combine_capabilities<Cap>(true, detail::get_operator_capability<Cap>(op_, in));
+#else
+            return false;
 #endif
           }
           else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {

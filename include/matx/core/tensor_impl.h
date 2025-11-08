@@ -248,15 +248,29 @@ class tensor_impl_t {
              "      return ldata_[offset];\n" +
              "    } else {\n" +
              "      return *reinterpret_cast<detail::Vector<T, EPT_int>*>(ldata_ + offset);\n" +
-             "    }\n" +
-             "  }\n" +
-             "  template <typename CapType, int M = RANK, typename... Is>\n" +
-             "  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T* data_ptr(index_t block_idx, index_t ttl_threads) const noexcept\n" +
-             "  {\n"
-             "    //const index_t offset = GetOffsetOptimized<CapType::ept>(indices...);\n" +
-             "    //return ldata_ + offset;\n" +
-             "    return ldata_ + block_idx * ttl_threads * static_cast<index_t>(CapType::ept);\n" +
-             "  }\n" +
+            "    }\n" +
+            "  }\n" +
+            "  template <typename CapType>\n" +
+            "  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(const cuda::std::array<index_t, RANK> &idx) const noexcept\n" +
+            "  {\n" +
+            "    return cuda::std::apply([&](auto &&...args) {\n" +
+            "      return this->operator()<CapType>(args...);\n" +
+            "    }, idx);\n" +
+            "  }\n" +
+            "  template <typename CapType>\n" +
+            "  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(const cuda::std::array<index_t, RANK> &idx) noexcept\n" +
+            "  {\n" +
+            "    return cuda::std::apply([&](auto &&...args) -> T& {\n" +
+            "      return this->operator()<CapType>(args...);\n" +
+            "    }, idx);\n" +
+            "  }\n" +
+            "  template <typename CapType, int M = RANK, typename... Is>\n" +
+            "  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T* data_ptr(index_t block_idx, index_t ttl_threads) const noexcept\n" +
+            "  {\n"
+            "    //const index_t offset = GetOffsetOptimized<CapType::ept>(indices...);\n" +
+            "    //return ldata_ + offset;\n" +
+            "    return ldata_ + block_idx * ttl_threads * static_cast<index_t>(CapType::ept);\n" +
+            "  }\n" +
              "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank()\n" +
              "  {\n" +
              "    return " + std::to_string(Rank()) + ";\n" +
@@ -1441,6 +1455,13 @@ MATX_IGNORE_WARNING_POP_GCC
         }
 
         return power;
+      }
+      else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+#ifdef MATX_EN_JIT
+        return true;
+#else
+        return false;
+#endif
       }
       else if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
 #ifdef MATX_EN_JIT

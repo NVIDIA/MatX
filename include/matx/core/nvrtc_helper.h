@@ -151,7 +151,7 @@ std::vector<std::string> __MATX_HOST__ __MATX_INLINE__ get_preprocessor_options(
   
 
 // Read file contents into a string
-std::string read_file_contents(const std::string& filepath) {
+inline std::string read_file_contents(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         MATX_LOG_ERROR("Failed to open file: {}", filepath);
@@ -163,40 +163,44 @@ std::string read_file_contents(const std::string& filepath) {
 }
 
 // Get the full path to jit_includes.h
-std::string get_jit_includes_path() {
+inline std::string get_jit_includes_path() {
     const auto source_path = std::filesystem::path(std::source_location::current().file_name());
     const auto matx_root = source_path.parent_path().parent_path().parent_path().parent_path();
     return (matx_root / "include" / "matx" / "core" / "jit_includes.h").string();
 }
 
 template <typename Op>
-std::string get_kernel_name([[maybe_unused]] const Op &op, bool stride) {
+std::string get_kernel_name([[maybe_unused]] const Op &op, bool stride, bool global_kernel) {
   if constexpr (Op::Rank() == 0) {
     return "matx::detail::matxOpT0Kernel";
   }  
   else if constexpr (Op::Rank() == 1) {
-    return "matx::detail::matxOpT1Kernel";
+    return global_kernel ? "matx::detail::matxOpT1Kernel" : "matx::detail::matxOpT1KernelBlock";
   }
   else if constexpr (Op::Rank() == 2) {
     if (stride) {
-      return "matx::detail::matxOpT2StrideKernel";
+      return global_kernel ? "matx::detail::matxOpT2StrideKernel" : "matx::detail::matxOpT2StrideKernelBlock";
     } else {
-      return "matx::detail::matxOpT2Kernel";
+      return global_kernel ? "matx::detail::matxOpT2Kernel" : "matx::detail::matxOpT2KernelBlock";
     }
   }
   else if constexpr (Op::Rank() == 3) {
     if (stride) {
-      return "matx::detail::matxOpT3StrideKernel";
+      return global_kernel ? "matx::detail::matxOpT3StrideKernel" : "matx::detail::matxOpT3StrideKernelBlock";
     } else {
-      return "matx::detail::matxOpT3Kernel";
+      return global_kernel ? "matx::detail::matxOpT3Kernel" : "matx::detail::matxOpT3KernelBlock";
     }
   }
   else if constexpr (Op::Rank() == 4) {
     if (stride) {
-      return "matx::detail::matxOpT4StrideKernel";
+      return global_kernel ? "matx::detail::matxOpT4StrideKernel" : "matx::detail::matxOpT4StrideKernelBlock";
     } else {
-      return "matx::detail::matxOpT4Kernel";
+      return global_kernel ? "matx::detail::matxOpT4Kernel" : "matx::detail::matxOpT4KernelBlock";
     }
+  }
+  else {
+    // For ranks > 4, use the TD (Tensor Dynamic) kernel
+    return "matx::detail::matxOpTDKernel";
   }
 
   return "MatXInvalidKernel";
@@ -296,7 +300,7 @@ inline std::string qualify_jit_type_names(const std::string& type_str) {
 }
 
 template <typename Op, typename SizeArray>
-auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, const SizeArray &sa, dim3 &blocks, dim3 &threads, ElementsPerThread ept, bool stride, int dynamic_shmem_size, int osize) {
+auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, const SizeArray &sa, dim3 &blocks, dim3 &threads, ElementsPerThread ept, bool stride, int dynamic_shmem_size, int osize, bool global_kernel) {
   // Pure NVRTC implementation
   // Cache both module and function to prevent resource leaks
   // CUmodule must remain loaded for CUfunction to be valid
@@ -311,7 +315,7 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, cons
   auto capstr = generate_capability_params_string(op, ept, false, osize, threads.x);
   const auto kernel_op_type = detail::get_operator_capability<OperatorCapability::JIT_TYPE_QUERY>(op);
   
-  std::string kernel_name = get_kernel_name(op, stride);
+  std::string kernel_name = get_kernel_name(op, stride, global_kernel);
   std::string cache_key = kernel_name + "_" + kernel_op_type;
 
   MATX_LOG_DEBUG("nvrtc_compile_and_run called with operator type: {}", typeid(op).name());
@@ -541,31 +545,55 @@ launch_kernel:
   auto storage = op.ToJITStorage();
   
   // Prepare kernel arguments
-  void* args[Op::Rank() + 1];
-  args[0] = &storage;
-  if constexpr (Op::Rank() >= 1) {
-    args[1] = const_cast<void*>(reinterpret_cast<const void*>(&sa[0]));
+  if constexpr (Op::Rank() > 4) {
+    // ND kernel: matxOpTDKernel(Op op, const cuda::std::array<matx::index_t, Op::Rank()> sizes, matx::index_t mult)
+    // mult is the product of all sizes except the first
+    index_t mult = cuda::std::accumulate(cuda::std::begin(sa) + 1, cuda::std::end(sa), 1, cuda::std::multiplies<index_t>());
+    
+    void* args[3];
+    args[0] = &storage;
+    args[1] = const_cast<void*>(reinterpret_cast<const void*>(&sa));
+    args[2] = &mult;
+    
+    MATX_LOG_DEBUG("Launching kernel with grid=({}, {}, {}), block=({}, {}, {}), dynamic_shmem_size={} bytes",
+                   blocks.x, blocks.y, blocks.z, threads.x, threads.y, threads.z, dynamic_shmem_size);
+    // Launch kernel
+    CUDA_CHECK(cuLaunchKernel(kernel_func,
+                              blocks.x, blocks.y, blocks.z,
+                              threads.x, threads.y, threads.z,
+                              dynamic_shmem_size,
+                              nullptr,  // stream
+                              args,
+                              nullptr));
   }
-  if constexpr (Op::Rank() >= 2) {
-    args[2] = const_cast<void*>(reinterpret_cast<const void*>(&sa[1]));
+  else {
+    // Rank 0-4 kernels: Pass individual size parameters
+    void* args[Op::Rank() + 1];
+    args[0] = &storage;
+    if constexpr (Op::Rank() >= 1) {
+      args[1] = const_cast<void*>(reinterpret_cast<const void*>(&sa[0]));
+    }
+    if constexpr (Op::Rank() >= 2) {
+      args[2] = const_cast<void*>(reinterpret_cast<const void*>(&sa[1]));
+    }
+    if constexpr (Op::Rank() >= 3) {
+      args[3] = const_cast<void*>(reinterpret_cast<const void*>(&sa[2]));
+    }
+    if constexpr (Op::Rank() == 4) {
+      args[4] = const_cast<void*>(reinterpret_cast<const void*>(&sa[3]));
+    }
+    
+    MATX_LOG_DEBUG("Launching kernel with grid=({}, {}, {}), block=({}, {}, {}), dynamic_shmem_size={} bytes",
+                   blocks.x, blocks.y, blocks.z, threads.x, threads.y, threads.z, dynamic_shmem_size);
+    // Launch kernel
+    CUDA_CHECK(cuLaunchKernel(kernel_func,
+                              blocks.x, blocks.y, blocks.z,
+                              threads.x, threads.y, threads.z,
+                              dynamic_shmem_size,
+                              nullptr,  // stream
+                              args,
+                              nullptr));
   }
-  if constexpr (Op::Rank() >= 3) {
-    args[3] = const_cast<void*>(reinterpret_cast<const void*>(&sa[2]));
-  }
-  if constexpr (Op::Rank() >= 4) {
-    args[4] = const_cast<void*>(reinterpret_cast<const void*>(&sa[3]));
-  }
-  
-  MATX_LOG_DEBUG("Launching kernel with grid=({}, {}, {}), block=({}, {}, {}), dynamic_shmem_size={} bytes",
-                 blocks.x, blocks.y, blocks.z, threads.x, threads.y, threads.z, dynamic_shmem_size);
-  // Launch kernel
-  CUDA_CHECK(cuLaunchKernel(kernel_func,
-                            blocks.x, blocks.y, blocks.z,
-                            threads.x, threads.y, threads.z,
-                            dynamic_shmem_size,
-                            nullptr,  // stream
-                            args,
-                            nullptr));
 }
 
 }

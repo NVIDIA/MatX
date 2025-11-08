@@ -186,6 +186,11 @@ namespace matx
             dx_fft_helper_.set_fft_type(DeduceFFTTransformType<typename scalar_to_complex<typename OpA::value_type>::ctype, value_type>());
             dx_fft_helper_.set_direction(Direction);
             dx_fft_helper_.set_cc(cc);
+            // if (fft_size_ <= 32) {
+            //   dx_fft_helper_.set_method(cuFFTDxMethod::REGISTER);
+            // } else {
+              dx_fft_helper_.set_method(cuFFTDxMethod::SHARED);
+            //}            
 
             bool contiguous = false;
             if constexpr (is_tensor_view_v<OpA>) {
@@ -274,10 +279,7 @@ namespace matx
           }
           else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
             bool supported = true;
-            if (((fft_size_ & (fft_size_ - 1)) != 0 || fft_size_ == 0) // Only support power-of-2 FFT sizes for JIT support
-                || is_complex_half_v<typename OpA::value_type>  // No half support in MatX for fusion yet
-                || !is_complex_v<typename OpA::value_type>) // Only support C2C for JIT support
-            {
+            if (!dx_fft_helper_.template CheckJITSizeAndTypeRequirements<OpA>()) {
               supported = false;
             } 
             else {
@@ -309,7 +311,10 @@ namespace matx
               // Currently MatX only attempts to use the "best" EPT as returned by cuFFTDx. In the future we may
               // try other EPT values that yield different SHM values.
               if (dx_fft_helper_.IsSupported()) {
-                auto result = combine_capabilities<Cap>(dx_fft_helper_.GetEPTs(), detail::get_operator_capability<Cap>(a_, in));
+                auto epts = dx_fft_helper_.GetEPTs();
+                // epts[0] = ElementsPerThread::EIGHT;
+                // epts[1] = ElementsPerThread::EIGHT;
+                auto result = combine_capabilities<Cap>(epts, detail::get_operator_capability<Cap>(a_, in));
                 MATX_LOG_DEBUG("ELEMENTS_PER_THREAD (JIT supported): [{},{}]", static_cast<int>(result[0]), static_cast<int>(result[1]));
                 return result;
               }
@@ -330,10 +335,10 @@ namespace matx
           else if constexpr (Cap == OperatorCapability::GROUPS_PER_BLOCK) {
             int ffts_per_block_candidate;
 
-            if constexpr (RANK > 1) {
+            if constexpr (Rank() > 1) {
               const int ffts_per_block = dx_fft_helper_.GetFFTsPerBlock();
               const auto last_dim = a_.Size(a_.Rank() - 2);
-              int ffts_per_block_candidate = ffts_per_block;
+              ffts_per_block_candidate = ffts_per_block;
               // Try to find an ffts_per_block that evenly divides into last dimension size
               // Decrease ffts_per_block until it divides evenly or until 1
               while (ffts_per_block_candidate > 1 && (last_dim % ffts_per_block_candidate != 0)) {
@@ -353,8 +358,13 @@ namespace matx
           else if constexpr (Cap == OperatorCapability::SET_ELEMENTS_PER_THREAD) {
             dx_fft_helper_.set_current_elements_per_thread(in.ept);
             auto result = combine_capabilities<Cap>(capability_attributes<Cap>::default_value, detail::get_operator_capability<Cap>(a_, in));
-            MATX_LOG_DEBUG("SET_ELEMENTS_PER_THREAD: {}", result);
+            MATX_LOG_DEBUG("SET_ELEMENTS_PER_THREAD: {}", static_cast<int>(in.ept));
             return result;
+          }
+          else if constexpr (Cap == OperatorCapability::GLOBAL_KERNEL) {
+            // If MathDx is enabled we always return false. Other checks on size and type may prevent JIT compilation.
+            MATX_LOG_DEBUG("GLOBAL_KERNEL: false");            
+            return false;
           }
           else if constexpr (Cap == OperatorCapability::SET_GROUPS_PER_BLOCK) {
             dx_fft_helper_.set_ffts_per_block(in.groups_per_block);

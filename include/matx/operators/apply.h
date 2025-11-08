@@ -34,6 +34,7 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
+#include <format>
 
 namespace matx
 {
@@ -83,8 +84,18 @@ namespace matx
 
         template <OperatorCapability Cap, typename InType>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
-          auto self_has_cap = capability_attributes<Cap>::default_value;
-          return combine_capabilities<Cap>(self_has_cap, get_combined_ops_capability<Cap>(in, ops_));
+          if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+            // Cannot JIT compile user-defined lambdas/functors - no way to get source code at runtime
+            return "";
+          }
+          else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+            // Cannot JIT compile user-defined lambdas/functors - no way to get source code at runtime
+            return false;
+          }
+          else {
+            auto self_has_cap = capability_attributes<Cap>::default_value;
+            return combine_capabilities<Cap>(self_has_cap, get_combined_ops_capability<Cap>(in, ops_));
+          }
         }
 
         template <typename ShapeType, typename Executor>

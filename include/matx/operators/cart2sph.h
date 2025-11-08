@@ -161,6 +161,16 @@ namespace matx
             return "";
 #endif
           }
+          else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+#ifdef MATX_EN_JIT
+            return combine_capabilities<Cap>(true, 
+              detail::get_operator_capability<Cap>(x_, in),
+              detail::get_operator_capability<Cap>(y_, in),
+              detail::get_operator_capability<Cap>(z_, in));
+#else
+            return false;
+#endif
+          }
           else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
 #ifdef MATX_EN_JIT
             const auto [key, value] = get_jit_op_str();

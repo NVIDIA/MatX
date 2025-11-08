@@ -6,7 +6,8 @@
 using namespace matx;
 using namespace matx::test;
 
-TYPED_TEST(OperatorTestsFloatNonComplexNonHalfAllExecs, ZipVecOp)
+// No JIT since we use custom types that can't be stringified
+TYPED_TEST(OperatorTestsFloatNonComplexNonHalfAllExecsWithoutJIT, ZipVecOp)
 {
   MATX_ENTER_HANDLER();
 

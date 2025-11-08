@@ -171,14 +171,15 @@ public:
           "   mutable typename detail::inner_storage_or_self_t<detail::base_type_t<T>> out_;\n" +
           "   mutable typename detail::inner_storage_or_self_t<detail::base_type_t<Op>> op_;\n" +
            "  template <typename CapType, typename... Is>\n" +
-           "  __MATX_INLINE__ __MATX_DEVICE__  decltype(auto) operator()(Is... indices) const\n" +
+           "  __MATX_INLINE__ __MATX_DEVICE__  auto operator()(Is... indices) const -> \n" +
+                "remove_cvref_t<decltype(detail::get_value<CapType>(op_, indices...))>\n" +
           "  {\n" +
+          "    using in_val_type = remove_cvref_t<decltype(detail::get_value<CapType>(op_, indices...))>;\n" +
+          "    if ((threadIdx.x * static_cast<int>(CapType::ept)) >= Size(Rank() - 1)) {\n" +
+          "      return in_val_type{};\n" +
+          "    }\n" +
           "    auto in_val = detail::get_value<CapType>(op_, indices...);\n" +
           "    using out_type = decltype(out_.template operator()<CapType>(indices...));\n" +
-          "    using in_val_type = decltype(in_val);\n" +
-          "    if ((threadIdx.x * static_cast<int>(CapType::ept)) >= Size(Rank() - 1)) {\n" +
-          "      return detail::GetJitSentinelValue<CapType, value_type>();\n" +
-          "    }\n" +
           "    if (out_.Rank() == 0 || threadIdx.x < out_.Size(out_.Rank() - 1)) {\n" +
           "      if constexpr (!is_vector_v<in_val_type> && is_vector_v<out_type>) {\n" +
           "        Vector<remove_cvref_t<in_val_type>, static_cast<size_t>(CapType::ept)> vec{in_val};\n" +
@@ -249,7 +250,14 @@ public:
       return "";
 #endif
     }  
-    else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+    else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+#ifdef MATX_EN_JIT
+            return combine_capabilities<Cap>(true, detail::get_operator_capability<Cap>(op_, in), detail::get_operator_capability<Cap>(out_, in));
+#else
+            return false;
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
 #ifdef MATX_EN_JIT
       // Get the key/value pair from get_jit_op_str()
       const auto [key, value] = get_jit_op_str();

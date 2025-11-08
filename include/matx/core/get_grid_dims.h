@@ -173,7 +173,7 @@ inline bool get_grid_dims(dim3 &blocks, dim3 &threads, const cuda::std::array<in
 
 // For JIT code we want to use a grid-stride loop always
 template <int RANK>
-inline bool get_grid_dims_jit(dim3 &blocks, dim3 &threads, const cuda::std::array<index_t, RANK> &sizes, index_t ept, int groups_per_block,
+inline bool get_grid_dims_block(dim3 &blocks, dim3 &threads, const cuda::std::array<index_t, RANK> &sizes, index_t ept, int groups_per_block,
                           int max_cta_size = 1024, bool force_size = false)
 {
   bool stride = false;

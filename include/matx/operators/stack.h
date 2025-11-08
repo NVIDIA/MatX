@@ -34,7 +34,9 @@
 
 
 #include "matx/core/type_utils.h"
+#include "matx/core/utils.h"
 #include "matx/operators/base_operator.h"
+#include <format>
 
 namespace matx
 {
@@ -72,6 +74,158 @@ namespace matx
       __MATX_INLINE__ std::string str() const {
         return get_str<-1>();
       }
+
+#ifdef MATX_EN_JIT
+      struct JIT_Storage {
+        cuda::std::tuple<typename detail::inner_storage_or_self_t<detail::base_type_t<Ts>>...> ops_;
+      };
+
+      JIT_Storage ToJITStorage() const {
+        return JIT_Storage{cuda::std::apply([](const auto&... ops) {
+          return cuda::std::make_tuple(detail::to_jit_storage(ops)...);
+        }, ops_)};
+      }
+
+      template <int I = 0>
+      __MATX_INLINE__ std::string get_sizes_str() const {
+        if constexpr (I < sizeof...(Ts)) {
+          const auto& op = cuda::std::get<I>(ops_);
+          std::string sizes = "op" + std::to_string(I) + "_";
+          for (int d = 0; d < RANK; d++) {
+            sizes += std::to_string(op.Size(d));
+            if (d < RANK - 1) sizes += "x";
+          }
+          if constexpr (I < sizeof...(Ts) - 1) {
+            return sizes + "_" + get_sizes_str<I+1>();
+          } else {
+            return sizes;
+          }
+        } else {
+          return "";
+        }
+      }
+
+      __MATX_INLINE__ std::string get_jit_class_name() const {
+        return std::format("JITStack_axis{}_num{}_{}", axis_, sizeof...(Ts), get_sizes_str<0>());
+      }
+
+      template <int I = 0>
+      __MATX_INLINE__ std::string get_jit_type_list() const {
+        if constexpr (I < sizeof...(Ts) - 1) {
+          return "typename T" + std::to_string(I) + ", " + get_jit_type_list<I+1>();
+        } else if constexpr (I == sizeof...(Ts) - 1) {
+          return "typename T" + std::to_string(I);
+        } else {
+          return "";
+        }
+      }
+
+      template <int I = 0>
+      __MATX_INLINE__ std::string get_jit_storage_tuple_types() const {
+        if constexpr (I < sizeof...(Ts) - 1) {
+          return "typename detail::inner_storage_or_self_t<detail::base_type_t<T" + std::to_string(I) + ">>, " + get_jit_storage_tuple_types<I+1>();
+        } else if constexpr (I == sizeof...(Ts) - 1) {
+          return "typename detail::inner_storage_or_self_t<detail::base_type_t<T" + std::to_string(I) + ">>";
+        } else {
+          return "";
+        }
+      }
+
+      __MATX_INLINE__ std::string get_jit_storage_tuple() const {
+        return "cuda::std::tuple<" + get_jit_storage_tuple_types<0>() + "> ops_;\n";
+      }
+
+      __MATX_INLINE__ auto get_jit_op_str() const {
+        std::string func_name = get_jit_class_name();
+        cuda::std::array<index_t, RANK + 1> out_dims_;
+        for (int i = 0; i < RANK + 1; i++) {
+          out_dims_[i] = Size(i);
+        }
+        
+        return cuda::std::make_tuple(
+          func_name,
+          std::format("template <{}> struct {} {{\n"
+              "  using value_type = typename T0::value_type;\n"
+              "  using matxop = bool;\n"
+              "  constexpr static int RANK_ = {};\n"
+              "  constexpr static cuda::std::array<index_t, RANK_+1> sizes_ = {{ {} }};\n"
+              "  constexpr static int axis_ = {};\n"
+              "  {}"
+              "  // Const GetVal\n"
+              "  template <typename CapType, int I, int N>\n"
+              "  __MATX_INLINE__ __MATX_DEVICE__ auto GetVal(index_t oidx, cuda::std::array<index_t, RANK_>& indices) const {{\n"
+              "    if constexpr ( I == N ) {{\n"
+              "      const auto &op = cuda::std::get<0>(ops_);\n"
+              "      return get_value<CapType>(op, indices);\n"
+              "    }} else {{\n"
+              "      if ( I < oidx ) {{\n"
+              "        return GetVal<CapType, I+1, N>(oidx, indices);\n"
+              "      }} else {{\n"
+              "        const auto &op = cuda::std::get<I>(ops_);\n"
+              "        return get_value<CapType>(op, indices);\n"
+              "      }}\n"
+              "    }}\n"
+              "  }}\n"
+              "  // Non-const GetVal for lvalue assignments\n"
+              "  template <typename CapType, int I, int N>\n"
+              "  __MATX_INLINE__ __MATX_DEVICE__ decltype(auto) GetVal(index_t oidx, cuda::std::array<index_t, RANK_>& indices) {{\n"
+              "    if constexpr ( I == N ) {{\n"
+              "      auto &op = cuda::std::get<0>(ops_);\n"
+              "      return get_value<CapType>(op, indices);\n"
+              "    }} else {{\n"
+              "      if ( I < oidx ) {{\n"
+              "        return GetVal<CapType, I+1, N>(oidx, indices);\n"
+              "      }} else {{\n"
+              "        auto &op = cuda::std::get<I>(ops_);\n"
+              "        return get_value<CapType>(op, indices);\n"
+              "      }}\n"
+              "    }}\n"
+              "  }}\n"
+              "  // Const operator()\n"
+              "  template <typename CapType, typename... Is>\n"
+              "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(Is... is) const {{\n"
+              "    if constexpr (CapType::ept == ElementsPerThread::ONE) {{\n"
+              "      cuda::std::array<index_t, RANK_+1> indices{{is...}};\n"
+              "      cuda::std::array<index_t, RANK_> indices_o;\n"
+              "      index_t oidx = indices[axis_];\n"
+              "      for(int i = 0; i < axis_; i++) {{\n"
+              "        indices_o[i] = indices[i];\n"
+              "      }}\n"
+              "      for(int i = axis_; i < (int)indices_o.size(); i++) {{\n"
+              "        indices_o[i] = indices[i+1];\n"
+              "      }}\n"
+              "      return GetVal<CapType, 0, {}>(oidx, indices_o);\n"
+              "    }} else {{\n"
+              "      return Vector<value_type, static_cast<index_t>(CapType::ept)>{{}};\n"
+              "    }}\n"
+              "  }}\n"
+              "  // Non-const operator()\n"
+              "  template <typename CapType, typename... Is>\n"
+              "  __MATX_INLINE__ __MATX_DEVICE__ decltype(auto) operator()(Is... is) {{\n"
+              "    if constexpr (CapType::ept == ElementsPerThread::ONE) {{\n"
+              "      cuda::std::array<index_t, RANK_+1> indices{{is...}};\n"
+              "      cuda::std::array<index_t, RANK_> indices_o;\n"
+              "      index_t oidx = indices[axis_];\n"
+              "      for(int i = 0; i < axis_; i++) {{\n"
+              "        indices_o[i] = indices[i];\n"
+              "      }}\n"
+              "      for(int i = axis_; i < (int)indices_o.size(); i++) {{\n"
+              "        indices_o[i] = indices[i+1];\n"
+              "      }}\n"
+              "      return GetVal<CapType, 0, {}>(oidx, indices_o);\n"
+              "    }} else {{\n"
+              "      return Vector<value_type, static_cast<index_t>(CapType::ept)>{{}};\n"
+              "    }}\n"
+              "  }}\n"
+              "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return RANK_+1; }}\n"
+              "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const {{\n"
+              "    return sizes_[dim];\n"
+              "  }}\n"
+              "}};\n",
+              get_jit_type_list<0>(), func_name, RANK, detail::array_to_string(out_dims_), axis_, get_jit_storage_tuple(), sizeof...(Ts), sizeof...(Ts))
+        );
+      }
+#endif
 
       __MATX_INLINE__ StackOp(int axis, const Ts&... ts) : ops_(ts...), axis_(axis)
       {
@@ -196,7 +350,41 @@ namespace matx
 
       template <OperatorCapability Cap, typename InType>
       __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
-        if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+        if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+#ifdef MATX_EN_JIT
+          return get_jit_class_name() + "<" + get_jit_type_params<0>() + ">";
+#else
+          return "";
+#endif
+        }
+        else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+#ifdef MATX_EN_JIT
+          return combine_capabilities<Cap>(true, get_combined_ops_capability<Cap>(in, ops_));
+#else
+          return false;
+#endif
+        }
+        else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+#ifdef MATX_EN_JIT
+          // Get the key/value pair from get_jit_op_str()
+          const auto [key, value] = get_jit_op_str();
+          
+          // Insert into the map if the key doesn't exist
+          if (in.find(key) == in.end()) {
+            in[key] = value;
+          }
+          
+          // Also handle child operators
+          cuda::std::apply([&in](const auto&... ops) {
+            (detail::get_operator_capability<Cap>(ops, in), ...);
+          }, ops_);
+          
+          return true;
+#else
+          return false;
+#endif
+        }
+        else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
           const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
           return combine_capabilities<Cap>(my_cap, get_combined_ops_capability<Cap>(in, ops_));
         } 
@@ -210,6 +398,23 @@ namespace matx
           return combine_capabilities<Cap>(self_has_cap, get_combined_ops_capability<Cap>(in, ops_));
         }
       }
+
+#ifdef MATX_EN_JIT
+      template <int I = 0>
+      __MATX_INLINE__ std::string get_jit_type_params() const {
+        if constexpr (I < sizeof...(Ts)) {
+          VoidCapabilityType void_type{};
+          auto type_name = detail::get_operator_capability<OperatorCapability::JIT_TYPE_QUERY>(cuda::std::get<I>(ops_), void_type);
+          if constexpr (I < sizeof...(Ts) - 1) {
+            return type_name + "," + get_jit_type_params<I+1>();
+          } else {
+            return type_name;
+          }
+        } else {
+          return "";
+        }
+      }
+#endif
 
       private:
       cuda::std::tuple<typename detail::base_type_t<Ts> ...> ops_;

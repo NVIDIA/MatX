@@ -98,10 +98,10 @@ namespace matx
               "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(Is... indices) const\n"
               "  {{\n"
               "    if constexpr (CapType::ept == ElementsPerThread::ONE) {{\n"
-              "      if (get_value<DefaultCapabilities>(cond_, indices...)) {{\n"
-              "        return get_value<DefaultCapabilities>(op1_, indices...);\n"
+              "      if (get_value<CapType>(cond_, indices...)) {{\n"
+              "        return get_value<CapType>(op1_, indices...);\n"
               "      }} else {{\n"
-              "        return get_value<DefaultCapabilities>(op2_, indices...);\n"
+              "        return get_value<CapType>(op2_, indices...);\n"
               "      }}\n"
               "    }} else {{\n"
               "      return Vector<int, static_cast<index_t>(CapType::ept)>{{}};\n"
@@ -253,7 +253,17 @@ namespace matx
           return "";
 #endif
         }
-        else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+          else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+#ifdef MATX_EN_JIT
+            return combine_capabilities<Cap>(true, 
+              detail::get_operator_capability<Cap>(cond_, in),
+              detail::get_operator_capability<Cap>(op1_, in),
+              detail::get_operator_capability<Cap>(op2_, in));
+#else
+            return false;
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
 #ifdef MATX_EN_JIT
           const auto [key, value] = get_jit_op_str();
           if (in.find(key) == in.end()) {

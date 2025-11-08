@@ -163,7 +163,7 @@ namespace matx
       }
 
       __MATX_INLINE__ auto get_jit_op_str() const {
-        cuda::std::array<index_t, Rank()> out_dims_;
+        cuda::std::array<index_t, static_cast<size_t>(Rank())> out_dims_;
         for (int i = 0; i < Rank(); ++i) {
           out_dims_[i] = Size(i);
         }
@@ -213,6 +213,15 @@ namespace matx
           return get_jit_class_name() + "<" + lhs_jit_name + "," + rhs_jit_name + "," + op_jit_name + ">";
 #else
           return "";
+#endif
+        }
+        else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+#ifdef MATX_EN_JIT
+          return combine_capabilities<Cap>(true, 
+                                        detail::get_operator_capability<Cap>(in1_, in),
+                                        detail::get_operator_capability<Cap>(in2_, in));
+#else
+          return false;
 #endif
         }
         else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {

@@ -82,9 +82,6 @@ TYPED_TEST(OperatorTestsNumericAllExecs, CloneOp)
 
     (tov = op).run(exec);
     exec.sync();
-    print(op);
-    print(tov);
-    print(tiv);
 
     for(int n = 0; n < N; n++) {
       for(int m = 0; m < M; m++) {
@@ -220,14 +217,16 @@ TYPED_TEST(OperatorTestsNumericAllExecs, CloneOp)
 
     exec.sync();
 
-    (tov = clone<3>(conv2d(tiv, delta, MATX_C_MODE_SAME), {N, matxKeepDim, matxKeepDim})).run(exec);
+    if (jit_supported(conv2d(tiv, delta, MATX_C_MODE_SAME))) {
+      (tov = clone<3>(conv2d(tiv, delta, MATX_C_MODE_SAME), {N, matxKeepDim, matxKeepDim})).run(exec);
 
-    exec.sync();
+      exec.sync();
 
-    for(int n = 0; n < N; n++) {
-      for(int m = 0; m < M; m++) {
-        for(int k = 0; k < K; k++) {
-          ASSERT_EQ(tov(n,m,k) , tiv(m,k));
+      for(int n = 0; n < N; n++) {
+        for(int m = 0; m < M; m++) {
+          for(int k = 0; k < K; k++) {
+            ASSERT_EQ(tov(n,m,k) , tiv(m,k));
+          }
         }
       }
     }

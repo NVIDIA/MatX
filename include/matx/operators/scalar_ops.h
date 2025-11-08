@@ -121,6 +121,9 @@ namespace detail {
       else if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) { \
         return get_jit_class_name() + "<" + detail::type_to_string<T>() + ">"; \
       } \
+      else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) { \
+        return true; \
+      } \
       else { \
         return capability_attributes<Cap>::default_value; \
       } \
@@ -189,6 +192,9 @@ namespace detail {
       } \
       else if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) { \
         return get_jit_class_name() + "<" + detail::type_to_string<T>() + ">"; \
+      } \
+      else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) { \
+        return true; \
       } \
       else { \
         return capability_attributes<Cap>::default_value; \
@@ -267,6 +273,9 @@ namespace detail {
       else if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) { \
         return get_jit_class_name() + "<" + detail::type_to_string<T1>() + "," + detail::type_to_string<T2>() + ">"; \
       } \
+      else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) { \
+        return true; \
+      } \
       else { \
         return capability_attributes<Cap>::default_value; \
       } \
@@ -338,6 +347,9 @@ namespace detail {
       else if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) { \
         return get_jit_class_name() + "<" + detail::type_to_string<T1>() + "," + detail::type_to_string<T2>() + ">"; \
       } \
+      else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) { \
+        return true; \
+      } \
       else { \
         return capability_attributes<Cap>::default_value; \
       } \
@@ -406,6 +418,9 @@ namespace detail {
       } \
       else if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) { \
         return get_jit_class_name() + "<" + detail::type_to_string<T1>() + "," + detail::type_to_string<T2>() + ">"; \
+      } \
+      else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) { \
+        return true; \
       } \
       else { \
         return capability_attributes<Cap>::default_value; \
