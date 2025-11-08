@@ -67,9 +67,9 @@ namespace matx
             sizes_str += std::to_string(sizes_[i]);
             if (i < CRank - 1) sizes_str += "_";
           }
-          for (size_t i = 0; i < T::Rank(); i++) {
+          for (int32_t i = 0; i < T::Rank(); i++) {
             dims_str += std::to_string(dims_[i]);
-            if (i < T::Rank() - 1) dims_str += "_";
+            if (i < static_cast<int32_t>(T::Rank()) - 1) dims_str += "_";
           }
           return std::format("JITClone_sizes{}_dims{}", sizes_str, dims_str);
         }
@@ -229,6 +229,13 @@ MATX_IGNORE_WARNING_POP_GCC
             return std::format("{}<{}>", get_jit_class_name(), op_jit_name);
 #else
             return "";
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+#ifdef MATX_EN_JIT
+            return combine_capabilities<Cap>(true, detail::get_operator_capability<Cap>(op_, in));
+#else
+            return false;
 #endif
           }
           else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {

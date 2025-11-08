@@ -34,6 +34,7 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
+#include <format>
 
 namespace matx
 {
@@ -87,7 +88,15 @@ namespace matx
 
         template <OperatorCapability Cap, typename InType>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
-          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+          if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+            // Cannot JIT compile user-defined lambdas/functors - no way to get source code at runtime
+            return "";
+          }
+          else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+            // Cannot JIT compile user-defined lambdas/functors - no way to get source code at runtime
+            return false;
+          }
+          else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
             const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
             return 
                 combine_capabilities<Cap>(my_cap, get_combined_ops_capability<Cap>(in, ops_));

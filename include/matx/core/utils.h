@@ -241,12 +241,17 @@ __MATX_INLINE__ std::string array_to_string(const Container& container) {
 
 template <typename T, size_t N>
 __MATX_INLINE__ std::string array_to_string(const cuda::std::array<T, N>& arr) {
-  std::string s;
-  for (size_t i = 0; i < N; ++i) {
-    if (i != 0) s += ", ";
-    s += std::to_string(arr[i]);
+  if constexpr (N == 0) {
+    return std::string("");
   }
-  return s;
+  else {
+    std::string s;
+    for (size_t i = 0; i < N; ++i) {
+      if (i != 0) s += ", ";
+      s += std::to_string(arr[i]);
+    }
+    return s;
+  }
 }
 
 
@@ -300,16 +305,16 @@ __MATX_INLINE__ __MATX_HOST__  std::string type_to_string()
     return "__nv_bfloat16";
   }
   else if constexpr (std::is_same_v<T, matxFp16>) {
-    return "matxFp16";
+    return "matx::matxFp16";
   }
   else if constexpr (std::is_same_v<T, matxBf16>) {
-    return "matxBf16";
+    return "matx::matxBf16";
   }
   else if constexpr (std::is_same_v<T, matxFp16Complex>) {
-    return "matxFp16Complex";
+    return "matx::matxFp16Complex";
   }
   else if constexpr (std::is_same_v<T, matxBf16Complex>) {
-    return "matxBf16Complex";
+    return "matx::matxBf16Complex";
   }
   // CCCL complex types
   else if constexpr (std::is_same_v<T, cuda::std::complex<float>>) {
@@ -354,6 +359,18 @@ __MATX_INLINE__ __MATX_HOST__  std::string type_to_string_c_name()
   }
   else if constexpr (std::is_same_v<T, long long>) {
     return "long_long";
+  }
+  else if constexpr (std::is_same_v<T, matxFp16>) {
+    return "matx_matxFp16";
+  }
+  else if constexpr (std::is_same_v<T, matxBf16>) {
+    return "matx_matxBf16";
+  }  
+  else if constexpr (std::is_same_v<T, matxFp16Complex>) {
+    return "matx_matxFp16Complex";
+  }
+  else if constexpr (std::is_same_v<T, matxBf16Complex>) {
+    return "matx_matxBf16Complex";
   }
   else {
     return type_to_string<T>();

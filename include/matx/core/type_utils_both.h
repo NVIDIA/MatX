@@ -382,6 +382,19 @@ concept is_cuda_executor = requires {
 template <typename T> 
 inline constexpr bool is_cuda_executor_v = requires { typename remove_cvref_t<T>::cuda_executor; };
 
+/**
+ * @brief Determine if a type is a CUDA executor but NOT a JIT CUDA executor
+ * 
+ * @tparam T Type to test
+ */
+template <typename T>
+concept is_cuda_non_jit_executor = requires { typename remove_cvref_t<T>::cuda_executor; }
+                                   && !(requires { typename remove_cvref_t<T>::jit_cuda_executor; });
+
+// Legacy variable for backwards compatibility
+template <typename T>
+inline constexpr bool is_cuda_non_jit_executor_v = requires { typename remove_cvref_t<T>::cuda_executor; }
+                                                   && !(requires { typename remove_cvref_t<T>::jit_cuda_executor; });
 
 /**
  * @brief Determine if a type is a complex type (any type supported)

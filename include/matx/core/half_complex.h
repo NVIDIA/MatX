@@ -1056,3 +1056,62 @@ using matxFp16Complex = matxHalfComplex<matxFp16>; ///< Alias for a MatX fp16 co
 using matxBf16Complex = matxHalfComplex<matxBf16>; ///< Alias for a MatXbf16 complex wrapper
 
 }; // namespace matx
+
+#ifndef __CUDACC_RTC__
+// Add std::formatter specializations for matxFp16Complex and matxBf16Complex
+#include <format>
+
+namespace std {
+
+/**
+ * @brief std::formatter specialization for matxFp16Complex
+ * 
+ * Enables matxFp16Complex to work with std::format by converting to complex<float>
+ */
+template <>
+struct formatter<matx::matxFp16Complex> {
+  template <typename ParseContext>
+  constexpr auto parse(ParseContext& ctx) {
+    return ctx.begin();
+  }
+
+  template <typename FormatContext>
+  auto format(const matx::matxFp16Complex& val, FormatContext& ctx) const {
+    float real_val = static_cast<float>(val.real());
+    float imag_val = static_cast<float>(val.imag());
+    
+    if (imag_val >= 0) {
+      return std::format_to(ctx.out(), "({}+{}i)", real_val, imag_val);
+    } else {
+      return std::format_to(ctx.out(), "({}{}i)", real_val, imag_val);
+    }
+  }
+};
+
+/**
+ * @brief std::formatter specialization for matxBf16Complex
+ * 
+ * Enables matxBf16Complex to work with std::format by converting to complex<float>
+ */
+template <>
+struct formatter<matx::matxBf16Complex> {
+  template <typename ParseContext>
+  constexpr auto parse(ParseContext& ctx) {
+    return ctx.begin();
+  }
+
+  template <typename FormatContext>
+  auto format(const matx::matxBf16Complex& val, FormatContext& ctx) const {
+    float real_val = static_cast<float>(val.real());
+    float imag_val = static_cast<float>(val.imag());
+    
+    if (imag_val >= 0) {
+      return std::format_to(ctx.out(), "({}+{}i)", real_val, imag_val);
+    } else {
+      return std::format_to(ctx.out(), "({}{}i)", real_val, imag_val);
+    }
+  }
+};
+
+} // namespace std
+#endif // __CUDACC_RTC__

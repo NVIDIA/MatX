@@ -36,7 +36,7 @@ TYPED_TEST(OperatorTestsNumericNonComplexAllExecs, AtOp)
 
   ASSERT_EQ(t0(), t2(1, 4));  
 
-  if constexpr (is_cuda_executor_v<ExecType> && (std::is_same_v<TestType, float> || std::is_same_v<TestType, double>)) {
+  if constexpr (is_cuda_non_jit_executor_v<ExecType> && (std::is_same_v<TestType, float> || std::is_same_v<TestType, double>)) {
     using ComplexType = detail::complex_from_scalar_t<TestType>;
     auto c0 = make_tensor<ComplexType>({});
     (c0 = at(fft(t1), 0)).run(exec);

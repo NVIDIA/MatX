@@ -71,7 +71,7 @@ namespace detail {
 
       __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
-      __MATX_INLINE__ std::string get_capability_str(int EPT) const {
+      __MATX_INLINE__ std::string get_capability_str([[maybe_unused]] int EPT) const {
         return std::string("sum");         
       }      
 

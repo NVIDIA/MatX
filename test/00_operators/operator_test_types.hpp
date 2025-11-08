@@ -82,26 +82,41 @@ class OperatorTestsBooleanAllExecs : public ::testing::Test {};
 template <typename TensorType>
 class OperatorTestsCastToFloatAllExecs : public ::testing::Test {};
 
+// Operator-specific type aliases using ExecutorTypesAllWithJIT instead of ExecutorTypesAll
+using MatXFloatNonHalfTypesAllExecsWithJIT           = TupleToTypes<TypedCartesianProduct<MatXFloatNonHalfTuple, ExecutorTypesAllWithJIT>::type>::type;
+using MatXNumericNonComplexTypesAllExecsWithJIT      = TupleToTypes<TypedCartesianProduct<MatXNumericNonComplexTuple, ExecutorTypesAllWithJIT>::type>::type;
+using MatXFloatNonComplexNonHalfTypesAllExecsWithJIT = TupleToTypes<TypedCartesianProduct<MatXFloatNonComplexNonHalfTuple, ExecutorTypesAllWithJIT>::type>::type;
+using MatXTypesFloatNonComplexAllExecsWithJIT        = TupleToTypes<TypedCartesianProduct<MatXFloatNonComplexTuple, ExecutorTypesAllWithJIT>::type>::type;
+using MatXTypesNumericAllExecsWithJIT                = TupleToTypes<TypedCartesianProduct<MatXNumericTuple, ExecutorTypesAllWithJIT>::type>::type;
+using MatXNumericNoHalfTypesAllExecsWithJIT          = TupleToTypes<TypedCartesianProduct<MatXNumericNonHalfTuple, ExecutorTypesAllWithJIT>::type>::type;
+using MatXComplexNonHalfTypesAllExecsWithJIT         = TupleToTypes<TypedCartesianProduct<MatXComplexNonHalfTuple, ExecutorTypesAllWithJIT>::type>::type;
+using MatXComplexTypesAllExecsWithJIT                = TupleToTypes<TypedCartesianProduct<MatXComplexTuple, ExecutorTypesAllWithJIT>::type>::type;
+using MatXAllTypesAllExecsWithJIT                    = TupleToTypes<TypedCartesianProduct<MatXAllTuple, ExecutorTypesAllWithJIT>::type>::type;
+using MatXTypesFloatAllExecsWithJIT                  = TupleToTypes<TypedCartesianProduct<MatXFloatTuple, ExecutorTypesAllWithJIT>::type>::type;
+using MatXTypesIntegralAllExecsWithJIT               = TupleToTypes<TypedCartesianProduct<MatXIntegralTuple, ExecutorTypesAllWithJIT>::type>::type;
+using MatXTypesBooleanAllExecsWithJIT                = TupleToTypes<TypedCartesianProduct<MatXIntegralTuple, ExecutorTypesAllWithJIT>::type>::type;
+using MatXTypesCastToFloatAllExecsWithJIT            = TupleToTypes<TypedCartesianProduct<MatXCastToFloatTuple, ExecutorTypesAllWithJIT>::type>::type;
+
 TYPED_TEST_SUITE(OperatorTestsFloatNonHalf,
-  MatXFloatNonHalfTypesAllExecs);  
+  MatXFloatNonHalfTypesAllExecsWithJIT);  
 TYPED_TEST_SUITE(OperatorTestsNumericNonComplexAllExecs,
-                 MatXNumericNonComplexTypesAllExecs);  
+                 MatXNumericNonComplexTypesAllExecsWithJIT);  
 TYPED_TEST_SUITE(OperatorTestsFloatNonComplexNonHalfAllExecs,
-                 MatXFloatNonComplexNonHalfTypesAllExecs);  
+                 MatXFloatNonComplexNonHalfTypesAllExecsWithJIT);  
 TYPED_TEST_SUITE(OperatorTestsFloatNonComplexAllExecs,
-                 MatXTypesFloatNonComplexAllExecs);
+                 MatXTypesFloatNonComplexAllExecsWithJIT);
 TYPED_TEST_SUITE(OperatorTestsFloatNonComplexSingleThreadedHostAllExecs,
                  MatXTypesFloatNonComplexSingleThreadedHostAllExecs);
 TYPED_TEST_SUITE(OperatorTestsNumericAllExecs,
-                 MatXTypesNumericAllExecs);                                
-TYPED_TEST_SUITE(OperatorTestsNumericNoHalfAllExecs, MatXNumericNoHalfTypesAllExecs);          
-TYPED_TEST_SUITE(OperatorTestsComplexNonHalfTypesAllExecs, MatXComplexNonHalfTypesAllExecs);
-TYPED_TEST_SUITE(OperatorTestsComplexTypesAllExecs, MatXComplexTypesAllExecs);
-TYPED_TEST_SUITE(OperatorTestsAllExecs, MatXAllTypesAllExecs);
-TYPED_TEST_SUITE(OperatorTestsFloatAllExecs, MatXTypesFloatAllExecs);
-TYPED_TEST_SUITE(OperatorTestsIntegralAllExecs, MatXTypesIntegralAllExecs);
-TYPED_TEST_SUITE(OperatorTestsBooleanAllExecs, MatXTypesBooleanAllExecs);
-TYPED_TEST_SUITE(OperatorTestsCastToFloatAllExecs, MatXTypesCastToFloatAllExecs);
+                 MatXTypesNumericAllExecsWithJIT);                                
+TYPED_TEST_SUITE(OperatorTestsNumericNoHalfAllExecs, MatXNumericNoHalfTypesAllExecsWithJIT);          
+TYPED_TEST_SUITE(OperatorTestsComplexNonHalfTypesAllExecs, MatXComplexNonHalfTypesAllExecsWithJIT);
+TYPED_TEST_SUITE(OperatorTestsComplexTypesAllExecs, MatXComplexTypesAllExecsWithJIT);
+TYPED_TEST_SUITE(OperatorTestsAllExecs, MatXAllTypesAllExecsWithJIT);
+TYPED_TEST_SUITE(OperatorTestsFloatAllExecs, MatXTypesFloatAllExecsWithJIT);
+TYPED_TEST_SUITE(OperatorTestsIntegralAllExecs, MatXTypesIntegralAllExecsWithJIT);
+TYPED_TEST_SUITE(OperatorTestsBooleanAllExecs, MatXTypesBooleanAllExecsWithJIT);
+TYPED_TEST_SUITE(OperatorTestsCastToFloatAllExecs, MatXTypesCastToFloatAllExecsWithJIT);
 
 
 } // namespace test

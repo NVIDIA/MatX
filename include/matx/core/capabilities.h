@@ -123,7 +123,7 @@ namespace detail {
   struct capability_attributes<OperatorCapability::SUPPORTS_JIT> {
     using type = bool;
     using input_type = VoidCapabilityType;
-    static constexpr bool default_value = true;
+    static constexpr bool default_value = false;
     static constexpr bool or_identity = false;
     static constexpr bool and_identity = true;
   };
@@ -249,6 +249,10 @@ namespace detail {
       // Default capabilities for non-MatX ops
       if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
         return detail::type_to_string<OperatorType>();
+      }
+      else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+        // If this is not a matx operator (like a constant or a lambda), we assume it supports JIT.
+        return true;
       }
       else {
         return capability_attributes<Cap>::default_value;

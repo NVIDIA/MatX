@@ -138,6 +138,13 @@ namespace matx
             return "";
 #endif
           }
+          else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+#ifdef MATX_EN_JIT
+            return true;
+#else
+            return false;
+#endif
+          }
           else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
 #ifdef MATX_EN_JIT
             detail::get_operator_capability<Cap>(range_, in);

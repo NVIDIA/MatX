@@ -63,9 +63,9 @@ namespace matx
 
         __MATX_INLINE__ std::string get_jit_class_name() const {
           std::string idx_str;
-          for (size_t i = 0; i < sizeof...(Is); i++) {
+          for (int32_t i = 0; i < static_cast<int32_t>(sizeof...(Is)); i++) {
             idx_str += std::to_string(idx_[i]);
-            if (i < sizeof...(Is) - 1) idx_str += "_";
+            if (i < static_cast<int32_t>(sizeof...(Is)) - 1) idx_str += "_";
           }
           return std::format("JITAt_idx{}", idx_str);
         }
@@ -128,6 +128,13 @@ namespace matx
             return std::format("{}<{}>", get_jit_class_name(), op_jit_name);
 #else
             return "";
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+#ifdef MATX_EN_JIT
+            return combine_capabilities<Cap>(true, detail::get_operator_capability<Cap>(op_, in));
+#else
+            return false;
 #endif
           }
           else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {

@@ -58,20 +58,27 @@ namespace matx
       }
 
       __MATX_INLINE__ std::string get_jit_class_name() const {
-        std::string val_str;
-        if constexpr (std::is_floating_point_v<T>) {
-          val_str = std::format("{}", v_);
-        } else {
-          val_str = std::to_string(v_);
-        }
-        return std::format("JITConstVal_val{}_rank{}", val_str, Rank());
+        std::string val_str = std::format("{}", v_);
+
+        return std::format("JITConstVal_val{}_rank{}", val_str, Rank() == matxNoRank ? "No" : std::to_string(Rank()));
       }
 
       __MATX_INLINE__ auto get_jit_op_str() const {
         std::string func_name = get_jit_class_name();
-        cuda::std::array<index_t, Rank()> out_dims_;
-        for (int i = 0; i < Rank(); ++i) {
-          out_dims_[i] = Size(i);
+        std::string dims_array_str;
+        std::string size_func_str;
+        
+        if constexpr (!is_noshape_v<ShapeType>) {
+          cuda::std::array<index_t, static_cast<size_t>(RANK)> out_dims_;
+          for (int i = 0; i < RANK; ++i) {
+            out_dims_[i] = Size(i);
+          }
+          dims_array_str = std::format("constexpr static cuda::std::array<index_t, {}> out_dims_ = {{ {} }};\n  ", 
+                                        RANK, detail::array_to_string(out_dims_));
+          size_func_str = std::format("constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const {{ return out_dims_[dim]; }}\n  ");
+        } else {
+          dims_array_str = "";
+          size_func_str = std::format("constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const {{ return 0; }}\n  ");
         }
         
         return cuda::std::make_tuple(
@@ -79,8 +86,8 @@ namespace matx
           std::format("template <typename T> struct {} {{\n"
               "  using value_type = T;\n"
               "  using matxop = bool;\n"
-              "  constexpr static cuda::std::array<index_t, {}> out_dims_ = {{ {} }};\n"
-              "  constexpr static T v_ = static_cast<T>({});\n"
+              "  {}"
+              "constexpr static T v_ = static_cast<T>({});\n"
               "  template <typename CapType, typename... Is>\n"
               "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(Is...) const\n"
               "  {{\n"
@@ -91,9 +98,9 @@ namespace matx
               "    }}\n"
               "  }}\n"
               "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return {}; }}\n"
-              "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const {{ return out_dims_[dim]; }}\n"
+              "  {}"
               "}};\n",
-              func_name, Rank(), detail::array_to_string(out_dims_), v_, Rank())
+              func_name, dims_array_str, v_, Rank(), size_func_str)
         );
       }
 #endif
@@ -139,6 +146,13 @@ namespace matx
           return get_jit_class_name() + "<" + type_to_string<T>() + ">";
 #else
           return "";
+#endif
+        }
+        else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+#ifdef MATX_EN_JIT
+          return true;
+#else
+          return false;
 #endif
         }
         else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
