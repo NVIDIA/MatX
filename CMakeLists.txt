@@ -37,10 +37,8 @@ include(rapids-find)
 rapids_cpm_init(OVERRIDE "${CMAKE_CURRENT_SOURCE_DIR}/cmake/versions.json")
 
 if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
-    include(rapids-cuda)
-    set(CMAKE_CUDA_ARCHITECTURES "NATIVE")
-    message(STATUS "Auto-detecting GPU architectures since CMAKE_CUDA_ARCHITECTURES not defined")
-    rapids_cuda_init_architectures(MATX)
+    set(CMAKE_CUDA_ARCHITECTURES "native")
+    message(STATUS "Using native GPU architecture since CMAKE_CUDA_ARCHITECTURES not defined")
 endif()
 
 # This needs to go after rapids initialization otherwise we get a rapids_export_parse_version error
