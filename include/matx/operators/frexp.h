@@ -99,7 +99,7 @@ namespace detail {
       template <typename CapType, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
       {
-        auto get_scalar = [this](const auto &x){
+        auto get_scalar = [](const auto &x){
           [[maybe_unused]] int rexp;        
           if constexpr (is_cuda_complex_v<value_type>) {
             if constexpr (std::is_same_v<float, typename value_type::value_type>) {
