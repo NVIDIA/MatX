@@ -93,6 +93,9 @@ struct LTOIRData {
 
 static constexpr size_t MAX_CUDA_DEVICES_PER_SYSTEM = 16;
 using CacheId = uint64_t;
+struct CacheFreeHelper {
+  void (*free)(std::any&);
+};
 
 // Common cache parameters that every cache entry needs
 struct CacheCommonParamsKey {
@@ -118,13 +121,29 @@ __attribute__ ((visibility ("default")))
 inline cuda::std::atomic<CacheId> CacheIdCounter{0};
 inline std::recursive_mutex cache_mtx; ///< Mutex protecting updates from map
 inline std::recursive_mutex ltoir_mutex; ///< Mutex protecting LTOIR cache operations
+inline std::recursive_mutex stream_alloc_mutex; ///< Mutex protecting stream allocation cache operations
+
+inline auto& CacheRegistry() {
+  // Protected by cache_mtx
+  static std::unordered_map<CacheId, CacheFreeHelper> registry;
+  return registry;
+}
 
 template<typename CacheType>
 __attribute__ ((visibility ("default")))
 CacheId GetCacheIdFromType()
 {
   static CacheId id = CacheIdCounter.fetch_add(1);
-
+  [[maybe_unused]] std::lock_guard<std::recursive_mutex> lock(cache_mtx);
+  auto &registry = CacheRegistry();
+  registry.emplace(id, CacheFreeHelper{
+    .free = [](std::any& any) -> void {
+      using CacheMap = std::unordered_map<CacheCommonParamsKey, CacheType, CacheCommonParamsKeyHash>;
+      // This clear is the unordered_map's clear, which will ultimately call the
+      // destructors of the cache entries.
+      std::any_cast<CacheMap&>(any).clear();
+    },
+  });
   return id;
 }
 
@@ -144,10 +163,7 @@ class matxCache_t {
 public:
   matxCache_t() {}
   ~matxCache_t() {
-    // Destroy all outstanding objects in the cache to free memory
-    for (auto &[k, v]: cache) {
-      v.reset();
-    }
+    ClearAll();
   }
 
   /**
@@ -163,6 +179,38 @@ public:
 
     using CacheMap = std::unordered_map<CacheCommonParamsKey, CacheType, CacheCommonParamsKeyHash>;
     std::any_cast<CacheMap&>(el->second).clear();
+  }
+
+  void ClearAll() {
+    // Clear all cache entries for all cache types
+    {
+      [[maybe_unused]] std::lock_guard<std::recursive_mutex> lock(cache_mtx);
+      for (auto &[id, v]: cache) {
+        auto entry = CacheRegistry().find(id);
+        if (entry == CacheRegistry().end()) {
+          continue;
+        }
+        auto &info = entry->second;
+        info.free(v);
+      }
+      cache.clear();
+    }
+    {
+      [[maybe_unused]] std::lock_guard<std::recursive_mutex> lock(stream_alloc_mutex);
+      for (auto &[outer_key, inner_map]: stream_alloc_cache) {
+        for (auto &[inner_key, value]: inner_map) {
+          if (value.ptr) {
+            matxFree(value.ptr);
+          }
+        }
+        inner_map.clear();
+      }
+      stream_alloc_cache.clear();
+    }
+    {
+      [[maybe_unused]] std::lock_guard<std::recursive_mutex> lock(ltoir_mutex);
+      ltoir_cache.clear();
+    }
   }
 
   template <typename CacheType, typename InParams, typename MakeFun, typename ExecFun, typename Executor>
@@ -210,6 +258,8 @@ public:
     CacheCommonParamsKey key;
     key.thread_id = std::this_thread::get_id();
     cudaGetDevice(&key.device_id);
+
+    [[maybe_unused]] std::lock_guard<std::recursive_mutex> lock(stream_alloc_mutex);
 
     auto &common_params_cache = stream_alloc_cache[key];
     auto el = common_params_cache.find(stream);
@@ -689,8 +739,25 @@ __MATX_INLINE__ matxCache_t &GetCache() {
   return InitCache();
 }
 
-
-
-
 }  // namespace detail
+
+// Helper function to free all MatX caches. This function frees caches created for
+// FFT plans, cuBLAS handles, and other state required for MatX transforms. This
+// function does not clear the allocator cache (i.e., allocations made with matxAlloc
+// other than those created to support transforms).
+// To free the allocator cache, use matx::FreeMatXAllocations().
+__attribute__ ((visibility ("default")))
+__MATX_INLINE__ void ClearMatXCaches() {
+  detail::GetCache().ClearAll();
+}
+
+// Helper function to clear both MatX caches and allocations. This provides a single
+// function that can be called prior to program exit to support clean shutdown
+// (i.e., to avoid issues with the order of destruction of static objects and CUDA contexts).
+__attribute__ ((visibility ("default")))
+__MATX_INLINE__ void ClearMatXCachesAndAllocations() {
+  ClearMatXCaches();
+  FreeMatXAllocations();
+}
+
 }; // namespace matx

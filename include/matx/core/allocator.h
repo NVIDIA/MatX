@@ -103,11 +103,11 @@ struct MemTracker {
     iter->second.stream = stream;
   }
 
+  // deallocate_internal assumes that the caller has already acquired the memory_mtx mutex.
   template <typename StreamType>
   auto deallocate_internal(void *ptr, [[maybe_unused]] StreamType st) {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
-    [[maybe_unused]] std::unique_lock lck(memory_mtx);
     auto iter = allocationMap.find(ptr);
 
     if (iter == allocationMap.end()) {
@@ -159,10 +159,12 @@ struct MemTracker {
   struct valid_stream_t { cudaStream_t stream; };
 
   auto deallocate(void *ptr) {
+    [[maybe_unused]] std::unique_lock lck(memory_mtx);
     deallocate_internal(ptr, no_stream_t{});
   }
 
   auto deallocate(void *ptr, cudaStream_t stream) {
+    [[maybe_unused]] std::unique_lock lck(memory_mtx);
     deallocate_internal(ptr, valid_stream_t{stream});
   }    
 
@@ -256,10 +258,22 @@ struct MemTracker {
     return MATX_INVALID_MEMORY;
   }
 
-  ~MemTracker() {
-    while (allocationMap.size()) {
-      deallocate(allocationMap.begin()->first);
+  void free_all() {
+    [[maybe_unused]] std::unique_lock lck(memory_mtx);
+    while (! allocationMap.empty()) {
+      auto it = allocationMap.begin();
+      const auto ptr = it->first;
+      deallocate_internal(ptr, no_stream_t{});
+      if (allocationMap.find(ptr) != allocationMap.end()) {
+        // deallocate_internal may have erased the pointer from the map
+        // If not, erase it here to avoid an infinite loop.
+        allocationMap.erase(ptr);
+      }
     }
+  }
+
+  ~MemTracker() {
+    free_all();
   }
 };
 
@@ -269,6 +283,16 @@ __attribute__ ((visibility ("default")))
 __MATX_INLINE__ MemTracker &GetAllocMap() {
   static MemTracker tracker;
   return tracker;
+}
+
+// Helper function to free all MatX allocations. This function frees all allocations
+// made with matxAlloc. These allocations may have been made directly by the user or they
+// may have been made by MatX internally for workspaces. This function does not free the
+// caches (i.e., allocations made for FFT plans, cuBLAS handles, and other state required
+// for MatX transforms). To free those caches, use matx::FreeMatXCaches().
+__attribute__ ((visibility ("default")))
+__MATX_INLINE__ void FreeMatXAllocations() {
+  GetAllocMap().free_all();
 }
 
 /**
