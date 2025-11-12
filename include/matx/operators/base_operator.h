@@ -197,6 +197,28 @@ namespace matx
 
               tp->TransformExec(tp->Shape(), ex);
             }
+            else if constexpr (is_tensor_view_v<typename T::tensor_type> && is_tensor_view_v<typename T::op_type> && is_cuda_executor_v<Ex>) {
+              // If we are doing a tensor to tensor assignment we should prefer cudaMemcpyAsync instead of a kernel
+              if (detail::check_aliased_memory(tp->get_lhs(), tp->get_rhs(), true)) {
+                MATX_THROW(matxInvalidParameter, "Possible aliased memory detected: LHS and RHS memory ranges overlap");
+              }
+
+              if (tp->get_lhs().IsContiguous() && tp->get_rhs().IsContiguous() && tp->get_lhs().Rank() == tp->get_rhs().Rank()) {
+                MATX_ASSERT_STR(tp->get_lhs().Bytes() >= tp->get_rhs().Bytes(), matxInvalidSize, "LHS tensor is smaller than RHS tensor in assignment");
+                MATX_LOG_TRACE("Copying {} bytes from {} to {} using cudaMemcpyAsync",
+                  tp->get_lhs().Bytes(), reinterpret_cast<void*>(tp->get_rhs().Data()), reinterpret_cast<void*>(tp->get_lhs().Data()));
+                cudaMemcpyAsync(reinterpret_cast<void*>(tp->get_lhs().Data()),
+                                reinterpret_cast<void*>(tp->get_rhs().Data()),
+                                tp->get_rhs().Bytes(),
+                                cudaMemcpyDefault,
+                                ex.getStream());
+              }
+              else {
+                MATX_LOG_TRACE("Copying {} bytes from {} to {} using kernel",
+                  tp->get_lhs().Bytes(), reinterpret_cast<void*>(tp->get_rhs().Data()), reinterpret_cast<void*>(tp->get_lhs().Data()));
+                ex.Exec(*tp);
+              }
+            }
             else {
               if (detail::check_aliased_memory(tp->get_lhs(), tp->get_rhs(), true)) {
                 MATX_THROW(matxInvalidParameter, "Possible aliased memory detected: LHS and RHS memory ranges overlap");

@@ -741,7 +741,7 @@ public:
 
     int dev;
     cudaGetDevice(&dev);
-  #if CUDA_VERSION <= 12000
+  #if CUDART_VERSION <= 12000
     cudaMemPrefetchAsync(this->Data(), this->desc_.TotalSize() * sizeof(T), dev, stream);
   #else
     cudaMemLocation loc;
@@ -765,7 +765,7 @@ public:
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-  #if CUDA_VERSION <= 12000
+  #if CUDART_VERSION <= 12000
     cudaMemPrefetchAsync(this->Data(), this->desc_.TotalSize() * sizeof(T), cudaCpuDeviceId,
                          stream);
   #else
