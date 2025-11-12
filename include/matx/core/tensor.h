@@ -824,6 +824,15 @@ MATX_LOOP_UNROLL
   }
 
   /**
+   * @brief Return the storage container from the tensor (const version)
+   *
+   * @return storage container
+   */
+  __MATX_INLINE__ auto GetStorage() const noexcept {
+    return storage_;
+  }
+
+  /**
    * Create a view of only imaginary-valued components of a complex array
    *
    * Only available on complex data types.
