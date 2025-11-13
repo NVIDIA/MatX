@@ -5,6 +5,7 @@ list(TRANSFORM OPERATOR_TEST_FILES PREPEND "00_operators/")
 
 set (test_sources
     00_misc/AllocatorTests.cu
+    00_misc/ClearCacheTests.cu
     00_misc/ProfilingTests.cu
     00_tensor/BasicTensorTests.cu
     00_tensor/CUBTests.cu
@@ -140,6 +141,8 @@ endforeach()
 
 # Number of test jobs to run in parallel
 set(CTEST_PARALLEL_JOBS 4)
+
+set_tests_properties(test_00_misc_ClearCacheTests PROPERTIES RUN_SERIAL TRUE)
 
 # Create a legacy matx_test script for CI compatibility
 configure_file(

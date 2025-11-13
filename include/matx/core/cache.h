@@ -136,6 +136,11 @@ CacheId GetCacheIdFromType()
   static CacheId id = CacheIdCounter.fetch_add(1);
   [[maybe_unused]] std::lock_guard<std::recursive_mutex> lock(cache_mtx);
   auto &registry = CacheRegistry();
+  if (registry.find(id) != registry.end()) {
+    // Registry already contains this ID, so no need to insert it again
+    // with its CacheFreHelper.
+    return id;
+  }
   registry.emplace(id, CacheFreeHelper{
     .free = [](std::any& any) -> void {
       using CacheMap = std::unordered_map<CacheCommonParamsKey, CacheType, CacheCommonParamsKeyHash>;
@@ -745,9 +750,9 @@ __MATX_INLINE__ matxCache_t &GetCache() {
 // FFT plans, cuBLAS handles, and other state required for MatX transforms. This
 // function does not clear the allocator cache (i.e., allocations made with matxAlloc
 // other than those created to support transforms).
-// To free the allocator cache, use matx::FreeMatXAllocations().
+// To free the allocator cache, use matx::FreeAllocations().
 __attribute__ ((visibility ("default")))
-__MATX_INLINE__ void ClearMatXCaches() {
+__MATX_INLINE__ void ClearCaches() {
   detail::GetCache().ClearAll();
 }
 
@@ -755,9 +760,9 @@ __MATX_INLINE__ void ClearMatXCaches() {
 // function that can be called prior to program exit to support clean shutdown
 // (i.e., to avoid issues with the order of destruction of static objects and CUDA contexts).
 __attribute__ ((visibility ("default")))
-__MATX_INLINE__ void ClearMatXCachesAndAllocations() {
-  ClearMatXCaches();
-  FreeMatXAllocations();
+__MATX_INLINE__ void ClearCachesAndAllocations() {
+  ClearCaches();
+  FreeAllocations();
 }
 
 }; // namespace matx

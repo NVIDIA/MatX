@@ -289,9 +289,12 @@ __MATX_INLINE__ MemTracker &GetAllocMap() {
 // made with matxAlloc. These allocations may have been made directly by the user or they
 // may have been made by MatX internally for workspaces. This function does not free the
 // caches (i.e., allocations made for FFT plans, cuBLAS handles, and other state required
-// for MatX transforms). To free those caches, use matx::FreeMatXCaches().
+// for MatX transforms). To free those caches, use matx::ClearCaches(). It is not safe to
+// call matxFree() on user-managed pointers after calling this function. This function should
+// be called after the user application has called matxFree() on any pointers for which it
+// will call matxFree().
 __attribute__ ((visibility ("default")))
-__MATX_INLINE__ void FreeMatXAllocations() {
+__MATX_INLINE__ void FreeAllocations() {
   GetAllocMap().free_all();
 }
 

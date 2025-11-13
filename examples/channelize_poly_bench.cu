@@ -139,7 +139,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   // printf("Benchmarking complex<double> -> complex<double>\n");
   // ChannelizePolyBench<cuda::std::complex<double>,cuda::std::complex<double>>(channel_start, channel_stop);
 
-  matx::ClearMatXCachesAndAllocations();
+  matx::ClearCachesAndAllocations();
 
   MATX_EXIT_HANDLER();
 }
