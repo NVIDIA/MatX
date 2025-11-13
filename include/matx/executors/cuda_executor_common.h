@@ -192,7 +192,11 @@ namespace detail
       if (use_jit) {
         const auto group_range = detail::get_operator_capability<detail::OperatorCapability::GROUPS_PER_BLOCK>(op);
         groups_per_block = group_range[0];
-        const int total_batches = static_cast<int>(TotalSize(op) / op.Size(0));
+        int total_batches = 1;
+        if constexpr (op.Rank() > 0) {
+          total_batches = static_cast<int>(TotalSize(op) / op.Size(0));
+        }
+
         // If we don't have enough batches then fix this to the smaller amount
         groups_per_block = cuda::std::min(groups_per_block, total_batches);
         const auto set_groups_per_block_query = detail::SetGroupsPerBlockQueryInput{groups_per_block};

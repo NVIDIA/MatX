@@ -170,32 +170,32 @@ std::string get_jit_includes_path() {
 }
 
 template <typename Op>
-std::string get_kernel_name([[maybe_unused]] const Op &op, bool stride) {
+std::string get_kernel_name([[maybe_unused]] const Op &op, bool stride, bool global_kernel) {
   if constexpr (Op::Rank() == 0) {
     return "matx::detail::matxOpT0Kernel";
   }  
   else if constexpr (Op::Rank() == 1) {
-    return "matx::detail::matxOpT1Kernel";
+    return global_kernel ? "matx::detail::matxOpT1Kernel" : "matx::detail::matxOpT1KernelBlock";
   }
   else if constexpr (Op::Rank() == 2) {
     if (stride) {
-      return "matx::detail::matxOpT2StrideKernel";
+      return global_kernel ? "matx::detail::matxOpT2StrideKernel" : "matx::detail::matxOpT2StrideKernelBlock";
     } else {
-      return "matx::detail::matxOpT2Kernel";
+      return global_kernel ? "matx::detail::matxOpT2Kernel" : "matx::detail::matxOpT2KernelBlock";
     }
   }
   else if constexpr (Op::Rank() == 3) {
     if (stride) {
-      return "matx::detail::matxOpT3StrideKernel";
+      return global_kernel ? "matx::detail::matxOpT3StrideKernel" : "matx::detail::matxOpT3StrideKernelBlock";
     } else {
-      return "matx::detail::matxOpT3Kernel";
+      return global_kernel ? "matx::detail::matxOpT3Kernel" : "matx::detail::matxOpT3KernelBlock";
     }
   }
   else if constexpr (Op::Rank() == 4) {
     if (stride) {
-      return "matx::detail::matxOpT4StrideKernel";
+      return global_kernel ? "matx::detail::matxOpT4StrideKernel" : "matx::detail::matxOpT4StrideKernelBlock";
     } else {
-      return "matx::detail::matxOpT4Kernel";
+      return global_kernel ? "matx::detail::matxOpT4Kernel" : "matx::detail::matxOpT4KernelBlock";
     }
   }
 
@@ -296,7 +296,7 @@ inline std::string qualify_jit_type_names(const std::string& type_str) {
 }
 
 template <typename Op, typename SizeArray>
-auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, const SizeArray &sa, dim3 &blocks, dim3 &threads, ElementsPerThread ept, bool stride, int dynamic_shmem_size, int osize) {
+auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, const SizeArray &sa, dim3 &blocks, dim3 &threads, ElementsPerThread ept, bool stride, int dynamic_shmem_size, int osize, bool global_kernel) {
   // Pure NVRTC implementation
   // Cache both module and function to prevent resource leaks
   // CUmodule must remain loaded for CUfunction to be valid
@@ -311,7 +311,7 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, cons
   auto capstr = generate_capability_params_string(op, ept, false, osize, threads.x);
   const auto kernel_op_type = detail::get_operator_capability<OperatorCapability::JIT_TYPE_QUERY>(op);
   
-  std::string kernel_name = get_kernel_name(op, stride);
+  std::string kernel_name = get_kernel_name(op, stride, global_kernel);
   std::string cache_key = kernel_name + "_" + kernel_op_type;
 
   MATX_LOG_DEBUG("nvrtc_compile_and_run called with operator type: {}", typeid(op).name());

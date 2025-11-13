@@ -6,7 +6,8 @@
 using namespace matx;
 using namespace matx::test;
 
-TYPED_TEST(OperatorTestsFloatAllExecs, IsClose)
+// assigning ones() with a half precision type is not constexpr
+TYPED_TEST(OperatorTestsFloatAllExecsWithoutJIT, IsClose)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;

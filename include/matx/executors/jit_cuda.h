@@ -119,12 +119,26 @@ namespace matx
           if (jit_ept_bounds[0] == detail::ElementsPerThread::INVALID) {
             MATX_THROW(matxInvalidParameter, "Operator does not support JIT compilation. Use cudaExecutor instead.");
           }
-          
+
+
+          bool global_kernel = detail::get_operator_capability<detail::OperatorCapability::GLOBAL_KERNEL>(op);
+          if (global_kernel) {
+            MATX_LOG_DEBUG("Operator operates on a global level");
+          } else {
+            MATX_LOG_DEBUG("Operator operates on a block level");
+          }
+
           // Create kernel provider for JIT
           auto kernel_provider = [&](detail::ElementsPerThread ept) {
             dim3 local_blocks = 1;
             dim3 local_threads = 1;
-            bool stride = detail::get_grid_dims_jit<Op::Rank()>(local_blocks, local_threads, sizes, static_cast<int>(ept), 1, 1024, true);
+            bool stride;
+            if (global_kernel) {
+              stride = detail::get_grid_dims<Op::Rank()>(local_blocks, local_threads, sizes, static_cast<int>(ept), 256);
+            } else {
+              stride = detail::get_grid_dims_jit<Op::Rank()>(local_blocks, local_threads, sizes, static_cast<int>(ept), 1, 1024, true);
+            }
+              
             
             // Return appropriate kernel function pointer based on EPT, rank, and stride
             switch (ept) {
@@ -233,11 +247,17 @@ namespace matx
           // Find the best launch parameters
           auto [best_ept, shm_size, block_size, groups_per_block] = detail::find_best_launch_params(op, kernel_provider, 0, true);
                   
-          bool stride = detail::get_grid_dims_jit<Op::Rank()>(blocks, threads, sizes, static_cast<int>(best_ept), groups_per_block, block_size, true);            
+          bool stride;
+          if (global_kernel) {
+            stride = detail::get_grid_dims<Op::Rank()>(blocks, threads, sizes, static_cast<int>(best_ept), 256);
+          } else {
+            stride = detail::get_grid_dims_jit<Op::Rank()>(blocks, threads, sizes, static_cast<int>(best_ept), groups_per_block, block_size, true);
+          }
+
           MATX_LOG_DEBUG("Shm size {}, Stride {}, estimated EPT {}, blocks {}x{}x{} threads {}x{}x{}", 
               shm_size, stride, static_cast<int>(best_ept), blocks.x, blocks.y, blocks.z, threads.x, threads.y, threads.z);
           const int osize = op.Rank() == 0 ? 1 : static_cast<int>(op.Size(op.Rank() - 1));
-          detail::nvrtc_compile_and_run("output.cu", op, sizes, blocks, threads, best_ept, stride, shm_size, osize);
+          detail::nvrtc_compile_and_run("output.cu", op, sizes, blocks, threads, best_ept, stride, shm_size, osize, global_kernel);
          
 #else
           MATX_ASSERT_STR(false, matxInvalidParameter, "Cannot call device executor using host compiler");

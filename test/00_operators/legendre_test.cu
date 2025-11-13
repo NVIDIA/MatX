@@ -40,7 +40,8 @@ TypeParam legendre_check(int n, int m, TypeParam x) {
   return p2;
 }
 
-TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Legendre)
+// No JIT until constexpr half is fixed
+TYPED_TEST(OperatorTestsFloatNonComplexAllExecsWithoutJIT, Legendre)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;

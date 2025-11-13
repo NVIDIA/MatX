@@ -150,8 +150,8 @@ namespace matx
               "  using matxop = bool;\n"
               "  constexpr static int RANK_ = {};\n"
               "  constexpr static cuda::std::array<index_t, RANK_> sizes_ = {{ {} }};\n"
-              "  int axis_;\n"
-              "  index_t size_;\n"
+              "  constexpr static int axis_ = {};\n"
+              "  constexpr static index_t size_ = {};\n"
               "  {}"
               "  // Non-const get_impl for lvalue assignments\n"
               "  template <typename CapType, int I, int N>\n"
@@ -226,7 +226,7 @@ namespace matx
               "    return sizes_[dim];\n"
               "  }}\n"
               "}};\n",
-              get_jit_type_list<0>(), func_name, RANK, detail::array_to_string(out_dims_), get_jit_storage_tuple(), sizeof...(Ts), sizeof...(Ts))
+              get_jit_type_list<0>(), func_name, RANK, detail::array_to_string(out_dims_), axis_, size_, get_jit_storage_tuple(), sizeof...(Ts), sizeof...(Ts))
         );
       }
 #endif
@@ -255,7 +255,8 @@ namespace matx
         if constexpr ( I == N ) {
           // This should never happen, but we return a fake value from the first tuple element anyways
           auto &op = cuda::std::get<0>(ops_);
-          return cuda::std::apply([&](auto &&...call_args) -> decltype(auto) { return op.template operator()<CapType>(call_args...); }, indices);
+          return cuda::std::apply([&](auto &&...call_args) -> decltype(auto) { 
+            return op.template operator()<CapType>(call_args...); }, indices);
         } else {
           auto &op = cuda::std::get<I>(ops_);
           auto idx = indices[axis_];
@@ -263,7 +264,8 @@ namespace matx
           // If in range of this operator
           if(idx < size) {
             // evaluate operator
-            return cuda::std::apply([&](auto &&...call_args) -> decltype(auto) { return op.template operator()<CapType>(call_args...); }, indices);
+            return cuda::std::apply([&](auto &&...call_args) -> decltype(auto) { 
+              return op.template operator()<CapType>(call_args...); }, indices);
           } else {
             // otherwise remove this operator and recurse
             indices[axis_] -= size;

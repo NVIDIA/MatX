@@ -149,7 +149,7 @@ namespace matx
               "  using matxop = bool;\n"
               "  constexpr static int RANK_ = {};\n"
               "  constexpr static cuda::std::array<index_t, RANK_+1> sizes_ = {{ {} }};\n"
-              "  int axis_;\n"
+              "  constexpr static int axis_ = {};\n"
               "  {}"
               "  // Const GetVal\n"
               "  template <typename CapType, int I, int N>\n"
@@ -222,7 +222,7 @@ namespace matx
               "    return sizes_[dim];\n"
               "  }}\n"
               "}};\n",
-              get_jit_type_list<0>(), func_name, RANK, detail::array_to_string(out_dims_), get_jit_storage_tuple(), sizeof...(Ts), sizeof...(Ts))
+              get_jit_type_list<0>(), func_name, RANK, detail::array_to_string(out_dims_), axis_, get_jit_storage_tuple(), sizeof...(Ts), sizeof...(Ts))
         );
       }
 #endif
