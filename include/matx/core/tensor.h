@@ -824,6 +824,15 @@ MATX_LOOP_UNROLL
   }
 
   /**
+   * @brief Return the storage container from the tensor (const version)
+   *
+   * @return storage container
+   */
+  __MATX_INLINE__ auto GetStorage() const noexcept {
+    return storage_;
+  }
+
+  /**
    * Create a view of only imaginary-valued components of a complex array
    *
    * Only available on complex data types.
@@ -1470,8 +1479,9 @@ MATX_LOOP_UNROLL
     t->device.device_id = 0;
 
     // Determine where this memory resides
-    auto kind     = GetPointerKind(this->Data());
-    [[maybe_unused]] auto mem_res  = cuPointerGetAttributes(sizeof(attr)/sizeof(attr[0]), attr, data, reinterpret_cast<CUdeviceptr>(this->Data()));
+    void *data_ptr = this->GetStorage().data();
+    auto kind = GetPointerKind(data_ptr);
+    [[maybe_unused]] auto mem_res = cuPointerGetAttributes(sizeof(attr)/sizeof(attr[0]), attr, data, reinterpret_cast<CUdeviceptr>(data_ptr));
     MATX_ASSERT_STR_EXP(mem_res, CUDA_SUCCESS, matxCudaError, "Error returned from cuPointerGetAttributes");
     if (kind == MATX_INVALID_MEMORY) {
       if (mem_type == CU_MEMORYTYPE_DEVICE) {
