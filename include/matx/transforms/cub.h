@@ -46,6 +46,7 @@
 #include "matx/core/tensor.h"
 #include "matx/core/iterator.h"
 #include "matx/core/operator_utils.h"
+#include "matx/core/type_utils_both.h"
 #include "matx/transforms/cccl_iterators.h"
 
 
@@ -1078,17 +1079,53 @@ private:
 #ifdef __CUDACC__
 struct CustomArgMaxCmp
 {
+private:
   template <typename T>
-  __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ T operator()(const T &a, const T &b) const {
-    return thrust::get<1>(a) < thrust::get<1>(b) ? b : a;
+  __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto ToTuple(const T &value) const
+  {
+    if constexpr (is_tuple_c<T>)
+    {
+      return value;
+    }
+    else
+    {
+      return cuda::std::make_tuple(value.first, value.second);
+    }
+  }
+
+public:
+  template <typename InitT, typename InputT>
+  __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(const InitT &a, const InputT &b) const
+  {
+    auto at = ToTuple(a);
+    auto bt = ToTuple(b);
+    return thrust::get<1>(at) < thrust::get<1>(bt) ? bt : at;
   }
 };
 
 struct CustomArgMinCmp
 {
+private:
   template <typename T>
-  __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ T operator()(const T &a, const T &b) const {
-    return thrust::get<1>(a) >= thrust::get<1>(b) ? b : a;
+  __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto ToTuple(const T &value) const
+  {
+    if constexpr (is_tuple_c<T>)
+    {
+      return value;
+    }
+    else
+    {
+      return cuda::std::make_tuple(value.first, value.second);
+    }
+  }
+
+public:
+  template <typename InitT, typename InputT>
+  __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(const InitT &a, const InputT &b) const
+  {
+    auto at = ToTuple(a);
+    auto bt = ToTuple(b);
+    return thrust::get<1>(at) >= thrust::get<1>(bt) ? bt : at;
   }
 };
 
