@@ -43,9 +43,51 @@
 #include <cuda/std/array>
 #include <utility>
 #include <vector>
+#include <unordered_map>
+#include <mutex>
 
 namespace matx
 {
+  namespace detail {
+    /**
+     * @brief Cached launch parameters for JIT kernels
+     * 
+     * This structure stores all computed launch parameters so we can skip expensive
+     * computations when we've already compiled a kernel for this operator type.
+     * 
+     * IMPORTANT: For JIT compilation, tensor sizes are encoded in the operator type
+     * string (from JIT_TYPE_QUERY). This means different sizes produce different cache
+     * keys, so grid dimensions ARE safe to cache - they won't vary for the same type.
+     * 
+     * The cache works in conjunction with the nvrtc_compile_and_run kernel cache:
+     * 1. First execution: Computes all launch params -> caches everything
+     * 2. Subsequent executions: Uses cached params -> skips ALL computations
+     * 
+     * This avoids:
+     * - find_best_launch_params: EPT selection, device queries, occupancy calculations
+     * - get_grid_dims/get_grid_dims_block: Grid dimension calculations
+     * - All CUDA device attribute queries
+     * - Register pressure and shared memory constraint analysis
+     * 
+     * The cache is keyed by the operator type string from JIT_TYPE_QUERY which
+     * includes both the operator structure AND tensor sizes.
+     */
+    struct JITLaunchParams {
+      ElementsPerThread best_ept;       // Optimal elements per thread for this operator
+      int shm_size;                      // Dynamic shared memory size in bytes
+      int block_size;                    // Block dimension size
+      int groups_per_block;              // Groups per block (for block-level kernels)
+      bool stride;                       // Whether kernel uses grid-stride loops
+      dim3 blocks;                       // Grid dimensions (x, y, z blocks)
+      dim3 threads;                      // Block dimensions (x, y, z threads)
+      int osize;                         // Output size (last dimension)
+      bool global_kernel;                // Whether this is a global or block-level kernel
+    };
+
+    // Global cache for JIT launch parameters, keyed by operator type string from JIT_TYPE_QUERY
+    static std::unordered_map<std::string, JITLaunchParams> jit_launch_params_cache;
+    static std::mutex jit_launch_params_mutex;
+  }  // namespace detail
 
   /**
    * @brief Executes operators on a CUDA-enabled device using JIT compilation
@@ -119,125 +161,158 @@ namespace matx
           if (jit_ept_bounds[0] == detail::ElementsPerThread::INVALID) {
             MATX_THROW(matxInvalidParameter, "Operator does not support JIT compilation. Use cudaExecutor instead.");
           }
-          
-          // Create kernel provider for JIT
-          auto kernel_provider = [&](detail::ElementsPerThread ept) {
-            dim3 local_blocks = 1;
-            dim3 local_threads = 1;
-            bool stride = detail::get_grid_dims_jit<Op::Rank()>(local_blocks, local_threads, sizes, static_cast<int>(ept), 1, 1024, true);
-            
-            // Return appropriate kernel function pointer based on EPT, rank, and stride
-            switch (ept) {
-              case detail::ElementsPerThread::THIRTY_TWO:
-                if constexpr (Op::Rank() == 0) {
-                  return (const void*)detail::matxOpT0Kernel<detail::CapabilityParams<detail::ElementsPerThread::THIRTY_TWO, false>, Op>;
-                } else if constexpr (Op::Rank() == 1) {
-                  return (const void*)detail::matxOpT1Kernel<detail::CapabilityParams<detail::ElementsPerThread::THIRTY_TWO, false>, Op>;
-                } else if constexpr (Op::Rank() == 2) {
-                  return stride ? (const void*)detail::matxOpT2StrideKernel<detail::CapabilityParams<detail::ElementsPerThread::THIRTY_TWO, false>, Op> 
-                                : (const void*)detail::matxOpT2Kernel<detail::CapabilityParams<detail::ElementsPerThread::THIRTY_TWO, false>, Op>;
-                } else if constexpr (Op::Rank() == 3) {
-                  return stride ? (const void*)detail::matxOpT3StrideKernel<detail::CapabilityParams<detail::ElementsPerThread::THIRTY_TWO, false>, Op> 
-                                : (const void*)detail::matxOpT3Kernel<detail::CapabilityParams<detail::ElementsPerThread::THIRTY_TWO, false>, Op>;
-                } else if constexpr (Op::Rank() == 4) {
-                  return stride ? (const void*)detail::matxOpT4StrideKernel<detail::CapabilityParams<detail::ElementsPerThread::THIRTY_TWO, false>, Op> 
-                                : (const void*)detail::matxOpT4Kernel<detail::CapabilityParams<detail::ElementsPerThread::THIRTY_TWO, false>, Op>;
-                }
-                break;
-              case detail::ElementsPerThread::SIXTEEN:
-                if constexpr (Op::Rank() == 0) {
-                  return (const void*)detail::matxOpT0Kernel<detail::CapabilityParams<detail::ElementsPerThread::SIXTEEN, false>, Op>;
-                } else if constexpr (Op::Rank() == 1) {
-                  return (const void*)detail::matxOpT1Kernel<detail::CapabilityParams<detail::ElementsPerThread::SIXTEEN, false>, Op>;
-                } else if constexpr (Op::Rank() == 2) {
-                  return stride ? (const void*)detail::matxOpT2StrideKernel<detail::CapabilityParams<detail::ElementsPerThread::SIXTEEN, false>, Op> 
-                                : (const void*)detail::matxOpT2Kernel<detail::CapabilityParams<detail::ElementsPerThread::SIXTEEN, false>, Op>;
-                } else if constexpr (Op::Rank() == 3) {
-                  return stride ? (const void*)detail::matxOpT3StrideKernel<detail::CapabilityParams<detail::ElementsPerThread::SIXTEEN, false>, Op> 
-                                : (const void*)detail::matxOpT3Kernel<detail::CapabilityParams<detail::ElementsPerThread::SIXTEEN, false>, Op>;
-                } else if constexpr (Op::Rank() == 4) {
-                  return stride ? (const void*)detail::matxOpT4StrideKernel<detail::CapabilityParams<detail::ElementsPerThread::SIXTEEN, false>, Op> 
-                                : (const void*)detail::matxOpT4Kernel<detail::CapabilityParams<detail::ElementsPerThread::SIXTEEN, false>, Op>;
-                }
-                break;
-              case detail::ElementsPerThread::EIGHT:
-                if constexpr (Op::Rank() == 0) {
-                  return (const void*)detail::matxOpT0Kernel<detail::CapabilityParams<detail::ElementsPerThread::EIGHT, false>, Op>;
-                } else if constexpr (Op::Rank() == 1) {
-                  return (const void*)detail::matxOpT1Kernel<detail::CapabilityParams<detail::ElementsPerThread::EIGHT, false>, Op>;
-                } else if constexpr (Op::Rank() == 2) {
-                  return stride ? (const void*)detail::matxOpT2StrideKernel<detail::CapabilityParams<detail::ElementsPerThread::EIGHT, false>, Op> 
-                                : (const void*)detail::matxOpT2Kernel<detail::CapabilityParams<detail::ElementsPerThread::EIGHT, false>, Op>;
-                } else if constexpr (Op::Rank() == 3) {
-                  return stride ? (const void*)detail::matxOpT3StrideKernel<detail::CapabilityParams<detail::ElementsPerThread::EIGHT, false>, Op> 
-                                : (const void*)detail::matxOpT3Kernel<detail::CapabilityParams<detail::ElementsPerThread::EIGHT, false>, Op>;
-                } else if constexpr (Op::Rank() == 4) {
-                  return stride ? (const void*)detail::matxOpT4StrideKernel<detail::CapabilityParams<detail::ElementsPerThread::EIGHT, false>, Op> 
-                                : (const void*)detail::matxOpT4Kernel<detail::CapabilityParams<detail::ElementsPerThread::EIGHT, false>, Op>;
-                }
-                break;
-              case detail::ElementsPerThread::FOUR:
-                if constexpr (Op::Rank() == 0) {
-                  return (const void*)detail::matxOpT0Kernel<detail::CapabilityParams<detail::ElementsPerThread::FOUR, false>, Op>;
-                }else if constexpr (Op::Rank() == 1) {
-                  return (const void*)detail::matxOpT1Kernel<detail::CapabilityParams<detail::ElementsPerThread::FOUR, false>, Op>;
-                } else if constexpr (Op::Rank() == 2) {
-                  return stride ? (const void*)detail::matxOpT2StrideKernel<detail::CapabilityParams<detail::ElementsPerThread::FOUR, false>, Op> 
-                                : (const void*)detail::matxOpT2Kernel<detail::CapabilityParams<detail::ElementsPerThread::FOUR, false>, Op>;
-                } else if constexpr (Op::Rank() == 3) {
-                  return stride ? (const void*)detail::matxOpT3StrideKernel<detail::CapabilityParams<detail::ElementsPerThread::FOUR, false>, Op> 
-                                : (const void*)detail::matxOpT3Kernel<detail::CapabilityParams<detail::ElementsPerThread::FOUR, false>, Op>;
-                } else if constexpr (Op::Rank() == 4) {
-                  return stride ? (const void*)detail::matxOpT4StrideKernel<detail::CapabilityParams<detail::ElementsPerThread::FOUR, false>, Op> 
-                                : (const void*)detail::matxOpT4Kernel<detail::CapabilityParams<detail::ElementsPerThread::FOUR, false>, Op>;
-                }
-                break;
-              case detail::ElementsPerThread::TWO:
-                if constexpr (Op::Rank() == 0) {
-                  return (const void*)detail::matxOpT0Kernel<detail::CapabilityParams<detail::ElementsPerThread::TWO, false>, Op>;
-                } else if constexpr (Op::Rank() == 1) {
-                  return (const void*)detail::matxOpT1Kernel<detail::CapabilityParams<detail::ElementsPerThread::TWO, false>, Op>;
-                } else if constexpr (Op::Rank() == 2) {
-                  return stride ? (const void*)detail::matxOpT2StrideKernel<detail::CapabilityParams<detail::ElementsPerThread::TWO, false>, Op> 
-                                : (const void*)detail::matxOpT2Kernel<detail::CapabilityParams<detail::ElementsPerThread::TWO, false>, Op>;
-                } else if constexpr (Op::Rank() == 3) {
-                  return stride ? (const void*)detail::matxOpT3StrideKernel<detail::CapabilityParams<detail::ElementsPerThread::TWO, false>, Op> 
-                                : (const void*)detail::matxOpT3Kernel<detail::CapabilityParams<detail::ElementsPerThread::TWO, false>, Op>;
-                } else if constexpr (Op::Rank() == 4) {
-                  return stride ? (const void*)detail::matxOpT4StrideKernel<detail::CapabilityParams<detail::ElementsPerThread::TWO, false>, Op> 
-                                : (const void*)detail::matxOpT4Kernel<detail::CapabilityParams<detail::ElementsPerThread::TWO, false>, Op>;
-                }
-                break;
-              case detail::ElementsPerThread::ONE:
-                if constexpr (Op::Rank() == 0) {
-                  return (const void*)detail::matxOpT0Kernel<detail::CapabilityParams<detail::ElementsPerThread::ONE, false>, Op>;
-                } else if constexpr (Op::Rank() == 1) {
-                  return (const void*)detail::matxOpT1Kernel<detail::CapabilityParams<detail::ElementsPerThread::ONE, false>, Op>;
-                } else if constexpr (Op::Rank() == 2) {
-                  return stride ? (const void*)detail::matxOpT2StrideKernel<detail::CapabilityParams<detail::ElementsPerThread::ONE, false>, Op> 
-                                : (const void*)detail::matxOpT2Kernel<detail::CapabilityParams<detail::ElementsPerThread::ONE, false>, Op>;
-                } else if constexpr (Op::Rank() == 3) {
-                  return stride ? (const void*)detail::matxOpT3StrideKernel<detail::CapabilityParams<detail::ElementsPerThread::ONE, false>, Op> 
-                                : (const void*)detail::matxOpT3Kernel<detail::CapabilityParams<detail::ElementsPerThread::ONE, false>, Op>;
-                } else if constexpr (Op::Rank() == 4) {
-                  return (const void*)detail::matxOpT4Kernel<detail::CapabilityParams<detail::ElementsPerThread::ONE, false>, Op>;
-                }
-                break;
-              default:
-                return (const void*)nullptr;
-            }
-            return (const void*)nullptr;
-          };
 
-          MATX_LOG_DEBUG("Finding best launch parameters for JIT");
-          // Find the best launch parameters
-          auto [best_ept, shm_size, block_size, groups_per_block] = detail::find_best_launch_params(op, kernel_provider, 0, true);
-                  
-          bool stride = detail::get_grid_dims_jit<Op::Rank()>(blocks, threads, sizes, static_cast<int>(best_ept), groups_per_block, block_size, true);            
-          MATX_LOG_DEBUG("Shm size {}, Stride {}, estimated EPT {}, blocks {}x{}x{} threads {}x{}x{}", 
-              shm_size, stride, static_cast<int>(best_ept), blocks.x, blocks.y, blocks.z, threads.x, threads.y, threads.z);
-          const int osize = op.Rank() == 0 ? 1 : static_cast<int>(op.Size(op.Rank() - 1));
-          detail::nvrtc_compile_and_run("output.cu", op, sizes, blocks, threads, best_ept, stride, shm_size, osize);
+
+          bool global_kernel = detail::get_operator_capability<detail::OperatorCapability::GLOBAL_KERNEL>(op);
+          if (global_kernel) {
+            MATX_LOG_DEBUG("Operator operates on a global level");
+          } else {
+            MATX_LOG_DEBUG("Operator operates on a block level");
+          }
+
+          if constexpr (Op::Rank() <= 4) {
+            // Get operator type string for cache lookup
+            const auto kernel_op_type = detail::get_operator_capability<detail::OperatorCapability::JIT_TYPE_QUERY>(op);
+            
+            // Check if we have cached launch parameters for this operator type
+            detail::JITLaunchParams cached_params;
+            bool has_cached_params = false;
+            {
+              std::lock_guard<std::mutex> lock(detail::jit_launch_params_mutex);
+              auto it = detail::jit_launch_params_cache.find(kernel_op_type);
+              if (it != detail::jit_launch_params_cache.end()) {
+                cached_params = it->second;
+                has_cached_params = true;
+              }
+            }
+
+            detail::ElementsPerThread best_ept;
+            int shm_size, block_size, groups_per_block;
+            bool stride;
+            
+            if (has_cached_params) {
+              // Use cached parameters - skip ALL expensive computations!
+              MATX_LOG_DEBUG("Using cached launch parameters for operator type: {}", kernel_op_type);
+              best_ept = cached_params.best_ept;
+              shm_size = cached_params.shm_size;
+              block_size = cached_params.block_size;
+              groups_per_block = cached_params.groups_per_block;
+              stride = cached_params.stride;
+              blocks = cached_params.blocks;
+              threads = cached_params.threads;
+              
+              MATX_LOG_DEBUG("Cached EPT {}, Shm size {}, Block size {}, Groups per block {}", 
+                             static_cast<int>(best_ept), shm_size, block_size, groups_per_block);
+            } else {
+              // No cached parameters - compute them
+              MATX_LOG_DEBUG("No cached parameters found, computing launch parameters for JIT");
+              
+              // Create kernel provider for JIT using consolidated function
+              auto kernel_provider = detail::create_kernel_provider<Op>(sizes, true, global_kernel);
+
+              // Find the best launch parameters
+              auto result = detail::find_best_launch_params(op, kernel_provider, 0, true);
+              best_ept = cuda::std::get<0>(result);
+              shm_size = cuda::std::get<1>(result);
+              block_size = cuda::std::get<2>(result);
+              groups_per_block = cuda::std::get<3>(result);
+              
+              MATX_LOG_DEBUG("Best EPT {}, Shm size {}, Block size {}, Groups per block {}", 
+                             static_cast<int>(best_ept), shm_size, block_size, groups_per_block);
+              
+              if (global_kernel) {
+                stride = detail::get_grid_dims<Op::Rank()>(blocks, threads, sizes, static_cast<int>(best_ept), 256);
+              } else {
+                stride = detail::get_grid_dims_block<Op::Rank()>(blocks, threads, sizes, static_cast<int>(best_ept), groups_per_block, block_size, true);
+              }
+              
+              // Cache ALL parameters for future use (sizes are encoded in type string)
+              detail::JITLaunchParams params_to_cache;
+              params_to_cache.best_ept = best_ept;
+              params_to_cache.shm_size = shm_size;
+              params_to_cache.block_size = block_size;
+              params_to_cache.groups_per_block = groups_per_block;
+              params_to_cache.stride = stride;
+              params_to_cache.blocks = blocks;
+              params_to_cache.threads = threads;
+              params_to_cache.osize = op.Rank() == 0 ? 1 : static_cast<int>(op.Size(op.Rank() - 1));
+              params_to_cache.global_kernel = global_kernel;
+              
+              {
+                std::lock_guard<std::mutex> lock(detail::jit_launch_params_mutex);
+                detail::jit_launch_params_cache[kernel_op_type] = params_to_cache;
+              }
+            }
+
+            MATX_LOG_DEBUG("Shm size {}, Stride {}, estimated EPT {}, blocks {}x{}x{} threads {}x{}x{}", 
+                shm_size, stride, static_cast<int>(best_ept), blocks.x, blocks.y, blocks.z, threads.x, threads.y, threads.z);
+            const int osize = op.Rank() == 0 ? 1 : static_cast<int>(op.Size(op.Rank() - 1));
+            detail::nvrtc_compile_and_run("output.cu", op, sizes, blocks, threads, best_ept, stride, shm_size, osize, global_kernel);
+          }
+          else {
+            // ND kernel support for ranks > 4 (JIT path)
+            // Get operator type string for cache lookup
+            const auto kernel_op_type = detail::get_operator_capability<detail::OperatorCapability::JIT_TYPE_QUERY>(op);
+            
+            // Check if we have cached launch parameters for this operator type
+            detail::JITLaunchParams cached_params;
+            bool has_cached_params = false;
+            {
+              std::lock_guard<std::mutex> lock(detail::jit_launch_params_mutex);
+              auto it = detail::jit_launch_params_cache.find(kernel_op_type);
+              if (it != detail::jit_launch_params_cache.end()) {
+                cached_params = it->second;
+                has_cached_params = true;
+              }
+            }
+            
+            detail::ElementsPerThread best_ept;
+            bool stride;
+            
+            if (has_cached_params) {
+              // Use cached parameters - skip ALL computations!
+              MATX_LOG_DEBUG("Using cached launch parameters for ND kernel: {}", kernel_op_type);
+              best_ept = cached_params.best_ept;
+              stride = cached_params.stride;
+              blocks = cached_params.blocks;
+              threads = cached_params.threads;
+            } else {
+              // No cached parameters - compute them
+              MATX_LOG_DEBUG("No cached parameters found, computing launch parameters for ND kernel");
+              
+              // Reuse the ept_type and jit_ept_bounds from above
+              const auto ept_bounds = jit_ept_bounds;
+              best_ept = ept_bounds[1];
+              stride = detail::get_grid_dims<Op::Rank()>(blocks, threads, sizes, static_cast<int>(best_ept), 1024);   
+              
+              // Cache ALL parameters for future use (sizes are encoded in type string)
+              detail::JITLaunchParams params_to_cache;
+              params_to_cache.best_ept = best_ept;
+              params_to_cache.shm_size = 0;
+              params_to_cache.block_size = threads.x;
+              params_to_cache.groups_per_block = 1;
+              params_to_cache.stride = stride;
+              params_to_cache.blocks = blocks;
+              params_to_cache.threads = threads;
+              params_to_cache.osize = op.Rank() == 0 ? 1 : static_cast<int>(op.Size(op.Rank() - 1));
+              params_to_cache.global_kernel = true;
+              
+              {
+                std::lock_guard<std::mutex> lock(detail::jit_launch_params_mutex);
+                detail::jit_launch_params_cache[kernel_op_type] = params_to_cache;
+              }
+            }
+            
+            MATX_LOG_DEBUG("Using ND kernel for rank > 4 with JIT and EPT {}", static_cast<int>(best_ept));            
+            index_t dims = cuda::std::accumulate(cuda::std::begin(sizes) + 1, cuda::std::end(sizes), 1, cuda::std::multiplies<index_t>());
+            const int osize = op.Rank() == 0 ? 1 : static_cast<int>(op.Size(op.Rank() - 1));
+            
+            MATX_LOG_DEBUG("ND kernel: stride {}, blocks {}x{}x{} threads {}x{}x{}, dims {}", 
+                stride, blocks.x, blocks.y, blocks.z, threads.x, threads.y, threads.z, dims);
+            
+            // Use ND kernel through JIT compilation
+            detail::nvrtc_compile_and_run("output.cu", op, sizes, blocks, threads, best_ept, stride, 0, osize, true);
+          }
          
 #else
           MATX_ASSERT_STR(false, matxInvalidParameter, "Cannot call device executor using host compiler");

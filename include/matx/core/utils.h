@@ -34,6 +34,7 @@
 
 #include <type_traits>
 #include <string>
+#include <format>
 #include <cuda_fp16.h>
 
 #include "matx/core/defines.h"
@@ -241,12 +242,17 @@ __MATX_INLINE__ std::string array_to_string(const Container& container) {
 
 template <typename T, size_t N>
 __MATX_INLINE__ std::string array_to_string(const cuda::std::array<T, N>& arr) {
-  std::string s;
-  for (size_t i = 0; i < N; ++i) {
-    if (i != 0) s += ", ";
-    s += std::to_string(arr[i]);
+  if constexpr (N == 0) {
+    return std::string("");
   }
-  return s;
+  else {
+    std::string s;
+    for (size_t i = 0; i < N; ++i) {
+      if (i != 0) s += ", ";
+      s += std::to_string(arr[i]);
+    }
+    return s;
+  }
 }
 
 
@@ -300,16 +306,16 @@ __MATX_INLINE__ __MATX_HOST__  std::string type_to_string()
     return "__nv_bfloat16";
   }
   else if constexpr (std::is_same_v<T, matxFp16>) {
-    return "matxFp16";
+    return "matx::matxFp16";
   }
   else if constexpr (std::is_same_v<T, matxBf16>) {
-    return "matxBf16";
+    return "matx::matxBf16";
   }
   else if constexpr (std::is_same_v<T, matxFp16Complex>) {
-    return "matxFp16Complex";
+    return "matx::matxFp16Complex";
   }
   else if constexpr (std::is_same_v<T, matxBf16Complex>) {
-    return "matxBf16Complex";
+    return "matx::matxBf16Complex";
   }
   // CCCL complex types
   else if constexpr (std::is_same_v<T, cuda::std::complex<float>>) {
@@ -355,6 +361,18 @@ __MATX_INLINE__ __MATX_HOST__  std::string type_to_string_c_name()
   else if constexpr (std::is_same_v<T, long long>) {
     return "long_long";
   }
+  else if constexpr (std::is_same_v<T, matxFp16>) {
+    return "matx_matxFp16";
+  }
+  else if constexpr (std::is_same_v<T, matxBf16>) {
+    return "matx_matxBf16";
+  }  
+  else if constexpr (std::is_same_v<T, matxFp16Complex>) {
+    return "matx_matxFp16Complex";
+  }
+  else if constexpr (std::is_same_v<T, matxBf16Complex>) {
+    return "matx_matxBf16Complex";
+  }
   else {
     return type_to_string<T>();
   }
@@ -372,6 +390,48 @@ auto get_jit_class_or_pod_name(const T& op)
   }
 }
 
+/**
+ * @brief Convert a number to a valid C++ symbol/identifier string
+ * 
+ * Formats a numeric value as a string that can be used in C++ variable names.
+ * For complex numbers, the format is "r{real}_i{imag}".
+ * For non-complex numbers, the format is the string representation of the value.
+ * Special characters like '.' and '-' are replaced with 'p' (for point) and 
+ * 'n' (for negative) respectively.
+ * 
+ * @tparam T Numeric type (can be complex or non-complex)
+ * @param val Numeric value to convert
+ * @return String representation safe for use in C++ identifiers
+ * 
+ * @example
+ * number_to_symbol(cuda::std::complex<float>{1.5, -2.3}) returns "r1p5_in2p3"
+ * number_to_symbol(3.14f) returns "3p14"
+ * number_to_symbol(-5) returns "n5"
+ */
+template <typename T>
+__MATX_INLINE__ std::string number_to_symbol(const T& val)
+{
+  // Helper lambda to sanitize floating point values for variable names
+  auto sanitize_float = [](auto v) -> std::string {
+    std::string str = std::format("{}", v);
+    // Replace '.' with 'p' (for point), '-' with 'n' (for negative)
+    for (auto& c : str) {
+      if (c == '.') c = 'p';
+      else if (c == '-') c = 'n';
+    }
+    return str;
+  };
+  
+  if constexpr (is_complex_v<T>) {
+    // Format complex numbers as r{real}_i{imag}
+    auto real_val = val.real();
+    auto imag_val = val.imag();
+    return std::format("r{}_i{}", sanitize_float(real_val), sanitize_float(imag_val));
+  } else {
+    // Format non-complex numbers directly
+    return sanitize_float(val);
+  }
+}
 
 
 }

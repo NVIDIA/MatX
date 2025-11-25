@@ -382,6 +382,31 @@ concept is_cuda_executor = requires {
 template <typename T> 
 inline constexpr bool is_cuda_executor_v = requires { typename remove_cvref_t<T>::cuda_executor; };
 
+/**
+ * @brief Determine if a type is a CUDA executor but NOT a JIT CUDA executor
+ * 
+ * @tparam T Type to test
+ */
+template <typename T>
+concept is_cuda_non_jit_executor = requires { typename remove_cvref_t<T>::cuda_executor; }
+                                   && !(requires { typename remove_cvref_t<T>::jit_cuda_executor; });
+
+// Legacy variable for backwards compatibility
+template <typename T>
+inline constexpr bool is_cuda_non_jit_executor_v = requires { typename remove_cvref_t<T>::cuda_executor; }
+                                                   && !(requires { typename remove_cvref_t<T>::jit_cuda_executor; });
+
+/**
+ * @brief Determine if a type is a CUDA JIT executor
+ *
+ * @tparam T Type to test
+ */
+template <typename T>
+concept is_cuda_jit_executor = requires { typename remove_cvref_t<T>::jit_cuda_executor; };
+
+// Legacy variable for backwards compatibility
+template <typename T>
+inline constexpr bool is_cuda_jit_executor_v = requires { typename remove_cvref_t<T>::jit_cuda_executor; };
 
 /**
  * @brief Determine if a type is a complex type (any type supported)
@@ -766,7 +791,7 @@ struct complex_type_of
 template <class C>
 using matx_convert_complex_type =
     typename cuda::std::conditional_t<!is_complex_v<C>, identity<C>,
-                                complex_type_of<C>>::type;
+                                complex_type_of<C>>::type;                         
 #endif
 
 template <class T, class = void> struct value_type {

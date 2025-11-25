@@ -70,6 +70,7 @@ namespace detail {
     MAX_EPT_VEC_LOAD, // The maximum EPT for a vector load.
     ELEMENT_WISE, // Whether the operator is element-wise (safe with aliasing)
     ALIASED_MEMORY, // Whether the operator's input and output pointers alias
+    GLOBAL_KERNEL, // Kernel operates entirely on a global level per chunk of data. False when at least one operator works on a block level
     // Add more capabilities as needed
   };
 
@@ -123,7 +124,7 @@ namespace detail {
   struct capability_attributes<OperatorCapability::SUPPORTS_JIT> {
     using type = bool;
     using input_type = VoidCapabilityType;
-    static constexpr bool default_value = true;
+    static constexpr bool default_value = false;
     static constexpr bool or_identity = false;
     static constexpr bool and_identity = true;
   };
@@ -144,7 +145,16 @@ namespace detail {
     static constexpr bool default_value = false;
     static constexpr bool or_identity = false;
     static constexpr bool and_identity = true;
-  };    
+  }; 
+  
+  template <>
+  struct capability_attributes<OperatorCapability::GLOBAL_KERNEL> {
+    using type = bool;
+    using input_type = VoidCapabilityType;
+    static constexpr bool default_value = true;
+    static constexpr bool or_identity = false;
+    static constexpr bool and_identity = true;
+  };   
 
   template <>
   struct capability_attributes<OperatorCapability::ALIASED_MEMORY> {
@@ -250,6 +260,10 @@ namespace detail {
       if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
         return detail::type_to_string<OperatorType>();
       }
+      else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+        // If this is not a matx operator (like a constant or a lambda), we assume it supports JIT.
+        return true;
+      }
       else {
         return capability_attributes<Cap>::default_value;
       }
@@ -274,6 +288,8 @@ namespace detail {
         return CapabilityQueryType::AND_QUERY; // If any sub-operator supports JIT, the expression might be JIT-able.
       case OperatorCapability::ASYNC_LOADS_REQUESTED:
         return CapabilityQueryType::OR_QUERY; // If any sub-operator requires asynchronous loads, the expression might require asynchronous loads.
+      case OperatorCapability::GLOBAL_KERNEL:
+        return CapabilityQueryType::AND_QUERY; // If any sub-operator operates on a global level, the expression might operate on a global level.
       case OperatorCapability::ELEMENTS_PER_THREAD:
         return CapabilityQueryType::RANGE_QUERY; // The expression should use the range of elements per thread of its children.
       case OperatorCapability::SET_ELEMENTS_PER_THREAD:

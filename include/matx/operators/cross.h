@@ -93,7 +93,49 @@ namespace matx
                 "  typename detail::inner_storage_or_self_t<detail::base_type_t<OpA>> a_;\n"
                 "  typename detail::inner_storage_or_self_t<detail::base_type_t<OpB>> b_;\n"
                 "  template <typename CapType, typename... Is>\n"
-                "  __MATX_INLINE__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) const {{ /* cross product logic */ }}\n"
+                "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(Is... indices) const {{\n"
+                "    if constexpr (CapType::ept == ElementsPerThread::ONE) {{\n"
+                "      cuda::std::array idx{{indices...}};\n"
+                "      auto idxOut = idx[idx.size() - 1];\n"
+                "      cuda::std::array idx0{{idx}};\n"
+                "      cuda::std::array idx1{{idx}};\n"
+                "      cuda::std::array idx2{{idx}};\n"
+                "      idx0[idx0.size() - 1] = 0LL;\n"
+                "      idx1[idx1.size() - 1] = 1LL;\n"
+                "      idx2[idx2.size() - 1] = 2LL;\n"
+                "      auto a0 = get_value<CapType>(a_, idx0);\n"
+                "      auto a1 = get_value<CapType>(a_, idx1);\n"
+                "      auto b0 = get_value<CapType>(b_, idx0);\n"
+                "      auto b1 = get_value<CapType>(b_, idx1);\n"
+                "      if (idxOut == 2 || (isA2D_ && isB2D_)) {{\n"
+                "        return a0 * b1 - a1 * b0;\n"
+                "      }}\n"
+                "      if (!isA2D_ && !isB2D_) {{\n"
+                "        auto a2 = get_value<CapType>(a_, idx2);\n"
+                "        auto b2 = get_value<CapType>(b_, idx2);\n"
+                "        if (idxOut == 0) {{\n"
+                "          return a1 * b2 - a2 * b1;\n"
+                "        }}\n"
+                "        return a2 * b0 - a0 * b2;\n"
+                "      }}\n"
+                "      else if (isA2D_ && !isB2D_) {{\n"
+                "        auto b2 = get_value<CapType>(b_, idx2);\n"
+                "        if (idxOut == 0) {{\n"
+                "          return a1 * b2;\n"
+                "        }}\n"
+                "        return -a0 * b2;\n"
+                "      }}\n"
+                "      else {{\n"
+                "        auto a2 = get_value<CapType>(a_, idx2);\n"
+                "        if (idxOut == 0) {{\n"
+                "          return -a2 * b1;\n"
+                "        }}\n"
+                "        return a2 * b0;\n"
+                "      }}\n"
+                "    }} else {{\n"
+                "      return Vector<value_type, static_cast<size_t>(CapType::ept)>();\n"
+                "    }}\n"
+                "  }}\n"
                 "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return Rank_; }}\n"
                 "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const {{ return out_dims_[dim]; }}\n"
                 "}};\n",
@@ -211,6 +253,15 @@ namespace matx
             return "";
 #endif
           }
+          else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+#ifdef MATX_EN_JIT
+            return combine_capabilities<Cap>(true, 
+              detail::get_operator_capability<Cap>(a_, in),
+              detail::get_operator_capability<Cap>(b_, in));
+#else
+            return false;
+#endif
+          }
           else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
 #ifdef MATX_EN_JIT
             const auto [key, value] = get_jit_op_str();
@@ -240,7 +291,7 @@ namespace matx
             return combine_capabilities<Cap>(
               self_has_cap,
             detail::get_operator_capability<Cap>(a_, in),
-              detail::get_operator_capability<Cap>(b_, in)
+            detail::get_operator_capability<Cap>(b_, in)
             );
           }
         }

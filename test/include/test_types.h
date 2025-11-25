@@ -75,6 +75,13 @@ template <> auto inline GenerateData<cuda::std::complex<double>>()
 using ExecutorTypesAll = cuda::std::tuple<matx::cudaExecutor, matx::SingleThreadedHostExecutor, matx::AllThreadsHostExecutor, matx::SelectThreadsHostExecutor>;
 using ExecutorTypesCUDAOnly = cuda::std::tuple<matx::cudaExecutor>;
 using ExecutorTypesAllSingleThreadedHost = cuda::std::tuple<matx::cudaExecutor, matx::SingleThreadedHostExecutor>;
+#ifdef MATX_EN_JIT
+using ExecutorTypesAllWithJIT = cuda::std::tuple<matx::CUDAJITExecutor, matx::cudaExecutor, matx::SingleThreadedHostExecutor, matx::AllThreadsHostExecutor, matx::SelectThreadsHostExecutor>;
+using ExecutorTypesAllWithoutJIT = cuda::std::tuple<matx::cudaExecutor, matx::SingleThreadedHostExecutor, matx::AllThreadsHostExecutor, matx::SelectThreadsHostExecutor>;
+#else 
+using ExecutorTypesAllWithJIT = ExecutorTypesAll;
+using ExecutorTypesAllWithoutJIT = ExecutorTypesAll;
+#endif
 
 /* Taken from https://stackoverflow.com/questions/70404549/cartesian-product-of-stdtuple */
 template<typename T1, typename T2>

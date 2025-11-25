@@ -88,12 +88,60 @@ namespace matx
                 "  typename detail::inner_storage_or_self_t<detail::base_type_t<T1>> n_;\n"
                 "  typename detail::inner_storage_or_self_t<detail::base_type_t<T2>> m_;\n"
                 "  typename detail::inner_storage_or_self_t<detail::base_type_t<T3>> in_;\n"
+                "  template <typename TypeParam>\n"
+                "  static __MATX_INLINE__ __MATX_DEVICE__ TypeParam legendre_calc(int n, int m, TypeParam x) {{\n"
+                "    if (m > n) return 0;\n"
+                "    TypeParam a = cuda::std::sqrt(TypeParam(1)-x*x);\n"
+                "    TypeParam d1 = 1, d0;\n"
+                "    for(int i=0; i < m; i++) {{\n"
+                "      d0 = d1;\n"
+                "      d1 = -TypeParam(2*i+1)*a*d0;\n"
+                "    }}\n"
+                "    TypeParam p0, p1 = 0, p2 = d1;\n"
+                "    for(int l=m; l<n; l++) {{\n"
+                "      p0 = p1;\n"
+                "      p1 = p2;\n"
+                "      p2 = (TypeParam(2*l+1) * x * p1 - TypeParam(l+m)*p0)/(TypeParam(l-m+1));\n"
+                "    }}\n"
+                "    return p2;\n"
+                "  }}\n"
                 "  template <typename CapType, typename... Is>\n"
-                "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(Is... indices) const {{ /* legendre logic */ }}\n"
+                "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(Is... indices) const {{\n"
+                "    if constexpr (CapType::ept == ElementsPerThread::ONE) {{\n"
+                "      cuda::std::array<index_t, Rank_> inds{{indices...}};\n"
+                "      cuda::std::array<index_t, {}> xinds;\n"
+                "      int axis1 = axis_[0];\n"
+                "      int axis2 = axis_[1];\n"
+                "      index_t nind = inds[axis1];\n"
+                "      int n = get_value<CapType>(n_, nind);\n"
+                "      index_t mind = inds[axis2];\n"
+                "      int m = get_value<CapType>(m_, mind);\n"
+                "      if(axis1>axis2) {{\n"
+                "        int tmp = axis1; axis1 = axis2; axis2 = tmp;\n"
+                "      }}\n"
+                "      int idx = 0;\n"
+                "      for(int i = 0; i < Rank_; i++) {{\n"
+                "        index_t ind = inds[i];\n"
+                "        if(i != axis_[0] && i != axis_[1]) {{\n"
+                "          xinds[idx++] = ind;\n"
+                "        }}\n"
+                "      }}\n"
+                "      auto x = get_value<CapType>(in_, xinds);\n"
+                "      if constexpr (is_complex_half_v<value_type>) {{\n"
+                "        return static_cast<value_type>(legendre_calc(n, m, cuda::std::complex<float>(x)));\n"
+                "      }} else if constexpr (is_matx_half_v<value_type>) {{\n"
+                "        return static_cast<value_type>(legendre_calc(n, m, float(x)));\n"
+                "      }} else {{\n"
+                "        return legendre_calc(n, m, x);\n"
+                "      }}\n"
+                "    }} else {{\n"
+                "      return Vector<value_type, static_cast<int>(CapType::ept)>{{}};\n"
+                "    }}\n"
+                "  }}\n"
                 "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return Rank_; }}\n"
                 "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const {{ return out_dims_[dim]; }}\n"
                 "}};\n",
-                func_name, Rank(), axis_[0], axis_[1], detail::array_to_string(out_dims_))
+                func_name, Rank(), axis_[0], axis_[1], detail::array_to_string(out_dims_), T3::Rank())
           );
         }
 #endif
@@ -217,6 +265,16 @@ namespace matx
             return std::format("{}<{},{},{}>", get_jit_class_name(), n_jit_name, m_jit_name, in_jit_name);
 #else
             return "";
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+#ifdef MATX_EN_JIT
+            return combine_capabilities<Cap>(true, 
+              detail::get_operator_capability<Cap>(n_, in),
+              detail::get_operator_capability<Cap>(m_, in),
+              detail::get_operator_capability<Cap>(in_, in));
+#else
+            return false;
 #endif
           }
           else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {

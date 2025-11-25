@@ -89,38 +89,12 @@ namespace std {
     }
   };
   
-  // Formatter for matxHalfComplex (fp16/bf16 complex)
-  template<typename T>
-  struct formatter<matx::matxHalfComplex<T>> {
-    constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
-    
-    template<typename FormatContext>
-    auto format(const matx::matxHalfComplex<T>& c, FormatContext& ctx) const {
-      return format_to(ctx.out(), "{}", matx::detail::format_complex(c));
-    }
-  };
+  // Formatter for matxHalfComplex (fp16/bf16 complex) - moved to half_complex.h
+  // Formatter for matxFp16 (half-precision float) - moved to half.h
+  // Formatter for matxBf16 (bfloat16) - moved to half.h
   
-  // Formatter for matxFp16 (half-precision float)
-  template<>
-  struct formatter<matx::matxFp16> {
-    constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
-    
-    template<typename FormatContext>
-    auto format(const matx::matxFp16& val, FormatContext& ctx) const {
-      return format_to(ctx.out(), "{:g}", static_cast<float>(val));
-    }
-  };
-  
-  // Formatter for matxBf16 (bfloat16)
-  template<>
-  struct formatter<matx::matxBf16> {
-    constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
-    
-    template<typename FormatContext>
-    auto format(const matx::matxBf16& val, FormatContext& ctx) const {
-      return format_to(ctx.out(), "{:g}", static_cast<float>(val));
-    }
-  };
+  // Note: The formatters for matxHalfComplex, matxFp16, and matxBf16 are now defined
+  // in their respective header files (half_complex.h and half.h) with proper guards.
 }
 
 namespace matx {

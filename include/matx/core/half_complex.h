@@ -60,7 +60,7 @@ template <typename T> struct alignas(sizeof(T) * 2) matxHalfComplex {
    * 
    * @param x_ Object to copy from
    */
-  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__
+  constexpr __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__
   matxHalfComplex(const cuda::std::complex<float> &x_) noexcept
       : x(x_.real()), y(x_.imag())
   {
@@ -73,7 +73,7 @@ template <typename T> struct alignas(sizeof(T) * 2) matxHalfComplex {
    * @param x_ Value of scalar
    */
   template <typename T2>
-  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex(const T2 &x_) noexcept
+  constexpr __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex(const T2 &x_) noexcept
       : x(static_cast<float>(x_)), y(0.0f)
   {
   }
@@ -87,7 +87,7 @@ template <typename T> struct alignas(sizeof(T) * 2) matxHalfComplex {
    * @param y_ Imaginary value
    */
   template <typename T2, typename T3>
-  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex(const T2 &x_,
+  constexpr __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex(const T2 &x_,
                                                       const T3 &y_) noexcept
       : x(static_cast<float>(x_)), y(static_cast<float>(y_))
   {
@@ -103,7 +103,7 @@ template <typename T> struct alignas(sizeof(T) * 2) matxHalfComplex {
   template <typename T2>
     requires (cuda::std::is_same_v<cuda::std::decay_t<T2>, matxFp16> || 
               cuda::std::is_same_v<cuda::std::decay_t<T2>, matxBf16>)
-  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex(T2 &&x_, T2 &&y_) noexcept
+  constexpr __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxHalfComplex(T2 &&x_, T2 &&y_) noexcept
       : x(static_cast<T>(x_)), 
         y(static_cast<T>(y_))
   {
@@ -1056,3 +1056,62 @@ using matxFp16Complex = matxHalfComplex<matxFp16>; ///< Alias for a MatX fp16 co
 using matxBf16Complex = matxHalfComplex<matxBf16>; ///< Alias for a MatXbf16 complex wrapper
 
 }; // namespace matx
+
+#ifndef __CUDACC_RTC__
+// Add std::formatter specializations for matxFp16Complex and matxBf16Complex
+#include <format>
+
+namespace std {
+
+/**
+ * @brief std::formatter specialization for matxFp16Complex
+ * 
+ * Enables matxFp16Complex to work with std::format by converting to complex<float>
+ */
+template <>
+struct formatter<matx::matxFp16Complex> {
+  template <typename ParseContext>
+  constexpr auto parse(ParseContext& ctx) {
+    return ctx.begin();
+  }
+
+  template <typename FormatContext>
+  auto format(const matx::matxFp16Complex& val, FormatContext& ctx) const {
+    float real_val = static_cast<float>(val.real());
+    float imag_val = static_cast<float>(val.imag());
+    
+    if (imag_val >= 0) {
+      return std::format_to(ctx.out(), "({}+{}i)", real_val, imag_val);
+    } else {
+      return std::format_to(ctx.out(), "({}{}i)", real_val, imag_val);
+    }
+  }
+};
+
+/**
+ * @brief std::formatter specialization for matxBf16Complex
+ * 
+ * Enables matxBf16Complex to work with std::format by converting to complex<float>
+ */
+template <>
+struct formatter<matx::matxBf16Complex> {
+  template <typename ParseContext>
+  constexpr auto parse(ParseContext& ctx) {
+    return ctx.begin();
+  }
+
+  template <typename FormatContext>
+  auto format(const matx::matxBf16Complex& val, FormatContext& ctx) const {
+    float real_val = static_cast<float>(val.real());
+    float imag_val = static_cast<float>(val.imag());
+    
+    if (imag_val >= 0) {
+      return std::format_to(ctx.out(), "({}+{}i)", real_val, imag_val);
+    } else {
+      return std::format_to(ctx.out(), "({}{}i)", real_val, imag_val);
+    }
+  }
+};
+
+} // namespace std
+#endif // __CUDACC_RTC__

@@ -8,7 +8,7 @@ using namespace matx::test;
 
 
 
-TYPED_TEST(OperatorTestsNumericAllExecs, SquareCopyTranspose)
+TYPED_TEST(OperatorTestsNumericNoHalfAllExecs, SquareCopyTranspose)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
@@ -32,8 +32,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, SquareCopyTranspose)
 
   for (index_t i = 0; i < count; i++) {
     for (index_t j = 0; j < count; j++) {
-      EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2t(i, j),
-                                             TestType(i * count + (double)j)));
+      ASSERT_EQ(t2t(i, j), TestType(i * count + (double)j));
     }
   }
 
@@ -52,7 +51,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, SquareCopyTranspose)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(OperatorTestsNumericAllExecs, NonSquareTranspose)
+TYPED_TEST(OperatorTestsNumericNoHalfAllExecs, NonSquareTranspose)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;

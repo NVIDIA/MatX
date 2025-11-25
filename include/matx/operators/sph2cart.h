@@ -88,7 +88,22 @@ namespace matx
                 "  typename detail::inner_storage_or_self_t<detail::base_type_t<T2>> phi_;\n"
                 "  typename detail::inner_storage_or_self_t<detail::base_type_t<T3>> r_;\n"
                 "  template <typename CapType, typename... Is>\n"
-                "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(Is... indices) const {{ /* sph2cart logic */ }}\n"
+                "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(Is... indices) const {{\n"
+                "    if constexpr (CapType::ept == ElementsPerThread::ONE) {{\n"
+                "      auto theta = get_value<CapType>(theta_, indices...);\n"
+                "      auto phi = get_value<CapType>(phi_, indices...);\n"
+                "      auto r = get_value<CapType>(r_, indices...);\n"
+                "      if constexpr (WHICH_ == 0) {{\n"
+                "        return r * (scalar_internal_cos(phi) * scalar_internal_cos(theta));\n"
+                "      }} else if constexpr (WHICH_ == 1) {{\n"
+                "        return r * (scalar_internal_cos(phi) * scalar_internal_sin(theta));\n"
+                "      }} else {{\n"
+                "        return r * scalar_internal_sin(phi);\n"
+                "      }}\n"
+                "    }} else {{\n"
+                "      return Vector<value_type, static_cast<index_t>(CapType::ept)>{{}};\n"
+                "    }}\n"
+                "  }}\n"
                 "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return Rank_; }}\n"
                 "  constexpr __MATX_INLINE__ __MATX_DEVICE__ auto Size(int dim) const {{ return out_dims_[dim]; }}\n"
                 "}};\n",
@@ -189,6 +204,16 @@ namespace matx
             return std::format("{}<{},{},{}>", get_jit_class_name(), theta_jit_name, phi_jit_name, r_jit_name);
 #else
             return "";
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+#ifdef MATX_EN_JIT
+            return combine_capabilities<Cap>(true, 
+              detail::get_operator_capability<Cap>(theta_, in),
+              detail::get_operator_capability<Cap>(phi_, in),
+              detail::get_operator_capability<Cap>(r_, in));
+#else
+            return false;
 #endif
           }
           else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {

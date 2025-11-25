@@ -40,6 +40,7 @@ TypeParam legendre_check(int n, int m, TypeParam x) {
   return p2;
 }
 
+// No JIT until constexpr half is fixed
 TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Legendre)
 {
   MATX_ENTER_HANDLER();

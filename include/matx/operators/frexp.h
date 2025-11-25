@@ -79,7 +79,57 @@ namespace detail {
               "  constexpr static cuda::std::array<index_t, Rank_> out_dims_ = {{ {} }};\n"
               "  typename detail::inner_storage_or_self_t<detail::base_type_t<OpA>> a_;\n"
               "  template <typename CapType, typename... Is>\n"
-              "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(Is... indices) const {{ /* Complex frexp logic */ }}\n"
+              "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(Is... indices) const {{\n"
+              "    if constexpr (CapType::ept == ElementsPerThread::ONE) {{\n"
+              "      const auto val = get_value<CapType>(a_, indices...);\n"
+              "      int rexp;\n"
+              "      if constexpr (is_cuda_complex_v<value_type>) {{\n"
+              "        if constexpr (cuda::std::is_same_v<float, typename value_type::value_type>) {{\n"
+              "          if constexpr (WHICH_ == 0) {{\n"
+              "            return cuda::std::frexpf(val.real(), &rexp);\n"
+              "          }} else if constexpr (WHICH_ == 1) {{\n"
+              "            cuda::std::frexpf(val.real(), &rexp);\n"
+              "            return rexp;\n"
+              "          }} else if constexpr (WHICH_ == 2) {{\n"
+              "            return cuda::std::frexpf(val.imag(), &rexp);\n"
+              "          }} else {{\n"
+              "            cuda::std::frexpf(val.imag(), &rexp);\n"
+              "            return rexp;\n"
+              "          }}\n"
+              "        }} else {{\n"
+              "          if constexpr (WHICH_ == 0) {{\n"
+              "            return cuda::std::frexp(val.real(), &rexp);\n"
+              "          }} else if constexpr (WHICH_ == 1) {{\n"
+              "            cuda::std::frexp(val.real(), &rexp);\n"
+              "            return rexp;\n"
+              "          }} else if constexpr (WHICH_ == 2) {{\n"
+              "            return cuda::std::frexp(val.imag(), &rexp);\n"
+              "          }} else {{\n"
+              "            cuda::std::frexp(val.imag(), &rexp);\n"
+              "            return rexp;\n"
+              "          }}\n"
+              "        }}\n"
+              "      }} else {{\n"
+              "        if constexpr (cuda::std::is_same_v<float, value_type>) {{\n"
+              "          const float frac = cuda::std::frexpf(val, &rexp);\n"
+              "          if constexpr (WHICH_ == 0) {{\n"
+              "            return frac;\n"
+              "          }} else {{\n"
+              "            return rexp;\n"
+              "          }}\n"
+              "        }} else {{\n"
+              "          const double frac = cuda::std::frexp(val, &rexp);\n"
+              "          if constexpr (WHICH_ == 0) {{\n"
+              "            return frac;\n"
+              "          }} else {{\n"
+              "            return rexp;\n"
+              "          }}\n"
+              "        }}\n"
+              "      }}\n"
+              "    }} else {{\n"
+              "      return Vector<value_type, static_cast<size_t>(CapType::ept)>{{}};\n"
+              "    }}\n"
+              "  }}\n"
               "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return Rank_; }}\n"
               "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const {{ return out_dims_[dim]; }}\n"
               "}};\n",
@@ -207,7 +257,14 @@ namespace detail {
           return "";
 #endif
         }
-        else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+          else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+#ifdef MATX_EN_JIT
+            return combine_capabilities<Cap>(true, detail::get_operator_capability<Cap>(a_, in));
+#else
+            return false;
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
 #ifdef MATX_EN_JIT
           const auto [key, value] = get_jit_op_str();
           if (in.find(key) == in.end()) {
