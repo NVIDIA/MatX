@@ -30,6 +30,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
+#include <cinttypes>
 #include <matx/core/type_utils.h>
 
 namespace matx {
