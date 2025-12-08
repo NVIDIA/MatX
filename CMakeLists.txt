@@ -68,6 +68,7 @@ option(MATX_EN_VISUALIZATION "Enable visualization support" OFF)
 option(MATX_EN_CUTENSOR OFF)
 option(MATX_EN_CUDSS OFF)
 option(MATX_EN_FILEIO OFF)
+option(MATX_EN_NVTIFF OFF "Enable nvTiff support")
 option(MATX_EN_X86_FFTW OFF "Enable x86 FFTW support")
 option(MATX_EN_NVPL OFF, "Enable NVIDIA Performance Libraries for optimized ARM CPU support")
 option(MATX_EN_BLIS OFF "Enable BLIS support")
@@ -289,15 +290,16 @@ if (MATX_EN_COVERAGE)
     target_link_options(matx INTERFACE -lgcov --coverage)
 endif()
 
-# Add nvtiff support if installed
-find_library(NVTIFF_LIBRARY nvtiff)
-if (NOT NVTIFF_LIBRARY)
-    message(STATUS "Cannot find nvtiff library.  Disabling MatX nvtiff features.")
-else()
-    message(STATUS "Found nvtiff library at ${NVTIFF_LIBRARY}.  Enabling MatX nvtiff features.")
-    target_compile_definitions(matx INTERFACE MATX_ENABLE_NVTIFF)
+if (MATX_EN_NVTIFF)
+    # Add nvtiff support if installed
+    find_library(NVTIFF_LIBRARY nvtiff)
+    if (NOT NVTIFF_LIBRARY)
+        message(STATUS "Cannot find nvtiff library.  Disabling MatX nvtiff features.")
+    else()
+        message(STATUS "Found nvtiff library at ${NVTIFF_LIBRARY}.  Enabling MatX nvtiff features.")
+        target_compile_definitions(matx INTERFACE MATX_ENABLE_NVTIFF)
+    endif()
 endif()
-
 
 # Get the tensor libraries if we need them
 if (MATX_EN_CUTENSOR)
