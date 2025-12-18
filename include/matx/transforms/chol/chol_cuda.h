@@ -58,7 +58,7 @@ struct DnCholCUDAParams_t {
   size_t batch_size;
   cublasFillMode_t uplo;
   MatXDataType_t dtype;
-  cudaExecutor exec;
+  const cudaExecutor &exec;
 };
 
 template <typename OutputTensor, typename ATensor>
