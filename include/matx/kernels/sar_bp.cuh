@@ -43,8 +43,13 @@
 #include "matx/core/utils.h"
 #include "matx/core/type_utils.h"
 #include "matx/core/tensor_utils.h"
+#include "matx/kernels/fltflt.h"
+
+#define PULSE_BLOCK_SIZE 1024
 
 namespace matx {
+
+static constexpr double SPEED_OF_LIGHT = 2.997291625155841e+08;
 
 #ifdef __CUDACC__
 
@@ -61,6 +66,14 @@ static __device__ __forceinline__ double NewtonRaphsonSqrt(double x) {
     // and avoids the need for a second division.
     const double NR_2 = NR_1 - (NR_1 * NR_1 - x) * est_2_inv_f64;
     return NR_2;
+}
+
+__device__ inline fltflt ComputeRangeToPixelFloatFloat(fltflt apx, fltflt apy, fltflt apz, float px, float py, float pz) {
+    const fltflt dx = fltflt_sub(fltflt_make_from_double(px), apx);
+    const fltflt dy = fltflt_sub(fltflt_make_from_double(py), apy);
+    const fltflt dz = fltflt_sub(fltflt_make_from_double(pz), apz);
+    const fltflt dist = fltflt_add(fltflt_add(fltflt_mul(dx, dx), fltflt_mul(dy, dy)), fltflt_mul(dz, dz));
+    return fltflt_sqrt(dist);
 }
 
 template <typename PlatPosType, SarBpComputeType ComputeType, typename strict_compute_t, typename loose_compute_t>
@@ -81,7 +94,7 @@ __device__ inline strict_compute_t ComputeRangeToPixel(const PlatPosType &ant_po
 #if __CUDA_ARCH__ == 700 || __CUDA_ARCH__ == 800 || __CUDA_ARCH__ == 900 || __CUDA_ARCH__ == 1000
             return ::sqrt(dx*dx + dy*dy + dz*dz);
 #else
-	    // Only use the Newton-Raphson approach on systems with reduced FP64 throughput
+            // Only use the Newton-Raphson approach on systems with reduced FP64 throughput
             return NewtonRaphsonSqrt(dx*dx + dy*dy + dz*dz);
 #endif
         } else {
@@ -95,8 +108,7 @@ __global__ void SarBpFillPhaseLUT(cuda::std::complex<StorageType> *phase_lut, Co
 {
     const int tid = blockIdx.x * blockDim.x + threadIdx.x;
     if (tid >= num_range_bins) return;
-    constexpr double C = 2.997291625155841e+08; // FIXME: Add to matx/core/constants.h or similar
-    constexpr ComputeType four_pi_over_c = static_cast<ComputeType>(4.0 * M_PI / C);
+    constexpr ComputeType four_pi_over_c = static_cast<ComputeType>(4.0 * M_PI / SPEED_OF_LIGHT);
     const ComputeType range_bin_start = static_cast<ComputeType>(tid - 0.5 * (num_range_bins-1)) * dr;
     const ComputeType phase = four_pi_over_c * ref_freq * range_bin_start;
     if constexpr (std::is_same_v<ComputeType, float>) {
@@ -143,7 +155,7 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
     using compute_t = typename std::conditional<ComputeType == SarBpComputeType::Double, double, float>::type;
     using strict_compute_t = typename std::conditional<ComputeType == SarBpComputeType::Double || ComputeType == SarBpComputeType::Mixed, double, float>::type;
     using strict_complex_compute_t = cuda::std::complex<strict_compute_t>;
-    using loose_compute_t = typename std::conditional<ComputeType == SarBpComputeType::Mixed || ComputeType == SarBpComputeType::Float, float, double>::type;
+    using loose_compute_t = typename std::conditional<ComputeType == SarBpComputeType::Double, double, float>::type;
     using loose_complex_compute_t = cuda::std::complex<loose_compute_t>;
 
     const index_t image_height = output.Size(0);
@@ -151,7 +163,15 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
     const index_t ix = static_cast<index_t>(blockIdx.x * blockDim.x + threadIdx.x);
     const index_t iy = static_cast<index_t>(blockIdx.y * blockDim.y + threadIdx.y);
 
-    if (ix >= image_width || iy >= image_height) return;
+    // Currently only used for FloatFloat compute type
+    __shared__ fltflt sh_ant_pos[PULSE_BLOCK_SIZE][4];
+
+    const bool is_valid = ix < image_width && iy < image_height;
+    if constexpr (ComputeType != SarBpComputeType::FloatFloat) {
+        // For the FloatFloat ComputeType, keep all threads active to participate in CTA-wide
+        // antenna position loads
+        if (! is_valid) return;
+    }
 
     const index_t num_pulses = range_profiles.Size(0);
     const index_t num_range_bins = range_profiles.Size(1);
@@ -197,14 +217,50 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
         }
     };
 
+    [[maybe_unused]] fltflt dr_inv_fltflt{};
+    if constexpr (ComputeType == SarBpComputeType::FloatFloat) {
+        dr_inv_fltflt = fltflt_make_from_double(dr_inv);
+    }
+    [[maybe_unused]] const int tid = threadIdx.x + threadIdx.y * blockDim.x;
+
     loose_complex_compute_t accum{};
     const loose_compute_t bin_offset = static_cast<loose_compute_t>(0.5) * static_cast<loose_compute_t>(num_range_bins-1);
     const loose_compute_t max_bin_f = static_cast<loose_compute_t>(num_range_bins) - static_cast<loose_compute_t>(2.0);
+    const int num_pulse_blocks = (num_pulses + PULSE_BLOCK_SIZE - 1) / PULSE_BLOCK_SIZE;
+    for (int block = 0; block < num_pulse_blocks; ++block) {
+    const int num_pulses_in_block = num_pulses - block * PULSE_BLOCK_SIZE < PULSE_BLOCK_SIZE ?
+        num_pulses - block * PULSE_BLOCK_SIZE : PULSE_BLOCK_SIZE;
+    if constexpr (ComputeType == SarBpComputeType::FloatFloat) {
+        __syncthreads();
+        for (index_t ip = tid; ip < num_pulses_in_block; ip += blockDim.x * blockDim.y) {
+            const int p = block * PULSE_BLOCK_SIZE + ip;
+            const plat_pos_t ant_pos_p = platform_positions.operator()(p);
+            sh_ant_pos[ip][0] = fltflt_make_from_double(ant_pos_p.x);
+            sh_ant_pos[ip][1] = fltflt_make_from_double(ant_pos_p.y);
+            sh_ant_pos[ip][2] = fltflt_make_from_double(ant_pos_p.z);
+            sh_ant_pos[ip][3] = fltflt_make_from_double(r_to_mcp(p));
+        }
+        __syncthreads();
+        if (! is_valid) {
+            continue;
+        }
+    }
     #pragma unroll 4
-    for (index_t p = 0; p < num_pulses; ++p) {
-        const strict_compute_t diffR =
-            ComputeRangeToPixel<PlatPosType, ComputeType, strict_compute_t, loose_compute_t>(platform_positions, p, px, py, pz) - r_to_mcp(p);
-        const loose_compute_t bin = static_cast<loose_compute_t>(diffR * dr_inv) + bin_offset;
+    for (index_t ip = 0; ip < num_pulses_in_block; ++ip) {
+        const int p = block * PULSE_BLOCK_SIZE + ip;
+        [[maybe_unused]] strict_compute_t diffR{};
+        loose_compute_t bin;
+        if constexpr (ComputeType == SarBpComputeType::FloatFloat) {
+            const fltflt diffR_ff = fltflt_sub(ComputeRangeToPixelFloatFloat(
+                sh_ant_pos[ip][0], sh_ant_pos[ip][1], sh_ant_pos[ip][2], px, py, pz), sh_ant_pos[ip][3]);
+            bin = static_cast<loose_compute_t>(
+                fltflt_to_float(fltflt_mul(diffR_ff, dr_inv_fltflt)) + bin_offset);
+            // diffR is otherwise unused for FloatFloat and thus not set
+        } else {
+            diffR = ComputeRangeToPixel<PlatPosType, ComputeType, strict_compute_t, loose_compute_t>(
+                platform_positions, p, px, py, pz) - r_to_mcp(p);
+            bin = static_cast<loose_compute_t>(diffR * dr_inv) + bin_offset;
+        }
         if (bin >= 0.0f && bin < max_bin_f) {
             loose_compute_t bin_floor, w;
             if constexpr (std::is_same_v<loose_compute_t, float>) {
@@ -234,13 +290,16 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
             accum += sample * matched_filter;
         }
     }
+}
 
-    initial_image_t initial_image_voxel = initial_image.operator()(iy, ix);
-    const image_t voxel_contribution {
-        initial_image_voxel.real() + accum.real(), initial_image_voxel.imag() + accum.imag() };
-    cuda::std::apply([voxel_contribution, &output](auto &&...args) {
-        output.operator()(args...) = voxel_contribution;
-    }, cuda::std::make_tuple(iy, ix));
+    if (is_valid) {
+        initial_image_t initial_image_voxel = initial_image.operator()(iy, ix);
+        const image_t voxel_contribution {
+            initial_image_voxel.real() + accum.real(), initial_image_voxel.imag() + accum.imag() };
+        cuda::std::apply([voxel_contribution, &output](auto &&...args) {
+            output.operator()(args...) = voxel_contribution;
+        }, cuda::std::make_tuple(iy, ix));
+    }
 }
 
 #endif // __CUDACC__

@@ -40,6 +40,12 @@ namespace matx {
 enum class SarBpComputeType {
   Double,
   Mixed,
+  // The FloatFloat compute type combines mixed precision (i.e., fp32 when possible) with a
+  // float-float handling of the values for which fp64 would otherwise be needed. The float-float
+  // representation offers increased precision relative to fp32, but not full fp64 precision,
+  // through the use of increased fp32 computation and representing each value as an unevaluated
+  // sum of two fp32 components.
+  FloatFloat,
   Float
 };
 
