@@ -1523,7 +1523,7 @@ using cub_cache_t = std::unordered_map<CubParams_t, std::any, CubParamsKeyHash, 
 template <typename OutputTensor, typename InputOperator>
 void sort_impl_inner(OutputTensor &a_out, const InputOperator &a,
           const SortDirection_t dir,
-          cudaExecutor exec = 0)
+          const cudaExecutor &exec)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
@@ -1569,7 +1569,7 @@ template <typename OutputIndexTensor, typename InputIndexTensor, typename Output
 void sort_pairs_impl_inner(OutputIndexTensor &idx_out, const InputIndexTensor &idx_in,
           OutputKeyTensor &a_out, const InputKeyTensor &a_in,
           const SortDirection_t dir,
-          [[maybe_unused]] cudaExecutor exec = 0)
+          const cudaExecutor &exec)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
@@ -2074,7 +2074,7 @@ void cub_dualargreduce(OutputTensor &a1_out,
 template <typename OutputTensor, typename InputOperator>
 void sort_impl(OutputTensor &a_out, const InputOperator &a,
           const SortDirection_t dir,
-          cudaExecutor exec = 0)
+          const cudaExecutor &exec)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
@@ -2139,7 +2139,7 @@ void sort_impl(OutputTensor &a_out, const InputOperator &a,
 template <typename OutputTensor, typename InputOperator>
 void argsort_impl(OutputTensor &idx_out, const InputOperator &a,
           const SortDirection_t dir,
-          cudaExecutor exec = 0)
+          const cudaExecutor &exec)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
@@ -2294,7 +2294,7 @@ void sort_impl(OutputTensor &a_out, const InputOperator &a,
  */
 template <typename OutputTensor, typename InputOperator>
 void cumsum_impl(OutputTensor &a_out, const InputOperator &a,
-            cudaExecutor exec = 0)
+            const cudaExecutor &exec)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
@@ -2531,7 +2531,7 @@ struct GTE
  *   CUDA executor or stream
  */
 template <typename SelectType, typename CountTensor, typename OutputTensor, typename InputOperator>
-void find_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperator &a, SelectType sel, cudaExecutor exec = 0)
+void find_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperator &a, SelectType sel, const cudaExecutor &exec)
 {
 #ifdef __CUDACC__
   static_assert(CountTensor::Rank() == 0, "Num found output tensor rank must be 0");
@@ -2652,7 +2652,7 @@ void find_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperator 
  *   CUDA executor stream
  */
 template <typename SelectType, typename CountTensor, typename OutputTensor, typename InputOperator>
-void find_idx_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperator &a, SelectType sel, cudaExecutor exec = 0)
+void find_idx_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperator &a, SelectType sel, const cudaExecutor &exec)
 {
 #ifdef __CUDACC__
   static_assert(CountTensor::Rank() == 0, "Num found output tensor rank must be 0");
@@ -2767,7 +2767,7 @@ void find_idx_impl(OutputTensor &a_out, CountTensor &num_found, const InputOpera
  *   CUDA executor
  */
 template <typename CountTensor, typename OutputTensor, typename InputOperator>
-void unique_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperator &a,  cudaExecutor exec = 0)
+void unique_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperator &a,  const cudaExecutor &exec)
 {
 #ifdef __CUDACC__
   static_assert(CountTensor::Rank() == 0, "Num found output tensor rank must be 0");

@@ -263,7 +263,7 @@ void __MATX_INLINE__ reduce(OutType dest, const InType &in, ReduceOp op,
  */
 template <typename OutType, typename InType>
 void __MATX_INLINE__ mean_impl(OutType dest, const InType &in,
-                 cudaExecutor exec = 0)
+                 const cudaExecutor &exec)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("mean_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
@@ -468,7 +468,7 @@ void __MATX_INLINE__ softmax_impl(OutType dest, const InType &in, PermDims dims,
  */
 template <typename OutType, typename InType>
 void __MATX_INLINE__ median_impl(OutType dest,
-                   const InType &in, cudaExecutor exec = 0)
+                   const InType &in, const cudaExecutor &exec)
 {
 #ifdef __CUDACC__
   if constexpr ( OutType::Rank() <= 1 && InType::Rank() <=2 ) {
@@ -640,7 +640,7 @@ void __MATX_INLINE__ median_impl(OutType dest, const InType &in, [[maybe_unused]
  *   CUDA executor
  */
 template <typename OutType, typename InType>
-void __MATX_INLINE__ sum_impl(OutType dest, const InType &in, cudaExecutor exec = 0)
+void __MATX_INLINE__ sum_impl(OutType dest, const InType &in, const cudaExecutor &exec)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("sum_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
@@ -706,7 +706,7 @@ void __MATX_INLINE__ sum_impl(OutType dest, const InType &in, [[maybe_unused]] c
  *   CUDA executor
  */
 template <typename OutType, typename InType>
-void __MATX_INLINE__ prod_impl(OutType dest, const InType &in, cudaExecutor exec = 0)
+void __MATX_INLINE__ prod_impl(OutType dest, const InType &in, const cudaExecutor &exec)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("prod_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
@@ -778,7 +778,7 @@ void __MATX_INLINE__ prod_impl(OutType dest, const InType &in, [[maybe_unused]] 
  *   CUDA executor or stream ID
  */
 template <typename OutType, typename InType>
-void __MATX_INLINE__ max_impl(OutType dest, const InType &in, cudaExecutor exec = 0)
+void __MATX_INLINE__ max_impl(OutType dest, const InType &in, const cudaExecutor &exec)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("max_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
@@ -848,7 +848,7 @@ void __MATX_INLINE__ max_impl(OutType dest, const InType &in, [[maybe_unused]] c
  *   CUDA executor or stream ID
  */
 template <typename OutType, typename TensorIndexType, typename InType>
-void __MATX_INLINE__ argmax_impl(OutType dest, TensorIndexType &idest, const InType &in, cudaExecutor exec = 0)
+void __MATX_INLINE__ argmax_impl(OutType dest, TensorIndexType &idest, const InType &in, const cudaExecutor &exec)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("argmax_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
@@ -926,7 +926,7 @@ void __MATX_INLINE__ argmax_impl(OutType dest, TensorIndexType &idest, const InT
  *   CUDA executor or stream ID
  */
 template <typename OutType, typename InType>
-void __MATX_INLINE__ min_impl(OutType dest, const InType &in, cudaExecutor exec = 0)
+void __MATX_INLINE__ min_impl(OutType dest, const InType &in, const cudaExecutor &exec)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("min_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
@@ -995,7 +995,7 @@ void __MATX_INLINE__ min_impl(OutType dest, const InType &in, [[maybe_unused]] c
  *   CUDA executor or stream ID
  */
 template <typename OutType, typename TensorIndexType, typename InType>
-void __MATX_INLINE__ argmin_impl(OutType dest, TensorIndexType &idest, const InType &in, cudaExecutor exec = 0)
+void __MATX_INLINE__ argmin_impl(OutType dest, TensorIndexType &idest, const InType &in, const cudaExecutor &exec)
 {
   static_assert(OutType::Rank() == TensorIndexType::Rank());
 #ifdef __CUDACC__
@@ -1082,7 +1082,7 @@ void __MATX_INLINE__ argmin_impl(OutType dest, TensorIndexType &idest, const InT
  *   CUDA executor or stream ID
  */
 template <typename OutType, typename TensorIndexType, typename InType>
-void __MATX_INLINE__ argminmax_impl(OutType destmin, TensorIndexType &idestmin, OutType destmax, TensorIndexType &idestmax, const InType &in, cudaExecutor exec = 0)
+void __MATX_INLINE__ argminmax_impl(OutType destmin, TensorIndexType &idestmin, OutType destmax, TensorIndexType &idestmax, const InType &in, const cudaExecutor &exec)
 {
   static_assert(OutType::Rank() == TensorIndexType::Rank());
 #ifdef __CUDACC__
@@ -1162,7 +1162,7 @@ void __MATX_INLINE__ argminmax_impl(OutType destmin, TensorIndexType &idestmin, 
  *   CUDA executor or stream ID
  */
 template <typename OutType, typename InType>
-void __MATX_INLINE__ any_impl(OutType dest, const InType &in, cudaExecutor exec = 0)
+void __MATX_INLINE__ any_impl(OutType dest, const InType &in, const cudaExecutor &exec)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("any_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
@@ -1235,7 +1235,7 @@ void __MATX_INLINE__ any_impl(OutType dest, const InType &in, [[maybe_unused]] c
  *   CUDA executor or stream ID
  */
 template <typename OutType, typename InType>
-void __MATX_INLINE__ all_impl(OutType dest, const InType &in, cudaExecutor exec = 0)
+void __MATX_INLINE__ all_impl(OutType dest, const InType &in, const cudaExecutor &exec)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("all_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
@@ -1313,7 +1313,7 @@ void __MATX_INLINE__ all_impl(OutType dest, const InType &in, [[maybe_unused]] c
  *   CUDA executor or stream ID
  */
 template <typename OutType, typename InType1, typename InType2>
-void __MATX_INLINE__ allclose(OutType dest, const InType1 &in1, const InType2 &in2, double rtol, double atol, cudaExecutor exec = 0)
+void __MATX_INLINE__ allclose(OutType dest, const InType1 &in1, const InType2 &in2, double rtol, double atol, const cudaExecutor &exec)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("allclose(" + get_type_str(in1) + ", " + get_type_str(in2) + ")", matx::MATX_NVTX_LOG_API)

@@ -8,7 +8,7 @@ from allclose is an ``int`` value since boolean reductions are not available in 
 
 
 .. doxygenfunction:: allclose(OutType dest, const InType1 &in1, const InType2 &in2, double rtol, double atol, const HostExecutor<MODE> &exec)
-.. doxygenfunction:: allclose(OutType dest, const InType1 &in1, const InType2 &in2, double rtol, double atol, cudaExecutor exec = 0)
+.. doxygenfunction:: allclose(OutType dest, const InType1 &in1, const InType2 &in2, double rtol, double atol, const cudaExecutor &exec)
 
 Examples
 ~~~~~~~~

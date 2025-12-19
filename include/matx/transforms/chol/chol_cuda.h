@@ -58,7 +58,7 @@ struct DnCholCUDAParams_t {
   size_t batch_size;
   cublasFillMode_t uplo;
   MatXDataType_t dtype;
-  cudaExecutor exec;
+  cudaStream_t stream;
 };
 
 template <typename OutputTensor, typename ATensor>
@@ -128,7 +128,7 @@ public:
     params.n = a.Size(RANK - 1);
     params.A = a.Data();
     params.uplo = uplo;
-    params.exec = exec;    
+    params.stream = exec.getStream();    
     params.dtype = TypeToInt<T1>();
 
     return params;
@@ -208,7 +208,7 @@ struct DnCholCUDAParamsKeyHash {
   {
     return  (std::hash<uint64_t>()(k.n)) + 
             (std::hash<uint64_t>()(k.batch_size)) + 
-            (std::hash<uint64_t>()((uint64_t)(k.exec.getStream())));
+            (std::hash<uint64_t>()((uint64_t)(k.stream)));
   }
 };
 
@@ -223,7 +223,7 @@ struct DnCholCUDAParamsKeyEq {
     return  l.n == t.n && 
             l.batch_size == t.batch_size && 
             l.dtype == t.dtype &&
-            l.exec.getStream() == t.exec.getStream();
+            l.stream == t.stream;
   }
 };
 
