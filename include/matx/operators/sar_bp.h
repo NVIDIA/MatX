@@ -215,10 +215,12 @@ namespace detail {
   };
 }
 
+namespace experimental {
 template <typename ImageType, typename RangeProfilesType, typename PlatPosType, typename VoxLocType, typename RangeToMcpType>
 inline auto sar_bp(const ImageType &initial_image, const RangeProfilesType &range_profiles,
     const PlatPosType &platform_positions, const VoxLocType &voxel_locations, const RangeToMcpType &range_to_mcp, const SarBpParams &params) {
-  return detail::SarBpOp<ImageType, RangeProfilesType, PlatPosType, VoxLocType, RangeToMcpType>(initial_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, params);
+  return matx::detail::SarBpOp<ImageType, RangeProfilesType, PlatPosType, VoxLocType, RangeToMcpType>(initial_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, params);
 }
 
-}
+} // end namespace experimental
+} // end namespace matx
