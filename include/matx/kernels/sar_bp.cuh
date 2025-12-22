@@ -126,7 +126,7 @@ __global__ void SarBpFillPhaseLUT(cuda::std::complex<StorageType> *phase_lut, Co
 
 // Template alias for the strict compute parameter type used in SarBp kernel
 template <SarBpComputeType ComputeType>
-using strict_compute_param_t = typename std::conditional<ComputeType == SarBpComputeType::Double || ComputeType == SarBpComputeType::Mixed, double, float>::type;
+using strict_compute_param_t = typename std::conditional<ComputeType == SarBpComputeType::Double || ComputeType == SarBpComputeType::Mixed || ComputeType == SarBpComputeType::FloatFloat, double, float>::type;
 
 template <SarBpComputeType ComputeType>
 using loose_compute_param_t = typename std::conditional<ComputeType == SarBpComputeType::Double, double, float>::type;
@@ -283,7 +283,8 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
             }, cuda::std::make_tuple(p, bin_floor_int + 1));
 
             const loose_complex_compute_t sample =
-                (static_cast<loose_compute_t>(1.0) - w) * sample_lo + w * sample_hi;
+                (static_cast<loose_compute_t>(1.0) - w) * static_cast<loose_complex_compute_t>(sample_lo) +
+                w * static_cast<loose_complex_compute_t>(sample_hi);
 
             const loose_complex_compute_t matched_filter = get_matched_filter(diffR, bin_floor_int, w);
 
