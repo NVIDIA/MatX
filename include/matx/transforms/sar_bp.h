@@ -57,7 +57,7 @@ inline void sar_bp_impl(OutImageType &out, const InitialImageType &initial_image
   MATX_STATIC_ASSERT_STR(InitialImageType::Rank() == 2, matxInvalidDim, "sar_bp: initial image must be a 2D tensor");
   MATX_STATIC_ASSERT_STR(RangeProfilesType::Rank() == 2, matxInvalidDim, "sar_bp: range profiles must be a 2D tensor");
 
-  const bool phase_lut_optimization = (params.features & SarBpFeature::PhaseLUTOptimization) != SarBpFeature::None;
+  const bool phase_lut_optimization = has_feature(params.features, SarBpFeature::PhaseLUTOptimization);
   if (params.compute_type == SarBpComputeType::FloatFloat && ! phase_lut_optimization) {
     // We currently require that phase LUT optimization be enabled for the FloatFloat compute type
     // because we do not yet have float-float based sin/cos implementations. Thus, we would fall back
