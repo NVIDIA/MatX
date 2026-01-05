@@ -155,7 +155,7 @@ static __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_mul(fltflt a, fltflt b) {
 // two_prod_fma() function for the hi components followed by subtraction of the square
 // of the result and re-normalization to a non-overlapping expansion.
 static __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_sqrt(fltflt a) {
-    const float xn = (a.hi == 0.0f) ? 0.0f :rsqrtf(a.hi);
+    const float xn = (a.hi == 0.0f) ? 0.0f : rsqrtf(a.hi);
     const float yn = __fmul_rn(a.hi, xn);
     const fltflt ynsqr = fltflt_two_prod_fma(yn, yn);
     const fltflt diff = fltflt_sub(a, ynsqr);

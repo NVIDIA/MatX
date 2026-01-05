@@ -69,9 +69,9 @@ static __device__ __forceinline__ double NewtonRaphsonSqrt(double x) {
 }
 
 __device__ inline fltflt ComputeRangeToPixelFloatFloat(fltflt apx, fltflt apy, fltflt apz, float px, float py, float pz) {
-    const fltflt dx = fltflt_sub(fltflt_make_from_double(px), apx);
-    const fltflt dy = fltflt_sub(fltflt_make_from_double(py), apy);
-    const fltflt dz = fltflt_sub(fltflt_make_from_double(pz), apz);
+    const fltflt dx = fltflt_sub(fltflt_make_from_float(px), apx);
+    const fltflt dy = fltflt_sub(fltflt_make_from_float(py), apy);
+    const fltflt dz = fltflt_sub(fltflt_make_from_float(pz), apz);
     const fltflt dist = fltflt_add(fltflt_add(fltflt_mul(dx, dx), fltflt_mul(dy, dy)), fltflt_mul(dz, dz));
     return fltflt_sqrt(dist);
 }
