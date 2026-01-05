@@ -35,6 +35,17 @@
 #ifndef MATX_CORE_LOG_H
 #define MATX_CORE_LOG_H
 
+// Check for <format> header availability (C++20 feature not supported by all compilers). Since there 
+// are so many compilers that support C++20 but not <format>, we want to make this an optional feature. 
+// If the <format> header is not available, we will disable all logging.
+#if __has_include(<format>)
+#define MATX_HAS_STD_FORMAT 1
+#else
+#define MATX_HAS_STD_FORMAT 0
+#endif
+
+#if MATX_HAS_STD_FORMAT
+
 #include <format>
 #include <source_location>
 #include <iostream>
@@ -381,5 +392,18 @@ public:
 #define MATX_LOG_WARN(...)  MATX_LOG(::matx::detail::LogLevel::WARN, __VA_ARGS__)
 #define MATX_LOG_ERROR(...) MATX_LOG(::matx::detail::LogLevel::ERROR, __VA_ARGS__)
 #define MATX_LOG_FATAL(...) MATX_LOG(::matx::detail::LogLevel::FATAL, __VA_ARGS__)
+
+#else // !MATX_HAS_STD_FORMAT
+
+// <format> header not available - disable all logging
+#define MATX_LOG(level, ...) do {} while(0)
+#define MATX_LOG_TRACE(...) do {} while(0)
+#define MATX_LOG_DEBUG(...) do {} while(0)
+#define MATX_LOG_INFO(...)  do {} while(0)
+#define MATX_LOG_WARN(...)  do {} while(0)
+#define MATX_LOG_ERROR(...) do {} while(0)
+#define MATX_LOG_FATAL(...) do {} while(0)
+
+#endif // MATX_HAS_STD_FORMAT
 
 #endif // MATX_CORE_LOG_H
