@@ -130,7 +130,7 @@ TYPED_TEST(SarBpTestNonComplexNonHalfFloatTypes, NonMixedTypes)
   params.center_frequency = 10.0e9;
   params.del_r = (max_x - min_x) / num_range_bins;
 
-  (image = sar_bp(zero_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, params)).run(this->exec);
+  (image = matx::experimental::sar_bp(zero_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, params)).run(this->exec);
   this->exec.sync();
 
   MATX_EXIT_HANDLER();
@@ -189,14 +189,14 @@ TYPED_TEST(SarBpTestDoubleType, MixedPrecision)
   // Run with Mixed precision and no additional optimizations
   {
     params.compute_type = SarBpComputeType::Mixed;
-    (image = sar_bp(zero_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, params)).run(this->exec);
+    (image = matx::experimental::sar_bp(zero_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, params)).run(this->exec);
     this->exec.sync();
   }
 
   // Enable PhaseLUTOptimization
   {
     params.features = SarBpFeature::PhaseLUTOptimization;
-    (image = sar_bp(zero_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, params)).run(this->exec);
+    (image = matx::experimental::sar_bp(zero_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, params)).run(this->exec);
     this->exec.sync();
   }
 
@@ -204,7 +204,7 @@ TYPED_TEST(SarBpTestDoubleType, MixedPrecision)
   // On 100 class GPUs with full FP64 throughput, Mixed precision is significantly faster than FloatFloat.
   {
     params.compute_type = SarBpComputeType::FloatFloat;
-    (image = sar_bp(zero_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, params)).run(this->exec);
+    (image = matx::experimental::sar_bp(zero_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, params)).run(this->exec);
     this->exec.sync();
   }
 
@@ -327,7 +327,7 @@ TYPED_TEST(SarBpTestDoubleType, PointTarget)
     auto image = matx::make_tensor<cuda::std::complex<double>>({image_height, image_width});
 
     bp_params.compute_type = matx::SarBpComputeType::Double;
-    (image = matx::sar_bp(zero_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, bp_params)).run(this->exec);
+    (image = matx::experimental::sar_bp(zero_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, bp_params)).run(this->exec);
     this->exec.sync();
 
     validate(image, 1.0e-10, 1.0e-10);
@@ -376,7 +376,7 @@ TYPED_TEST(SarBpTestDoubleType, PointTarget)
     MATX_CUDA_CHECK(cudaMemcpy(range_to_mcp.Data(), h_range_to_mcp_f32.data(), h_range_to_mcp_f32.size() * sizeof(float), cudaMemcpyHostToDevice));
 
     bp_params.compute_type = matx::SarBpComputeType::Float;
-    (image = matx::sar_bp(zero_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, bp_params)).run(this->exec);
+    (image = matx::experimental::sar_bp(zero_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, bp_params)).run(this->exec);
     this->exec.sync();
 
     for (matx::index_t i = 0; i < image_height; i++) {
@@ -411,13 +411,15 @@ TYPED_TEST(SarBpTestDoubleType, PointTarget)
     MATX_CUDA_CHECK(cudaMemcpy(range_to_mcp.Data(), h_range_to_mcp.data(), h_range_to_mcp.size() * sizeof(double), cudaMemcpyHostToDevice));
 
     bp_params.compute_type = matx::SarBpComputeType::Mixed;
-    (image = matx::sar_bp(zero_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, bp_params)).run(this->exec);
+    // example-begin sar-bp-1
+    (image = matx::experimental::sar_bp(zero_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, bp_params)).run(this->exec);
+    // example-end sar-bp-1
     this->exec.sync();  
 
     validate(image, 1.0e-10, 1.0e-2);
 
     bp_params.compute_type = matx::SarBpComputeType::FloatFloat;
-    (image = matx::sar_bp(zero_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, bp_params)).run(this->exec);
+    (image = matx::experimental::sar_bp(zero_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, bp_params)).run(this->exec);
     this->exec.sync();  
 
     validate(image, 1.0e-10, 1.0e-2);

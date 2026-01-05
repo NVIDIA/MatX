@@ -44,18 +44,6 @@
 
 namespace matx {
 
-  /**
- * @brief SAR Backprojection.
- * 
- * @tparam ImageType Type of input and output image
- * @tparam RangeProfilesType Type of range profiles
- * @tparam PlatPosType Type of platform positions
- * @param initial_image Initial image
- * @param range_profiles Range profiles
- * @param platform_positions Platform positions
- * @param params SAR BP parameters
- * @param stream CUDA stream on which to run the kernel(s)
- */
 template <typename OutImageType, typename InitialImageType, typename RangeProfilesType, typename PlatPosType, typename VoxLocType, typename RangeToMcpType>
 inline void sar_bp_impl(OutImageType &out, const InitialImageType &initial_image, const RangeProfilesType &range_profiles, const PlatPosType &platform_positions,
   const VoxLocType &voxel_locations, const RangeToMcpType &range_to_mcp, const SarBpParams &params, cudaStream_t stream = 0) {

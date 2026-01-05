@@ -32,6 +32,8 @@
 
 #pragma once
 
+namespace matx {
+
 // This header implements a float-float type (fltflt) that uses two single-precision floating
 // point values to represent a higher-precision value. When normalized, the components of the
 // float-float representation are non-overlapping and the hi components is larger in magnitude
@@ -67,6 +69,8 @@ static __host__ __device__ __forceinline__ double fltflt_to_double(fltflt x) {
 static __host__ __device__ __forceinline__ float fltflt_to_float(fltflt x) {
     return x.hi;
 }
+
+#ifdef __CUDACC__
 
 // fltflt_two_sum is the Two-Sum algorithm given by Thall, which he attributes to Knuth.
 // This corresponds to function twoSum() from Thall's paper, which implements Algorithm 2.
@@ -158,3 +162,7 @@ static __device__ __forceinline__ fltflt fltflt_sqrt(fltflt a) {
     fltflt prod = fltflt_two_prod_fma(xn, 0.5f * diff.hi);
     return fltflt_add_float(prod, yn);
 }
+
+#endif // defined(__CUDACC__)
+
+} // namespace matx

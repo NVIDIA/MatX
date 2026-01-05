@@ -138,6 +138,11 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
                       strict_compute_param_t<ComputeType> phase_correction_partial,
                       cuda::std::complex<loose_compute_param_t<ComputeType>> *phase_lut)
 {
+    static_assert(OutImageType::Rank() == 2, "Output image must be a 2D tensor");
+    static_assert(InitialImageType::Rank() == 2, "Initial image must be a 2D tensor");
+    static_assert(RangeProfilesType::Rank() == 2, "Range profiles must be a 2D tensor");
+    static_assert(PlatPosType::Rank() == 1, "Platform positions must be a 1D tensor");
+    static_assert(VoxLocType::Rank() == 2, "Voxel locations must be a 2D tensor");
     static_assert(is_complex_v<typename OutImageType::value_type>, "Output image must be complex");
     static_assert(is_complex_v<typename InitialImageType::value_type>, "Initial image must be complex");
     static_assert(is_complex_v<typename RangeProfilesType::value_type>, "Range profiles must be complex");
@@ -177,6 +182,8 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
     const index_t num_range_bins = range_profiles.Size(1);
 
     constexpr loose_compute_t half = static_cast<loose_compute_t>(0.5);
+    static_assert(std::is_same_v<voxel_loc_t, double3> || std::is_same_v<voxel_loc_t, double4> ||
+        std::is_same_v<voxel_loc_t, float3> || std::is_same_v<voxel_loc_t, float4>, "SarBp: VoxLocType must represent a 2D operator of type double3, double4, float3, or float4");
     const voxel_loc_t voxel_loc = voxel_locations(iy, ix);
     const loose_compute_t py = voxel_loc.y;
     const loose_compute_t px = voxel_loc.x;

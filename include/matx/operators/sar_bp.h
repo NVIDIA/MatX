@@ -37,24 +37,39 @@
 
 namespace matx {
 
+  /**
+ * @brief Floating point compute type for the SAR BP kernel.
+ *
+ * The compute type controls the floating point precision of intermediate calculations in the SAR BP kernel.
+ * While the inputs (range profiles, antenna positions, etc.) and output (image) have their own data
+ * types, we may wish to use a different precision for the internal calculations. For example, the
+ * output may be cuda::std::complex<float> while the intermediate calculations are done in double.
+ */
 enum class SarBpComputeType {
-  Double,
-  Mixed,
-  // The FloatFloat compute type combines mixed precision (i.e., fp32 when possible) with a
-  // float-float handling of the values for which fp64 would otherwise be needed. The float-float
-  // representation offers increased precision relative to fp32, but not full fp64 precision,
-  // through the use of increased fp32 computation and representing each value as an unevaluated
-  // sum of two fp32 components.
-  FloatFloat,
-  Float
+  Double, //!< Uses double precision for all intermediate calculations.
+  Mixed, /**< Uses mixed precision for intermediate calculations. This compute type offers a trade-off between
+              performance and precision. With \p Mixed precision, the range calculated per pixel-pulse pair will 
+              still typically be done in double-precision, but interpolation and accumulation will be single-precision.
+              When combined with \p PhaseLUTOptimization, the sine/cosine calculations will no longer be double-precision
+              either. */
+  FloatFloat, /**< The \p FloatFloat compute type combines mixed precision (i.e., fp32 when possible) with a
+              float-float handling of the values for which fp64 would otherwise be needed. The float-float
+              representation offers increased precision relative to fp32, but not full fp64 precision,
+              through the use of increased fp32 computation and representing each value as an unevaluated
+              sum of two fp32 components. */
+  Float //!< Uses single precision for all intermediate calculations.
 };
 
-// Features that can be enabled or disabled for the SAR BP kernel. These features are enabled by setting
-// the corresponding bit in the SarBpParams::features field.
+/**
+ * @brief Features that can be enabled or disabled for the SAR BP kernel.
+ */
 enum class SarBpFeature : uint32_t {
-  None = 0x0,
-  PhaseLUTOptimization = 0x1,
-  // Add more features here as needed
+  None = 0x0, //!<  No features enabled.
+  PhaseLUTOptimization = 0x1, /**< Enable the phase LUT optimization. This feature uses a precomputed lookup table
+  to store partial values for the reference phases used during backprojection. The value from the lookup table will
+  be combined with an incremental phase calculation within a single range bin that is computed using the lower-precision
+  intrinsic sine/cosine functions. This optimization will utilize a small amount of device memory as a workspace
+  buffer. This optimization is typically only useful for the \p Mixed and \p FloatFloat compute types. */
 };
 
 // Enable bitmask operations for SarBpFeature
@@ -75,15 +90,14 @@ constexpr bool has_feature(SarBpFeature features, SarBpFeature feature) noexcept
   return (features & feature) != SarBpFeature::None;
 }
 
+/**
+ * @brief Parameters used for SAR backprojection.
+ */
 struct SarBpParams {
-  // compute_type controls the floating point precision of intermediate calculations in the SAR BP kernel.
-  // While the inputs (range profiles, antenna positions, etc.) and output (image) have their own data
-  // types, we may wish to use a different precision for the internal calculations. For example, the
-  // output may be cuda::std::complex<float> while the intermediate calculations are done in double.
-  SarBpComputeType compute_type{SarBpComputeType::Double};
-  SarBpFeature features{SarBpFeature::None};
-  double center_frequency{0.0};
-  double del_r{0.0};
+  SarBpComputeType compute_type{SarBpComputeType::Double}; //!<  The floating point compute type (precision) of the kernel.
+  SarBpFeature features{SarBpFeature::None}; //!<  The features to enable or disable in the kernel.
+  double center_frequency{0.0}; //!<  The center frequency of the radar in Hz.
+  double del_r{0.0}; //!<  The range resolution of the radar. The units should match those of the other locations and distances provided to the backprojector.
 };
 
 }
@@ -216,6 +230,31 @@ namespace detail {
 }
 
 namespace experimental {
+
+/**
+* @brief SAR backprojection.
+*
+* @tparam ImageType Type of initial_image and output image. ImageType must represent a 2D operator of size image_height x image_width for an image of the corresponding dimensions.
+* ImageType must be a complex type. Typical data types are cuda::std::complex<float> or cuda::std::complex<double>.
+* @tparam RangeProfilesType Type of range_profiles. RangeProfilesType must represent a 2D operator of size num_pulses x num_range_bins containing the range-compressed complex samples.
+* RangeProfilesType must be a complex type. Typical data types are cuda::std::complex<float> or cuda::std::complex<double>.
+* @tparam PlatPosType Type of platform positions. PlatPosType must represent a 1D operator of size num_pulses containing the platform positions. Currently, the only supported data
+* types for PlatPosType are double3, double4, float3, and float4. If the user has three separate operators for the x, y, and z coordinates, they can be combined using the zipvec operator.
+* @tparam VoxLocType Type of voxel locations. VoxLocType must represent a 2D operator of size image_height x image_width containing the voxel locations. Currently, the only supported
+* data types for VoxLocType are double3, double4, float3, and float4. For the float4 and double4 data types, the w coordinate is ignored.
+* If the user has three separate operators for the x, y, and z coordinates, they can be combined using the zipvec operator.
+* @tparam RangeToMcpType Type of range to motion compensation point. RangeToMcpType must represent a 0D or 1D real-valued operator of size 1 or num_pulses.
+* @param initial_image Initial image. Initial image must represent a 2D operator of size image_height x image_width for an image of the corresponding dimensions. Contributions computed
+* during backprojection will be added to the initial image. The user can use the zeros generator (i.e., matx::zeros) if no initial image is needed.
+* @param range_profiles Range profiles. Range profiles must represent a 2D operator of size num_pulses x num_range_bins containing the range-compressed complex samples.
+* @param platform_positions Platform positions represent the x, y, and z coordinates of the aperture phase center for each pulse. The coordinates should be in
+* the same coordinate system and units as the voxel locations. See \p PlatPosType documentation for details on supported rank and data types.
+* @param voxel_locations Voxel locations represent the x, y, and z coordinates of the voxels in the image. The coordinates should be in
+* the same coordinate system and units as the platform positions. See \p VoxLocType documentation for details on supported rank and data types.
+* @param range_to_mcp Range to motion compensation point is the distance (range) from each platform position to the motion compensation point.
+* See \p RangeToMcpType documentation for details on supported rank and data types.
+* @param params SAR backprojection parameters. See \p SarBpParams documentation for details on supported parameters.
+*/
 template <typename ImageType, typename RangeProfilesType, typename PlatPosType, typename VoxLocType, typename RangeToMcpType>
 inline auto sar_bp(const ImageType &initial_image, const RangeProfilesType &range_profiles,
     const PlatPosType &platform_positions, const VoxLocType &voxel_locations, const RangeToMcpType &range_to_mcp, const SarBpParams &params) {
