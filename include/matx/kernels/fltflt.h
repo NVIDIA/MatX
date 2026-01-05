@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // BSD 3-Clause License
 //
-// Copyright (c) 2025, NVIDIA Corporation
+// Copyright (c) 2026, NVIDIA Corporation
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -36,7 +36,7 @@ namespace matx {
 
 // This header implements a float-float type (fltflt) that uses two single-precision floating
 // point values to represent a higher-precision value. When normalized, the components of the
-// float-float representation are non-overlapping and the hi components is larger in magnitude
+// float-float representation are non-overlapping and the hi component is larger in magnitude
 // than the lo component. Because floats are used to represent both components, only the
 // mantissa is effectively increased -- the number of exponent bits, and thus the dynamic range
 // represented by a float-float value, is the same as a single-precision floating point value.

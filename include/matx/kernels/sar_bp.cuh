@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // BSD 3-Clause License
 //
-// Copyright (c) 2025, NVIDIA Corporation
+// Copyright (c) 2026, NVIDIA Corporation
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -202,7 +202,7 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
     };
 
     const loose_compute_t phase_correction_partial_loose = static_cast<loose_compute_t>(phase_correction_partial);
-    const auto get_matched_filter = [&phase_lut, &phase_correction_partial, &phase_correction_partial_loose](strict_compute_t diffR, index_t bin_floor_int, loose_compute_t w) -> loose_complex_compute_t {
+    const auto get_reference_phase = [&phase_lut, &phase_correction_partial, &phase_correction_partial_loose](strict_compute_t diffR, index_t bin_floor_int, loose_compute_t w) -> loose_complex_compute_t {
         if constexpr (PhaseLUT) {
             const loose_complex_compute_t base_phase = phase_lut[bin_floor_int];
             float incr_sinx, incr_cosx;
@@ -293,9 +293,9 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
                 (static_cast<loose_compute_t>(1.0) - w) * static_cast<loose_complex_compute_t>(sample_lo) +
                 w * static_cast<loose_complex_compute_t>(sample_hi);
 
-            const loose_complex_compute_t matched_filter = get_matched_filter(diffR, bin_floor_int, w);
+            const loose_complex_compute_t ref_phase = get_reference_phase(diffR, bin_floor_int, w);
 
-            accum += sample * matched_filter;
+            accum += sample * ref_phase;
         }
     }
 }

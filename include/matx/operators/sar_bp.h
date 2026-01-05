@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // BSD 3-Clause License
 //
-// Copyright (c) 2025, NVIDIA Corporation
+// Copyright (c) 2026, NVIDIA Corporation
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -97,7 +97,7 @@ struct SarBpParams {
   SarBpComputeType compute_type{SarBpComputeType::Double}; //!<  The floating point compute type (precision) of the kernel.
   SarBpFeature features{SarBpFeature::None}; //!<  The features to enable or disable in the kernel.
   double center_frequency{0.0}; //!<  The center frequency of the radar in Hz.
-  double del_r{0.0}; //!<  The range resolution of the radar. The units should match those of the other locations and distances provided to the backprojector.
+  double del_r{0.0}; //!<  The range per compressed range bin. The units should match those of the other locations and distances provided to the backprojector.
 };
 
 }
