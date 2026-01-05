@@ -298,5 +298,48 @@ inline bool get_grid_dims_block(dim3 &blocks, dim3 &threads, const cuda::std::ar
   MATX_LOG_DEBUG("Blocks {}x{}x{} Threads {}x{}x{} groups_per_block={}", blocks.x, blocks.y, blocks.z, threads.x, threads.y, threads.z, groups_per_block);
   return stride;
 }
+
+// For 2D block operators (e.g., cuBLASDx GEMM) where all threads in a block cooperate 
+// on the last 2 dimensions and blockIdx is used purely for batching
+template <int RANK>
+inline bool get_grid_dims_block_2d(dim3 &blocks, dim3 &threads, 
+                                    const cuda::std::array<index_t, RANK> &sizes,
+                                    int block_dim) {
+  // Threads are set to block_dim in x, y and z are 1
+  // All threads cooperate via flattened thread ID in the kernel
+  threads.x = block_dim;
+  threads.y = 1;
+  threads.z = 1;
+  
+  // Grid covers batch dimensions only (dims 0 to RANK-3)
+  blocks.x = 1;
+  blocks.y = 1;
+  blocks.z = 1;
+  
+  if constexpr (RANK == 2) {
+    blocks.x = 1;  // Single block for entire 2D output
+  }
+  else if constexpr (RANK == 3) {
+    blocks.x = static_cast<int>(sizes[0]);  // Batch dim
+  }
+  else if constexpr (RANK == 4) {
+    blocks.x = static_cast<int>(sizes[1]);  // Second-to-last batch
+    blocks.y = static_cast<int>(sizes[0]);  // First batch dim
+  }
+  else if constexpr (RANK > 4) {
+    // For higher ranks, flatten batch dimensions into available grid dims
+    // This may need stride handling for very large batches
+    index_t total_batches = 1;
+    for (int i = 0; i < RANK - 2; i++) {
+      total_batches *= sizes[i];
+    }
+    blocks.x = static_cast<int>(total_batches);
+  }
+  
+  MATX_LOG_DEBUG("Block2D: Blocks {}x{}x{} Threads {}x{}x{}", blocks.x, blocks.y, blocks.z, threads.x, threads.y, threads.z);
+  
+  // No stride needed for now - could be extended for very large batches
+  return false;
+}
 } // end namespace detail
 } // end namespace matx

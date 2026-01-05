@@ -71,6 +71,7 @@ namespace detail {
     ELEMENT_WISE, // Whether the operator is element-wise (safe with aliasing)
     ALIASED_MEMORY, // Whether the operator's input and output pointers alias
     GLOBAL_KERNEL, // Kernel operates entirely on a global level per chunk of data. False when at least one operator works on a block level
+    PASS_THROUGH_THREADS, // All threads must call operator() on nested operators; bounds checking done at tensor level
     // Add more capabilities as needed
   };
 
@@ -246,6 +247,15 @@ namespace detail {
     static constexpr int default_value = 32;
     static constexpr int min_identity = 32;
     static constexpr int max_identity = 1;
+  };
+
+  template <>
+  struct capability_attributes<OperatorCapability::PASS_THROUGH_THREADS> {
+    using type = bool;
+    using input_type = VoidCapabilityType;
+    static constexpr bool default_value = false;  // Default: operators do their own bounds checking
+    static constexpr bool or_identity = false;
+    static constexpr bool and_identity = true;
   };    
 
 
@@ -312,6 +322,8 @@ namespace detail {
         return CapabilityQueryType::RANGE_QUERY; // The expression should use the minimum block size supported by all operators.
       case OperatorCapability::GENERATE_LTOIR:
         return CapabilityQueryType::AND_QUERY; // The expression should generate LTOIR code if all its children generate it.
+      case OperatorCapability::PASS_THROUGH_THREADS:
+        return CapabilityQueryType::OR_QUERY; // If ANY operator needs pass-through, all threads must call operator()
       default:
         // Default to OR_QUERY or handle as an error/assertion if a capability isn't mapped.
         return CapabilityQueryType::OR_QUERY; 

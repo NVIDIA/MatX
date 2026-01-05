@@ -170,7 +170,7 @@ inline std::string get_jit_includes_path() {
 }
 
 template <typename Op>
-std::string get_kernel_name([[maybe_unused]] const Op &op, bool stride, bool global_kernel) {
+std::string get_kernel_name([[maybe_unused]] const Op &op, bool stride, bool global_kernel, bool pass_through_threads = false) {
   if constexpr (Op::Rank() == 0) {
     return "matx::detail::matxOpT0Kernel";
   }  
@@ -178,21 +178,27 @@ std::string get_kernel_name([[maybe_unused]] const Op &op, bool stride, bool glo
     return global_kernel ? "matx::detail::matxOpT1Kernel" : "matx::detail::matxOpT1KernelBlock";
   }
   else if constexpr (Op::Rank() == 2) {
-    if (stride) {
+    if (pass_through_threads) {
+      return "matx::detail::matxOpT2KernelBlock2D";
+    } else if (stride) {
       return global_kernel ? "matx::detail::matxOpT2StrideKernel" : "matx::detail::matxOpT2StrideKernelBlock";
     } else {
       return global_kernel ? "matx::detail::matxOpT2Kernel" : "matx::detail::matxOpT2KernelBlock";
     }
   }
   else if constexpr (Op::Rank() == 3) {
-    if (stride) {
+    if (pass_through_threads) {
+      return "matx::detail::matxOpT3KernelBlock2D";
+    } else if (stride) {
       return global_kernel ? "matx::detail::matxOpT3StrideKernel" : "matx::detail::matxOpT3StrideKernelBlock";
     } else {
       return global_kernel ? "matx::detail::matxOpT3Kernel" : "matx::detail::matxOpT3KernelBlock";
     }
   }
   else if constexpr (Op::Rank() == 4) {
-    if (stride) {
+    if (pass_through_threads) {
+      return "matx::detail::matxOpT4KernelBlock2D";
+    } else if (stride) {
       return global_kernel ? "matx::detail::matxOpT4StrideKernel" : "matx::detail::matxOpT4StrideKernelBlock";
     } else {
       return global_kernel ? "matx::detail::matxOpT4Kernel" : "matx::detail::matxOpT4KernelBlock";
@@ -207,7 +213,7 @@ std::string get_kernel_name([[maybe_unused]] const Op &op, bool stride, bool glo
 }
 
 template <typename Op>
-std::string generate_capability_params_string([[maybe_unused]] const Op &op, ElementsPerThread EPT, bool JIT, int osize, int block_size) {
+std::string generate_capability_params_string([[maybe_unused]] const Op &op, ElementsPerThread EPT, bool JIT, int osize, int block_size, bool pass_through_threads = false) {
   std::string ept_str;
   switch (EPT) {
     case ElementsPerThread::ONE:
@@ -235,6 +241,8 @@ std::string generate_capability_params_string([[maybe_unused]] const Op &op, Ele
   
   std::string jit_str = JIT ? "true" : "false";
 
+  std::string pass_through_str = pass_through_threads ? "true" : "false";
+  
   std::string final_str =  
          "namespace matx { namespace detail {\n"
          "template <ElementsPerThread EPT, bool JIT>\n"
@@ -243,6 +251,7 @@ std::string generate_capability_params_string([[maybe_unused]] const Op &op, Ele
          "  static constexpr bool jit = JIT;\n"
          "  static constexpr int osize = " + std::to_string(osize) + ";\n"
          "  static constexpr int block_size = " + std::to_string(block_size) + ";\n"
+         "  static constexpr bool pass_through_threads = " + pass_through_str + ";\n"
          "};\n"
          "using CurrentCapabilities = CapabilityParams<" + ept_str + ", " + jit_str + ">;\n"
          "} }\n";
@@ -300,7 +309,7 @@ inline std::string qualify_jit_type_names(const std::string& type_str) {
 }
 
 template <typename Op, typename SizeArray>
-auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, const SizeArray &sa, dim3 &blocks, dim3 &threads, ElementsPerThread ept, bool stride, int dynamic_shmem_size, int osize, bool global_kernel) {
+auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, const SizeArray &sa, dim3 &blocks, dim3 &threads, ElementsPerThread ept, bool stride, int dynamic_shmem_size, int osize, bool global_kernel, bool pass_through_threads = false) {
   // Pure NVRTC implementation
   // Cache both module and function to prevent resource leaks
   // CUmodule must remain loaded for CUfunction to be valid
@@ -312,10 +321,10 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, cons
   static std::mutex kernel_cache_mutex;
   
   const auto all_jit_classes_string = get_all_jit_classes_string(op);
-  auto capstr = generate_capability_params_string(op, ept, false, osize, threads.x);
+  auto capstr = generate_capability_params_string(op, ept, false, osize, threads.x, pass_through_threads);
   const auto kernel_op_type = detail::get_operator_capability<OperatorCapability::JIT_TYPE_QUERY>(op);
   
-  std::string kernel_name = get_kernel_name(op, stride, global_kernel);
+  std::string kernel_name = get_kernel_name(op, stride, global_kernel, pass_through_threads);
   std::string cache_key = kernel_name + "_" + kernel_op_type;
 
   MATX_LOG_DEBUG("nvrtc_compile_and_run called with operator type: {}", typeid(op).name());

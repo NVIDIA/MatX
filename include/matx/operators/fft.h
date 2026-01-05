@@ -186,11 +186,7 @@ namespace matx
             dx_fft_helper_.set_fft_type(DeduceFFTTransformType<typename scalar_to_complex<typename OpA::value_type>::ctype, value_type>());
             dx_fft_helper_.set_direction(Direction);
             dx_fft_helper_.set_cc(cc);
-            // if (fft_size_ <= 32) {
-            //   dx_fft_helper_.set_method(cuFFTDxMethod::REGISTER);
-            // } else {
-              dx_fft_helper_.set_method(cuFFTDxMethod::SHARED);
-            //}            
+            dx_fft_helper_.set_method(cuFFTDxMethod::SHARED);           
 
             bool contiguous = false;
             if constexpr (is_tensor_view_v<OpA>) {

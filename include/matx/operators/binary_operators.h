@@ -180,13 +180,11 @@ namespace matx
                "  typename detail::inner_storage_or_self_t<detail::base_type_t<Op>> op_;\n" +
                "  template <typename CapType, typename... Is>\n" +
                "  __MATX_INLINE__ __MATX_DEVICE__  decltype(auto) operator()(Is... indices) const\n" +
-               "  {\n" +
-               "    if ((threadIdx.x * static_cast<int>(CapType::ept)) > Size(Rank() - 1)) {\n" +
-               "      return detail::GetJitSentinelValue<CapType, value_type>();\n" +
-               "    }\n" +
+               "  {\n" +     
                "    auto i1 = get_value<CapType>(in1_, indices...);\n" + 
                "    auto i2 = get_value<CapType>(in2_, indices...);\n" +
-               "    return op_.template operator()<CapType>(i1, i2);\n" + 
+               "    auto result = op_.template operator()<CapType>(i1, i2);\n" +
+               "    return result;\n" + 
                "  }\n" +
                "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank()\n" +
                "  {\n" +

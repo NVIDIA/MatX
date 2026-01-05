@@ -175,22 +175,17 @@ public:
                 "remove_cvref_t<decltype(detail::get_value<CapType>(op_, indices...))>\n" +
           "  {\n" +
           "    using in_val_type = remove_cvref_t<decltype(detail::get_value<CapType>(op_, indices...))>;\n" +
-          "    if ((threadIdx.x * static_cast<int>(CapType::ept)) >= Size(Rank() - 1)) {\n" +
-          "      return in_val_type{};\n" +
-          "    }\n" +
           "    auto in_val = detail::get_value<CapType>(op_, indices...);\n" +
           "    using out_type = decltype(out_.template operator()<CapType>(indices...));\n" +
-          "    if (out_.Rank() == 0 || threadIdx.x < out_.Size(out_.Rank() - 1)) {\n" +
-          "      if constexpr (!is_vector_v<in_val_type> && is_vector_v<out_type>) {\n" +
-          "        Vector<remove_cvref_t<in_val_type>, static_cast<size_t>(CapType::ept)> vec{in_val};\n" +
-          "        out_.template operator()<CapType>(indices...) = vec;\n" +
-          "      }\n" +
-           "      else {\n" +
-           "        out_.template operator()<CapType>(indices...) = in_val;\n" +
-           "      }\n" +
-           "    }\n" +
-           "    return in_val;\n" +
-           "  }\n" +
+          "    if constexpr (!is_vector_v<in_val_type> && is_vector_v<out_type>) {\n" +
+          "      Vector<remove_cvref_t<in_val_type>, static_cast<size_t>(CapType::ept)> vec{in_val};\n" +
+          "      out_.template operator()<CapType>(indices...) = vec;\n" +
+          "    }\n" +
+          "    else {\n" +
+          "      out_.template operator()<CapType>(indices...) = in_val;\n" +
+          "    }\n" +
+          "    return in_val;\n" +
+          "  }\n" +
            "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank()\n" +
            "  {\n" +
            "    return T::Rank();\n" +
