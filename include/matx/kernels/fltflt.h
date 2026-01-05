@@ -52,21 +52,21 @@ struct fltflt {
     float lo;
 };
 
-static __host__ __device__ __forceinline__ fltflt fltflt_make_from_double(double x) {
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_make_from_double(double x) {
     float hi = (float)x;
     float lo = (float)(x - (double)hi);
     return fltflt{ hi, lo };
 }
 
-static __host__ __device__ __forceinline__ fltflt fltflt_make_from_float(float x) {
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_make_from_float(float x) {
     return fltflt{ x, 0.0f };
 }
 
-static __host__ __device__ __forceinline__ double fltflt_to_double(fltflt x) {
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ double fltflt_to_double(fltflt x) {
     return (double)x.hi + (double)x.lo;
 }
 
-static __host__ __device__ __forceinline__ float fltflt_to_float(fltflt x) {
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ float fltflt_to_float(fltflt x) {
     return x.hi;
 }
 
@@ -75,7 +75,7 @@ static __host__ __device__ __forceinline__ float fltflt_to_float(fltflt x) {
 // fltflt_two_sum is the Two-Sum algorithm given by Thall, which he attributes to Knuth.
 // This corresponds to function twoSum() from Thall's paper, which implements Algorithm 2.
 // This algorithm produces a normalized (non-overlapping) expansion.
-static __device__ __forceinline__ fltflt fltflt_two_sum(float a, float b) {
+static __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_two_sum(float a, float b) {
     const float s = __fadd_rn(a, b);
     const float v = __fsub_rn(s, a);
     const float e = __fadd_rn(
@@ -88,7 +88,7 @@ static __device__ __forceinline__ fltflt fltflt_two_sum(float a, float b) {
 // to Dekker. This corresponds to function quickTwoSum() from Thall's paper, which
 // implements Algorithm 3. This algorithm produces a normalized (non-overlapping) expansion,
 // but unlike fltflt_two_sum, it assumes that |a| >= |b|.
-static __device__ __forceinline__ fltflt fltflt_fast_two_sum(float a, float b) {
+static __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_fast_two_sum(float a, float b) {
     const float s = __fadd_rn(a, b);
     const float e = __fsub_rn(b, __fsub_rn(s, a));
     return { s, e };
@@ -98,7 +98,7 @@ static __device__ __forceinline__ fltflt fltflt_fast_two_sum(float a, float b) {
 // to Hida. This corresponds to function FMA-twoProd() from Thall's paper, which
 // implements Algorithm 5. This algorithm produces a normalized (non-overlapping) expansion
 // using a fused multiply-add operation.
-static __device__ __forceinline__ fltflt fltflt_two_prod_fma(float a, float b) {
+static __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_two_prod_fma(float a, float b) {
     const float x = __fmul_rn(a, b);
     const float y = __fmaf_rn(a, b, -x);
     return { x, y };
@@ -107,7 +107,7 @@ static __device__ __forceinline__ fltflt fltflt_two_prod_fma(float a, float b) {
 // fltflt_add is the df64_add() function given by Thall. This function uses two_sum()
 // for the hi and lo components followed by addition of the cross terms and
 // re-normalization to a non-overlapping expansion.
-static __device__ __forceinline__ fltflt fltflt_add(fltflt a, fltflt b) {
+static __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_add(fltflt a, fltflt b) {
     fltflt s = fltflt_two_sum(a.hi, b.hi);
     const fltflt t = fltflt_two_sum(a.lo, b.lo);
     s.lo = __fadd_rn(s.lo, t.hi);
@@ -119,7 +119,7 @@ static __device__ __forceinline__ fltflt fltflt_add(fltflt a, fltflt b) {
 
 // fltflt_add_float is an optimization of df64_add() for the case where b is
 // a float, and thus b.lo is zero.
-static __device__ __forceinline__ fltflt fltflt_add_float(fltflt a, float b) {
+static __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_add_float(fltflt a, float b) {
     fltflt s = fltflt_two_sum(a.hi, b);
     s.lo = __fadd_rn(s.lo, a.lo);
     s = fltflt_fast_two_sum(s.hi, s.lo);
@@ -127,21 +127,21 @@ static __device__ __forceinline__ fltflt fltflt_add_float(fltflt a, float b) {
 }
 
 // fltflt_sub() subtracts b from a. It delegates to fltflt_add() with a negated b.
-static __device__ __forceinline__ fltflt fltflt_sub(fltflt a, fltflt b) {
+static __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_sub(fltflt a, fltflt b) {
     const fltflt neg_b = { -b.hi, -b.lo };
     return fltflt_add(a, neg_b);
 }
 
 // fltflt_sub_float() is an optimization of fltflt_sub() for the case where b is
 // a float, and thus b.lo is zero. It delegates to fltflt_add_float() with a negated b.
-static __device__ __forceinline__ fltflt fltflt_sub_float(fltflt a, float b) {
+static __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_sub_float(fltflt a, float b) {
     return fltflt_add_float(a, -b);
 }
 
 // fltflt_mul() is the df64_mult() function given by Thall. This function uses the
 // two_prod_fma() function for the hi components followed by addition of the cross terms
 // and re-normalization to a non-overlapping expansion.
-static __device__ __forceinline__ fltflt fltflt_mul(fltflt a, fltflt b) {
+static __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_mul(fltflt a, fltflt b) {
     fltflt p;
     p = fltflt_two_prod_fma(a.hi, b.hi);
     p.lo = __fmaf_rn(a.hi, b.lo, p.lo);
@@ -154,7 +154,7 @@ static __device__ __forceinline__ fltflt fltflt_mul(fltflt a, fltflt b) {
 // This function implements Algorithm 7 from Thall's paper. It uses the
 // two_prod_fma() function for the hi components followed by subtraction of the square
 // of the result and re-normalization to a non-overlapping expansion.
-static __device__ __forceinline__ fltflt fltflt_sqrt(fltflt a) {
+static __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_sqrt(fltflt a) {
     const float xn = (a.hi == 0.0f) ? 0.0f :rsqrtf(a.hi);
     const float yn = __fmul_rn(a.hi, xn);
     const fltflt ynsqr = fltflt_two_prod_fma(yn, yn);
