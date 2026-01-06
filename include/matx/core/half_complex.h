@@ -1058,6 +1058,7 @@ using matxBf16Complex = matxHalfComplex<matxBf16>; ///< Alias for a MatXbf16 com
 }; // namespace matx
 
 #ifndef __CUDACC_RTC__
+#if __has_include(<format>)
 // Add std::formatter specializations for matxFp16Complex and matxBf16Complex
 #include <format>
 
@@ -1114,4 +1115,5 @@ struct formatter<matx::matxBf16Complex> {
 };
 
 } // namespace std
+#endif // __has_include(<format>)
 #endif // __CUDACC_RTC__

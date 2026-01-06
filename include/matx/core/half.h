@@ -1434,36 +1434,38 @@ using matxBf16 = matxHalf<__nv_bfloat16>; ///< Alias for bf16
 }; // namespace matx
 
 #ifndef __CUDACC_RTC__
-// Add std::formatter specializations for matxFp16 and matxBf16
-#include <format>
+#if __has_include(<format>)
+  // Add std::formatter specializations for matxFp16 and matxBf16
+  #include <format>
 
-namespace std {
+  namespace std {
 
-/**
- * @brief std::formatter specialization for matxFp16
- * 
- * Enables matxFp16 to work with std::format by converting to float
- */
-template <>
-struct formatter<matx::matxFp16> : formatter<float> {
-  template <typename FormatContext>
-  auto format(const matx::matxFp16& val, FormatContext& ctx) const {
-    return formatter<float>::format(static_cast<float>(val), ctx);
-  }
-};
+  /**
+  * @brief std::formatter specialization for matxFp16
+  * 
+  * Enables matxFp16 to work with std::format by converting to float
+  */
+  template <>
+  struct formatter<matx::matxFp16> : formatter<float> {
+    template <typename FormatContext>
+    auto format(const matx::matxFp16& val, FormatContext& ctx) const {
+      return formatter<float>::format(static_cast<float>(val), ctx);
+    }
+  };
 
-/**
- * @brief std::formatter specialization for matxBf16
- * 
- * Enables matxBf16 to work with std::format by converting to float
- */
-template <>
-struct formatter<matx::matxBf16> : formatter<float> {
-  template <typename FormatContext>
-  auto format(const matx::matxBf16& val, FormatContext& ctx) const {
-    return formatter<float>::format(static_cast<float>(val), ctx);
-  }
-};
+  /**
+  * @brief std::formatter specialization for matxBf16
+  * 
+  * Enables matxBf16 to work with std::format by converting to float
+  */
+  template <>
+  struct formatter<matx::matxBf16> : formatter<float> {
+    template <typename FormatContext>
+    auto format(const matx::matxBf16& val, FormatContext& ctx) const {
+      return formatter<float>::format(static_cast<float>(val), ctx);
+    }
+  };
 
 } // namespace std
-#endif
+#endif // __has_include(<format>)
+#endif // __CUDACC_RTC__
