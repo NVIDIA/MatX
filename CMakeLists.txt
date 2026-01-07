@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.23.1)
+cmake_minimum_required(VERSION 3.25.2)
 
 set(MATX_VERSION 0.9.4)
 
@@ -99,10 +99,6 @@ if (MATX_BUILD_DOCS)
     add_subdirectory(docs_input)
 endif()
 
-# MatX requires C++20 to build. Enforce on all libraries pulled in as well
-set(CMAKE_CXX_STANDARD 20)
-set(CUDA_CXX_STANDARD 20)
-
 # Check for <format> header availability (required for logging support)
 include(CheckIncludeFileCXX)
 set(CMAKE_REQUIRED_FLAGS "-std=c++20")
@@ -140,7 +136,7 @@ target_include_directories(matx INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOU
 "$<INSTALL_INTERFACE:include/matx/kernels>")
 
                            
-target_compile_features(matx INTERFACE cxx_std_17 $<BUILD_INTERFACE:cuda_std_17>)
+target_compile_features(matx INTERFACE cxx_std_20 $<BUILD_INTERFACE:cuda_std_20>)
 
 # 11.2 and above required for async allocation
 if (CMAKE_CUDA_COMPILER_VERSION VERSION_LESS 11.5)

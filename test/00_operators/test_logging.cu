@@ -13,6 +13,10 @@
 
 using namespace matx;
 
+// We only include the logging tests if the <format> header is available
+// and thus if logging is supported
+#if __has_include(<format>)
+
 class LoggingTest : public ::testing::Test {
 protected:
   void SetUp() override {
@@ -162,3 +166,4 @@ TEST_F(LoggingTest, SourceLocation) {
 // because they depend on file system access and permissions.
 // Manual testing is recommended for file output functionality.
 
+#endif // __has_include(<format>)
