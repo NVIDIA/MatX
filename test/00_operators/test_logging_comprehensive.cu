@@ -16,6 +16,10 @@
 
 using namespace matx;
 
+// We only include the logging tests if the <format> header is available
+// and thus if logging is supported
+#if __has_include(<format>)
+
 class LoggingComprehensiveTest : public ::testing::Test {
 protected:
   void SetUp() override {
@@ -384,3 +388,4 @@ TEST_F(LoggingComprehensiveTest, InvalidDestinationFallback) {
   SUCCEED();
 }
 
+#endif // __has_include(<format>)

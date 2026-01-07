@@ -34,7 +34,6 @@
 
 #include <type_traits>
 #include <string>
-#include <format>
 #include <cuda_fp16.h>
 
 #include "matx/core/defines.h"
@@ -413,20 +412,21 @@ __MATX_INLINE__ std::string number_to_symbol(const T& val)
 {
   // Helper lambda to sanitize floating point values for variable names
   auto sanitize_float = [](auto v) -> std::string {
-    std::string str = std::format("{}", v);
-    // Replace '.' with 'p' (for point), '-' with 'n' (for negative)
+    std::ostringstream oss;
+    oss << v;
+    std::string str = oss.str();
     for (auto& c : str) {
       if (c == '.') c = 'p';
       else if (c == '-') c = 'n';
     }
     return str;
   };
-  
+
   if constexpr (is_complex_v<T>) {
     // Format complex numbers as r{real}_i{imag}
     auto real_val = val.real();
     auto imag_val = val.imag();
-    return std::format("r{}_i{}", sanitize_float(real_val), sanitize_float(imag_val));
+    return std::string("r") + sanitize_float(real_val) + "_i" + sanitize_float(imag_val);
   } else {
     // Format non-complex numbers directly
     return sanitize_float(val);
