@@ -50,6 +50,7 @@
 #include "matx/core/half.h"
 #include <cuda/std/__algorithm/min.h>
 #include <cuda/std/__algorithm/max.h>
+#include <cuda/std/tuple>
 
 union HalfBits {
   constexpr HalfBits(short x) : i(x) {}
@@ -853,7 +854,7 @@ void __MATX_INLINE__ argmax_impl(OutType dest, TensorIndexType &idest, const InT
 #ifdef __CUDACC__
   MATX_NVTX_START("argmax_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
-  const auto initial_value = thrust::make_tuple(static_cast<matx::index_t>(-1), std::numeric_limits<typename InType::value_type>::lowest());
+  const auto initial_value = cuda::std::make_tuple(static_cast<matx::index_t>(-1), std::numeric_limits<typename InType::value_type>::lowest());
   using reduce_param_type = typename detail::ReduceParams_t<typename detail::CustomArgMaxCmp, decltype(initial_value)>;
   auto reduce_params = reduce_param_type{detail::CustomArgMaxCmp{}, initial_value};
 
@@ -1001,7 +1002,7 @@ void __MATX_INLINE__ argmin_impl(OutType dest, TensorIndexType &idest, const InT
 #ifdef __CUDACC__
   MATX_NVTX_START("argmin_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
-  const auto initial_value = thrust::make_tuple(static_cast<matx::index_t>(-1), std::numeric_limits<typename InType::value_type>::max());
+  const auto initial_value = cuda::std::make_tuple(static_cast<matx::index_t>(-1), std::numeric_limits<typename InType::value_type>::max());
   using reduce_param_type = typename detail::ReduceParams_t<typename detail::CustomArgMinCmp, decltype(initial_value)>;
   auto reduce_params = reduce_param_type{detail::CustomArgMinCmp{}, initial_value};
 
@@ -1088,7 +1089,7 @@ void __MATX_INLINE__ argminmax_impl(OutType destmin, TensorIndexType &idestmin, 
 #ifdef __CUDACC__
   MATX_NVTX_START("argminmax_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
-  const auto initial_value = thrust::make_tuple(
+  const auto initial_value = cuda::std::make_tuple(
     static_cast<matx::index_t>(-1),
     std::numeric_limits<typename InType::value_type>::max(),
     static_cast<matx::index_t>(-1),

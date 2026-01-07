@@ -39,6 +39,7 @@
 
 #ifdef __CUDACC__
 #include <cub/cub.cuh>
+#include <cuda/std/tuple>
 #endif // __CUDACC__
 
 #include "matx/core/error.h"
@@ -1099,7 +1100,7 @@ public:
   {
     auto at = ToTuple(a);
     auto bt = ToTuple(b);
-    return thrust::get<1>(at) < thrust::get<1>(bt) ? bt : at;
+    return cuda::std::get<1>(at) < cuda::std::get<1>(bt) ? bt : at;
   }
 };
 
@@ -1125,7 +1126,7 @@ public:
   {
     auto at = ToTuple(a);
     auto bt = ToTuple(b);
-    return thrust::get<1>(at) >= thrust::get<1>(bt) ? bt : at;
+    return cuda::std::get<1>(at) >= cuda::std::get<1>(bt) ? bt : at;
   }
 };
 
@@ -1136,27 +1137,27 @@ struct CustomArgMinMaxCmp
     T result;
 
     // Min part
-    if (thrust::get<1>(a) >= thrust::get<1>(b))
+    if (cuda::std::get<1>(a) >= cuda::std::get<1>(b))
     {
-      thrust::get<0>(result) = thrust::get<0>(b);
-      thrust::get<1>(result) = thrust::get<1>(b);
+      cuda::std::get<0>(result) = cuda::std::get<0>(b);
+      cuda::std::get<1>(result) = cuda::std::get<1>(b);
     }
     else
     {
-      thrust::get<0>(result) = thrust::get<0>(a);
-      thrust::get<1>(result) = thrust::get<1>(a);
+      cuda::std::get<0>(result) = cuda::std::get<0>(a);
+      cuda::std::get<1>(result) = cuda::std::get<1>(a);
     }
 
     // Max part
-    if (thrust::get<3>(a) < thrust::get<3>(b))
+    if (cuda::std::get<3>(a) < cuda::std::get<3>(b))
     {
-      thrust::get<2>(result) = thrust::get<2>(b);
-      thrust::get<3>(result) = thrust::get<3>(b);
+      cuda::std::get<2>(result) = cuda::std::get<2>(b);
+      cuda::std::get<3>(result) = cuda::std::get<3>(b);
     }
     else
     {
-      thrust::get<2>(result) = thrust::get<2>(a);
-      thrust::get<3>(result) = thrust::get<3>(a);
+      cuda::std::get<2>(result) = cuda::std::get<2>(a);
+      cuda::std::get<3>(result) = cuda::std::get<3>(a);
     }
 
     return result;
