@@ -223,8 +223,8 @@ TYPED_TEST(SarBpTestDoubleType, PointTarget)
 
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
-  const matx::index_t image_width = 128;
-  const matx::index_t image_height = 128;
+  constexpr matx::index_t image_width = 128;
+  constexpr matx::index_t image_height = 128;
   const matx::index_t num_pulses = 128;
   const matx::index_t num_range_bins = 128;
 
@@ -288,9 +288,7 @@ TYPED_TEST(SarBpTestDoubleType, PointTarget)
   // re_thresh and im_thresh are the thresholds for the real and imaginary parts of the pixel
   // centered at the target location, respectively.
 
-MATX_IGNORE_WARNING_PUSH_CLANG("-Wnounused-lambda-capture")    
   auto validate = [image_height, image_width, num_pulses](auto &image, double re_thresh, [[maybe_unused]] double im_thresh) {
-MATX_IGNORE_WARNING_POP_CLANG
     for (matx::index_t i = 0; i < image_height; i++) {
       for (matx::index_t j = 0; j < image_width; j++) {
         if (i == image_height / 4 && j == image_width / 4) {
