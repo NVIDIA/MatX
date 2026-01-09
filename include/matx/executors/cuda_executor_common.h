@@ -334,7 +334,7 @@ namespace detail
 
         int total_batches = 1;
         if constexpr (Op::Rank() > 0) {
-          total_batches = static_cast<int>(TotalSize(op) / op.Size(op.Rank() - 1));
+          total_batches = static_cast<int>(TotalSize(op) / op.Size(Op::Rank() - 1));
         }
 
         // Iterate through all possible groups_per_block values
