@@ -390,10 +390,6 @@ if (MATX_EN_FILEIO OR MATX_EN_VISUALIZATION OR MATX_EN_PYBIND11 OR MATX_BUILD_EX
     check_python_libs("numpy")
     check_optional_python_libs("cupy")
 
-    # Required by pybind
-    # https://pybind11.readthedocs.io/en/stable/faq.html#someclass-declared-with-greater-
-    # visibility-than-the-type-of-its-field-someclass-member-wattributes
-    target_compile_options(matx INTERFACE -fvisibility=hidden)
     target_link_libraries(matx INTERFACE pybind11::embed)
 
     # Visualization requires Python libraries
