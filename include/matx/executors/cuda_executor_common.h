@@ -157,7 +157,7 @@ namespace detail
     return [&, is_jit, global_kernel](ElementsPerThread ept) -> const void* {
       dim3 local_blocks = 1;
       dim3 local_threads = 1;
-      bool stride;
+      [[maybe_unused]] bool stride;
       
       if (is_jit && !global_kernel) {
         stride = get_grid_dims_block<Op::Rank()>(local_blocks, local_threads, sizes, static_cast<int>(ept), 1, 1024, true);
