@@ -333,7 +333,7 @@ namespace detail
         }
 
         int total_batches = 1;
-        if constexpr (op.Rank() > 0) {
+        if constexpr (Op::Rank() > 0) {
           total_batches = static_cast<int>(TotalSize(op) / op.Size(op.Rank() - 1));
         }
 
