@@ -381,15 +381,15 @@ if (MATX_EN_FILEIO OR MATX_EN_VISUALIZATION OR MATX_EN_PYBIND11 OR MATX_BUILD_EX
     find_package(Python3  REQUIRED COMPONENTS Interpreter Development)
     find_package(pybind11 REQUIRED)
 
+    # Export pybind11 dependency for downstream users after make install
+    rapids_export_package(INSTALL pybind11 matx-exports GLOBAL_TARGETS pybind11::embed pybind11::pybind11)
+    rapids_export_package(BUILD pybind11 matx-exports GLOBAL_TARGETS pybind11::embed pybind11::pybind11)    
+
     # Check for python libs
     include(cmake/CheckPythonLibs.cmake)
     check_python_libs("numpy")
     check_optional_python_libs("cupy")
 
-    # Required by pybind
-    # https://pybind11.readthedocs.io/en/stable/faq.html#someclass-declared-with-greater-
-    # visibility-than-the-type-of-its-field-someclass-member-wattributes
-    target_compile_options(matx INTERFACE -fvisibility=hidden)
     target_link_libraries(matx INTERFACE pybind11::embed)
 
     # Visualization requires Python libraries
