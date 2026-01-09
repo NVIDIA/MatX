@@ -46,7 +46,7 @@
 #define LIBCUBLASDX_CHECK(ans)                                                                                           \
   do {                                                                                                               \
     commondxStatusType result = (ans);                                                                             \
-    MATX_ASSERT_STR_EXP(result, commondxStatusType::COMMONDX_SUCCESS, matxCublasError, "cuBLASDx failed");\
+    MATX_ASSERT_STR_EXP(result, commondxStatusType::COMMONDX_SUCCESS, matxLibMathdxError, "cuBLASDx failed");\
   } while (0)
 
 namespace matx {
@@ -63,44 +63,45 @@ namespace matx {
 
   // Real, half or bfloat16
   if constexpr (std::is_same_v<T, matxFp16> || std::is_same_v<T, matxBf16>) {
-    if (compute_capability == 70 || compute_capability == 72) max_size = 128;
-    else if (compute_capability == 75) max_size = 104;
-    else if (compute_capability == 80 || compute_capability == 87) max_size = 166;
-    else if (compute_capability == 86 || compute_capability == 89 || compute_capability == 120 || compute_capability == 121) max_size = 129;
-      else if (compute_capability == 90 || compute_capability == 100 || compute_capability == 101 || compute_capability == 103 || compute_capability == 110) max_size = 196;
+    if (compute_capability == 700 || compute_capability == 720) max_size = 128;
+    else if (compute_capability == 750) max_size = 104;
+    else if (compute_capability == 800 || compute_capability == 870) max_size = 166;
+    else if (compute_capability == 860 || compute_capability == 890 || compute_capability == 1200 || compute_capability == 1210) max_size = 129;
+      else if (compute_capability == 900 || compute_capability == 1000 || compute_capability == 1010 || compute_capability == 1030 || compute_capability == 1100) max_size = 196;
   }
     // Real, float OR Complex, half/bf16
   else if constexpr (std::is_same_v<T, float> || std::is_same_v<T, matxFp16Complex> || std::is_same_v<T, cuda::std::complex<matxBf16>>) {
-    if (compute_capability == 70 || compute_capability == 72) max_size = 90;
-    else if (compute_capability == 75) max_size = 73;
-    else if (compute_capability == 80 || compute_capability == 87) max_size = 117;
-    else if (compute_capability == 86 || compute_capability == 89 || compute_capability == 120 || compute_capability == 121) max_size = 91;
-      else if (compute_capability == 90 || compute_capability == 100 || compute_capability == 101 || compute_capability == 103 || compute_capability == 110) max_size = 139;
+    if (compute_capability == 700 || compute_capability == 720) max_size = 90;
+    else if (compute_capability == 750) max_size = 73;
+    else if (compute_capability == 800 || compute_capability == 870) max_size = 117;
+    else if (compute_capability == 860 || compute_capability == 890 || compute_capability == 1200 || compute_capability == 1210) max_size = 91;
+      else if (compute_capability == 900 || compute_capability == 1000 || compute_capability == 1010 || compute_capability == 1030 || compute_capability == 1100) max_size = 139;
   }
   // Real, double OR Complex, float
   else if constexpr (std::is_same_v<T, double> || std::is_same_v<T, cuda::std::complex<float>>) {
-    if (compute_capability == 70 || compute_capability == 72) max_size = 64;
-    else if (compute_capability == 75) max_size = 52;
-    else if (compute_capability == 80 || compute_capability == 87) max_size = 83;
-    else if (compute_capability == 86 || compute_capability == 89 || compute_capability == 120 || compute_capability == 121) max_size = 64;
-      else if (compute_capability == 90 || compute_capability == 100 || compute_capability == 101 || compute_capability == 103 || compute_capability == 110) max_size = 98;
+    if (compute_capability == 700 || compute_capability == 720) max_size = 64;
+    else if (compute_capability == 750) max_size = 52;
+    else if (compute_capability == 800 || compute_capability == 870) max_size = 83;
+    else if (compute_capability == 860 || compute_capability == 890 || compute_capability == 1200 || compute_capability == 1210) max_size = 64;
+      else if (compute_capability == 900 || compute_capability == 1000 || compute_capability == 1010 || compute_capability == 1030 || compute_capability == 1100) max_size = 98;
   }
   // Complex, double
   else if constexpr (std::is_same_v<T, cuda::std::complex<double>>) {
-    if (compute_capability == 70 || compute_capability == 72) max_size = 45;
-    else if (compute_capability == 75) max_size = 36;
-    else if (compute_capability == 80 || compute_capability == 87) max_size = 58;
-    else if (compute_capability == 86 || compute_capability == 89 || compute_capability == 120 || compute_capability == 121) max_size = 45;
-      else if (compute_capability == 90 || compute_capability == 100 || compute_capability == 101 || compute_capability == 103 || compute_capability == 110) max_size = 69;
+    if (compute_capability == 700 || compute_capability == 720) max_size = 45;
+    else if (compute_capability == 750) max_size = 36;
+    else if (compute_capability == 800 || compute_capability == 870) max_size = 58;
+    else if (compute_capability == 860 || compute_capability == 890 || compute_capability == 1200 || compute_capability == 1210) max_size = 45;
+      else if (compute_capability == 900 || compute_capability == 1000 || compute_capability == 1010 || compute_capability == 1030 || compute_capability == 1100) max_size = 69;
   }
 
-  if (max_size == 0)
+  if (max_size == 0) {
     return false;
+  }
 
-    const auto max_shm = static_cast<size_t>(max_size) * static_cast<size_t>(max_size) * sizeof(T) * 2; // Most SHM both A and B can use
-    const auto req_shm = sizeof(T) * (static_cast<size_t>(m) * static_cast<size_t>(k) + static_cast<size_t>(k) * static_cast<size_t>(n));
+  const auto max_shm = static_cast<size_t>(max_size) * static_cast<size_t>(max_size) * sizeof(T) * 2; // Most SHM both A and B can use
+  const auto req_shm = sizeof(T) * (static_cast<size_t>(m) * static_cast<size_t>(k) + static_cast<size_t>(k) * static_cast<size_t>(n));
 
-    // All dimensions must fit in shared memory
+  // All dimensions must fit in shared memory
   return req_shm <= max_shm;
 }
 
@@ -354,10 +355,7 @@ namespace matx {
         return true;
       }
 
-      std::string GetFuncStr(const std::string &gemm_func_name) const {
-        // Generate device code for cuBLASDx GEMM
-        // Based on: https://github.com/NVIDIA/CUDALibrarySamples/blob/master/MathDx/cuBLASDx/01_gemm_introduction/introduction_example.cu
-        
+      std::string GetFuncStr(const std::string &gemm_func_name, float alpha, float beta) const {
         std::string result = R"(
           using value_type = )";
         result += detail::type_to_string<InputType>();
@@ -369,8 +367,8 @@ namespace matx {
           
           // Get pointers to input data from operators
           // Note: This assumes contiguous, row-major layout
-          const value_type* a_ptr = a_.Data();
-          const value_type* b_ptr = b_.Data();
+          const value_type* a_ptr = a_.template data_ptr<CapType>(blockIdx.x, blockDim.x * blockDim.y * blockDim.z);
+          const value_type* b_ptr = b_.template data_ptr<CapType>(blockIdx.x, blockDim.x * blockDim.y * blockDim.z);
           
           // Offset to the batch element
           const index_t batch_idx = blockIdx.x;
@@ -390,11 +388,10 @@ namespace matx {
         result += R"( * sizeof(value_type);
           constexpr size_t b_size = )";
         result += std::to_string(static_cast<int>(k_ * n_));
-        result += R"( * sizeof(value_type);
-          constexpr size_t c_size = )";
+
         result += std::to_string(static_cast<int>(m_ * n_));
         result += R"( * sizeof(value_type);
-          
+                    printf("a_ptr: %p, b_ptr: %p a_size: %lu, b_size: %lu\n", a_ptr, b_ptr, a_size, b_size);
           value_type* smem_a = reinterpret_cast<value_type*>(smem);
           value_type* smem_b = reinterpret_cast<value_type*>(smem + a_size);
           value_type* smem_c = reinterpret_cast<value_type*>(smem + a_size + b_size);
@@ -421,19 +418,29 @@ namespace matx {
           
           // Call the cuBLASDx generated GEMM function
           // Signature: void func(value_type* alpha, value_type* a, value_type* b, value_type* beta, value_type* c)
-          value_type alpha_val = static_cast<value_type>(1);
-          value_type beta_val = static_cast<value_type>(0);
-          )";
+        )";
+        result += "value_type alpha_val = static_cast<value_type>(" + std::to_string(alpha) + ");\n";
+        result += "value_type beta_val = static_cast<value_type>(" + std::to_string(beta) + ");\n";
         result += gemm_func_name;
         result += R"((&alpha_val, smem_a, smem_b, &beta_val, smem_c);
           
           __syncthreads();
           
           // Each thread returns its portion of the result
-          // Note: For element-wise access pattern, we'd need to map (indices...) to the linear index
-          // This is a simplified version that assumes the calling context handles indexing properly
-          const int output_idx = threadIdx.x; // Simplified - actual implementation would need proper index mapping
-          return smem_c[output_idx];
+          // For vectorized execution, return a Vector; for scalar, return scalar
+          if constexpr (CapType::ept == ElementsPerThread::ONE) {
+            const int output_idx = threadIdx.x;
+            return smem_c[output_idx];
+          } else {
+            constexpr int EPT = static_cast<int>(CapType::ept);
+            const int output_idx = threadIdx.x * EPT;
+            Vector<value_type, EPT> result;
+            MATX_LOOP_UNROLL
+            for (int i = 0; i < EPT; ++i) {
+              result.data[i] = smem_c[output_idx + i];
+            }
+            return result;
+          }
         )";
 
         return result;

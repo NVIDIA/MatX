@@ -80,6 +80,17 @@ namespace matx
             return "matmul(" + get_type_str(a_) + "," + get_type_str(b_) + ")";
         }
 
+#ifdef MATX_EN_JIT
+        struct JIT_Storage {
+          typename detail::inner_storage_or_self_t<detail::base_type_t<OpA>> a_;
+          typename detail::inner_storage_or_self_t<detail::base_type_t<OpB>> b_;
+        };
+
+        JIT_Storage ToJITStorage() const {
+          return JIT_Storage{detail::to_jit_storage(a_), detail::to_jit_storage(b_)};
+        }
+#endif           
+
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
         __MATX_INLINE__ std::string get_jit_class_name() const {
           std::string symbol_name = "JITMatMulOp_";
@@ -119,7 +130,7 @@ namespace matx
                  "  template <typename CapType, typename... Is>\n" +
                  "  __MATX_INLINE__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) const\n" +
                  "  {\n" +
-                 "    " + dx_gemm_helper_.GetFuncStr(gemm_func_name) + "\n" +
+                 "    " + dx_gemm_helper_.GetFuncStr(gemm_func_name, alpha_, beta_) + "\n" +
                  "  }\n" +
                  "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank()\n" +
                  "  {\n" +
@@ -171,7 +182,7 @@ namespace matx
           cudaGetDevice(&device);
           cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device);
           cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device);
-          int cc = major * 10 + minor;  // Compute capability as two digits (e.g., 89 for SM 8.9)
+          int cc = major * 100 + minor;  // Compute capability as three digits (e.g., 890 for SM 8.9)
           
           dx_gemm_helper_.set_m(a_.Size(OpA::Rank() - 2));
           dx_gemm_helper_.set_n(b_.Size(OpB::Rank() - 1));
@@ -212,6 +223,7 @@ namespace matx
           else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
             bool supported = dx_gemm_helper_.template CheckJITSizeAndTypeRequirements<OpA, OpB>() && 
                              dx_gemm_helper_.IsSupported();
+
             auto result = combine_capabilities<Cap>(supported, 
                                                     detail::get_operator_capability<Cap>(a_, in),
                                                     detail::get_operator_capability<Cap>(b_, in));

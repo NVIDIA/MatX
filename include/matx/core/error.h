@@ -63,6 +63,7 @@ namespace matx
     matxInvalidSize,
     matxCudaError,
     matxCufftError,
+    matxLibMathdxError,
     matxMatMulError,
     matxAssertError,
     matxInvalidType,
