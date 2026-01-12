@@ -58,7 +58,7 @@ constexpr index_t MATX_CHANNELIZE_POLY1D_FUSED_CHAN_KERNEL_THRESHOLD = 6;
 // to balance occupancy and CTA size. For now, we choose a reasonable default.
 constexpr index_t MATX_CHANNELIZE_POLY1D_FULL_SMEM_KERNEL_NOUT_PER_ITER = 4;
 
-template <typename OutType, typename InType, typename FilterType>
+template <typename OutType, typename InType, typename FilterType, typename AccumType>
 inline void matxChannelizePoly1DInternal(OutType o, const InType &i,
                                      const FilterType &filter, cudaStream_t stream)
 {
@@ -74,7 +74,7 @@ inline void matxChannelizePoly1DInternal(OutType o, const InType &i,
   const int elem_blocks = static_cast<int>(
     (nout_per_channel + ELTS_PER_THREAD - 1) / ELTS_PER_THREAD);
   dim3 grid(elem_blocks, static_cast<int>(num_channels), num_batches);
-  ChannelizePoly1D<THREADS, OutType, InType, FilterType><<<grid, THREADS, 0, stream>>>(
+  ChannelizePoly1D<THREADS, OutType, InType, FilterType, AccumType><<<grid, THREADS, 0, stream>>>(
       o, i, filter);
 #endif
 }
@@ -115,7 +115,7 @@ inline size_t matxChannelizePoly1DInternal_ShouldUseSmemKernel(const OutType &ou
       num_channels <= (MAX_NUM_THREADS_PER_BLOCK/detail::MATX_CHANNELIZE_POLY1D_FULL_SMEM_KERNEL_NOUT_PER_ITER));
 }
 
-template <typename OutType, typename InType, typename FilterType>
+template <typename OutType, typename InType, typename FilterType, typename AccumType>
 inline void matxChannelizePoly1DInternal_Smem(OutType o, const InType &i, const FilterType &filter, cudaStream_t stream)
 {
 #ifdef __CUDACC__
@@ -132,12 +132,12 @@ inline void matxChannelizePoly1DInternal_Smem(OutType o, const InType &i, const 
   const uint32_t num_blocks = static_cast<uint32_t>((nout_per_channel + elem_per_block - 1) / elem_per_block);
   dim3 grid(num_blocks, 1, num_batches);
   const size_t smem_size = matxChannelizePoly1DInternal_SmemSizeBytes(o, i, filter);
-  ChannelizePoly1D_Smem<OutType, InType, FilterType><<<grid, block, smem_size, stream>>>(
+  ChannelizePoly1D_Smem<OutType, InType, FilterType, AccumType><<<grid, block, smem_size, stream>>>(
       o, i, filter, elem_per_block);
 #endif
 }
 
-template <typename OutType, typename InType, typename FilterType>
+template <typename OutType, typename InType, typename FilterType, typename AccumType>
 inline void matxChannelizePoly1DInternal_FusedChan(OutType o, const InType &i,
                                      const FilterType &filter, cudaStream_t stream)
 {
@@ -155,19 +155,19 @@ inline void matxChannelizePoly1DInternal_FusedChan(OutType o, const InType &i,
   dim3 grid(elem_blocks, 1, num_batches);
   switch (num_channels) {
     case 2:
-      ChannelizePoly1D_FusedChan<THREADS, 2, OutType, InType, FilterType><<<grid,THREADS,0,stream>>>(o, i, filter);
+      ChannelizePoly1D_FusedChan<THREADS, 2, OutType, InType, FilterType, AccumType><<<grid,THREADS,0,stream>>>(o, i, filter);
       break;
     case 3:
-      ChannelizePoly1D_FusedChan<THREADS, 3, OutType, InType, FilterType><<<grid,THREADS,0,stream>>>(o, i, filter);
+      ChannelizePoly1D_FusedChan<THREADS, 3, OutType, InType, FilterType, AccumType><<<grid,THREADS,0,stream>>>(o, i, filter);
       break;
     case 4:
-      ChannelizePoly1D_FusedChan<THREADS, 4, OutType, InType, FilterType><<<grid,THREADS,0,stream>>>(o, i, filter);
+      ChannelizePoly1D_FusedChan<THREADS, 4, OutType, InType, FilterType, AccumType><<<grid,THREADS,0,stream>>>(o, i, filter);
       break;
     case 5:
-      ChannelizePoly1D_FusedChan<THREADS, 5, OutType, InType, FilterType><<<grid,THREADS,0,stream>>>(o, i, filter);
+      ChannelizePoly1D_FusedChan<THREADS, 5, OutType, InType, FilterType, AccumType><<<grid,THREADS,0,stream>>>(o, i, filter);
       break;
     case 6:
-      ChannelizePoly1D_FusedChan<THREADS, 6, OutType, InType, FilterType><<<grid,THREADS,0,stream>>>(o, i, filter);
+      ChannelizePoly1D_FusedChan<THREADS, 6, OutType, InType, FilterType, AccumType><<<grid,THREADS,0,stream>>>(o, i, filter);
       break;
     default:
       MATX_THROW(matxInvalidDim, "channelize_poly: channel count not support with fused kernel");
@@ -202,6 +202,8 @@ inline void matxChannelizePoly1DUnpackInternal(DataType inout, cudaStream_t stre
  * @tparam OutType Type of output
  * @tparam InType Type of input
  * @tparam FilterType Type of filter
+ * @tparam AccumType Type of accumulator. This type should always be real, but it will be promoted to
+ * complex when necessary.
  * @param out Output tensor
  * @param in Input operator
  * @param f Filter operator
@@ -213,23 +215,26 @@ inline void matxChannelizePoly1DUnpackInternal(DataType inout, cudaStream_t stre
  * this implementation does not yet support oversampled cases.
  * @param stream CUDA stream on which to run the kernel(s)
  */
-template <typename OutType, typename InType, typename FilterType>
+template <typename OutType, typename InType, typename FilterType, typename AccumType>
 inline void channelize_poly_impl(OutType out, const InType &in, const FilterType &f,
                    index_t num_channels, [[maybe_unused]] index_t decimation_factor, cudaStream_t stream = 0) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  using input_t = typename InType::value_type;
-  using filter_t = typename FilterType::value_type;
-  using output_t = typename OutType::value_type;
+  using OutTensor = std::remove_cv_t<std::remove_reference_t<OutType>>;
+  using InTensor = std::remove_cv_t<std::remove_reference_t<InType>>;
+  using FilterTensor = std::remove_cv_t<std::remove_reference_t<FilterType>>;
+  using input_t = typename InTensor::value_type;
+  using filter_t = typename FilterTensor::value_type;
+  using output_t = typename OutTensor::value_type;
 
-  constexpr int IN_RANK = InType::Rank();
-  constexpr int OUT_RANK = OutType::Rank();
+  constexpr int IN_RANK = InTensor::Rank();
+  constexpr int OUT_RANK = OutTensor::Rank();
 
   // The last dimension of the input becomes [num_channels, num_elem_per_channel] in the last
   // two dimensions of the output
   MATX_STATIC_ASSERT_STR(OUT_RANK == IN_RANK+1, matxInvalidDim, "channelize_poly: output rank should be 1 higher than input");
 
   MATX_STATIC_ASSERT_STR(is_complex_v<output_t> || is_complex_half_v<output_t>,
-    matxInvalidType, "channelize_poly: output type should be complex");
+    matxInvalidType, "channelize_poly: output type must be complex");
 
   // Currently only support 1D filters.
   MATX_STATIC_ASSERT_STR(FilterType::Rank() == 1, matxInvalidDim, "channelize_poly: currently only support 1D filters");
@@ -256,7 +261,7 @@ inline void channelize_poly_impl(OutType out, const InType &in, const FilterType
   // and we will use an R2C transform. Otherwise, we will use a C2C transform.
   if constexpr (! is_complex_v<input_t> && ! is_complex_half_v<input_t> && ! is_complex_v<filter_t> && ! is_complex_half_v<filter_t>) {
     if (num_channels <= detail::MATX_CHANNELIZE_POLY1D_FUSED_CHAN_KERNEL_THRESHOLD) {
-      matxChannelizePoly1DInternal_FusedChan(out, in, f, stream);
+      matxChannelizePoly1DInternal_FusedChan<OutTensor, InTensor, FilterTensor, AccumType>(out, in, f, stream);
     } else {
       index_t start_dims[OUT_RANK], stop_dims[OUT_RANK];
       std::fill_n(start_dims, OUT_RANK, 0);
@@ -296,9 +301,9 @@ inline void channelize_poly_impl(OutType out, const InType &in, const FilterType
       }();
 
       if (matxChannelizePoly1DInternal_ShouldUseSmemKernel(out, in, f)) {
-        matxChannelizePoly1DInternal_Smem(fft_in_slice, in, f, stream);
+        matxChannelizePoly1DInternal_Smem<decltype(fft_in_slice), InTensor, FilterTensor, AccumType>(fft_in_slice, in, f, stream);
       } else {
-        matxChannelizePoly1DInternal(fft_in_slice, in, f, stream);
+        matxChannelizePoly1DInternal<decltype(fft_in_slice), InTensor, FilterTensor, AccumType>(fft_in_slice, in, f, stream);
       }
       stop_dims[OUT_RANK-1] = (num_channels/2) + 1;
       auto out_packed = slice<OUT_RANK>(out, start_dims, stop_dims);
@@ -307,12 +312,12 @@ inline void channelize_poly_impl(OutType out, const InType &in, const FilterType
     }
   } else {
     if (num_channels <= detail::MATX_CHANNELIZE_POLY1D_FUSED_CHAN_KERNEL_THRESHOLD) {
-      matxChannelizePoly1DInternal_FusedChan(out, in, f, stream);
+      matxChannelizePoly1DInternal_FusedChan<OutTensor, InTensor, FilterTensor, AccumType>(out, in, f, stream);
     } else {
       if (matxChannelizePoly1DInternal_ShouldUseSmemKernel(out, in, f)) {
-        matxChannelizePoly1DInternal_Smem(out, in, f, stream);
+        matxChannelizePoly1DInternal_Smem<OutTensor, InTensor, FilterTensor, AccumType>(out, in, f, stream);
       } else {
-        matxChannelizePoly1DInternal(out, in, f, stream);
+        matxChannelizePoly1DInternal<OutTensor, InTensor, FilterTensor, AccumType>(out, in, f, stream);
       }
       // Specify FORWARD here to prevent any normalization after the ifft. We do not
       // want any extra scaling on the output values.

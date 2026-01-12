@@ -37,6 +37,7 @@
 #include <iomanip>
 #include <stdint.h>
 #include <stdio.h>
+#include <type_traits>
 
 #include "matx/core/utils.h"
 #include "matx/core/type_utils.h"
@@ -50,13 +51,48 @@ namespace matx {
 constexpr index_t CHANNELIZE_POLY1D_ELEMS_PER_THREAD = 1;
 
 #ifdef __CUDACC__ 
-template <int THREADS, typename OutType, typename InType, typename FilterType>
+
+namespace detail {
+template <typename AccumT, typename FilterT>
+__device__ __forceinline__ auto channelize_cast_filter(FilterT v)
+{
+    if constexpr (is_complex_v<FilterT>) {
+        // Complex filter: keep full complex multiply
+        return static_cast<AccumT>(v);
+    } else if constexpr (is_complex_v<AccumT>) {
+        // Real filter + complex accumulator: promote to scalar only
+        using accum_scalar_t = typename inner_op_type_t<AccumT>::type;
+        return static_cast<accum_scalar_t>(v);
+    } else {
+        return static_cast<AccumT>(v);
+    }
+}
+
+template <typename AccumT, typename InputT>
+__device__ __forceinline__ auto channelize_cast_input(InputT v)
+{
+    if constexpr (is_complex_v<InputT>) {
+        return static_cast<AccumT>(v);
+    } else if constexpr (is_complex_v<AccumT>) {
+        using accum_scalar_t = typename inner_op_type_t<AccumT>::type;
+        return static_cast<accum_scalar_t>(v);
+    } else {
+        return static_cast<AccumT>(v);
+    }
+}
+} // namespace detail
+
+template <int THREADS, typename OutType, typename InType, typename FilterType, typename AccumType>
 __launch_bounds__(THREADS)
 __global__ void ChannelizePoly1D(OutType output, InType input, FilterType filter)
 {
     using output_t = typename OutType::value_type;
     using input_t = typename InType::value_type;
     using filter_t = typename FilterType::value_type;
+    static_assert(! is_complex_v<AccumType>,
+      "channelize_poly: accumulator type must be real; it will be treated as complex when necessary");
+    // If the output is complex, then then accumulator is complex. Otherwise, the accumulator is real.
+    using accum_t = cuda::std::conditional_t<is_complex_v<output_t>, typename detail::scalar_to_complex<AccumType>::ctype, AccumType>;
 
     // Opportunistically store the filter taps in shared memory if the static shared memory
     // size is sufficient. Otherwise, we will read directly from global memory on use.
@@ -108,7 +144,7 @@ __global__ void ChannelizePoly1D(OutType output, InType input, FilterType filter
     if (filter_phase_len <= SMEM_MAX_FILTER_TAPS) {
         for (index_t t = first_out_elem+tid; t <= last_out_elem; t += THREADS) {
             const index_t first_ind = cuda::std::max(static_cast<index_t>(0), t - filter_phase_len + 1);
-            output_t accum {};
+            accum_t accum {};
             const filter_t *h = smem_filter;
             // index_t in MatX should be signed (32 or 64 bit), so j-- below will not underflow
             static_assert(std::is_signed_v<index_t>, "assumed signed index_t, but it is unsigned");
@@ -127,13 +163,14 @@ __global__ void ChannelizePoly1D(OutType output, InType input, FilterType filter
                 cuda::std::apply([&in_val, &input](auto &&...args) {                    
                     in_val = input.operator()(args...);
                 }, indims);
-                accum += (*h) * in_val;
+                accum += detail::channelize_cast_filter<accum_t>(*h) *
+                         detail::channelize_cast_input<accum_t>(in_val);
                 indims[InRank-1] -= num_channels;
                 h++;
             }
             outdims[OutElemRank] = t;
             cuda::std::apply([accum, &output](auto &&...args) {
-                output.operator()(args...) = accum;
+                output.operator()(args...) = static_cast<output_t>(accum);
             }, outdims);
         }
     } else {
@@ -159,20 +196,21 @@ __global__ void ChannelizePoly1D(OutType output, InType input, FilterType filter
                 h_ind += num_channels;
             }
             const index_t niter = j_start - first_ind + 1;
-            output_t accum {};
+            accum_t accum {};
             input_t in_val;
             for (index_t i = 0; i < niter; i++) {
                 cuda::std::apply([&in_val, &input](auto &&...args) {                    
                     in_val = input.operator()(args...);
                 }, indims);
                 const filter_t h_val = filter.operator()(h_ind);
-                accum += h_val * in_val;
+                accum += detail::channelize_cast_filter<accum_t>(h_val) *
+                         detail::channelize_cast_input<accum_t>(in_val);
                 h_ind += num_channels;
                 indims[InRank-1] -= num_channels;
             }
             outdims[OutElemRank] = t;
             cuda::std::apply([accum, &output](auto &&...args) {
-                output.operator()(args...) = accum;
+                output.operator()(args...) = static_cast<output_t>(accum);
             }, outdims);
         }
     }
@@ -180,12 +218,16 @@ __global__ void ChannelizePoly1D(OutType output, InType input, FilterType filter
 
 // This kernel works in cases where the full filter (with potentially some zero padding) and
 // the inputs required to compute elems_per_channel_per_cta outputs all fit into shared memory.
-template <typename OutType, typename InType, typename FilterType>
+template <typename OutType, typename InType, typename FilterType, typename AccumType>
 __global__ void ChannelizePoly1D_Smem(OutType output, InType input, FilterType filter, index_t elems_per_channel_per_cta)
 {
     using output_t = typename OutType::value_type;
     using input_t = typename InType::value_type;
     using filter_t = typename FilterType::value_type;
+    static_assert(! is_complex_v<AccumType>,
+        "channelize_poly: accumulator type must be real; it will be treated as complex when necessary");
+    // If the output is complex, then then accumulator is complex. Otherwise, the accumulator is real.
+    using accum_t = cuda::std::conditional_t<is_complex_v<output_t>, typename detail::scalar_to_complex<AccumType>::ctype, AccumType>;
 
     extern __shared__ uint8_t __attribute((aligned(16))) smem_dyn_align16[];
 
@@ -218,11 +260,11 @@ __global__ void ChannelizePoly1D_Smem(OutType output, InType input, FilterType f
     const uint32_t ty = threadIdx.y;
     const uint32_t by = blockDim.y;
 
-    for (uint32_t t = tid; t < filter_full_len; t += nthreads) {
+    for (int32_t t = tid; t < filter_full_len; t += nthreads) {
         smem_h[t] = filter.operator()(t);
     }
 
-    for (uint32_t t = filter_full_len+tid; t < filter_phase_len * num_channels; t += nthreads) {
+    for (int32_t t = filter_full_len+tid; t < filter_phase_len * num_channels; t += nthreads) {
         smem_h[t] = static_cast<filter_t>(0);
     }
 
@@ -290,7 +332,7 @@ __global__ void ChannelizePoly1D_Smem(OutType output, InType input, FilterType f
         outdims[OutElemRank] = next_start_elem + ty;
         if (outdims[OutElemRank] <= last_elem) {
             const filter_t *h = h_start;
-            output_t accum { 0 };
+            accum_t accum { 0 };
             const uint32_t first_end = cuda::std::min(cached_input_ind_tail + filter_phase_len - 1, smem_input_height - 1);
             // The footprint of samples involved in the convolution may wrap from the end
             // to the beginning of smem_input. The prologue below handles the samples from
@@ -301,19 +343,21 @@ __global__ void ChannelizePoly1D_Smem(OutType output, InType input, FilterType f
             const input_t *sample = smem_input + cached_input_ind_tail * num_channels + (num_channels - 1 - chan);
             // Apply the filter h in reverse order below to flip the filter for convolution
             for (uint32_t k = 0; k < prologue_count; k++) {
-                accum += (*h) * (*sample);
+                accum += detail::channelize_cast_filter<accum_t>(*h) *
+                         detail::channelize_cast_input<accum_t>(*sample);
                 sample += num_channels;
                 h -= num_channels;
             }
             sample = smem_input + (num_channels - 1 - chan);
             for (uint32_t k = 0; k < epilogue_count; k++) {
-                accum += (*h) * (*sample);
+                accum += detail::channelize_cast_filter<accum_t>(*h) *
+                         detail::channelize_cast_input<accum_t>(*sample);
                 sample += num_channels;
                 h -= num_channels;
             }
 
             cuda::std::apply([accum, &output](auto &&...args) {
-                output.operator()(args...) = accum;
+                output.operator()(args...) = static_cast<output_t>(accum);
             }, outdims);
         }
 
@@ -321,13 +365,19 @@ __global__ void ChannelizePoly1D_Smem(OutType output, InType input, FilterType f
     }
 }
 
-template <int THREADS, int NUM_CHAN, typename OutType, typename InType, typename FilterType>
+template <int THREADS, int NUM_CHAN, typename OutType, typename InType, typename FilterType, typename AccumType>
 __launch_bounds__(THREADS)
 __global__ void ChannelizePoly1D_FusedChan(OutType output, InType input, FilterType filter)
 {
     using output_t = typename OutType::value_type;
     using input_t = typename InType::value_type;
     using filter_t = typename FilterType::value_type;
+    static_assert(! is_complex_v<AccumType>,
+        "channelize_poly: accumulator type must be real; it will be treated as complex when necessary");
+    // If the output is complex, then then accumulator is complex. Otherwise, the accumulator is real.
+    using filtering_accum_t = cuda::std::conditional_t<is_complex_v<input_t> || is_complex_v<filter_t>,
+        typename detail::scalar_to_complex<AccumType>::ctype, AccumType>;
+    using complex_accum_t = typename detail::scalar_to_complex<AccumType>::ctype;
 
     constexpr int InRank = InType::Rank();
     constexpr int OutRank = OutType::Rank();
@@ -353,8 +403,8 @@ __global__ void ChannelizePoly1D_FusedChan(OutType output, InType input, FilterT
     // Versions of CUDA prior to 11.8 do not allow static shared memory allocations of
     // cuda::std::complex types due to it having no trivial constructor. This workaround
     // prevents an 'initializer not allowed for __shared__ variable' error.
-    __align__(sizeof(output_t)) __shared__ uint8_t smem_eij_workaround[sizeof(output_t)*NUM_CHAN*NUM_CHAN];
-    output_t (&smem_eij)[NUM_CHAN][NUM_CHAN] = reinterpret_cast<output_t (&)[NUM_CHAN][NUM_CHAN]>(smem_eij_workaround);
+    __align__(sizeof(complex_accum_t)) __shared__ uint8_t smem_eij_workaround[sizeof(complex_accum_t)*NUM_CHAN*NUM_CHAN];
+    complex_accum_t (&smem_eij)[NUM_CHAN][NUM_CHAN] = reinterpret_cast<complex_accum_t (&)[NUM_CHAN][NUM_CHAN]>(smem_eij_workaround);
     // Pre-compute the DFT complex exponentials and store in shared memory
     for (int t = tid; t < NUM_CHAN*NUM_CHAN; t += THREADS) {
         const int i = t / NUM_CHAN;
@@ -363,22 +413,22 @@ __global__ void ChannelizePoly1D_FusedChan(OutType output, InType input, FilterT
             const double arg = 2.0 * M_PI * j * i / NUM_CHAN;
             double sinx, cosx;
             sincos(arg, &sinx, &cosx);
-            output_t eij { cosx, sinx };
+            complex_accum_t eij { cosx, sinx };
             smem_eij[i][j] = eij;
         } else {
             const float arg = 2.0f * static_cast<float>(M_PI) * j * i / NUM_CHAN;
             float sinx, cosx;
             sincosf(arg, &sinx, &cosx);
-            output_t eij { cosx, sinx };
+            complex_accum_t eij { cosx, sinx };
             smem_eij[i][j] = eij;
         }
     }
     __syncthreads();
 
-    output_t accum[NUM_CHAN];
+    filtering_accum_t accum[NUM_CHAN];
     for (index_t t = first_out_elem+tid; t <= last_out_elem; t += THREADS) {
         for (int i = 0; i < NUM_CHAN; i++) {
-            accum[i] = static_cast<output_t>(0);
+            accum[i] = static_cast<filtering_accum_t>(0);
         }
         index_t first_ind = cuda::std::max(static_cast<index_t>(0), t - filter_phase_len + 1);
         indims[InRank-1] = t * NUM_CHAN + NUM_CHAN - 1;
@@ -391,7 +441,8 @@ __global__ void ChannelizePoly1D_FusedChan(OutType output, InType input, FilterT
                 const filter_t h_val = (h_ind < filter_full_len) ? filter.operator()(h_ind) : static_cast<filter_t>(0);
                 if (indims[InRank-1] < input_len) {
                     cuda::std::apply([&accum, chan, h_val, &input](auto &&...args) {                    
-                        accum[chan] += h_val * input.operator()(args...);
+                        accum[chan] += detail::channelize_cast_filter<filtering_accum_t>(h_val) *
+                                       detail::channelize_cast_input<filtering_accum_t>(input.operator()(args...));
                     }, indims);
                 }
                 h_ind++;
@@ -405,7 +456,8 @@ __global__ void ChannelizePoly1D_FusedChan(OutType output, InType input, FilterT
             for (int chan = 0; chan < NUM_CHAN; chan++) {
                 const filter_t h_val = filter.operator()(h_ind);
                 cuda::std::apply([&accum, chan, h_val, &input](auto &&...args) {                    
-                    accum[chan] += h_val * input.operator()(args...);
+                    accum[chan] += detail::channelize_cast_filter<filtering_accum_t>(h_val) *
+                                   detail::channelize_cast_input<filtering_accum_t>(input.operator()(args...));
                 }, indims);
                 h_ind++;
                 indims[InRank-1]--;
@@ -421,7 +473,8 @@ __global__ void ChannelizePoly1D_FusedChan(OutType output, InType input, FilterT
                 // const filter_t h_val = (h_ind < filter_full_len) ? filter.operator()(h_ind) : static_cast<filter_t>(0);
                 const filter_t h_val = filter.operator()(h_ind);
                 cuda::std::apply([&accum, chan, h_val, &input](auto &&...args) {                    
-                    accum[chan] += h_val * input.operator()(args...);
+                    accum[chan] += detail::channelize_cast_filter<filtering_accum_t>(h_val) *
+                                   detail::channelize_cast_input<filtering_accum_t>(input.operator()(args...));
                 }, indims);
                 h_ind++;
                 indims[InRank-1]--;
@@ -434,80 +487,80 @@ __global__ void ChannelizePoly1D_FusedChan(OutType output, InType input, FilterT
         // terms. For real inputs, we only compute the unique (up to conjugate symmetry) components.
         if constexpr (is_complex_v<input_t> || is_complex_half_v<input_t>) {
             for (int chan = 0; chan < NUM_CHAN; chan++) {
-                output_t dft { 0 };
+                complex_accum_t dft { 0 };
                 for (int j = 0; j < NUM_CHAN; j++) {
                     dft += accum[j] * smem_eij[chan][j];
                 }
                 outdims[ChannelRank] = chan;
                 cuda::std::apply([dft, &output](auto &&...args) {
-                    output.operator()(args...) = dft;
-                }, outdims);            
+                    output.operator()(args...) = static_cast<output_t>(dft);
+                }, outdims);
             }
         } else {
             constexpr int mid = NUM_CHAN/2 + 1;
             if constexpr (NUM_CHAN % 2 == 0) {
                 // Channel 0, DC. There is no conjugate symmetric component for this value.
                 {
-                    output_t dft { 0 };
+                    complex_accum_t dft { 0 };
                     for (int j = 0; j < NUM_CHAN; j++) {
                         dft += accum[j] * smem_eij[0][j];
                     }
                     outdims[ChannelRank] = 0;
                     cuda::std::apply([dft, &output](auto &&...args) {
-                        output.operator()(args...) = dft;
+                        output.operator()(args...) = static_cast<output_t>(dft);
                     }, outdims);
                 }
                 // Channel mid-1, Nyquist. There is no conjugate symmetric component for this value.
                 {
-                    output_t dft { 0 };
+                    complex_accum_t dft { 0 };
                     for (int j = 0; j < NUM_CHAN; j++) {
                         dft += accum[j] * smem_eij[mid-1][j];
                     }
                     outdims[ChannelRank] = mid-1;
                     cuda::std::apply([dft, &output](auto &&...args) {
-                        output.operator()(args...) = dft;
+                        output.operator()(args...) = static_cast<output_t>(dft);
                     }, outdims);
                 }
                 // Conjugate symmetric components
                 for (int chan = 1; chan < mid-1; chan++) {
-                    output_t dft { 0 };
+                    complex_accum_t dft { 0 };
                     for (int j = 0; j < NUM_CHAN; j++) {
                         dft += accum[j] * smem_eij[chan][j];
                     }
                     outdims[ChannelRank] = chan;
                     cuda::std::apply([dft, &output](auto &&...args) {
-                        output.operator()(args...) = dft;
+                        output.operator()(args...) = static_cast<output_t>(dft);
                     }, outdims);
                     outdims[ChannelRank] = NUM_CHAN - chan;
                     cuda::std::apply([dft, &output](auto &&...args) {
-                        output.operator()(args...) = conj(dft);
+                        output.operator()(args...) = static_cast<output_t>(conj(dft));
                     }, outdims);
                 }
             } else {
                 // Channel 0, DC. There is no conjugate symmetric component for this value.
                 {
-                    output_t dft { 0 };
+                    complex_accum_t dft { 0 };
                     for (int j = 0; j < NUM_CHAN; j++) {
                         dft += accum[j] * smem_eij[0][j];
                     }
                     outdims[ChannelRank] = 0;
                     cuda::std::apply([dft, &output](auto &&...args) {
-                        output.operator()(args...) = dft;
+                        output.operator()(args...) = static_cast<output_t>(dft);
                     }, outdims);
                 }
                 // Conjugate symmetric components
                 for (int chan = 1; chan < mid; chan++) {
-                    output_t dft { 0 };
+                    complex_accum_t dft { 0 };
                     for (int j = 0; j < NUM_CHAN; j++) {
                         dft += accum[j] * smem_eij[chan][j];
                     }
                     outdims[ChannelRank] = chan;
                     cuda::std::apply([dft, &output](auto &&...args) {
-                        output.operator()(args...) = dft;
+                        output.operator()(args...) = static_cast<output_t>(dft);
                     }, outdims);
                     outdims[ChannelRank] = NUM_CHAN - chan;
                     cuda::std::apply([dft, &output](auto &&...args) {
-                        output.operator()(args...) = conj(dft);
+                        output.operator()(args...) = static_cast<output_t>(conj(dft));
                     }, outdims);
                 }                
             }
