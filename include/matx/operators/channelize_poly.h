@@ -174,7 +174,7 @@ namespace detail {
       }
 
       template <typename... NewProps>
-      constexpr auto props() {
+      constexpr auto props() const {
         using AllProps = typename merge_props_unique<type_list<CurrentProps...>, NewProps...>::type;
         return make_channelize_poly_op<OpA, FilterType, AllProps>::make(a_, f_, num_channels_, decimation_factor_);
       }

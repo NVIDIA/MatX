@@ -38,6 +38,8 @@
 
 namespace matx
 {
+namespace detail
+{
 
 template <typename... Ts>
 struct type_list {};
@@ -47,11 +49,11 @@ template <typename T, typename List>
 struct contains;
 
 template <typename T>
-struct contains<T, type_list<>> : std::false_type {};
+struct contains<T, type_list<>> : cuda::std::false_type {};
 
 template <typename T, typename Head, typename... Tail>
 struct contains<T, type_list<Head, Tail...>>
-    : cuda::std::conditional_t<std::is_same_v<T, Head>, std::true_type, contains<T, type_list<Tail...>>> {};
+    : cuda::std::conditional_t<cuda::std::is_same_v<T, Head>, cuda::std::true_type, contains<T, type_list<Tail...>>> {};
 
 // Helper to append a type if not already in the list
 template <typename List, typename T>
@@ -96,10 +98,10 @@ template <typename Tag, typename... Props>
 inline constexpr bool has_property_tag = (cuda::std::is_same_v<Tag, Props> || ...);
 
 template <template <typename> class C, typename T>
-struct is_property_category : std::false_type {};
+struct is_property_category : cuda::std::false_type {};
 
 template <template <typename> class C, typename T>
-struct is_property_category<C, C<T>> : std::true_type {};
+struct is_property_category<C, C<T>> : cuda::std::true_type {};
 
 template <template <typename> class C, typename... Props>
 inline constexpr bool has_property_category = (is_property_category<C, Props>::value || ...);
@@ -134,6 +136,8 @@ struct get_property_or<Prop, Default, Head, Tail...> {
     using type = typename get_property_or<Prop, Default, Tail...>::type;
 };
 
+} // namespace detail
+
 // Below are common properties meant to be reused by multiple operators. If a property only
 // makes sense for a single operator (such as a tag specificying a specific algorithm), then
 // the property should be defined directly in the operator.
@@ -154,4 +158,4 @@ struct PropAccum { using type = T; };
 template <typename T>
 struct PropOutput { using type = T; };
 
-};
+} // namespace matx

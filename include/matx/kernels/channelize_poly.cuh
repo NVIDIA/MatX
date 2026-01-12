@@ -54,7 +54,7 @@ constexpr index_t CHANNELIZE_POLY1D_ELEMS_PER_THREAD = 1;
 
 namespace detail {
 template <typename AccumT, typename FilterT>
-__device__ __forceinline__ auto channelize_cast_filter(FilterT v)
+__MATX_DEVICE__ __MATX_INLINE__ auto channelize_cast_filter(FilterT v)
 {
     if constexpr (is_complex_v<FilterT>) {
         // Complex filter: keep full complex multiply
@@ -69,7 +69,7 @@ __device__ __forceinline__ auto channelize_cast_filter(FilterT v)
 }
 
 template <typename AccumT, typename InputT>
-__device__ __forceinline__ auto channelize_cast_input(InputT v)
+__MATX_DEVICE__ __MATX_INLINE__ auto channelize_cast_input(InputT v)
 {
     if constexpr (is_complex_v<InputT>) {
         return static_cast<AccumT>(v);
