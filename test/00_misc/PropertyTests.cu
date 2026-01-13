@@ -61,18 +61,18 @@ class PropertyAccumOutputTest : public BaseOp<PropertyAccumOutputTest<OpA, Curre
     using value_type = typename OpA::value_type;
 
     // Return the size of the accumulator in bytes. The default is float (4 bytes).
-    size_t sizeof_accum() const {
+    constexpr size_t sizeof_accum() const {
         using accum_t = detail::get_property_or<PropAccum, float, CurrentProps...>::type;
         return sizeof(accum_t);
     }
 
-    size_t sizeof_output() const {
+    constexpr size_t sizeof_output() const {
         using output_t = detail::get_property_or<PropOutput, value_type, CurrentProps...>::type;
         return sizeof(output_t);
     }
 
     template <typename... NewProps>
-    constexpr auto props() {
+    constexpr auto props() const {
         using AllProps = typename detail::merge_props_unique<detail::type_list<CurrentProps...>, NewProps...>::type;
         return make_property_accum_test_op<OpA, AllProps>::make(a_);
     }
@@ -80,7 +80,7 @@ class PropertyAccumOutputTest : public BaseOp<PropertyAccumOutputTest<OpA, Curre
 
 template <typename OpA, typename... Props>
 struct make_property_accum_test_op<OpA, detail::type_list<Props...>> {
-    static auto make(OpA a) {
+    static constexpr auto make(OpA a) {
         return PropertyAccumOutputTest<OpA, Props...>(a);
     }
 };
@@ -99,7 +99,7 @@ class PropertyTagTest : public BaseOp<PropertyTagTest<OpA, CurrentProps...>>
     }
 
     template <typename... NewProps>
-    constexpr auto props() {
+    constexpr auto props() const {
         using AllProps = typename detail::merge_props_unique<detail::type_list<CurrentProps...>, NewProps...>::type;
         return make_property_tag_test_op<OpA, AllProps>::make(a_);
     }
@@ -107,7 +107,7 @@ class PropertyTagTest : public BaseOp<PropertyTagTest<OpA, CurrentProps...>>
 
 template <typename OpA, typename... Props>
 struct make_property_tag_test_op<OpA, detail::type_list<Props...>> {
-    static auto make(OpA a) {
+    static constexpr auto make(OpA a) {
         return PropertyTagTest<OpA, Props...>(a);
     }
 };
