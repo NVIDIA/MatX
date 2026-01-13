@@ -106,6 +106,26 @@ struct is_property_category<C, C<T>> : cuda::std::true_type {};
 template <template <typename> class C, typename... Props>
 inline constexpr bool has_property_category = (is_property_category<C, Props>::value || ...);
 
+template <template <typename> class Prop, typename... Props>
+struct count_property;
+
+template <template <typename> class Prop>
+struct count_property<Prop> : cuda::std::integral_constant<int, 0> {};
+
+template <template <typename> class Prop,
+          typename T,
+          typename... Tail>
+struct count_property<Prop, Prop<T>, Tail...>
+    : cuda::std::integral_constant<
+          int,
+          1 + count_property<Prop, Tail...>::value> {};
+
+template <template <typename> class Prop,
+          typename Head,
+          typename... Tail>
+struct count_property<Prop, Head, Tail...>
+    : count_property<Prop, Tail...> {};
+
 // The get_property_or helpers are used to extract a type from a category-style
 // property (i.e., a templated property) or return a default type if the property
 // is not found. Using the PropAccum property as an example, we can extract the accumulator
@@ -124,6 +144,11 @@ template <template <typename> class Prop,
           typename T,
           typename... Tail>
 struct get_property_or<Prop, Default, Prop<T>, Tail...> {
+    static_assert(
+        count_property<Prop, Tail...>::value == 0,
+        "Duplicate property detected"
+    );
+
     using type = T;
 };
 
