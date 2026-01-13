@@ -16,3 +16,9 @@ Examples
    :end-before: example-end channelize_poly-test-1
    :dedent:
 
+.. literalinclude:: ../../../../test/00_transform/ChannelizePoly.cu
+   :language: cpp
+   :start-after: example-begin channelize_poly-test-2
+   :end-before: example-end channelize_poly-test-2
+   :dedent:
+
