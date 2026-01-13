@@ -243,9 +243,9 @@ __global__ void ChannelizePoly1D_Smem(OutType output, InType input, FilterType f
     // implicitly padded with zeros. We assume that the kernel selection logic
     // considers the size of the zero-padded filter since that is what we actually
     // store in shared memory.
-    const uint32_t num_channels = static_cast<uint32_t>(output.Size(ChannelRank));
-    const uint32_t filter_full_len = static_cast<uint32_t>(filter.Size(0));
-    const uint32_t filter_phase_len = static_cast<uint32_t>((filter_full_len + num_channels - 1) / num_channels);
+    const int32_t num_channels = static_cast<int32_t>(output.Size(ChannelRank));
+    const int32_t filter_full_len = static_cast<int32_t>(filter.Size(0));
+    const int32_t filter_phase_len = static_cast<int32_t>((filter_full_len + num_channels - 1) / num_channels);
 
     filter_t *smem_h = reinterpret_cast<filter_t *>(smem_dyn_align16);
     size_t smem_input_offset = sizeof(filter_t) * filter_phase_len * num_channels;
@@ -254,11 +254,11 @@ __global__ void ChannelizePoly1D_Smem(OutType output, InType input, FilterType f
     }
     input_t *smem_input = reinterpret_cast<input_t *>(smem_dyn_align16 + smem_input_offset);
 
-    const uint32_t tid = threadIdx.y * blockDim.x + threadIdx.x;
-    const uint32_t nthreads = blockDim.x * blockDim.y;
-    const uint32_t chan = threadIdx.x;
-    const uint32_t ty = threadIdx.y;
-    const uint32_t by = blockDim.y;
+    const int32_t tid = static_cast<int32_t>(threadIdx.y * blockDim.x + threadIdx.x);
+    const int32_t nthreads = static_cast<int32_t>(blockDim.x * blockDim.y);
+    const int32_t chan = static_cast<int32_t>(threadIdx.x);
+    const int32_t ty = static_cast<int32_t>(threadIdx.y);
+    const int32_t by = static_cast<int32_t>(blockDim.y);
 
     for (int32_t t = tid; t < filter_full_len; t += nthreads) {
         smem_h[t] = filter.operator()(t);
@@ -270,7 +270,7 @@ __global__ void ChannelizePoly1D_Smem(OutType output, InType input, FilterType f
 
     // The input stored in shared memory is logically [smem_input_height, num_channels] where
     // smem_input_height is the number of samples at the output sample rate stored in smem.
-    const uint32_t smem_input_height = filter_phase_len + by - 1;
+    const int32_t smem_input_height = filter_phase_len + by - 1;
 
     const index_t start_elem = blockIdx.x * elems_per_channel_per_cta;
     const index_t last_elem_this_block = static_cast<index_t>(blockIdx.x) * elems_per_channel_per_cta + (elems_per_channel_per_cta - 1);
@@ -279,9 +279,9 @@ __global__ void ChannelizePoly1D_Smem(OutType output, InType input, FilterType f
     auto outdims = BlockToIdx(output, blockIdx.z, 2);
     outdims[ChannelRank] = chan;
 
-    for (uint32_t t = ty; t < filter_phase_len-1; t += by) {
+    for (int32_t t = ty; t < filter_phase_len-1; t += by) {
         const index_t out_sample_ind = start_elem - (filter_phase_len-1) + t;
-        const uint32_t smem_ind = t * num_channels + chan;
+        const int32_t smem_ind = t * num_channels + chan;
         const index_t input_ind = out_sample_ind * num_channels + chan;
         if (input_ind >= 0 && input_ind < input_len) {
             indims[InRank-1] = input_ind;
@@ -296,7 +296,7 @@ __global__ void ChannelizePoly1D_Smem(OutType output, InType input, FilterType f
     index_t next_start_elem = start_elem;
     const index_t num_elem_iters = (last_elem - start_elem + 1 + by - 1) / by;
 
-    uint32_t cached_input_ind_tail = filter_phase_len - 1 + ty;
+    int32_t cached_input_ind_tail = filter_phase_len - 1 + ty;
     const filter_t *h_start = smem_h + num_channels * filter_phase_len - (num_channels - chan);
     for (index_t iter = 0; iter < num_elem_iters; iter++) {
 
@@ -304,10 +304,10 @@ __global__ void ChannelizePoly1D_Smem(OutType output, InType input, FilterType f
 
         // Load next elems_per_channel_per_cta elements for each channel
         const index_t next_last_elem = cuda::std::min(next_start_elem + static_cast<index_t>(by) - 1, last_elem);
-        const uint32_t out_samples_this_iter = static_cast<uint32_t>(next_last_elem - next_start_elem + 1);
+        const int32_t out_samples_this_iter = static_cast<int32_t>(next_last_elem - next_start_elem + 1);
         if (ty < out_samples_this_iter) {
             indims[InRank-1] = (next_start_elem + ty) * num_channels + chan;
-            const uint32_t smem_ind = cached_input_ind_tail * num_channels + chan;
+            const int32_t smem_ind = cached_input_ind_tail * num_channels + chan;
             if (indims[InRank-1] < input_len) {
                 cuda::std::apply([smem_input, smem_ind, &input](auto &&...args) {
                     smem_input[smem_ind] = input.operator()(args...);
@@ -333,23 +333,23 @@ __global__ void ChannelizePoly1D_Smem(OutType output, InType input, FilterType f
         if (outdims[OutElemRank] <= last_elem) {
             const filter_t *h = h_start;
             accum_t accum { 0 };
-            const uint32_t first_end = cuda::std::min(cached_input_ind_tail + filter_phase_len - 1, smem_input_height - 1);
+            const int32_t first_end = cuda::std::min(cached_input_ind_tail + filter_phase_len - 1, smem_input_height - 1);
             // The footprint of samples involved in the convolution may wrap from the end
             // to the beginning of smem_input. The prologue below handles the samples from
             // the current tail to the end of smem_input and the epilogue starts back at the
             // beginning of smem_input.
-            const uint32_t prologue_count = (first_end - cached_input_ind_tail + 1);
-            const uint32_t epilogue_count = (prologue_count < filter_phase_len) ? filter_phase_len - prologue_count : 0;
+            const int32_t prologue_count = (first_end - cached_input_ind_tail + 1);
+            const int32_t epilogue_count = (prologue_count < filter_phase_len) ? filter_phase_len - prologue_count : 0;
             const input_t *sample = smem_input + cached_input_ind_tail * num_channels + (num_channels - 1 - chan);
             // Apply the filter h in reverse order below to flip the filter for convolution
-            for (uint32_t k = 0; k < prologue_count; k++) {
+            for (int32_t k = 0; k < prologue_count; k++) {
                 accum += detail::channelize_cast_filter<accum_t>(*h) *
                          detail::channelize_cast_input<accum_t>(*sample);
                 sample += num_channels;
                 h -= num_channels;
             }
             sample = smem_input + (num_channels - 1 - chan);
-            for (uint32_t k = 0; k < epilogue_count; k++) {
+            for (int32_t k = 0; k < epilogue_count; k++) {
                 accum += detail::channelize_cast_filter<accum_t>(*h) *
                          detail::channelize_cast_input<accum_t>(*sample);
                 sample += num_channels;

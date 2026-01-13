@@ -183,7 +183,7 @@ namespace detail {
   template <typename OpA, typename FilterType, typename... Props>
   struct make_channelize_poly_op<OpA, FilterType, type_list<Props...>> {
       template <typename A, typename F>
-      static auto make(A &&a, F &&f, index_t num_channels, index_t decimation_factor) {
+      static constexpr auto make(A &&a, F &&f, index_t num_channels, index_t decimation_factor) {
           using AType = remove_cvref_t<A>;
           using FType = remove_cvref_t<F>;
           return ChannelizePolyOp<AType, FType, Props...>(

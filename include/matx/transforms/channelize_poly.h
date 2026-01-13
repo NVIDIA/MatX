@@ -219,15 +219,15 @@ template <typename OutType, typename InType, typename FilterType, typename Accum
 inline void channelize_poly_impl(OutType out, const InType &in, const FilterType &f,
                    index_t num_channels, [[maybe_unused]] index_t decimation_factor, cudaStream_t stream = 0) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  using OutTensor = std::remove_cv_t<std::remove_reference_t<OutType>>;
-  using InTensor = std::remove_cv_t<std::remove_reference_t<InType>>;
-  using FilterTensor = std::remove_cv_t<std::remove_reference_t<FilterType>>;
-  using input_t = typename InTensor::value_type;
-  using filter_t = typename FilterTensor::value_type;
-  using output_t = typename OutTensor::value_type;
+  using OutputOp = std::remove_cv_t<std::remove_reference_t<OutType>>;
+  using InputOp = std::remove_cv_t<std::remove_reference_t<InType>>;
+  using FilterOp = std::remove_cv_t<std::remove_reference_t<FilterType>>;
+  using input_t = typename InputOp::value_type;
+  using filter_t = typename FilterOp::value_type;
+  using output_t = typename OutputOp::value_type;
 
-  constexpr int IN_RANK = InTensor::Rank();
-  constexpr int OUT_RANK = OutTensor::Rank();
+  constexpr int IN_RANK = InputOp::Rank();
+  constexpr int OUT_RANK = OutputOp::Rank();
 
   // The last dimension of the input becomes [num_channels, num_elem_per_channel] in the last
   // two dimensions of the output
@@ -261,7 +261,7 @@ inline void channelize_poly_impl(OutType out, const InType &in, const FilterType
   // and we will use an R2C transform. Otherwise, we will use a C2C transform.
   if constexpr (! is_complex_v<input_t> && ! is_complex_half_v<input_t> && ! is_complex_v<filter_t> && ! is_complex_half_v<filter_t>) {
     if (num_channels <= detail::MATX_CHANNELIZE_POLY1D_FUSED_CHAN_KERNEL_THRESHOLD) {
-      matxChannelizePoly1DInternal_FusedChan<OutTensor, InTensor, FilterTensor, AccumType>(out, in, f, stream);
+      matxChannelizePoly1DInternal_FusedChan<OutputOp, InputOp, FilterOp, AccumType>(out, in, f, stream);
     } else {
       index_t start_dims[OUT_RANK], stop_dims[OUT_RANK];
       std::fill_n(start_dims, OUT_RANK, 0);
@@ -301,9 +301,9 @@ inline void channelize_poly_impl(OutType out, const InType &in, const FilterType
       }();
 
       if (matxChannelizePoly1DInternal_ShouldUseSmemKernel(out, in, f)) {
-        matxChannelizePoly1DInternal_Smem<decltype(fft_in_slice), InTensor, FilterTensor, AccumType>(fft_in_slice, in, f, stream);
+        matxChannelizePoly1DInternal_Smem<decltype(fft_in_slice), InputOp, FilterOp, AccumType>(fft_in_slice, in, f, stream);
       } else {
-        matxChannelizePoly1DInternal<decltype(fft_in_slice), InTensor, FilterTensor, AccumType>(fft_in_slice, in, f, stream);
+        matxChannelizePoly1DInternal<decltype(fft_in_slice), InputOp, FilterOp, AccumType>(fft_in_slice, in, f, stream);
       }
       stop_dims[OUT_RANK-1] = (num_channels/2) + 1;
       auto out_packed = slice<OUT_RANK>(out, start_dims, stop_dims);
@@ -312,12 +312,12 @@ inline void channelize_poly_impl(OutType out, const InType &in, const FilterType
     }
   } else {
     if (num_channels <= detail::MATX_CHANNELIZE_POLY1D_FUSED_CHAN_KERNEL_THRESHOLD) {
-      matxChannelizePoly1DInternal_FusedChan<OutTensor, InTensor, FilterTensor, AccumType>(out, in, f, stream);
+      matxChannelizePoly1DInternal_FusedChan<OutputOp, InputOp, FilterOp, AccumType>(out, in, f, stream);
     } else {
       if (matxChannelizePoly1DInternal_ShouldUseSmemKernel(out, in, f)) {
-        matxChannelizePoly1DInternal_Smem<OutTensor, InTensor, FilterTensor, AccumType>(out, in, f, stream);
+        matxChannelizePoly1DInternal_Smem<OutputOp, InputOp, FilterOp, AccumType>(out, in, f, stream);
       } else {
-        matxChannelizePoly1DInternal<OutTensor, InTensor, FilterTensor, AccumType>(out, in, f, stream);
+        matxChannelizePoly1DInternal<OutputOp, InputOp, FilterOp, AccumType>(out, in, f, stream);
       }
       // Specify FORWARD here to prevent any normalization after the ifft. We do not
       // want any extra scaling on the output values.
