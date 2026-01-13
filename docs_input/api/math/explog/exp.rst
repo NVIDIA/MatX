@@ -5,6 +5,8 @@ exp
 
 Exponential function
 
+.. versionadded:: 0.3.0
+
 .. doxygenfunction:: exp(Op t)
 
 Examples

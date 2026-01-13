@@ -11,6 +11,8 @@ have the same first value; if they don't match, the first value from `c` will be
 Passing a single array/operator as input is equivalent to passing the conjugate of the same
 input as the second parameter. 
 
+.. versionadded:: 0.9.0
+
 .. doxygenfunction:: toeplitz(const T (&c)[D])
 .. doxygenfunction:: toeplitz(const Op &c)
 .. doxygenfunction:: toeplitz(const T (&c)[D1], const T (&r)[D2])

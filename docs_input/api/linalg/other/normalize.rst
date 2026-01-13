@@ -22,6 +22,8 @@ normalize all values in a tensor according to specified method, equivalent to `M
    * - CENTER
      - Center data to have mean 0
 
+.. versionadded:: 0.9.1
+
 .. doxygenfunction:: normalize(const OpA &op, const NORMALIZE_RANGE normalize_method)
 .. doxygenfunction:: normalize(const OpA &op, const NORMALIZE_RANGE normalize_method, const float p)
 .. doxygenfunction:: normalize(const OpA &op, const NORMALIZE_RANGE normalize_method, const float a, const float b)

@@ -5,6 +5,8 @@ cgsolve
 
 Complex gradient solve on square matrix
 
+.. versionadded:: 0.6.0
+
 .. doxygenfunction:: cgsolve(const AType &A, const BType &B, double tol=1e-6, int max_iters=4)
 
 Examples

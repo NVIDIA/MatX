@@ -16,6 +16,8 @@ advantage of. Running the ``black_scholes`` example shows the performance differ
 Note you may see a naming collision with ``std::apply`` or ``cuda::std::apply``. For this function 
 it's best to use the ``matx::apply`` form instead.
 
+.. versionadded:: 0.9.4
+
 .. doxygenfunction:: matx::apply
 
 Examples

@@ -5,6 +5,8 @@ frexp
 
 Return the normalized fraction and exponent part of a floating point number
 
+.. versionadded:: 0.9.0
+
 .. doxygenfunction:: frexp(const OpA &a) 
 
 Examples

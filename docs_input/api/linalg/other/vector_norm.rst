@@ -7,6 +7,8 @@ Compute a norm of a vector. Currently L1 and L2 norms are supported.
 
 The `order` parameter can be either `NormOrder::L1`` or `NormOrder::L2``
 
+.. versionadded:: 0.9.0
+
 .. doxygenfunction:: vector_norm(const Op &op, NormOrder order = NormOrder::NONE)
 .. doxygenfunction:: vector_norm(const Op &op, const int (&dims)[D], NormOrder order = NormOrder::NONE)
 

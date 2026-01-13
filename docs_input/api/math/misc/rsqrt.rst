@@ -5,6 +5,8 @@ rsqrt
 
 Reciprocal square root
 
+
+.. versionadded:: 0.3.0
 .. doxygenfunction:: rsqrt(Op t) 
   
 Examples

@@ -8,6 +8,8 @@ Perform a Cholesky factorization.
 .. note::
   The input matrix must be symmetric positive-definite
 
+.. versionadded:: 0.6.0
+
 .. doxygenfunction:: chol
 
 Enums

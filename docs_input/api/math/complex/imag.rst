@@ -5,6 +5,8 @@ imag
 
 Imaginary part of complex number
 
+
+.. versionadded:: 0.3.0
 .. doxygenfunction:: imag(Op t)
 
 Examples

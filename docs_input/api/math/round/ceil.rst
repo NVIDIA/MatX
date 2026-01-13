@@ -5,6 +5,8 @@ ceil
 
 Computes the smallest integer not less than the input
 
+
+.. versionadded:: 0.3.0
 .. doxygenfunction:: ceil(Op t)
 
 Examples

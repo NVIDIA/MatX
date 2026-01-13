@@ -5,6 +5,8 @@ as_complex_double
 
 Cast an operator to cuda::std::complex<double>
 
+
+.. versionadded:: 0.3.0
 .. doxygenfunction:: matx::as_complex_double(const T &t)
 .. doxygenfunction:: matx::as_complex_double(const T1 &t1, const T2 &t2)
 

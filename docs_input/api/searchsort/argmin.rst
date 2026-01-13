@@ -5,6 +5,8 @@ argmin
 
 Returns both the minimum values and the indices of the minimum values across the input operator
 
+.. versionadded:: 0.6.0
+
 .. doxygenfunction:: argmin(const InType &in, const int (&dims)[D])
 .. doxygenfunction:: argmin(const InType &in)
 

@@ -7,6 +7,8 @@ Return a range of linearly-spaced numbers using first and last value. The step s
 determined by the `count` parameter. `axis` (either 0 or 1) can be used to make the increasing
 sequence along the specified axis.
 
+
+.. versionadded:: 0.1.0
 .. doxygenfunction:: matx::linspace(T first, T last, index_t count, int axis = 0)
 .. doxygenfunction:: matx::linspace(const T (&firsts)[NUM_RC], const T (&lasts)[NUM_RC], index_t count, int axis = 0)
 

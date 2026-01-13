@@ -6,6 +6,8 @@ min
 Reduces the input by the minimum values across the specified axes or performs
 an element-wise minimum on each element in the input operators.
 
+.. versionadded:: 0.6.0
+
 .. doxygenfunction:: min(const InType &in, const int (&dims)[D])
 .. doxygenfunction:: min(const InType &in)
 .. doxygenfunction:: min(Op t, Op t2)

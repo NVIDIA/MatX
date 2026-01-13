@@ -5,6 +5,8 @@ sin
 
 Sine in radians
 
+.. versionadded:: 0.3.0
+
 .. doxygenfunction:: sin(Op t)
   
 Examples

@@ -5,6 +5,8 @@ sqrt
 
 Square root
 
+.. versionadded:: 0.3.0
+
 .. doxygenfunction:: sqrt(Op t) 
   
 Examples

@@ -5,6 +5,8 @@ lcollapse
 
 Collapse the left-most dimensions
 
+.. versionadded:: 0.3.0
+
 .. doxygenfunction:: lcollapse
 
 Examples

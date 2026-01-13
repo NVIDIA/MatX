@@ -5,6 +5,8 @@ rcollapse
 
 Collapse the right-most dimensions
 
+.. versionadded:: 0.3.0
+
 .. doxygenfunction:: rcollapse
 
 Examples

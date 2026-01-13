@@ -5,6 +5,8 @@ fmod
 
 Floating point modulo
 
+
+.. versionadded:: 0.3.0
 .. doxygenfunction:: fmod(Op t, Op t2)
 
 Examples

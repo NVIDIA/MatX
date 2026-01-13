@@ -5,6 +5,8 @@ median
 
 Compute the median of the reduction dimensions
 
+.. versionadded:: 0.6.0
+
 .. doxygenfunction:: median(const InType &in, const int (&dims)[D])
 .. doxygenfunction:: median(const InType &in)
 

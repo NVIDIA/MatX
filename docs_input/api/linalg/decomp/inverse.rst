@@ -11,6 +11,8 @@ Compute the inverse of a square matrix.
 .. note::
    This function is currently not supported with host-based executors (CPU)
 
+.. versionadded:: 0.6.0
+
 .. doxygenfunction:: inv(const OpA &a)
 
 Examples

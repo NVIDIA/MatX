@@ -5,6 +5,8 @@ upsample
 
 Upsample a signal by stuffing zeros
 
+.. versionadded:: 0.3.0
+
 .. doxygenfunction:: upsample
 
 Examples

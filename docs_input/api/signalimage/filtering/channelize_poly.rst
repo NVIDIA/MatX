@@ -5,6 +5,8 @@ channelize_poly
 
 Polyphase channelizer with a configurable number of channels
 
+.. versionadded:: 0.6.0
+
 .. doxygenfunction:: matx::channelize_poly(const InType &in, const FilterType &f, index_t num_channels, index_t decimation_factor)
 
 Examples

@@ -5,6 +5,8 @@ acosh
 
 Hyperbolic inverse cosine
 
+
+.. versionadded:: 0.3.0
 .. doxygenfunction:: acosh(Op t)
 
 Examples

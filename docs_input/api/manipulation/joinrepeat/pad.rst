@@ -12,6 +12,8 @@ padding mode uses the specified pad value for all padded elements. The edge padd
 values of the input operator for the padded elements (i.e., pre-padding will use the value of the first
 element and post-padding will use the value of the last element).
 
+.. versionadded:: 0.9.3
+
 .. doxygenenum:: matx::PadMode
 
 .. doxygenfunction:: pad(const T& op, int axis, const std::array<index_t, 2>& pad_sizes, const typename T::value_type& pad_value, PadMode mode = MATX_PAD_MODE_CONSTANT)

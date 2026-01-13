@@ -5,6 +5,8 @@ atan
 
 Inverse tangent
 
+
+.. versionadded:: 0.3.0
 .. doxygenfunction:: atan(Op t)
 
 Examples

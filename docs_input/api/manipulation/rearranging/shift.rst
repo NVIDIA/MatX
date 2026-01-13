@@ -5,6 +5,8 @@ shift
 
 Shift an operator by a given amount either positive or negative along one dimension
 
+.. versionadded:: 0.3.0
+
 .. doxygenfunction:: shift(const OpT &op, ShiftOpT s)
 .. doxygenfunction:: shift(const OpT &op, ShiftT s, ShiftsT... shifts)
 

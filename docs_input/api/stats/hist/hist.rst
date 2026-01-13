@@ -8,6 +8,8 @@ Compute a histogram of input `a` with bounds specified by `upper` and `lower` an
 .. note::
    This function is currently not supported with host-based executors (CPU)
 
+.. versionadded:: 0.6.0
+
 .. doxygenfunction:: hist(const InputOperator &a, const typename InputOperator::value_type lower, const typename InputOperator::value_type upper, int num_levels)
 
 Examples

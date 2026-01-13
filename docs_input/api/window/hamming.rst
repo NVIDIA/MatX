@@ -5,6 +5,8 @@ hamming
 
 Generate a Hamming window
 
+
+.. versionadded:: 0.1.0
 .. doxygenfunction:: matx::hamming(ShapeType &&s)
 .. doxygenfunction:: matx::hamming(const index_t (&s)[RANK])
 

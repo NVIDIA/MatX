@@ -8,6 +8,8 @@ Cross product of two operators with last dimension 2 or 3.
 Inputs `A` and `B` may be higher rank than 1, in which case batching will occur
 on all dimensions besides the last dimension.
 
+.. versionadded:: 0.9.1
+
 .. doxygenfunction:: cross(const OpA &A, const OpB &B)
 
 Examples

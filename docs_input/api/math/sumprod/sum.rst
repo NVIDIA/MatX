@@ -5,6 +5,8 @@ sum
 
 Reduces the input by the sum of values across the specified axes.
 
+.. versionadded:: 0.6.0
+
 .. doxygenfunction:: sum(const InType &in, const int (&dims)[D])
 .. doxygenfunction:: sum(const InType &in)
 

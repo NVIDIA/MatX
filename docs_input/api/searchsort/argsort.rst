@@ -5,6 +5,8 @@ argsort
 
 Compute the indices that would sort the elements of a tensor in either ascending or descending order
 
+.. versionadded:: 0.6.0
+
 .. doxygenfunction:: argsort(const InputOperator &a, const SortDirection_t dir)
 
 Sort Direction

@@ -5,6 +5,8 @@ fftshift2D
 
 Perform a 2D FFT shift by moving zero-frequency components to the center
 
+.. versionadded:: 0.3.0
+
 .. doxygenfunction:: fftshift2D
 
 Examples

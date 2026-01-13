@@ -5,6 +5,8 @@ blackman
 
 Generate a Blackman window
 
+
+.. versionadded:: 0.1.0
 .. doxygenfunction:: matx::blackman(ShapeType &&s)
 .. doxygenfunction:: matx::blackman(const index_t (&s)[RANK])
 

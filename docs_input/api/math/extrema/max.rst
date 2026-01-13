@@ -6,6 +6,8 @@ max
 Reduces the input by the maximum values across the specified axes or performs
 an element-wise maximum on each element in the input operators.
 
+.. versionadded:: 0.6.0
+
 .. doxygenfunction:: max(const InType &in, const int (&dims)[D])
 .. doxygenfunction:: max(const InType &in)
 .. doxygenfunction:: max(Op t, Op t2)

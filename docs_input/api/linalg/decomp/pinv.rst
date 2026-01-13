@@ -5,6 +5,8 @@ pinv
 
 Compute the Moore-Penrose pseudo-inverse of a matrix.
 
+.. versionadded:: 0.6.0
+
 .. doxygenfunction:: pinv(const OpA &a, float rcond = get_default_rcond<typename OpA::value_type>())
 
 Examples

@@ -5,6 +5,8 @@ acos
 
 Inverse cosine
 
+
+.. versionadded:: 0.3.0
 .. doxygenfunction:: acos(Op t)
   
 Examples

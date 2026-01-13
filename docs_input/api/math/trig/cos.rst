@@ -5,6 +5,8 @@ cos
 
 Cosine
 
+.. versionadded:: 0.3.0
+
 .. doxygenfunction:: cos(Op t)
   
 Examples

@@ -8,6 +8,8 @@ tensor with a given value or a 1D input operator, while the operator pulls diago
 
 Operator
 ________
+
+.. versionadded:: 0.3.0
 .. doxygenfunction:: diag(const T1 &t, index_t k = 0)
 
 Examples

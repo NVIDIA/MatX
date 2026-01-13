@@ -5,6 +5,8 @@ eye
 
 Generate an identity tensor
 
+
+.. versionadded:: 0.3.0
 .. doxygenfunction:: matx::eye(ShapeType &&s)
 .. doxygenfunction:: matx::eye(const index_t (&s)[RANK])
 

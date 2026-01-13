@@ -5,6 +5,8 @@ surf
 
 Create a surface plot
 
+
+.. versionadded:: 0.1.0
 .. doxygenfunction:: surf(const T1 &x, const T1 &y, const T2 &z, const std::string &out_fname = "")
 .. doxygenfunction:: surf(const T1 &z, const std::string &out_fname = "")
 

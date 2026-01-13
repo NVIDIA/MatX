@@ -5,6 +5,8 @@ Not-equal (!=)
 
 Non-equality test
 
+
+.. versionadded:: 0.3.0
 .. doxygenfunction:: operator!=(Op t, Op t2)
 
 Examples

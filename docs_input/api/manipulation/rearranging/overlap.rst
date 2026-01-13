@@ -21,6 +21,8 @@ end of the data to make the tensor rectangular.
 .. note::
     Only 1D input operators are accepted at this time
 
+.. versionadded:: 0.6.0
+
 .. doxygenfunction:: overlap( const OpType &op, const index_t (&windows)[N], const index_t (&strides)[N])
 .. doxygenfunction:: overlap( const OpType &op, const cuda::std::array<index_t, N> &windows, const cuda::std::array<index_t, N> &strides)
 

@@ -9,6 +9,8 @@ Read a CSV file into a tensor
    This function requires the optional ``MATX_ENABLE_FILEIO`` compile flag
 
 
+
+.. versionadded:: 0.3.0
 .. doxygenfunction:: read_csv(TensorType &t, const std::string fname, const std::string delimiter, bool header = true)
 
 Examples

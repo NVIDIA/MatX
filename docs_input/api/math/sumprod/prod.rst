@@ -5,6 +5,8 @@ prod
 
 Reduce an input by the product of all elements in the reduction set
 
+.. versionadded:: 0.6.0
+
 .. doxygenfunction:: prod(const InType &in, const int (&dims)[D])
 .. doxygenfunction:: prod(const InType &in)
 

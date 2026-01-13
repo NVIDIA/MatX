@@ -5,6 +5,8 @@ Negate (-)
 
 Unary negation operator
 
+
+.. versionadded:: 0.3.0
 .. doxygenfunction:: operator-(Op t)
 
 Examples

@@ -5,6 +5,8 @@ remap
 
 Remaps an input operator by selecting items from an input index operator
 
+.. versionadded:: 0.3.0
+
 .. doxygenfunction:: remap(const Op &t, Ind idx)
 .. doxygenfunction:: remap(const Op &t, Ind idx, Inds... inds)
 

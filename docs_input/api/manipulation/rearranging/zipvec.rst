@@ -7,6 +7,8 @@ Zips together multiple operators to yield a vectorized operator, like float2.
 zipvec can be used, for example, to create a 2D/3D set of coordinates stored as float2/float3
 using operators that represent the independent coordinate components.
 
+.. versionadded:: 0.3.0
+
 .. doxygenfunction:: zipvec(const Ts&... ts)
 
 Examples

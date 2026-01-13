@@ -6,6 +6,8 @@ copy
 Copy an operator into a tensor. This is equivalent to (a = b), but may be optimized further
 since it cannot be chained with other expressions.
 
+.. versionadded:: 0.3.0
+
 .. doxygenfunction:: copy(OutputTensor &out, const InputTensor &in, Executor exec)
 .. doxygenfunction:: copy(OutputTensor &out, const InputTensor &in, cudaStream_t stream = 0)
 .. doxygenfunction:: copy(const Tensor &in, Executor exec)

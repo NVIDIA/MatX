@@ -8,6 +8,8 @@ Compute a norm of a matrix. Currently Frobenius or L1 norms are supported
 The `order` parameter can be either `NormOrder::L1`` or `NormOrder::FROB`. `NormOrder::NONE` 
 may also be used as an alias for the Frobenius norm.
 
+.. versionadded:: 0.9.0
+
 .. doxygenfunction:: matrix_norm(const Op &op, NormOrder order = NormOrder::NONE)
 .. doxygenfunction:: matrix_norm(const Op &op, const int (&dims)[D], NormOrder order = NormOrder::NONE)
 

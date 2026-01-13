@@ -5,6 +5,8 @@ fftfreq
 
 Returns the bin centers in cycles/unit of the sampling frequency known by the user
 
+.. versionadded:: 0.3.0
+
 .. doxygenfunction:: matx::fftfreq(index_t n, float d = 1.0)
 
 Examples

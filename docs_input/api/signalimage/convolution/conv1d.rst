@@ -11,6 +11,8 @@ either direct or FFT-based convolution. Direct performs the typical sliding-wind
 FFT uses the convolution theorem. The FFT method may be faster for large inputs, but both methods should be tested
 for the target input sizes.
 
+.. versionadded:: 0.6.0
+
 .. doxygenfunction:: conv1d(const In1Type &i1, const In2Type &i2, matxConvCorrMode_t mode, matxConvCorrMethod_t method)
 
 Convolution/Correlation Mode

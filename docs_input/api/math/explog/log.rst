@@ -5,6 +5,8 @@ log
 
 Natural logarithm
 
+.. versionadded:: 0.3.0
+
 .. doxygenfunction:: log(Op t)
 
 Examples

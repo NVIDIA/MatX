@@ -5,6 +5,8 @@ IF
 
 Conditional "if" statement for operators
 
+.. versionadded:: 0.3.0
+
 .. doxygenfunction:: matx::IF
 
 Examples
