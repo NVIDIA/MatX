@@ -114,9 +114,9 @@ __global__ void ChannelizePoly1D(OutType output, InType input, FilterType filter
     const index_t filter_full_len = filter.Size(0);
     const index_t filter_phase_len = (filter_full_len + num_channels - 1) / num_channels;
 
-    const int elem_block = blockIdx.x;
-    const int channel = blockIdx.y;
-    const int tid = threadIdx.x;
+    const index_t elem_block = static_cast<index_t>(blockIdx.x);
+    const index_t channel = static_cast<index_t>(blockIdx.y);
+    const index_t tid = static_cast<index_t>(threadIdx.x);
 
     constexpr index_t ELEMS_PER_BLOCK = CHANNELIZE_POLY1D_ELEMS_PER_THREAD * THREADS;
     const index_t first_out_elem = elem_block * CHANNELIZE_POLY1D_ELEMS_PER_THREAD * THREADS;
@@ -254,17 +254,17 @@ __global__ void ChannelizePoly1D_Smem(OutType output, InType input, FilterType f
     }
     input_t *smem_input = reinterpret_cast<input_t *>(smem_dyn_align16 + smem_input_offset);
 
-    const int32_t tid = static_cast<int32_t>(threadIdx.y * blockDim.x + threadIdx.x);
-    const int32_t nthreads = static_cast<int32_t>(blockDim.x * blockDim.y);
-    const int32_t chan = static_cast<int32_t>(threadIdx.x);
-    const int32_t ty = static_cast<int32_t>(threadIdx.y);
-    const int32_t by = static_cast<int32_t>(blockDim.y);
+    const index_t tid = static_cast<index_t>(threadIdx.y * blockDim.x + threadIdx.x);
+    const index_t nthreads = static_cast<index_t>(blockDim.x * blockDim.y);
+    const index_t chan = static_cast<index_t>(threadIdx.x);
+    const index_t ty = static_cast<index_t>(threadIdx.y);
+    const index_t by = static_cast<index_t>(blockDim.y);
 
-    for (int32_t t = tid; t < filter_full_len; t += nthreads) {
+    for (index_t t = tid; t < filter_full_len; t += nthreads) {
         smem_h[t] = filter.operator()(t);
     }
 
-    for (int32_t t = filter_full_len+tid; t < filter_phase_len * num_channels; t += nthreads) {
+    for (index_t t = filter_full_len+tid; t < filter_phase_len * num_channels; t += nthreads) {
         smem_h[t] = static_cast<filter_t>(0);
     }
 
@@ -279,9 +279,9 @@ __global__ void ChannelizePoly1D_Smem(OutType output, InType input, FilterType f
     auto outdims = BlockToIdx(output, blockIdx.z, 2);
     outdims[ChannelRank] = chan;
 
-    for (int32_t t = ty; t < filter_phase_len-1; t += by) {
+    for (index_t t = ty; t < filter_phase_len-1; t += by) {
         const index_t out_sample_ind = start_elem - (filter_phase_len-1) + t;
-        const int32_t smem_ind = t * num_channels + chan;
+        const index_t smem_ind = t * num_channels + chan;
         const index_t input_ind = out_sample_ind * num_channels + chan;
         if (input_ind >= 0 && input_ind < input_len) {
             indims[InRank-1] = input_ind;
@@ -296,7 +296,7 @@ __global__ void ChannelizePoly1D_Smem(OutType output, InType input, FilterType f
     index_t next_start_elem = start_elem;
     const index_t num_elem_iters = (last_elem - start_elem + 1 + by - 1) / by;
 
-    int32_t cached_input_ind_tail = filter_phase_len - 1 + ty;
+    index_t cached_input_ind_tail = filter_phase_len - 1 + ty;
     const filter_t *h_start = smem_h + num_channels * filter_phase_len - (num_channels - chan);
     for (index_t iter = 0; iter < num_elem_iters; iter++) {
 
@@ -307,7 +307,7 @@ __global__ void ChannelizePoly1D_Smem(OutType output, InType input, FilterType f
         const int32_t out_samples_this_iter = static_cast<int32_t>(next_last_elem - next_start_elem + 1);
         if (ty < out_samples_this_iter) {
             indims[InRank-1] = (next_start_elem + ty) * num_channels + chan;
-            const int32_t smem_ind = cached_input_ind_tail * num_channels + chan;
+            const index_t smem_ind = cached_input_ind_tail * num_channels + chan;
             if (indims[InRank-1] < input_len) {
                 cuda::std::apply([smem_input, smem_ind, &input](auto &&...args) {
                     smem_input[smem_ind] = input.operator()(args...);
@@ -389,8 +389,8 @@ __global__ void ChannelizePoly1D_FusedChan(OutType output, InType input, FilterT
     const index_t filter_full_len = filter.Size(0);
     const index_t filter_phase_len = (filter_full_len + NUM_CHAN - 1) / NUM_CHAN;
 
-    const int elem_block = blockIdx.x;
-    const int tid = threadIdx.x;
+    const index_t elem_block = static_cast<index_t>(blockIdx.x);
+    const index_t tid = static_cast<index_t>(threadIdx.x);
 
     auto indims = BlockToIdx(input, blockIdx.z, 1);
     auto outdims = BlockToIdx(output, blockIdx.z, 2);
@@ -581,7 +581,7 @@ __global__ void ChannelizePoly1DUnpackDFT(DataType inout)
     constexpr int ElemRank = Rank-2;
     using value_t = typename DataType::value_type;
 
-    const int tid = blockIdx.y * blockDim.x + threadIdx.x;
+    const index_t tid = static_cast<index_t>(blockIdx.y * blockDim.x + threadIdx.x);
 
     const index_t num_elem_per_channel = inout.Size(ElemRank);
     const index_t num_channels = inout.Size(ChannelRank);

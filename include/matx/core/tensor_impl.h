@@ -186,7 +186,7 @@ class tensor_impl_t {
              "  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type GetOffsetOptimized(Is... indices) const {\n" +
              "     constexpr size_t rank = sizeof...(Is);\n" +
              "     constexpr int EPT_int = static_cast<int>(EPT);\n" +
-             "     const cuda::std::array<index_t, rank> idx{indices...};\n" +
+             "     const cuda::std::array<index_t, rank> idx{static_cast<index_t>(indices)...};\n" +
              "    \n" +
              "    if constexpr (rank == 1) {\n" +
              "        if constexpr (EPT != detail::ElementsPerThread::ONE) {\n" +
@@ -1198,7 +1198,9 @@ MATX_IGNORE_WARNING_POP_GCC
 MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")      
       constexpr size_t rank = sizeof...(Is);
       constexpr int EPT_int = static_cast<int>(EPT);
-      const cuda::std::array<index_t, rank> idx{indices...};
+      // Explicit cast to index_t to avoid narrowing conversion errors when
+      // indices are unsigned (e.g., uint32_t) and index_t is signed (int32_t)
+      const cuda::std::array<index_t, rank> idx{static_cast<index_t>(indices)...};
       
       if constexpr (rank == 1) {
         if constexpr (EPT != detail::ElementsPerThread::ONE) {
