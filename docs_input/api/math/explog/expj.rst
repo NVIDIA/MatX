@@ -5,6 +5,8 @@ expj
 
 Complex exponential
 
+
+.. versionadded:: 0.3.0
 .. doxygenfunction:: expj(Op t)
 
 Examples

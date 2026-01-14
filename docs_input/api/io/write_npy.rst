@@ -9,6 +9,8 @@ Write an NPY file from a tensor
    This function requires the optional ``MATX_ENABLE_FILEIO`` compile flag
 
 
+
+.. versionadded:: 0.3.0
 .. doxygenfunction:: write_npy(const TensorType &t, const std::string& fname)
 
 Examples

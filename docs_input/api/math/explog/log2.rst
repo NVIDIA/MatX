@@ -5,6 +5,8 @@ log2
 
 Base-2 logarithm
 
+
+.. versionadded:: 0.3.0
 .. doxygenfunction:: log2(Op t)
   
 Examples

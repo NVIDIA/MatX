@@ -5,6 +5,8 @@ asin
 
 Inverse sine
 
+
+.. versionadded:: 0.3.0
 .. doxygenfunction:: asin(Op t)
   
 Examples

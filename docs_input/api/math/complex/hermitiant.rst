@@ -5,6 +5,8 @@ hermitianT
 
 Hermitian transpose (complex conjugate transpose)
 
+
+.. versionadded:: 0.1.0
 .. doxygenfunction:: hermitianT
 
 Examples

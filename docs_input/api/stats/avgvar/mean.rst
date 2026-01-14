@@ -5,6 +5,8 @@ mean
 
 Compute the mean of the reduction dimensions
 
+.. versionadded:: 0.6.0
+
 .. doxygenfunction:: mean(const InType &in, const int (&dims)[D])
 .. doxygenfunction:: mean(const InType &in)
 

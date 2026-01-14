@@ -5,6 +5,8 @@ isinf
 
 Returns a truth value if operator value is infinite
 
+.. versionadded:: 0.3.0
+
 .. doxygenfunction:: isinf(Op x)
 
 Examples

@@ -6,6 +6,8 @@ select
 Selects value from a tensor based on a 1D index mapping. The 1D index mapping works for any rank tensor.
 Usually the mapping is provided by `find_idx`, but any source with the same mapping will work.
 
+.. versionadded:: 0.3.0
+
 .. doxygenfunction:: select(const T &t, IdxType idx)
 
 Examples

@@ -5,5 +5,7 @@ line
 
 Create a line graph
 
+
+.. versionadded:: 0.1.0
 .. doxygenfunction:: line(const TensorType &ten, const std::string &title,const std::string &xlabel,const std::string &ylabel, const std::string &out_fname = "")
 

@@ -5,6 +5,8 @@ fliplr
 
 Flips an operator left to right
 
+.. versionadded:: 0.3.0
+
 .. doxygenfunction:: fliplr
 
 Examples

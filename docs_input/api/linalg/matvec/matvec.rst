@@ -5,6 +5,8 @@ matvec
 
 Matrix-vector multiplication
 
+.. versionadded:: 0.6.0
+
 .. doxygenfunction:: matvec
 
 For information on experimental sparse tensor support for Sparse-Matrix x Vector (SpMV), please see :ref:`sparse_tensor_api`.

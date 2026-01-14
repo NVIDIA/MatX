@@ -5,6 +5,8 @@ qr
 
 Perform a QR decomposition. 
 
+.. versionadded:: 0.6.0
+
 .. doxygenfunction:: qr
 
 .. note::

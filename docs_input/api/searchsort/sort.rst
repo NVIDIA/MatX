@@ -5,6 +5,8 @@ sort
 
 Sort elements of a tensor in either ascending or descending order
 
+.. versionadded:: 0.6.0
+
 .. doxygenfunction:: sort(const InputOperator &a, const SortDirection_t dir)
 
 Sort Direction

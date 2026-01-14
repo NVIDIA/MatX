@@ -5,6 +5,8 @@ reverse
 
 Reverse the values of an operator along a single dimension
 
+.. versionadded:: 0.3.0
+
 .. cpp:function:: template <int DIM, typename Op> reverse(const Op &t)
 .. cpp:function:: template <int DIM1, int DIM2, int... DIMS, typename Op> reverse(const Op &t)
 

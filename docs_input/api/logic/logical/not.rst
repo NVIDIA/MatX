@@ -5,6 +5,8 @@
 
 Logical NOT
 
+
+.. versionadded:: 0.3.0
 .. doxygenfunction:: operator!(Op t)
 
 Examples

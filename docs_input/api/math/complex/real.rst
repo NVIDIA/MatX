@@ -5,6 +5,8 @@ real
 
 Real part of complex number
 
+
+.. versionadded:: 0.3.0
 .. doxygenfunction:: real(Op t) 
 
 Examples

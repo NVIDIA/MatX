@@ -5,6 +5,8 @@ pow
 
 Raise input to a power
 
+
+.. versionadded:: 0.3.0
 .. doxygenfunction:: pow(Op t, Op t2)
 
 Examples

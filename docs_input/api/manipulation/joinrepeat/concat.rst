@@ -6,6 +6,8 @@ concat
 Concatenate operators along a dimension. The returned operator will index into each of the 
 concatenated operators, depending on where it's indexed
 
+.. versionadded:: 0.3.0
+
 .. doxygenfunction:: concat
 
 Examples

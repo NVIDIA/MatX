@@ -8,6 +8,7 @@ Perform a Direct Cosine Transform (DCT)
 .. note::
    These functions are currently not supported with host-based executors (CPU)
 
+.. versionadded:: 0.1.0
 
 .. doxygenfunction:: dct(OutputTensor &out, const InputTensor &in, const cudaStream_t stream = 0)
 

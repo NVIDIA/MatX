@@ -5,6 +5,8 @@ trace
 
 Return the trace (sum of elements on the diagonal) of a tensor
 
+.. versionadded:: 0.6.0
+
 .. doxygenfunction:: trace(const InputOperator &a)
 
 Examples

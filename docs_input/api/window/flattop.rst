@@ -5,6 +5,8 @@ flattop
 
 Generate a flattop window
 
+
+.. versionadded:: 0.1.0
 .. doxygenfunction:: matx::flattop(ShapeType &&s)
 .. doxygenfunction:: matx::flattop(const index_t (&s)[RANK])
 

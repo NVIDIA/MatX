@@ -5,6 +5,8 @@ svd
 
 Perform a singular value decomposition (SVD). 
 
+.. versionadded:: 0.6.0
+
 .. doxygenfunction:: svd
 
 Enums

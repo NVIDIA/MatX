@@ -5,6 +5,8 @@ log10
 
 Base-10 logarithm
 
+
+.. versionadded:: 0.3.0
 .. doxygenfunction:: log10(Op t) 
   
 Examples

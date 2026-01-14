@@ -5,6 +5,8 @@ chirp
 
 Creates a real chirp signal (swept-frequency cosine)
 
+
+.. versionadded:: 0.3.0
 .. doxygenfunction:: chirp(index_t num, TimeType last, FreqType f0, TimeType t1, FreqType f1, ChirpMethod method = ChirpMethod::CHIRP_METHOD_LINEAR)
 .. doxygenfunction:: chirp(SpaceOp t, FreqType f0, typename SpaceOp::value_type t1, FreqType f1, ChirpMethod method = ChirpMethod::CHIRP_METHOD_LINEAR)
 

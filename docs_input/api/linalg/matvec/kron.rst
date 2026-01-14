@@ -5,6 +5,8 @@ kron
 
 Perform a Kronecker product of two operators
 
+.. versionadded:: 0.3.0
+
 .. doxygenfunction:: kron
 
 Examples

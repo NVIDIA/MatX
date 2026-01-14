@@ -8,6 +8,8 @@ Outer product of two vectors
 Inputs `A` and `B` may be higher rank than 1, in which case batching will occur
 on all other dimensions.
 
+.. versionadded:: 0.6.0
+
 .. doxygenfunction:: outer
 
 Examples

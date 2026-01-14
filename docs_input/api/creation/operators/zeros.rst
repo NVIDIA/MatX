@@ -10,6 +10,8 @@ in contexts where the shape can be deduced by the expression, thus simplifying t
 If the shape cannot be deducded, the explicit shape version is used to specify the shape
 directly.
 
+
+.. versionadded:: 0.1.0
 .. doxygenfunction:: matx::zeros()
 .. doxygenfunction:: matx::zeros(ShapeType &&s)
 .. doxygenfunction:: matx::zeros(const index_t (&s)[RANK])

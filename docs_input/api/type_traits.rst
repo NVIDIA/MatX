@@ -4,6 +4,8 @@ Type Traits
 MatX type traits help advanced developers to make compile-time decisions about types. Most of these are used extensively
 inside of MatX, and are not needed in most user applications.
 
+.. versionadded:: 0.1.0
+
 MatX now uses C++20 concepts for type traits. Legacy variable templates (ending in ``_v``) and functions (ending in ``_t()``) 
 are maintained for backward compatibility.
 

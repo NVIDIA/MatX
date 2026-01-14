@@ -7,6 +7,8 @@ Finds the peaks in a 1D input operator.
 
 Currently only the `height` and `threshold` parameters are supported.
 
+.. versionadded:: 0.6.0
+
 .. doxygenfunction:: find_peaks
 
 Examples

@@ -12,6 +12,8 @@ operators. both host and device generation is supported through the cuRAND libra
  
 Please see the documentation for each function for a full list of supported types
 
+
+.. versionadded:: 0.1.0
 .. doxygenfunction:: matx::random(ShapeType &&s, Distribution_t dist, uint64_t seed = 0,LowerType alpha = 1, LowerType beta = 0)
 .. doxygenfunction:: matx::random(const index_t (&s)[RANK], Distribution_t dist, uint64_t seed = 0,LowerType alpha = 1, LowerType beta = 0)
 .. doxygenfunction:: matx::randomi(ShapeType &&s, uint64_t seed = 0, LowerType min = 0, LowerType max = 100)

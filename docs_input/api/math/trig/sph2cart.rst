@@ -5,6 +5,8 @@ sph2cart
 
 Spherical to Cartesian coordinates
 
+
+.. versionadded:: 0.3.0
 .. doxygenfunction:: sph2cart
 
 Examples

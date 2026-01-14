@@ -5,6 +5,8 @@ Addition (+)
 
 Binary addition operator
 
+
+.. versionadded:: 0.3.0
 .. doxygenfunction:: operator+(Op t, Op t2)
 
 Examples

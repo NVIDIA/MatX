@@ -5,6 +5,8 @@ floor
 
 Round down to nearest integer
 
+
+.. versionadded:: 0.3.0
 .. doxygenfunction:: floor(Op t)
 
 Examples

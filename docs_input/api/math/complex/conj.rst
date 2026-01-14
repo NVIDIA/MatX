@@ -7,6 +7,8 @@ Complex conjugate
 
 If input is real the same value is returned
 
+
+.. versionadded:: 0.3.0
 .. doxygenfunction:: conj(Op t)
 
 Examples

@@ -18,6 +18,8 @@ the operation is launched:
 
     (a = at(b, 5)).run();
 
+.. versionadded:: 0.1.0
+
 .. doxygenfunction:: at(const Op &op, Is... indices)
 
 Examples

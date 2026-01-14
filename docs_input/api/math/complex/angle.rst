@@ -5,6 +5,8 @@ angle
 
 Phase angle of a complex number
 
+
+.. versionadded:: 0.3.0
 .. doxygenfunction:: angle(Op t)
 
 Examples

@@ -5,6 +5,8 @@ as_int8
 
 Cast an operator to an int8_t
 
+
+.. versionadded:: 0.3.0
 .. doxygenfunction:: matx::as_int8
 
 Examples

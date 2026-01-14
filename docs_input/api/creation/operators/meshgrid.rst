@@ -5,6 +5,8 @@ meshgrid
 
 Creates a matrix with values from two vectors
 
+
+.. versionadded:: 0.3.0
 .. doxygenfunction:: matx::meshgrid(Ts&&... ts)
 
 Examples

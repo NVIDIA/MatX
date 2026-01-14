@@ -5,4 +5,6 @@ as_uint16
 
 Cast an operator to an uint16_t
 
+
+.. versionadded:: 0.3.0
 .. doxygenfunction:: matx::as_uint16

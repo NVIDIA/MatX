@@ -5,6 +5,8 @@ conv2d
 
 2D convolution
 
+.. versionadded:: 0.6.0
+
 .. doxygenfunction:: conv2d(const In1Type &i1, const In2Type &i2, matxConvCorrMode_t mode)
 .. doxygenfunction:: conv2d(const In1Type &i1, const In2Type &i2, const int32_t (&axis)[2], matxConvCorrMode_t mode)   
 

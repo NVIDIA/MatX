@@ -68,6 +68,8 @@ Note you may see a naming collision with ``std::apply`` or ``cuda::std::apply``.
 it's best to use the ``matx::apply_idx`` form instead. For the standard library function used to unpack
 indices, use ``cuda::std::apply``.
 
+.. versionadded:: 0.9.4
+
 .. doxygenfunction:: matx::apply_idx
 
 Examples

@@ -5,6 +5,8 @@ corr
 
 Cross-correlation of two inputs
 
+.. versionadded:: 0.6.0
+
 .. doxygenfunction:: corr(const In1Type &i1, const In2Type &i2, matxConvCorrMode_t mode, matxConvCorrMethod_t method)
 .. doxygenfunction:: corr(const In1Type &i1, const In2Type &i2, const int32_t (&axis)[1], matxConvCorrMode_t mode, matxConvCorrMethod_t method)
 

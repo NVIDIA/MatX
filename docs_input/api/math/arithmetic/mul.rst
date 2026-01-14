@@ -5,6 +5,8 @@ Multiply (*)
 
 Element-wise multiplication operator
 
+
+.. versionadded:: 0.3.0
 .. doxygenfunction:: operator*(Op t, Op t2)
 .. doxygenfunction:: mul(Op t, Op t2)
 
