@@ -272,7 +272,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     float v4 = output_tensor4(i);
     if (fabsf(v1 - v2) > tol || fabsf(v1 - v3) > tol || fabsf(v1 - v4) > tol || 
         fabsf(v2 - v3) > tol || fabsf(v2 - v4) > tol || fabsf(v3 - v4) > tol) {
-      printf("Mismatch at idx %lld: v1=%.8f v2=%.8f v3=%.8f v4=%.8f\n", i, v1, v2, v3, v4);
+      printf("Mismatch at idx %" MATX_INDEX_T_FMT ": v1=%.8f v2=%.8f v3=%.8f v4=%.8f\n", i, v1, v2, v3, v4);
       all_match = false;
       break;
     }

@@ -372,7 +372,9 @@ auto make_tensor( TensorType &tensor,
  * @returns New tensor
  **/
 template <typename T, typename ShapeType>
-  requires (!is_matx_descriptor<ShapeType> && !std::is_array_v<remove_cvref_t<ShapeType>>)
+  requires (!is_matx_descriptor<ShapeType> &&
+            !std::is_array_v<remove_cvref_t<ShapeType>> &&
+            is_tuple_c<remove_cvref_t<ShapeType>>)
 auto make_tensor( T *data,
                   ShapeType &&shape,
                   bool owning = false) {
@@ -464,7 +466,9 @@ auto make_tensor( TensorType &tensor,
  * @returns New tensor
  **/
 template <typename T, typename ShapeType>
-  requires (!is_matx_descriptor<ShapeType> && !std::is_array_v<remove_cvref_t<ShapeType>>)
+  requires (!is_matx_descriptor<ShapeType> &&
+            !std::is_array_v<remove_cvref_t<ShapeType>> &&
+            is_tuple_c<remove_cvref_t<ShapeType>>)
 auto make_tensor_p( T *const data,
                     ShapeType &&shape,
                     bool owning = false) {
