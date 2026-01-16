@@ -109,13 +109,13 @@ MATX_LOOP_UNROLL
   // blocks for the map step, store that value as well
   if (tid < len) {
 MATX_LOOP_UNROLL
-    for (uint32_t r = 0; r < RECURSIVE_VALS_PER_THREAD; r++) {
-      vals[r] = d_in(blockIdx.y, tid + BLOCK_SIZE_RECURSIVE * r);
+    for (index_t r = 0; r < RECURSIVE_VALS_PER_THREAD; r++) {
+      vals[r] = d_in(static_cast<index_t>(blockIdx.y), static_cast<index_t>(tid + BLOCK_SIZE_RECURSIVE * r));
     }
 
     if (lane > WARP_SIZE - num_non_recursive) {
 MATX_LOOP_UNROLL
-      for (uint32_t r = 0; r < RECURSIVE_VALS_PER_THREAD; r++) {
+      for (index_t r = 0; r < RECURSIVE_VALS_PER_THREAD; r++) {
         s_exch[((BLOCK_SIZE_RECURSIVE / WARP_SIZE) * r + (warp_id + 1)) *
                    (num_non_recursive - 1) +
                (WARP_SIZE - lane - 1)] =
@@ -134,7 +134,7 @@ MATX_LOOP_UNROLL
       }
       else {
         s_exch[threadIdx.x] =
-            d_in(blockIdx.y, chunk_id * blockDim.x - threadIdx.x - 1);
+            d_in(static_cast<index_t>(blockIdx.y), static_cast<index_t>(chunk_id * blockDim.x - threadIdx.x - 1));
       }
     }
   }
@@ -603,7 +603,7 @@ MATX_LOOP_UNROLL
 MATX_LOOP_UNROLL
   for (uint32_t r = 0; r < RECURSIVE_VALS_PER_THREAD; r++) {
     if ((tid + r * BLOCK_SIZE_RECURSIVE) < len) {
-      d_out(blockIdx.y, tid + r * BLOCK_SIZE_RECURSIVE) = vals[r];
+      d_out(static_cast<index_t>(blockIdx.y), static_cast<index_t>(tid + r * BLOCK_SIZE_RECURSIVE)) = vals[r];
     }
   }
 
