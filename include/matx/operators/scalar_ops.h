@@ -435,7 +435,6 @@ MATX_UNARY_OP_GEN(ceil, Ceil);
 MATX_UNARY_OP_GEN(floor, Floor);
 MATX_UNARY_OP_GEN(round, Round);
 MATX_UNARY_OP_GEN(exp, Exp);
-MATX_UNARY_OP_GEN(sqrt, Sqrt);
 MATX_UNARY_OP_GEN(log10, Log10);
 MATX_UNARY_OP_GEN(log2, Log2);
 MATX_UNARY_OP_GEN(log, Log);
@@ -452,6 +451,7 @@ MATX_UNARY_OP_GEN(acosh, Acosh);
 MATX_UNARY_OP_GEN(atanh, Atanh);
 
 
+MATX_UNARY_OP_GEN_NOFUNC(sqrt, Sqrt);
 MATX_UNARY_OP_GEN_NOFUNC(rsqrt, RSqrt);
 MATX_UNARY_OP_GEN_NOFUNC(csqrt, CSqrt);
 MATX_UNARY_OP_GEN_NOFUNC(conj, Conj);
