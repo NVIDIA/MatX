@@ -69,11 +69,10 @@ static __device__ __forceinline__ double NewtonRaphsonSqrt(double x) {
 }
 
 __device__ inline fltflt ComputeRangeToPixelFloatFloat(fltflt apx, fltflt apy, fltflt apz, float px, float py, float pz) {
-    const fltflt dx = fltflt_sub(fltflt_make_from_float(px), apx);
-    const fltflt dy = fltflt_sub(fltflt_make_from_float(py), apy);
-    const fltflt dz = fltflt_sub(fltflt_make_from_float(pz), apz);
-    const fltflt dist = fltflt_add(fltflt_add(fltflt_mul(dx, dx), fltflt_mul(dy, dy)), fltflt_mul(dz, dz));
-    return fltflt_sqrt(dist);
+    const fltflt dx = px - apx;
+    const fltflt dy = py - apy;
+    const fltflt dz = pz - apz;
+    return fltflt_sqrt(dx * dx + dy * dy + dz * dz);
 }
 
 template <typename PlatPosType, SarBpComputeType ComputeType, typename strict_compute_t, typename loose_compute_t>
@@ -258,10 +257,10 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
         [[maybe_unused]] strict_compute_t diffR{};
         loose_compute_t bin;
         if constexpr (ComputeType == SarBpComputeType::FloatFloat) {
-            const fltflt diffR_ff = fltflt_sub(ComputeRangeToPixelFloatFloat(
-                sh_ant_pos[ip][0], sh_ant_pos[ip][1], sh_ant_pos[ip][2], px, py, pz), sh_ant_pos[ip][3]);
+            const fltflt diffR_ff = ComputeRangeToPixelFloatFloat(
+                sh_ant_pos[ip][0], sh_ant_pos[ip][1], sh_ant_pos[ip][2], px, py, pz) - sh_ant_pos[ip][3];
             bin = static_cast<loose_compute_t>(
-                fltflt_to_float(fltflt_mul(diffR_ff, dr_inv_fltflt)) + bin_offset);
+                static_cast<loose_compute_t>(diffR_ff * dr_inv_fltflt) + bin_offset);
             // diffR is otherwise unused for FloatFloat and thus not set
         } else {
             diffR = ComputeRangeToPixel<PlatPosType, ComputeType, strict_compute_t, loose_compute_t>(

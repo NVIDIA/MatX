@@ -91,6 +91,23 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ auto UnaryVecFunc(const UnaryOpFun
 // Unary scalar_internal functions (custom implementations)
 
 template <typename T>
+static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto scalar_internal_sqrt(T v1) {
+  // Use an unqualified call so ADL can find MatX overloads (e.g. matxHalf, fltflt) even if
+  // they are declared after this header is parsed. Fall back to cuda::std::sqrt otherwise.
+  using cuda::std::sqrt;
+  using matx::sqrt;
+
+  if constexpr (requires { sqrt(v1); }) {
+    return sqrt(v1);
+  }
+  else {
+    // This should be unreachable for arithmetic types, but keeps compilation errors readable
+    // for unsupported types.
+    return cuda::std::sqrt(v1);
+  }
+}
+
+template <typename T>
 static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto scalar_internal_rsqrt(T v1) {
   if constexpr (is_matx_type_v<T>){
     return rsqrt(v1);

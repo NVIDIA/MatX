@@ -32,6 +32,8 @@
 
 #pragma once
 
+#include <cmath>
+
 namespace matx {
 
 // This header implements a float-float type (fltflt) that uses two single-precision floating
@@ -50,6 +52,9 @@ namespace matx {
 struct fltflt {
     float hi;
     float lo;
+
+    __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ explicit operator double() const;
+    __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ explicit operator float() const;
 };
 
 static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_make_from_double(double x) {
@@ -70,17 +75,76 @@ static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ float fltflt_to_float(fltfl
     return x.hi;
 }
 
-#ifdef __CUDACC__
+namespace detail {
+// Provide host/device wrappers for CUDA round-to-nearest intrinsics. On host, we fall back
+// to standard operations. These helpers allow fltflt arithmetic to be callable from host
+// code in a .cu translation unit (NVCC host pass), while still using fast intrinsics in
+// device code.
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ float fadd_rn(float a, float b)
+{
+#if defined(__CUDA_ARCH__)
+    return __fadd_rn(a, b);
+#else
+    return a + b;
+#endif
+}
+
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ float fsub_rn(float a, float b)
+{
+#if defined(__CUDA_ARCH__)
+    return __fsub_rn(a, b);
+#else
+    return a - b;
+#endif
+}
+
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ float fmul_rn(float a, float b)
+{
+#if defined(__CUDA_ARCH__)
+    return __fmul_rn(a, b);
+#else
+    return a * b;
+#endif
+}
+
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ float fmaf_rn(float a, float b, float c)
+{
+#if defined(__CUDA_ARCH__)
+    return __fmaf_rn(a, b, c);
+#else
+    // Use fmaf on host for better precision when available.
+    return ::fmaf(a, b, c);
+#endif
+}
+
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ float fdividef_rn(float a, float b)
+{
+#if defined(__CUDA_ARCH__)
+    return __fdividef(a, b);
+#else
+    return a / b;
+#endif
+}
+
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ float fltflt_rsqrt(float x)
+{
+#if defined(__CUDA_ARCH__)
+    return rsqrtf(x);
+#else
+    return 1.0f / ::sqrtf(x);
+#endif
+}
+} // namespace detail
 
 // fltflt_two_sum is the Two-Sum algorithm given by Thall, which he attributes to Knuth.
 // This corresponds to function twoSum() from Thall's paper, which implements Algorithm 2.
 // This algorithm produces a normalized (non-overlapping) expansion.
-static __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_two_sum(float a, float b) {
-    const float s = __fadd_rn(a, b);
-    const float v = __fsub_rn(s, a);
-    const float e = __fadd_rn(
-        __fsub_rn(a,__fsub_rn(s, v)),
-        __fsub_rn(b, v));
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_two_sum(float a, float b) {
+    const float s = detail::fadd_rn(a, b);
+    const float v = detail::fsub_rn(s, a);
+    const float e = detail::fadd_rn(
+        detail::fsub_rn(a, detail::fsub_rn(s, v)),
+        detail::fsub_rn(b, v));
     return { s, e };
 }
 
@@ -88,9 +152,9 @@ static __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_two_sum(float a, float b) {
 // to Dekker. This corresponds to function quickTwoSum() from Thall's paper, which
 // implements Algorithm 3. This algorithm produces a normalized (non-overlapping) expansion,
 // but unlike fltflt_two_sum, it assumes that |a| >= |b|.
-static __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_fast_two_sum(float a, float b) {
-    const float s = __fadd_rn(a, b);
-    const float e = __fsub_rn(b, __fsub_rn(s, a));
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_fast_two_sum(float a, float b) {
+    const float s = detail::fadd_rn(a, b);
+    const float e = detail::fsub_rn(b, detail::fsub_rn(s, a));
     return { s, e };
 }
 
@@ -98,71 +162,179 @@ static __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_fast_two_sum(float a, float
 // to Hida. This corresponds to function FMA-twoProd() from Thall's paper, which
 // implements Algorithm 5. This algorithm produces a normalized (non-overlapping) expansion
 // using a fused multiply-add operation.
-static __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_two_prod_fma(float a, float b) {
-    const float x = __fmul_rn(a, b);
-    const float y = __fmaf_rn(a, b, -x);
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_two_prod_fma(float a, float b) {
+    const float x = detail::fmul_rn(a, b);
+    const float y = detail::fmaf_rn(a, b, -x);
     return { x, y };
 }
 
 // fltflt_add is the df64_add() function given by Thall. This function uses two_sum()
 // for the hi and lo components followed by addition of the cross terms and
 // re-normalization to a non-overlapping expansion.
-static __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_add(fltflt a, fltflt b) {
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_add(fltflt a, fltflt b) {
     fltflt s = fltflt_two_sum(a.hi, b.hi);
     const fltflt t = fltflt_two_sum(a.lo, b.lo);
-    s.lo = __fadd_rn(s.lo, t.hi);
+    s.lo = detail::fadd_rn(s.lo, t.hi);
     s = fltflt_fast_two_sum(s.hi, s.lo);
-    s.lo = __fadd_rn(s.lo, t.lo);
+    s.lo = detail::fadd_rn(s.lo, t.lo);
     s = fltflt_fast_two_sum(s.hi, s.lo);
     return s;
 }
 
 // fltflt_add_float is an optimization of df64_add() for the case where b is
 // a float, and thus b.lo is zero.
-static __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_add_float(fltflt a, float b) {
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_add_float(fltflt a, float b) {
     fltflt s = fltflt_two_sum(a.hi, b);
-    s.lo = __fadd_rn(s.lo, a.lo);
+    s.lo = detail::fadd_rn(s.lo, a.lo);
     s = fltflt_fast_two_sum(s.hi, s.lo);
     return s;
 }
 
 // fltflt_sub() subtracts b from a. It delegates to fltflt_add() with a negated b.
-static __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_sub(fltflt a, fltflt b) {
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_sub(fltflt a, fltflt b) {
     const fltflt neg_b = { -b.hi, -b.lo };
     return fltflt_add(a, neg_b);
 }
 
 // fltflt_sub_float() is an optimization of fltflt_sub() for the case where b is
 // a float, and thus b.lo is zero. It delegates to fltflt_add_float() with a negated b.
-static __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_sub_float(fltflt a, float b) {
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_sub_float(fltflt a, float b) {
     return fltflt_add_float(a, -b);
+}
+
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_sub_float(float a, fltflt b) {
+    return fltflt_add_float({-b.hi, -b.lo}, a);
 }
 
 // fltflt_mul() is the df64_mult() function given by Thall. This function uses the
 // two_prod_fma() function for the hi components followed by addition of the cross terms
 // and re-normalization to a non-overlapping expansion.
-static __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_mul(fltflt a, fltflt b) {
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_mul(fltflt a, fltflt b) {
     fltflt p;
     p = fltflt_two_prod_fma(a.hi, b.hi);
-    p.lo = __fmaf_rn(a.hi, b.lo, p.lo);
-    p.lo = __fmaf_rn(a.lo, b.hi, p.lo);
+    p.lo = detail::fmaf_rn(a.hi, b.lo, p.lo);
+    p.lo = detail::fmaf_rn(a.lo, b.hi, p.lo);
     p = fltflt_fast_two_sum(p.hi, p.lo);
     return p;
+}
+
+// fltflt_mul_float() is an optimization of fltflt_mul() for the case where b is
+// a float, and thus b.lo is zero. This function uses one fewer fmaf_rn() operation.
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_mul_float(fltflt a, float b) {
+    fltflt p;
+    p = fltflt_two_prod_fma(a.hi, b);
+    p.lo = detail::fmaf_rn(a.lo, b, p.lo);
+    p = fltflt_fast_two_sum(p.hi, p.lo);
+    return p;
+}
+
+// fltflt_div() is the df64_div() function given by Thall, which he attributes to Karp.
+// This function implements Algorithm 6 from Thall's paper. For the initial approximation,
+// we use the __fdividef() intrinsic on the device.
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_div(fltflt a, fltflt b) {
+    const float xn = (b.hi == 0.0f) ? 0.0f : detail::fdividef_rn(1.0f, b.hi);
+    const float yn = detail::fmul_rn(a.hi, xn);
+    const fltflt diff = fltflt_sub(a, fltflt_mul_float(b, yn));
+    const fltflt prod = fltflt_two_prod_fma(xn, diff.hi);
+    return fltflt_add_float(prod, yn);
+}
+
+// fltflt_div_float_denom() is an optimization of fltflt_div() for the case where b is
+// a float, and thus b.lo is zero.
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_div_float_denom(fltflt a, float b) {
+    const float xn = (b == 0.0f) ? 0.0f : detail::fdividef_rn(1.0f, b);
+    const float yn = detail::fmul_rn(a.hi, xn);
+    const fltflt diff = fltflt_sub(a, fltflt_two_prod_fma(b, yn));
+    const fltflt prod = fltflt_two_prod_fma(xn, diff.hi);
+    return fltflt_add_float(prod, yn);
+}
+
+// fltflt_div_float_numer() is an optimization of fltflt_div() for the case where a is
+// a float, and thus a.lo is zero.
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_div_float_numer(float a, fltflt b) {
+    const float xn = (b.hi == 0.0f) ? 0.0f : detail::fdividef_rn(1.0f, b.hi);
+    const float yn = detail::fmul_rn(a, xn);
+    const fltflt diff = fltflt_sub_float(a, fltflt_mul_float(b, yn));
+    const fltflt prod = fltflt_two_prod_fma(xn, diff.hi);
+    return fltflt_add_float(prod, yn);
 }
 
 // fltflt_sqrt() is the df64_sqrt() function given by Thall, which he attributes to Karp.
 // This function implements Algorithm 7 from Thall's paper. It uses the
 // two_prod_fma() function for the hi components followed by subtraction of the square
 // of the result and re-normalization to a non-overlapping expansion.
-static __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_sqrt(fltflt a) {
-    const float xn = (a.hi == 0.0f) ? 0.0f : rsqrtf(a.hi);
-    const float yn = __fmul_rn(a.hi, xn);
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_sqrt(fltflt a) {
+    const float xn = (a.hi == 0.0f) ? 0.0f : detail::fltflt_rsqrt(a.hi);
+    const float yn = detail::fmul_rn(a.hi, xn);
     const fltflt ynsqr = fltflt_two_prod_fma(yn, yn);
     const fltflt diff = fltflt_sub(a, ynsqr);
     fltflt prod = fltflt_two_prod_fma(xn, 0.5f * diff.hi);
     return fltflt_add_float(prod, yn);
 }
 
-#endif // defined(__CUDACC__)
+// Scalar sqrt overload so unary operator dispatch can handle fltflt expressions
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt sqrt(fltflt a) { return fltflt_sqrt(a); }
+
+// fltflt_abs() returns the absolute value of a. This function assumes that a is normalized
+// and thus that the sign of the hi component is the same as the sign of the value. If the
+// value is not normalized, then it is possible for a.hi to be 0 and thus the sign of the value
+// is the sign of the lo component. We do not handle this case in this implementation, but
+// in implementations that allow non-normalized values, it should either be added or the
+// value should be re-normalized prior to calling this function.
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_abs(fltflt a) {
+    if (a.hi < 0.0f) {
+        return { -a.hi, -a.lo };
+    }
+    return a;
+}
+
+fltflt::operator double() const {
+    return fltflt_to_double(*this);
+}
+fltflt::operator float() const {
+    return fltflt_to_float(*this);
+}
+
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt operator+(fltflt a, fltflt b) { return fltflt_add(a, b); }
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt operator+(fltflt a, float b) { return fltflt_add_float(a, b); }
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt operator+(float a, fltflt b) { return fltflt_add_float(b, a); }
+
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt operator-(fltflt a, fltflt b) { return fltflt_sub(a, b); }
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt operator-(fltflt a, float b) { return fltflt_sub_float(a, b); }
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt operator-(float a, fltflt b) { return fltflt_sub_float(a, b); }
+
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt operator-(fltflt a) { return { -a.hi, -a.lo }; }
+
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt operator*(fltflt a, fltflt b) { return fltflt_mul(a, b); }
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt operator*(fltflt a, float b) { return fltflt_mul_float(a, b); }
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt operator*(float a, fltflt b) { return fltflt_mul_float(b, a); }
+
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt operator/(fltflt a, fltflt b) { return fltflt_div(a, b); }
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt operator/(fltflt a, float b) { return fltflt_div_float_denom(a, b); }
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt operator/(float a, fltflt b) { return fltflt_div_float_numer(a, b); }
+
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator==(fltflt a, fltflt b) { return a.hi == b.hi && a.lo == b.lo; }
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator==(fltflt a, float b) { return a.hi == b && a.lo == 0.0f; }
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator==(float a, fltflt b) { return b.hi == a && b.lo == 0.0f; }
+
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator!=(fltflt a, fltflt b) { return !(a == b); }
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator!=(fltflt a, float b) { return !(a == b); }
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator!=(float a, fltflt b) { return !(a == b); }
+
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator<(fltflt a, fltflt b) { return a.hi < b.hi || (a.hi == b.hi && a.lo < b.lo); }
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator<(fltflt a, float b) { return a.hi < b || (a.hi == b && a.lo < 0.0f); }
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator<(float a, fltflt b) { return a < b.hi || (a == b.hi && b.lo > 0.0f); }
+
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator>(fltflt a, fltflt b) { return a.hi > b.hi || (a.hi == b.hi && a.lo > b.lo); }
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator>(fltflt a, float b) { return a.hi > b || (a.hi == b && a.lo > 0.0f); }
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator>(float a, fltflt b) { return a > b.hi || (a == b.hi && b.lo < 0.0f); }
+
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator<=(fltflt a, fltflt b) { return a < b || a == b; }
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator<=(fltflt a, float b) { return a < b || a == b; }
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator<=(float a, fltflt b) { return a < b || a == b; }
+
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator>=(fltflt a, fltflt b) { return a > b || a == b; }
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator>=(fltflt a, float b) { return a > b || a == b; }
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator>=(float a, fltflt b) { return a > b || a == b; }
 
 } // namespace matx
