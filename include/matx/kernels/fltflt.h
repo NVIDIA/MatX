@@ -288,10 +288,10 @@ static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_abs(fltflt a)
     return a;
 }
 
-fltflt::operator double() const {
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt::operator double() const {
     return fltflt_to_double(*this);
 }
-fltflt::operator float() const {
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt::operator float() const {
     return fltflt_to_float(*this);
 }
 

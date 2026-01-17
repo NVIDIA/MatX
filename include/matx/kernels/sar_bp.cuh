@@ -259,8 +259,7 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
         if constexpr (ComputeType == SarBpComputeType::FloatFloat) {
             const fltflt diffR_ff = ComputeRangeToPixelFloatFloat(
                 sh_ant_pos[ip][0], sh_ant_pos[ip][1], sh_ant_pos[ip][2], px, py, pz) - sh_ant_pos[ip][3];
-            bin = static_cast<loose_compute_t>(
-                static_cast<loose_compute_t>(diffR_ff * dr_inv_fltflt) + bin_offset);
+            bin = static_cast<loose_compute_t>(diffR_ff * dr_inv_fltflt) + bin_offset;
             // diffR is otherwise unused for FloatFloat and thus not set
         } else {
             diffR = ComputeRangeToPixel<PlatPosType, ComputeType, strict_compute_t, loose_compute_t>(
