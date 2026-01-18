@@ -225,7 +225,7 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
 
     [[maybe_unused]] fltflt dr_inv_fltflt{};
     if constexpr (ComputeType == SarBpComputeType::FloatFloat) {
-        dr_inv_fltflt = fltflt_make_from_double(dr_inv);
+        dr_inv_fltflt = static_cast<fltflt>(dr_inv);
     }
     [[maybe_unused]] const int tid = threadIdx.x + threadIdx.y * blockDim.x;
 
@@ -241,10 +241,10 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
         for (index_t ip = tid; ip < num_pulses_in_block; ip += blockDim.x * blockDim.y) {
             const int p = block * PULSE_BLOCK_SIZE + ip;
             const plat_pos_t ant_pos_p = platform_positions.operator()(p);
-            sh_ant_pos[ip][0] = fltflt_make_from_double(ant_pos_p.x);
-            sh_ant_pos[ip][1] = fltflt_make_from_double(ant_pos_p.y);
-            sh_ant_pos[ip][2] = fltflt_make_from_double(ant_pos_p.z);
-            sh_ant_pos[ip][3] = fltflt_make_from_double(r_to_mcp(p));
+            sh_ant_pos[ip][0] = static_cast<fltflt>(ant_pos_p.x);
+            sh_ant_pos[ip][1] = static_cast<fltflt>(ant_pos_p.y);
+            sh_ant_pos[ip][2] = static_cast<fltflt>(ant_pos_p.z);
+            sh_ant_pos[ip][3] = static_cast<fltflt>(r_to_mcp(p));
         }
         __syncthreads();
         if (! is_valid) {

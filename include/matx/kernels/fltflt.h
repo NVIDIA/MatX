@@ -53,26 +53,38 @@ struct fltflt {
     float hi;
     float lo;
 
-    __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ explicit operator double() const;
-    __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ explicit operator float() const;
+    // The default constructor does not initialize the components, so the value is indeterminate.
+    __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt() {}
+    __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ explicit fltflt(double x) {
+        this->hi = static_cast<float>(x);
+        this->lo = static_cast<float>(x - static_cast<double>(this->hi));
+    }
+    __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ explicit fltflt(float x) : hi(x), lo(0.0f) {}
+    __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ explicit fltflt(float hi_, float lo_) : hi(hi_), lo(lo_) {}
+    __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ explicit operator double() const {
+        return static_cast<double>(hi) + static_cast<double>(lo);
+    }
+    __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ explicit operator float() const { return hi; }
 };
 
-static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_make_from_double(double x) {
-    float hi = (float)x;
-    float lo = (float)(x - (double)hi);
-    return fltflt{ hi, lo };
-}
-
-static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_make_from_float(float x) {
-    return fltflt{ x, 0.0f };
-}
-
+// The constructors and conversion operators in the fltflt struct allow conversion to double and float
+// via static_cast<double>(fltflt_val) and similar for float. The fltflt_to_* functions are provided for completeness.
 static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ double fltflt_to_double(fltflt x) {
-    return (double)x.hi + (double)x.lo;
+    return static_cast<double>(x.hi) + static_cast<double>(x.lo);
 }
 
 static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ float fltflt_to_float(fltflt x) {
-    return x.hi;
+    return static_cast<float>(x);
+}
+
+// The fltflt_make* functions are provided for completeness, but users can directly use
+// static_cast<fltflt>() as well
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_make_from_double(double x) {
+    return static_cast<fltflt>(x);
+}
+
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_make_from_float(float x) {
+    return static_cast<fltflt>(x);
 }
 
 namespace detail {
@@ -145,7 +157,7 @@ static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_two_sum(float
     const float e = detail::fadd_rn(
         detail::fsub_rn(a, detail::fsub_rn(s, v)),
         detail::fsub_rn(b, v));
-    return { s, e };
+    return fltflt{ s, e };
 }
 
 // fltflt_fast_two_sum is the Fast-Two-Sum algorithm given by Thall, which he attributes
@@ -155,7 +167,7 @@ static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_two_sum(float
 static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_fast_two_sum(float a, float b) {
     const float s = detail::fadd_rn(a, b);
     const float e = detail::fsub_rn(b, detail::fsub_rn(s, a));
-    return { s, e };
+    return fltflt{ s, e };
 }
 
 // fltflt_two_prod_fma is the Two-Product-FMA algorithm given by Thall, which he attributes
@@ -165,7 +177,7 @@ static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_fast_two_sum(
 static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_two_prod_fma(float a, float b) {
     const float x = detail::fmul_rn(a, b);
     const float y = detail::fmaf_rn(a, b, -x);
-    return { x, y };
+    return fltflt{ x, y };
 }
 
 // fltflt_add is the df64_add() function given by Thall. This function uses two_sum()
@@ -192,7 +204,7 @@ static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_add_float(flt
 
 // fltflt_sub() subtracts b from a. It delegates to fltflt_add() with a negated b.
 static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_sub(fltflt a, fltflt b) {
-    const fltflt neg_b = { -b.hi, -b.lo };
+    const fltflt neg_b = fltflt{ -b.hi, -b.lo };
     return fltflt_add(a, neg_b);
 }
 
@@ -203,7 +215,7 @@ static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_sub_float(flt
 }
 
 static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_sub_float(float a, fltflt b) {
-    return fltflt_add_float({-b.hi, -b.lo}, a);
+    return fltflt_add_float(fltflt{ -b.hi, -b.lo }, a);
 }
 
 // fltflt_mul() is the df64_mult() function given by Thall. This function uses the
@@ -283,16 +295,9 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt sqrt(fltflt a) { return flt
 // value should be re-normalized prior to calling this function.
 static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_abs(fltflt a) {
     if (a.hi < 0.0f) {
-        return { -a.hi, -a.lo };
+        return fltflt{ -a.hi, -a.lo };
     }
     return a;
-}
-
-__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt::operator double() const {
-    return fltflt_to_double(*this);
-}
-__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt::operator float() const {
-    return fltflt_to_float(*this);
 }
 
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt operator+(fltflt a, fltflt b) { return fltflt_add(a, b); }
@@ -303,7 +308,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt operator-(fltflt a, fltflt 
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt operator-(fltflt a, float b) { return fltflt_sub_float(a, b); }
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt operator-(float a, fltflt b) { return fltflt_sub_float(a, b); }
 
-__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt operator-(fltflt a) { return { -a.hi, -a.lo }; }
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt operator-(fltflt a) { return fltflt{ -a.hi, -a.lo }; }
 
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt operator*(fltflt a, fltflt b) { return fltflt_mul(a, b); }
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt operator*(fltflt a, float b) { return fltflt_mul_float(a, b); }

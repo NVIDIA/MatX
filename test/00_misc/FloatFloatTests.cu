@@ -273,7 +273,7 @@ static int numMatchingMantissaBits(double a, double b) {
 TYPED_TEST(FltFltExecutorTests, Addition) {
     auto pi = make_tensor<fltflt>({});
     auto one = make_tensor<float>({});
-    (pi = fltflt_make_from_double(std::numbers::pi)).run(this->exec);
+    (pi = static_cast<fltflt>(std::numbers::pi)).run(this->exec);
     (one = 1.0f).run(this->exec);
     auto add_result = make_tensor<double>({});
     // Add a left-hand side and right-hand side, resp., of 1.0 to the pi tensor.
@@ -305,7 +305,7 @@ TYPED_TEST(FltFltExecutorTests, Addition) {
 TYPED_TEST(FltFltExecutorTests, Multiplication) {
     auto pi = make_tensor<fltflt>({});
     auto pi_f32 = make_tensor<float>({});
-    (pi = fltflt_make_from_double(std::numbers::pi)).run(this->exec);
+    (pi = static_cast<fltflt>(std::numbers::pi)).run(this->exec);
     (pi_f32 = std::numbers::pi_v<float>).run(this->exec);
     auto mul_result = make_tensor<double>({});
     auto mul_result_lhs_f32 = make_tensor<double>({});
@@ -333,8 +333,8 @@ TYPED_TEST(FltFltExecutorTests, Subtraction) {
   auto pi = make_tensor<fltflt>({});
   auto e = make_tensor<fltflt>({});
   auto e_f32 = make_tensor<float>({});
-  (pi = fltflt_make_from_double(std::numbers::pi)).run(this->exec);
-  (e = fltflt_make_from_double(std::numbers::e)).run(this->exec);
+  (pi = static_cast<fltflt>(std::numbers::pi)).run(this->exec);
+  (e = static_cast<fltflt>(std::numbers::e)).run(this->exec);
   (e_f32 = std::numbers::e_v<float>).run(this->exec);
   auto sub_result = make_tensor<double>({});
   auto sub_result_lhs_f32 = make_tensor<double>({});
@@ -369,9 +369,9 @@ TYPED_TEST(FltFltExecutorTests, Division) {
   auto e = make_tensor<fltflt>({});
   auto pi_f32 = make_tensor<float>({});
   auto e_f32 = make_tensor<float>({});
-  (pi = fltflt_make_from_double(std::numbers::pi)).run(this->exec);
+  (pi = static_cast<fltflt>(std::numbers::pi)).run(this->exec);
   (pi_f32 = std::numbers::pi_v<float>).run(this->exec);
-  (e = fltflt_make_from_double(std::numbers::e)).run(this->exec);
+  (e = static_cast<fltflt>(std::numbers::e)).run(this->exec);
   (e_f32 = std::numbers::e_v<float>).run(this->exec);
 
   auto div_result = make_tensor<double>({});
@@ -396,7 +396,7 @@ TYPED_TEST(FltFltExecutorTests, Division) {
 
 TYPED_TEST(FltFltExecutorTests, SquareRoot) {
   auto pi = make_tensor<fltflt>({});
-  (pi = fltflt_make_from_double(std::numbers::pi)).run(this->exec);
+  (pi = static_cast<fltflt>(std::numbers::pi)).run(this->exec);
 
   auto sqrt_result = make_tensor<double>({});
   (sqrt_result = matx::apply(FltFltSqrt{}, pi)).run(this->exec);
@@ -412,7 +412,7 @@ TYPED_TEST(FltFltExecutorTests, SquareRoot) {
 
 TYPED_TEST(FltFltExecutorTests, MatXSqrtOperator) {
   auto pi = make_tensor<fltflt>({});
-  (pi = fltflt_make_from_double(std::numbers::pi)).run(this->exec);
+  (pi = static_cast<fltflt>(std::numbers::pi)).run(this->exec);
 
   auto sqrt_result = make_tensor<fltflt>({});
   (sqrt_result = sqrt(pi)).run(this->exec);
@@ -433,10 +433,10 @@ TYPED_TEST(FltFltExecutorTests, AbsoluteValue) {
   auto neg_pi = make_tensor<fltflt>({});
   auto e = make_tensor<fltflt>({});
   auto neg_e = make_tensor<fltflt>({});
-  (pi = fltflt_make_from_double(std::numbers::pi)).run(this->exec);
-  (neg_pi = fltflt_make_from_double(-1.0 * std::numbers::pi)).run(this->exec);
-  (e = fltflt_make_from_double(std::numbers::e)).run(this->exec);
-  (neg_e = fltflt_make_from_double(-1.0 * std::numbers::e)).run(this->exec);
+  (pi = static_cast<fltflt>(std::numbers::pi)).run(this->exec);
+  (neg_pi = static_cast<fltflt>(-1.0 * std::numbers::pi)).run(this->exec);
+  (e = static_cast<fltflt>(std::numbers::e)).run(this->exec);
+  (neg_e = static_cast<fltflt>(-1.0 * std::numbers::e)).run(this->exec);
 
   auto abs_result_pi = make_tensor<double>({});
   auto abs_result_neg_pi = make_tensor<double>({});
@@ -465,9 +465,9 @@ TYPED_TEST(FltFltExecutorTests, CmpEq) {
     auto pi_f64 = make_tensor<fltflt>({});
     auto pi_f32 = make_tensor<fltflt>({});
     auto zero = make_tensor<fltflt>({});
-    (pi_f64 = fltflt_make_from_double(std::numbers::pi)).run(this->exec);
-    (pi_f32 = fltflt_make_from_float(std::numbers::pi_v<float>)).run(this->exec);
-    (zero = fltflt_make_from_double(0.0)).run(this->exec);
+    (pi_f64 = static_cast<fltflt>(std::numbers::pi)).run(this->exec);
+    (pi_f32 = static_cast<fltflt>(std::numbers::pi_v<float>)).run(this->exec);
+    (zero = static_cast<fltflt>(0.0)).run(this->exec);
 
     auto eq_result_pi_eq_0 = make_tensor<bool>({});
     auto eq_result_f32_f64 = make_tensor<bool>({});
@@ -571,9 +571,9 @@ TYPED_TEST(FltFltExecutorTests, CmpNeq) {
     auto pi_f64 = make_tensor<fltflt>({});
     auto pi_f32 = make_tensor<fltflt>({});
     auto zero = make_tensor<fltflt>({});
-    (pi_f64 = fltflt_make_from_double(std::numbers::pi)).run(this->exec);
-    (pi_f32 = fltflt_make_from_float(std::numbers::pi_v<float>)).run(this->exec);
-    (zero = fltflt_make_from_double(0.0)).run(this->exec);
+    (pi_f64 = static_cast<fltflt>(std::numbers::pi)).run(this->exec);
+    (pi_f32 = static_cast<fltflt>(std::numbers::pi_v<float>)).run(this->exec);
+    (zero = static_cast<fltflt>(0.0)).run(this->exec);
 
     auto neq_result_pi_neq_0 = make_tensor<bool>({});
     auto neq_result_f32_f64 = make_tensor<bool>({});
@@ -674,8 +674,8 @@ TYPED_TEST(FltFltExecutorTests, CmpLt) {
   {
     auto pi = make_tensor<fltflt>({});
     auto e = make_tensor<fltflt>({});
-    (pi = fltflt_make_from_double(std::numbers::pi)).run(this->exec);
-    (e = fltflt_make_from_double(std::numbers::e)).run(this->exec);
+    (pi = static_cast<fltflt>(std::numbers::pi)).run(this->exec);
+    (e = static_cast<fltflt>(std::numbers::e)).run(this->exec);
 
     auto lt_pi_e = make_tensor<bool>({});
     auto lt_e_pi = make_tensor<bool>({});
@@ -774,8 +774,8 @@ TYPED_TEST(FltFltExecutorTests, CmpGt) {
   {
     auto pi = make_tensor<fltflt>({});
     auto e = make_tensor<fltflt>({});
-    (pi = fltflt_make_from_double(std::numbers::pi)).run(this->exec);
-    (e = fltflt_make_from_double(std::numbers::e)).run(this->exec);
+    (pi = static_cast<fltflt>(std::numbers::pi)).run(this->exec);
+    (e = static_cast<fltflt>(std::numbers::e)).run(this->exec);
 
     auto gt_pi_e = make_tensor<bool>({});
     auto gt_e_pi = make_tensor<bool>({});
@@ -874,8 +874,8 @@ TYPED_TEST(FltFltExecutorTests, CmpLe) {
   {
     auto pi = make_tensor<fltflt>({});
     auto e = make_tensor<fltflt>({});
-    (pi = fltflt_make_from_double(std::numbers::pi)).run(this->exec);
-    (e = fltflt_make_from_double(std::numbers::e)).run(this->exec);
+    (pi = static_cast<fltflt>(std::numbers::pi)).run(this->exec);
+    (e = static_cast<fltflt>(std::numbers::e)).run(this->exec);
 
     auto le_e_pi = make_tensor<bool>({});
     auto le_pi_e = make_tensor<bool>({});
@@ -974,8 +974,8 @@ TYPED_TEST(FltFltExecutorTests, CmpGe) {
   {
     auto pi = make_tensor<fltflt>({});
     auto e = make_tensor<fltflt>({});
-    (pi = fltflt_make_from_double(std::numbers::pi)).run(this->exec);
-    (e = fltflt_make_from_double(std::numbers::e)).run(this->exec);
+    (pi = static_cast<fltflt>(std::numbers::pi)).run(this->exec);
+    (e = static_cast<fltflt>(std::numbers::e)).run(this->exec);
 
     auto ge_pi_e = make_tensor<bool>({});
     auto ge_e_pi = make_tensor<bool>({});
@@ -1078,9 +1078,9 @@ TYPED_TEST(FltFltExecutorTests, ExampleQuadraticEquation) {
   auto b = make_tensor<fltflt>({});
   auto c = make_tensor<fltflt>({});
   auto norm = make_tensor<fltflt>({});
-  (a = fltflt_make_from_double(std::numbers::pi)).run(this->exec);
-  (b = fltflt_make_from_double(std::numbers::e)).run(this->exec);
-  (c = fltflt_make_from_double(std::numbers::sqrt2)).run(this->exec);
+  (a = static_cast<fltflt>(std::numbers::pi)).run(this->exec);
+  (b = static_cast<fltflt>(std::numbers::e)).run(this->exec);
+  (c = static_cast<fltflt>(std::numbers::sqrt2)).run(this->exec);
   (norm = sqrt(a * a + b * b + c * c)).run(this->exec);
   this->exec.sync();
 
