@@ -69,11 +69,10 @@ static __device__ __forceinline__ double NewtonRaphsonSqrt(double x) {
 }
 
 __device__ inline fltflt ComputeRangeToPixelFloatFloat(fltflt apx, fltflt apy, fltflt apz, float px, float py, float pz) {
-    const fltflt dx = fltflt_sub(fltflt_make_from_float(px), apx);
-    const fltflt dy = fltflt_sub(fltflt_make_from_float(py), apy);
-    const fltflt dz = fltflt_sub(fltflt_make_from_float(pz), apz);
-    const fltflt dist = fltflt_add(fltflt_add(fltflt_mul(dx, dx), fltflt_mul(dy, dy)), fltflt_mul(dz, dz));
-    return fltflt_sqrt(dist);
+    const fltflt dx = px - apx;
+    const fltflt dy = py - apy;
+    const fltflt dz = pz - apz;
+    return fltflt_sqrt(dx * dx + dy * dy + dz * dz);
 }
 
 template <typename PlatPosType, SarBpComputeType ComputeType, typename strict_compute_t, typename loose_compute_t>
@@ -226,7 +225,7 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
 
     [[maybe_unused]] fltflt dr_inv_fltflt{};
     if constexpr (ComputeType == SarBpComputeType::FloatFloat) {
-        dr_inv_fltflt = fltflt_make_from_double(dr_inv);
+        dr_inv_fltflt = static_cast<fltflt>(dr_inv);
     }
     [[maybe_unused]] const int tid = threadIdx.x + threadIdx.y * blockDim.x;
 
@@ -242,10 +241,10 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
         for (index_t ip = tid; ip < num_pulses_in_block; ip += blockDim.x * blockDim.y) {
             const int p = block * PULSE_BLOCK_SIZE + ip;
             const plat_pos_t ant_pos_p = platform_positions.operator()(p);
-            sh_ant_pos[ip][0] = fltflt_make_from_double(ant_pos_p.x);
-            sh_ant_pos[ip][1] = fltflt_make_from_double(ant_pos_p.y);
-            sh_ant_pos[ip][2] = fltflt_make_from_double(ant_pos_p.z);
-            sh_ant_pos[ip][3] = fltflt_make_from_double(r_to_mcp(p));
+            sh_ant_pos[ip][0] = static_cast<fltflt>(ant_pos_p.x);
+            sh_ant_pos[ip][1] = static_cast<fltflt>(ant_pos_p.y);
+            sh_ant_pos[ip][2] = static_cast<fltflt>(ant_pos_p.z);
+            sh_ant_pos[ip][3] = static_cast<fltflt>(r_to_mcp(p));
         }
         __syncthreads();
         if (! is_valid) {
@@ -258,10 +257,9 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
         [[maybe_unused]] strict_compute_t diffR{};
         loose_compute_t bin;
         if constexpr (ComputeType == SarBpComputeType::FloatFloat) {
-            const fltflt diffR_ff = fltflt_sub(ComputeRangeToPixelFloatFloat(
-                sh_ant_pos[ip][0], sh_ant_pos[ip][1], sh_ant_pos[ip][2], px, py, pz), sh_ant_pos[ip][3]);
-            bin = static_cast<loose_compute_t>(
-                fltflt_to_float(fltflt_mul(diffR_ff, dr_inv_fltflt)) + bin_offset);
+            const fltflt diffR_ff = ComputeRangeToPixelFloatFloat(
+                sh_ant_pos[ip][0], sh_ant_pos[ip][1], sh_ant_pos[ip][2], px, py, pz) - sh_ant_pos[ip][3];
+            bin = static_cast<loose_compute_t>(diffR_ff * dr_inv_fltflt) + bin_offset;
             // diffR is otherwise unused for FloatFloat and thus not set
         } else {
             diffR = ComputeRangeToPixel<PlatPosType, ComputeType, strict_compute_t, loose_compute_t>(
