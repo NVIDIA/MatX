@@ -72,7 +72,8 @@ __device__ inline fltflt ComputeRangeToPixelFloatFloat(fltflt apx, fltflt apy, f
     const fltflt dx = px - apx;
     const fltflt dy = py - apy;
     const fltflt dz = pz - apz;
-    return fltflt_sqrt(dx * dx + dy * dy + dz * dz);
+    const fltflt dx2dy2 = fltflt_fma(dx, dx, dy * dy);
+    return fltflt_sqrt(fltflt_fma(dz, dz, dx2dy2));
 }
 
 template <typename PlatPosType, SarBpComputeType ComputeType, typename strict_compute_t, typename loose_compute_t>
