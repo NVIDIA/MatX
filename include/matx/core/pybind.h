@@ -45,6 +45,12 @@ namespace fs = std::filesystem;
 
 namespace matx {
 
+#if defined(__GNUC__) || defined(__clang__)
+#define MATX_PYBIND_VISIBILITY __attribute__((visibility("hidden")))
+#else
+#define MATX_PYBIND_VISIBILITY
+#endif
+
 #define MATX_TEST_ASSERT_NEAR(__x, __y, __t)                                   \
   if constexpr (IsHalfType<decltype(__x)>())                                   \
     if (fabs(static_cast<float>(__x) - static_cast<float>(__y)) > __t)         \
@@ -83,7 +89,7 @@ template <typename T> struct TestFailResult {
 };
 
 
-class MatXPybind {
+class MATX_PYBIND_VISIBILITY MatXPybind {
 public:
   MatXPybind() { Init(); }
 
@@ -531,5 +537,7 @@ private:
 
 }; //namespace detail
 }; // namespace matx
+
+#undef MATX_PYBIND_VISIBILITY
 
 #endif
