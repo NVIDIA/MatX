@@ -88,11 +88,7 @@ std::vector<std::string> __MATX_HOST__ __MATX_INLINE__ get_preprocessor_options(
         options.push_back("-arch=sm_80");  // fallback
     #endif
     
-    #ifdef NVRTC_CXX_STANDARD
-        options.push_back("-std=c++" NVRTC_CXX_STANDARD);
-    #else
-        options.push_back("-std=c++20");   // fallback
-    #endif
+    options.push_back("-std=c++20");
 
     return options;
 }

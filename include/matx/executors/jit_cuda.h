@@ -316,7 +316,7 @@ namespace matx
               params_to_cache.threads = threads;
               params_to_cache.osize = op.Rank() == 0 ? 1 : static_cast<int>(op.Size(op.Rank() - 1));
               params_to_cache.global_kernel = true;
-              
+              params_to_cache.pass_through_threads = pass_through_threads;
               {
                 std::lock_guard<std::mutex> lock(detail::jit_launch_params_mutex);
                 detail::jit_launch_params_cache[kernel_op_type] = params_to_cache;

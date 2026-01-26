@@ -38,6 +38,9 @@
 
 #include "matx/core/half_complex.h"
 #include "matx/core/half.h"
+
+#include <limits>
+#include <format>
 #define GEMM_DX_FUNC_PREFIX "gemm_cublasdx_func"
 
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
@@ -113,6 +116,14 @@ namespace matx {
       index_t k_;       // Inner dimension (A cols = B rows)
       int cc_;          // Compute capability
       bool is_complex_; // Whether the type is complex
+
+      template <typename Scalar>
+      static std::string FormatScalarLiteral(Scalar value) {
+        return std::format(
+            "{:.{}g}",
+            value,
+            std::numeric_limits<Scalar>::max_digits10);
+      }
 
     public:
       // Constructor
@@ -208,7 +219,7 @@ namespace matx {
         }
 
         // Add CUDA version to the symbol name
-#if defined(CUDA_VERSION)
+#if defined(CUDART_VERSION)
         symbol_name += "_CUDA";
         symbol_name += std::to_string(CUDART_VERSION);
 #else
@@ -411,8 +422,12 @@ namespace matx {
           // Call the cuBLASDx generated GEMM function
           // Signature: void func(value_type* alpha, value_type* a, value_type* b, value_type* beta, value_type* c)
         )";
-        result += "value_type alpha_val = static_cast<value_type>(" + std::to_string(alpha) + ");\n";
-        result += "value_type beta_val = static_cast<value_type>(" + std::to_string(beta) + ");\n";
+        using literal_type = cuda::std::conditional_t<
+            std::is_same_v<InputType, double> || std::is_same_v<InputType, cuda::std::complex<double>>,
+            double,
+            float>;
+        result += "value_type alpha_val = static_cast<value_type>(" + FormatScalarLiteral(static_cast<literal_type>(alpha)) + ");\n";
+        result += "value_type beta_val = static_cast<value_type>(" + FormatScalarLiteral(static_cast<literal_type>(beta)) + ");\n";
         result += gemm_func_name;
         result += R"((&alpha_val, smem_a, smem_b, &beta_val, smem_c);
           

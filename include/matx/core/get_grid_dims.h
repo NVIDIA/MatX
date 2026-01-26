@@ -333,7 +333,27 @@ inline bool get_grid_dims_block_2d(dim3 &blocks, dim3 &threads,
     for (int i = 0; i < RANK - 2; i++) {
       total_batches *= sizes[i];
     }
-    blocks.x = static_cast<int>(total_batches);
+    if (total_batches == 0) {
+      blocks.x = 0;
+      blocks.y = 0;
+      blocks.z = 0;
+    }
+    else {
+      constexpr index_t kMaxGridDim = 65535;
+      index_t remaining = total_batches;
+
+      blocks.x = static_cast<int>(std::min(remaining, kMaxGridDim));
+      remaining = (remaining + blocks.x - 1) / blocks.x;
+
+      blocks.y = static_cast<int>(std::min(remaining, kMaxGridDim));
+      remaining = (remaining + blocks.y - 1) / blocks.y;
+
+      blocks.z = static_cast<int>(std::min(remaining, kMaxGridDim));
+
+      if (remaining > kMaxGridDim) {
+         return true;
+      }
+    }
   }
   
   MATX_LOG_DEBUG("Block2D: Blocks {}x{}x{} Threads {}x{}x{}", blocks.x, blocks.y, blocks.z, threads.x, threads.y, threads.z);

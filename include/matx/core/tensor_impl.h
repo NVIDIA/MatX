@@ -265,7 +265,9 @@ class tensor_impl_t {
              "    static_assert(sizeof...(Is) == M, \"Number of indices of operator() must match rank of tensor\");\n" +
              "    constexpr int EPT_int = static_cast<int>(CapType::ept);\n" +
              "    if constexpr (CapType::pass_through_threads) {\n" +
-             "      static cuda::std::conditional_t<CapType::ept == detail::ElementsPerThread::ONE, T, detail::Vector<T, EPT_int>> dummy_;\n" +
+             "      using ReturnType = cuda::std::conditional_t<CapType::ept == detail::ElementsPerThread::ONE, T, detail::Vector<T, EPT_int>>;\n" +
+             "      __align__(alignof(ReturnType)) __shared__ unsigned char dummy_storage[sizeof(ReturnType)];\n" +
+             "      auto &dummy_ = *reinterpret_cast<ReturnType *>(dummy_storage);\n" +
              "      if (!CheckBounds<CapType, 0>(cuda::std::make_tuple(indices...))) {\n" +
              "        return dummy_;\n" +
              "      }\n" +
