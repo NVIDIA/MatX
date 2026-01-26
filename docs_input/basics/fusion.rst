@@ -60,13 +60,13 @@ CUDA JIT Kernel Fusion
     CUDA JIT kernel fusion is considered an experimental feature. There may be bugs that don't occur with JIT disabled, and new features are being added over time.
 
 MatX supports CUDA JIT kernel fusion that compiles the entire expression into a single kernel. Currently this is enabled 
-for all standard MatX element-wise operators and FFT operations via MathDx. To enable fusion with MathDx, 
+for all standard MatX element-wise operators and FFT and GEMM operations via MathDx. To enable fusion with MathDx, 
 the following options must be enabled: ``-DMATX_EN_MATHDX=ON``. Once enabled, the ``CUDAJITExecutor`` can be used perform JIT compilation
-in supported situations. If the expression cannot be JIT compiled, the JITExecutor will fall back to the normal non-JIT path.
+in supported situations. If the expression cannot be JIT compiled, the JITExecutor may throw an error.
 
 While JIT compilation can provide a large performance boost, there are two overheads that occur when using JIT compilation:
-- The first pass to JIT the code takes time. The first time a ``run()`` statement is executed on a new operator, MatX identifies this and performs JIT compilation. Depending on the complexity of the operator, this could be anywhere from milliseconds to seconds to complete. Once finished, MatX will cache the compiled kernel so that subsequent runs of the same operator will not require JIT compilation.
-- A lookup is done to find kernels that have already been compiled. This is a small overhead and may not be noticeable.
+* The first pass to JIT the code takes time. The first time a ``run()`` statement is executed on a new operator, MatX identifies this and performs JIT compilation. Depending on the complexity of the operator, this could be anywhere from milliseconds to seconds to complete. Once finished, MatX will cache the compiled kernel so that subsequent runs of the same operator will not require JIT compilation.
+* A lookup is done to find kernels that have already been compiled. This is a small overhead and may not be noticeable.
 
 As mentioned above, there is no difference in syntax between MatX statements that perform JIT compilation and those that do not. The executor 
 is the only change, just as it would be with a host executor. For example, in the following code:
@@ -76,7 +76,7 @@ is the only change, just as it would be with a host executor. For example, in th
     (A = B * fft(C)).run(CUDAExecutor{});
     (A = B * fft(C)).run(CUDAJITExecutor{});
 
-When MathDx is disabled, the the first statement will execute the FFT into a temporary buffer, then the multiply will be executed. This results 
+The first statement will execute the FFT as a separate kernel into a temporary buffer, then the multiply will be executed. This results 
 in a minimum of 2 kernels (one for MatX and at least one for cuFFT). The second statement will execute the FFT and multiply in a single kernel if 
 possible.
 
@@ -102,5 +102,28 @@ example:
 In this case the MathDx library requires at least 2 elements per thread for the FFT, but the ``fftshift1D`` operator requires 
 only 1 element per thread. Therefore, the entire expression cannot be JIT-compiled and will fall back to the non-JIT path. Some of 
 these restrictions may be relaxed in newer versions of MatX or the MathDx library.
+
+MathDx Compatibility
+====================
+
+.. list-table:: MathDx library compatibility for CUDA JIT fusion
+   :header-rows: 1
+   :widths: 20 14 66
+
+   * - Library
+     - Supported
+     - Notes
+   * - cuBLASDx
+     - Yes
+     - Enabled via ``-DMATX_EN_MATHDX=ON`` for GEMM fusion paths.
+   * - cuFFTDx
+     - Yes
+     - Enabled via ``-DMATX_EN_MATHDX=ON`` for FFT fusion paths.
+   * - cuSolverDx
+     - No
+     - Not supported yet by MatX CUDA JIT fusion.
+   * - cuRandDx
+     - No
+     - Not supported yet by MatX CUDA JIT fusion.
 
 
