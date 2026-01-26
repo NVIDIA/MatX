@@ -5,6 +5,8 @@ bartlett
 
 Generate a Bartlett window
 
+
+.. versionadded:: 0.1.0
 .. doxygenfunction:: matx::bartlett(ShapeType &&s)
 .. doxygenfunction:: matx::bartlett(const index_t (&s)[RANK])
 

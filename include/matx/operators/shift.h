@@ -59,13 +59,67 @@ namespace matx
         using value_type = typename T1::value_type;
         using self_type = ShiftOp<DIM, T1, T2>;
 
+#ifdef MATX_EN_JIT
+        struct JIT_Storage {
+          typename detail::inner_storage_or_self_t<detail::base_type_t<T1>> op_;
+          typename detail::inner_storage_or_self_t<detail::base_type_t<T2>> shift_;
+        };
+
+        JIT_Storage ToJITStorage() const {
+          return JIT_Storage{detail::to_jit_storage(op_), detail::to_jit_storage(shift_)};
+        }
+
+        __MATX_INLINE__ std::string get_jit_class_name() const {
+          return std::format("JITShift_dim{}", DIM);
+        }
+
+        __MATX_INLINE__ auto get_jit_op_str() const {
+          std::string func_name = get_jit_class_name();
+          cuda::std::array<index_t, Rank()> out_dims_;
+          for (int i = 0; i < Rank(); ++i) {
+            out_dims_[i] = Size(i);
+          }
+          
+          return cuda::std::make_tuple(
+            func_name,
+            std::format("template <typename T1, typename T2> struct {} {{\n"
+                "  using value_type = typename T1::value_type;\n"
+                "  using matxop = bool;\n"
+                "  constexpr static int DIM_ = {};\n"
+                "  constexpr static int Rank_ = {};\n"
+                "  constexpr static cuda::std::array<index_t, Rank_> sizes_ = {{ {} }};\n"
+                "  typename detail::inner_storage_or_self_t<detail::base_type_t<T1>> op_;\n"
+                "  typename detail::inner_storage_or_self_t<detail::base_type_t<T2>> shift_;\n"
+                "  template <typename CapType, typename... Is>\n"
+                "  __MATX_INLINE__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) const\n"
+                "  {{\n"
+                "    if constexpr (CapType::ept == ElementsPerThread::ONE) {{\n"
+                "      cuda::std::array idx{{indices...}};\n"
+                "      index_t shift = -get_value<CapType>(shift_, indices...);\n"
+                "      shift = (shift + idx[DIM_]) % sizes_[DIM_];\n"
+                "      if (shift < 0) shift += sizes_[DIM_];\n"
+                "      idx[DIM_] = shift;\n"
+                "      return get_value<CapType>(op_, idx);\n"
+                "    }} else {{\n"
+                "      return Vector<value_type, static_cast<size_t>(CapType::ept)>();\n"
+                "    }}\n"
+                "  }}\n"
+                "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return Rank_; }}\n"
+                "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const {{ return sizes_[dim]; }}\n"
+                "}};\n",
+                func_name, DIM, Rank(), detail::array_to_string(out_dims_))
+          );
+        }
+#endif
+
         __MATX_INLINE__ std::string str() const { return "shift(" + op_.str() + ")"; }
 
         __MATX_INLINE__ ShiftOp(const T1 &op, T2 shift) : op_(op), shift_(shift)
         {
+          MATX_LOG_TRACE("{} constructor: dim={}, rank={}", str(), DIM, Rank());
           static_assert(DIM < Rank(), "Dimension to shift must be less than rank of tensor");
 
-          #pragma unroll
+          MATX_LOOP_UNROLL
           for (int i = 0; i < Rank(); i++) {
             index_t size1 = detail::get_expanded_size<Rank()>(op_, i);
             index_t size2 = detail::get_expanded_size<Rank()>(shift_, i);
@@ -76,37 +130,107 @@ namespace matx
           MATX_ASSERT_COMPATIBLE_OP_SIZES(op_);
         }
 
-        template <typename Op, typename Sizes, typename ShiftType, typename... Is>
+        template <typename CapType, typename Op, typename Sizes, typename ShiftType, typename... Is>
         static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(
             Op&& op,
             const Sizes &sizes,
             ShiftType shiftin,
             Is... indices)
         {
-          cuda::std::array idx{indices...};
-          index_t shift = -get_value(shiftin, indices...);
+          if constexpr (CapType::ept == ElementsPerThread::ONE) {
+            cuda::std::array idx{indices...};
+            index_t shift = -get_value<CapType>(shiftin, indices...);
 
-          shift = (shift + idx[DIM]) % sizes[DIM];
+            shift = (shift + idx[DIM]) % sizes[DIM];
 
-          if (shift < 0) {
-            shift += sizes[DIM];
+            if (shift < 0) {
+              shift += sizes[DIM];
+            }
+
+            idx[DIM] = shift;
+
+            return get_value<CapType>(cuda::std::forward<Op>(op), idx);
+          } else {
+            return Vector<value_type, static_cast<size_t>(CapType::ept)>();
           }
+        }
 
-          idx[DIM] = shift;
-
-          return get_value(cuda::std::forward<Op>(op), idx);
+        template <typename CapType, typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
+        {
+          return get_impl<CapType>(cuda::std::as_const(op_), sizes_, shift_, indices...);
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          return get_impl(cuda::std::as_const(op_), sizes_, shift_, indices...);
+          return this->operator()<DefaultCapabilities>(indices...);
+        }
+
+        template <typename CapType, typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
+        {
+          return get_impl<CapType>(cuda::std::forward<decltype(op_)>(op_), sizes_, shift_, indices...);
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
-          return get_impl(cuda::std::forward<decltype(op_)>(op_), sizes_, shift_, indices...);
+          return this->operator()<DefaultCapabilities>(indices...);
+        }
+
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
+          if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+#ifdef MATX_EN_JIT
+            const auto op_jit_name = detail::get_operator_capability<Cap>(op_, in);
+            const auto shift_jit_name = detail::get_operator_capability<Cap>(shift_, in);
+            return std::format("{}<{},{}>", get_jit_class_name(), op_jit_name, shift_jit_name);
+#else
+            return "";
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+#ifdef MATX_EN_JIT
+            return combine_capabilities<Cap>(true, detail::get_operator_capability<Cap>(op_, in));
+#else
+            return false;
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+#ifdef MATX_EN_JIT
+            const auto [key, value] = get_jit_op_str();
+            if (in.find(key) == in.end()) {
+              in[key] = value;
+            }
+            detail::get_operator_capability<Cap>(op_, in);
+            detail::get_operator_capability<Cap>(shift_, in);
+            return true;
+#else
+            return false;
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
+            return detail::get_operator_capability<Cap>(op_, in) + 
+                   detail::get_operator_capability<Cap>(shift_, in);
+          }
+          else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+            return combine_capabilities<Cap>(
+              my_cap,
+            detail::get_operator_capability<Cap>(op_, in),
+              detail::get_operator_capability<Cap>(shift_, in)
+            );
+          } else if constexpr (Cap == OperatorCapability::ALIASED_MEMORY) {
+            auto in_copy = in;
+            in_copy.permutes_input_output = true;
+            return combine_capabilities<Cap>(detail::get_operator_capability<Cap>(op_, in_copy), detail::get_operator_capability<Cap>(shift_, in_copy));
+          } else {
+            auto self_has_cap = capability_attributes<Cap>::default_value;
+            return combine_capabilities<Cap>(
+              self_has_cap, detail::get_operator_capability<Cap>(op_, in), detail::get_operator_capability<Cap>(shift_, in)
+            );
+          }
         }
 
         template <typename ShapeType, typename Executor>
@@ -137,18 +261,14 @@ namespace matx
 
         ~ShiftOp() = default;
         ShiftOp(const ShiftOp &rhs) = default;
+
         __MATX_INLINE__ auto operator=(const self_type &rhs) {
           return set(*this, rhs);
         }
 
         template<typename R>
         __MATX_INLINE__ auto operator=(const R &rhs) {
-          if constexpr (is_matx_transform_op<R>()) {
-            return mtie(*this, rhs);
-          }
-          else {
-            return set(*this, rhs);
-          }
+          return set(*this, rhs);
         }
 
       private:

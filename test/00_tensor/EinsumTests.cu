@@ -113,8 +113,8 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Contraction3D)
   auto b1 = make_tensor<TestType>({24});
   auto c2 = make_tensor<TestType>({5,2});
 
-  (a1 = linspace<0>(a1.Shape(), (TestType)0, static_cast<TestType>(a1.Size(0) - 1))).run(exec);
-  (b1 = linspace<0>(b1.Shape(), (TestType)0, static_cast<TestType>(b1.Size(0) - 1))).run(exec);
+  (a1 = linspace((TestType)0, static_cast<TestType>(a1.Size(0) - 1), a1.Size(0))).run(exec);
+  (b1 = linspace((TestType)0, static_cast<TestType>(b1.Size(0) - 1), b1.Size(0))).run(exec);
   auto a = a1.View({3,4,5});
   auto b = b1.View({4,3,2});
 
@@ -144,8 +144,8 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Contraction3DOperator)
 
   // Perform a 3D tensor contraction
   (c2 = cutensor::einsum("ijk,jil->kl",
-    reshape(linspace<0>(a1.Shape(), (TestType)0, static_cast<TestType>(a1.Size(0) - 1)), {3,4,5}),
-    reshape(linspace<0>(b1.Shape(), (TestType)0, static_cast<TestType>(b1.Size(0) - 1)), {4,3,2}))).run(exec);
+    reshape(linspace((TestType)0, static_cast<TestType>(a1.Size(0) - 1), a1.Size(0)), {3,4,5}),
+    reshape(linspace((TestType)0, static_cast<TestType>(b1.Size(0) - 1), b1.Size(0)), {4,3,2}))).run(exec);
 
   exec.sync();
   MATX_TEST_ASSERT_COMPARE(this->pb, c2, "c_float3d", 0.01);

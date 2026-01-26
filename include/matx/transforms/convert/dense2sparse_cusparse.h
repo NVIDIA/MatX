@@ -20,14 +20,15 @@
 //
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 // AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-// DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-// FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-// SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-// CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-// OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+// POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
@@ -35,6 +36,7 @@
 #include <cusparse.h>
 
 #include <numeric>
+#include <typeinfo>
 
 #include "matx/core/cache.h"
 #include "matx/core/sparse_tensor.h"
@@ -51,7 +53,6 @@ struct Dense2SparseParams_t {
   MatXDataType_t dtype;
   MatXDataType_t ptype;
   MatXDataType_t ctype;
-  int rank;
   cudaStream_t stream;
   index_t m;
   index_t n;
@@ -60,18 +61,19 @@ struct Dense2SparseParams_t {
   void *ptrO1;
   void *ptrO2;
   void *ptrA;
+  size_t format_hash;  // Hash of the sparse tensor format type
 };
 
 // Helper method to construct storage.
 template <typename T>
-__MATX_INLINE__ static auto makeDefaultNonOwningStorage(size_t sz,
+__MATX_INLINE__ static Storage<T> makeDefaultNonOwningStorage(size_t sz,
                                                         matxMemorySpace_t space,
                                                         cudaStream_t stream) {
-  T *ptr;
-  matxAlloc(reinterpret_cast<void **>(&ptr), sz * sizeof(T), space, stream);
-  raw_pointer_buffer<T, matx_allocator<T>> buf{ptr, sz * sizeof(T),
-                                               /*owning=*/false};
-  return basic_storage<decltype(buf)>{std::move(buf)};
+  T *ptr = nullptr;
+  if (sz != 0) {
+    matxAlloc(reinterpret_cast<void **>(&ptr), sz * sizeof(T), space, stream);
+  }
+  return Storage<T>(ptr, sz);
 }
 
 template <typename TensorTypeO, typename TensorTypeA>
@@ -130,7 +132,8 @@ public:
                                            &workspaceSize_);
     MATX_ASSERT(ret == CUSPARSE_STATUS_SUCCESS, matxCudaError);
     if (workspaceSize_) {
-      matxAlloc((void **)&workspace_, workspaceSize_, MATX_DEVICE_MEMORY);
+      matxAlloc((void **)&workspace_, workspaceSize_, MATX_DEVICE_MEMORY,
+                stream);
     }
     ret =
         cusparseDenseToSparse_analysis(handle_, matA_, matO_, algo, workspace_);
@@ -147,8 +150,12 @@ public:
       // the nnz is updated explicitly here before allocating
       // the new components of COO.
       POS *pos = reinterpret_cast<POS *>(params_.ptrO1);
-      pos[1] = nnz;
       matxMemorySpace_t space = GetPointerKind(pos);
+      if (space == MATX_DEVICE_MEMORY || space == MATX_ASYNC_DEVICE_MEMORY) {
+        cudaMemcpy(pos + 1, &nnz, sizeof(POS), cudaMemcpyHostToDevice);
+      } else {
+        pos[1] = static_cast<POS>(nnz);
+      }
       o.SetVal(makeDefaultNonOwningStorage<VAL>(nnz, space, stream));
       o.SetCrd(0, makeDefaultNonOwningStorage<CRD>(nnz, space, stream));
       o.SetCrd(1, makeDefaultNonOwningStorage<CRD>(nnz, space, stream));
@@ -172,7 +179,7 @@ public:
 
   ~Dense2SparseHandle_t() {
     if (workspaceSize_) {
-      matxFree(workspace_);
+      matxFree(workspace_, params_.stream);
     }
     cusparseDestroy(handle_);
   }
@@ -183,7 +190,6 @@ public:
     params.dtype = TypeToInt<VAL>();
     params.ptype = TypeToInt<POS>();
     params.ctype = TypeToInt<CRD>();
-    params.rank = a.Rank();
     params.stream = stream;
     // TODO: simple no-batch, row-wise, no-transpose for now
     params.m = a.Size(TensorTypeA::Rank() - 2);
@@ -195,6 +201,8 @@ public:
     params.ptrO1 = o.POSData(0);
     params.ptrO2 = o.POSData(1);
     params.ptrA = a.Data();
+    // Add format type hash to distinguish between COO/CSR/CSC etc
+    params.format_hash = typeid(typename TensorTypeO::Format).hash_code();
     return params;
   }
 
@@ -225,21 +233,23 @@ struct Dense2SparseParamsKeyHash {
   std::size_t operator()(const Dense2SparseParams_t &k) const noexcept {
     return std::hash<uint64_t>()(reinterpret_cast<uint64_t>(k.ptrO1)) +
            std::hash<uint64_t>()(reinterpret_cast<uint64_t>(k.ptrA)) +
-           std::hash<uint64_t>()(reinterpret_cast<uint64_t>(k.stream));
+           std::hash<uint64_t>()(reinterpret_cast<uint64_t>(k.stream)) +
+           std::hash<size_t>()(k.format_hash);
   }
 };
 
 /**
- * Test SOLVE parameters for equality. Unlike the hash, all parameters must
- * match exactly to ensure the hashed kernel can be reused for the computation.
+ * Test Dense2Sparse parameters for equality. Unlike the hash, all parameters
+ * must match exactly to ensure the hashed kernel can be reused for the
+ * computation.
  */
 struct Dense2SparseParamsKeyEq {
   bool operator()(const Dense2SparseParams_t &l,
                   const Dense2SparseParams_t &t) const noexcept {
     return l.dtype == t.dtype && l.ptype == t.ptype && l.ctype == t.ctype &&
-           l.rank == t.rank && l.stream == t.stream && l.m == t.m &&
-           l.n == t.n && l.ptrO1 == t.ptrO1 && l.ptrO2 == t.ptrO2 &&
-           l.ptrA == t.ptrA;
+           l.stream == t.stream && l.m == t.m && l.n == t.n &&
+           l.ptrO1 == t.ptrO1 && l.ptrO2 == t.ptrO2 && l.ptrA == t.ptrA &&
+           l.format_hash == t.format_hash;
   }
 };
 
@@ -300,12 +310,15 @@ void dense2sparse_impl(OutputTensorType &o, const InputTensorType &A,
 
   // Lookup and cache.
   using cache_val_type = detail::Dense2SparseHandle_t<otype, atype>;
+  auto cache_id = detail::GetCacheIdFromType<detail::dense2sparse_cache_t>();
+  MATX_LOG_DEBUG("Dense2Sparse transform: cache_id={}", cache_id);
   detail::GetCache().LookupAndExec<detail::dense2sparse_cache_t>(
-      detail::GetCacheIdFromType<detail::dense2sparse_cache_t>(), params,
+      cache_id, params,
       [&]() { return std::make_shared<cache_val_type>(o, a, stream); },
       [&](std::shared_ptr<cache_val_type> cache_type) {
         cache_type->Exec(o, a);
-      });
+      },
+      exec);
 }
 
 } // end namespace matx

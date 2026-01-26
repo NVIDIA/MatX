@@ -5,6 +5,8 @@ atanh
 
 Hyperbolic inverse tangent
 
+
+.. versionadded:: 0.3.0
 .. doxygenfunction:: atanh(Op t)
 
 Examples

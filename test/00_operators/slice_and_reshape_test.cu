@@ -17,7 +17,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexNonHalfAllExecs, SliceAndReshape)
   {
     // Unit test combining slice with reshape which showed a bug in the past
     auto t = make_tensor<TestType>({100});
-    (t = linspace<0>(t.Shape(), (TestType)0, (TestType)99)).run(exec);
+    (t = linspace((TestType)0, (TestType)99, t.Size(0))).run(exec);
     auto rs = reshape(t, {2, 10, 5});
     auto s = slice(rs, {0, 0, 2}, {matxEnd, matxEnd, matxEnd});
     exec.sync();

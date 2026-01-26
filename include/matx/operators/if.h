@@ -38,6 +38,7 @@
 
 namespace matx
 {
+  namespace detail {
   /**
    * Conditionally execute an operator
    *
@@ -53,12 +54,58 @@ namespace matx
     class IFOP : public BaseOp<IFOP<T1, T2>>
   {
     private:
-      typename detail::base_type_t<T1> cond_;
-      typename detail::base_type_t<T2> op_;
+      mutable typename detail::base_type_t<T1> cond_;
+      mutable typename detail::base_type_t<T2> op_;
       cuda::std::array<index_t, detail::matx_max(detail::get_rank<T1>(), detail::get_rank<T2>())> size_;
 
     public:
       using value_type = void; ///< Scalar type for type extraction
+
+#ifdef MATX_EN_JIT
+      struct JIT_Storage {
+        typename detail::inner_storage_or_self_t<detail::base_type_t<T1>> cond_;
+        typename detail::inner_storage_or_self_t<detail::base_type_t<T2>> op_;
+      };
+
+      JIT_Storage ToJITStorage() const {
+        return JIT_Storage{detail::to_jit_storage(cond_), detail::to_jit_storage(op_)};
+      }
+
+      __MATX_INLINE__ std::string get_jit_class_name() const {
+        return "JITIF";
+      }
+
+      __MATX_INLINE__ auto get_jit_op_str() const {
+        std::string func_name = get_jit_class_name();
+        cuda::std::array<index_t, Rank()> out_dims_;
+        for (int i = 0; i < Rank(); ++i) {
+          out_dims_[i] = Size(i);
+        }
+        
+        return cuda::std::make_tuple(
+          func_name,
+          std::format("template <typename T1, typename T2> struct {} {{\n"
+              "  using value_type = void;\n"
+              "  constexpr static int Rank_ = {};\n"
+              "  constexpr static cuda::std::array<index_t, Rank_> size_ = {{ {} }};\n"
+              "  typename detail::inner_storage_or_self_t<detail::base_type_t<T1>> cond_;\n"
+              "  typename detail::inner_storage_or_self_t<detail::base_type_t<T2>> op_;\n"
+              "  template <typename CapType, typename... Is>\n"
+              "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(Is... indices) const\n"
+              "  {{\n"
+              "    if constexpr (CapType::ept == ElementsPerThread::ONE) {{\n"
+              "      if (get_value<CapType>(cond_, indices...)) {{\n"
+              "        get_value<CapType>(op_, indices...);\n"
+              "      }}\n"
+              "    }}\n"
+              "  }}\n"
+              "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return Rank_; }}\n"
+              "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const {{ return size_[dim]; }}\n"
+              "}};\n",
+              func_name, Rank(), detail::array_to_string(out_dims_))
+        );
+      }
+#endif
 
       __MATX_INLINE__ std::string str() const { return  "if(" + cond_.str() + ") then {" +  op_.str() + "}"; }
       /**
@@ -68,28 +115,45 @@ namespace matx
        * @param op Operator if conditional branch is true
        */
       __MATX_INLINE__ IFOP(const T1 &cond, const T2 &op) : cond_(cond), op_(op)
-    {
-      static_assert((!is_tensor_view_v<T2>),
-          "Only operator emmitters are allowed in IF. Tensor views are "
-          "not allowed");
-      constexpr index_t rank1 = detail::get_rank<T1>();
-      constexpr index_t rank2 = detail::get_rank<T2>();
-      static_assert(rank1 == -1 || rank1 == Rank());
-      static_assert(rank2 == -1 || rank2 == Rank());
-
-      if constexpr (Rank() > 0)
       {
-        for (int i = 0; i < Rank(); i++)
-        {
-          index_t size1 = detail::get_expanded_size<Rank()>(cond_, i);
-          index_t size2 = detail::get_expanded_size<Rank()>(op_, i);
-          size_[i] = detail::matx_max(size1, size2);
-        }
+        MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
+        static_assert((!is_tensor_view_v<T2>),
+            "Only operator emmitters are allowed in IF. Tensor views are "
+            "not allowed");
+        constexpr index_t rank1 = detail::get_rank<T1>();
+        constexpr index_t rank2 = detail::get_rank<T2>();
+        static_assert(rank1 == -1 || rank1 == Rank());
+        static_assert(rank2 == -1 || rank2 == Rank());
 
-        MATX_ASSERT_COMPATIBLE_OP_SIZES(op_);
-        MATX_ASSERT_COMPATIBLE_OP_SIZES(cond_);
+        if constexpr (Rank() > 0)
+        {
+          for (int i = 0; i < Rank(); i++)
+          {
+            index_t size1 = detail::get_expanded_size<Rank()>(cond_, i);
+            index_t size2 = detail::get_expanded_size<Rank()>(op_, i);
+            size_[i] = detail::matx_max(size1, size2);
+          }
+
+          MATX_ASSERT_COMPATIBLE_OP_SIZES(op_);
+          MATX_ASSERT_COMPATIBLE_OP_SIZES(cond_);
+        }
       }
-    }
+
+      /**
+       * @brief Operator() for getting values of an if operator. Does not support multiple elements per thread.
+       *
+       * @tparam EPT ElementsPerThread
+       * @tparam Is Index types
+       * @param indices Index values
+       */
+      template <typename CapType, typename... Is>
+        __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator()(Is... indices) const {
+          if constexpr (CapType::ept == ElementsPerThread::ONE) {
+            if (get_value<CapType>(cond_, indices...)) {
+              get_value<CapType>(op_, indices...);
+            }
+          }
+        }
 
       /**
        * @brief Operator() for getting values of an if operator
@@ -99,9 +163,7 @@ namespace matx
        */
       template <typename... Is>
         __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator()(Is... indices) const {
-          if (get_value(cond_, indices...)) {
-            get_value(op_, indices...);
-          }
+          return this->operator()<DefaultCapabilities>(indices...);
         }
 
       /**
@@ -149,7 +211,63 @@ namespace matx
           cond_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
       }
+
+      template <OperatorCapability Cap, typename InType>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
+        if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+#ifdef MATX_EN_JIT
+          const auto cond_jit_name = detail::get_operator_capability<Cap>(cond_, in);
+          const auto op_jit_name = detail::get_operator_capability<Cap>(op_, in);
+          return std::format("{}<{},{}>", get_jit_class_name(), cond_jit_name, op_jit_name);
+#else
+          return "";
+#endif
+        }
+        else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+#ifdef MATX_EN_JIT
+          return combine_capabilities<Cap>(true, 
+            detail::get_operator_capability<Cap>(cond_, in),
+            detail::get_operator_capability<Cap>(op_, in));
+#else
+          return false;
+#endif
+        }
+        else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+#ifdef MATX_EN_JIT
+          const auto [key, value] = get_jit_op_str();
+          if (in.find(key) == in.end()) {
+            in[key] = value;
+          }
+          detail::get_operator_capability<Cap>(cond_, in);
+          detail::get_operator_capability<Cap>(op_, in);
+          return true;
+#else
+          return false;
+#endif
+        }
+        else if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
+          return detail::get_operator_capability<Cap>(cond_, in) +
+                 detail::get_operator_capability<Cap>(op_, in);
+        }
+        else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+          const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+          return combine_capabilities<Cap>(
+            my_cap,
+          detail::get_operator_capability<Cap>(cond_, in),
+            detail::get_operator_capability<Cap>(op_, in)
+          );
+        } else {
+          auto self_has_cap = capability_attributes<Cap>::default_value;
+          return combine_capabilities<Cap>(
+            self_has_cap,
+          detail::get_operator_capability<Cap>(cond_, in),
+            detail::get_operator_capability<Cap>(op_, in)
+          );
+        }
+      }
   };
+
+  } // end namespace detail
 
   /**
    *
@@ -166,6 +284,6 @@ namespace matx
    */
   template <typename T1, typename T2>
     auto IF(T1 t1, T2 t2) {
-      return IFOP<T1,T2>(t1,t2);
+      return detail::IFOP<T1,T2>(t1,t2);
     }
 } // end namespace matx

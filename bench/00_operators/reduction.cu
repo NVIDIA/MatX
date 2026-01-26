@@ -29,7 +29,7 @@ template <typename ValueType>
 void reduce_0d_matx(nvbench::state &state, nvbench::type_list<ValueType>)
 {
   // Get current parameters:
-  const long long int x_len = state.get_int64("Tensor Size");
+  const index_t x_len = static_cast<index_t>(state.get_int64("Tensor Size"));
 
   state.add_element_count(x_len, "NumElements");
   state.add_global_memory_reads<ValueType>(x_len * x_len * x_len * x_len, "DataSize");
@@ -64,7 +64,7 @@ template <typename ValueType>
 void reduce_0d_cub(nvbench::state &state, nvbench::type_list<ValueType>)
 {
   // Get current parameters:
-  const long long int x_len = state.get_int64("Tensor Size");
+  const index_t x_len = static_cast<index_t>(state.get_int64("Tensor Size"));
 
   state.add_element_count(x_len, "NumElements");
   state.add_global_memory_reads<ValueType>(x_len * x_len * x_len * x_len, "DataSize");
@@ -89,7 +89,7 @@ template <typename ValueType>
 void reduce_0d_cub_permute(nvbench::state &state, nvbench::type_list<ValueType>)
 {
   // Get current parameters:
-  const long long int x_len = state.get_int64("Tensor Size");
+  const index_t x_len = static_cast<index_t>(state.get_int64("Tensor Size"));
 
   state.add_element_count(x_len, "NumElements");
   state.add_global_memory_reads<ValueType>(x_len * x_len * x_len * x_len, "DataSize");
@@ -128,10 +128,10 @@ void reduce_4d(
            )
 {
   cudaExecutor exec{0};
-  const int size0 = static_cast<int>(state.get_int64("Size0"));
-  const int size1 = static_cast<int>(state.get_int64("Size1"));
-  const int size2 = static_cast<int>(state.get_int64("Size2"));
-  const int size3 = static_cast<int>(state.get_int64("Size3"));
+  const index_t size0 = static_cast<index_t>(state.get_int64("Size0"));
+  const index_t size1 = static_cast<index_t>(state.get_int64("Size1"));
+  const index_t size2 = static_cast<index_t>(state.get_int64("Size2"));
+  const index_t size3 = static_cast<index_t>(state.get_int64("Size3"));
 
   auto t1 = make_tensor<ValueType>({size3});
   auto t4 = make_tensor<ValueType>({size3, size2, size1, size0});

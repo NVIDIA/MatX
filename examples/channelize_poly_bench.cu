@@ -105,7 +105,8 @@ void ChannelizePolyBench(matx::index_t channel_start, matx::index_t channel_stop
       cudaEventElapsedTime(&elapsed_ms, start, stop);
 
       const double avg_elapsed_us = (static_cast<double>(elapsed_ms)/NUM_ITERATIONS)*1.0e3;
-      printf("Batches: %5lld Channels: %5lld FilterLen: %5lld InputLen: %7lld Elapsed Usecs: %12.1f MPts/sec: %12.3f\n",
+      printf("Batches: %5" MATX_INDEX_T_FMT " Channels: %5" MATX_INDEX_T_FMT " FilterLen: %5" MATX_INDEX_T_FMT
+        " InputLen: %7" MATX_INDEX_T_FMT " Elapsed Usecs: %12.1f MPts/sec: %12.3f\n",
         num_batches, num_channels, filter_len, input_len, avg_elapsed_us,
         static_cast<double>(num_batches*num_channels*output_len_per_channel)/1.0e6/(avg_elapsed_us/1.0e6));
     }
@@ -137,6 +138,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
   // printf("Benchmarking complex<double> -> complex<double>\n");
   // ChannelizePolyBench<cuda::std::complex<double>,cuda::std::complex<double>>(channel_start, channel_stop);
+
+  matx::ClearCachesAndAllocations();
 
   MATX_EXIT_HANDLER();
 }

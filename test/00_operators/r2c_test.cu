@@ -18,7 +18,13 @@ TYPED_TEST(OperatorTestsFloatNonComplexNonHalfAllExecs, R2COp)
   // r2c requires FFT support, so we need to check the executor here
   if constexpr (!detail::CheckFFTSupport<ExecType, TestType>()) {
     GTEST_SKIP();
-  }  
+  }
+
+#ifndef MATX_EN_MATHDX  
+  if constexpr (is_cuda_jit_executor_v<ExecType>) {
+    GTEST_SKIP();
+  }
+#endif
 
   const int N1 = 5;
   const int N2 = 6;

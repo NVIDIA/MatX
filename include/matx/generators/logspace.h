@@ -33,16 +33,58 @@
 #pragma once
 
 #include "matx/generators/generator1d.h"
+#include "matx/core/log.h"
+#include <type_traits>
 
 namespace matx
 {
   namespace detail {
-    template <class T> class Logspace {
+    template <class T> class Logspace : public BaseOp<Logspace<T>> {
       private:
         Range<T> range_;
 
       public:
         using value_type = T;
+        using matxop = bool;
+
+#ifdef MATX_EN_JIT
+        struct JIT_Storage {
+          typename detail::inner_storage_or_self_t<Range<T>> range_;
+        };
+
+        JIT_Storage ToJITStorage() const {
+          return JIT_Storage{detail::to_jit_storage(range_)};
+        }
+
+        __MATX_INLINE__ std::string get_jit_class_name() const {
+          return "JITLogspace";
+        }
+
+        __MATX_INLINE__ auto get_jit_op_str() const {
+          std::string func_name = get_jit_class_name();
+          
+          return cuda::std::make_tuple(
+            func_name,
+            std::format("template <typename T> struct {} {{\n"
+                "  using value_type = T;\n"
+                "  using matxop = bool;\n"
+                "  Range<T> range_;\n"
+                "  template <typename CapType>\n"
+                "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(index_t idx) const\n"
+                "  {{\n"
+                "    auto range_val = range_.template operator()<CapType>(idx);\n"
+                "    auto log_func = [](const auto &val) {{\n"
+                "      return cuda::std::pow(10, val);\n"
+                "    }};\n"
+                "    return detail::ApplyVecFunc<CapType, value_type>(log_func, range_val);\n"
+                "  }}\n"
+                "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return 1; }}\n"
+                "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size([[maybe_unused]] int dim) const {{ return index_t(0); }}\n"
+                "}};\n",
+                func_name)
+          );
+        }
+#endif
 
         __MATX_INLINE__ std::string str() const { return "logspace"; }
 	
@@ -65,28 +107,75 @@ namespace matx
           else {
             range_ = Range<T>{first, (last - first) / static_cast<T>(count - 1)};
           }
+          MATX_LOG_TRACE("Logspace constructor: first={}, last={}, count={}", first, last, count);
 #endif
         }
 
-        __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ T operator()(index_t idx) const
+        template <typename CapType>
+        __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t idx) const
         {
-          if constexpr (is_matx_half_v<T>) {
-            return static_cast<T>(
-                cuda::std::pow(10, static_cast<float>(range_(idx))));
-          }
-          else {
-            return cuda::std::pow(10, range_(idx));
-          }
+          auto range_val = range_.template operator()<CapType>(idx);
+          auto log_func = [](const auto &val) {
+            if constexpr (is_matx_half_v<T>) {
+              return static_cast<T>(
+                  cuda::std::pow(10, static_cast<float>(val)));
+            }
+            else {
+                return cuda::std::pow(10, val);
+            }
+          };
 
-          // WAR for compiler bug.
-          if constexpr (!is_matx_half_v<T>) {
-            return cuda::std::pow(10, range_(idx));
-          }
-          else {
-            return static_cast<T>(
-                cuda::std::pow(10, static_cast<float>(range_(idx))));
-          }
+          return detail::ApplyVecFunc<CapType, value_type>(log_func, range_val); 
         }
+
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
+          if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+#ifdef MATX_EN_JIT
+            const auto range_jit_name = detail::get_operator_capability<Cap>(range_, in);
+            return "JITLogspace<" + range_jit_name + ">";
+#else
+            return "";
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+#ifdef MATX_EN_JIT
+            return true;
+#else
+            return false;
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+#ifdef MATX_EN_JIT
+            detail::get_operator_capability<Cap>(range_, in);
+            return true;
+#else
+            return false;
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
+            return detail::get_operator_capability<Cap>(range_, in);
+          }
+          else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+            return my_cap;
+          } else {          
+            auto self_has_cap = detail::capability_attributes<Cap>::default_value;
+            return self_has_cap;
+          }
+        }       
+
+
+        __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t idx) const
+        {
+          return this->operator()<DefaultCapabilities>(idx);
+        }
+
+        constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size([[maybe_unused]] int dim) const
+        {
+          return index_t(0); // Logspace is used with matxGenerator1D_t which provides the size
+        }
+        static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return 1; }
     };
   }
 
@@ -106,9 +195,9 @@ namespace matx
    * @param last Last value
    * @return Operator with log10-spaced values 
    */
-  template <int Dim, typename ShapeType, typename T = float,
-           std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
-             inline auto logspace(ShapeType &&s, T first, T last)
+  template <int Dim, typename ShapeType, typename T = float>
+    requires (!cuda::std::is_array_v<remove_cvref_t<ShapeType>>)
+  inline auto logspace(ShapeType &&s, T first, T last)
              {
                constexpr int RANK = cuda::std::tuple_size<std::decay_t<ShapeType>>::value;
                static_assert(RANK > Dim);

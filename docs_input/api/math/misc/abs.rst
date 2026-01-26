@@ -5,6 +5,8 @@ abs
 
 Absolute value for real numbers, or complex magnitude for complex numbers
 
+.. versionadded:: 0.3.0
+
 .. doxygenfunction:: abs(Op t) 
   
 Examples

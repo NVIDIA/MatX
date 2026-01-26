@@ -5,7 +5,9 @@ IFELSE
 
 Conditional "if/else" statement for operators
 
-.. doxygenclass:: matx::IFELSE
+.. versionadded:: 0.3.0
+
+.. doxygenfunction:: matx::IFELSE
 
 Examples
 ~~~~~~~~

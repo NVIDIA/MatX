@@ -33,25 +33,111 @@
 #pragma once
 
 #include "matx/generators/generator1d.h"
+#include "matx/core/log.h"
+#include <type_traits>
+#include <cuda/std/numbers>
 
 namespace matx
 {
   namespace detail {
-    template <typename T> class Hanning {
+    template <typename T> class Hanning : public BaseOp<Hanning<T>> {
       private:
         index_t size_;
 
       public:
         using value_type = T;
+        using matxop = bool;
+
+#ifdef MATX_EN_JIT
+        struct JIT_Storage {
+          // No runtime members - size_ is made constexpr
+        };
+
+        JIT_Storage ToJITStorage() const {
+          return JIT_Storage{};
+        }
+
+        __MATX_INLINE__ std::string get_jit_class_name() const {
+          return "JITHanning_size" + std::to_string(size_);
+        }
+
+        __MATX_INLINE__ auto get_jit_op_str() const {
+          std::string func_name = get_jit_class_name();
+          
+          return cuda::std::make_tuple(
+            func_name,
+            std::string("template <typename T> struct " + func_name + " {\n") +
+                "  using value_type = T;\n" +
+                "  using matxop = bool;\n" +
+                "  constexpr static index_t size_ = " + std::to_string(size_) + ";\n" +
+                "  template <typename CapType>\n" +
+                "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(index_t i) const\n" +
+                "  {\n" +
+                "    return detail::ApplyGeneratorVecFunc<CapType, T>([](index_t idx) { return T(0.5) * (1 - cuda::std::cos(T(2 * cuda::std::numbers::pi) * T(idx) / T(size_ - 1))); }, i);\n" +
+                "  }\n" +
+                "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() { return 1; }\n" +
+                "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size([[maybe_unused]] int dim) const { return size_; }\n" +
+                "};\n"
+          );
+        }
+#endif
 
         __MATX_INLINE__ std::string str() const { return "hanning"; }
 
-        inline __MATX_HOST__ __MATX_DEVICE__ Hanning(index_t size) : size_(size){};
+        inline __MATX_HOST__ __MATX_DEVICE__ Hanning(index_t size) : size_(size){
+#ifndef __CUDA_ARCH__
+          MATX_LOG_TRACE("Hanning constructor: size={}", size);
+#endif
+        };
+
+        template <typename CapType>
+        inline __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
+        {
+          return detail::ApplyGeneratorVecFunc<CapType, T>([this](index_t idx) { return T(0.5) * (1 - cuda::std::cos(T(2 * M_PI) * T(idx) / T(size_ - 1))); }, i);
+        }
 
         inline __MATX_HOST__ __MATX_DEVICE__ T operator()(index_t i) const
         {
-          return T(0.5) * (1 - cuda::std::cos(T(2 * M_PI) * T(i) / T(size_ - 1)));
+          return this->operator()<DefaultCapabilities>(i);
         }
+
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
+          if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+#ifdef MATX_EN_JIT
+            return get_jit_class_name() + "<" + type_to_string<T>() + ">";
+#else
+            return "";
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+#ifdef MATX_EN_JIT
+            return true;
+#else
+            return false;
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+#ifdef MATX_EN_JIT
+            const auto [key, value] = get_jit_op_str();
+            if (in.find(key) == in.end()) {
+              in[key] = value;
+            }
+            return true;
+#else
+            return false;
+#endif
+          }
+          else {
+            return capability_attributes<Cap>::default_value;
+          }
+        }
+
+        constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size([[maybe_unused]] int dim) const
+        {
+          return size_;
+        }
+        static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return 1; }
     };
   }
 
@@ -71,9 +157,9 @@ namespace matx
    *
    * Returns values for a Hanning window across the selected dimension.
    */
-  template <int Dim, typename ShapeType, typename T = float,
-           std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
-             inline auto hanning(ShapeType &&s)
+  template <int Dim, typename ShapeType, typename T = float>
+    requires (!cuda::std::is_array_v<remove_cvref_t<ShapeType>>)
+  inline auto hanning(ShapeType &&s)
              {
                constexpr int RANK = cuda::std::tuple_size<std::decay_t<ShapeType>>::value;
                static_assert(RANK > Dim);

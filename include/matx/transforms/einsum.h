@@ -123,22 +123,44 @@ public:
       "Failed to create cuTensorNet handle");
 
     // setup tensor network
-    status = cutensornetCreateNetworkDescriptor(handle_,
-                                                sizeof...(InT),
-                                                params_.nmodes_.data(),
-                                                extents,
-                                                strides,
-                                                modes,
-                                                nullptr,
-                                                out.Rank(),
-                                                extents[sizeof...(InT)],
-                                                strides[sizeof...(InT)],
-                                                modes[sizeof...(InT)],
-                                                MatXTypeToCudaType<typename OutputTensor::value_type>(),
-                                                CUTENSORNET_COMPUTE_32F,
-                                                &descNet_);
+    status = cutensornetCreateNetwork(handle_, &descNet_);
     MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS,
-      matxcuTensorError, "Failed to create cuTensorNet network descriptor");
+      matxcuTensorError, "Failed to create cuTensorNet network");
+
+    // Append input tensors to the network
+    for (i = 0; i < sizeof...(InT); i++) {
+      int64_t tensorId;
+      status = cutensornetNetworkAppendTensor(handle_,
+                                              descNet_,
+                                              params_.nmodes_[i],
+                                              extents[i],
+                                              modes[i],
+                                              nullptr,  // qualifiers
+                                              MatXTypeToCudaType<typename OutputTensor::value_type>(),
+                                              &tensorId);
+      MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS,
+        matxcuTensorError, "Failed to append input tensor to cuTensorNet network");
+      tensorIds_[i] = tensorId;
+    }
+
+    // Set the output tensor for the network
+    status = cutensornetNetworkSetOutputTensor(handle_,
+                                               descNet_,
+                                               out.Rank(),
+                                               modes[sizeof...(InT)],
+                                               MatXTypeToCudaType<typename OutputTensor::value_type>());
+    MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS,
+      matxcuTensorError, "Failed to set output tensor for cuTensorNet network");
+
+    // Set the compute type
+    cutensornetComputeType_t computeType = CUTENSORNET_COMPUTE_32F;
+    status = cutensornetNetworkSetAttribute(handle_,
+                                            descNet_,
+                                            CUTENSORNET_NETWORK_COMPUTE_TYPE,
+                                            &computeType,
+                                            sizeof(computeType));
+    MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS,
+      matxcuTensorError, "Failed to set compute type for cuTensorNet network");
 
     cutensornetContractionOptimizerConfig_t optimizerConfig;
     status = cutensornetCreateContractionOptimizerConfig(handle_, &optimizerConfig);
@@ -221,51 +243,66 @@ public:
     MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS, matxcuTensorError,
       "Failed to set cuTENSOR memory");
 
+    // Set input tensor memory for the network
+    for (i = 0; i < sizeof...(InT); i++) {
+      status = cutensornetNetworkSetInputTensorMemory(handle_,
+                                                      descNet_,
+                                                      tensorIds_[i],
+                                                      data_in[i],
+                                                      strides[i]);
+      MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS,
+        matxcuTensorError, "cutensornetNetworkSetInputTensorMemory failed");
+    }
+
+    // Set output tensor memory for the network
+    status = cutensornetNetworkSetOutputTensorMemory(handle_,
+                                                     descNet_,
+                                                     out.Data(),
+                                                     strides[sizeof...(InT)]);
+    MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS,
+      matxcuTensorError, "cutensornetNetworkSetOutputTensorMemory failed");
+
     /*******************************
      * Initialize all pair-wise contraction plans (for cuTENSOR)
      *******************************/
-    status = cutensornetCreateContractionPlan(handle_,
-                                                descNet_,
-                                                optimizerInfo,
-                                                workDesc_,
-                                                &plan_);
+    status = cutensornetNetworkPrepareContraction(handle_,
+                                                  descNet_,
+                                                  workDesc_);
     MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS,
-      matxcuTensorError, "cutensornetCreateContractionPlan failed");
+      matxcuTensorError, "cutensornetNetworkPrepareContraction failed");
 
 
     /*******************************
     * Optional: Auto-tune cuTENSOR's cutensorContractionPlan to pick the fastest kernel
     *******************************/
-    cutensornetContractionAutotunePreference_t autotunePref;
-    status = cutensornetCreateContractionAutotunePreference(handle_,
+    cutensornetNetworkAutotunePreference_t autotunePref;
+    status = cutensornetCreateNetworkAutotunePreference(handle_,
                             &autotunePref);
     MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS,
-      matxcuTensorError, "cutensornetCreateContractionAutotunePreference failed");
+      matxcuTensorError, "cutensornetCreateNetworkAutotunePreference failed");
 
     const int numAutotuningIterations = 5; // may be 0
-    status = cutensornetContractionAutotunePreferenceSetAttribute(
+    status = cutensornetNetworkAutotunePreferenceSetAttribute(
                             handle_,
                             autotunePref,
-                            CUTENSORNET_CONTRACTION_AUTOTUNE_MAX_ITERATIONS,
+                            CUTENSORNET_NETWORK_AUTOTUNE_MAX_ITERATIONS,
                             &numAutotuningIterations,
                             sizeof(numAutotuningIterations));
     MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS,
-      matxcuTensorError, "cutensornetContractionAutotunePreferenceSetAttribute failed");
+      matxcuTensorError, "cutensornetNetworkAutotunePreferenceSetAttribute failed");
 
     // modify the plan again to find the best pair-wise contractions
-    status = cutensornetContractionAutotune(handle_,
-                            plan_,
-                            data_in,
-                            out.Data(),
+    status = cutensornetNetworkAutotuneContraction(handle_,
+                            descNet_,
                             workDesc_,
                             autotunePref,
                             stream);
     MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS,
-      matxcuTensorError, "cutensornetContractionAutotune failed");
+      matxcuTensorError, "cutensornetNetworkAutotuneContraction failed");
 
-    status = cutensornetDestroyContractionAutotunePreference(autotunePref);
+    status = cutensornetDestroyNetworkAutotunePreference(autotunePref);
     MATX_ASSERT_STR(status == CUTENSORNET_STATUS_SUCCESS,
-      matxcuTensorError, "cutensornetDestroyContractionAutotunePreference failed");
+      matxcuTensorError, "cutensornetDestroyNetworkAutotunePreference failed");
 
   }
 
@@ -406,18 +443,35 @@ public:
     size_t i = 0;
     ((data_in[i++] = tensors.Data()), ...);
 
+    // Set input tensor memory for the network
+    for (i = 0; i < sizeof...(InT); i++) {
+      status = cutensornetNetworkSetInputTensorMemory(handle_,
+                                                      descNet_,
+                                                      tensorIds_[i],
+                                                      data_in[i],
+                                                      params_.strides_[i].data());
+      MATX_ASSERT_STR_EXP(status, CUTENSORNET_STATUS_SUCCESS,
+        matxcuTensorError, "cutensornetNetworkSetInputTensorMemory failed");
+    }
+
+    // Set output tensor memory for the network
+    status = cutensornetNetworkSetOutputTensorMemory(handle_,
+                                                     descNet_,
+                                                     out.Data(),
+                                                     params_.strides_[sizeof...(InT)].data());
+    MATX_ASSERT_STR_EXP(status, CUTENSORNET_STATUS_SUCCESS,
+      matxcuTensorError, "cutensornetNetworkSetOutputTensorMemory failed");
+
     int32_t accumulateOutput = 0;
-    status = cutensornetContractSlices(handle_,
-                              plan_,
-                              data_in,
-                              out.Data(),
+    status = cutensornetNetworkContract(handle_,
+                              descNet_,
                               accumulateOutput,
                               workDesc_,
                               sliceGroup,
                               stream);
 
     MATX_ASSERT_STR_EXP(status, CUTENSORNET_STATUS_SUCCESS,
-      matxcuTensorError, "cutensornetContraction failed");
+      matxcuTensorError, "cutensornetNetworkContract failed");
 
   }
 
@@ -429,13 +483,13 @@ public:
       }
     }
 
-    cutensornetContractionPlan_t plan_;
     int64_t workSize_;
     void *workspace_;
     cutensornetWorkspaceDescriptor_t workDesc_;
     cutensornetHandle_t handle_;
     cutensornetNetworkDescriptor_t descNet_;
     EinsumParams_t<InT...> params_;
+    int64_t tensorIds_[sizeof...(InT)];
 };
 
 template <typename... InT>
@@ -496,15 +550,16 @@ namespace cutensor {
    * @tparam InT Types of input tensors
    * @param out Output tensor
    * @param subscripts String containing Einstein notation of operation to perform
-   * @param stream CUDA stream
+   * @param exec CUDA executor
    * @param tensors List of input tensors
    */
   template <typename OutputType, typename... InT>
-  void einsum_impl([[maybe_unused]] OutputType &out, [[maybe_unused]] const std::string &subscripts, [[maybe_unused]] cudaStream_t stream, [[maybe_unused]] InT... tensors)
+  void einsum_impl([[maybe_unused]] OutputType &out, [[maybe_unused]] const std::string &subscripts, [[maybe_unused]] const cudaExecutor &exec, [[maybe_unused]] InT... tensors)
   {
 #ifdef MATX_EN_CUTENSOR
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
+    const auto stream = exec.getStream();
     auto out_n = detail::cutensor::getEinsumSupportedTensor(out, stream);
     auto in_t = cuda::std::make_tuple(detail::cutensor::getEinsumSupportedTensor(tensors, stream)...);
 
@@ -530,8 +585,10 @@ namespace cutensor {
 
     params.stream = stream;
 
+    auto cache_id = detail::GetCacheIdFromType<einsum_cache_t>();
+    MATX_LOG_DEBUG("Einsum transform: cache_id={}", cache_id);
     detail::GetCache().LookupAndExec<einsum_cache_t>(
-        detail::GetCacheIdFromType<einsum_cache_t>(),
+        cache_id,
         params,
         [&]() {
             return cuda::std::apply([&](auto&&... args) {
@@ -542,7 +599,8 @@ namespace cutensor {
             cuda::std::apply([&](auto&&... args) {
                 ctype->Exec(out_n, stream, args...);
             }, in_t);
-        }
+        },
+        exec
     );
 #else
     MATX_THROW(matxNotSupported, "einsum() currently requires MATX_EN_CUTENSOR=ON but MATX_EN_CUTENSOR=OFF");

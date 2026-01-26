@@ -46,38 +46,107 @@ namespace matx
       class Sph2CartOp : public BaseOp<Sph2CartOp<T1, T2, T3, WHICH>>
     {
       private:
-        typename detail::base_type_t<T1> theta_;
-        typename detail::base_type_t<T2> phi_;
-        typename detail::base_type_t<T3> r_;
+        mutable typename detail::base_type_t<T1> theta_;
+        mutable typename detail::base_type_t<T2> phi_;
+        mutable typename detail::base_type_t<T3> r_;
 
       public:
         using matxop = bool;
         using value_type = typename T1::value_type;
+
+#ifdef MATX_EN_JIT
+        struct JIT_Storage {
+          typename detail::inner_storage_or_self_t<detail::base_type_t<T1>> theta_;
+          typename detail::inner_storage_or_self_t<detail::base_type_t<T2>> phi_;
+          typename detail::inner_storage_or_self_t<detail::base_type_t<T3>> r_;
+        };
+
+        JIT_Storage ToJITStorage() const {
+          return JIT_Storage{detail::to_jit_storage(theta_), detail::to_jit_storage(phi_), detail::to_jit_storage(r_)};
+        }
+
+        __MATX_INLINE__ std::string get_jit_class_name() const {
+          return std::format("JITSph2Cart_which{}", WHICH);
+        }
+
+        __MATX_INLINE__ auto get_jit_op_str() const {
+          std::string func_name = get_jit_class_name();
+          cuda::std::array<index_t, Rank()> out_dims_;
+          for (int i = 0; i < Rank(); ++i) {
+            out_dims_[i] = Size(i);
+          }
+          
+          return cuda::std::make_tuple(
+            func_name,
+            std::format("template <typename T1, typename T2, typename T3> struct {} {{\n"
+                "  using value_type = typename T1::value_type;\n"
+                "  using matxop = bool;\n"
+                "  constexpr static int WHICH_ = {};\n"
+                "  constexpr static int Rank_ = {};\n"
+                "  constexpr static cuda::std::array<index_t, Rank_> out_dims_ = {{ {} }};\n"
+                "  typename detail::inner_storage_or_self_t<detail::base_type_t<T1>> theta_;\n"
+                "  typename detail::inner_storage_or_self_t<detail::base_type_t<T2>> phi_;\n"
+                "  typename detail::inner_storage_or_self_t<detail::base_type_t<T3>> r_;\n"
+                "  template <typename CapType, typename... Is>\n"
+                "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(Is... indices) const {{\n"
+                "    if constexpr (CapType::ept == ElementsPerThread::ONE) {{\n"
+                "      auto theta = get_value<CapType>(theta_, indices...);\n"
+                "      auto phi = get_value<CapType>(phi_, indices...);\n"
+                "      auto r = get_value<CapType>(r_, indices...);\n"
+                "      if constexpr (WHICH_ == 0) {{\n"
+                "        return r * (scalar_internal_cos(phi) * scalar_internal_cos(theta));\n"
+                "      }} else if constexpr (WHICH_ == 1) {{\n"
+                "        return r * (scalar_internal_cos(phi) * scalar_internal_sin(theta));\n"
+                "      }} else {{\n"
+                "        return r * scalar_internal_sin(phi);\n"
+                "      }}\n"
+                "    }} else {{\n"
+                "      return Vector<value_type, static_cast<index_t>(CapType::ept)>{{}};\n"
+                "    }}\n"
+                "  }}\n"
+                "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return Rank_; }}\n"
+                "  constexpr __MATX_INLINE__ __MATX_DEVICE__ auto Size(int dim) const {{ return out_dims_[dim]; }}\n"
+                "}};\n",
+                func_name, WHICH, Rank(), detail::array_to_string(out_dims_))
+          );
+        }
+#endif
 
         __MATX_INLINE__ std::string str() const { return "sph2cart(" + get_type_str(theta_) +
           "," + get_type_str(phi_) + "," + get_type_str(r_) + ")"; }
 
         __MATX_INLINE__ Sph2CartOp(const T1 &theta, const T2 &phi, const T3 &r) : theta_(theta), phi_(phi), r_(r)
       {
+        MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
         MATX_ASSERT_COMPATIBLE_OP_SIZES(theta);
         MATX_ASSERT_COMPATIBLE_OP_SIZES(phi);
         MATX_ASSERT_COMPATIBLE_OP_SIZES(r);
       }
 
+        template <typename CapType, typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
+        {
+          if constexpr (CapType::ept == ElementsPerThread::ONE) {
+            [[maybe_unused]] auto theta = get_value<CapType>(theta_, indices...);
+            [[maybe_unused]] auto phi = get_value<CapType>(phi_, indices...);
+            auto r = get_value<CapType>(r_, indices...);
+
+            if constexpr (WHICH==0) { // X
+              return r * (scalar_internal_cos(phi) * scalar_internal_cos(theta));
+            } else if constexpr (WHICH==1) { // Y
+              return r * (scalar_internal_cos(phi) * scalar_internal_sin(theta));
+            } else {  // Z
+              return r * scalar_internal_sin(phi);
+            }
+          } else {
+            return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
+          }
+        }
+
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
         {
-          [[maybe_unused]] auto theta = get_value(theta_, indices...);
-          [[maybe_unused]] auto phi = get_value(phi_, indices...);
-          auto r = get_value(r_, indices...);
-
-          if constexpr (WHICH==0) { // X
-            return r * _internal_cos(phi) * _internal_cos(theta);
-          } else if constexpr (WHICH==1) { // Y
-            return r * _internal_cos(phi) * _internal_sin(theta);
-          } else {  // Z
-            return r * _internal_sin(phi);
-          }
+          return this->operator()<DefaultCapabilities>(indices...);
         }
 
         template <typename ShapeType, typename Executor>
@@ -123,6 +192,66 @@ namespace matx
 					index_t size2 = get_expanded_size<Rank()>(phi_, dim);
 					index_t size3 = get_expanded_size<Rank()>(r_, dim);
 					return detail::matx_max(size1, size2, size3);
+        }
+
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
+          if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+#ifdef MATX_EN_JIT
+            const auto theta_jit_name = detail::get_operator_capability<Cap>(theta_, in);
+            const auto phi_jit_name = detail::get_operator_capability<Cap>(phi_, in);
+            const auto r_jit_name = detail::get_operator_capability<Cap>(r_, in);
+            return std::format("{}<{},{},{}>", get_jit_class_name(), theta_jit_name, phi_jit_name, r_jit_name);
+#else
+            return "";
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+#ifdef MATX_EN_JIT
+            return combine_capabilities<Cap>(true, 
+              detail::get_operator_capability<Cap>(theta_, in),
+              detail::get_operator_capability<Cap>(phi_, in),
+              detail::get_operator_capability<Cap>(r_, in));
+#else
+            return false;
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+#ifdef MATX_EN_JIT
+            const auto [key, value] = get_jit_op_str();
+            if (in.find(key) == in.end()) {
+              in[key] = value;
+            }
+            detail::get_operator_capability<Cap>(theta_, in);
+            detail::get_operator_capability<Cap>(phi_, in);
+            detail::get_operator_capability<Cap>(r_, in);
+            return true;
+#else
+            return false;
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
+            return detail::get_operator_capability<Cap>(theta_, in) +
+                   detail::get_operator_capability<Cap>(phi_, in) +
+                   detail::get_operator_capability<Cap>(r_, in);
+          }
+          else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+            return combine_capabilities<Cap>(
+              my_cap,
+              detail::get_operator_capability<Cap>(theta_, in),
+              detail::get_operator_capability<Cap>(phi_, in),
+              detail::get_operator_capability<Cap>(r_, in)
+            );
+          } else {
+            auto self_has_cap = capability_attributes<Cap>::default_value;
+            return combine_capabilities<Cap>(
+              self_has_cap,
+              detail::get_operator_capability<Cap>(theta_, in),
+              detail::get_operator_capability<Cap>(phi_, in),
+              detail::get_operator_capability<Cap>(r_, in)
+            );
+          }
         }
     };
   }

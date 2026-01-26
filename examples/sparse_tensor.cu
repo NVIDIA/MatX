@@ -7,8 +7,8 @@
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are met:
 //
-// 1. Redistributions of source code must retain the above copyright notice, this
-//    list of conditions and the following disclaimer.
+// 1. Redistributions of source code must retain the above copyright notice,
+//    this list of conditions and the following disclaimer.
 //
 // 2. Redistributions in binary form must reproduce the above copyright notice,
 //    this list of conditions and the following disclaimer in the documentation
@@ -20,14 +20,15 @@
 //
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 // AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-// DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-// FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-// SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-// CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-// OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+// POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
 #include "matx.h"
@@ -36,8 +37,7 @@
 
 using namespace matx;
 
-int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
-{
+int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv) {
   MATX_ENTER_HANDLER();
 
   cudaStream_t stream = 0;
@@ -49,18 +49,22 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   // support in e.g. cuSPARSE, but MatX provides a much more general
   // way to define the sparse tensor storage through a DSL (see doc).
   //
-  experimental::Scalar::print();   // scalars
-  experimental::SpVec::print();    // sparse vectors
-  experimental::COO::print();      // various sparse matrix formats
+  experimental::Scalar::print(); // scalars
+  experimental::SpVec::print();  // sparse vectors
+  experimental::COO::print();    // various sparse matrix formats
   experimental::CSR::print();
   experimental::CSC::print();
   experimental::DCSR::print();
-  experimental::BSR<2,2>::print(); // 2x2 blocks
-  experimental::COO4::print();     // 4-dim tensor in COO
-  experimental::CSF5::print();     // 5-dim tensor in CSF
+  experimental::DIAI::print();
+  experimental::DIAJ::print();
+  experimental::SkewDIAI::print();
+  experimental::SkewDIAJ::print();
+  experimental::BSR<2, 2>::print(); // 2x2 blocks
+  experimental::COO4::print();      // 4-dim tensor in COO
+  experimental::CSF5::print();      // 5-dim tensor in CSF
 
   //
-  // Creates a COO matrix for the following 4x8 dense matrix with 5 nonzero
+  // Creates a 4x8 COO matrix for the following 4x8 dense matrix with 5 nonzero
   // elements, using the factory method that uses MatX tensors for the 1-dim
   // buffers. The sparse matrix resides in the same memory space as its buffer
   // constituents.
@@ -71,15 +75,15 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   //   | 0, 0, 3, 4, 0, 5, 0, 0 |
   //
   // tensor_impl_2_f32: SparseTensor{float} Rank: 2, Sizes:[4, 8], Levels:[4, 8]
-  // nse    = 5
   // format = ( d0, d1 ) -> ( d0 : compressed(non-unique), d1 : singleton )
+  // space  = CUDA managed memory
+  // nse    = 5
   // crd[0] = ( 0  0  3  3  3 )
   // crd[1] = ( 0  1  2  3  5 )
   // values = ( 1.0000e+00  2.0000e+00  3.0000e+00  4.0000e+00  5.0000e+00 )
-  // space  = CUDA managed memory
   //
   auto vals = make_tensor<float>({5});
-  auto idxi = make_tensor<int>({5}); 
+  auto idxi = make_tensor<int>({5});
   auto idxj = make_tensor<int>({5});
   vals.SetVals({1, 2, 3, 4, 5});
   idxi.SetVals({0, 0, 3, 3, 3});
@@ -120,14 +124,19 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   //
   auto B = make_tensor<float, 2>({8, 4});
   auto C = make_tensor<float>({4, 4});
-  B.SetVals({
-    { 0,  1,  2,  3}, { 4,  5,  6,  7}, { 8,  9, 10, 11}, {12, 13, 14, 15},
-    {16, 17, 18, 19}, {20, 21, 22, 23}, {24, 25, 26, 27}, {28, 29, 30, 31} });
+  B.SetVals({{0, 1, 2, 3},
+             {4, 5, 6, 7},
+             {8, 9, 10, 11},
+             {12, 13, 14, 15},
+             {16, 17, 18, 19},
+             {20, 21, 22, 23},
+             {24, 25, 26, 27},
+             {28, 29, 30, 31}});
   (C = matmul(Acoo, B)).run(exec);
   print(C);
 
   //
-  // Creates a CSR matrix which is used to solve the following
+  // Creates a 4x4 CSR matrix which is used to solve the following
   // system of equations AX=Y, where X is the unknown.
   //
   // | 1 2 0 0 |   | 1 5 |   |  5 17 |
@@ -143,9 +152,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   colidx.SetVals({0, 1, 1, 2, 3});
   auto Acsr = experimental::make_tensor_csr(coeffs, rowptr, colidx, {4, 4});
   print(Acsr);
-  auto X = make_tensor<float>({4, 2});
-  auto Y = make_tensor<float>({4, 2});
-  Y.SetVals({ {5, 17}, {6, 18}, {12, 28}, {20, 40} });
+  auto X = make_tensor<float>({2, 4}); // solution along rows
+  auto Y = make_tensor<float>({2, 4}); // RHS along rows
+  Y.SetVals({{5, 6, 12, 20}, {17, 18, 28, 40}});
   (X = solve(Acsr, Y)).run(exec);
   print(X);
 
@@ -158,13 +167,91 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   // "dense2sparse" operation at the right-hand-side.
   //
   auto D = make_tensor<float, 2>({4, 8});
-  D.SetVals({
-    {0, 11,  0, 12,  0,  0,  0,  0},
-    {0,  0, 13,  0,  0,  0,  0,  0},
-    {0,  0,  0,  0,  0,  0,  0, 14},
-    {0, 15,  0,  0, 16,  0, 17,  0}});
+  D.SetVals({{0, 11, 0, 12, 0, 0, 0, 0},
+             {0, 0, 13, 0, 0, 0, 0, 0},
+             {0, 0, 0, 0, 0, 0, 0, 14},
+             {0, 15, 0, 0, 16, 0, 17, 0}});
   (Acoo = dense2sparse(D)).run(exec);
   print(Acoo);
+
+  //
+  // Conversions between sparse formats: COO to CSR.
+  // For speed-of-operation, the CSC output actually
+  // shares some of the buffers with COO on completion.
+  //
+  auto Acsr2 = experimental::make_zero_tensor_csr<float, int, int>({4, 8});
+  (Acsr2 = sparse2sparse(Acoo)).run(exec);
+  print(Acsr2);
+
+  //
+  // Creates a 6x6 DIA matrix with 3 nonzero diagonals.
+  //
+  // |  4  1  0  0  0  0 |
+  // | -1  4  1  0  0  0 |
+  // |  0 -1  4  1  0  0 |
+  // |  0  0 -1  4  1  0 |
+  // |  0  0  0 -1  4  1 |
+  // |  0  0  0  0 -1  4 |
+  //
+  auto dvals = make_tensor<float>({3 * 6});
+  auto doffsets = make_tensor<int>({3});
+  dvals.SetVals({-1, -1, -1, -1, -1, 0, 4, 4, 4, 4, 4, 4, 0, 1, 1, 1, 1, 1});
+  doffsets.SetVals({-1, 0, 1});
+  auto AdiaJ = experimental::make_tensor_dia<experimental::DIA_INDEX_J>(
+      dvals, doffsets, {6, 6});
+  print(AdiaJ);
+  printf("DiaJ(3,3)=%f\n", AdiaJ(3, 3));
+
+  //
+  // Perform a direct SpMV. This is also the correct way of performing
+  // an efficient sparse operation.
+  //
+  auto V = make_tensor<float>({6});
+  auto R = make_tensor<float>({6});
+  V.SetVals({1, 2, 3, 4, 5, 6});
+  (R = matvec(AdiaJ, V)).run(exec);
+  print(R);
+
+  //
+  // Perform a direct solve. This is only supported for a tri-diagonal
+  // matrix in DIA-I format where the rhs is overwritten with the answer.
+  //
+  // |  4  1  0  0  0  0 |    | 1   7 |   |  6  36 |
+  // | -1  4  1  0  0  0 |    | 2   8 |   | 10  34 |
+  // |  0 -1  4  1  0  0 | x  | 3   9 | = | 14  38 |
+  // |  0  0 -1  4  1  0 |    | 4  10 |   | 18  42 |
+  // |  0  0  0 -1  4  1 |    | 5  11 |   | 22  46 |
+  // |  0  0  0  0 -1  4 |    | 6  12 |   | 19  37 |
+  //
+  dvals.SetVals({0, -1, -1, -1, -1, -1, 4, 4, 4, 4, 4, 4, 1, 1, 1, 1, 1, 0});
+  auto AdiaI = experimental::make_tensor_dia<experimental::DIA_INDEX_I>(
+      dvals, doffsets, {6, 6});
+  auto Rhs = make_tensor<float, 2>({2, 6});
+  Rhs.SetVals({{6, 10, 14, 18, 22, 19}, {36, 34, 38, 42, 46, 37}});
+  (Rhs = solve(AdiaI, Rhs)).run(exec);
+  print(Rhs);
+
+  //
+  // Perform a batched direct solve. This is only supported for a uniform
+  // batched tri-diagonal matrix in DIA-I format where the rhs-s are
+  // overwritten with the answers.
+  //
+  // batch0          batch1
+  // | 10 -1  0  0 | | 20 -2  0  0 | x  | 1  1  1  1 |  1  1  1  1 |
+  // | -1 10 -1  0 | | -2 20 -2  0 |
+  // |  0 -1 10 -1 | |  0 -2 20 -2 | =  | 9  8  8  9 | 18 16 16 18 |
+  // |  0  0 -1 10 | |  0  0 -2 20 |
+  //
+  auto bdvals = make_tensor<float>({2 * 3 * 4});
+  bdvals.SetVals({0,  -1, -1, -1, 0,  -2, -2, -2, 10, 10, 10, 10,
+                  20, 20, 20, 20, -1, -1, -1, 0,  -2, -2, -2, 0});
+  auto AbatcheddiaI =
+      experimental::make_tensor_uniform_batched_dia<experimental::DIA_INDEX_I>(
+          bdvals, doffsets, {2, 4, 4});
+  auto L = make_tensor<float>({2 * 4});
+  L.SetVals({9, 8, 8, 9, 18, 16, 16, 18});
+  (L = solve(AbatcheddiaI, L)).run(exec);
+  print(L);
 
   MATX_EXIT_HANDLER();
 }

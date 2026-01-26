@@ -5,6 +5,8 @@ lu
 
 Perform an LU factorization.
 
+.. versionadded:: 0.6.0
+
 .. doxygenfunction:: lu
 
 Examples

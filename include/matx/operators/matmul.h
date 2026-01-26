@@ -40,6 +40,7 @@
 #ifdef MATX_EN_CPU_MATMUL
   #include "matx/transforms/matmul/matmul_cblas.h"
 #endif
+#include <cuda/std/__algorithm/max.h>
 
 namespace matx
 {
@@ -57,7 +58,8 @@ namespace matx
         cuda::std::array<index_t, out_rank> out_dims_;
         // This should be tensor_impl_t, but need to work around issues with temp types returned in matmul
         mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, out_rank> tmp_out_;
-        mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr; 
+        mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr;
+        mutable bool prerun_done_ = false; 
 
       public:
         using matxop = bool;
@@ -71,6 +73,7 @@ namespace matx
 
         __MATX_INLINE__ MatMulOp(const OpA &a, const OpB &b, float alpha, float beta, PermDims perm) : 
               a_(a), b_(b), alpha_(alpha), beta_(beta), perm_(perm) {
+          MATX_LOG_TRACE("{} constructor: alpha={}, beta={}", str(), alpha, beta);
           if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
             for (int r = 0; r < Rank(); r++) {
               if (r == Rank() - 2) {
@@ -94,15 +97,32 @@ namespace matx
           }
         }
 
-        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
+        template <typename CapType, typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
+        {
+          return tmp_out_.template operator()<CapType>(indices...);
+        }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          return tmp_out_(indices...);
+          return this->operator()<DefaultCapabilities>(indices...);
+        }
+
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
+          if constexpr (Cap == OperatorCapability::ALIASED_MEMORY) {
+            auto in_copy = in;
+            in_copy.permutes_input_output = true;
+            return combine_capabilities<Cap>(detail::get_operator_capability<Cap>(a_, in_copy), detail::get_operator_capability<Cap>(b_, in_copy));
+          } else {
+            auto self_has_cap = capability_attributes<Cap>::default_value;
+            return combine_capabilities<Cap>(self_has_cap, 
+                                             detail::get_operator_capability<Cap>(a_, in),
+                                             detail::get_operator_capability<Cap>(b_, in));
+          }
         }
    
-
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {
           return out_rank;
@@ -111,6 +131,8 @@ namespace matx
         {
           return out_dims_[dim];
         }
+
+        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
@@ -147,10 +169,15 @@ namespace matx
         template <typename ShapeType, typename Executor>
         __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
         {
+          if (prerun_done_) {
+            return;
+          }
+
           InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));  
 
           detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
 
+          prerun_done_ = true;
           Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
         }
 

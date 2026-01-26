@@ -5,6 +5,8 @@ any
 
 Returns a truth value if any value in the reduction converts to a boolean "true"
 
+.. versionadded:: 0.6.0
+
 .. doxygenfunction:: any(const InType &in, const int (&dims)[D])
 .. doxygenfunction:: any(const InType &in)
 

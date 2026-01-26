@@ -5,6 +5,8 @@ resample_poly
 
 Polyphase resampler with a configurable up and downsample rate
 
+.. versionadded:: 0.6.0
+
 .. doxygenfunction:: matx::resample_poly(const InType &in, const FilterType &f, index_t up, index_t down)
 
 Examples

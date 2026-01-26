@@ -34,7 +34,6 @@
 
 
 #include "matx/core/type_utils.h"
-#include "matx/operators/base_operator.h"
 #include "matx/operators/permute.h"
 #include "matx/transforms/reduce.h"
 
@@ -57,11 +56,17 @@ namespace detail {
 
       __MATX_INLINE__ std::string str() const { return "argmin(" + get_type_str(a_) + ")"; }
       __MATX_INLINE__ ArgMinOp(const OpA &a) : a_(a) {
-     
+        MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
       };
 
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const = delete;
+
+      template <OperatorCapability Cap, typename InType>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
+        auto self_has_cap = capability_attributes<Cap>::default_value;
+        return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
+      }
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {

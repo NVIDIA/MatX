@@ -50,35 +50,99 @@ namespace matx
       class KronOp : public BaseOp<KronOp<T1, T2, DIM>>
     {
       private:
-        typename detail::base_type_t<T1> op1_;
-        typename detail::base_type_t<T2> op2_;
+        mutable typename detail::base_type_t<T1> op1_;
+        mutable typename detail::base_type_t<T2> op2_;
 
       public:
         using matxop = bool;
         using value_type = typename T1::value_type;
 
+#ifdef MATX_EN_JIT
+        struct JIT_Storage {
+          typename detail::inner_storage_or_self_t<detail::base_type_t<T1>> op1_;
+          typename detail::inner_storage_or_self_t<detail::base_type_t<T2>> op2_;
+        };
+
+        JIT_Storage ToJITStorage() const {
+          return JIT_Storage{detail::to_jit_storage(op1_), detail::to_jit_storage(op2_)};
+        }
+
+        __MATX_INLINE__ std::string get_jit_class_name() const {
+          return "JITKron";
+        }
+
+        __MATX_INLINE__ auto get_jit_op_str() const {
+          std::string func_name = get_jit_class_name();
+          cuda::std::array<index_t, Rank()> out_dims_;
+          for (int i = 0; i < Rank(); ++i) {
+            out_dims_[i] = Size(i);
+          }
+          
+          return cuda::std::make_tuple(
+            func_name,
+            std::format("template <typename T1, typename T2> struct {} {{\n"
+                "  using value_type = typename T1::value_type;\n"
+                "  using matxop = bool;\n"
+                "  constexpr static int Rank_ = {};\n"
+                "  constexpr static cuda::std::array<index_t, Rank_> out_dims_ = {{ {} }};\n"
+                "  typename detail::inner_storage_or_self_t<detail::base_type_t<T1>> op1_;\n"
+                "  typename detail::inner_storage_or_self_t<detail::base_type_t<T2>> op2_;\n"
+                "  template <typename CapType, typename... Is>\n"
+                "  __MATX_INLINE__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) const\n"
+                "  {{\n"
+                "    if constexpr (CapType::ept == ElementsPerThread::ONE) {{\n"
+                "      cuda::std::array idx1{{indices...}};\n"
+                "      cuda::std::array idx2{{indices...}};\n"
+                "      idx2[Rank_ - 2] = pp_get<Rank_ - 2>(indices...) % op2_.Size(Rank_ - 2);\n"
+                "      idx2[Rank_ - 1] = pp_get<Rank_ - 1>(indices...) % op2_.Size(Rank_ - 1);\n"
+                "      idx1[Rank_ - 2] = pp_get<Rank_ - 2>(indices...) / op2_.Size(Rank_ - 2);\n"
+                "      idx1[Rank_ - 1] = pp_get<Rank_ - 1>(indices...) / op2_.Size(Rank_ - 1);\n"
+                "      return get_value<CapType>(op2_, idx2) * get_value<CapType>(op1_, idx1);\n"
+                "    }} else {{\n"
+                "      return Vector<value_type, static_cast<index_t>(CapType::ept)>{{}};\n"
+                "    }}\n"
+                "  }}\n"
+                "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return Rank_; }}\n"
+                "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const {{ return out_dims_[dim]; }}\n"
+                "}};\n",
+                func_name, Rank(), detail::array_to_string(out_dims_))
+          );
+        }
+#endif
+
         __MATX_INLINE__ std::string str() const { return "kron(" + op1_.str() + "," + op2_.str() + ")"; }
 
         __MATX_INLINE__ KronOp(const T1 &op1, const T2 &op2) : op1_(op1), op2_(op2)
         {
+          MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
           static_assert(RankGTE(Rank(), 2), "Kronecker product must be used on tensors with rank 2 or higher");
         }        
+
+        template <typename CapType, typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
+        {
+          if constexpr (CapType::ept == ElementsPerThread::ONE) {
+            cuda::std::array idx1{indices...};
+            cuda::std::array idx2{indices...};
+
+            idx2[Rank() - 2] = pp_get<Rank() - 2>(indices...) % op2_.Size(Rank() - 2);
+            idx2[Rank() - 1] = pp_get<Rank() - 1>(indices...) % op2_.Size(Rank() - 1);
+
+            idx1[Rank() - 2] = pp_get<Rank() - 2>(indices...) / op2_.Size(Rank() - 2);
+            idx1[Rank() - 1] = pp_get<Rank() - 1>(indices...) / op2_.Size(Rank() - 1);
+
+            return get_value<CapType>(op2_, idx2) * get_value<CapType>(op1_, idx1);
+          }
+          else {
+            return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
+          }
+        }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          cuda::std::array idx1{indices...};
-          cuda::std::array idx2{indices...};
-
-          idx2[Rank() - 2] = pp_get<Rank() - 2>(indices...) % op2_.Size(Rank() - 2);
-          idx2[Rank() - 1] = pp_get<Rank() - 1>(indices...) % op2_.Size(Rank() - 1);
-
-          idx1[Rank() - 2] = pp_get<Rank() - 2>(indices...) / op2_.Size(Rank() - 2);
-          idx1[Rank() - 1] = pp_get<Rank() - 1>(indices...) / op2_.Size(Rank() - 1);
-
-          return get_value(op2_, idx2) * get_value(op1_, idx1);
+          return this->operator()<DefaultCapabilities>(indices...);
         }
-
 
         template <typename ShapeType, typename Executor>
         __MATX_INLINE__ void PreRun(ShapeType &&shape, Executor &&ex) const noexcept
@@ -111,6 +175,61 @@ namespace matx
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
         {
           return op1_.Size(dim) * op2_.Size(dim);
+        }
+
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
+          if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+#ifdef MATX_EN_JIT
+            const auto op1_jit_name = detail::get_operator_capability<Cap>(op1_, in);
+            const auto op2_jit_name = detail::get_operator_capability<Cap>(op2_, in);
+            return std::format("{}<{},{}>", get_jit_class_name(), op1_jit_name, op2_jit_name);
+#else
+            return "";
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+#ifdef MATX_EN_JIT
+            return combine_capabilities<Cap>(true, 
+              detail::get_operator_capability<Cap>(op1_, in),
+              detail::get_operator_capability<Cap>(op2_, in));
+#else
+            return false;
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+#ifdef MATX_EN_JIT
+            const auto [key, value] = get_jit_op_str();
+            if (in.find(key) == in.end()) {
+              in[key] = value;
+            }
+            detail::get_operator_capability<Cap>(op1_, in);
+            detail::get_operator_capability<Cap>(op2_, in);
+            return true;
+#else
+            return false;
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
+            return detail::get_operator_capability<Cap>(op1_, in) +
+                   detail::get_operator_capability<Cap>(op2_, in);
+          }
+          else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+            return combine_capabilities<Cap>(
+              my_cap,
+              detail::get_operator_capability<Cap>(op1_, in),
+              detail::get_operator_capability<Cap>(op2_, in)
+            );
+          }
+          else {
+            auto self_has_cap = capability_attributes<Cap>::default_value;
+            return combine_capabilities<Cap>(
+              self_has_cap,
+              detail::get_operator_capability<Cap>(op1_, in),
+              detail::get_operator_capability<Cap>(op2_, in)
+            );
+          }
         }
     };
   }

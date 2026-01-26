@@ -261,3 +261,87 @@ TYPED_TEST(CUBTestsNumericNonComplexAllExecs, Sort)
 
   MATX_EXIT_HANDLER();
 }
+
+
+TYPED_TEST(CUBTestsNumericNonComplexAllExecs, Argsort)
+{
+  MATX_ENTER_HANDLER();
+
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+ 
+
+  for (index_t i = 0; i < this->t1.Lsize(); i++) {
+    this->t1(i) = static_cast<TestType>((2 * (i % 2) - 1) * i);
+  }
+
+  auto tmpv = make_tensor<index_t>({this->t1.Lsize()});
+
+  // example-begin argsort-test-1
+  // Ascending argsort of 1D input
+  (tmpv = matx::argsort(this->t1, SORT_DIR_ASC)).run(this->exec);
+  // example-end argsort-test-1
+  this->exec.sync();
+
+  for (index_t i = 1; i < tmpv.Lsize(); i++) {
+    ASSERT_GT(this->t1(tmpv(i)), this->t1(tmpv(i - 1)));
+  }
+
+  // example-begin argsort-test-2
+  // Descending argsort of 1D input
+  (tmpv = matx::argsort(this->t1, SORT_DIR_DESC)).run(this->exec);
+  // example-end argsort-test-2
+  this->exec.sync();
+
+  for (index_t i = 1; i < tmpv.Lsize(); i++) {
+    ASSERT_LT(this->t1(tmpv(i)), this->t1(tmpv(i - 1)));
+  }
+
+  // operator input test
+  const auto L = tmpv.Lsize();
+  (tmpv = matx::argsort(matx::concat(0,
+    static_cast<TestType>(2.0) * matx::ones<TestType>({1}), matx::ones<TestType>({L-1})), SORT_DIR_ASC)).run(this->exec);
+  this->exec.sync();
+  ASSERT_EQ(tmpv(L-1), 0);
+  for (index_t i = 0; i < L-1; i++) {
+    ASSERT_EQ(tmpv(i), i+1);
+  }
+
+  // 2D tests
+  auto tmpv2 = make_tensor<index_t>(this->t2.Shape());
+
+  for (index_t i = 0; i < this->t2.Size(0); i++) {
+    for (index_t j = 0; j < this->t2.Size(1); j++) {
+      this->t2(i, j) = static_cast<TestType>((2 * (j % 2) - 1) * j + i);
+    }
+  }
+
+  (tmpv2 = matx::argsort(this->t2, SORT_DIR_ASC)).run(this->exec);
+  this->exec.sync();
+
+  for (index_t i = 0; i < tmpv2.Size(0); i++) {
+    for (index_t j = 1; j < tmpv2.Size(1); j++) {
+      ASSERT_GT(this->t2(i, tmpv2(i, j)), this->t2(i, tmpv2(i, j - 1)));
+    }
+  }
+
+  // Sort the first column of t2
+  auto tmpslice = make_tensor<index_t>({this->t2.Size(0)});
+  (tmpslice = matx::argsort(matx::slice<1>(this->t2, {0, 0}, {matx::matxEnd, matx::matxDropDim}), SORT_DIR_ASC)).run(this->exec);
+  this->exec.sync();
+
+  for (index_t i = 1; i < this->t2.Size(0); i++) {
+    ASSERT_GT(this->t2(tmpslice(i), 0), this->t2(tmpslice(i-1), 0));
+  }
+
+  // Descending
+  (tmpv2 = matx::argsort(this->t2, SORT_DIR_DESC)).run(this->exec);
+  this->exec.sync();
+
+  for (index_t i = 0; i < tmpv2.Size(0); i++) {
+    for (index_t j = 1; j < tmpv2.Size(1); j++) {
+      ASSERT_LT(this->t2(i, tmpv2(i, j)), this->t2(i, tmpv2(i, j - 1)));
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}

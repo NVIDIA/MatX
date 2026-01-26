@@ -48,7 +48,51 @@ namespace matx
     template<class Op1, class Op2>
       class CommaOp : public BaseOp<CommaOp<Op1, Op2>>{
         public:
+
+#ifdef MATX_EN_JIT
+          struct JIT_Storage {
+            typename detail::inner_storage_or_self_t<detail::base_type_t<Op1>> op1_;
+            typename detail::inner_storage_or_self_t<detail::base_type_t<Op2>> op2_;
+          };
+
+          JIT_Storage ToJITStorage() const {
+            return JIT_Storage{detail::to_jit_storage(op1_), detail::to_jit_storage(op2_)};
+          }
+
+          __MATX_INLINE__ std::string get_jit_class_name() const {
+            return "JITComma";
+          }
+
+          __MATX_INLINE__ auto get_jit_op_str() const {
+            std::string func_name = get_jit_class_name();
+            cuda::std::array<index_t, Rank()> out_dims_;
+            for (int i = 0; i < Rank(); ++i) {
+              out_dims_[i] = Size(i);
+            }
+            
+            return cuda::std::make_tuple(
+              func_name,
+              std::format("template <typename Op1, typename Op2> struct {} {{\n"
+                  "  constexpr static int Rank_ = {};\n"
+                  "  constexpr static cuda::std::array<index_t, Rank_> out_dims_ = {{ {} }};\n"
+                  "  typename detail::inner_storage_or_self_t<detail::base_type_t<Op1>> op1_;\n"
+                  "  typename detail::inner_storage_or_self_t<detail::base_type_t<Op2>> op2_;\n"
+                  "  template <typename CapType, typename... Is>\n"
+                  "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(Is... indices) const\n"
+                  "  {{\n"
+                  "    get_value<CapType>(op1_, indices...);\n"
+                  "    return get_value<CapType>(op2_, indices...);\n"
+                  "  }}\n"
+                  "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return Rank_; }}\n"
+                  "  constexpr __MATX_INLINE__ __MATX_DEVICE__ auto Size(int dim) const {{ return out_dims_[dim]; }}\n"
+                  "}};\n",
+                  func_name, Rank(), detail::array_to_string(out_dims_))
+            );
+          }
+#endif
+
           __MATX_HOST__ __MATX_INLINE__  CommaOp(const Op1 &op1, const Op2 &op2) : op1_(op1), op2_(op2) {
+            MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
             MATX_STATIC_ASSERT_STR(Op1::Rank() == Op2::Rank(), matxInvalidSize, 
                 "Chained expressions using the comma operator must match in rank");
             if constexpr ( Rank() > 0) {
@@ -60,11 +104,16 @@ namespace matx
 
 	        __MATX_INLINE__ std::string str() const { return op1_.str() + ", " + op2_.str(); }
 
+          template <typename CapType, typename... Is>
+          __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator()(Is... indices) const {
+            get_value<CapType>(op1_, indices...);
+            return get_value<CapType>(op2_, indices...);
+          }
+
           template <typename... Is>
-          auto __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ operator()(Is... indices) const {
-            get_value(op1_, indices...);
-            return get_value(op2_, indices...);
-          }                       
+          __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator()(Is... indices) const {
+            return this->operator()<DefaultCapabilities>(indices...);
+          }
 
           static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() noexcept
           {
@@ -99,10 +148,57 @@ namespace matx
               op2_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
             }
           }       
-                 
+
+          template <OperatorCapability Cap, typename InType>
+          __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
+            if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+#ifdef MATX_EN_JIT
+              const auto op1_jit_name = detail::get_operator_capability<Cap>(op1_, in);
+              const auto op2_jit_name = detail::get_operator_capability<Cap>(op2_, in);
+              return std::format("{}<{},{}>", get_jit_class_name(), op1_jit_name, op2_jit_name);
+#else
+              return "";
+#endif
+            }
+            else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+#ifdef MATX_EN_JIT
+            return combine_capabilities<Cap>(true, 
+              detail::get_operator_capability<Cap>(op1_, in),
+              detail::get_operator_capability<Cap>(op2_, in));
+#else
+            return false;
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+#ifdef MATX_EN_JIT
+              const auto [key, value] = get_jit_op_str();
+              if (in.find(key) == in.end()) {
+                in[key] = value;
+              }
+              detail::get_operator_capability<Cap>(op1_, in);
+              detail::get_operator_capability<Cap>(op2_, in);
+              return true;
+#else
+              return false;
+#endif
+            }
+            else if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
+              return detail::get_operator_capability<Cap>(op1_, in) +
+                     detail::get_operator_capability<Cap>(op2_, in);
+            }
+            else {
+              auto self_has_cap = capability_attributes<Cap>::default_value;
+              return combine_capabilities<Cap>(
+                self_has_cap,
+                detail::get_operator_capability<Cap>(op1_, in),
+                detail::get_operator_capability<Cap>(op2_, in)
+              );
+            }
+          }
+
         private:
-          typename detail::base_type_t<Op1> op1_;
-          typename detail::base_type_t<Op2> op2_;
+          mutable typename detail::base_type_t<Op1> op1_;
+          mutable typename detail::base_type_t<Op2> op2_;
       };  
   }
 
@@ -115,7 +211,8 @@ namespace matx
    * @param r Right operator value
    * @return Result of comma operator
    */
-  template <typename T, typename S, std::enable_if_t<is_matx_op<T>() && is_matx_op<S>(), bool> = true>
+  template <typename T, typename S>
+    requires (is_matx_op_c<T> && is_matx_op_c<S>)
     __MATX_INLINE__ __MATX_HOST__ auto operator,(const T &l, const S &r)
     {
       return detail::CommaOp(l, r);

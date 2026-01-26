@@ -5,6 +5,8 @@ range
 
 Return a range of numbers using a start and step value. The total length is based on the shape
 
+
+.. versionadded:: 0.1.0
 .. doxygenfunction:: matx::range(ShapeType &&s, T first, T step)
 .. doxygenfunction:: matx::range(const index_t (&s)[RANK], T first, T step)
 

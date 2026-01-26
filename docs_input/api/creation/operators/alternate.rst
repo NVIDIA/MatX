@@ -5,6 +5,8 @@ alternate
 
 Generate an alternating sequence of +1, -1, +1, ...
 
+
+.. versionadded:: 0.3.0
 .. doxygenfunction:: matx::alternate(const index_t len)
 
 Examples

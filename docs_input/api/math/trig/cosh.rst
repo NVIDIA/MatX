@@ -5,6 +5,8 @@ cosh
 
 Hyperbolic cosine
 
+
+.. versionadded:: 0.3.0
 .. doxygenfunction:: cosh(Op t)
   
 Examples

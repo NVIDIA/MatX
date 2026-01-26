@@ -5,6 +5,8 @@ hanning
 
 Generate a Hanning window
 
+
+.. versionadded:: 0.1.0
 .. doxygenfunction:: matx::hanning(ShapeType &&s)
 .. doxygenfunction:: matx::hanning(const index_t (&s)[RANK])
 

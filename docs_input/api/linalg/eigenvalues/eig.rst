@@ -5,6 +5,8 @@ eig
 
 Perform an eigenvalue decomposition for Hermitian or real symmetric matrices.
 
+.. versionadded:: 0.6.0
+
 .. doxygenfunction:: eig
 
 Enums

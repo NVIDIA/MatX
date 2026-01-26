@@ -5,6 +5,8 @@ cumsum
 
 Compute the cumulative sum of the reduction dimensions
 
+.. versionadded:: 0.6.0
+
 .. doxygenfunction:: cumsum(const InputOperator &a)
 
 Examples

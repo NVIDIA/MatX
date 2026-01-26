@@ -48,7 +48,8 @@ namespace matx
         PermDims perm_;
         cuda::std::array<index_t, OpA::Rank()> out_dims_;
         mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, OpA::Rank()> tmp_out_;
-        mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr; 
+        mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr;
+        mutable bool prerun_done_ = false; 
 
       public:
         using matxop = bool;
@@ -62,18 +63,29 @@ namespace matx
 
         __MATX_INLINE__ SoftmaxOp(const OpA &A, PermDims perm) : 
               a_(A), perm_(perm) {
+          MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
           for (int r = 0; r < OpA::Rank(); r++) {
             out_dims_[r] = a_.Size(r);
           }          
         }
 
-        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
+        template <typename CapType, typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
+        {
+          return tmp_out_.template operator()<CapType>(indices...);
+        }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          return tmp_out_(indices...);
+          return this->operator()<DefaultCapabilities>(indices...);
         }
+
+              template <OperatorCapability Cap, typename InType>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
+        auto self_has_cap = capability_attributes<Cap>::default_value;
+        return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
+      }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {
@@ -84,6 +96,7 @@ namespace matx
           return out_dims_[dim];
         }
 
+        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
           static_assert(is_cuda_executor_v<Executor>, "softmax() only supports the CUDA executor currently");
@@ -107,10 +120,15 @@ namespace matx
         template <typename ShapeType, typename Executor>
         __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
         {
+          if (prerun_done_) {
+            return;
+          }
+
           InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));          
 
           detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
 
+          prerun_done_ = true;
           Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
         }
 

@@ -47,8 +47,9 @@ namespace detail {
   {
     private:
       typename detail::base_type_t<OpA> a_;
-      mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, 0> tmp_out_;
+      mutable ::matx::detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, 0> tmp_out_;
       mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr;
+      mutable bool prerun_done_ = false;
 
     public:
       using matxop = bool;
@@ -57,23 +58,41 @@ namespace detail {
       using trace_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "trace()"; }
-      __MATX_INLINE__ TraceOp(const OpA &a) : a_(a) {}
+      __MATX_INLINE__ TraceOp(const OpA &a) : a_(a) {
+        MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
+      }
 
       __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
-      template <typename... Is>
+      template <typename CapType, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
-        return tmp_out_(indices...);
+        return tmp_out_.template operator()<CapType>(indices...);
       }
 
-      template <typename Out, typename Executor>
-      void Exec(Out &&out, Executor &&ex) const {
-        trace_impl(cuda::std::get<0>(out), a_, ex);
+      template <typename... Is>
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
+        return this->operator()<DefaultCapabilities>(indices...);
+      }
+
+      template <OperatorCapability Cap, typename InType>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
+        auto self_has_cap = capability_attributes<Cap>::default_value;
+        return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
       {
         return 0;
+      }
+
+      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size([[maybe_unused]] int dim) const
+      {
+        return 1;
+      }
+
+      template <typename Out, typename Executor>
+      void Exec(Out &&out, Executor &&ex) const {
+        trace_impl(cuda::std::get<0>(out), a_, ex);
       }
 
       template <typename ShapeType, typename Executor>
@@ -87,10 +106,15 @@ namespace detail {
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
       {
+        if (prerun_done_) {
+          return;
+        }
+
         InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));      
 
         detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), {}, &ptr);
 
+        prerun_done_ = true;
         Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
       }
 
@@ -103,12 +127,6 @@ namespace detail {
 
         matxFree(ptr);
       }
-
-      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size([[maybe_unused]] int dim) const
-      {
-        return 1;
-      }
-
   };
 }
 

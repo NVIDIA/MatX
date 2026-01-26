@@ -44,15 +44,65 @@ namespace matx
    */
   namespace detail {
     template <typename T1, typename T2>
-      class TopelitzOp : public BaseOp<TopelitzOp<T1, T2>>
+      class ToeplitzOp : public BaseOp<ToeplitzOp<T1, T2>>
     {
       private:
-        typename detail::base_type_t<T1> op1_;
-        typename detail::base_type_t<T2> op2_;
+        mutable typename detail::base_type_t<T1> op1_;
+        mutable typename detail::base_type_t<T2> op2_;
 
       public:
         using matxop = bool;
         using value_type = typename T1::value_type;
+
+#ifdef MATX_EN_JIT
+        struct JIT_Storage {
+          typename detail::inner_storage_or_self_t<detail::base_type_t<T1>> op1_;
+          typename detail::inner_storage_or_self_t<detail::base_type_t<T2>> op2_;
+        };
+
+        JIT_Storage ToJITStorage() const {
+          return JIT_Storage{detail::to_jit_storage(op1_), detail::to_jit_storage(op2_)};
+        }
+
+        __MATX_INLINE__ std::string get_jit_class_name() const {
+          return "JITToeplitz";
+        }
+
+        __MATX_INLINE__ auto get_jit_op_str() const {
+          std::string func_name = get_jit_class_name();
+          index_t size1 = 0, size2 = 0;
+          if constexpr (is_matx_op<T1>()) size1 = op1_.Size(0);
+          if constexpr (is_matx_op<T2>()) size2 = op2_.Size(0);
+          
+          return cuda::std::make_tuple(
+            func_name,
+            std::format("template <typename T1, typename T2> struct {} {{\n"
+                "  using value_type = typename T1::value_type;\n"
+                "  using matxop = bool;\n"
+                "  constexpr static index_t size1_ = {};\n"
+                "  constexpr static index_t size2_ = {};\n"
+                "  typename detail::inner_storage_or_self_t<detail::base_type_t<T1>> op1_;\n"
+                "  typename detail::inner_storage_or_self_t<detail::base_type_t<T2>> op2_;\n"
+                "  template <typename CapType>\n"
+                "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(index_t i, index_t j) const {{\n"
+                "    if constexpr (CapType::ept == ElementsPerThread::ONE) {{\n"
+                "      if (j > i) {{\n"
+                "        return get_value<CapType>(op2_, j - i);\n"
+                "      }}\n"
+                "      else {{\n"
+                "        return get_value<CapType>(op1_, i - j);\n"
+                "      }}\n"
+                "    }} else {{\n"
+                "      return Vector<value_type, static_cast<index_t>(CapType::ept)>{{}};\n"
+                "    }}\n"
+                "  }}\n"
+                "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return 2; }}\n"
+                "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const {{ return (dim == 0) ? size1_ : size2_; }}\n"
+                "}};\n",
+                func_name, size1, size2)
+          );
+        }
+#endif
 
       __MATX_INLINE__ std::string str() const { 
         std::string top1;
@@ -74,8 +124,9 @@ namespace matx
         return "toeplitz(" + top1 + "," + top2 + ")"; 
       }
 
-        __MATX_INLINE__ TopelitzOp(const T1 &op1, const T2 &op2) : op1_(op1), op2_(op2)
+        __MATX_INLINE__ ToeplitzOp(const T1 &op1, const T2 &op2) : op1_(op1), op2_(op2)
       {
+        MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
         if constexpr (is_matx_op<T1>()) {
           static_assert(T1::Rank() == 1, "toeplitz() operator input rank must be 1");
         }
@@ -89,28 +140,94 @@ namespace matx
         }        
       }
 
-        template <typename... Is>
+        template <typename CapType>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i, index_t j) const
         {
-          if (j > i) {
-            if constexpr (is_matx_op<T2>()) {
-              auto val = get_value(op2_, j - i);
+          if constexpr (CapType::ept == ElementsPerThread::ONE) {
+            if (j > i) {
+              if constexpr (is_matx_op<T2>()) {
+                auto val = get_value<CapType>(op2_, j - i);
               return val;
+              }
+              else {
+                auto val = op2_[j - i];
+                return val;
+              }
             }
             else {
-              auto val = op2_[j - i];
-              return val;
+              if constexpr (is_matx_op<T1>()) {
+                auto val = get_value<CapType>(op1_, i - j);
+                return val;
+              }
+              else {
+                auto val = op1_[i - j];
+                return val;
+              }          
             }
+          } else {
+            return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
+          }
+        }
+
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(index_t i, index_t j) const
+        {
+          return this->operator()<DefaultCapabilities>(i, j);
+        }
+
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
+          if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+#ifdef MATX_EN_JIT
+            const auto op1_jit_name = detail::get_operator_capability<Cap>(op1_, in);
+            const auto op2_jit_name = detail::get_operator_capability<Cap>(op2_, in);
+            return std::format("{}<{},{}>", get_jit_class_name(), op1_jit_name, op2_jit_name);
+#else
+            return "";
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+#ifdef MATX_EN_JIT
+            return combine_capabilities<Cap>(true, 
+              detail::get_operator_capability<Cap>(op1_, in),
+              detail::get_operator_capability<Cap>(op2_, in));
+#else
+            return false;
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+#ifdef MATX_EN_JIT
+            const auto [key, value] = get_jit_op_str();
+            if (in.find(key) == in.end()) {
+              in[key] = value;
+            }
+            detail::get_operator_capability<Cap>(op1_, in);
+            detail::get_operator_capability<Cap>(op2_, in);
+            return true;
+#else
+            return false;
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
+            auto op1_cap = detail::get_operator_capability<Cap>(op1_, in);
+            auto op2_cap = detail::get_operator_capability<Cap>(op2_, in);
+            return op1_cap + op2_cap;
+          }
+          else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+            auto op1_cap = detail::get_operator_capability<Cap>(op1_, in);
+            auto op2_cap = detail::get_operator_capability<Cap>(op2_, in);
+            return combine_capabilities<Cap>(my_cap, op1_cap, op2_cap);
+          } 
+          else if constexpr (Cap == OperatorCapability::ALIASED_MEMORY) {
+            auto in_copy = in;
+            in_copy.permutes_input_output = true;
+            return combine_capabilities<Cap>(detail::get_operator_capability<Cap>(op1_, in_copy), detail::get_operator_capability<Cap>(op2_, in_copy));
           }
           else {
-            if constexpr (is_matx_op<T1>()) {
-              auto val = get_value(op1_, i - j);
-              return val;
-            }
-            else {
-              auto val = op1_[i - j];
-              return val;
-            }          
+            auto self_has_cap = capability_attributes<Cap>::default_value;
+            auto op1_cap = detail::get_operator_capability<Cap>(op1_, in);
+            auto op2_cap = detail::get_operator_capability<Cap>(op2_, in);
+            return combine_capabilities<Cap>(self_has_cap, op1_cap, op2_cap);
           }
         }
 
@@ -173,11 +290,13 @@ namespace matx
   auto __MATX_INLINE__ toeplitz(const T (&c)[D])
   {
     const auto op = detail::to_array(c);
-    const auto op2 = op;
+    auto op2 = op;
     if constexpr (is_complex_v<T>) {
-      cuda::std::transform(op2.begin(), op2.end(), [](T val){ return _internal_conj(val); } );
+      cuda::std::array<T, D> r_conj = op;
+      cuda::std::transform(r_conj.begin(), r_conj.end(), r_conj.begin(), [](T val){ return _internal_conj(val); } );
+      op2 = r_conj;      
     }
-    return detail::TopelitzOp(op, op2);
+    return detail::ToeplitzOp(op, op2);
   };
 
   /**
@@ -193,14 +312,15 @@ namespace matx
    * @returns
    *   New operator of the kronecker product
    */
-  template <typename Op, std::enable_if_t<!std::is_array_v<typename remove_cvref<Op>::type>, bool> = true>
+  template <typename Op>
+    requires (!cuda::std::is_array_v<remove_cvref_t<Op>>)
   auto __MATX_INLINE__ toeplitz(const Op &c)
   {
     if constexpr (is_complex_v<typename Op::value_type>) {
-      return detail::TopelitzOp(c, conj(c));
+      return detail::ToeplitzOp(c, conj(c));
     }
     else {
-      return detail::TopelitzOp(c, c);
+      return detail::ToeplitzOp(c, c);
     }
   };  
 
@@ -228,7 +348,7 @@ namespace matx
   {
     const auto cop = detail::to_array(c);
     const auto rop = detail::to_array(r);    
-    return detail::TopelitzOp(cop, rop);
+    return detail::ToeplitzOp(cop, rop);
   };
 
   /**
@@ -248,11 +368,11 @@ namespace matx
    * @returns
    *   New operator of the kronecker product
    */
-  template <typename COp, typename ROp, std::enable_if_t< !std::is_array_v<typename remove_cvref<COp>::type> && 
-                                                          !std::is_array_v<typename remove_cvref<ROp>::type>, 
-                                                          bool> = true>
+  template <typename COp, typename ROp>
+    requires (!cuda::std::is_array_v<remove_cvref_t<COp>> && 
+              !cuda::std::is_array_v<remove_cvref_t<ROp>>)
   auto __MATX_INLINE__ toeplitz(const COp &c, const ROp &r)
   {
-    return detail::TopelitzOp<COp, ROp>(c, r);
+    return detail::ToeplitzOp<COp, ROp>(c, r);
   };    
 } // end namespace matx

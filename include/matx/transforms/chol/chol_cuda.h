@@ -32,8 +32,8 @@
 
 #pragma once
 
-#include "cublas_v2.h"
-#include "cusolverDn.h"
+#include <cublas_v2.h>
+#include <cusolverDn.h>
 
 #include "matx/core/error.h"
 #include "matx/core/nvtx.h"
@@ -58,7 +58,7 @@ struct DnCholCUDAParams_t {
   size_t batch_size;
   cublasFillMode_t uplo;
   MatXDataType_t dtype;
-  cudaExecutor exec;
+  cudaStream_t stream;
 };
 
 template <typename OutputTensor, typename ATensor>
@@ -128,7 +128,7 @@ public:
     params.n = a.Size(RANK - 1);
     params.A = a.Data();
     params.uplo = uplo;
-    params.exec = exec;    
+    params.stream = exec.getStream();    
     params.dtype = TypeToInt<T1>();
 
     return params;
@@ -208,7 +208,7 @@ struct DnCholCUDAParamsKeyHash {
   {
     return  (std::hash<uint64_t>()(k.n)) + 
             (std::hash<uint64_t>()(k.batch_size)) + 
-            (std::hash<uint64_t>()((uint64_t)(k.exec.getStream())));
+            (std::hash<uint64_t>()((uint64_t)(k.stream)));
   }
 };
 
@@ -223,7 +223,7 @@ struct DnCholCUDAParamsKeyEq {
     return  l.n == t.n && 
             l.batch_size == t.batch_size && 
             l.dtype == t.dtype &&
-            l.exec.getStream() == t.exec.getStream();
+            l.stream == t.stream;
   }
 };
 
@@ -303,15 +303,18 @@ void chol_impl(OutputTensor &&out, const ATensor &a,
   auto params = detail::matxDnCholCUDAPlan_t<OutputTensor, decltype(tmp_out)>::GetCholParams(tmp_out, uplo_cusolver, exec);
 
   using cache_val_type = detail::matxDnCholCUDAPlan_t<OutputTensor, decltype(tmp_out)>;
+  auto cache_id = detail::GetCacheIdFromType<detail::chol_cuda_cache_t>();
+  MATX_LOG_DEBUG("Cholesky transform: cache_id={}", cache_id);
   detail::GetCache().LookupAndExec<detail::chol_cuda_cache_t>(
-    detail::GetCacheIdFromType<detail::chol_cuda_cache_t>(),
+    cache_id,
     params,
     [&]() {
       return std::make_shared<cache_val_type>(tmp_out, exec, uplo_cusolver);
     },
     [&](std::shared_ptr<cache_val_type> ctype) {
       ctype->Exec(tmp_out, tmp_out, exec, uplo_cusolver);
-    }
+    },
+    exec
   );
 
   if (!allContiguous) {

@@ -50,7 +50,8 @@ namespace matx
         int max_iters_;
         cuda::std::array<index_t, 2> out_dims_;
         mutable detail::tensor_impl_t<typename OpA::value_type, 2> tmp_out_;
-        mutable typename OpA::value_type *ptr = nullptr;               
+        mutable typename OpA::value_type *ptr = nullptr;
+        mutable bool prerun_done_ = false;               
 
       public:
         using matxop = bool;
@@ -64,7 +65,7 @@ namespace matx
 
         __MATX_INLINE__ CGSolveOp(const OpA &A, const OpB &B, double tol, int max_iters) : 
               a_(A), b_(B), tol_(tol), max_iters_(max_iters) {
-          
+          MATX_LOG_TRACE("{} constructor: tol={}, max_iters={}", str(), tol, max_iters);
           for (int r = 0; r < Rank(); r++) {
             out_dims_[r] = b_.Size(r);
           }
@@ -72,10 +73,26 @@ namespace matx
 
         __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
+        template <typename CapType, typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
+        {
+          return tmp_out_.template operator()<CapType>(indices...);
+        }
+
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          return tmp_out_(indices...);
+          return this->operator()<DefaultCapabilities>(indices...);
+        }
+
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
+          auto self_has_cap = capability_attributes<Cap>::default_value;
+          return combine_capabilities<Cap>(
+            self_has_cap,
+            detail::get_operator_capability<Cap>(a_, in),
+            detail::get_operator_capability<Cap>(b_, in)
+          );
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -109,10 +126,15 @@ namespace matx
         template <typename ShapeType, typename Executor>
         __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
         {
+          if (prerun_done_) {
+            return;
+          }
+
           InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));         
 
           detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
 
+          prerun_done_ = true;
           Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
         }
 

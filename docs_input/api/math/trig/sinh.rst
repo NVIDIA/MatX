@@ -5,6 +5,8 @@ sinh
 
 Hyperbolic sine
 
+
+.. versionadded:: 0.3.0
 .. doxygenfunction:: sinh(Op t)
   
 Examples

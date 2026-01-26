@@ -34,7 +34,6 @@
 
 
 #include "matx/core/type_utils.h"
-#include "matx/operators/base_operator.h"
 #include "matx/operators/permute.h"
 #include "matx/transforms/reduce.h"
 
@@ -48,9 +47,11 @@ namespace detail {
   {
     private:
       typename detail::base_type_t<OpA> a_;
+      int ddof_;
       cuda::std::array<index_t, ORank> out_dims_;
       mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, ORank> tmp_out_;
-      mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr;   
+      mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr;
+      mutable bool prerun_done_ = false;   
 
     public:
       using matxop = bool;
@@ -59,7 +60,8 @@ namespace detail {
       using stdd_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "stdd(" + get_type_str(a_) + ")"; }
-      __MATX_INLINE__ StddOp(const OpA &a) : a_(a) { 
+      __MATX_INLINE__ StddOp(const OpA &a, int ddof) : a_(a),  ddof_(ddof) { 
+        MATX_LOG_TRACE("{} constructor: rank={}, ddof={}", str(), Rank(), ddof);
         for (int r = 0; r < ORank; r++) {
           out_dims_[r] = a_.Size(r);
         }
@@ -67,14 +69,25 @@ namespace detail {
 
       __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
+      template <typename CapType, typename... Is>
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
+        return tmp_out_.template operator()<CapType>(indices...);
+      }
+
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
-        return tmp_out_(indices...);
+        return this->operator()<DefaultCapabilities>(indices...);
+      }
+
+      template <OperatorCapability Cap, typename InType>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
+        auto self_has_cap = capability_attributes<Cap>::default_value;
+        return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
       }
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
-        stdd_impl(cuda::std::get<0>(out), a_, ex);
+        stdd_impl(cuda::std::get<0>(out), a_, ex, ddof_);
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -93,10 +106,15 @@ namespace detail {
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
       {
+        if (prerun_done_) {
+          return;
+        }
+
         InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));  
 
         detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
 
+        prerun_done_ = true;
         Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
       }
 
@@ -133,15 +151,18 @@ namespace detail {
  *   Input data to reduce
  * @param dims
  *   Array containing dimensions to reduce over
+ * @param ddof
+ *   ddof – Delta Degrees Of Freedom used in the divisor of the result as N - ddof. Defaults to 1 to give an unbiased estimate
+ * @returns Operator with reduced values of standard deviation computed
  */
 template <typename InType, int D>
-__MATX_INLINE__ auto stdd(const InType &in, const int (&dims)[D])
+__MATX_INLINE__ auto stdd(const InType &in, const int (&dims)[D], int ddof = 1)
 {
   static_assert(D <= InType::Rank(), "reduction dimensions must be <= Rank of input");
   auto perm = detail::getPermuteDims<InType::Rank()>(dims);
   auto permop = permute(in, perm);
 
-  return detail::StddOp<decltype(permop), InType::Rank() - D>(permop);
+  return detail::StddOp<decltype(permop), InType::Rank() - D>(permop, ddof);
 }
 
 /**
@@ -155,11 +176,14 @@ __MATX_INLINE__ auto stdd(const InType &in, const int (&dims)[D])
  *
  * @param in
  *   Input data to reduce
+ * @param ddof
+ *   ddof – Delta Degrees Of Freedom used in the divisor of the result as N - ddof. Defaults to 1 to give an unbiased estimate
+ * @returns Operator with reduced values of standard deviation computed
  */
 template <typename InType>
-__MATX_INLINE__ auto stdd(const InType &in)
+__MATX_INLINE__ auto stdd(const InType &in, int ddof = 1)
 {
-  return detail::StddOp<decltype(in), 0>(in);
+  return detail::StddOp<decltype(in), 0>(in, ddof);
 }
 
 }

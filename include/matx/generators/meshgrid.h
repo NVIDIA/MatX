@@ -32,6 +32,7 @@
 
 #pragma once
 #include "matx/operators/permute.h"
+#include "matx/core/log.h"
 
 namespace matx
 {
@@ -42,31 +43,125 @@ namespace matx
     template <typename T1, int RANK, int AXIS> 
       class MeshGridOp : public BaseOp<MeshGridOp<T1, RANK, AXIS>> {
         private:
-          T1 t1_;
+          mutable T1 t1_;
           cuda::std::array<index_t, RANK> shape_;
+          int idx_;
 
         public:
           using matxop = bool;
           using value_type = typename T1::value_type;
-          //typedef typename T1::value_type value_type;
+
+#ifdef MATX_EN_JIT
+          struct JIT_Storage {
+            typename detail::inner_storage_or_self_t<T1> t1_;
+          };
+
+          JIT_Storage ToJITStorage() const {
+            return JIT_Storage{detail::to_jit_storage(t1_)};
+          }
+
+          __MATX_INLINE__ std::string get_jit_class_name() const {
+            std::string shape_str;
+            for (int i = 0; i < RANK; i++) {
+              shape_str += std::to_string(shape_[i]);
+              if (i < RANK - 1) shape_str += "_";
+            }
+            return std::format("JITMeshGrid_rank{}_axis{}_shape{}", RANK, AXIS, shape_str);
+          }
+
+          __MATX_INLINE__ auto get_jit_op_str() const {
+            std::string func_name = get_jit_class_name();
+            
+            return cuda::std::make_tuple(
+              func_name,
+              std::format("template <typename T1> struct {} {{\n"
+                  "  using value_type = typename T1::value_type;\n"
+                  "  using matxop = bool;\n"
+                  "  constexpr static int RANK_ = {};\n"
+                  "  constexpr static int AXIS_ = {};\n"
+                  "  constexpr static cuda::std::array<index_t, RANK_> shape_ = {{ {} }};\n"
+                  "  typename detail::inner_storage_or_self_t<T1> t1_;\n"
+                  "  template <typename CapType, typename... Is>\n"
+                  "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(Is... indices) const\n"
+                  "  {{\n"
+                  "    cuda::std::array<index_t, RANK_> inds{{indices...}};\n"
+                  "    auto ind = inds[AXIS_];\n"
+                  "    return get_value<CapType>(t1_, ind);\n"
+                  "  }}\n"
+                  "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return RANK_; }}\n"
+                  "  __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const {{ return shape_[dim]; }}\n"
+                  "}};\n",
+                  func_name, RANK, AXIS, detail::array_to_string(shape_))
+            );
+          }
+#endif
 
           __MATX_INLINE__ std::string str() const { return "meshgrid"; }
 
-          __MATX_INLINE__ MeshGridOp(T1 t1, cuda::std::array<index_t, RANK> shape) : t1_(t1), shape_(shape) {
+          __MATX_INLINE__ MeshGridOp(T1 t1, cuda::std::array<index_t, RANK> shape, int idx) : t1_(t1), shape_(shape), idx_(idx) {
             static_assert(shape.size() == RANK );
             static_assert(is_matx_op<T1>());
+            MATX_LOG_TRACE("MeshGridOp constructor: rank={}, axis={}, idx={}", RANK, AXIS, idx);
           }
 
-          template <typename... Is>
-            __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
 
-              cuda::std::array<index_t, Rank()> inds{indices...};
-              // get index for the axis
-              auto ind = inds[AXIS];
-              // look up value for the axis
-              auto val = get_value(t1_, ind);
-              return val;
+
+          template <typename CapType, typename... Is>
+          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const {
+
+            cuda::std::array<index_t, Rank()> inds{indices...};
+            // get index for the axis
+            auto ind = inds[AXIS];
+            // look up value for the axis
+            auto val = get_value<CapType>(t1_, ind);
+            return val;
+          }
+
+          template <OperatorCapability Cap, typename InType>
+          __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
+            if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+#ifdef MATX_EN_JIT
+              const auto t1_jit_name = detail::get_operator_capability<Cap>(t1_, in);
+              return std::format("{}<{}>", get_jit_class_name(), t1_jit_name);
+#else
+              return "";
+#endif
             }
+            else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+#ifdef MATX_EN_JIT
+            return true;
+#else
+            return false;
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+#ifdef MATX_EN_JIT
+              const auto [key, value] = get_jit_op_str();
+              if (in.find(key) == in.end()) {
+                in[key] = value;
+              }
+              detail::get_operator_capability<Cap>(t1_, in);
+              return true;
+#else
+              return false;
+#endif
+            }
+            else if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
+              return detail::get_operator_capability<Cap>(t1_, in);
+            }
+            else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+              const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+              return combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(t1_, in));
+            } else {            
+              auto self_has_cap = detail::capability_attributes<Cap>::default_value;
+              return detail::combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(t1_, in));
+            }
+          }          
+
+          template <typename... Is>
+          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const {
+            return this->operator()<DefaultCapabilities>(indices...);
+          }
 
           __MATX_INLINE__  __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const {
             return shape_[dim];
@@ -105,7 +200,7 @@ namespace matx
         }
 
         // return one meshgrid operator per rank
-        return cuda::std::tuple{ permute(MeshGridOp<Ts, RANK, I>{ts, shape}, perm)...};
+        return cuda::std::tuple{ permute(MeshGridOp<Ts, RANK, I>{ts, shape, I}, perm)...};
       }
 
   } // end namespace detail

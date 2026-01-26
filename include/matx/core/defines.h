@@ -32,8 +32,9 @@
 
 #pragma once
 
-// This file is intended to contain simple defines that don't rely on any other headers. It must be
-// useable on both host and device compilers
+// This file is intended to contain simple defines that don't rely on any other
+// MatX headers. It must be usable on both host and device compilers
+#include <cuda/std/limits>
 
 namespace matx {
 
@@ -45,12 +46,23 @@ namespace matx {
     #define MATX_INDEX_T_FMT "lld"
 #endif
 
+// By default, MatX opts out of additional handling of NaNs and infinite values
+// in complex multiplication and division. These checks are defined in Annex G
+// as an optional part of the C11 standard, but are not specified in the C++
+// standard. The checks add additional cost beyond a "standard" implementation
+// that computes, for example, complex multiplication via:
+//   (a + bi) * (c + di) = (ac - bd) + (ad + bc)i.
+// Users can opt-in to the additional checks by defining MATX_EN_COMPLEX_OP_NAN_CHECKS.
+#ifndef MATX_EN_COMPLEX_OP_NAN_CHECKS
+#define LIBCUDACXX_ENABLE_SIMPLIFIED_COMPLEX_OPERATIONS
+#endif
+
 #ifdef __CUDACC__
     #define __MATX_HOST__ __host__
     #define __MATX_DEVICE__ __device__
 #else
-    #define __MATX_HOST__  __host__
-    #define __MATX_DEVICE__ __device__
+    #define __MATX_HOST__
+    #define __MATX_DEVICE__
 #endif
 
 #ifdef __GNUC__
@@ -85,19 +97,37 @@ namespace matx {
 
     #define MATX_IGNORE_WARNING_POP_GCC \
         _Pragma("GCC diagnostic pop")
+#else
+    #define MATX_IGNORE_WARNING_PUSH_GCC(WARN_MSG)
+    #define MATX_IGNORE_WARNING_POP_GCC
+    #define MATX_IGNORE_WARNING_PUSH_CLANG(WARN_MSG)
+    #define MATX_IGNORE_WARNING_POP_CLANG
 #endif
 
 // std::ceil is not constexpr until C++23
 #define MATX_ROUND_UP(N, S) ((((N) + (S) - 1) / (S)) * (S))
 
 enum {
-  matxKeepDim     = std::numeric_limits<index_t>::max(),
-  matxDropDim     = std::numeric_limits<index_t>::max() - 1,
-  matxEnd         = std::numeric_limits<index_t>::max() - 2,
-  matxKeepStride  = std::numeric_limits<index_t>::max() - 3,
+  matxKeepDim     = cuda::std::numeric_limits<index_t>::max(),
+  matxDropDim     = cuda::std::numeric_limits<index_t>::max() - 1,
+  matxEnd         = cuda::std::numeric_limits<index_t>::max() - 2,
+  matxKeepStride  = cuda::std::numeric_limits<index_t>::max() - 3,
 
   // If adding a new marker adjust this to the last element above
   matxIdxSentinel = matxKeepStride - 1,
 };
+
+// Do this on a per-architecture basis in the future
+static constexpr int MAX_VEC_WIDTH_BYTES = 16;
+
+
+#if defined(__CUDACC__)
+  #define MATX_LOOP_UNROLL _Pragma("unroll")
+  #define MATX_LOOP_DO_NOT_UNROLL _Pragma("unroll 1")
+#else
+#  define MATX_LOOP_UNROLL
+  #define MATX_LOOP_DO_NOT_UNROLL
+#endif
+
 
 }

@@ -7,6 +7,7 @@ Determine the closeness of values across two operators using absolute and relati
 from isclose is an ``int`` value since it's commonly used for reductions and ``bool`` reductions using
 atomics are not available in hardware.
 
+.. versionadded:: 0.1.0
 
 .. doxygenfunction:: isclose
 

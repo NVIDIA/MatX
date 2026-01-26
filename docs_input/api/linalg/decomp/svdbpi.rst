@@ -6,6 +6,8 @@ svdbpi
 Perform a singular value decomposition (SVD) using the block power iteration method. This method is usually
 better than `svd` where the matrices are small and batches are large
 
+
+.. versionadded:: 0.6.0
 .. doxygenfunction:: svdbpi
 
 Examples

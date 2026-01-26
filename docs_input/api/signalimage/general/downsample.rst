@@ -5,6 +5,8 @@ downsample
 
 downsample a signal by dropping samples
 
+.. versionadded:: 0.3.0
+
 .. doxygenfunction:: downsample
 
 Examples

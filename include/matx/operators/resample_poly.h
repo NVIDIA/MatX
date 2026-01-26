@@ -54,7 +54,8 @@ namespace detail {
       index_t down_;
       cuda::std::array<index_t, OpA::Rank()> out_dims_;
       mutable detail::tensor_impl_t<out_t, OpA::Rank()> tmp_out_;
-      mutable out_t *ptr = nullptr;       
+      mutable out_t *ptr = nullptr;
+      mutable bool prerun_done_ = false;       
 
     public:
       using matxop = bool;
@@ -65,7 +66,8 @@ namespace detail {
       __MATX_INLINE__ std::string str() const { return "resample_poly(" + get_type_str(a_) + "," + get_type_str(f_) + ")";}
       __MATX_INLINE__ ResamplePolyOp(const OpA &a, const FilterType &f, index_t up, index_t down) : 
           a_(a), f_(f), up_(up), down_(down) 
-      { 
+      {
+        MATX_LOG_TRACE("{} constructor: up={}, down={}", str(), up, down); 
         const index_t up_len = a_.Size(OpA::Rank() - 1) * up_;
         const index_t b_len = up_len / down_ + ((up_len % down_) ? 1 : 0);
 
@@ -76,12 +78,37 @@ namespace detail {
         out_dims_[OpA::Rank() - 1] = b_len;
       }
 
-      __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
+      // Const versions
+      template <typename CapType, typename... Is>
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
+        return tmp_out_.template operator()<CapType>(indices...);
+      }
 
       template <typename... Is>
-      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) {
-        return tmp_out_(indices...);
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
+        return this->operator()<DefaultCapabilities>(indices...);
       }
+
+      template <OperatorCapability Cap, typename InType>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
+        auto self_has_cap = capability_attributes<Cap>::default_value;
+        return combine_capabilities<Cap>(self_has_cap, 
+                                           detail::get_operator_capability<Cap>(a_, in),
+                                           detail::get_operator_capability<Cap>(f_, in));
+      }
+
+      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
+      {
+        return out_dims_[dim];
+      }      
+
+      static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+      {
+        return OpA::Rank();
+      }
+
+
+      __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
@@ -89,12 +116,6 @@ namespace detail {
 
         resample_poly_impl(cuda::std::get<0>(out), a_, f_, up_, down_, ex.getStream());
       }
-
-      static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
-      {
-        return OpA::Rank();
-      }
-
 
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void InnerPreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept {
@@ -110,10 +131,15 @@ namespace detail {
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
       {
+        if (prerun_done_) {
+          return;
+        }
+
         InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));         
 
         detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
 
+        prerun_done_ = true;
         Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
       }
 
@@ -130,12 +156,6 @@ namespace detail {
 
         matxFree(ptr);       
       }             
-
-      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
-      {
-        return out_dims_[dim];
-      }
-
   };
 }
 

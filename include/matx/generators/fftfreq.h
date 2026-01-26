@@ -33,11 +33,12 @@
 #pragma once
 
 #include "matx/generators/generator1d.h"
+#include "matx/core/log.h"
 
 namespace matx
 {
   namespace detail {
-    template <class T> class FFTFreqOp {
+    template <class T> class FFTFreqOp : public BaseOp<FFTFreqOp<T>> {
       private:
         index_t n_;
         float d_;
@@ -46,18 +47,103 @@ namespace matx
         using value_type = T;
         using matxop = bool;
 
+#ifdef MATX_EN_JIT
+        struct JIT_Storage {
+          // No runtime members - all become constexpr
+        };
+
+        JIT_Storage ToJITStorage() const {
+          return JIT_Storage{};
+        }
+
+        __MATX_INLINE__ std::string get_jit_class_name() const {
+          return std::format("JITFFTFreq_n{}_d{}", n_, d_);
+        }
+
+        __MATX_INLINE__ auto get_jit_op_str() const {
+          std::string func_name = get_jit_class_name();
+          
+          return cuda::std::make_tuple(
+            func_name,
+            std::format("template <typename T> struct {} {{\n"
+                "  using value_type = T;\n"
+                "  using matxop = bool;\n"
+                "  constexpr static index_t n_ = {};\n"
+                "  constexpr static float d_ = {};\n"
+                "  template <typename CapType>\n"
+                "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(index_t idx) const\n"
+                "  {{\n"
+                "    return detail::ApplyGeneratorVecFunc<CapType, T>([](index_t i) {{\n"
+                "      index_t offset = i >= (n_+1)/2 ? -n_ : 0;\n"
+                "      return static_cast<T>(i + offset) / (d_*(T)n_);\n"
+                "    }}, idx);\n"
+                "  }}\n"
+                "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return 1; }}\n"
+                "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size([[maybe_unused]] int dim) const {{ return n_; }}\n"
+                "}};\n",
+                func_name, n_, d_)
+          );
+        }
+#endif
+
         __MATX_INLINE__ std::string str() const { return "fftfreq"; }
 
         inline FFTFreqOp(index_t n, float d = 1.0)
         {
           n_ = n;
           d_ = d;
+          MATX_LOG_TRACE("FFTFreqOp constructor: n={}, d={}", n, d);
         }
 
-        __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ T operator()(index_t idx) const {
-          index_t offset = idx >= (n_+1)/2 ? -n_ : 0;
-          return static_cast<T>(idx + offset) / (d_*(T)n_);
+        template <typename CapType>
+        __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t idx) const {
+          return detail::ApplyGeneratorVecFunc<CapType, T>([this](index_t i) {
+            index_t offset = i >= (n_+1)/2 ? -n_ : 0;
+            return static_cast<T>(i + offset) / (d_*(T)n_);
+          }, idx);
         }
+
+        __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t idx) const {
+          return this->operator()<DefaultCapabilities>(idx);
+        }
+
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
+          if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+#ifdef MATX_EN_JIT
+            return get_jit_class_name() + "<" + type_to_string<T>() + ">";
+#else
+            return "";
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+#ifdef MATX_EN_JIT
+            return true;
+#else
+            return false;
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+#ifdef MATX_EN_JIT
+            const auto [key, value] = get_jit_op_str();
+            if (in.find(key) == in.end()) {
+              in[key] = value;
+            }
+            return true;
+#else
+            return false;
+#endif
+          }
+          else {
+            return capability_attributes<Cap>::default_value;
+          }
+        }
+
+        constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size([[maybe_unused]] int dim) const
+        {
+          return n_;
+        }
+        static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return 1; }
     };
   }
 

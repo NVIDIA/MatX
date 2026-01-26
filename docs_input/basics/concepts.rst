@@ -29,7 +29,7 @@ As an example:
 .. code-block:: cpp
 
     // Create a tensor. "t" is an operator
-    auto t    = make_tensor<float>({10);
+    auto t    = make_tensor<float>({10});
 
     // Create a sin operator that operates on "t" and name it "op"
     auto op   = sin(t);

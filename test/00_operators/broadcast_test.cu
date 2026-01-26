@@ -17,11 +17,12 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Broadcast)
 
   {
     auto t0 = make_tensor<TestType>({});
+    t0() = (TestType)2.0f;    
     tensor_t<TestType, 4> t4i({10, 20, 30, 40});
     tensor_t<TestType, 4> t4o({10, 20, 30, 40});
     (t4o = t0).run(exec);
+    exec.sync();
 
-    t0() = (TestType)2.0f;
     for (index_t i = 0; i < t4i.Size(0); i++) {
       for (index_t j = 0; j < t4i.Size(1); j++) {
         for (index_t k = 0; k < t4i.Size(2); k++) {

@@ -1,6 +1,6 @@
-cmake_minimum_required(VERSION 3.23.1)
+cmake_minimum_required(VERSION 3.25.2)
 
-set(MATX_VERSION 0.9.0)
+set(MATX_VERSION 0.9.4)
 
 # Used for config file generation
 if(NOT DEFINED PROJECT_NAME)
@@ -37,10 +37,8 @@ include(rapids-find)
 rapids_cpm_init(OVERRIDE "${CMAKE_CURRENT_SOURCE_DIR}/cmake/versions.json")
 
 if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
-    include(rapids-cuda)
-    set(CMAKE_CUDA_ARCHITECTURES "NATIVE")
-    message(STATUS "Auto-detecting GPU architectures since CMAKE_CUDA_ARCHITECTURES not defined")
-    rapids_cuda_init_architectures(MATX)
+    set(CMAKE_CUDA_ARCHITECTURES "native")
+    message(STATUS "Using native GPU architecture since CMAKE_CUDA_ARCHITECTURES not defined")
 endif()
 
 # This needs to go after rapids initialization otherwise we get a rapids_export_parse_version error
@@ -55,7 +53,7 @@ if (NOT CMAKE_CUDA_ARCHITECTURES)
 endif()
 message(STATUS "Using GPU architectures ${CMAKE_CUDA_ARCHITECTURES}")
 
-rapids_cmake_write_version_file(include/version_config.h)
+rapids_cmake_write_version_file(include/matx/version_config.h)
 
 # Command line options
 option(MATX_BUILD_EXAMPLES "Build examples" OFF)
@@ -70,12 +68,20 @@ option(MATX_EN_VISUALIZATION "Enable visualization support" OFF)
 option(MATX_EN_CUTENSOR OFF)
 option(MATX_EN_CUDSS OFF)
 option(MATX_EN_FILEIO OFF)
+option(MATX_EN_NVTIFF OFF "Enable nvTiff support")
 option(MATX_EN_X86_FFTW OFF "Enable x86 FFTW support")
 option(MATX_EN_NVPL OFF, "Enable NVIDIA Performance Libraries for optimized ARM CPU support")
 option(MATX_EN_BLIS OFF "Enable BLIS support")
 option(MATX_EN_OPENBLAS OFF "Enable OpenBLAS (BLAS + LAPACK) support")
 option(MATX_DISABLE_CUB_CACHE "Disable caching for CUB allocations" ON)
 option(MATX_EN_COVERAGE OFF "Enable code coverage reporting")
+option(MATX_EN_COMPLEX_OP_NAN_CHECKS "Enable full NaN/Inf handling for complex multiplication and division" OFF)
+option(MATX_EN_CUDA_LINEINFO "Enable line information for CUDA kernels via -lineinfo nvcc flag" OFF)
+option(MATX_EN_EXTENDED_LAMBDA "Enable extended lambda support for device/host lambdas" ON)
+option(MATX_EN_JIT "Enable CUDA JIT compilation support via NVRTC" OFF)
+option(MATX_EN_MATHDX "Enable MathDx support for kernel fusion" OFF)
+option(MATX_EN_UNSAFE_ALIAS_DETECTION "Enable aliased memory detection" OFF)
+option(MATX_DISABLE_EXCEPTIONS "Disable C++ exceptions and log errors instead" OFF)
 
 set(MATX_EN_PYBIND11 OFF CACHE BOOL "Enable pybind11 support")
 
@@ -93,9 +99,16 @@ if (MATX_BUILD_DOCS)
     add_subdirectory(docs_input)
 endif()
 
-# MatX requires C++17 to build. Enforce on all libraries pulled in as well
-set(CMAKE_CXX_STANDARD 17)
-set(CUDA_CXX_STANDARD 17)
+# Check for <format> header availability (required for logging support)
+include(CheckIncludeFileCXX)
+set(CMAKE_REQUIRED_FLAGS "-std=c++20")
+check_include_file_cxx("format" MATX_HAS_STD_FORMAT)
+if (NOT MATX_HAS_STD_FORMAT)
+    message(WARNING "C++20 <format> header not found. MatX logging will be disabled. "
+                    "Consider using a newer compiler (GCC 13+ or Clang 15+) for full logging support.")
+else()
+    message(STATUS "C++20 <format> header found. MatX logging will be enabled.")
+endif()
 
 if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
     execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion OUTPUT_VARIABLE GCC_VERSION)
@@ -121,7 +134,9 @@ target_include_directories(matx INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOU
                                          "$<INSTALL_INTERFACE:include>")
 target_include_directories(matx INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/matx/kernels>"
 "$<INSTALL_INTERFACE:include/matx/kernels>")
-target_compile_features(matx INTERFACE cxx_std_17 $<BUILD_INTERFACE:cuda_std_17>)
+
+                           
+target_compile_features(matx INTERFACE cxx_std_20 $<BUILD_INTERFACE:cuda_std_20>)
 
 # 11.2 and above required for async allocation
 if (CMAKE_CUDA_COMPILER_VERSION VERSION_LESS 11.5)
@@ -138,12 +153,18 @@ target_link_libraries(matx INTERFACE CCCL::CCCL)
 
 # Set flags for compiling tests faster (only for nvcc)
 if (NOT CMAKE_CUDA_COMPILER_ID STREQUAL "Clang")
-    set(MATX_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} --threads 0 -ftemplate-backtrace-limit=0)
+    set(MATX_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} --threads 0 -ftemplate-backtrace-limit=0 --extended-lambda)
 endif()
 
 # Hack because CMake doesn't have short circult evaluation
-if (NOT CMAKE_BUILD_TYPE OR "${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
-    set(MATX_CUDA_FLAGS ${MATX_CUDA_FLAGS} -lineinfo)
+if (NOT CMAKE_BUILD_TYPE OR "${CMAKE_BUILD_TYPE}" STREQUAL "Debug" OR MATX_EN_CUDA_LINEINFO)
+    # Propagate -lineinfo to all MatX consumers
+    target_compile_options(matx INTERFACE $<$<COMPILE_LANGUAGE:CUDA>:-lineinfo>)
+endif()
+
+# Enable extended lambda support for device/host lambdas (required for apply operator)
+if (MATX_EN_EXTENDED_LAMBDA)
+    target_compile_options(matx INTERFACE $<$<COMPILE_LANGUAGE:CUDA>:--extended-lambda>)
 endif()
 
 # Set preferred compiler warning flags. nvc++ doesn't support most warnings
@@ -194,11 +215,18 @@ if (MATX_NVTX_FLAGS)
     add_definitions(-DMATX_NVTX_FLAGS)
     target_compile_definitions(matx INTERFACE MATX_NVTX_FLAGS)
 endif()
+if (MATX_DISABLE_EXCEPTIONS)
+    target_compile_definitions(matx INTERFACE MATX_DISABLE_EXCEPTIONS)
+endif()
 if (MATX_BUILD_32_BIT)
     set(MATX_NVPL_INT_TYPE "lp64")
     target_compile_definitions(matx INTERFACE MATX_INDEX_32_BIT)
 else()
     set(MATX_NVPL_INT_TYPE "ilp64")
+endif()
+
+if (MATX_EN_UNSAFE_ALIAS_DETECTION)
+    target_compile_definitions(matx INTERFACE MATX_EN_UNSAFE_ALIAS_DETECTION)
 endif()
 
 # Host support
@@ -260,25 +288,30 @@ if (MATX_DISABLE_CUB_CACHE)
     target_compile_definitions(matx INTERFACE MATX_DISABLE_CUB_CACHE)
 endif()
 
+if (MATX_EN_COMPLEX_OP_NAN_CHECKS)
+    target_compile_definitions(matx INTERFACE MATX_EN_COMPLEX_OP_NAN_CHECKS)
+endif()
+
 if (MATX_EN_COVERAGE)
     target_compile_options(matx INTERFACE -fprofile-arcs -ftest-coverage)
     target_link_options(matx INTERFACE -lgcov --coverage)
 endif()
 
-# Add nvtiff support if installed
-find_library(NVTIFF_LIBRARY nvtiff)
-if (NOT NVTIFF_LIBRARY)
-    message(STATUS "Cannot find nvtiff library.  Disabling MatX nvtiff features.")
-else()
-    message(STATUS "Found nvtiff library at ${NVTIFF_LIBRARY}.  Enabling MatX nvtiff features.")
-    target_compile_definitions(matx INTERFACE MATX_ENABLE_NVTIFF)
+if (MATX_EN_NVTIFF)
+    # Add nvtiff support if installed
+    find_library(NVTIFF_LIBRARY nvtiff)
+    if (NOT NVTIFF_LIBRARY)
+        message(STATUS "Cannot find nvtiff library.  Disabling MatX nvtiff features.")
+    else()
+        message(STATUS "Found nvtiff library at ${NVTIFF_LIBRARY}.  Enabling MatX nvtiff features.")
+        target_compile_definitions(matx INTERFACE MATX_ENABLE_NVTIFF)
+    endif()
 endif()
-
 
 # Get the tensor libraries if we need them
 if (MATX_EN_CUTENSOR)
-    set(CUTENSORNET_VERSION 24.03.0.4)
-    set(CUTENSOR_VERSION 2.0.1.2)
+    set(CUTENSORNET_VERSION 25.09.1.12)
+    set(CUTENSOR_VERSION 2.3.1.0)
 
     include(cmake/FindcuTENSOR.cmake)
     include(cmake/FindcuTensorNet.cmake)
@@ -292,8 +325,41 @@ if (MATX_EN_CUTENSOR)
     target_link_libraries(matx INTERFACE "-Wl,--disable-new-dtags")
 endif()
 
+# Enable JIT compilation support
+if (MATX_EN_JIT OR MATX_EN_MATHDX)
+    message(STATUS "Enabling JIT compilation support via NVRTC")
+    target_compile_definitions(matx INTERFACE MATX_EN_JIT)
+    
+    # Add NVRTC configuration as compiler definitions
+    list(GET CMAKE_CUDA_ARCHITECTURES 0 NVRTC_CUDA_ARCH)
+    # Strip -real or -virt postfix if present
+    string(REGEX REPLACE "-real$" "" NVRTC_CUDA_ARCH "${NVRTC_CUDA_ARCH}")
+    string(REGEX REPLACE "-virtual$" "" NVRTC_CUDA_ARCH "${NVRTC_CUDA_ARCH}")
+    target_compile_definitions(matx INTERFACE NVRTC_CUDA_ARCH="${NVRTC_CUDA_ARCH}")
+    target_compile_definitions(matx INTERFACE NVRTC_CXX_STANDARD="${CMAKE_CXX_STANDARD}")
+    
+    # Link NVRTC library
+    target_link_libraries(matx INTERFACE CUDA::nvrtc)
+endif()
+
+if (MATX_EN_MATHDX)
+    set(MathDx_VERSION 25.06)
+    set(MathDx_NANO 0)
+    include(cmake/FindMathDx.cmake)
+    target_compile_definitions(matx INTERFACE MATX_EN_MATHDX)
+    
+    # Link libmathdx if available
+    if(TARGET libmathdx::libmathdx)
+        target_link_libraries(matx INTERFACE libmathdx::libmathdx)
+        message(STATUS "Linked libmathdx to matx target")
+    endif()
+    
+    # Link mathdx components
+    target_link_libraries(matx INTERFACE mathdx::cufftdx)
+endif()
+
 if (MATX_EN_CUDSS)
-    set(cuDSS_VERSION 0.4.0.2)
+    set(cuDSS_VERSION 0.7.0.20)
     include(cmake/FindcuDSS.cmake)
     target_compile_definitions(matx INTERFACE MATX_EN_CUDSS)
     target_link_libraries(matx INTERFACE cuDSS::cuDSS)
@@ -310,21 +376,20 @@ if (MATX_EN_FILEIO OR MATX_EN_VISUALIZATION OR MATX_EN_PYBIND11 OR MATX_BUILD_EX
     set(MATX_EN_PYBIND11 ON)
     target_compile_definitions(matx INTERFACE MATX_ENABLE_PYBIND11)
     target_compile_definitions(matx INTERFACE MATX_ENABLE_FILEIO)
-    target_compile_options(matx INTERFACE -DMATX_ROOT="${PROJECT_SOURCE_DIR}")
 
     include(cmake/GetPyBind11.cmake)
     find_package(Python3  REQUIRED COMPONENTS Interpreter Development)
     find_package(pybind11 REQUIRED)
+
+    # Export pybind11 dependency for downstream users after make install
+    rapids_export_package(INSTALL pybind11 matx-exports GLOBAL_TARGETS pybind11::embed pybind11::pybind11)
+    rapids_export_package(BUILD pybind11 matx-exports GLOBAL_TARGETS pybind11::embed pybind11::pybind11)    
 
     # Check for python libs
     include(cmake/CheckPythonLibs.cmake)
     check_python_libs("numpy")
     check_optional_python_libs("cupy")
 
-    # Required by pybind
-    # https://pybind11.readthedocs.io/en/stable/faq.html#someclass-declared-with-greater-
-    # visibility-than-the-type-of-its-field-someclass-member-wattributes
-    target_compile_options(matx INTERFACE -fvisibility=hidden)
     target_link_libraries(matx INTERFACE pybind11::embed)
 
     # Visualization requires Python libraries
@@ -335,13 +400,15 @@ if (MATX_EN_FILEIO OR MATX_EN_VISUALIZATION OR MATX_EN_PYBIND11 OR MATX_BUILD_EX
 endif()
 
 # Add in all CUDA linker dependencies
-target_link_libraries(matx INTERFACE    CUDA::cudart
-                                        CUDA::cublas
-                                        CUDA::cublasLt
-                                        CUDA::cufft
-                                        CUDA::cusolver
-                                        CUDA::cuda_driver
-                                        CUDA::curand)
+target_link_libraries(matx INTERFACE
+    CUDA::cublas
+    CUDA::cublasLt
+    CUDA::cuda_driver
+    CUDA::cudart
+    CUDA::cufft
+    CUDA::curand
+    CUDA::cusolver
+    CUDA::cusparse)
 
 if (CMAKE_VERSION VERSION_LESS 3.25.0)
     target_link_libraries(matx INTERFACE CUDA::nvToolsExt)
@@ -357,7 +424,7 @@ if (NOT_SUBPROJECT)
 
     install(TARGETS matx EXPORT matx-exports)
     install(DIRECTORY include/ DESTINATION include)
-    install(FILES ${CMAKE_BINARY_DIR}/include/version_config.h DESTINATION include)
+    install(FILES ${CMAKE_BINARY_DIR}/include/matx/version_config.h DESTINATION include)
 
     set(doc_string
     [=[

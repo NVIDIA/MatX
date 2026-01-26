@@ -2,7 +2,10 @@ set(OPERATOR_TEST_FILES
   abs2_test.cu
   advanced_op_test.cu
   advanced_remap_test.cu
+  aliased_memory_test.cu
   angle_test.cu
+  apply_test.cu
+  apply_idx_test.cu
   at_test.cu
   base_op_test.cu
   broadcast_test.cu
@@ -16,17 +19,29 @@ set(OPERATOR_TEST_FILES
   concat_test.cu
   cross_test.cu
   fftshift_test.cu
+  find_peaks.cu
   flatten_test.cu
   fmod_test.cu
   frexp_test.cu
   frexpc_test.cu
   get_string_test.cu
+  ifelse_test.cu  
   interleaved_test.cu
+  interp_test.cu
   isclose_test.cu
   isnaninf_test.cu
   legendre_test.cu
-  operator_func_test.cu
+  operator_func_boolean_test.cu
+  operator_func_complex_test.cu
+  operator_func_div_complex_test.cu
+  operator_func_float_noncomplex_test.cu
+  operator_func_integral_test.cu
+  operator_func_nd_test.cu
+  operator_func_numeric_noncomplex_test.cu
+  operator_func_numeric_test.cu
+  operator_func_r2c_test.cu
   overlap_test.cu
+  pad_test.cu
   permute_test.cu
   planar_test.cu
   polyval_test.cu
@@ -47,8 +62,11 @@ set(OPERATOR_TEST_FILES
   sph2cart_test.cu
   square_copy_transpose_test.cu
   stack_test.cu
+  test_logging.cu
+  test_logging_comprehensive.cu
   toeplitz_test.cu
   transpose_test.cu
   trig_funcs_test.cu
-  updownsample_test.cu  
+  updownsample_test.cu 
+  zipvec_test.cu
 )

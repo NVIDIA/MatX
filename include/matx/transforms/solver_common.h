@@ -57,47 +57,7 @@ namespace matx {
   using lapack_int_t = index_t;
 #endif
 
-/* Parameter enums */
-
-/**
- * @enum SolverFillMode
- *   Indicates which part (lower or upper) of the dense matrix was filled
- *   and should be used by the function.
- */
-enum class SolverFillMode {
-  UPPER,  /**< Use the upper part of the matrix */
-  LOWER   /**< Use the lower part of the matrix */
-};
-
-/**
- * @enum EigenMode
- *   Specifies whether or not eigenvectors should be computed.
- */
-enum class EigenMode {
-  NO_VECTOR,  /**< Only eigenvalues are computed */
-  VECTOR      /**< Both eigenvalues and eigenvectors are computed */
-};
-
-/**
- * @enum SVDMode
- *   Modes for computing columns of *U* and rows of *VT* in Singular Value Decomposition (SVD).
- *   Corresponds to the LAPACK/cuSolver parameters jobu and jobvt. The same option is used
- *   for both jobu and jobvt in MatX.
- */
-enum class SVDMode {
-  ALL,     /**< Compute all columns of *U* and all rows of *VT* (Equivalent to jobu = jobvt = 'A') */
-  REDUCED, /**< Compute only the first `min(m,n` columns of *U* and rows of *VT* (Equivalent to jobu = jobvt = 'S') */
-  NONE     /**< Compute no columns of *U* or rows of *VT* (Equivalent to jobu = jobvt = 'N') */
-};
-
-/**
- * @enum SVDHostAlgo
- *   Controls the LAPACK driver used for SVD on host.
- */
-enum class SVDHostAlgo {
-  QR,  /**< QR-based method (corresponds to `gesvd`) */
-  DC   /**< Divide and Conquer method (corresponds to `gesdd`) */
-};
+#include "matx/core/operator_options.h"
 
 namespace detail {
 
@@ -197,7 +157,7 @@ __MATX_INLINE__ void SetBatchPointers(const TensorType &a, std::vector<PointerTy
     int batch_offset = static_cast<int>(BTYPE);
     cuda::std::array<shape_type, TensorType::Rank()> idx{0};
     auto a_shape = a.Shape();
-    size_t total_iter = std::accumulate(a_shape.begin(), a_shape.begin() + TensorType::Rank() - batch_offset, 1, std::multiplies<shape_type>());
+    size_t total_iter = std::accumulate(a_shape.begin(), a_shape.begin() + TensorType::Rank() - batch_offset, static_cast<shape_type>(1), std::multiplies<shape_type>());
     for (size_t iter = 0; iter < total_iter; iter++) {
       auto ap = cuda::std::apply([&a](auto... param) { return a.GetPointer(param...); }, idx);
       batch_ptrs.push_back(ap);

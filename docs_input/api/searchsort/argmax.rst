@@ -5,6 +5,8 @@ argmax
 
 Returns both the maximum values and the indices of the maximum values across the input operator
 
+.. versionadded:: 0.6.0
+
 .. doxygenfunction:: argmax(const InType &in, const int (&dims)[D])
 .. doxygenfunction:: argmax(const InType &in)
 

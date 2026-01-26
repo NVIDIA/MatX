@@ -5,6 +5,8 @@ polyval
 
 Evaluate a polynomial given an input sequence and coefficients
 
+
+.. versionadded:: 0.1.0
 .. doxygenfunction:: polyval(const Op &op, const Coeffs &coeffs)
 
 Examples

@@ -39,7 +39,6 @@
 #ifdef MATX_EN_CPU_SOLVER
   #include "matx/transforms/svd/svd_lapack.h"
 #endif
-
 namespace matx {
 
 
@@ -59,11 +58,25 @@ namespace detail {
       using svd_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "svd(" + get_type_str(a_) + ")"; }
-      __MATX_INLINE__ SVDOp(const OpA &a, const SVDMode jobz, const SVDHostAlgo algo) : a_(a), jobz_(jobz), algo_(algo) { };
+      __MATX_INLINE__ SVDOp(const OpA &a, const SVDMode jobz, const SVDHostAlgo algo) : a_(a), jobz_(jobz), algo_(algo) {
+        MATX_LOG_TRACE("{} constructor: jobz={}, algo={}", str(), static_cast<int>(jobz), static_cast<int>(algo));
+      };
 
       // This should never be called
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const = delete;
+
+      template <OperatorCapability Cap, typename InType>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
+        if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+          const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+          return combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(a_, in));
+        }
+        else {
+          auto self_has_cap = capability_attributes<Cap>::default_value;
+          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
+        }
+      }
 
       // TODO: Handle SVDMode::NONE case better to not require U & VT
       template <typename Out, typename Executor>
@@ -76,11 +89,6 @@ namespace detail {
         }
       }
 
-      static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
-      {
-        return OpA::Rank();
-      }
-
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
       {
@@ -89,6 +97,10 @@ namespace detail {
         }
       }
 
+      static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+      {
+        return OpA::Rank();
+      }
       // Size is not relevant in svd() since there are multiple return values and it
       // is not allowed to be called in larger expressions
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
@@ -116,7 +128,7 @@ namespace detail {
  *   Compute all, part, or none of matrices *U* and *VT*
  * @param algo
  *   For Host SVD calls, whether to use more efficient divide-and-conquer based
- *   `gesdd` routine or the QR factorization based `gesvd` routine. `gesdd`
+ *   `gesdd` routine or the QR factorization based `gesvd` routine. `gesdd`
  *   can run significantly faster, especially for large matrices. However, `gesdd`
  *   requires \f$ O(\min(M,N) ^ 2) \f$ memory as compared to \f$ O(\max(M,N)) \f$ for
  *   `gesvd`, and it can have poorer accuracy in some cases.
@@ -157,12 +169,29 @@ namespace detail {
       using svd_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "svdpi(" + get_type_str(a_) + ")"; }
-      __MATX_INLINE__ SVDPIOp(const OpA &a, const OpX &x, int iterations, index_t k) : a_(a), x_(x), iterations_(iterations), k_(k) 
-      { }
+      __MATX_INLINE__ SVDPIOp(const OpA &a, const OpX &x, int iterations, index_t k) : a_(a), x_(x), iterations_(iterations), k_(k)
+      {
+        MATX_LOG_TRACE("{} constructor: iterations={}, k={}", str(), iterations, k); }
 
       // This should never be called
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const = delete;
+
+      template <OperatorCapability Cap, typename InType>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
+        if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+          const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+          return combine_capabilities<Cap>(my_cap, 
+                                           detail::get_operator_capability<Cap>(a_, in),
+                                           detail::get_operator_capability<Cap>(x_, in));
+        }
+        else {
+          auto self_has_cap = capability_attributes<Cap>::default_value;
+          return combine_capabilities<Cap>(self_has_cap, 
+                                           detail::get_operator_capability<Cap>(a_, in),
+                                           detail::get_operator_capability<Cap>(x_, in));
+        }
+      }
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) {
@@ -242,6 +271,18 @@ namespace detail {
       // This should never be called
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const = delete;
+
+      template <OperatorCapability Cap, typename InType>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
+        if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+          const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+          return combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(a_, in));
+        }
+        else {
+          auto self_has_cap = capability_attributes<Cap>::default_value;
+          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
+        }
+      }
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) {

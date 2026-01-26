@@ -20,14 +20,15 @@
 //
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 // AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-// DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-// FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-// SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-// CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-// OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+// POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
@@ -51,7 +52,6 @@ struct Sparse2DenseParams_t {
   MatXDataType_t dtype;
   MatXDataType_t ptype;
   MatXDataType_t ctype;
-  int rank;
   cudaStream_t stream;
   index_t nse;
   index_t m;
@@ -123,13 +123,14 @@ public:
                                            &workspaceSize_);
     MATX_ASSERT(ret == CUSPARSE_STATUS_SUCCESS, matxCudaError);
     if (workspaceSize_) {
-      matxAlloc((void **)&workspace_, workspaceSize_, MATX_DEVICE_MEMORY);
+      matxAlloc((void **)&workspace_, workspaceSize_, MATX_DEVICE_MEMORY,
+                stream);
     }
   }
 
   ~Sparse2DenseHandle_t() {
     if (workspaceSize_) {
-      matxFree(workspace_);
+      matxFree(workspace_, params_.stream);
     }
     cusparseDestroy(handle_);
   }
@@ -140,7 +141,6 @@ public:
     params.dtype = TypeToInt<typename TensorTypeA::val_type>();
     params.ptype = TypeToInt<typename TensorTypeA::pos_type>();
     params.ctype = TypeToInt<typename TensorTypeA::crd_type>();
-    params.rank = a.Rank();
     params.stream = stream;
     // TODO: simple no-batch, row-wise, no-transpose for now
     params.nse = a.Nse();
@@ -189,17 +189,17 @@ struct Sparse2DenseParamsKeyHash {
 };
 
 /**
- * Test SOLVE parameters for equality. Unlike the hash, all parameters must
- * match exactly to ensure the hashed kernel can be reused for the computation.
+ * Test Sparse2Dense parameters for equality. Unlike the hash, all parameters
+ * must match exactly to ensure the hashed kernel can be reused for the
+ * computation.
  */
 struct Sparse2DenseParamsKeyEq {
   bool operator()(const Sparse2DenseParams_t &l,
                   const Sparse2DenseParams_t &t) const noexcept {
     return l.dtype == t.dtype && l.ptype == t.ptype && l.ctype == t.ctype &&
-           l.rank == t.rank && l.stream == t.stream && l.nse == t.nse &&
-           l.m == t.m && l.n == t.n && l.ptrA0 == t.ptrA0 &&
-           l.ptrA1 == t.ptrA1 && l.ptrA2 == t.ptrA2 && l.ptrA3 == t.ptrA3 &&
-           l.ptrA4 == t.ptrA4 && l.ptrO == t.ptrO;
+           l.stream == t.stream && l.nse == t.nse && l.m == t.m && l.n == t.n &&
+           l.ptrA0 == t.ptrA0 && l.ptrA1 == t.ptrA1 && l.ptrA2 == t.ptrA2 &&
+           l.ptrA3 == t.ptrA3 && l.ptrA4 == t.ptrA4 && l.ptrO == t.ptrO;
   }
 };
 
@@ -227,7 +227,7 @@ void sparse2dense_impl(OutputTensorType &O, const InputTensorType &a,
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   const auto stream = exec.getStream();
 
-   // Transform into supported form.
+  // Transform into supported form.
   auto o = getS2DSupportedTensor(O, stream);
 
   using atype = InputTensorType;
@@ -257,12 +257,15 @@ void sparse2dense_impl(OutputTensorType &O, const InputTensorType &a,
 
   // Lookup and cache.
   using cache_val_type = detail::Sparse2DenseHandle_t<otype, atype>;
+  auto cache_id = detail::GetCacheIdFromType<detail::sparse2dense_cache_t>();
+  MATX_LOG_DEBUG("Sparse2Dense transform: cache_id={}", cache_id);
   detail::GetCache().LookupAndExec<detail::sparse2dense_cache_t>(
-      detail::GetCacheIdFromType<detail::sparse2dense_cache_t>(), params,
+      cache_id, params,
       [&]() { return std::make_shared<cache_val_type>(o, a, stream); },
       [&](std::shared_ptr<cache_val_type> cache_type) {
         cache_type->Exec(o, a);
-      });
+      },
+      exec);
 
   // Copy transformed output back.
   if (!o.isSameView(O)) {

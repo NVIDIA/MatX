@@ -12,6 +12,8 @@ for a detailed walkthrough on creating tensors.
 Return by Value
 ~~~~~~~~~~~~~~~
 
+
+.. versionadded:: 0.1.0
 .. doxygenfunction:: make_tensor( const index_t (&shape)[RANK], matxMemorySpace_t space = MATX_MANAGED_MEMORY, cudaStream_t stream = 0)
 .. doxygenfunction:: make_tensor( TensorType &tensor, const index_t (&shape)[TensorType::Rank()], matxMemorySpace_t space = MATX_MANAGED_MEMORY, cudaStream_t stream = 0)
 .. doxygenfunction:: make_tensor( ShapeType &&shape, matxMemorySpace_t space = MATX_MANAGED_MEMORY, cudaStream_t stream = 0)
@@ -22,14 +24,19 @@ Return by Value
 .. doxygenfunction:: make_tensor( T *data, ShapeType &&shape, bool owning = false)
 .. doxygenfunction:: make_tensor( TensorType &tensor, typename TensorType::value_type *data, typename TensorType::shape_container &&shape)
 .. doxygenfunction:: make_tensor( TensorType &tensor, typename TensorType::value_type *ptr)
-.. doxygenfunction:: make_tensor( Storage &&s, ShapeType &&shape)
-.. doxygenfunction:: make_tensor( TensorType &tensor, typename TensorType::storage_type &&s, typename TensorType::shape_container &&shape)
 .. doxygenfunction:: make_tensor( T* const data, D &&desc, bool owning = false)
 .. doxygenfunction:: make_tensor( TensorType &tensor, typename TensorType::value_type* const data, typename TensorType::desc_type &&desc)
 .. doxygenfunction:: make_tensor( D &&desc, matxMemorySpace_t space = MATX_MANAGED_MEMORY, cudaStream_t stream = 0)
 .. doxygenfunction:: make_tensor( TensorType &&tensor, typename TensorType::desc_type &&desc, matxMemorySpace_t space = MATX_MANAGED_MEMORY, cudaStream_t stream = 0)
 .. doxygenfunction:: make_tensor( T *const data, const index_t (&shape)[RANK], const index_t (&strides)[RANK], bool owning = false)
 .. doxygenfunction:: make_tensor( TensorType &tensor, typename TensorType::value_type *const data, const index_t (&shape)[TensorType::Rank()], const index_t (&strides)[TensorType::Rank()])
+
+Custom Allocator Support
+~~~~~~~~~~~~~~~~~~~~~~~~
+.. doxygenfunction:: make_tensor( const index_t (&shape)[RANK], Allocator&& alloc)
+.. doxygenfunction:: make_tensor( ShapeType &&shape, Allocator&& alloc)
+.. doxygenfunction:: make_tensor( TensorType &tensor, const index_t (&shape)[TensorType::Rank()], Allocator&& alloc)
+.. doxygenfunction:: make_tensor( TensorType &tensor, ShapeType &&shape, Allocator&& alloc)
 
 Return by Pointer
 ~~~~~~~~~~~~~~~~~

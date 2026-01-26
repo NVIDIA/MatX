@@ -5,6 +5,8 @@ asinh
 
 Hyperbolic inverse sine
 
+
+.. versionadded:: 0.3.0
 .. doxygenfunction:: asinh(Op t)
 
 Examples

@@ -35,6 +35,7 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
+#include "matx/transforms/solve/solve_cusparse.h"
 #ifdef MATX_EN_CUDSS
 #include "matx/transforms/solve/solve_cudss.h"
 #endif
@@ -50,8 +51,9 @@ private:
 
   static constexpr int out_rank = OpB::Rank();
   cuda::std::array<index_t, out_rank> out_dims_;
-  mutable detail::tensor_impl_t<typename OpA::value_type, out_rank> tmp_out_;
+  mutable ::matx::detail::tensor_impl_t<typename OpA::value_type, out_rank> tmp_out_;
   mutable typename OpA::value_type *ptr = nullptr;
+  mutable bool prerun_done_ = false;
 
 public:
   using matxop = bool;
@@ -60,6 +62,7 @@ public:
   using value_type = typename OpA::value_type;
 
   __MATX_INLINE__ SolveOp(const OpA &a, const OpB &b) : a_(a), b_(b) {
+    MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
     for (int r = 0, rank = Rank(); r < rank; r++) {
       out_dims_[r] = b_.Size(r);
     }
@@ -71,10 +74,24 @@ public:
 
   __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
+  template <typename CapType, typename... Is>
+  __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto)
+  operator()(Is... indices) const {
+    return tmp_out_.template operator()<CapType>(indices...);
+  }
+
   template <typename... Is>
   __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto)
   operator()(Is... indices) const {
-    return tmp_out_(indices...);
+    return this->operator()<DefaultCapabilities>(indices...);
+  }
+
+  template <OperatorCapability Cap, typename InType>
+  __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
+    auto self_has_cap = capability_attributes<Cap>::default_value;
+    return combine_capabilities<Cap>(self_has_cap, 
+                                       detail::get_operator_capability<Cap>(a_, in),
+                                       detail::get_operator_capability<Cap>(b_, in));
   }
 
   static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t
@@ -91,11 +108,18 @@ public:
   void Exec([[maybe_unused]] Out &&out, [[maybe_unused]] Executor &&ex) const {
     static_assert(!is_sparse_tensor_v<OpB>, "sparse rhs not implemented");
     if constexpr (is_sparse_tensor_v<OpA>) {
+      // Note that diagonal solve assumes TRI-diagonal storage currently.
+      if constexpr (OpA::Format::isDIAI() || OpA::Format::isDIAJ()) {
+        sparse_dia_solve_impl(cuda::std::get<0>(out), a_, b_, ex);
+      } else if constexpr (OpA::Format::isBatchedDIAIUniform()) {
+        sparse_batched_dia_solve_impl(cuda::std::get<0>(out), a_, b_, ex);
+      } else {
 #ifdef MATX_EN_CUDSS
-      sparse_solve_impl(cuda::std::get<0>(out), a_, b_, ex);
+        sparse_solve_impl(cuda::std::get<0>(out), a_, b_, ex);
 #else
-      MATX_THROW(matxNotSupported, "Sparse direct solver requires cuDSS");
+        MATX_THROW(matxNotSupported, "Sparse direct solver requires cuDSS");
 #endif
+      }
     } else {
       MATX_THROW(matxNotSupported,
                  "Direct solver currently only supports sparse system");
@@ -116,9 +140,14 @@ public:
   template <typename ShapeType, typename Executor>
   __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape,
                               [[maybe_unused]] Executor &&ex) const noexcept {
+    if (prerun_done_) {
+      return;
+    }
+
     InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
     detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_,
                                &ptr);
+    prerun_done_ = true;
     Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
   }
 
@@ -137,10 +166,13 @@ public:
 } // end namespace detail
 
 /**
- * Run a direct SOLVE (viz. X = solve(A, B) solves system AX=B for unknown X).
- *
- * Note that currently, this operation is only implemented for solving
- * a linear system with a very **sparse** matrix A.
+ * Running X = solve(A, B) solves the system A X^T = B^T for
+ * an unknown X given the rhs B. The transposition is used so
+ * that the different rhs vectors and solutions are stacked by
+ * row (another way to think about this is that X and B are
+ * presented using column-major storage). Currently, this
+ * operation is only implemented for solving a linear system
+ * with a very **sparse** matrix A in CSR or DIA format.
  *
  * @tparam OpA
  *    Data type of A tensor (sparse)

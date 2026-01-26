@@ -37,9 +37,10 @@
 #include "matx/operators/scalar_ops.h"
 #include "matx/operators/base_operator.h"
 
+
 #define MATX_DEFINE_UNARY_OP(FUNCTION, TENSOR_OP)                   \
-  template <typename I1,                                            \
-            typename = typename std::enable_if_t<is_matx_op<I1>()>> \
+  template <typename I1>                                            \
+    requires is_matx_op_c<I1>                                       \
   [[nodiscard]] __MATX_INLINE__ auto FUNCTION(const I1 &i1)         \
   {                                                                 \
     using I1Type = extract_value_type_t<I1>;                        \
@@ -67,11 +68,23 @@ namespace matx
     using value_type = typename Op::value_type;
     using self_type = matxUnaryOp<I1, Op>;
 
+#ifdef MATX_EN_JIT
+    struct JIT_Storage {
+      typename detail::inner_storage_or_self_t<detail::base_type_t<I1>> in1_;
+      typename detail::inner_storage_or_self_t<detail::base_type_t<Op>> op_;
+    };
+
+    JIT_Storage ToJITStorage() const {
+      return JIT_Storage{detail::to_jit_storage(in1_), detail::to_jit_storage(op_)};
+    }
+#endif
+
     __MATX_INLINE__ const std::string str() const {
       return op_.str() + "(" + get_type_str(in1_) + ")";
     }
 
     __MATX_INLINE__ matxUnaryOp(const I1 &in1, const Op &op) : in1_(in1), op_(op) {
+      MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
       if constexpr (Rank() > 0) {
         for (int32_t i = 0; i < Rank(); i++) {
           size_[i] = get_size(in1_, i);
@@ -86,11 +99,103 @@ namespace matx
         }, idx);
     }
 
-    template <typename... Is, std::enable_if_t<std::conjunction_v<std::is_integral<Is>...>, bool> = true>
+    template <typename CapType, typename... Is>
+      requires (cuda::std::conjunction_v<cuda::std::is_integral<Is>...>)
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
     {
-      auto i1 = get_value(in1_, indices...);
-      return op_(i1);
+      auto i1 = get_value<CapType>(in1_, indices...);
+      return op_.template operator()<CapType>(i1);
+    }
+
+    template <typename... Is>
+      requires (cuda::std::conjunction_v<cuda::std::is_integral<Is>...>)
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
+    {
+      return this->template operator()<DefaultCapabilities>(indices...);
+    }
+
+    
+#ifdef MATX_EN_JIT
+    __MATX_INLINE__ std::string get_jit_class_name() const {
+      return "JITUnaryOp";
+    }
+
+    __MATX_INLINE__ auto get_jit_op_str() const {
+      std::string func_name = get_jit_class_name();
+      cuda::std::array<index_t, Rank()> out_dims_;
+      for (int i = 0; i < Rank(); ++i) {
+        out_dims_[i] = Size(i);
+      }
+      
+      return cuda::std::make_tuple(
+        func_name,
+        std::string("template <typename I1, typename Op> struct " + func_name + " {\n") +
+            "  using value_type = typename Op::value_type;\n" +
+            "  using matxop = bool;\n" +
+            "  constexpr static cuda::std::array<index_t, " + std::to_string(Rank()) + "> out_dims_ = { " +
+            detail::array_to_string(out_dims_) + " };\n" +
+            "  typename detail::inner_storage_or_self_t<detail::base_type_t<I1>> in1_;\n" +
+            "  typename detail::inner_storage_or_self_t<detail::base_type_t<Op>> op_;\n" +
+            "  template <typename CapType, typename... Is>\n" +
+            "  __MATX_INLINE__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) const\n" +
+            "  {\n" +
+            "    if ((threadIdx.x * static_cast<int>(CapType::ept)) > Size(Rank() - 1)) {\n" +
+            "      return detail::GetJitSentinelValue<CapType, value_type>();\n" +
+            "    }\n" +
+            "    auto i1 = get_value<CapType>(in1_, indices...);\n" +
+            "    return op_.template operator()<CapType>(i1);\n" +
+            "  }\n" +
+            "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank()\n" +
+            "  {\n" +
+            "    return detail::get_rank<I1>();\n" +
+            "  }\n" +
+            "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const\n" +
+            "  {\n" +
+            "    return out_dims_[dim];\n" +
+            "  }\n" +
+            "};\n"
+      );
+    }
+#endif
+
+    template <OperatorCapability Cap, typename InType>
+    __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
+      if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+#ifdef MATX_EN_JIT
+        const auto lhs_jit_name = detail::get_operator_capability<Cap>(in1_, in);
+        const auto op_jit_name = detail::get_operator_capability<Cap>(op_, in);
+        return get_jit_class_name() + "<" + lhs_jit_name + "," + op_jit_name + ">";
+#else
+        return "";
+#endif
+      }
+      else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+#ifdef MATX_EN_JIT
+        return combine_capabilities<Cap>(true, detail::get_operator_capability<Cap>(in1_, in));
+#else
+        return false;
+#endif
+      }
+      else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+#ifdef MATX_EN_JIT
+        const auto [key, value] = get_jit_op_str();
+        if (in.find(key) == in.end()) {
+          in[key] = value;
+        }
+        detail::get_operator_capability<Cap>(in1_, in);
+        detail::get_operator_capability<Cap>(op_, in);
+        return true;
+#else
+        return false;
+#endif
+      }
+      else if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
+        return detail::get_operator_capability<Cap>(in1_, in);
+      }
+      else {
+        auto self_has_cap = capability_attributes<Cap>::default_value;
+        return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(in1_, in));
+      }
     }
 
     static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -369,7 +474,7 @@ namespace matx
 
 #else
   MATX_DEFINE_UNARY_OP(sqrt, detail::SqrtOp);
-  MATX_DEFINE_UNARY_OP(csqrt, detail::CsqrtOp);
+  MATX_DEFINE_UNARY_OP(csqrt, detail::CSqrtOp);
   MATX_DEFINE_UNARY_OP(rsqrt, detail::RSqrtOp);
   MATX_DEFINE_UNARY_OP(exp, detail::ExpOp);
   MATX_DEFINE_UNARY_OP(expj, detail::ExpjOp);
@@ -377,24 +482,7 @@ namespace matx
   MATX_DEFINE_UNARY_OP(log2, detail::Log2Op);
   MATX_DEFINE_UNARY_OP(log, detail::LogOp);
   MATX_DEFINE_UNARY_OP(loge, detail::LogOp);
-#if 0
   MATX_DEFINE_UNARY_OP(conj, detail::ConjOp);
-#else
-  // implementing without a macro so we can optimize conj(real)
-  template <typename I1,
-            typename = typename std::enable_if_t<is_matx_op<I1>()>>
-  [[nodiscard]] __MATX_INLINE__ auto conj(I1 i1) {
-    using I1Type = extract_value_type_t<I1>;
-    if constexpr (is_complex_v<I1Type>) {
-      using Op = detail::ConjOp<I1Type>;
-      const typename detail::base_type_t<I1> &base = i1;
-      return detail::matxUnaryOp(base, Op());
-    } else {
-      // real type conj is a no-op so return original op.
-      return i1;
-    }
-  }
-#endif
   MATX_DEFINE_UNARY_OP(abs, detail::AbsOp);
   MATX_DEFINE_UNARY_OP(abs2, detail::Abs2Op);
   MATX_DEFINE_UNARY_OP(sin, detail::SinOp);
@@ -414,24 +502,7 @@ namespace matx
   MATX_DEFINE_UNARY_OP(ceil, detail::CeilOp);
   MATX_DEFINE_UNARY_OP(round, detail::RoundOp);
   MATX_DEFINE_UNARY_OP(normcdf, detail::NormCdfOp);
-#if 0
   MATX_DEFINE_UNARY_OP(real, detail::RealOp);
-#else
-  // implementing without a macro so we can optimize away real on a real operator
-  template <typename I1,
-            typename = typename std::enable_if_t<is_matx_op<I1>()>>
-  [[nodiscard]] __MATX_INLINE__ auto real(I1 i1) {
-    using I1Type = extract_value_type_t<I1>;
-    if constexpr (is_complex_v<I1Type>) {
-      using Op = detail::RealOp<I1Type>;
-      const typename detail::base_type_t<I1> &base = i1;
-      return detail::matxUnaryOp(base, Op());
-    } else {
-      // already real just return i1
-      return i1;
-    }
-  }
-#endif
   MATX_DEFINE_UNARY_OP(imag, detail::ImagOp);
   MATX_DEFINE_UNARY_OP(operator-, detail::SubNegOp );
   MATX_DEFINE_UNARY_OP(isnan, detail::IsNanOp);

@@ -35,6 +35,7 @@
 #include <cassert>
 #include <type_traits>
 #include <cuda/std/functional>
+#include "matx/core/vector.h"
 #include "matx/core/error.h"
 #include "matx/core/defines.h"
 #include "matx/core/tensor_desc.h"
@@ -42,6 +43,7 @@
 #include "matx/core/tensor_utils.h"
 #include "matx/operators/set.h"
 #include "matx/core/sparse_tensor_format.h"
+#include "matx/core/utils.h"
 //#include "matx_exec_kernel.h"
 #include "iterator.h"
 #include "matx/core/make_tensor.h"
@@ -59,7 +61,7 @@ struct DenseTensorData {
 template <typename T, typename CRD, typename POS, typename TF>
 struct SparseTensorData {
   using sparse_data = bool;
-  using value_type = T;  
+  using value_type = T;
   using crd_type = CRD;
   using pos_type = POS;
   using Format = TF;
@@ -103,6 +105,185 @@ class tensor_impl_t {
     // Type specifier for signaling this is a matx operation
     using matxop = bool;
 
+#ifdef MATX_EN_JIT
+    // Tensors are considered a leaf type and there cannot be an inner storage type
+    struct JIT_Storage {
+      T *ldata_;
+    };
+
+    JIT_Storage ToJITStorage() const {
+      return JIT_Storage{data_.ldata_};
+    }
+
+    __MATX_INLINE__ std::string get_jit_class_name() const {
+      std::string symbol_name = "JITTensorImpl_" + detail::type_to_string_c_name<T>() + "_";
+
+      symbol_name += "R" + std::to_string(RANK) + "_";
+
+      symbol_name += "SI_";
+      for (int i = 0; i < RANK; ++i) {
+        symbol_name += std::to_string(desc_.Size(i));
+        if (i != RANK - 1) {
+          symbol_name += "_";
+        }
+      }
+
+      symbol_name += "ST_";
+      for (int i = 0; i < RANK; ++i) {
+        symbol_name += std::to_string(desc_.Stride(i));
+        if (i != RANK - 1) {
+          symbol_name += "_";
+        }
+      }
+
+      return symbol_name;
+    }        
+
+    __MATX_INLINE__ auto get_jit_op_str() const {
+      // Note tensors are considered a leaf type, so we do not make JIT_Storage like we do for all other operators. This is because
+      // the inner type is just a plain pointer and has no operator() defined on it.
+      const std::string class_name = get_jit_class_name();
+      return cuda::std::make_tuple(
+         class_name, 
+         std::string("struct " + class_name + "  {\n") + 
+             "  static constexpr int RANK = " + std::to_string(Rank()) + ";\n" +
+             "  using T = " + detail::type_to_string<T>() + ";\n" +
+             "  using value_type = T;\n" +
+             "  using matxop = bool;\n" +
+             "  using stride_type = " +  detail::type_to_string<stride_type>() + ";\n" +
+             "  T *ldata_;\n" +       
+             "  constexpr static cuda::std::array<index_t, " + std::to_string(Rank()) + "> strides_ = { " + detail::array_to_string(desc_.Strides()) + " };\n" +
+             "  constexpr static cuda::std::array<index_t, " + std::to_string(Rank()) + "> sizes_ = { " + detail::array_to_string(desc_.Shape()) + " };\n" +
+             "  template <detail::ElementsPerThread EPT, int I = 0, typename ...Is>\n" +
+             "  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type GetVal([[maybe_unused]] cuda::std::tuple<Is...> tup)  {\n" +
+             "    if constexpr (I < sizeof...(Is)) {\n" +
+             "      if constexpr (EPT != detail::ElementsPerThread::ONE && I == sizeof...(Is) - 1) {\n" +
+             "        return GetVal<EPT, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(strides_[I] * static_cast<index_t>(EPT));\n" +
+             "      }\n" +
+             "      else {\n" +
+             "        return GetVal<EPT, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(strides_[I]);\n" +
+             "      }\n" +
+             "    }\n" +
+             "    else {\n" +
+             "      return 0;\n" +
+             "    }\n" +
+             "  }\n" +
+             "  template <detail::ElementsPerThread EPT, int I = 0, typename ...Is>\n" +
+             "  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type GetValC([[maybe_unused]] const cuda::std::tuple<Is...> tup) const {\n" +
+             "    if constexpr (I < sizeof...(Is)) {\n" +
+             "      if constexpr (EPT != detail::ElementsPerThread::ONE && I == sizeof...(Is) - 1) {\n" +
+             "        return GetValC<EPT, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(strides_[I] * static_cast<index_t>(EPT));\n" +
+             "      }\n" +
+             "      else {\n" +
+             "        return GetValC<EPT, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(strides_[I]);\n" +
+             "      }\n" +
+             "    }\n" +
+             "    else {\n" +
+             "      return 0;\n" +
+             "    }\n" +
+             "  }\n" + 
+             "  template <detail::ElementsPerThread EPT, typename... Is>\n" +
+             "  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type GetOffsetOptimized(Is... indices) const {\n" +
+             "     constexpr size_t rank = sizeof...(Is);\n" +
+             "     constexpr int EPT_int = static_cast<int>(EPT);\n" +
+             "     const cuda::std::array<index_t, rank> idx{indices...};\n" +
+             "    \n" +
+             "    if constexpr (rank == 1) {\n" +
+             "        if constexpr (EPT != detail::ElementsPerThread::ONE) {\n" +
+             "          return idx[0] * (strides_[0] * EPT_int);\n" +
+             "      } else {\n" +
+             "        return idx[0] * strides_[0];\n" +
+             "      }\n" +
+             "    }\n" +
+             "    else if constexpr (rank == 2) {\n" +
+             "      if constexpr (EPT != detail::ElementsPerThread::ONE) {\n" +
+             "        return idx[0] * strides_[0] + idx[1] * (strides_[1] * EPT_int);\n" +
+             "      } else {\n" +
+             "        return idx[0] * strides_[0] + idx[1] * strides_[1];\n" +
+             "      }\n" +
+             "    }\n" +
+             "    else if constexpr (rank == 3) {\n" +
+             "      if constexpr (EPT != detail::ElementsPerThread::ONE) {\n" +
+             "        return idx[0] * strides_[0] + idx[1] * strides_[1] + idx[2] * (strides_[2] * EPT_int);\n" +
+             "      } else {\n" +
+             "        return idx[0] * strides_[0] + idx[1] * strides_[1] + idx[2] * strides_[2];\n" +
+             "      }\n" +
+             "    }\n" +
+             "    else if constexpr (rank == 4) {\n" +
+             "      if constexpr (EPT != detail::ElementsPerThread::ONE) {\n" +
+             "        return idx[0] * strides_[0] + idx[1] * strides_[1] + idx[2] * strides_[2] + idx[3] * (strides_[3] * EPT_int);\n" +
+             "      } else {\n" +
+             "        return idx[0] * strides_[0] + idx[1] * strides_[1] + idx[2] * strides_[2] + idx[3] * strides_[3];\n" +
+             "      }\n" +
+             "    }\n" +
+             "    else {\n" +
+             "      // For rank > 4, fall back to the recursive implementation\n" +
+             "      return GetValC<EPT, 0, Is...>(cuda::std::make_tuple(indices...));\n" +
+             "    }\n" +
+             "  }\n" +                         
+             "  template <typename CapType, int M = RANK, typename... Is,\n" +
+             "            cuda::std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>\n" +
+             "  __MATX_INLINE__  __MATX_DEVICE__ decltype(auto) operator()(Is... indices) const noexcept" + "{\n" +
+             "    static_assert(sizeof...(Is) == M, \"Number of indices of operator() must match rank of tensor\");\n" +
+             "     constexpr int EPT_int = static_cast<int>(CapType::ept);\n" +
+             "     const index_t offset = GetOffsetOptimized<CapType::ept>(indices...);\n" +
+             "     if constexpr (CapType::ept == detail::ElementsPerThread::ONE) {\n" +
+             "       return ldata_[offset];\n" +
+             "     } else if constexpr (EPT_int * sizeof(T) <= MAX_VEC_WIDTH_BYTES ) {\n" +
+             "       return *reinterpret_cast<detail::Vector<T, EPT_int>*>(ldata_ + offset);\n" +
+             "     } else {\n" +
+             "       detail::Vector<T, EPT_int> vec;\n" +
+             "       vec.template load<EPT_int>(ldata_ + offset);\n" +
+             "       return vec;\n" +
+             "     }\n" +
+             "  }\n" +
+             "  template <typename CapType, int M = RANK, typename... Is,\n" +
+             "            cuda::std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>\n" +
+             "  __MATX_INLINE__  __MATX_DEVICE__ decltype(auto) operator()(Is... indices) noexcept\n" +
+             "  {\n" +
+             "    static_assert(sizeof...(Is) == M, \"Number of indices of operator() must match rank of tensor\");\n" +
+             "    constexpr int EPT_int = static_cast<int>(CapType::ept);\n" +
+             "    const index_t offset = GetOffsetOptimized<CapType::ept>(indices...);\n" +
+             "    if constexpr (CapType::ept == detail::ElementsPerThread::ONE) {\n" +
+             "      return ldata_[offset];\n" +
+             "    } else {\n" +
+             "      return *reinterpret_cast<detail::Vector<T, EPT_int>*>(ldata_ + offset);\n" +
+            "    }\n" +
+            "  }\n" +
+            "  template <typename CapType>\n" +
+            "  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(const cuda::std::array<index_t, RANK> &idx) const noexcept\n" +
+            "  {\n" +
+            "    return cuda::std::apply([&](auto &&...args) {\n" +
+            "      return this->operator()<CapType>(args...);\n" +
+            "    }, idx);\n" +
+            "  }\n" +
+            "  template <typename CapType>\n" +
+            "  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(const cuda::std::array<index_t, RANK> &idx) noexcept\n" +
+            "  {\n" +
+            "    return cuda::std::apply([&](auto &&...args) -> T& {\n" +
+            "      return this->operator()<CapType>(args...);\n" +
+            "    }, idx);\n" +
+            "  }\n" +
+            "  template <typename CapType, int M = RANK, typename... Is>\n" +
+            "  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T* data_ptr(index_t block_idx, index_t ttl_threads) const noexcept\n" +
+            "  {\n"
+            "    //const index_t offset = GetOffsetOptimized<CapType::ept>(indices...);\n" +
+            "    //return ldata_ + offset;\n" +
+            "    return ldata_ + block_idx * ttl_threads * static_cast<index_t>(CapType::ept);\n" +
+            "  }\n" +
+             "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank()\n" +
+             "  {\n" +
+             "    return " + std::to_string(Rank()) + ";\n" +
+             "  }\n" +
+             "  constexpr __MATX_INLINE__  __MATX_DEVICE__ index_t Size(int dim) const\n" +
+             "  {\n" +
+             "    return sizes_[dim];\n " +
+             "  }\n" +
+             "};\n"
+      );
+    }    
+#endif     
+
     __MATX_INLINE__ tensor_impl_t(const tensor_impl_t &) = default;
     __MATX_INLINE__ tensor_impl_t(tensor_impl_t &&) = default;
     __MATX_INLINE__ tensor_impl_t& operator=(tensor_impl_t &&) = default;
@@ -115,9 +296,9 @@ class tensor_impl_t {
       return std::string("tensor_impl_") + std::to_string(RANK) + "_" + to_short_str<T>();
     }
 
-    /** Swaps two raw_pointer_buffers
+    /** Swaps two tensor implementations
      *
-     * Swaps members of two raw_pointer_buffers
+     * Swaps members of two tensor implementations
      *
      * @param lhs
      *   Left argument
@@ -126,7 +307,7 @@ class tensor_impl_t {
      */
     friend void swap(self_type &lhs, self_type &rhs) noexcept
     {
-      using std::swap;
+      using cuda::std::swap;
 
       swap(lhs.data_, rhs.data_);
       swap(lhs.desc_, rhs.desc_);
@@ -155,8 +336,8 @@ class tensor_impl_t {
      * @param shape
      *   Tensor shape
      */
-    template <typename ShapeType,
-              std::enable_if_t<!is_tensor_view_v<remove_cvref_t<ShapeType>> && !is_matx_descriptor_v<remove_cvref_t<ShapeType>>, bool> = true>
+    template <typename ShapeType>
+      requires (!is_tensor<remove_cvref_t<ShapeType>> && !is_matx_descriptor<remove_cvref_t<ShapeType>>)
     __MATX_INLINE__ tensor_impl_t(ShapeType &&shape) : desc_(std::forward<ShapeType>(shape))
     {
     }
@@ -185,7 +366,8 @@ class tensor_impl_t {
      * @param shape
      *   Sizes for each dimension. Length of sizes must match RANK
      */
-    template <typename ShapeType, std::enable_if_t<!is_matx_descriptor_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+    template <typename ShapeType>
+      requires (!is_matx_descriptor<remove_cvref_t<ShapeType>>)
     __MATX_INLINE__ tensor_impl_t(T *const ldata, ShapeType &&shape)
         : desc_(std::forward<ShapeType>(shape))
     {
@@ -232,7 +414,8 @@ class tensor_impl_t {
      */
 // gcc 14.1 incorrectly reports desc as uninitialized in some contexts
 MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
-    template <typename DescriptorType, std::enable_if_t<is_matx_descriptor_v<typename remove_cvref<DescriptorType>::type>, bool> = true>
+    template <typename DescriptorType>
+      requires is_matx_descriptor<remove_cvref_t<DescriptorType>>
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ tensor_impl_t(T *const ldata,
                     DescriptorType &&desc)
         : desc_{std::forward<DescriptorType>(desc)}
@@ -251,7 +434,8 @@ MATX_IGNORE_WARNING_POP_GCC
      * @param desc
      *   Tensor descriptor
      */
-    template <typename DescriptorType, std::enable_if_t<is_matx_descriptor_v<typename remove_cvref<DescriptorType>::type>, bool> = true>
+    template <typename DescriptorType>
+      requires is_matx_descriptor<remove_cvref_t<DescriptorType>>
     __MATX_INLINE__ tensor_impl_t(DescriptorType &&desc)
         : desc_{std::forward<DescriptorType>(desc)}
     {
@@ -633,6 +817,7 @@ MATX_IGNORE_WARNING_POP_GCC
         return set(*this, *this % op_base);
     }
 
+
     /**
      * Get the shape the tensor from the underlying data
      *
@@ -675,7 +860,7 @@ MATX_IGNORE_WARNING_POP_GCC
       MATX_ASSERT_STR(((RANK - end_count) == N), matxInvalidSize,
               "Number of matxDropDim specifiers must match the output rank");
 
-  #pragma unroll
+  MATX_LOOP_UNROLL
       for (int i = 0; i < RANK; i++) {
         typename Desc::shape_type first = firsts[i] < 0 ? this->Size(i) + firsts[i] : firsts[i];
         typename Desc::shape_type end = ends[i]   < 0 ? this->Size(i) + ends[i]   : ends[i];
@@ -760,7 +945,7 @@ MATX_IGNORE_WARNING_POP_GCC
 
       int d = 0;
 
-      #pragma unroll
+      MATX_LOOP_UNROLL
       for (int i = 0; i < N; i++) {
         index_t size = clones[i];
 
@@ -805,7 +990,7 @@ MATX_IGNORE_WARNING_POP_GCC
       cuda::std::array<stride_type, RANK> s;
       [[maybe_unused]] bool done[RANK] = {0};
 
-  #pragma unroll
+  MATX_LOOP_UNROLL
       for (int i = 0; i < RANK; i++) {
         int d = dims[i];
         MATX_ASSERT_STR(d < RANK, matxInvalidDim,
@@ -893,7 +1078,7 @@ MATX_IGNORE_WARNING_POP_GCC
     template <typename... Is>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T* GetPointer(Is... indices) const noexcept
     {
-      return data_.ldata_ + GetValC<0, Is...>(cuda::std::make_tuple(indices...));
+      return data_.ldata_ + GetOffsetOptimized<detail::ElementsPerThread::ONE>(indices...);
     }
 
     // Locates position of an element at given indices, or returns -1 when not
@@ -903,8 +1088,8 @@ MATX_IGNORE_WARNING_POP_GCC
     GetPos(index_t *lvlsz, index_t *lvl, index_t pos) const {
       static constexpr int LVL = TensorData::Format::LVL;
       if constexpr (L < LVL) {
-        using ftype = std::tuple_element_t<L, typename TensorData::Format::LVLSPECS>;
-        if constexpr (ftype::lvltype == ::matx::experimental::LvlType::Dense) {
+        using lspec = std::tuple_element_t<L, typename TensorData::Format::LvlSpecs>;
+        if constexpr (lspec::Type::isDense() || lspec::Type::isRange()) {
           // Dense level: pos * size + i.
           // TODO: see below, use a constexpr GetLvlSize(L) instead?
           const index_t dpos = pos * lvlsz[L] + lvl[L];
@@ -913,7 +1098,7 @@ MATX_IGNORE_WARNING_POP_GCC
           } else {
             return dpos;
           }
-        } else if constexpr (ftype::lvltype == ::matx::experimental::LvlType::Singleton) {
+        } else if constexpr (lspec::Type::isSingleton()) {
           // Singleton level: pos if crd[pos] == i and next levels match.
           if (CRDData(L)[pos] == lvl[L]) {
             if constexpr (L + 1 < LVL) {
@@ -922,8 +1107,7 @@ MATX_IGNORE_WARNING_POP_GCC
               return pos;
             }
           }
-        } else if constexpr (ftype::lvltype == ::matx::experimental::LvlType::Compressed ||
-                            ftype::lvltype == ::matx::experimental::LvlType::CompressedNonUnique) {
+        } else if constexpr (lspec::Type::isCompressed() || lspec::Type::isCompressedNU()) {
           // Compressed level: scan for match on i and test next levels.
           const typename TensorData::crd_type *c = CRDData(L);
           const typename TensorData::pos_type *p = POSData(L);
@@ -931,7 +1115,7 @@ MATX_IGNORE_WARNING_POP_GCC
             if (c[pp] == lvl[L]) {
               if constexpr (L + 1 < LVL) {
                 const index_t cpos = GetPos<L + 1>(lvlsz, lvl, pp);
-                if constexpr (ftype::lvltype == ::matx::experimental::LvlType::Compressed) {
+                if constexpr (lspec::Type::isCompressed()) {
                   return cpos; // always end scan (unique)
                 } else if (cpos != -1) {
                   return cpos; // only end scan on success (non-unique)
@@ -941,10 +1125,14 @@ MATX_IGNORE_WARNING_POP_GCC
               }
             }
           }
+        } else {
+#ifndef __CUDACC__
+          MATX_THROW(matxNotSupported, "unimplemented case");
+#endif
         }
       }
       return -1; // not found
-    }    
+    }
 
     // Element getter (viz. "lhs = Acoo(0,0);"). Note that due to the compact
     // nature of sparse data structures, these storage formats do not provide
@@ -955,7 +1143,7 @@ MATX_IGNORE_WARNING_POP_GCC
     // should avoid using getters inside performance critial regions, since
     // the implementation is far worse than O(1).
     template <typename... Is>
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T GetSparseValue(Is... indices) const noexcept { 
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T GetSparseValue(Is... indices) const noexcept {
       static constexpr int DIM = TensorData::Format::DIM;
       static constexpr int LVL = TensorData::Format::LVL;
 
@@ -964,9 +1152,9 @@ MATX_IGNORE_WARNING_POP_GCC
       cuda::std::array<index_t, DIM> dim{indices...};
       cuda::std::array<index_t, LVL> lvl;
       cuda::std::array<index_t, LVL> lvlsz;
-      TensorData::Format::dim2lvl(dim.data(), lvl.data(), /*asSize=*/false);
+      TensorData::Format::template dim2lvl<false>(dim.data(), lvl.data());
       // TODO: only compute once and provide a constexpr LvlSize(l) instead?
-      TensorData::Format::dim2lvl(Shape().data(), lvlsz.data(), /*asSize=*/true);
+      TensorData::Format::template dim2lvl<true>(Shape().data(), lvlsz.data());
       const index_t pos = GetPos(lvlsz.data(), lvl.data(), 0);
       if (pos != -1) {
         const typename TensorData::value_type tmp = Data()[pos];
@@ -987,11 +1175,16 @@ MATX_IGNORE_WARNING_POP_GCC
       return desc_.IsContiguous();
     }
 
-    template <int I = 0, typename ...Is>
+    template <typename detail::ElementsPerThread EPT, int I = 0, typename ...Is>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type GetVal([[maybe_unused]] cuda::std::tuple<Is...> tup)  {
       if constexpr (I < sizeof...(Is)) {
 MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
-        return GetVal<I+1, Is...>(tup) + cuda::std::get<I>(tup)*this->desc_.Stride(I);
+        if constexpr (EPT != detail::ElementsPerThread::ONE && I == sizeof...(Is) - 1) {
+          return GetVal<EPT, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(this->desc_.Stride(I) * static_cast<index_t>(EPT));
+        }
+        else {
+          return GetVal<EPT, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(this->desc_.Stride(I));
+        }
 MATX_IGNORE_WARNING_POP_GCC
       }
       else {
@@ -999,11 +1192,59 @@ MATX_IGNORE_WARNING_POP_GCC
       }
     }
 
-    template <int I = 0, typename ...Is>
+    // Optimized offset calculation for ranks 1-4 with explicit stride multiplications
+    template <detail::ElementsPerThread EPT, typename... Is>
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type GetOffsetOptimized(Is... indices) const {
+MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")      
+      constexpr size_t rank = sizeof...(Is);
+      constexpr int EPT_int = static_cast<int>(EPT);
+      const cuda::std::array<index_t, rank> idx{indices...};
+      
+      if constexpr (rank == 1) {
+        if constexpr (EPT != detail::ElementsPerThread::ONE) {
+          return idx[0] * (this->desc_.Stride(0) * EPT_int);
+        } else {
+          return idx[0] * this->desc_.Stride(0);
+        }
+      }
+      else if constexpr (rank == 2) {
+        if constexpr (EPT != detail::ElementsPerThread::ONE) {
+          return idx[0] * this->desc_.Stride(0) + idx[1] * (this->desc_.Stride(1) * EPT_int);
+        } else {
+          return idx[0] * this->desc_.Stride(0) + idx[1] * this->desc_.Stride(1);
+        }
+      }
+      else if constexpr (rank == 3) {
+        if constexpr (EPT != detail::ElementsPerThread::ONE) {
+          return idx[0] * this->desc_.Stride(0) + idx[1] * this->desc_.Stride(1) + idx[2] * (this->desc_.Stride(2) * EPT_int);
+        } else {
+          return idx[0] * this->desc_.Stride(0) + idx[1] * this->desc_.Stride(1) + idx[2] * this->desc_.Stride(2);
+        }
+      }
+      else if constexpr (rank == 4) {
+        if constexpr (EPT != detail::ElementsPerThread::ONE) {
+          return idx[0] * this->desc_.Stride(0) + idx[1] * this->desc_.Stride(1) + idx[2] * this->desc_.Stride(2) + idx[3] * (this->desc_.Stride(3) * EPT_int);
+        } else {
+          return idx[0] * this->desc_.Stride(0) + idx[1] * this->desc_.Stride(1) + idx[2] * this->desc_.Stride(2) + idx[3] * this->desc_.Stride(3);
+        }
+      }
+      else {
+        // For rank > 4, fall back to the recursive implementation
+        return GetValC<EPT, 0, Is...>(cuda::std::make_tuple(indices...));
+      }
+MATX_IGNORE_WARNING_POP_GCC      
+    }
+
+    template <detail::ElementsPerThread EPT, int I = 0, typename ...Is>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type GetValC([[maybe_unused]] const cuda::std::tuple<Is...> tup) const {
       if constexpr (I < sizeof...(Is)) {
 MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
-        return GetValC<I+1, Is...>(tup) + cuda::std::get<I>(tup)*this->desc_.Stride(I);
+        if constexpr (EPT != detail::ElementsPerThread::ONE && I == sizeof...(Is) - 1) {
+          return GetValC<EPT, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(this->desc_.Stride(I) * static_cast<index_t>(EPT));
+        }
+        else {
+          return GetValC<EPT, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(this->desc_.Stride(I));
+        }
 MATX_IGNORE_WARNING_POP_GCC
       }
       else {
@@ -1020,7 +1261,7 @@ MATX_IGNORE_WARNING_POP_GCC
      * @returns value at given index
      *
      */
-    template <int M = RANK, typename... Is>
+    template <typename CapType, int M = RANK, typename... Is>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) const noexcept
     {
       static_assert(sizeof...(Is) == M, "Number of indices of operator() must match rank of tensor");
@@ -1028,12 +1269,51 @@ MATX_IGNORE_WARNING_POP_GCC
 #ifndef NDEBUG
         assert(data_.ldata_ != nullptr);
 #endif
-        return *(data_.ldata_ + GetValC<0, Is...>(cuda::std::make_tuple(indices...)));
+        constexpr int EPT_int = static_cast<int>(CapType::ept);
+        const index_t offset = GetOffsetOptimized<CapType::ept>(indices...);
+
+        if constexpr (CapType::ept == detail::ElementsPerThread::ONE) {
+          return data_.ldata_[offset];
+        } else if constexpr (EPT_int * sizeof(T) <= MAX_VEC_WIDTH_BYTES ) {
+          return *reinterpret_cast<detail::Vector<T, EPT_int>*>(data_.ldata_ + offset);
+        } else {
+          detail::Vector<T, EPT_int> vec;
+          vec.template load<EPT_int>(data_.ldata_ + offset);
+          return vec;
+        }
       }
       else { // Sparse tensor getter
         return GetSparseValue(indices...);
       }
     }
+
+    /**
+     * Return a pointer to the tensor's data at the specified indices
+     *
+     * @param indices
+     *   Indices of tensor
+     *
+     * @returns pointer to value at given index
+     */
+    template <typename CapType, int M = RANK, typename... Is>
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T* data_ptr(Is... indices) const noexcept
+    {
+      static_assert(sizeof...(Is) == M, "Number of indices of data_ptr must match rank of tensor");
+      if constexpr (!is_sparse_data_v<TensorData>) {
+        const index_t offset = GetOffsetOptimized<CapType::ept>(indices...);
+        return data_.ldata_ + offset;
+      }
+      else {
+        // For sparse tensor, this is not supported
+        return nullptr;
+      }
+    }
+
+    template <int M = RANK, typename... Is>
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) const noexcept
+    {
+      return this->template operator()<DefaultCapabilities>(indices...);
+    }    
 
     /**
      * operator() getter
@@ -1044,8 +1324,8 @@ MATX_IGNORE_WARNING_POP_GCC
      * @returns value at given index
      *
      */
-    template <int M = RANK, typename... Is,
-      std::enable_if_t<std::conjunction_v<std::is_integral<Is>...>, bool> = true>
+    template <typename CapType, int M = RANK, typename... Is>
+      requires (cuda::std::conjunction_v<cuda::std::is_integral<Is>...>)
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) noexcept
     {
       if constexpr (!is_sparse_data_v<TensorData>) {
@@ -1053,11 +1333,47 @@ MATX_IGNORE_WARNING_POP_GCC
 #ifndef NDEBUG
         assert(data_.ldata_ != nullptr);
 #endif
-        return *(data_.ldata_ + GetVal<0, Is...>(cuda::std::make_tuple(indices...)));
+        constexpr int EPT_int = static_cast<int>(CapType::ept);
+        const index_t offset = GetOffsetOptimized<CapType::ept>(indices...);
+
+        if constexpr (CapType::ept == detail::ElementsPerThread::ONE) {
+          return data_.ldata_[offset];
+        } else {
+          return *reinterpret_cast<detail::Vector<T, EPT_int>*>(data_.ldata_ + offset);
+        }
       }
       else {
         return GetSparseValue(indices...);
       }
+    }
+
+    template <int M = RANK, typename... Is>
+      requires (cuda::std::conjunction_v<cuda::std::is_integral<Is>...>)
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) noexcept
+    {
+      return this->template operator()<DefaultCapabilities>(indices...);
+    }
+
+    template <typename CapType>
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(const cuda::std::array<index_t, RANK> &idx) const noexcept
+    {
+      return cuda::std::apply([&](auto &&...args) -> T {
+          return this->operator()<CapType>(args...);
+        }, idx);
+    }
+
+    /**
+     * operator() getter with an array index
+     *
+     * @returns value in tensor
+     *
+     */
+    template <typename CapType>
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__  decltype(auto) operator()(const cuda::std::array<index_t, RANK> &idx) noexcept
+    {
+      return cuda::std::apply([&](auto &&...args) -> T& {
+          return this->operator()<CapType>(args...);
+        }, idx);
     }
 
     /**
@@ -1069,7 +1385,7 @@ MATX_IGNORE_WARNING_POP_GCC
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(const cuda::std::array<index_t, RANK> &idx) const noexcept
     {
       return cuda::std::apply([&](auto &&...args) -> T {
-          return this->operator()(args...);
+          return this->operator()<DefaultCapabilities>(args...);
         }, idx);
     }
 
@@ -1082,9 +1398,141 @@ MATX_IGNORE_WARNING_POP_GCC
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__  decltype(auto) operator()(const cuda::std::array<index_t, RANK> &idx) noexcept
     {
       return cuda::std::apply([&](auto &&...args) -> T& {
-          return this->operator()(args...);
+          return this->operator()<DefaultCapabilities>(args...);
         }, idx);
     }
+
+
+    template <detail::OperatorCapability Cap, typename InType>
+    __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
+      // Since tensors are a "leaf" operator type, we will never have an operator passed to a tensor as the
+      // type, but only POD types.
+      if constexpr (Cap == detail::OperatorCapability::ELEMENTS_PER_THREAD) {
+        if constexpr (Rank() == 0) {
+          return cuda::std::array<detail::ElementsPerThread, 2>{detail::ElementsPerThread::ONE, detail::ElementsPerThread::ONE};
+        }
+        else {
+          if (Stride(Rank() - 1) != 1) {
+            return cuda::std::array<detail::ElementsPerThread, 2>{detail::ElementsPerThread::ONE, detail::ElementsPerThread::ONE};
+          }
+        }
+
+        // Maybe relax this constraint later, but for now the tensor has to be contiguous. This should prevent clones
+        // and strides from vectorizing.
+        if (!IsContiguous()) {
+          return cuda::std::array<detail::ElementsPerThread, 2>{detail::ElementsPerThread::ONE, detail::ElementsPerThread::ONE};
+        }
+
+        if constexpr (sizeof(T) != alignment_by_type<T>()) {
+          // If the alignment of the type does not match sizeof(T), then the logic
+          // below will not necessarily work. It would generally work if alignment_by_type<T>() < sizeof(T),
+          // except for cases where sizeof(T) > MAX_VEC_WIDTH_BYTES, which result in division by zero.
+          // Curently, this is only true for vector types (e.g., double3) and we use one EPT for these cases.
+          return cuda::std::array<detail::ElementsPerThread, 2>{detail::ElementsPerThread::ONE, detail::ElementsPerThread::ONE};
+        } else {
+          // Set to the max ILP if possible and let the dispatch routine reduce it if needed
+          int width = in.jit ? 32 : MAX_VEC_WIDTH_BYTES / sizeof(T); 
+          while (width > 1) {
+            if (((Lsize() % width) == 0) &&                                       // Last dim is a multiple of vector load size
+              ((reinterpret_cast<uintptr_t>(data_.ldata_) % (sizeof(T) * width)) == 0)) {
+              break;
+            }
+
+            width /= 2;
+          }
+
+          return cuda::std::array<detail::ElementsPerThread, 2>{detail::ElementsPerThread::ONE, static_cast<detail::ElementsPerThread>(width)};
+        }
+      }
+      else if constexpr (Cap == OperatorCapability::MAX_EPT_VEC_LOAD) {
+        int vec = MAX_VEC_WIDTH_BYTES / sizeof(T);
+        // Round down to next lower power of two
+        // (if already a power of two, remains unchanged)
+        // For vec = 0, will stay zero (avoid infinite loop)
+        int power = 1;
+        while (power * 2 <= vec) {
+          power *= 2;
+        }
+
+        return power;
+      }
+      else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+#ifdef MATX_EN_JIT
+        return true;
+#else
+        return false;
+#endif
+      }
+      else if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+#ifdef MATX_EN_JIT
+        // No need to use combine_capabilities here since we're just returning a string.
+        return get_jit_class_name();
+#else
+        return "";
+#endif
+      } 
+      else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+#ifdef MATX_EN_JIT
+        const auto [key, value] = get_jit_op_str();
+      
+        // Insert into the map if the key doesn't exist
+        if (in.find(key) == in.end()) {
+          in[key] = value;
+        }
+
+        return true;
+#else
+        return false;
+#endif
+      }
+      else if constexpr (Cap == OperatorCapability::ALIASED_MEMORY) {
+        // Check if this tensor's memory overlaps with the query input range
+        static_assert(std::is_same_v<remove_cvref_t<InType>, detail::AliasedMemoryQueryInput>, 
+                      "ALIASED_MEMORY capability requires AliasedMemoryQueryInput");
+
+        // Rank 0 (scalars) don't need aliasing checks
+        if constexpr (Rank() == 0) {
+          return false;
+        }
+        else if constexpr (is_sparse_data_v<TensorData>) {
+          return false;
+        }
+        else {
+          // The logic to detect overlaps is as follows: If we have a complete overlap (first and last pointers are identical), 
+          // ie (a = a), then we need to check if the tensor is contiguous or if the input permutes the input and output. If either 
+          // of those are true then this will alias. Otherwise we have a partial overlap. For a partial overlap we always say this
+          // can alias.
+
+          // Get address of first element using operator()(0, 0, ...)
+          auto get_first = [this]<size_t... Is>(cuda::std::index_sequence<Is...>) {
+            return &(const_cast<tensor_impl_t*>(this)->operator()(static_cast<index_t>(Is*0)...));
+          };
+          void* tensor_start = static_cast<void*>(const_cast<T*>(get_first(cuda::std::make_index_sequence<Rank()>{})));
+          
+          // Get address of last element using operator()(Size(0)-1, Size(1)-1, ...)
+          auto get_last = [this]<size_t... Is>(cuda::std::index_sequence<Is...>) {
+            return &(const_cast<tensor_impl_t*>(this)->operator()(static_cast<index_t>(Size(Is)-1)...));
+          };
+          void* tensor_end = static_cast<void*>(static_cast<char*>(static_cast<void*>(const_cast<T*>(get_last(cuda::std::make_index_sequence<Rank()>{})))) + sizeof(T));
+
+          bool complete_overlap = tensor_start == in.start_ptr && tensor_end == in.end_ptr;
+          if (complete_overlap) {      
+            MATX_LOG_TRACE("Complete overlap of tensors. Contiguous: {}", IsContiguous());
+            return !IsContiguous() || in.permutes_input_output;
+          }
+          
+          // Check for overlap: two ranges [a1, a2) and [b1, b2) overlap if a1 < b2 && b1 < a2
+          bool overlaps = (tensor_start < in.end_ptr) && (in.start_ptr < tensor_end);
+          
+          MATX_LOG_TRACE("Overlap of tensors: {}", overlaps);
+          return overlaps;
+        }
+      }
+      else {
+        return detail::capability_attributes<Cap>::default_value;
+      }
+    }
+
 
     /**
      * Get the rank of the tensor
@@ -1167,13 +1615,13 @@ MATX_IGNORE_WARNING_POP_GCC
       data_.ldata_ = data;
     }
 
-    template <typename U = TensorData, 
-          std::enable_if_t<is_sparse_data_v<U>, int> = 0>
+    template <typename U = TensorData>
+      requires is_sparse_data<U>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__  auto CRDData(int l) const noexcept {
       return data_.crd_[l];
     }
-    template <typename U = TensorData, 
-          std::enable_if_t<is_sparse_data_v<U>, int> = 0>
+    template <typename U = TensorData>
+      requires is_sparse_data<U>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__  auto POSData(int l) const noexcept{
       return data_.pos_[l];
     }
@@ -1189,10 +1637,10 @@ MATX_IGNORE_WARNING_POP_GCC
     }
 
     template <typename U = TensorData>
-    auto SetSparseData(T* data, 
-                      typename U::crd_type* crd[U::LVL], 
-                      typename U::pos_type* pos[U::LVL])
-        -> std::enable_if_t<is_sparse_data_v<U>, void> {
+      requires is_sparse_data<U>
+    void SetSparseData(T* data,
+                      typename U::crd_type* crd[U::LVL],
+                      typename U::pos_type* pos[U::LVL]) {
       data_.ldata_ = data;
       memcpy(data_.crd_, crd, U::LVL*sizeof(crd[0]));
       memcpy(data_.pos_, pos, U::LVL*sizeof(pos[0]));
@@ -1207,6 +1655,13 @@ MATX_IGNORE_WARNING_POP_GCC
     __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
     {
     }
+
+    __MATX_INLINE__ __MATX_HOST__ bool has_capability([[maybe_unused]] OperatorCapability cap) const {
+      // Get the capability of the current operator node itself
+      // The derived class's get_capability_impl will handle the specific logic for that operator type,
+      // including querying children if it's a composite operator.
+      return false; 
+    } 
 
 
   protected:

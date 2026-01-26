@@ -24,7 +24,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, FMod)
   (tov0 = fmod(tiv0, tiv1)).run(exec);
   // example-end fmod-test-1
   exec.sync();
-  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::_internal_fmod((TestType)5.0, (TestType)3.1)));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::scalar_internal_fmod((TestType)5.0, (TestType)3.1)));
 
   MATX_EXIT_HANDLER();
 } 

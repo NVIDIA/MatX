@@ -34,7 +34,6 @@
 
 #include <cstdint>
 #include <type_traits>
-#include <optional>
 
 #include "matx/core/allocator.h"
 #include "matx/core/error.h"
@@ -46,15 +45,9 @@
 #include "matx/transforms/fft/fft_cuda.h"
 
 namespace matx {
-typedef enum {
-  AMBGFUN_CUT_TYPE_2D,
-  AMBGFUN_CUT_TYPE_DELAY,
-  AMBGFUN_CUT_TYPE_DOPPLER,
-} AMBGFunCutType_t;
-};
-
-namespace matx {
 namespace detail {
+
+struct EmptyY {};
 
 
 template <class O, class I1, class I2>
@@ -69,19 +62,26 @@ public:
   {
   }
 
-  __MATX_DEVICE__ inline void operator()(index_t idy, index_t idx)
+  template <typename CapType>
+  __MATX_DEVICE__ __MATX_INLINE__ __MATX_HOST__ void operator()(index_t idy, index_t idx)
   {
+    if constexpr (CapType::ept == ElementsPerThread::ONE) {
+      index_t xcol = idx - (xnorm_.Size(xnorm_.Rank() - 1) - 1) + idy;
+      if (xcol >= 0 && xcol < (xnorm_.Size(xnorm_.Rank() - 1))) {
+        typename I1::type xnorm = xnorm_(xcol);
+        typename I2::type ynorm = ynorm_(idx);
 
-    index_t xcol = idx - (xnorm_.Size(xnorm_.Rank() - 1) - 1) + idy;
-    if (xcol >= 0 && xcol < (xnorm_.Size(xnorm_.Rank() - 1))) {
-      typename I1::type xnorm = xnorm_(xcol);
-      typename I2::type ynorm = ynorm_(idx);
+        out_(idy, idx) = ynorm * cuda::std::conj(xnorm);
+      }
+      else {
+        out_(idy, idx) = {0, 0};
+      }
+    }
+  }
 
-      out_(idy, idx) = ynorm * cuda::std::conj(xnorm);
-    }
-    else {
-      out_(idy, idx) = {0, 0};
-    }
+  __MATX_DEVICE__ __MATX_INLINE__ __MATX_HOST__ void operator()(index_t idy, index_t idx)
+  {
+    return out_.template operator()<ElementsPerThread::ONE>(idy, idx);
   }
 
   constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
@@ -93,6 +93,17 @@ public:
   {
     return O::Rank();
   }
+
+
+  template <OperatorCapability Cap, typename InType>
+  __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
+    // No specific capabilities enforced
+    auto self_has_cap = capability_attributes<Cap>::default_value;
+    return combine_capabilities<Cap>(self_has_cap, 
+          detail::get_operator_capability<Cap>(xnorm_, in), 
+          detail::get_operator_capability<Cap>(ynorm_, in),
+          detail::get_operator_capability<Cap>(out_, in));
+  }     
 };
 
 template <class O, class I1>
@@ -109,15 +120,32 @@ public:
       : out_(out), x_(x), fs_(fs), cut_(cut), nfreq_(nfreq)
   {
   }
+
+  template <typename CapType>
   __MATX_DEVICE__ inline void operator()(index_t idx)
   {
-
-    out_(idx) =
-        exp(cuda::std::complex<float>{
-            0, static_cast<float>(2.0 * M_PI *
-                                  (-fs_ / 2.0 + idx * fs_ / nfreq_) * cut_)}) *
-        x_(idx);
+    if constexpr (CapType::ept == ElementsPerThread::ONE) {
+      out_(idx) =
+          exp(cuda::std::complex<float>{
+              0, static_cast<float>(2.0 * M_PI *
+                                    (-fs_ / 2.0 + idx * fs_ / nfreq_) * cut_)}) *
+          x_(idx);
+    }
   }
+
+  __MATX_DEVICE__ inline void operator()(index_t idx)
+  {
+    return out_.template operator()<ElementsPerThread::ONE>(idx);
+  } 
+
+  template <OperatorCapability Cap, typename InType>
+  __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
+    // No specific capabilities enforced
+    auto self_has_cap = capability_attributes<Cap>::default_value;
+    return combine_capabilities<Cap>(self_has_cap, 
+          detail::get_operator_capability<Cap>(out_, in), 
+          detail::get_operator_capability<Cap>(x_, in));
+  }       
 
   constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
   {
@@ -141,13 +169,30 @@ public:
       : out_(out), x_(x), fs_(fs), cut_(cut)
   {
   }
+
+  template <typename CapType>
   __MATX_DEVICE__ inline void operator()(index_t idx)
   {
-
-    out_(idx) = exp(cuda::std::complex<float>{
-                    0, static_cast<float>(2.0 * M_PI * idx / fs_ * cut_)}) *
-                x_(idx);
+    if constexpr (CapType::ept == ElementsPerThread::ONE) {
+      out_(idx) = exp(cuda::std::complex<float>{
+                      0, static_cast<float>(2.0 * M_PI * idx / fs_ * cut_)}) *
+                  x_(idx);
+    }
   }
+
+  __MATX_DEVICE__ inline void operator()(index_t idx)
+  {
+    return out_.template operator()<ElementsPerThread::ONE>(idx);
+  }
+
+  template <OperatorCapability Cap, typename InType>
+  __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
+    // No specific capabilities enforced
+    auto self_has_cap = capability_attributes<Cap>::default_value;
+    return combine_capabilities<Cap>(self_has_cap, 
+          detail::get_operator_capability<Cap>(out_, in), 
+          detail::get_operator_capability<Cap>(x_, in));
+  }           
 
   constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
   {
@@ -159,9 +204,9 @@ public:
   }
 };
 
-template <typename AMFTensor, typename XTensor>
+template <typename AMFTensor, typename XTensor, typename YTensor>
 void ambgfun_impl(AMFTensor &amf, XTensor &x,
-                     std::optional<XTensor> &y,
+                     YTensor &y,
                      [[maybe_unused]] double fs, ::matx::AMBGFunCutType_t cut,
                      [[maybe_unused]] float cut_val, cudaStream_t stream = 0)
 {
@@ -183,8 +228,8 @@ void ambgfun_impl(AMFTensor &amf, XTensor &x,
 
   auto y_normdiv_v = x_normdiv_v.View();
 
-  if (y) {
-    ry.Reset(y.value().Data(), y.value().Shape());
+  if constexpr (!std::is_same_v<YTensor, EmptyY>) {
+    ry.Reset(y.Data(), y.Shape());
     y_normdiv_v.Shallow(make_tensor<T1>(y_normdiv_v.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream));
     auto y_norm_v = make_tensor<float>({}, MATX_ASYNC_DEVICE_MEMORY, stream);
 

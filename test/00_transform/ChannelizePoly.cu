@@ -257,6 +257,154 @@ TYPED_TEST(ChannelizePolyTestDoubleType, MixedPrecision)
   MATX_EXIT_HANDLER();
 }
 
+// Tests that verify that the accumulator property is used to set the type of the accumulator.
+// Also tests that the output property is used to set the type of the output.
+TYPED_TEST(ChannelizePolyTestDoubleType, AccumProperty)
+{
+  MATX_ENTER_HANDLER();
+
+  cudaStream_t stream = 0;
+
+  const index_t a_len = 2500;
+  const index_t f_len = 155;
+  const index_t num_channels = 5;
+  const index_t decimation_factor = num_channels;
+  const index_t b_len_per_channel = (a_len + num_channels - 1) / num_channels;
+  const double mixed_thresh = 1e-5;
+  const double mixed_thresh_complex_input = 1e-4;
+
+  this->pb->template InitAndRunTVGenerator<double>(
+    "00_transforms", "channelize_poly_operators", "channelize", {a_len, f_len, num_channels});
+  auto a64 = make_tensor<double>({a_len});
+  auto f64 = make_tensor<double>({f_len});
+  auto gold_output_hreal = make_tensor<cuda::std::complex<double>>({b_len_per_channel, num_channels});
+  this->pb->NumpyToTensorView(a64, "a");
+  this->pb->NumpyToTensorView(f64, "filter_random");
+  this->pb->NumpyToTensorView(gold_output_hreal, "b_random_hreal");
+
+  auto a32 = make_tensor<float>({a_len});
+  (a32 = as_float(a64)).run(this->exec);
+  auto f32 = make_tensor<float>({f_len});
+  (f32 = as_float(f64)).run(this->exec);
+  auto b32 = make_tensor<cuda::std::complex<float>>({b_len_per_channel, num_channels});
+  auto b64 = make_tensor<cuda::std::complex<double>>({b_len_per_channel, num_channels});
+
+  // Single precision input, output, and filter, double precision accumulator
+  {
+    auto chan_poly = channelize_poly(a32, f32, num_channels, decimation_factor).props<PropAccum<double>>();
+    (b32 = chan_poly).run(this->exec);
+    cudaStreamSynchronize(stream);
+    MATX_TEST_ASSERT_COMPARE(this->pb, b32, "b_random", mixed_thresh);
+  }
+
+  // Single precision input, double precision filter and accumulator
+  {
+    auto chan_poly = channelize_poly(a32, f64, num_channels, decimation_factor).props<PropAccum<double>>();
+    (b64 = chan_poly).run(this->exec);
+    cudaStreamSynchronize(stream);
+    MATX_TEST_ASSERT_COMPARE(this->pb, b64, "b_random", mixed_thresh);
+  }
+
+  // Double precision input and accumulator, single precision filter
+  {
+    auto chan_poly = channelize_poly(a64, f32, num_channels, decimation_factor).props<PropAccum<double>>();
+    (b64 = chan_poly).run(this->exec);
+    cudaStreamSynchronize(stream);
+    MATX_TEST_ASSERT_COMPARE(this->pb, b64, "b_random", mixed_thresh);
+  }
+
+  // Double precision input and filter, single precision accumulator. This would be an odd
+  // configuration, but technically allowed.
+  {
+    auto chan_poly = channelize_poly(a64, f64, num_channels, decimation_factor).props<PropAccum<float>>();
+    (b32 = chan_poly).run(this->exec);
+    cudaStreamSynchronize(stream);
+    MATX_TEST_ASSERT_COMPARE(this->pb, b32, "b_random", mixed_thresh);
+  }
+
+  this->pb->template InitAndRunTVGenerator<cuda::std::complex<double>>(
+    "00_transforms", "channelize_poly_operators", "channelize", {a_len, f_len, num_channels});
+  auto ac64 = make_tensor<cuda::std::complex<double>>({a_len});
+  this->pb->NumpyToTensorView(ac64, "a");
+  this->pb->NumpyToTensorView(f64, "filter_random_real");
+  this->pb->NumpyToTensorView(gold_output_hreal, "b_random_hreal");
+
+  // The following cases are all for complex inputs and real filters
+
+  auto ac32 = make_tensor<cuda::std::complex<float>>({a_len});
+  (ac32 = as_complex_float(ac64)).run(this->exec);
+  (f32 = as_float(f64)).run(this->exec);
+
+  // Below, we test that using a double-precision accumulator by running with fp32 inputs with and
+  // without a double-precision accumulator demonstrates higher accuracy when an fp64 accumulator.
+  // Note that for the single-precision test, we need to write to a single-precision output or the
+  // accumulator would by default use the output type (i.e,. cuda::std::complex<double> for b64).
+  auto max_err = make_tensor<double>({});
+  double max_err_fp32{};
+  double max_err_fp32_in_fp64_accum{};
+
+  // All single precision
+  {
+    auto chan_poly = channelize_poly(ac32, f32, num_channels, decimation_factor);
+    (b32 = chan_poly).run(this->exec);
+    cudaStreamSynchronize(stream);
+    MATX_TEST_ASSERT_COMPARE(this->pb, b32, "b_random_hreal", mixed_thresh_complex_input);
+    (max_err = matx::max(matx::abs(as_complex_double(b32) - gold_output_hreal), {0,1})).run(this->exec);
+    cudaStreamSynchronize(stream);
+    max_err_fp32 = max_err();
+  }
+
+  // Single precision complex input, output, and filter, double precision accumulator
+  {
+    auto chan_poly = channelize_poly(ac32, f32, num_channels, decimation_factor)
+      .props<PropAccum<double>, PropOutput<cuda::std::complex<double>>>();
+    // Add a dummy complex value to force a PreRun call on chan_poly, which
+    // without the PropOutput would create a single-precision complex output type for
+    // the intermediate result.
+    (b64 = chan_poly + cuda::std::complex<double>(0.0, 0.0)).run(this->exec);
+    cudaStreamSynchronize(stream);
+    MATX_TEST_ASSERT_COMPARE(this->pb, b64, "b_random_hreal", mixed_thresh_complex_input);
+    (max_err = matx::max(matx::abs(b64 - gold_output_hreal), {0,1})).run(this->exec);
+    cudaStreamSynchronize(stream);
+    max_err_fp32_in_fp64_accum = max_err();
+  }
+
+  // We expect a bit better than 8x improvement with the fp64 accumulator for this case
+  ASSERT_GT(max_err_fp32, 8.0 * max_err_fp32_in_fp64_accum) << "expect > 8x improvement with fp64 accumulator";
+
+  // Single precision complex input, double precision filter and accumulator
+  {
+    // example-begin channelize_poly-test-2
+    // Single precision complex input (ac32) and double-precision filter (f64).
+    // Properties force double-precision accumulator and output.
+    auto chan_poly = channelize_poly(ac32, f64, num_channels, decimation_factor)
+      .props<PropAccum<double>, PropOutput<cuda::std::complex<double>>>();
+    (b64 = chan_poly).run(this->exec);
+    // example-end channelize_poly-test-2
+    cudaStreamSynchronize(stream);
+    MATX_TEST_ASSERT_COMPARE(this->pb, b64, "b_random_hreal", mixed_thresh_complex_input);
+  }
+
+  // Double precision complex input and accumulator, single precision filter
+  {
+    auto chan_poly = channelize_poly(ac64, f32, num_channels, decimation_factor).props<PropAccum<double>>();
+    (b64 = chan_poly).run(this->exec);
+    cudaStreamSynchronize(stream);
+    MATX_TEST_ASSERT_COMPARE(this->pb, b64, "b_random_hreal", mixed_thresh_complex_input);
+  }
+
+  // Double precision complex input and filter, single precision accumulator. This would be an odd
+  // configuration, but technically allowed.
+  {
+    auto chan_poly = channelize_poly(ac64, f64, num_channels, decimation_factor).props<PropAccum<float>>();
+    (b64 = chan_poly).run(this->exec);
+    cudaStreamSynchronize(stream);
+    MATX_TEST_ASSERT_COMPARE(this->pb, b64, "b_random_hreal", mixed_thresh_complex_input);
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
 // Batched tests use random input and filter values with two batch dimensions.
 TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, Batched)
 {
@@ -284,7 +432,7 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, Batched)
     const index_t num_channels = test_cases[i].num_channels;
     // Currently do not support oversampled channelization
     const index_t decimation_factor = num_channels;
-    [[maybe_unused]] const index_t b_len_per_channel = (a_len + num_channels - 1) / num_channels;
+    const index_t b_len_per_channel = (a_len + num_channels - 1) / num_channels;
     std::vector<index_t> sizes = { a_len, f_len, num_channels };
     sizes.insert(sizes.end(), test_cases[i].batch_dims.begin(), test_cases[i].batch_dims.end());
     this->pb->template InitAndRunTVGenerator<TestType>(

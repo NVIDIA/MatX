@@ -50,12 +50,77 @@ namespace matx
         using self_type = PermuteOp<T>;
 
       private:
-        typename detail::base_type_t<T> op_;
+        mutable typename detail::base_type_t<T> op_;
         cuda::std::array<int32_t, T::Rank()> dims_;
 
       public:
         using matxop = bool;
         using matxoplvalue = bool;
+
+#ifdef MATX_EN_JIT
+        struct JIT_Storage {
+          typename detail::inner_storage_or_self_t<detail::base_type_t<T>> op_;
+        };
+
+        JIT_Storage ToJITStorage() const {
+          return JIT_Storage{detail::to_jit_storage(op_)};
+        }
+
+        __MATX_INLINE__ std::string get_jit_class_name() const {
+          std::string dims_str;
+          for (int i = 0; i < Rank(); i++) {
+            dims_str += std::to_string(dims_[i]);
+            if (i < Rank() - 1) dims_str += "_";
+          }
+          return "JITPermute_dims" + dims_str;
+        }
+
+        __MATX_INLINE__ auto get_jit_op_str() const {
+          std::string func_name = get_jit_class_name();
+          cuda::std::array<index_t, Rank()> out_dims_;
+          for (int i = 0; i < Rank(); ++i) {
+            out_dims_[i] = Size(i);
+          }
+
+          std::string dims_array = "{ ";
+          for (int i = 0; i < Rank(); i++) {
+            dims_array += std::to_string(dims_[i]);
+            if (i < Rank() - 1) dims_array += ", ";
+          }
+          dims_array += " }";
+          
+          return cuda::std::make_tuple(
+            func_name,
+            std::string("template <typename T> struct " + func_name + " {\n") +
+                "  using value_type = typename T::value_type;\n" +
+                "  using matxop = bool;\n" +
+                "  constexpr static int Rank_ = " + std::to_string(Rank()) + ";\n" +
+                "  constexpr static cuda::std::array<index_t, Rank_> out_dims_ = { " +
+                detail::array_to_string(out_dims_) + " };\n" +
+                "  constexpr static cuda::std::array<int32_t, Rank_> dims_ = " + dims_array + ";\n" +
+                "  typename detail::inner_storage_or_self_t<detail::base_type_t<T>> op_;\n" +
+                "  template <typename CapType, typename... Is>\n" +
+                "  __MATX_INLINE__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) const\n" +
+                "  {\n" +
+                "    if constexpr (CapType::ept == ElementsPerThread::ONE) {\n" +
+                "      cuda::std::array<index_t, Rank_> inds{indices...};\n" +
+                "      cuda::std::array<index_t, Rank_> ind;\n" +
+                "      for(int32_t i = 0; i < Rank_; i++) {\n" +
+                "        for(int32_t j = 0; j < Rank_; j++) {\n" +
+                "          if(dims_[j] == i) ind[i] = inds[j];\n" +
+                "        }\n" +
+                "      }\n" +
+                "      return get_value<CapType>(op_, ind);\n" +
+                "    } else {\n" +
+                "      return Vector<value_type, static_cast<index_t>(CapType::ept)>{};\n" +
+                "    }\n" +
+                "  }\n" +
+                "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() { return Rank_; }\n" +
+                "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int32_t dim) const { return out_dims_[dim]; }\n" +
+                "};\n"
+          );
+        }
+#endif
 
         __MATX_INLINE__ std::string str() const { return "permute(" + op_.str() + ")"; }
 
@@ -74,51 +139,68 @@ namespace matx
 
             dims_[i] = dims[i];
           }
+          MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
         }
 
-        template <typename Op, typename Dims, typename... Is>
+        template <typename CapType, typename Op, typename Dims, typename... Is>
         static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, const Dims &dims, Is... indices)
         {
-          static_assert(sizeof...(Is)==Rank());
-          static_assert((std::is_convertible_v<Is, index_t> && ... ));
+          if constexpr (CapType::ept == ElementsPerThread::ONE) {
+            static_assert(sizeof...(Is)==Rank());
+            static_assert((std::is_convertible_v<Is, index_t> && ... ));
 
-          // convert variadic type to tuple so we can read/update
-          cuda::std::array<index_t, Rank()> inds{indices...};
+            // convert variadic type to tuple so we can read/update
+            cuda::std::array<index_t, Rank()> inds{indices...};
 MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
-          cuda::std::array<index_t, Rank()> ind;
+            cuda::std::array<index_t, Rank()> ind;
 MATX_IGNORE_WARNING_POP_GCC
 
 #if 0
     //This causes register spills but might be faster if Rank is large
-#pragma unroll
-          for(int32_t i = 0; i < Rank(); i++) {
-            ind[dims_[i]] = inds[i];
-          }
+MATX_LOOP_UNROLL
+            for(int32_t i = 0; i < Rank(); i++) {
+              ind[dims_[i]] = inds[i];
+            }
 #else
-#pragma unroll
-    // use double loop to avoid register spills
-          for(int32_t i = 0; i < Rank(); i++) {
-#pragma unroll
-            for(int32_t j = 0; j < Rank(); j++) {
-              if(dims[j] == i) {
-                ind[i] = inds[j];
+MATX_LOOP_UNROLL
+      // use double loop to avoid register spills
+            for(int32_t i = 0; i < Rank(); i++) {
+MATX_LOOP_UNROLL
+              for(int32_t j = 0; j < Rank(); j++) {
+                if(dims[j] == i) {
+                  ind[i] = inds[j];
+                }
               }
             }
-          }
 #endif
-          return get_value(cuda::std::forward<Op>(op), ind);
+            return get_value<CapType>(cuda::std::forward<Op>(op), ind);
+          } else {
+            return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
+          }
+        }
+
+        template <typename CapType, typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
+        {
+          return get_impl<CapType>(cuda::std::as_const(op_), dims_, indices...);
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          return get_impl(cuda::std::as_const(op_), dims_, indices...);
+          return this->operator()<DefaultCapabilities>(indices...);
+        }
+
+        template <typename CapType, typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
+        {
+          return get_impl<CapType>(cuda::std::forward<decltype(op_)>(op_), dims_, indices...);
         }
 
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
-          return get_impl(cuda::std::forward<decltype(op_)>(op_), dims_, indices...);
+          return this->operator()<DefaultCapabilities>(indices...);
         }
 
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int32_t dim) const
@@ -142,20 +224,57 @@ MATX_IGNORE_WARNING_POP_GCC
           }
         }
 
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
+          if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+#ifdef MATX_EN_JIT
+            const auto op_jit_name = detail::get_operator_capability<Cap>(op_, in);
+            return get_jit_class_name() + "<" + op_jit_name + ">";
+#else
+            return "";
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+#ifdef MATX_EN_JIT
+            return combine_capabilities<Cap>(true, detail::get_operator_capability<Cap>(op_, in));
+#else
+            return false;
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+#ifdef MATX_EN_JIT
+            const auto [key, value] = get_jit_op_str();
+            if (in.find(key) == in.end()) {
+              in[key] = value;
+            }
+            detail::get_operator_capability<Cap>(op_, in);
+            return true;
+#else
+            return false;
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
+            return detail::get_operator_capability<Cap>(op_, in);
+          }
+          else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+            return combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(op_, in));
+          } else {
+            auto self_has_cap = capability_attributes<Cap>::default_value;
+            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_, in));
+          }
+        }
+
         ~PermuteOp() = default;
         PermuteOp(const PermuteOp &rhs) = default;
+
         __MATX_INLINE__ auto operator=(const self_type &rhs) {
           return set(*this, rhs);
         }
 
         template<typename R>
         __MATX_INLINE__ auto operator=(const R &rhs) {
-          if constexpr (is_matx_transform_op<R>()) {
-            return mtie(*this, rhs);
-          }
-          else {
-            return set(*this, rhs);
-          }
+          return set(*this, rhs);
         }
     };
   }

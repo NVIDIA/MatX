@@ -240,15 +240,18 @@ void cov_impl(TensorTypeC &c, const TensorTypeA &a,
   auto params = detail::matxCovHandle_t<TensorTypeC, TensorTypeA>::GetCovParams(c, a, stream);
 
   using cache_val_type = detail::matxCovHandle_t<TensorTypeC, TensorTypeA>;
+  auto cache_id = detail::GetCacheIdFromType<detail::cov_cache_t>();
+  MATX_LOG_DEBUG("Covariance transform: cache_id={}", cache_id);
   detail::GetCache().LookupAndExec<detail::cov_cache_t>(
-    detail::GetCacheIdFromType<detail::cov_cache_t>(),
+    cache_id,
     params,
     [&]() {
       return std::make_shared<cache_val_type>(c, a);
     },
     [&](std::shared_ptr<cache_val_type> ctype) {
       ctype->Exec(c, a, exec);
-    }
+    },
+    exec
   );
 }
 

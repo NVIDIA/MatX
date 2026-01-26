@@ -7,8 +7,8 @@
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are met:
 //
-// 1. Redistributions of source code must retain the above copyright notice, this
-//    list of conditions and the following disclaimer.
+// 1. Redistributions of source code must retain the above copyright notice,
+//    this list of conditions and the following disclaimer.
 //
 // 2. Redistributions in binary form must reproduce the above copyright notice,
 //    this list of conditions and the following disclaimer in the documentation
@@ -20,14 +20,15 @@
 //
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 // AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-// DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-// FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-// SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-// CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-// OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+// POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
@@ -47,10 +48,12 @@ private:
 public:
   using matxop = bool;
   using matx_transform_op = bool;
-  using dense2sparse_xform_op = bool;
+  using tosparse_xform_op = bool;
   using value_type = typename OpA::value_type;
 
-  __MATX_INLINE__ Dense2SparseOp(const OpA &a) : a_(a) {}
+  __MATX_INLINE__ Dense2SparseOp(const OpA &a) : a_(a) {
+    MATX_LOG_TRACE("{} constructor: rank={}", str(), OpA::Rank());
+  }
 
   __MATX_INLINE__ std::string str() const {
     return "dense2sparse(" + get_type_str(a_) + ")";
@@ -66,12 +69,18 @@ public:
     return a_.Size(dim);
   }
 
+  template <OperatorCapability Cap, typename InType>
+  __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
+    auto self_has_cap = capability_attributes<Cap>::default_value;
+    return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
+  }
+
   template <typename Out, typename Executor>
   void Exec([[maybe_unused]] Out &&out, [[maybe_unused]] Executor &&ex) const {
     if constexpr (is_sparse_tensor_v<OpA>) {
       MATX_THROW(matxNotSupported, "Cannot use dense2sparse on sparse input");
     } else {
-      // NOTE: sparse assignment A = dense2sparse(B) takes direct reference!
+      // NOTE: sparse assignment O = dense2sparse(A) takes direct reference!
       if constexpr (is_sparse_tensor_v<Out>) {
         dense2sparse_impl(out, a_, ex);
       } else {

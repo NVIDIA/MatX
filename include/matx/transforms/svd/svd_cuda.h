@@ -32,8 +32,8 @@
 
 #pragma once
 
-#include "cublas_v2.h"
-#include "cusolverDn.h"
+#include <cublas_v2.h>
+#include <cusolverDn.h>
 
 #include "matx/core/error.h"
 #include "matx/core/nvtx.h"
@@ -45,6 +45,7 @@
 
 #include <cstdio>
 #include <numeric>
+#include <cuda/std/__algorithm/min.h>
 
 namespace matx {
 
@@ -55,6 +56,7 @@ enum class SVDMethod {
   GESVDJ_BATCHED,
   POW_ITER,
 };
+
 
 template<typename AType>
 inline auto svdbpi_impl_workspace(const AType &A, cudaStream_t stream) {
@@ -675,7 +677,7 @@ public:
               MatXTypeToCudaType<T1>(), &this->dspace, &this->hspace);
     }
     else {
-      int i_dspace;
+      int i_dspace = 0;
 
       if constexpr (std::is_same_v<float, T1>) {
         ret = cusolverDnSgesvdjBatched_bufferSize(
@@ -713,7 +715,7 @@ public:
         MATX_THROW(matxInvalidType, "Invalid data type passed to svd()");
       }
 
-      this->dspace = i_dspace;
+      this->dspace = sizeof(T1) * i_dspace;
       this->hspace = 0;
     }
 
@@ -965,14 +967,14 @@ void svd_impl(UTensor &&u, STensor &&s,
 
   // The power iteration method is a custom kernel so we don't need to test the types
   if (method == detail::SVDMethod::POW_ITER) {
-    svdbpi_impl(u, s, vt, a, 10, 0.f, exec);
-    return;
+    MATX_THROW(matxInvalidType, "Power iteration method not implemented");
+    //svdbpi_impl(u, s, vt, a, 10, 0.f, exec);
   }
 
   // cuSolver destroys the input, so we need to make a copy of A regardless
   T1 *tp;
   auto a_shape = a.Shape();
-  auto a_total_size = std::accumulate(a_shape.begin(), a_shape.begin() + ATensor::Rank(), 1, std::multiplies<index_t>());
+  auto a_total_size = std::accumulate(a_shape.begin(), a_shape.begin() + ATensor::Rank(), static_cast<index_t>(1), std::multiplies<index_t>());
   matxAlloc(reinterpret_cast<void **>(&tp), sizeof(T1) * a_total_size, MATX_ASYNC_DEVICE_MEMORY, stream);
 
   if (m_leq_n) {
@@ -999,15 +1001,18 @@ void svd_impl(UTensor &&u, STensor &&s,
 
     // Get cache or new SVD plan if it doesn't exist
     using cache_val_type = detail::matxDnSVDCUDAPlan_t<decltype(u_in), decltype(s_new), decltype(vt_in), decltype(at_col_maj)>;
+    auto cache_id = detail::GetCacheIdFromType<detail::svd_cuda_cache_t>();
+    MATX_LOG_DEBUG("SVD transform (full): cache_id={}", cache_id);
     detail::GetCache().LookupAndExec<detail::svd_cuda_cache_t>(
-      detail::GetCacheIdFromType<detail::svd_cuda_cache_t>(),
+      cache_id,
       params,
       [&]() {
         return std::make_shared<cache_val_type>(u_in, s_new, vt_in, at_col_maj, method, exec, job_cusolver);
       },
       [&](std::shared_ptr<cache_val_type> ctype) {
         ctype->Exec(u_in, s_new, vt_in, at_col_maj, exec, job_cusolver);
-      }
+      },
+      exec
     );
 
     if(!u_new.isSameView(u)) {
@@ -1036,15 +1041,18 @@ void svd_impl(UTensor &&u, STensor &&s,
 
     // Get cache or new SVD plan if it doesn't exist
     using cache_val_type = detail::matxDnSVDCUDAPlan_t<decltype(u_col_maj), decltype(s_new), decltype(vt_col_maj), decltype(tvt)>;
+    auto cache_id = detail::GetCacheIdFromType<detail::svd_cuda_cache_t>();
+    MATX_LOG_DEBUG("SVD transform (vectors): cache_id={}", cache_id);
     detail::GetCache().LookupAndExec<detail::svd_cuda_cache_t>(
-      detail::GetCacheIdFromType<detail::svd_cuda_cache_t>(),
+      cache_id,
       params,
       [&]() {
         return std::make_shared<cache_val_type>(u_col_maj, s_new, vt_col_maj, tvt, method, exec, job_cusolver);
       },
       [&](std::shared_ptr<cache_val_type> ctype) {
         ctype->Exec(u_col_maj, s_new, vt_col_maj, tvt, exec, job_cusolver);
-      }
+      },
+      exec
     );
 
     // cuSolver writes u and vt in col-major format, so we need to transpose them back.

@@ -35,7 +35,7 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
-#include "matx/transforms/conv.h"
+#include "matx/transforms/reduce.h"
 
 namespace matx
 {
@@ -51,7 +51,8 @@ namespace matx
         bool init_;
         cuda::std::array<index_t, ORank> out_dims_;
         mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, ORank> tmp_out_;
-        mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr; 
+        mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr;
+        mutable bool prerun_done_ = false; 
 
       public:
         using matxop = bool;
@@ -65,6 +66,7 @@ namespace matx
 
         __MATX_INLINE__ ReduceOp(const OpA &A, PermDims perm, ReductionOp rop, bool init) : 
               a_(A), perm_(perm), reduction_op_(rop), init_(init) {
+          MATX_LOG_TRACE("{} constructor: rop={}, init={}", str(), static_cast<int>(rop), init);
           for (int r = 0; r < ORank; r++) {
             out_dims_[r] = a_.Size(r);
           }
@@ -72,10 +74,22 @@ namespace matx
 
         __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
+        template <typename CapType, typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
+        {
+          return tmp_out_.template operator()<CapType>(indices...);
+        }
+
         template <typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          return tmp_out_(indices...);
+          return this->operator()<DefaultCapabilities>(indices...);
+        }
+
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
+          auto self_has_cap = capability_attributes<Cap>::default_value;
+          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
         }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -110,10 +124,15 @@ namespace matx
         template <typename ShapeType, typename Executor>
         __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
         {
+          if (prerun_done_) {
+            return;
+          }
+
           InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));           
 
           detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
 
+          prerun_done_ = true;
           Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
         }
 
@@ -132,7 +151,7 @@ namespace matx
 /**
  * Perform a reduction
  *
- * Performs a reduction from tensor "in" ingo a 0D operator using reduction
+ * Performs a reduction from tensor "in" into a 0D operator using reduction
  * operation ReduceOp. Without axes, reductions are performed over the entire
  * input operator.
  *
@@ -159,7 +178,7 @@ __MATX_INLINE__ auto reduce(const InType &in, ReduceOp op, bool init = true)
 /**
  * Perform a reduction
  *
- * Performs a reduction from tensor "in" ingo a 0D operator using reduction
+ * Performs a reduction from tensor "in" into a 0D operator using reduction
  * operation ReduceOp. In general, the reductions are performed over the
  * innermost dimensions, where the number of dimensions is the difference
  * between the input and number of axes. For example, when axes is the same as the

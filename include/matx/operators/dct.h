@@ -29,7 +29,6 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
-
 #pragma once
 
 #include <cstdint>
@@ -45,20 +44,51 @@ namespace matx {
 
 /* Operator for perfoming the 2*exp(-j*pi*k/(2N)) part of the DCT */
 namespace detail {
-template <typename O, typename I> class dctOp : public BaseOp<dctOp<O, I>> {
+template <typename I, typename Out> class dctOp : public BaseOp<dctOp<I, Out>> {
 private:
-  O out_;
-  I in_;
+  using input_type = typename I::value_type;
+  using value_type = typename input_type::value_type; // Real type from complex
+
+  typename detail::base_type_t<Out> out_;
+  typename detail::base_type_t<I> in_;
   index_t N_;
 
 public:
-  dctOp(O out, I in, index_t N) : out_(out), in_(in), N_(N) {}
+  dctOp(Out out, I in, index_t N) : out_(out), in_(in), N_(N) {
+    MATX_LOG_TRACE("dctOp constructor: N={}", N);
+  }
+
+  template <typename CapType>
+  __MATX_DEVICE__ inline void operator()(index_t idx)
+  {
+    const auto in_val = get_value<CapType>(in_, idx);
+    if constexpr(CapType::ept == ElementsPerThread::ONE) {
+      out_(idx) = static_cast<value_type>(
+        in_val.real() * cuda::std::cos(static_cast<value_type>(-1 * M_PI) * idx / (static_cast<value_type>(2.0f) * N_)) -
+        in_val.imag() * cuda::std::sin(static_cast<value_type>(-1 * M_PI) * idx / (static_cast<value_type>(2.0f) * N_)));
+    }
+  }
 
   __MATX_DEVICE__ inline void operator()(index_t idx)
   {
-    out_(idx) =
-        in_(idx).real() * 2.0f * cuda::std::cos(-1 * M_PI * idx / (2.0 * N_)) -
-        in_(idx).imag() * 2.0f * cuda::std::sin(-1 * M_PI * idx / (2.0 * N_));
+    this->operator()<DefaultCapabilities>(idx);
+  }
+
+  template <OperatorCapability Cap, typename InType>
+  __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const
+  {
+    if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+      const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+      return combine_capabilities<Cap>(my_cap, 
+        detail::get_operator_capability<Cap>(out_, in), 
+        detail::get_operator_capability<Cap>(in_, in));
+    }
+    else {
+      auto self_has_cap = capability_attributes<Cap>::default_value;
+      return combine_capabilities<Cap>(self_has_cap, 
+        detail::get_operator_capability<Cap>(out_, in), 
+        detail::get_operator_capability<Cap>(in_, in));
+    }
   }
 
   constexpr __MATX_HOST__ __MATX_DEVICE__ inline index_t Size(int i) const
@@ -68,7 +98,7 @@ public:
 
   static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
   {
-    return O::Rank();
+    return Out::Rank();
   }
 };
 }
@@ -101,9 +131,8 @@ void dct(OutputTensor &out, const InputTensor &in,
   MATX_STATIC_ASSERT(OutputTensor::Rank() == 1, matxInvalidDim);
   index_t N = in.Size(OutputTensor::Rank() - 1);
 
-  tensor_t<cuda::std::complex<typename OutputTensor::value_type>, 1> tmp{{N + 1}};
-
-  fft_impl(tmp, in, 0, FFTNorm::BACKWARD, stream);
+  tensor_t<typename OutputTensor::value_type, 1> tmp{{N + 1}};
+  (tmp = rfft(concat(0, in, reverse<0>(in)), 0, FFTNorm::BACKWARD)).run(stream);
   auto s = slice(tmp, {0}, {N});
   detail::dctOp(out, s, N).run(stream);
 }

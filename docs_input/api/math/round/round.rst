@@ -5,6 +5,8 @@ round
 
 Round to nearest integer
 
+
+.. versionadded:: 0.3.0
 .. doxygenfunction:: round(Op t)
 
 Examples

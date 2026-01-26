@@ -34,7 +34,6 @@
 
 
 #include "matx/core/type_utils.h"
-#include "matx/operators/base_operator.h"
 #include "matx/operators/permute.h"
 #include "matx/transforms/reduce.h"
 
@@ -50,7 +49,8 @@ namespace detail {
       typename detail::base_type_t<OpA> a_;
       cuda::std::array<index_t, ORank> out_dims_;
       mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, ORank> tmp_out_;
-      mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr;     
+      mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr;
+      mutable bool prerun_done_ = false;     
 
     public:
       using matxop = bool;
@@ -60,6 +60,7 @@ namespace detail {
 
       __MATX_INLINE__ std::string str() const { return "all(" + get_type_str(a_) + ")"; }
       __MATX_INLINE__ AllOp(const OpA &a) : a_(a) { 
+        MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
         for (int r = 0; r < ORank; r++) {
           out_dims_[r] = a_.Size(r);
         }
@@ -67,10 +68,15 @@ namespace detail {
 
       __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
+      template <typename CapType, typename... Is>
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
+        return tmp_out_.template operator()<CapType>(indices...);
+      };
+
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
-        return tmp_out_(indices...);
-      };
+        return tmp_out_.template operator()<DefaultCapabilities>(indices...);
+      };      
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
@@ -81,6 +87,13 @@ namespace detail {
       {
         return ORank;
       }
+
+      template <OperatorCapability Cap, typename InType>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
+        // No specific capabilities enforced
+        auto self_has_cap = capability_attributes<Cap>::default_value;
+        return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
+      }      
 
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void InnerPreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
@@ -93,10 +106,15 @@ namespace detail {
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
       {
+        if (prerun_done_) {
+          return;
+        }
+
         InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
 
         detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
 
+        prerun_done_ = true;
         Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
       }
 

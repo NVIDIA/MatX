@@ -49,10 +49,54 @@ namespace matx
         template <typename S>
           matxGenerator1D_t(S &&s, Generator1D f) : f_(f), s_(std::forward<S>(s)) {}
 
-        template <typename... Is>
-          __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
-            return f_(pp_get<Dim>(indices...));
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
+          if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            if constexpr (RANK != 1) { // Vectorization not supported yet
+              return cuda::std::array<detail::ElementsPerThread, 2>{detail::ElementsPerThread::ONE, detail::ElementsPerThread::ONE};
+            }
+            else {
+              return detail::capability_attributes<Cap>::default_value;
+            }
+          } 
+          else if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY || 
+                             Cap == OperatorCapability::JIT_CLASS_QUERY ||
+                             Cap == OperatorCapability::SUPPORTS_JIT) {
+            // Forward JIT-related capabilities to the generator
+            return f_.template get_capability<Cap>(in);
           }
+          else {          
+            return detail::capability_attributes<Cap>::default_value;
+          }
+        }
+
+#ifdef MATX_EN_JIT
+        struct JIT_Storage {
+          // Empty storage - generator data is made constexpr in JIT code
+        };
+
+        JIT_Storage ToJITStorage() const {
+          return JIT_Storage{};
+        }
+
+        __MATX_INLINE__ std::string get_jit_class_name() const {
+          return f_.get_jit_class_name();
+        }
+
+        __MATX_INLINE__ auto get_jit_op_str() const {
+          return f_.get_jit_op_str();
+        }
+#endif
+
+        template <typename CapType, typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const {
+          return f_.template operator()<CapType>(pp_get<Dim>(indices...));
+        }
+
+        template <typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const {
+          return this->operator()<DefaultCapabilities>(indices...);
+        }
 
         constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const
         {

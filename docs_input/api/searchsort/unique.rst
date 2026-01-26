@@ -6,6 +6,8 @@ unique
 Reduce to unique values in input. On completion `a_out` contains all unique values in `a`, and `num_found`
 contains the number of unique elements.
 
+.. versionadded:: 0.6.0
+
 .. doxygenfunction:: unique(const OpA &a)
 
 Examples

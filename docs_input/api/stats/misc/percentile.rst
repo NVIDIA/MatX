@@ -11,6 +11,8 @@ of 0 is equivalent to mean, 100 is max, and 50 is the median when using the ``LI
 
 Supported methods for interpolation are: LINEAR, HAZEN, WEIBULL, LOWER, HIGHER, MIDPOINT, NEAREST, MEDIAN_UNBIASED, and NORMAL_UNBIASED
 
+.. versionadded:: 0.6.0
+
 .. doxygenfunction:: percentile(const InType &in, unsigned char q, PercentileMethod method = PercentileMethod::LINEAR)
 .. doxygenfunction:: percentile(const InType &in, unsigned char q, const int (&dims)[D], PercentileMethod method = PercentileMethod::LINEAR)
 

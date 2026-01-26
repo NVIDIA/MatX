@@ -6,6 +6,8 @@ flatten
 Flatten an operator into a 1D operator where the total length is the product of all sizes
 of the original operator
 
+.. versionadded:: 0.1.0
+
 .. doxygenfunction:: flatten
 
 Examples

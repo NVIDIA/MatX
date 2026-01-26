@@ -5,6 +5,8 @@ set_print_format_type
 
 Set the MatX print format type
 
+
+.. versionadded:: 0.3.0
 .. doxygenenum:: PrintFormatType
 
 .. doxygenfunction:: set_print_format_type(enum PrintFormatType format_type)

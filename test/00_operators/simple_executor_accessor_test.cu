@@ -6,7 +6,7 @@
 using namespace matx;
 using namespace matx::test;
 
-TYPED_TEST(OperatorTestsAllExecs, SimpleExecutorAccessorTests)
+TYPED_TEST(OperatorTestsAllExecsWithoutJIT, SimpleExecutorAccessorTests)
 {
   MATX_ENTER_HANDLER();
 

@@ -40,7 +40,6 @@
   #include "matx/transforms/lu/lu_lapack.h"
 #endif
 
-
 namespace matx {
 namespace detail {
   template<typename OpA>
@@ -56,11 +55,19 @@ namespace detail {
       using lu_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "lu()"; }
-      __MATX_INLINE__ LUOp(const OpA &a) : a_(a) { };
+      __MATX_INLINE__ LUOp(const OpA &a) : a_(a) {
+        MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
+      };
 
       // This should never be called
       template <typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const = delete;
+
+      template <OperatorCapability Cap, typename InType>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
+        auto self_has_cap = capability_attributes<Cap>::default_value;
+        return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
+      }
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
@@ -81,7 +88,6 @@ namespace detail {
           a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
       }
-
       // Size is not relevant in eig() since there are multiple return values and it
       // is not allowed to be called in larger expressions
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const

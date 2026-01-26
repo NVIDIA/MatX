@@ -52,7 +52,6 @@ struct MatMulCUSPARSEParams_t {
   MatXDataType_t dtype;
   MatXDataType_t ptype;
   MatXDataType_t ctype;
-  int rank;
   cudaStream_t stream;
   float alpha;
   float beta;
@@ -80,12 +79,13 @@ public:
   using TB = typename TensorTypeB::value_type;
   using TC = typename TensorTypeC::value_type;
 
+  // Mixed-precision compute type.
+  using TCOMP = std::conditional_t<is_matx_half_v<TC>, float, TC>;
+
   /**
    * Construct a sparse GEMM handle
-   *   SpMV
    *   SpMM        <- for now
    *   SpGEMM
-   *
    */
   MatMulCUSPARSEHandle_t(TensorTypeC &c, const TensorTypeA &a,
                          const TensorTypeB &b, cudaStream_t stream, float alpha,
@@ -94,12 +94,12 @@ public:
     params_ = GetGemmParams(c, a, b, stream, alpha, beta);
 
     // Properly typed alpha, beta.
-    if constexpr (std::is_same_v<TC, cuda::std::complex<float>> ||
-                  std::is_same_v<TC, cuda::std::complex<double>>) {
+    if constexpr (std::is_same_v<TCOMP, cuda::std::complex<float>> ||
+                  std::is_same_v<TCOMP, cuda::std::complex<double>>) {
       salpha_ = {alpha, 0};
       sbeta_ = {beta, 0};
-    } else if constexpr (std::is_same_v<TC, float> ||
-                         std::is_same_v<TC, double>) {
+    } else if constexpr (std::is_same_v<TCOMP, float> ||
+                         std::is_same_v<TCOMP, double>) {
       salpha_ = alpha;
       sbeta_ = beta;
     } else {
@@ -149,19 +149,20 @@ public:
 
     // Allocate a workspace for SpMM.
     const cusparseSpMMAlg_t algo = CUSPARSE_SPMM_ALG_DEFAULT;
-    const cudaDataType comptp = dtc; // TODO: support separate comp type?!
+    const cudaDataType comptp = MatXTypeToCudaType<TCOMP>();
     ret = cusparseSpMM_bufferSize(handle_, params_.opA, params_.opB, &salpha_,
                                   matA_, matB_, &sbeta_, matC_, comptp, algo,
                                   &workspaceSize_);
     MATX_ASSERT(ret == CUSPARSE_STATUS_SUCCESS, matxMatMulError);
     if (workspaceSize_) {
-      matxAlloc((void **)&workspace_, workspaceSize_, MATX_DEVICE_MEMORY);
+      matxAlloc((void **)&workspace_, workspaceSize_, MATX_DEVICE_MEMORY,
+                stream);
     }
   }
 
   ~MatMulCUSPARSEHandle_t() {
     if (workspaceSize_) {
-      matxFree(workspace_);
+      matxFree(workspace_, params_.stream);
     }
     cusparseDestroy(handle_);
   }
@@ -173,7 +174,6 @@ public:
     params.dtype = TypeToInt<typename TensorTypeA::val_type>();
     params.ptype = TypeToInt<typename TensorTypeA::pos_type>();
     params.ctype = TypeToInt<typename TensorTypeA::crd_type>();
-    params.rank = c.Rank();
     params.stream = stream;
     params.alpha = alpha;
     params.beta = beta;
@@ -201,7 +201,7 @@ public:
                             [[maybe_unused]] const TensorTypeB &b) {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL);
     const cusparseSpMMAlg_t algo = CUSPARSE_SPMM_ALG_DEFAULT;
-    const cudaDataType comptp = MatXTypeToCudaType<TC>(); // TODO: see above
+    const cudaDataType comptp = MatXTypeToCudaType<TCOMP>();
     [[maybe_unused]] cusparseStatus_t ret =
         cusparseSpMM(handle_, params_.opA, params_.opB, &salpha_, matA_, matB_,
                      &sbeta_, matC_, comptp, algo, workspace_);
@@ -216,8 +216,8 @@ private:
   size_t workspaceSize_ = 0;
   void *workspace_ = nullptr;
   detail::MatMulCUSPARSEParams_t params_;
-  TC salpha_;
-  TC sbeta_;
+  TCOMP salpha_;
+  TCOMP sbeta_;
 };
 
 /**
@@ -242,12 +242,11 @@ struct MatMulCUSPARSEParamsKeyEq {
   bool operator()(const MatMulCUSPARSEParams_t &l,
                   const MatMulCUSPARSEParams_t &t) const noexcept {
     return l.dtype == t.dtype && l.ptype == t.ptype && l.ctype == t.ctype &&
-           l.rank == t.rank && l.stream == t.stream && l.alpha == t.alpha &&
-           l.beta == t.beta && l.nse == t.nse && l.m == t.m && l.n == t.n &&
-           l.k == t.k && l.opA == t.opA && l.opB == t.opB &&
-           l.ptrA0 == t.ptrA0 && l.ptrA1 == t.ptrA1 && l.ptrA2 == t.ptrA2 &&
-           l.ptrA3 == t.ptrA3 && l.ptrA4 == t.ptrA4 && l.ptrB == t.ptrB &&
-           l.ptrC == t.ptrC;
+           l.stream == t.stream && l.alpha == t.alpha && l.beta == t.beta &&
+           l.nse == t.nse && l.m == t.m && l.n == t.n && l.k == t.k &&
+           l.opA == t.opA && l.opB == t.opB && l.ptrA0 == t.ptrA0 &&
+           l.ptrA1 == t.ptrA1 && l.ptrA2 == t.ptrA2 && l.ptrA3 == t.ptrA3 &&
+           l.ptrA4 == t.ptrA4 && l.ptrB == t.ptrB && l.ptrC == t.ptrC;
   }
 };
 
@@ -256,8 +255,8 @@ using gemm_cusparse_cache_t =
                        MatMulCUSPARSEParamsKeyHash, MatMulCUSPARSEParamsKeyEq>;
 
 template <typename Op>
-__MATX_INLINE__ auto getCuSparseSupportedTensor(const Op &in,
-                                                cudaStream_t stream) {
+__MATX_INLINE__ auto getCuSparseGemmSupportedTensor(const Op &in,
+                                                    cudaStream_t stream) {
   const auto func = [&]() {
     if constexpr (is_tensor_view_v<Op>) {
       return in.Stride(Op::Rank() - 1) == 1;
@@ -278,8 +277,8 @@ void sparse_matmul_impl(TensorTypeC &C, const TensorTypeA &a,
   const auto stream = exec.getStream();
 
   // Transform into supported form.
-  auto b = getCuSparseSupportedTensor(B, stream);
-  auto c = getCuSparseSupportedTensor(C, stream);
+  auto b = getCuSparseGemmSupportedTensor(B, stream);
+  auto c = getCuSparseGemmSupportedTensor(C, stream);
   if (!is_matx_transform_op<TensorTypeB>() && !b.isSameView(B)) {
     (b = B).run(stream);
   }
@@ -301,8 +300,9 @@ void sparse_matmul_impl(TensorTypeC &C, const TensorTypeA &a,
                 "tensors must have rank-2");
   static_assert(std::is_same_v<TC, TA> && std::is_same_v<TC, TB>,
                 "tensors must have the same data type");
-  // TODO: allow MIXED-PRECISION computation!
-  static_assert(std::is_same_v<TC, float> || std::is_same_v<TC, double> ||
+  static_assert(std::is_same_v<TC, matx::matxFp16> ||
+                    std::is_same_v<TC, matx::matxBf16> ||
+                    std::is_same_v<TC, float> || std::is_same_v<TC, double> ||
                     std::is_same_v<TC, cuda::std::complex<float>> ||
                     std::is_same_v<TC, cuda::std::complex<double>>,
                 "unsupported data type");
@@ -320,14 +320,17 @@ void sparse_matmul_impl(TensorTypeC &C, const TensorTypeA &a,
 
   // Lookup and cache.
   using cache_val_type = detail::MatMulCUSPARSEHandle_t<ctype, atype, btype>;
+  auto cache_id = detail::GetCacheIdFromType<detail::gemm_cusparse_cache_t>();
+  MATX_LOG_DEBUG("MatMul CUSPARSE transform: cache_id={}", cache_id);
   detail::GetCache().LookupAndExec<detail::gemm_cusparse_cache_t>(
-      detail::GetCacheIdFromType<detail::gemm_cusparse_cache_t>(), params,
+      cache_id, params,
       [&]() {
         return std::make_shared<cache_val_type>(c, a, b, stream, alpha, beta);
       },
       [&](std::shared_ptr<cache_val_type> cache_type) {
         cache_type->Exec(c, a, b);
-      });
+      },
+      exec);
 
   // Copy transformed output back.
   if (!c.isSameView(C)) {

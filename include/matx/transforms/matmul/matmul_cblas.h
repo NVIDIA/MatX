@@ -257,7 +257,7 @@ __MATX_INLINE__ void matmul_exec(TensorTypeC &c,
     // Get total number of batches
     auto c_shape = c.Shape();
     total_iter = std::accumulate(c_shape.begin(),
-                                 c_shape.begin() + TensorTypeC::Rank() - 3, 1,
+                                 c_shape.begin() + TensorTypeC::Rank() - 3, static_cast<shape_type>(1),
                                  std::multiplies<shape_type>());
   }
 
@@ -514,10 +514,6 @@ void matmul_impl([[maybe_unused]] TensorTypeC C,
   auto c = getCBLASSupportedTensor(C);
   auto a = getCBLASSupportedTensor(A_);
   auto b = getCBLASSupportedTensor(B_);
-
-  typedef decltype(c) ctype;
-  typedef decltype(a) atype;
-  typedef decltype(b) btype;
 
   if (!is_matx_transform_op<TensorTypeA>() && !a.isSameView(A_)) {
     (a = A_).run(exec);

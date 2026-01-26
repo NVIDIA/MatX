@@ -50,11 +50,11 @@ are necessary
 ## Requirements
 MatX support is currently limited to **Linux only** due to the time to test Windows. If you'd like to voice your support for native Windows support using Visual Studio, please comment on the issue here: https://github.com/NVIDIA/MatX/issues/153.
 
-**Note**: CUDA 12.0.0 through 12.2.0 have an issue that causes building MatX unit tests to show a compiler error or cause a segfault in the compiler. Please use CUDA 11.8 or CUDA 12.2.1+ with MatX.
+**Note**: CUDA 12.0.0 through 12.2.0 have an issue that causes building MatX unit tests to show a compiler error or cause a segfault in the compiler. Please use CUDA 12.2.1+ with MatX.
 
-MatX is using features in C++17 and the latest CUDA compilers and libraries. For this reason, when running with GPU support, CUDA 11.8 and g++9, nvc++ 24.5, or clang 17 or newer is required. You can download the CUDA Toolkit [here](https://developer.nvidia.com/cuda-downloads).
+MatX is using features in C++20 and the latest CUDA compilers and libraries. For this reason, when running with GPU support, CUDA 12.2.1 and g++9, nvc++ 24.5, or clang 17 or newer is required. You can download the CUDA Toolkit [here](https://developer.nvidia.com/cuda-downloads).
 
-MatX has been tested on and supports Pascal, Turing, Volta, Ampere, Ada, and Hopper GPU architectures. Jetson products are supported with Jetpack 5.0 or above.
+MatX has been tested on and supports Volta, Ampere, Ada, Hopper, and Blackwell GPU architectures. Jetson products are supported with Jetpack 5.0 or above.
 
 The MatX build system when used with CMake will automatically fetch packages from the internet that are missing or out of date. If you are on a machine without internet access or want to manage the packages yourself, please follow the [offline instructions](https://nvidia.github.io/MatX/build.html#matx-in-offline-environments) 
 and pay attention to the [required versions of the dependencies](https://nvidia.github.io/MatX/build.html#required-third-party-dependencies).
@@ -178,17 +178,20 @@ the need to store large test vector files in git, and instead can be generated a
 
 To run the unit tests, from the cmake build directory run:
 ```sh
-test/matx_test
+make -j test
 ```
 
-This will execute all unit tests defined. If you wish to execute a subset of tests, or run with different options, you
-may run test/matx_test directly with parameters defined by [Google Test](https://github.com/google/googletest). To run matx_test
-directly, you must be inside the build/test directory for the correct paths to be set. For example,
-to run only tests with the name FFT:
+This will execute all unit tests defined. It is also possible to build and execute a single test, for example:
+```
+make test_00_operators_interp_test
+test/test_00_operators_interp_test
+```
+
+To run a subset of tests, it is possible to use [ctest](https://cmake.org/cmake/help/latest/manual/ctest.1.html) from inside the `build/test` directory. For example, to run only tests with the name FFT:
 
 ```sh
 cd build/test
-./matx_test --gtest_filter="*FFT*"
+ctest -R "FFT"
 ```
 
 
@@ -197,45 +200,6 @@ We provide a variety of training materials and examples to quickly learn the Mat
 - A [quick start guide](docs_input/quickstart.rst) can be found in the docs directory or from the [main documentation site](https://nvidia.github.io/MatX/quickstart.html). The MatX quick start guide is modeled after [NumPy's](https://numpy.org/doc/stable/user/quickstart.html) and demonstrates how to manipulate and create tensors.
 - A set of MatX [notebooks](docs_input/notebooks) can be found in the docs directory. These four notebooks walk through the major MatX features and allow the developer to practice writing MatX code with guided examples and questions.
 - Finally, for new MatX developers, browsing the [example applications](examples) can provide familarity with the API and best practices.
-
-## Release Major Features
-**v0.9.0**:
-- *Features*
-    * Full CPU support for both ARM and x86 on all solver, BLAS, and FFT functions, including multi-threaded support
-    * New vector_norm and matrix_norm operators
-- *Bug fixes*
-    * Many host and device compiler fixes and workarounds
-    * Performance improvements in nested transforms
-
-**v0.8.0**:
-- *Features*
-    * Updated cuTENSOR and cuTensorNet versions
-    * Added configurable print formatting
-    * ARM FFT support via NVPL
-    * New operators: abs2(), outer(), isnan(), isinf()
-    * Many more unit tests for CPU tests
-- Bug fixes for matmul on Hopper, 2D FFTs, and more
-  
-**v0.7.0**:
-- *Features*
-    * Automatic documentation generation
-    * Use CCCL instead of CUB/libcudac++
-    * New operators: `polyval`, `matvec`
-    * Improved caching and teardown of transforms
-    * Optimized polyphase resampler
-    * Negative slice indexing
-- Many new bug fixes and error checking
-  
-**v0.6.0**:
-- Breaking changes
-    * This marks the first release of using "transforms as operators". This allows transforms to be used in any operator expression, whereas the previous release required them to be on separate lines. For an example, please see: https://nvidia.github.io/MatX/basics/fusion.html. This also causes a breaking change with transform usage. Converting to the new format is as simple as moving the function parameters. For example: `matmul(C, A, B, stream);` becomes `(C = matmul(A,B)).run(stream);`. 
-- *Features*
-    * Polyphase channelizer
-    * Many new operators, including upsample, downsample, pwelch, overlap, at, etc
-    * Added more lvalue semantics for operators based on view manipulation
-- Bug fixes
-    * Fixed cache issues
-    * Fixed stride = 0 in matmul
 
 ## Discussions
 We have an open discussions board [here](https://github.com/NVIDIA/MatX/discussions). We encourage any questions about the library to be posted here for other users to learn from and read through.

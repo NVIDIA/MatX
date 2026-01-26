@@ -5,6 +5,8 @@ as_type
 
 Cast an operator to an arbitrary type
 
+.. versionadded:: 0.3.0
+
 .. doxygenfunction:: matx::as_type
 
 Examples

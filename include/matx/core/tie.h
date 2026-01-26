@@ -35,6 +35,7 @@
 
 #include <tuple>
 #include "matx/core/type_utils.h"
+#include "matx/core/capabilities.h"
 
 namespace matx {
 
@@ -68,13 +69,22 @@ struct mtie : public BaseOp<mtie<Ts...>>{
   mtie(Ts... ts) : ts_(ts...) {}
 
   // operator= to cover multiple return types using mtie in a run statement
-  template <typename RHS, std::enable_if_t<is_matx_transform_op<RHS>(), bool> = true>
-  [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator=(RHS &&rhs)
+  template <typename RHS>
+    requires is_matx_transform_op_c<RHS>
+  [[nodiscard]] __MATX_INLINE__ __MATX_HOST__  auto operator=(RHS &&rhs)
   {
     return cuda::std::apply([&](auto... args) {
       return mtie<typename detail::base_type_t<Ts> ..., RHS>{args..., rhs};
     }, ts_);
   }
+
+  template <detail::OperatorCapability Cap, typename InType>
+  __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {          
+    auto self_has_cap = detail::capability_attributes<Cap>::default_value;
+    return cuda::std::apply([&](const auto&... args) {
+      return detail::combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(args, in)...);
+    }, ts_);
+  }   
 
   template <int n>
   auto get() {

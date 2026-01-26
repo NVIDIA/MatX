@@ -6,6 +6,8 @@ stack
 Stack operators along a dimension. Each input must be the same rank, and the returned operator has
 a rank increase of one where the new dimension reflects the stacked operators.
 
+.. versionadded:: 0.3.0
+
 .. doxygenfunction:: stack
 
 Examples

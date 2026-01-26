@@ -5,6 +5,8 @@ cart2sph
 
 Cartesian to spherical coordinates
 
+
+.. versionadded:: 0.3.0
 .. doxygenfunction:: cart2sph
 
 Examples

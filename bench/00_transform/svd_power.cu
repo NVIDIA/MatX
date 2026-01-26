@@ -19,11 +19,11 @@ void svdpi_batch(nvbench::state &state,
   state.set_cuda_stream(nvbench::make_cuda_stream_view(stream));
   cudaExecutor exec{stream};
 
-  int64_t batch = state.get_int64("batch");
-  int64_t m = state.get_int64("rows");
-  int64_t n = state.get_int64("cols");
+  const index_t batch = static_cast<index_t>(state.get_int64("batch"));
+  const index_t m = static_cast<index_t>(state.get_int64("rows"));
+  const index_t n = static_cast<index_t>(state.get_int64("cols"));
 
-  int64_t r = std::min(n,m);
+  index_t r = std::min(n,m);
   auto A = make_tensor<AType>({batch, m, n});
   auto U = make_tensor<AType>({batch, m, r});
   auto VT = make_tensor<AType>({batch, r, n});
@@ -67,19 +67,18 @@ void svdbpi_batch(nvbench::state &state,
   cudaStream_t stream = 0;
   state.set_cuda_stream(nvbench::make_cuda_stream_view(stream));
   cudaExecutor exec{stream};
+  const index_t batch = static_cast<index_t>(state.get_int64("batch"));
+  const index_t m = static_cast<index_t>(state.get_int64("rows"));
+  const index_t n = static_cast<index_t>(state.get_int64("cols"));
 
-  int64_t batch = state.get_int64("batch");
-  int64_t m = state.get_int64("rows");
-  int64_t n = state.get_int64("cols");
-
-  int64_t r = std::min(n,m);
+  index_t r = std::min(n,m);
   auto A = make_tensor<AType>({batch, m, n});
   auto U = make_tensor<AType>({batch, m, r});
   auto VT = make_tensor<AType>({batch, r, n});
   auto S = make_tensor<SType>({batch, r});
 
   int iterations = 10;
-  
+
   (A = random<float>({batch, m, n}, NORMAL)).run(exec);
 
   (U = 0).run(exec);

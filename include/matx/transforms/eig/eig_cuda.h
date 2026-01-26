@@ -32,8 +32,8 @@
 
 #pragma once
 
-#include "cublas_v2.h"
-#include "cusolverDn.h"
+#include <cublas_v2.h>
+#include <cusolverDn.h>
 
 #include "matx/core/error.h"
 #include "matx/core/nvtx.h"
@@ -348,15 +348,18 @@ void eig_impl(OutputTensor &&out, WTensor &&w,
 
   // Get cache or new eigen plan if it doesn't exist
   using cache_val_type = detail::matxDnEigCUDAPlan_t<OutputTensor, decltype(w_new), decltype(a_new)>;
+  auto cache_id = detail::GetCacheIdFromType<detail::eig_cuda_cache_t>();
+  MATX_LOG_DEBUG("Eigenvalue transform: cache_id={}", cache_id);
   detail::GetCache().LookupAndExec<detail::eig_cuda_cache_t>(
-    detail::GetCacheIdFromType<detail::eig_cuda_cache_t>(),
+    cache_id,
     params,
     [&]() {
       return std::make_shared<cache_val_type>(w_new, tv, exec, jobz_cusolver, uplo_cusolver);
     },
     [&](std::shared_ptr<cache_val_type> ctype) {
       ctype->Exec(tv, w_new, tv, exec, jobz_cusolver, uplo_cusolver);
-    }
+    },
+    exec
   );
 
   /* Copy and free async buffer for transpose */

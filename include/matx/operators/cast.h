@@ -44,6 +44,8 @@ namespace matx
   template<> __MATX_INLINE__ std::string as_type_str<double>() { return "as_double"; }
   template<> __MATX_INLINE__ std::string as_type_str<cuda::std::complex<double>>() { return "cuda::std::complex<double>"; }
   template<> __MATX_INLINE__ std::string as_type_str<cuda::std::complex<float>>() { return "cuda::std::complex<float>"; }
+  template<> __MATX_INLINE__ std::string as_type_str<int64_t>() { return "as_int64_t"; }
+  template<> __MATX_INLINE__ std::string as_type_str<uint64_t>() { return "as_uint64_t"; }
   template<> __MATX_INLINE__ std::string as_type_str<int32_t>() { return "as_int32_t"; }
   template<> __MATX_INLINE__ std::string as_type_str<uint32_t>() { return "as_uint32_t"; }
   template<> __MATX_INLINE__ std::string as_type_str<int16_t>() { return "as_int16_t"; }
@@ -68,19 +70,113 @@ namespace matx
         using matxop = bool;
         using value_type = NewType;
 
-	      __MATX_INLINE__ std::string str() const { return as_type_str<NewType>() + "(" + op_.str() + ")"; }
-        __MATX_INLINE__ CastOp(const T &op) : op_(op){};  
+#ifdef MATX_EN_JIT
+        struct JIT_Storage {
+          typename detail::inner_storage_or_self_t<detail::base_type_t<T>> op_;
+        };
 
-        template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
+        JIT_Storage ToJITStorage() const {
+          return JIT_Storage{detail::to_jit_storage(op_)};
+        }
+
+        __MATX_INLINE__ std::string get_jit_class_name() const {
+          return "JITCastOp";
+        }
+
+        __MATX_INLINE__ auto get_jit_op_str() const {
+          std::string func_name = get_jit_class_name();
+          cuda::std::array<index_t, Rank()> out_dims_;
+          for (int i = 0; i < Rank(); ++i) {
+            out_dims_[i] = Size(i);
+          }
+          
+          return cuda::std::make_tuple(
+            func_name,
+            std::string("template <typename T, typename NewType> struct " + func_name + " {\n") +
+                "  using value_type = NewType;\n" +
+                "  using matxop = bool;\n" +
+                "  constexpr static cuda::std::array<index_t, " + std::to_string(Rank()) + "> out_dims_ = { " +
+                detail::array_to_string(out_dims_) + " };\n" +
+                "  typename detail::inner_storage_or_self_t<detail::base_type_t<T>> op_;\n" +
+                "  template <typename CapType, typename... Is>\n" +
+                "  __MATX_INLINE__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) const\n" +
+                "  {\n" +
+                "    if ((threadIdx.x * static_cast<int>(CapType::ept)) > Size(Rank() - 1)) {\n" +
+                "      return detail::GetJitSentinelValue<CapType, value_type>();\n" +
+                "    }\n" +
+                "    auto cast_func = [](const auto &val) { return static_cast<NewType>(val); };\n" +
+                "    return ApplyVecFunc<CapType, NewType>(cast_func, get_value<CapType>(op_, indices...));\n" +
+                "  }\n" +
+                "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank()\n" +
+                "  {\n" +
+                "    return detail::get_rank<T>();\n" +
+                "  }\n" +
+                "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const\n" +
+                "  {\n" +
+                "    return out_dims_[dim];\n" +
+                "  }\n" +
+                "};\n"
+          );
+        }
+#endif
+
+	      __MATX_INLINE__ std::string str() const { return as_type_str<NewType>() + "(" + op_.str() + ")"; }
+        __MATX_INLINE__ CastOp(const T &op) : op_(op){
+          MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
+        };
+
+        template <typename CapType, typename... Is>
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          return static_cast<NewType>(get_value(op_, indices...));     
+          auto cast_func = [](const auto &val) {
+            return static_cast<NewType>(val);   
+          };
+
+          return ApplyVecFunc<CapType, NewType>(cast_func, get_value<CapType>(op_, indices...));        
         }
 
         template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) 
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          return static_cast<NewType>(get_value(op_, indices...));
+          return this->operator()<DefaultCapabilities>(indices...);
+        }
+
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
+          if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+#ifdef MATX_EN_JIT
+            const auto op_jit_name = detail::get_operator_capability<Cap>(op_, in);
+            return get_jit_class_name() + "<" + op_jit_name + "," + detail::type_to_string<NewType>() + ">";
+#else
+            return "";
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+#ifdef MATX_EN_JIT
+            return combine_capabilities<Cap>(true, detail::get_operator_capability<Cap>(op_, in));
+#else
+            return false;
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+#ifdef MATX_EN_JIT
+            const auto [key, value] = get_jit_op_str();
+            if (in.find(key) == in.end()) {
+              in[key] = value;
+            }
+            detail::get_operator_capability<Cap>(op_, in);
+            return true;
+#else
+            return false;
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
+            return detail::get_operator_capability<Cap>(op_, in);
+          }
+          else {
+            auto self_has_cap = capability_attributes<Cap>::default_value;
+            return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_, in));
+          }
         }
 
         template <typename ShapeType, typename Executor>
@@ -97,7 +193,7 @@ namespace matx
           if constexpr (is_matx_op<T>()) {
             op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           }
-        }            
+        }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {
@@ -123,26 +219,129 @@ namespace matx
         static_assert(!is_complex_v<T2> && !is_complex_half_v<T2>, "T2 input operator cannot be complex");
         static_assert(is_complex_v<NewType> || is_complex_half_v<NewType>, "ComplexCastOp output type should be complex");
 
+#ifdef MATX_EN_JIT
+        struct JIT_Storage {
+          typename detail::inner_storage_or_self_t<detail::base_type_t<T1>> real_op_;
+          typename detail::inner_storage_or_self_t<detail::base_type_t<T2>> imag_op_;
+        };
+
+        JIT_Storage ToJITStorage() const {
+          return JIT_Storage{detail::to_jit_storage(real_op_), detail::to_jit_storage(imag_op_)};
+        }
+
+        __MATX_INLINE__ std::string get_jit_class_name() const {
+          return "JITComplexCastOp";
+        }
+
+        __MATX_INLINE__ auto get_jit_op_str() const {
+          std::string func_name = get_jit_class_name();
+          cuda::std::array<index_t, Rank()> out_dims_;
+          for (int i = 0; i < Rank(); ++i) {
+            out_dims_[i] = Size(i);
+          }
+          
+          return cuda::std::make_tuple(
+            func_name,
+            std::string("template <typename T1, typename T2, typename NewType> struct " + func_name + " {\n") +
+                "  using value_type = NewType;\n" +
+                "  using matxop = bool;\n" +
+                "  constexpr static cuda::std::array<index_t, " + std::to_string(Rank()) + "> out_dims_ = { " +
+                detail::array_to_string(out_dims_) + " };\n" +
+                "  typename detail::inner_storage_or_self_t<detail::base_type_t<T1>> real_op_;\n" +
+                "  typename detail::inner_storage_or_self_t<detail::base_type_t<T2>> imag_op_;\n" +
+                "  template <typename CapType, typename... Is>\n" +
+                "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(Is... indices) const\n" +
+                "  {\n" +
+                "    if ((threadIdx.x * static_cast<int>(CapType::ept)) > Size(Rank() - 1)) {\n" +
+                "      return detail::GetJitSentinelValue<CapType, value_type>();\n" +
+                "    }\n" +
+                "    auto cast_func = [](const auto &real, const auto &imag) {\n" +
+                "      using inner_type = typename inner_op_type_t<NewType>::type;\n" +
+                "      return NewType(static_cast<inner_type>(real),static_cast<inner_type>(imag));\n" +
+                "    };\n" +
+                "    const auto real_val = get_value<CapType>(real_op_, indices...);\n" +
+                "    const auto imag_val = get_value<CapType>(imag_op_, indices...);\n" +
+                "    return ApplyVecFunc<CapType, NewType>(cast_func, real_val, imag_val);\n" +
+                "  }\n" +
+                "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank()\n" +
+                "  {\n" +
+                "    return detail::get_rank<T1>();\n" +
+                "  }\n" +
+                "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const\n" +
+                "  {\n" +
+                "    return out_dims_[dim];\n" +
+                "  }\n" +
+                "};\n"
+          );
+        }
+#endif
+
 	      __MATX_INLINE__ std::string str() const { return as_type_str<NewType>() + "(" + real_op_.str() + "," + imag_op_.str() + ")"; }
         __MATX_INLINE__ ComplexCastOp(T1 real_op, T2 imag_op) : real_op_(real_op), imag_op_(imag_op) {
+          MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
           static_assert(detail::get_rank<T1>() == detail::get_rank<T2>(), "rank of real and imaginary operators must match");
           if (real_op_.Shape() != imag_op_.Shape()) {
             MATX_THROW(matxInvalidSize, "ComplexCastOp: sizes of input operators must match in all dimensions");
           }
         };
 
-        template <typename... Is>
+        template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
         {
-          using inner_type = typename inner_op_type_t<NewType>::type;
-          return NewType(static_cast<inner_type>(real_op_(indices...)),static_cast<inner_type>(imag_op_(indices...)));
+          auto cast_func = [](const auto &real, const auto &imag) {
+            using inner_type = typename inner_op_type_t<NewType>::type;
+            return NewType(static_cast<inner_type>(real),static_cast<inner_type>(imag));            
+          };
+
+          const auto real_val = get_value<CapType>(real_op_, indices...);
+          const auto imag_val = get_value<CapType>(imag_op_, indices...);
+
+          return ApplyVecFunc<CapType, NewType>(cast_func, real_val, imag_val);
         }
 
         template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
         {
-          using inner_type = typename inner_op_type_t<NewType>::type;
-          return NewType(static_cast<inner_type>(real_op_(indices...)),static_cast<inner_type>(imag_op_(indices...)));
+          return this->operator()<DefaultCapabilities>(indices...);
+        }
+
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
+          if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+#ifdef MATX_EN_JIT
+            const auto real_jit_name = detail::get_operator_capability<Cap>(real_op_, in);
+            const auto imag_jit_name = detail::get_operator_capability<Cap>(imag_op_, in);
+            return get_jit_class_name() + "<" + real_jit_name + "," + imag_jit_name + ",NewType>";
+#else
+            return "";
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+#ifdef MATX_EN_JIT
+            const auto [key, value] = get_jit_op_str();
+            if (in.find(key) == in.end()) {
+              in[key] = value;
+            }
+            detail::get_operator_capability<Cap>(real_op_, in);
+            detail::get_operator_capability<Cap>(imag_op_, in);
+            return true;
+#else
+            return false;
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
+            return 
+              detail::get_operator_capability<Cap>(real_op_, in) +
+              detail::get_operator_capability<Cap>(imag_op_, in);
+          }
+          else {
+            auto self_has_cap = capability_attributes<Cap>::default_value;
+            return combine_capabilities<Cap>(
+              self_has_cap,
+              detail::get_operator_capability<Cap>(real_op_, in),
+              detail::get_operator_capability<Cap>(imag_op_, in)
+            );
+          }
         }
 
         template <typename ShapeType, typename Executor>
@@ -183,11 +382,11 @@ namespace matx
 
   /**
    * @brief Helper function to cast an input operator to a different type
-   * 
+   *
    * @tparam T Input type
    * @tparam NewType Casted type
    * @param t Input operator
-   * @return Operator output casted to NewType 
+   * @return Operator output casted to NewType
    */
   template <typename NewType, typename T>
     auto __MATX_INLINE__ as_type(T t)
@@ -198,7 +397,7 @@ namespace matx
       } else {
         return detail::CastOp<T, NewType>(t);
       }
-    };   
+    };
 
   /**
    * @brief Helper function to cast a pair of input operators to a complex type.
@@ -218,29 +417,29 @@ namespace matx
 
   /**
    * @brief Helper function to cast an input operator to an int
-   * 
+   *
    * @tparam T Input type
    * @param t Input operator
-   * @return Operator output casted to int 
+   * @return Operator output casted to int
    */
   template <typename T>
     auto __MATX_INLINE__ as_int(const T &t)
     {
       return as_type<int>(t);
-    };   
+    };
 
   /**
    * @brief Helper function to cast an input operator to an float
-   * 
+   *
    * @tparam T Input type
    * @param t Input operator
-   * @return Operator output casted to float 
+   * @return Operator output casted to float
    */
   template <typename T>
     auto __MATX_INLINE__ as_float(const T &t)
     {
       return as_type<float>(t);
-    };   
+    };
 
   /**
    * @brief Helper function to cast an input operator to a cuda::std::complex<float>
@@ -287,16 +486,16 @@ namespace matx
 
   /**
    * @brief Helper function to cast an input operator to an double
-   * 
+   *
    * @tparam T Input type
    * @param t Input operator
-   * @return Operator output casted to double 
+   * @return Operator output casted to double
    */
   template <typename T>
     auto __MATX_INLINE__ as_double(const T &t)
     {
       return as_type<double>(t);
-    };   
+    };
 
   /**
    * @brief Helper function to cast an input operator to a cuda::std::complex<double>
@@ -312,81 +511,107 @@ namespace matx
     };
 
   /**
-   * @brief Helper function to cast an input operator to an uint32_t
-   * 
+   * @brief Helper function to cast an input operator to an uint64_t
+   *
    * @tparam T Input type
    * @param t Input operator
-   * @return Operator output casted to uint32_t 
+   * @return Operator output casted to uint64_t
+   */
+  template <typename T>
+    auto __MATX_INLINE__ as_uint64(const T &t)
+    {
+      return as_type<uint64_t>(t);
+    };
+
+  /**
+   * @brief Helper function to cast an input operator to an int64_t
+   *
+   * @tparam T Input type
+   * @param t Input operator
+   * @return Operator output casted to int64_t
+   */
+  template <typename T>
+    auto __MATX_INLINE__ as_int64(const T &t)
+    {
+      return as_type<int64_t>(t);
+    };
+
+  /**
+   * @brief Helper function to cast an input operator to an uint32_t
+   *
+   * @tparam T Input type
+   * @param t Input operator
+   * @return Operator output casted to uint32_t
    */
   template <typename T>
     auto __MATX_INLINE__ as_uint32(const T &t)
     {
       return as_type<uint32_t>(t);
-    };   
+    };
 
   /**
    * @brief Helper function to cast an input operator to an int32_t
-   * 
+   *
    * @tparam T Input type
    * @param t Input operator
-   * @return Operator output casted to int32_t 
+   * @return Operator output casted to int32_t
    */
   template <typename T>
     auto __MATX_INLINE__ as_int32(const T &t)
     {
       return as_type<int32_t>(t);
-    }; 
+    };
 
   /**
    * @brief Helper function to cast an input operator to an int16_t
-   * 
+   *
    * @tparam T Input type
    * @param t Input operator
-   * @return Operator output casted to int16_t 
+   * @return Operator output casted to int16_t
    */
   template <typename T>
     auto __MATX_INLINE__ as_int16(const T &t)
     {
       return as_type<int16_t>(t);
-    }; 
+    };
 
   /**
    * @brief Helper function to cast an input operator to an uint16_t
-   * 
+   *
    * @tparam T Input type
    * @param t Input operator
-   * @return Operator output casted to uint16_t 
+   * @return Operator output casted to uint16_t
    */
   template <typename T>
     auto __MATX_INLINE__ as_uint16(const T &t)
     {
       return as_type<uint16_t>(t);
-    }; 
+    };
 
   /**
    * @brief Helper function to cast an input operator to an int8_t
-   * 
+   *
    * @tparam T Input type
    * @param t Input operator
-   * @return Operator output casted to int8_t 
+   * @return Operator output casted to int8_t
    */
   template <typename T>
     auto __MATX_INLINE__ as_int8(const T &t)
     {
       return as_type<int8_t>(t);
-    }; 
+    };
 
   /**
    * @brief Helper function to cast an input operator to an uint8_t
-   * 
+   *
    * @tparam T Input type
    * @param t Input operator
-   * @return Operator output casted to uint8_t 
+   * @return Operator output casted to uint8_t
    */
   template <typename T>
     auto __MATX_INLINE__ as_uint8(const T &t)
     {
       return as_type<uint8_t>(t);
-    }; 
+    };
 
 } // end namespace matx

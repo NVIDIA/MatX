@@ -6,6 +6,8 @@ logspace
 Return a range of logarithmically-spaced numbers using first and last value. The step size is
 determined by the shape.
 
+
+.. versionadded:: 0.1.0
 .. doxygenfunction:: matx::logspace(ShapeType &&s, T first, T last)
 .. doxygenfunction:: matx::logspace(const index_t (&s)[RANK], T first, T last)
 

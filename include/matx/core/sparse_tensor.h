@@ -7,8 +7,8 @@
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are met:
 //
-// 1. Redistributions of source code must retain the above copyright notice, this
-//    list of conditions and the following disclaimer.
+// 1. Redistributions of source code must retain the above copyright notice,
+//    this list of conditions and the following disclaimer.
 //
 // 2. Redistributions in binary form must reproduce the above copyright notice,
 //    this list of conditions and the following disclaimer in the documentation
@@ -20,16 +20,16 @@
 //
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 // AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-// DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-// FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-// SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-// CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-// OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+// POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
-
 #pragma once
 
 #include <string>
@@ -54,6 +54,7 @@ class sparse_set : public BaseOp<sparse_set<T, Op>> {
 private:
   T &out_;
   mutable typename detail::base_type_t<Op> op_;
+
 public:
   inline sparse_set(T &out, const Op &op) : out_(out), op_(op) {}
   template <typename Ex> __MATX_INLINE__ void run(Ex &&ex) {
@@ -73,9 +74,9 @@ namespace experimental {
 //   TF  : tensor format
 //
 template <typename VAL, typename CRD, typename POS, typename TF,
-          typename StorageV = DefaultStorage<VAL>,
-          typename StorageC = DefaultStorage<CRD>,
-          typename StorageP = DefaultStorage<POS>,
+          typename StorageV = Storage<VAL>,
+          typename StorageC = Storage<CRD>,
+          typename StorageP = Storage<POS>,
           typename DimDesc = DefaultDescriptor<TF::DIM>>
 class sparse_tensor_t
     : public detail::tensor_impl_t<
@@ -143,11 +144,6 @@ public:
     for (int l = 0; l < LVL; l++) {
       c[l] = coordinates_[l].data();
       p[l] = positions_[l].data();
-      // All non-null data resides in same space.
-      if (v) {
-        assert(!c[l] || GetPointerKind(c[l]) == GetPointerKind(v));
-        assert(!p[l] || GetPointerKind(p[l]) == GetPointerKind(v));
-      }
     }
     this->SetSparseData(v, c, p);
   }
@@ -155,19 +151,19 @@ public:
   // A direct sparse tensor assignment (viz. (Acoo = ...).exec();).
   template <typename T>
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ auto operator=(const T &op) {
-    [[maybe_unused]] typename T::dense2sparse_xform_op valid = true;
+    [[maybe_unused]] typename T::tosparse_xform_op valid = true;
     return detail::sparse_set(*this, op);
   }
 
   // Size getters.
   index_t Nse() const {
-    return static_cast<index_t>(values_.size() / sizeof(VAL));
+    return static_cast<index_t>(values_.size());
   }
   index_t crdSize(int l) const {
-    return static_cast<index_t>(coordinates_[l].size() / sizeof(CRD));
+    return static_cast<index_t>(coordinates_[l].size());
   }
   index_t posSize(int l) const {
-    return static_cast<index_t>(positions_[l].size() / sizeof(POS));
+    return static_cast<index_t>(positions_[l].size());
   }
 
 private:

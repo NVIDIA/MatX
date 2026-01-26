@@ -34,4 +34,5 @@
 
 #include "matx/executors/support.h"
 #include "matx/executors/cuda.h"
+#include "matx/executors/jit_cuda.h"
 #include "matx/executors/host.h"

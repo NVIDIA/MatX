@@ -42,6 +42,8 @@
 #include "matx/core/tensor.h"
 #include "matx/operators/clone.h"
 #include "matx/kernels/conv.cuh"
+#include <cuda/std/__algorithm/min.h>
+#include <cuda/std/__algorithm/max.h>
 
 namespace matx {
 namespace detail {
@@ -62,7 +64,7 @@ inline void matxFFTConv1DInternal(OutputType &o, const InType &i,
   std::fill(std::begin(slice_start), std::end(slice_start), 0);
   std::fill(std::begin(slice_end), std::end(slice_end), matxEnd);
 
-  
+
 #if (CUDART_VERSION <= 11080)
   matx::tensor_t<complex_from_scalar_t<typename InType::scalar_type>, InType::Rank()> s1;
   matx::tensor_t<complex_from_scalar_t<typename InType::scalar_type>, InType::Rank()> s2;
@@ -90,7 +92,7 @@ inline void matxFFTConv1DInternal(OutputType &o, const InType &i,
   auto s1 = allocate_tensor(in_shape_padded);
   auto s2 = allocate_tensor(in_shape_padded);
   auto sifft = allocate_tensor(in_shape_padded);
-#endif  
+#endif
 
   if constexpr (! is_complex_v<typename InType::value_type>) {
     slice_end[InType::Rank() - 1] = padded_size/2 + 1;
@@ -189,7 +191,6 @@ inline void matxDirectConv1DInternal(OutputType &o, const InType &i,
 
   using strip_input_t = typename InType::value_type;
   using strip_filter_t = typename FilterType::value_type;
-  using shape_type = std::conditional_t<has_shape_type_v<OutputType>, typename OutputType::shape_type, index_t>;
 
   size_t filter_len = filter.Size(filter.Rank()-1);
 
@@ -202,7 +203,7 @@ inline void matxDirectConv1DInternal(OutputType &o, const InType &i,
 
   size_t shmsize = filter_shm + signal_shm;
 
-  shape_type sig_len = i.Size(OutputType::Rank() - 1);
+  const index_t sig_len = i.Size(OutputType::Rank() - 1);
   int work_per_block = CONV1D_ELEMENTS_PER_BLOCK;
   unsigned int num_blocks = (unsigned int)(sig_len + filter.Size(filter.Rank()-1) + work_per_block -1) / work_per_block;
 
@@ -337,13 +338,13 @@ inline void conv1d_impl(OutputType o, const In1Type &i1, const In2Type &i2,
     index_t shape[LRank];
 
     // copy left-most dimensions from i1
-    #pragma unroll
+    MATX_LOOP_UNROLL
     for(int i = 0; i < DRank; i++) {
       shape[i] = i1.Size(i);
     }
 
     // set right most dimensions as matxKeepDim
-    #pragma unroll
+    MATX_LOOP_UNROLL
     for(int i = 0; i < SRank; i++) {
       shape[DRank+i] = matxKeepDim;
     }
@@ -364,13 +365,13 @@ inline void conv1d_impl(OutputType o, const In1Type &i1, const In2Type &i2,
     index_t shape[LRank];
 
     // copy left-most dimensions from i2
-    #pragma unroll
+    MATX_LOOP_UNROLL
     for(int i = 0; i < DRank; i++) {
       shape[i] = i2.Size(i);
     }
 
     // set right most dimensions as matxKeepDim
-    #pragma unroll
+    MATX_LOOP_UNROLL
     for(int i = 0; i < SRank; i++) {
       shape[DRank+i] = matxKeepDim;
     }

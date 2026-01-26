@@ -7,8 +7,8 @@
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are met:
 //
-// 1. Redistributions of source code must retain the above copyright notice, this
-//    list of conditions and the following disclaimer.
+// 1. Redistributions of source code must retain the above copyright notice,
+//    this list of conditions and the following disclaimer.
 //
 // 2. Redistributions in binary form must reproduce the above copyright notice,
 //    this list of conditions and the following disclaimer in the documentation
@@ -20,14 +20,15 @@
 //
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 // AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-// DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-// FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-// SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-// CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-// OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+// POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
@@ -38,66 +39,102 @@ namespace matx {
 namespace experimental {
 
 //
-// A level type consists of a level format together with a set of
-// level properties (ordered and unique by default).
-//
-// TODO: split out format and properties, generalize into class
-//
-enum class LvlType { Dense, Singleton, Compressed, CompressedNonUnique };
-
-//
 // A level expression consists of an expression in terms of dimension
-// variables. Currently, the following expressions are supported:
+// variables (e.g. d0, d0 + d1, d1 - d0, d0 div 2, or d0 mod 2).
 //
-// (1) di
-// (2) di div 2
-// (3) di mod 2
+// TODO: more elegant to have Var(i) and Const(c) in type "syntax"
 //
-enum class LvlOp { Id, Div, Mod };
-template <LvlOp o, int d, int c> class LvlExpr {
+// TODO: Add/Sub inversion semantics restricted to j+i,j-i and last-level range
+//
+enum class LvlOp { Id, Add, Sub, Div, Mod };
+template <LvlOp O, int I, int J = 0> class LvlExpr {
 public:
-  static constexpr LvlOp op = o;
-  static constexpr int di = d;
-  static constexpr int cj = c;
+  static constexpr LvlOp op = O;
+  static constexpr int di = I; // dim var
+  static constexpr int cj = J; // dim var or const
+
+  static constexpr bool isId(int d) { return op == LvlOp::Id && di == d; }
 
   static std::string toString() {
     if constexpr (op == LvlOp::Id) {
       return "d" + std::to_string(di);
+    } else if constexpr (op == LvlOp::Add) {
+      return "d" + std::to_string(di) + " + d" + std::to_string(cj);
+    } else if constexpr (op == LvlOp::Sub) {
+      return "d" + std::to_string(di) + " - d" + std::to_string(cj);
     } else if constexpr (op == LvlOp::Div) {
       return "d" + std::to_string(di) + " div " + std::to_string(cj);
     } else if constexpr (op == LvlOp::Mod) {
       return "d" + std::to_string(di) + " mod " + std::to_string(cj);
     } else { // Should not happen
-      return "";
-    }     
+      return "?";
+    }
+  }
+};
+
+//
+// A level type consists of a level format together with a set of
+// level properties (unique and ordered by default).
+//
+enum class LvlFormat { Dense, Compressed, Singleton, Range };
+template <LvlFormat F, bool U = true, bool O = true> class LvlType {
+public:
+  static constexpr LvlFormat format = F;
+  static constexpr bool unique = U;
+  static constexpr bool ordered = O;
+
+  // TODO: support other useful combinations
+  static_assert((unique || format == LvlFormat::Compressed) && ordered);
+
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ static constexpr bool
+  isDense() {
+    return format == LvlFormat::Dense;
+  }
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ static constexpr bool
+  isCompressed() {
+    return format == LvlFormat::Compressed && unique;
+  }
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ static constexpr bool
+  isCompressedNU() {
+    return format == LvlFormat::Compressed && !unique;
+  }
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ static constexpr bool
+  isSingleton() {
+    return format == LvlFormat::Singleton;
+  }
+
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ static constexpr bool
+  isRange() {
+    return format == LvlFormat::Range;
+  }
+
+  static std::string toString() {
+    if constexpr (isDense()) {
+      return "dense";
+    } else if constexpr (isCompressed()) {
+      return "compressed";
+    } else if constexpr (isCompressedNU()) {
+      return "compressed(non-unique)";
+    } else if constexpr (isSingleton()) {
+      return "singleton";
+    } else if constexpr (isRange()) {
+      return "range";
+    } else { // Should not happen
+      return "?";
+    }
   }
 };
 
 //
 // A level specification consists of a level expression and a level type.
 //
-template <typename Expr, LvlType ltype> class LvlSpec {
+template <class E, class T> class LvlSpec {
 public:
-  using expr = Expr;
-  static constexpr LvlType lvltype = ltype;
+  using Expr = E;
+  using Type = T;
 
   static std::string toString() {
-    return Expr::toString() + " : " + LvlTypeToString();
-  }
-
-  // TODO: move to LvlType when that class evolves
-  static inline std::string LvlTypeToString() {
-    if constexpr (ltype == LvlType::Dense) {
-      return "dense";
-    } else if constexpr (ltype == LvlType::Singleton) {
-      return "singleton";
-    } else if constexpr (ltype == LvlType::Compressed) {
-      return "compressed";
-    } else if constexpr (ltype == LvlType::CompressedNonUnique) {
-      return "compressed(non-unique)";
-    } else { // Should not happen
-      return "";
-    } 
+    return Expr::toString() + " : " + Type::toString();
   }
 };
 
@@ -106,103 +143,163 @@ public:
 // specifications (d0, d1, etc.) and an explicit ordered sequence of level
 // specifications (e.g. d0 : Dense, d1 : Compressed).
 //
-template <int D, typename... LvlSpecs> class SparseTensorFormat {
+template <int D, class... S> class SparseTensorFormat {
 public:
-  using LVLSPECS = std::tuple<LvlSpecs...>;
+  using LvlSpecs = cuda::std::tuple<S...>;
   static constexpr int DIM = D;
-  static constexpr int LVL = sizeof...(LvlSpecs);
+  static constexpr int LVL = sizeof...(S);
 
   static_assert(DIM <= LVL);
 
   static constexpr bool isSpVec() {
-    if constexpr (LVL == 1) {
-      using first_type = std::tuple_element_t<0, LVLSPECS>;
-      return first_type::lvltype == LvlType::Compressed &&
-             first_type::expr::op == LvlOp::Id && first_type::expr::di == 0;
+    if constexpr (DIM == 1 && LVL == 1) {
+      using type0 = cuda::std::tuple_element_t<0, LvlSpecs>;
+      return type0::Expr::isId(0) && type0::Type::isCompressed();
     }
     return false;
   }
 
   static constexpr bool isCOO() {
-    if constexpr (LVL == 2) {
-      using first_type = std::tuple_element_t<0, LVLSPECS>;
-      using second_type = std::tuple_element_t<1, LVLSPECS>;
-      return first_type::lvltype == LvlType::CompressedNonUnique &&
-             first_type::expr::op == LvlOp::Id && first_type::expr::di == 0 &&
-             second_type::lvltype == LvlType::Singleton &&
-             second_type::expr::op == LvlOp::Id && second_type::expr::di == 1;
+    if constexpr (DIM == 2 && LVL == 2) {
+      using type0 = cuda::std::tuple_element_t<0, LvlSpecs>;
+      using type1 = cuda::std::tuple_element_t<1, LvlSpecs>;
+      return type0::Expr::isId(0) && type0::Type::isCompressedNU() &&
+             type1::Expr::isId(1) && type1::Type::isSingleton();
     }
     return false;
   }
 
   static constexpr bool isCSR() {
-    if constexpr (LVL == 2) {
-      using first_type = std::tuple_element_t<0, LVLSPECS>;
-      using second_type = std::tuple_element_t<1, LVLSPECS>;
-      return first_type::lvltype == LvlType::Dense &&
-             first_type::expr::op == LvlOp::Id && first_type::expr::di == 0 &&
-             second_type::lvltype == LvlType::Compressed &&
-             second_type::expr::op == LvlOp::Id && second_type::expr::di == 1;
+    if constexpr (DIM == 2 && LVL == 2) {
+      using type0 = cuda::std::tuple_element_t<0, LvlSpecs>;
+      using type1 = cuda::std::tuple_element_t<1, LvlSpecs>;
+      return type0::Expr::isId(0) && type0::Type::isDense() &&
+             type1::Expr::isId(1) && type1::Type::isCompressed();
     }
     return false;
   }
 
   static constexpr bool isCSC() {
-    if constexpr (LVL == 2) {
-      using first_type = std::tuple_element_t<0, LVLSPECS>;
-      using second_type = std::tuple_element_t<1, LVLSPECS>;
-      return first_type::lvltype == LvlType::Dense &&
-             first_type::expr::op == LvlOp::Id && first_type::expr::di == 1 &&
-             second_type::lvltype == LvlType::Compressed &&
-             second_type::expr::op == LvlOp::Id && second_type::expr::di == 0;
+    if constexpr (DIM == 2 && LVL == 2) {
+      using type0 = cuda::std::tuple_element_t<0, LvlSpecs>;
+      using type1 = cuda::std::tuple_element_t<1, LvlSpecs>;
+      return type0::Expr::isId(1) && type0::Type::isDense() &&
+             type1::Expr::isId(0) && type1::Type::isCompressed();
     }
     return false;
   }
 
-  template <typename CRD, int L = 0>
+  static constexpr bool isDIAI() {
+    if constexpr (DIM == 2 && LVL == 2) {
+      using type0 = cuda::std::tuple_element_t<0, LvlSpecs>;
+      using type1 = cuda::std::tuple_element_t<1, LvlSpecs>;
+      return type0::Expr::op == LvlOp::Sub && type0::Expr::di == 1 &&
+             type0::Expr::cj == 0 && type0::Type::isCompressed() &&
+             type1::Expr::isId(0) && type1::Type::isRange();
+    }
+    return false;
+  }
+
+  static constexpr bool isDIAJ() {
+    if constexpr (DIM == 2 && LVL == 2) {
+      using type0 = cuda::std::tuple_element_t<0, LvlSpecs>;
+      using type1 = cuda::std::tuple_element_t<1, LvlSpecs>;
+      return type0::Expr::op == LvlOp::Sub && type0::Expr::di == 1 &&
+             type0::Expr::cj == 0 && type0::Type::isCompressed() &&
+             type1::Expr::isId(1) && type1::Type::isRange();
+    }
+    return false;
+  }
+
+  static constexpr bool isBatchedDIAIUniform() {
+    if constexpr (DIM == 3 && LVL == 3) {
+      using type0 = cuda::std::tuple_element_t<0, LvlSpecs>;
+      using type1 = cuda::std::tuple_element_t<1, LvlSpecs>;
+      using type2 = cuda::std::tuple_element_t<2, LvlSpecs>;
+      return type0::Expr::op == LvlOp::Sub && type0::Expr::di == 2 &&
+             type0::Expr::cj == 1 && type0::Type::isCompressed() &&
+             type1::Expr::isId(0) && type1::Type::isDense() &&
+             type2::Expr::isId(1) && type2::Type::isRange();
+    }
+    return false;
+  }
+
+  template <bool SZ, class CRD, int L = 0>
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ static void
-  dim2lvl(const CRD *dims, CRD *lvls, bool asSize) {
+  dim2lvl(const CRD *dims, CRD *lvls) {
     if constexpr (L < LVL) {
-      using ftype = std::tuple_element_t<L, LVLSPECS>;
-      if constexpr (ftype::expr::op == LvlOp::Id) {
-        lvls[L] = dims[ftype::expr::di];
-      } else if constexpr (ftype::expr::op == LvlOp::Div) {
-        lvls[L] = dims[ftype::expr::di] / ftype::expr::cj;
-      } else if constexpr (ftype::expr::op == LvlOp::Mod) {
-        lvls[L] = asSize ? ftype::expr::cj
-                         : (dims[ftype::expr::di] % ftype::expr::cj);
+      using ftype = cuda::std::tuple_element_t<L, LvlSpecs>;
+      static_assert(ftype::Expr::di < DIM);
+      if constexpr (ftype::Expr::op == LvlOp::Id) {
+        lvls[L] = dims[ftype::Expr::di];
+      } else if constexpr (ftype::Expr::op == LvlOp::Add) {
+        static_assert(ftype::Expr::cj < DIM);
+        if constexpr (SZ) { // range [0:M+N-2]
+          lvls[L] = dims[ftype::Expr::di] + dims[ftype::Expr::cj] - 1;
+        } else {
+          lvls[L] = dims[ftype::Expr::di] + dims[ftype::Expr::cj];
+        }
+      } else if constexpr (ftype::Expr::op == LvlOp::Sub) {
+        static_assert(ftype::Expr::cj < DIM);
+        if constexpr (SZ) { // range [-M+1:N-1]
+          lvls[L] = dims[ftype::Expr::di] + dims[ftype::Expr::cj] - 1;
+        } else {
+          lvls[L] = dims[ftype::Expr::di] - dims[ftype::Expr::cj];
+        }
+      } else if constexpr (ftype::Expr::op == LvlOp::Div) {
+        lvls[L] = dims[ftype::Expr::di] / ftype::Expr::cj;
+      } else if constexpr (ftype::Expr::op == LvlOp::Mod) {
+        if constexpr (SZ) { // range [0:i % C]
+          lvls[L] = ftype::Expr::cj;
+        } else {
+          lvls[L] = dims[ftype::Expr::di] % ftype::Expr::cj;
+        }
+      } else {
+#ifndef __CUDACC__
+        MATX_THROW(matxNotSupported, "unimplemented case");
+#endif
       }
       if constexpr (L + 1 < LVL) {
-        dim2lvl<CRD, L + 1>(dims, lvls, asSize);
+        dim2lvl<SZ, CRD, L + 1>(dims, lvls);
       }
     }
   }
 
-  template <typename CRD, int L = 0>
+  template <class CRD, int L = 0>
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ static void
   lvl2dim(const CRD *lvls, CRD *dims) {
     if constexpr (L < LVL) {
-      using ftype = std::tuple_element_t<L, LVLSPECS>;
-      if constexpr (ftype::expr::op == LvlOp::Id) {
-        dims[ftype::expr::di] = lvls[L];
-      } else if constexpr (ftype::expr::op == LvlOp::Div) {
-        dims[ftype::expr::di] = lvls[L] * ftype::expr::cj;
-      } else if constexpr (ftype::expr::op == LvlOp::Mod) {
-        dims[ftype::expr::di] += lvls[L]; // update (seen second)
+      using ftype = cuda::std::tuple_element_t<L, LvlSpecs>;
+      static_assert(ftype::Expr::di < DIM);
+      if constexpr (ftype::Expr::op == LvlOp::Id) {
+        dims[ftype::Expr::di] = lvls[L];
+      } else if constexpr (ftype::Expr::op == LvlOp::Add) {
+        using ltype = cuda::std::tuple_element_t<LVL - 1, LvlSpecs>;
+        static_assert(ltype::Expr::op == LvlOp::Id && ltype::Type::isRange());
+        if constexpr (ftype::Expr::cj == ltype::Expr::di) {
+          dims[ftype::Expr::di] = lvls[L] - lvls[LVL - 1];
+        } else if constexpr (ftype::Expr::di == ltype::Expr::di) {
+          dims[ftype::Expr::cj] = lvls[L] - lvls[LVL - 1];
+        }
+      } else if constexpr (ftype::Expr::op == LvlOp::Sub) {
+        using ltype = cuda::std::tuple_element_t<LVL - 1, LvlSpecs>;
+        static_assert(ltype::Expr::op == LvlOp::Id && ltype::Type::isRange());
+        if constexpr (ftype::Expr::cj == ltype::Expr::di) {
+          dims[ftype::Expr::di] = lvls[L] + lvls[LVL - 1];
+        } else if constexpr (ftype::Expr::di == ltype::Expr::di) {
+          dims[ftype::Expr::cj] = lvls[LVL - 1] - lvls[L];
+        }
+      } else if constexpr (ftype::Expr::op == LvlOp::Div) {
+        dims[ftype::Expr::di] = lvls[L] * ftype::Expr::cj;
+      } else if constexpr (ftype::Expr::op == LvlOp::Mod) {
+        dims[ftype::Expr::di] += lvls[L]; // update (seen second)
+      } else {
+#ifndef __CUDACC__
+        MATX_THROW(matxNotSupported, "unimplemented case");
+#endif
       }
       if constexpr (L + 1 < LVL) {
         lvl2dim<CRD, L + 1>(lvls, dims);
-      }
-    }
-  }
-
-  template <int L = 0> static void printLevel() {
-    if constexpr (L < LVL) {
-      using ftype = std::tuple_element_t<L, LVLSPECS>;
-      std::cout << " " << ftype::toString();
-      if constexpr (L + 1 < LVL) {
-        std::cout << ",";
-        printLevel<L + 1>();
       }
     }
   }
@@ -218,97 +315,143 @@ public:
     printLevel();
     std::cout << " )" << std::endl;
   };
+
+private:
+  template <int L = 0> static void printLevel() {
+    if constexpr (L < LVL) {
+      using ftype = cuda::std::tuple_element_t<L, LvlSpecs>;
+      std::cout << " " << ftype::toString();
+      if constexpr (L + 1 < LVL) {
+        std::cout << ",";
+        printLevel<L + 1>();
+      }
+    }
+  }
 };
 
 //
 // Predefined common tensor formats. Note that even though the tensor
 // format was introduced to define the universal sparse tensor type, the
 // "all-dense" format also naturally describes dense scalars, vectors,
-// matrices, and tensors, with all d-major format variants.
+// matrices, and tensors, with all dimension-major format variants.
 //
 
 // Dimension short-cuts (d0, d1, d3, d4).
-using D0 = LvlExpr<LvlOp::Id, 0, 1>;
-using D1 = LvlExpr<LvlOp::Id, 1, 1>;
-using D2 = LvlExpr<LvlOp::Id, 2, 1>;
-using D3 = LvlExpr<LvlOp::Id, 3, 1>;
-using D4 = LvlExpr<LvlOp::Id, 4, 1>;
+using D0 = LvlExpr<LvlOp::Id, 0>;
+using D1 = LvlExpr<LvlOp::Id, 1>;
+using D2 = LvlExpr<LvlOp::Id, 2>;
+using D3 = LvlExpr<LvlOp::Id, 3>;
+using D4 = LvlExpr<LvlOp::Id, 4>;
+
+// Operation short-cuts.
+template <int I, int J> using Add = LvlExpr<LvlOp::Add, I, J>;
+template <int I, int J> using Sub = LvlExpr<LvlOp::Sub, I, J>;
+template <int I, int J> using Div = LvlExpr<LvlOp::Div, I, J>;
+template <int I, int J> using Mod = LvlExpr<LvlOp::Mod, I, J>;
+
+// Level type short-cuts.
+using Dense = LvlType<LvlFormat::Dense>;
+using Compressed = LvlType<LvlFormat::Compressed>;
+using CompressedNU = LvlType<LvlFormat::Compressed, false>;
+using Singleton = LvlType<LvlFormat::Singleton>;
+using Range = LvlType<LvlFormat::Range>;
 
 // Scalars.
 using Scalar = SparseTensorFormat<0>;
 
 // Vectors.
-using DnVec = SparseTensorFormat<1, LvlSpec<D0, LvlType::Dense>>;
-using SpVec = SparseTensorFormat<1, LvlSpec<D1, LvlType::Compressed>>;
+using DnVec = SparseTensorFormat<1, LvlSpec<D0, Dense>>;
+using SpVec = SparseTensorFormat<1, LvlSpec<D0, Compressed>>;
 
 // Dense Matrices.
-using DnMat = SparseTensorFormat<2, LvlSpec<D0, LvlType::Dense>,
-                                 LvlSpec<D1, LvlType::Dense>>;
-using DnMatCol = SparseTensorFormat<2, LvlSpec<D1, LvlType::Dense>,
-                                    LvlSpec<D0, LvlType::Dense>>;
+using DnMat = SparseTensorFormat<2, LvlSpec<D0, Dense>, LvlSpec<D1, Dense>>;
+using DnMatCol = SparseTensorFormat<2, LvlSpec<D1, Dense>, LvlSpec<D0, Dense>>;
 
 // Sparse Matrices.
-using COO = SparseTensorFormat<2, LvlSpec<D0, LvlType::CompressedNonUnique>,
-                               LvlSpec<D1, LvlType::Singleton>>;
-using CSR = SparseTensorFormat<2, LvlSpec<D0, LvlType::Dense>,
-                               LvlSpec<D1, LvlType::Compressed>>;
-using CSC = SparseTensorFormat<2, LvlSpec<D1, LvlType::Dense>,
-                               LvlSpec<D0, LvlType::Compressed>>;
-using DCSR = SparseTensorFormat<2, LvlSpec<D0, LvlType::Compressed>,
-                                LvlSpec<D1, LvlType::Compressed>>;
-using DCSC = SparseTensorFormat<2, LvlSpec<D1, LvlType::Compressed>,
-                                LvlSpec<D0, LvlType::Compressed>>;
-using CROW = SparseTensorFormat<2, LvlSpec<D0, LvlType::Compressed>,
-                                LvlSpec<D1, LvlType::Dense>>;
-using CCOL = SparseTensorFormat<2, LvlSpec<D1, LvlType::Compressed>,
-                                LvlSpec<D0, LvlType::Dense>>;
+using COO =
+    SparseTensorFormat<2, LvlSpec<D0, CompressedNU>, LvlSpec<D1, Singleton>>;
+using CSR = SparseTensorFormat<2, LvlSpec<D0, Dense>, LvlSpec<D1, Compressed>>;
+using CSC = SparseTensorFormat<2, LvlSpec<D1, Dense>, LvlSpec<D0, Compressed>>;
+using DCSR =
+    SparseTensorFormat<2, LvlSpec<D0, Compressed>, LvlSpec<D1, Compressed>>;
+using DCSC =
+    SparseTensorFormat<2, LvlSpec<D1, Compressed>, LvlSpec<D0, Compressed>>;
+using CROW = SparseTensorFormat<2, LvlSpec<D0, Compressed>, LvlSpec<D1, Dense>>;
+using CCOL = SparseTensorFormat<2, LvlSpec<D1, Compressed>, LvlSpec<D0, Dense>>;
+using DIAI =
+    SparseTensorFormat<2, LvlSpec<Sub<1, 0>, Compressed>, LvlSpec<D0, Range>>;
+using DIAJ =
+    SparseTensorFormat<2, LvlSpec<Sub<1, 0>, Compressed>, LvlSpec<D1, Range>>;
+using SkewDIAI =
+    SparseTensorFormat<2, LvlSpec<Add<1, 0>, Compressed>, LvlSpec<D0, Range>>;
+using SkewDIAJ =
+    SparseTensorFormat<2, LvlSpec<Add<1, 0>, Compressed>, LvlSpec<D1, Range>>;
 
 // Sparse Block Matrices.
-template <int m, int n>
+template <int M, int N>
 using BSR =
-    SparseTensorFormat<2, LvlSpec<LvlExpr<LvlOp::Div, 0, m>, LvlType::Dense>,
-                       LvlSpec<LvlExpr<LvlOp::Div, 1, n>, LvlType::Compressed>,
-                       LvlSpec<LvlExpr<LvlOp::Mod, 0, m>, LvlType::Dense>,
-                       LvlSpec<LvlExpr<LvlOp::Mod, 1, n>, LvlType::Dense>>;
+    SparseTensorFormat<2, LvlSpec<Div<0, M>, Dense>,
+                       LvlSpec<Div<1, N>, Compressed>,
+                       LvlSpec<Mod<0, M>, Dense>, LvlSpec<Mod<1, N>, Dense>>;
+template <int M, int N>
+using BSRCol =
+    SparseTensorFormat<2, LvlSpec<Div<0, M>, Dense>,
+                       LvlSpec<Div<1, N>, Compressed>,
+                       LvlSpec<Mod<1, N>, Dense>, LvlSpec<Mod<0, M>, Dense>>;
 
 // 3-D Tensors.
-using Dn3 = SparseTensorFormat<3, LvlSpec<D0, LvlType::Dense>,
-                               LvlSpec<D1, LvlType::Dense>,
-                               LvlSpec<D2, LvlType::Dense>>;
-using COO3 = SparseTensorFormat<3, LvlSpec<D0, LvlType::CompressedNonUnique>,
-                                LvlSpec<D1, LvlType::Singleton>,
-                                LvlSpec<D2, LvlType::Singleton>>;
-using CSF3 = SparseTensorFormat<3, LvlSpec<D0, LvlType::Compressed>,
-                                LvlSpec<D1, LvlType::Compressed>,
-                                LvlSpec<D2, LvlType::Compressed>>;
+using Dn3 = SparseTensorFormat<3, LvlSpec<D0, Dense>, LvlSpec<D1, Dense>,
+                               LvlSpec<D2, Dense>>;
+using COO3 = SparseTensorFormat<3, LvlSpec<D0, CompressedNU>,
+                                LvlSpec<D1, Singleton>, LvlSpec<D2, Singleton>>;
+using CSF3 =
+    SparseTensorFormat<3, LvlSpec<D0, Compressed>, LvlSpec<D1, Compressed>,
+                       LvlSpec<D2, Compressed>>;
+
+// Experimental batched DIA formats. Placing the batch *after* the offset
+// compression ensures similar diagonals of the batches are stored
+// consecutively, but forces a uniform nonzero structure over all.
+using BatchedDIAINonUniform =
+    SparseTensorFormat<3, LvlSpec<D0, Dense>, LvlSpec<Sub<2, 1>, Compressed>,
+                       LvlSpec<D1, Range>>;
+using BatchedDIAJNonUniform =
+    SparseTensorFormat<3, LvlSpec<D0, Dense>, LvlSpec<Sub<2, 1>, Compressed>,
+                       LvlSpec<D2, Range>>;
+using BatchedDIAIUniform =
+    SparseTensorFormat<3, LvlSpec<Sub<2, 1>, Compressed>, LvlSpec<D0, Dense>,
+                       LvlSpec<D1, Range>>;
+using BatchedDIAJUniform =
+    SparseTensorFormat<3, LvlSpec<Sub<2, 1>, Compressed>, LvlSpec<D0, Dense>,
+                       LvlSpec<D2, Range>>;
+
+// Sparse Block 3-D Tensors.
+template <int M, int N, int K>
+using BSR3 = SparseTensorFormat<
+    3, LvlSpec<Div<0, M>, Dense>, LvlSpec<Div<1, N>, Compressed>,
+    LvlSpec<Div<2, K>, Compressed>, LvlSpec<Mod<0, M>, Dense>,
+    LvlSpec<Mod<1, N>, Dense>, LvlSpec<Mod<2, K>, Dense>>;
 
 // 4-D Tensors.
-using Dn4 =
-    SparseTensorFormat<4, LvlSpec<D0, LvlType::Dense>,
-                       LvlSpec<D1, LvlType::Dense>, LvlSpec<D2, LvlType::Dense>,
-                       LvlSpec<D3, LvlType::Dense>>;
-using COO4 = SparseTensorFormat<4, LvlSpec<D0, LvlType::CompressedNonUnique>,
-                                LvlSpec<D1, LvlType::Singleton>,
-                                LvlSpec<D2, LvlType::Singleton>,
-                                LvlSpec<D3, LvlType::Singleton>>;
-using CSF4 = SparseTensorFormat<
-    4, LvlSpec<D0, LvlType::Compressed>, LvlSpec<D1, LvlType::Compressed>,
-    LvlSpec<D2, LvlType::Compressed>, LvlSpec<D3, LvlType::Compressed>>;
+using Dn4 = SparseTensorFormat<4, LvlSpec<D0, Dense>, LvlSpec<D1, Dense>,
+                               LvlSpec<D2, Dense>, LvlSpec<D3, Dense>>;
+using COO4 =
+    SparseTensorFormat<4, LvlSpec<D0, CompressedNU>, LvlSpec<D1, Singleton>,
+                       LvlSpec<D2, Singleton>, LvlSpec<D3, Singleton>>;
+using CSF4 =
+    SparseTensorFormat<4, LvlSpec<D0, Compressed>, LvlSpec<D1, Compressed>,
+                       LvlSpec<D2, Compressed>, LvlSpec<D3, Compressed>>;
 
 // 5-D Tensors.
-using Dn5 =
-    SparseTensorFormat<5, LvlSpec<D0, LvlType::Dense>,
-                       LvlSpec<D1, LvlType::Dense>, LvlSpec<D2, LvlType::Dense>,
-                       LvlSpec<D3, LvlType::Dense>,
-                       LvlSpec<D4, LvlType::Dense>>;
-using COO5 = SparseTensorFormat<
-    5, LvlSpec<D0, LvlType::CompressedNonUnique>,
-    LvlSpec<D1, LvlType::Singleton>, LvlSpec<D2, LvlType::Singleton>,
-    LvlSpec<D3, LvlType::Singleton>, LvlSpec<D4, LvlType::Singleton>>;
-using CSF5 = SparseTensorFormat<
-    5, LvlSpec<D0, LvlType::Compressed>, LvlSpec<D1, LvlType::Compressed>,
-    LvlSpec<D2, LvlType::Compressed>, LvlSpec<D3, LvlType::Compressed>,
-    LvlSpec<D4, LvlType::Compressed>>;
+using Dn5 = SparseTensorFormat<5, LvlSpec<D0, Dense>, LvlSpec<D1, Dense>,
+                               LvlSpec<D2, Dense>, LvlSpec<D3, Dense>,
+                               LvlSpec<D4, Dense>>;
+using COO5 = SparseTensorFormat<5, LvlSpec<D0, CompressedNU>,
+                                LvlSpec<D1, Singleton>, LvlSpec<D2, Singleton>,
+                                LvlSpec<D3, Singleton>, LvlSpec<D4, Singleton>>;
+using CSF5 =
+    SparseTensorFormat<5, LvlSpec<D0, Compressed>, LvlSpec<D1, Compressed>,
+                       LvlSpec<D2, Compressed>, LvlSpec<D3, Compressed>,
+                       LvlSpec<D4, Compressed>>;
 
 } // namespace experimental
 } // namespace matx

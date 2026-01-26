@@ -9,6 +9,8 @@ Reduce to softmax values in input. Softmax is defined as:
 
    \sigma(z_i) = \frac{e^{z_{i}}}{\sum_{j=1}^K e^{z_{j}}} \ \ \ for\ i=1,2,\dots,K
 
+.. versionadded:: 0.6.0
+
 .. doxygenfunction:: softmax(const InType &in, const int (&dims)[D])
 .. doxygenfunction:: softmax(const InType &in)
 

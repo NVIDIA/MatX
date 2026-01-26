@@ -5,6 +5,8 @@ ambgfun
 
 Ambiguity function
 
+.. versionadded:: 0.6.0
+
 .. doxygenfunction:: ambgfun(const XTensor &x, const YTensor &y, double fs, AMBGFunCutType_t cut, float cut_val = 0.0)
 .. doxygenfunction:: ambgfun(const XTensor &x, double fs, AMBGFunCutType_t cut, float cut_val = 0.0)
 

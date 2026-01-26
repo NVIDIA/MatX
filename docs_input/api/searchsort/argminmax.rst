@@ -5,6 +5,8 @@ argminmax
 
 Returns the minimum values, minimum value indices, maximum values, and maximum value indices across the input operator
 
+.. versionadded:: 0.6.0
+
 .. doxygenfunction:: argminmax(const InType &in, const int (&dims)[D])
 .. doxygenfunction:: argminmax(const InType &in)
 

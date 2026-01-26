@@ -29,7 +29,6 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
-
 #pragma once
 
 
@@ -57,7 +56,8 @@ namespace matx
    *   Executor to run copy in
    */
 #ifndef DOXYGEN_ONLY  
-  template <typename OutputTensor, typename InputTensor, typename Executor, std::enable_if_t<is_executor_t<Executor>(), bool> = true>
+  template <typename OutputTensor, typename InputTensor, typename Executor>
+    requires is_executor<Executor>
 #else
   template <typename OutputTensor, typename InputTensor, typename Executor>  
 #endif
@@ -74,7 +74,8 @@ namespace matx
     };
 
 #ifndef DOXYGEN_ONLY  
-  template <typename OutputTensor, typename InputTensor, std::enable_if_t<is_tensor_view_v<InputTensor>, bool> = true>
+  template <typename OutputTensor, typename InputTensor>
+    requires is_tensor<InputTensor>
 #else
   template <typename OutputTensor, typename InputTensor>
 #endif  
@@ -98,7 +99,8 @@ namespace matx
    * @return New tensor into which the input view has been copied
    */
 #ifndef DOXYGEN_ONLY    
-  template <typename Tensor, typename Executor, std::enable_if_t<is_executor_t<Executor>(), bool> = true>
+  template <typename Tensor, typename Executor>
+    requires is_executor<Executor>
 #else
   template <typename Tensor, typename Executor>
 #endif  

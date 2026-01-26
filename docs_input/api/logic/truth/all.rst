@@ -5,6 +5,8 @@ all
 
 Returns a truth value if all values in the reduction converts to a boolean "true"
 
+.. versionadded:: 0.6.0
+
 .. doxygenfunction:: all(const InType &in, const int (&dims)[D])
 .. doxygenfunction:: all(const InType &in)
 

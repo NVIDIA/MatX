@@ -5,6 +5,8 @@ as_complex_float
 
 Cast an operator to cuda::std::complex<float>
 
+
+.. versionadded:: 0.3.0
 .. doxygenfunction:: matx::as_complex_float(const T &t)
 .. doxygenfunction:: matx::as_complex_float(const T1 &t1, const T2 &t2)
 

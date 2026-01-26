@@ -6,6 +6,7 @@
 using namespace matx;
 using namespace matx::test;
 
+// assigning ones() with a half precision type is not constexpr
 TYPED_TEST(OperatorTestsFloatAllExecs, IsClose)
 {
   MATX_ENTER_HANDLER();

@@ -5,6 +5,8 @@ tanh
 
 Hyperbolic tangent
 
+
+.. versionadded:: 0.3.0
 .. doxygenfunction:: tanh(Op t)
   
 Examples

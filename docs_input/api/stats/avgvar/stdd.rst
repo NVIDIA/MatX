@@ -3,10 +3,15 @@
 stdd
 ####
 
-Compute the standard deviation of a tensor. The name `stdd` is used to avoid confliction with the use of the C++ standard library
+Compute the standard deviation of a tensor. The name `stdd` is used to avoid confliction with the use of the C++ standard library.
 
-.. doxygenfunction:: stdd(const InType &in, const int (&dims)[D])
-.. doxygenfunction:: stdd(const InType &in)
+Note that in C++ ``{1}`` and ``1`` as the second parameter is ambiguous. To use the version across a specific dimension you must either 
+explicitly specify ``ddof`` or create a temporary array variable.
+
+.. versionadded:: 0.6.0
+
+.. doxygenfunction:: stdd(const InType &in, const int (&dims)[D], int ddof = 1)
+.. doxygenfunction:: stdd(const InType &in, int ddof = 1)
 
 Examples
 ~~~~~~~~

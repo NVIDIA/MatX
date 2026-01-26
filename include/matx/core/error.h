@@ -32,6 +32,8 @@
 
 #pragma once
 
+#ifndef __CUDACC_RTC__
+
 #include <cstdio>
 #include <exception>
 #include <sstream>
@@ -40,6 +42,8 @@
 #endif
 
 #include "matx/core/stacktrace.h"
+#include "matx/core/log.h"
+#endif
 
 namespace matx
 {
@@ -143,9 +147,26 @@ namespace matx
       detail::printStackTrace(stack);
     }
 
-    const char *what() const throw() { return str; }
+    const char* what() const noexcept override { return str; }
   };
   }
+
+#ifdef MATX_DISABLE_EXCEPTIONS
+
+#define MATX_ENTER_HANDLER() {
+#define MATX_EXIT_HANDLER() }
+
+#define MATX_THROW(e, str_arg)                       \
+  do {                                               \
+    MATX_LOG_FATAL("matxException ({}: {}) - {}:{}", matxErrorString(e), str_arg, __FILE__, __LINE__); \
+    std::stringstream matx_stack_trace;              \
+    detail::printStackTrace(matx_stack_trace);       \
+    std::string matx_stack_str = matx_stack_trace.str(); \
+    MATX_LOG_FATAL("Stack Trace:\n{}", matx_stack_str); \
+    std::abort();                                    \
+  } while(0)
+
+#else
 
 #define MATX_ENTER_HANDLER() \
   try                        \
@@ -153,10 +174,10 @@ namespace matx
 
 #define MATX_EXIT_HANDLER()                                     \
   }                                                             \
-  catch (matx::detail::matxException & e)                                     \
+  catch (matx::detail::matxException & e)                       \
   {                                                             \
-    fprintf(stderr, "%s\n", e.what());                          \
-    fprintf(stderr, "Stack Trace:\n%s", e.stack.str().c_str()); \
+    MATX_LOG_FATAL("{}", e.what());                             \
+    MATX_LOG_FATAL("Stack Trace:\n{}", e.stack.str());          \
     exit(1);                                                    \
   }
 
@@ -165,7 +186,9 @@ namespace matx
     throw matx::detail::matxException(e, str, __FILE__, __LINE__); \
   }
 
-#ifndef NDEBUG
+#endif
+
+#if !defined(NDEBUG) && !defined(__CUDA_ARCH__)
   #define MATX_ASSERT(a, error) \
   {                           \
     if ((a) != true)          \
@@ -185,10 +208,10 @@ namespace matx
   #define MATX_ASSERT_STR_EXP(a, expected, error, str) \
   {                                    \
     auto tmp = a;                      \
-    if ((tmp != expected))                   \
+    if ((tmp != expected))             \
     {                                  \
-      std::cout << #a ": " << str << "(" << tmp << " != " << expected << ")\n";\
-      MATX_THROW(error, "");  \
+      MATX_LOG_ERROR("{}: {} ({} != {})", #a, str, static_cast<int>(tmp), static_cast<int>(expected)); \
+      MATX_THROW(error, "");           \
     }                                  \
   }
 
@@ -205,50 +228,66 @@ namespace matx
 
 #define MATX_STATIC_ASSERT_STR(a, error, str) \
   {                                           \
-    static_assert((a), #error ": " #str);       \
+    static_assert((a), #error ": " #str);     \
   }
+
 
 #define MATX_CUDA_CHECK(e)                                      \
-  if (e != cudaSuccess)                                         \
-  {                                                             \
-    fprintf(stderr, "%s:%d CUDA Error: %s\n", __FILE__,__LINE__, cudaGetErrorString(e)); \
-    MATX_THROW(matx::matxCudaError, cudaGetErrorString(e));           \
-  }
+  do {                                                          \
+    const auto e_ = (e);                                        \
+    if (e_ != cudaSuccess)                                      \
+    {                                                           \
+      MATX_LOG_ERROR("{}:{} CUDA Error: {} ({})", __FILE__, __LINE__, cudaGetErrorString(e_), static_cast<int>(e_)); \
+      MATX_THROW(matx::matxCudaError, cudaGetErrorString(e_));  \
+    }                                                           \
+  } while (0)
 
 // Macro for checking cuda errors following a cuda launch or api call
-#define MATX_CUDA_CHECK_LAST_ERROR()        \
+#define MATX_CUDA_CHECK_LAST_ERROR()   \
   {                                    \
     const auto e = cudaGetLastError(); \
     MATX_CUDA_CHECK(e);                \
   }
 
 // This macro asserts compatible dimensions of current class to an operator.
-#define MATX_ASSERT_COMPATIBLE_OP_SIZES(op)                               \
+#define MATX_ASSERT_COMPATIBLE_OP_SIZES(op)                          \
   if constexpr (Rank() > 0) {                                        \
     bool compatible = true;                                          \
-    _Pragma("unroll")                                                \
+    MATX_LOOP_UNROLL                                                 \
     for (int32_t i = 0; i < Rank(); i++) {                           \
-      [[maybe_unused]] index_t size = matx::detail::get_expanded_size<Rank()>(op, i);       \
+      [[maybe_unused]] index_t size = matx::detail::get_expanded_size<Rank()>(op, i); \
       compatible = (size == 0 || size == Size(i));                   \
     }                                                                \
     if (!compatible) { \
-      std::cerr << "Incompatible operator sizes: ("; \
+      std::string msg = "Incompatible operator sizes: ("; \
       for (int32_t i = 0; i < Rank(); i++) { \
-        std::cerr << Size(i); \
+        msg += std::to_string(Size(i)); \
         if (i != Rank() - 1) { \
-          std::cerr << ","; \
+          msg += ","; \
         } \
       } \
-      std::cerr << ") not compatible with ("; \
+      msg += ") not compatible with ("; \
       for (int32_t i = 0; i < Rank(); i++) { \
-        std::cerr << matx::detail::get_expanded_size<Rank()>(op, i); \
+        msg += std::to_string(matx::detail::get_expanded_size<Rank()>(op, i)); \
         if (i != Rank() - 1) { \
-          std::cerr << ","; \
+          msg += ","; \
         } \
       } \
-      std::cerr << ")" << std::endl; \
+      msg += ")"; \
+      MATX_LOG_ERROR("{}", msg); \
       MATX_THROW(matxInvalidSize, "Incompatible operator sizes"); \
-    }                   \
+    } \
+  }
+
+
+#define MATX_STATIC_ASSERT(a, error)    \
+  {                                     \
+    static_assert((a), #error ": " #a); \
+  }
+
+#define MATX_STATIC_ASSERT_STR(a, error, str) \
+  {                                           \
+    static_assert((a), #error ": " #str);       \
   }
 
 } // end namespace matx

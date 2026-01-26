@@ -9,6 +9,8 @@ Read an NPY file into a tensor
    This function requires the optional ``MATX_ENABLE_FILEIO`` compile flag
 
 
+
+.. versionadded:: 0.3.0
 .. doxygenfunction:: read_npy(TensorType &t, const std::string& fname)
 
 Examples

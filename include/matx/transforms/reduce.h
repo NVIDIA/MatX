@@ -34,16 +34,23 @@
 
 #include <cfloat>
 
-#include "matx/core/cache.h"
+#include <cuda.h>
+#include <cuda_runtime.h>
 #include "matx/core/error.h"
 #include "matx/core/get_grid_dims.h"
-#include "matx/core/nvtx.h"
 #include "matx/core/tensor.h"
 #include "matx/core/type_utils.h"
 #include "matx/core/utils.h"
+#include <cuda/std/complex>
+#include "matx/core/cache.h"
+#include "matx/core/nvtx.h"
 #include "matx/transforms/cub.h"
 #include "matx/transforms/copy.h"
+#include "matx/core/reduce_utils.h"
 #include "matx/core/half.h"
+#include <cuda/std/__algorithm/min.h>
+#include <cuda/std/__algorithm/max.h>
+#include <cuda/std/tuple>
 
 union HalfBits {
   constexpr HalfBits(short x) : i(x) {}
@@ -61,638 +68,6 @@ union PascalHalfBits {
   __nv_bfloat16 b[2];
 };
 
-#ifdef __CUDACC__
-/**
- * Warp shuffle down with a complex float
- *
- * Shuffles both the real and imaginary components down by the specified delta
- * over the thread mask.
- *
- * @param mask
- *   Thread mask of warp to participate in shuffle
- * @param var
- *   Variable to shuffle
- * @param delta
- *   Amount to shuffle
- * @returns
- *   Value shuffled*
- */
-__MATX_DEVICE__ __MATX_INLINE__ auto __shfl_down_sync(unsigned mask,
-                                        cuda::std::complex<float> var,
-                                        unsigned int delta)
-{
-  var.real(__shfl_down_sync(mask, var.real(), delta));
-  var.imag(__shfl_down_sync(mask, var.imag(), delta));
-  return var;
-}
-
-/**
- * Warp shuffle down with a complex double
- *
- * Shuffles both the real and imaginary components down by the specified delta
- * over the thread mask.
- *
- * @param mask
- *   Thread mask of warp to participate in shuffle
- * @param var
- *   Variable to shuffle
- * @param delta
- *   Amount to shuffle
- * @returns
- *   Value shuffled
- */
-__MATX_DEVICE__ __MATX_INLINE__ auto __shfl_down_sync(unsigned mask,
-                                        cuda::std::complex<double> var,
-                                        unsigned int delta)
-{
-  var.real(__shfl_down_sync(mask, var.real(), delta));
-  var.imag(__shfl_down_sync(mask, var.imag(), delta));
-  return var;
-}
-
-/**
- * Atomic min version for floats
- *
- * Computes the minimum of two floating point values atomically
- *
- * @param addr
- *   Source and destination for new minimum
- * @param val
- *   Value to compare against
- */
-__MATX_DEVICE__ __MATX_INLINE__ void atomicMin(float *addr, float val)
-{
-  unsigned int *address_as_uint = (unsigned int *)addr;
-  unsigned int old = *address_as_uint, assumed;
-  unsigned int val_uint = __float_as_uint(val);
-
-  // nan should be ok here but should verify
-  while (val < __uint_as_float(old)) {
-    assumed = old;
-    old = atomicCAS(address_as_uint, assumed, val_uint);
-  }
-};
-
-/**
- * Atomic max version for floats
- *
- * Computes the maximum of two floating point values atomically
- *
- * @param addr
- *   Source and destination for new maximum
- * @param val
- *   Value to compare against
- */
-__MATX_DEVICE__ __MATX_INLINE__ void atomicMax(float *addr, float val)
-{
-  unsigned int *address_as_uint = (unsigned int *)addr;
-  unsigned int old = *address_as_uint, assumed;
-  unsigned int val_uint = __float_as_uint(val);
-
-  // nan should be ok here but should verify
-  while (val > __uint_as_float(old)) {
-    assumed = old;
-    old = atomicCAS(address_as_uint, assumed, val_uint);
-  }
-};
-
-/**
- * Atomic max version for bfloat16
- *
- * Computes the maximum of two matxBf16 values atomically
- *
- * @param addr
- *   Source and destination for new maximum
- * @param val
- *   Value to compare against
- */
-__MATX_DEVICE__ __MATX_INLINE__ __nv_bfloat16 atomicMax(__nv_bfloat16 *addr, __nv_bfloat16 val)
-{
-#if __CUDA_ARCH__ > 600
-  HalfBits tmpval;
-  HalfBits old;
-  unsigned short *address_as_other = (unsigned short *)addr;
-
-  unsigned short assumed;
-  old.i = *address_as_other;
-  tmpval.b = val;
-
-  // nan should be ok here but should verify
-  while (val > old.b) {
-    assumed = old.i;
-    old.b = static_cast<float>(atomicCAS(address_as_other, assumed, tmpval.i));
-  }
-
-  return old.b;
-#else // Pascal doesn't support short atomicCAS
-  PascalHalfBits tmpval;
-  PascalHalfBits old;
-  unsigned int *address_as_other;
-  int offset;
-
-  MATX_IGNORE_WARNING_PUSH_CLANG("-Wcast-align")
-  // We need to move our pointer back
-  if ((uintptr_t)addr & 0x10) {
-    address_as_other = (unsigned int *)(reinterpret_cast<uint8_t*>(addr) - 2);
-    offset = 1;
-  }
-  else {
-    address_as_other = (unsigned int *)(addr);
-    offset = 0;
-  }
-  MATX_IGNORE_WARNING_POP_CLANG
-
-  unsigned short assumed;
-  old.i = *address_as_other;
-  tmpval.b[offset] = val;
-
-  // nan should be ok here but should verify
-  while (val > old.b[offset]) {
-    assumed = old.i;
-    old.b[offset] = static_cast<float>(atomicCAS(address_as_other, assumed, tmpval.i));
-  }
-
-  return old.b[offset];
-#endif
-};
-
-
-/**
- * Atomic max version for fp16
- *
- * Computes the maximum of two matxFp16 values atomically
- *
- * @param addr
- *   Source and destination for new maximum
- * @param val
- *   Value to compare against
- */
-__MATX_DEVICE__ __MATX_INLINE__ __half atomicMax(__half *addr, __half val)
-{
-#if __CUDA_ARCH__ > 600
-  HalfBits tmpval;
-  HalfBits old;
-  unsigned short *address_as_other = (unsigned short *)addr;
-
-  unsigned short assumed;
-  old.i = *address_as_other;
-  tmpval.h = val;
-
-  // nan should be ok here but should verify
-  while (val > old.h) {
-    assumed = old.i;
-    old.h = atomicCAS(address_as_other, assumed, tmpval.i);
-  }
-
-  return old.h;
-#else // Pascal doesn't support short atomicCAS
-  PascalHalfBits tmpval;
-  PascalHalfBits old;
-  unsigned int *address_as_other;
-  int offset;
-
-  MATX_IGNORE_WARNING_PUSH_CLANG("-Wcast-align")
-  // We need to move our pointer back to align to a 2b boundary
-  if ((uintptr_t)addr & 0x10) {
-    address_as_other = (unsigned int *)(reinterpret_cast<uint8_t*>(addr) - 2);
-    offset = 1;
-  }
-  else {
-    address_as_other = (unsigned int *)(addr);
-    offset = 0;
-  }
-  MATX_IGNORE_WARNING_POP_CLANG
-
-  unsigned short assumed;
-  old.i = *address_as_other;
-  tmpval.h[offset] = val;
-
-  // nan should be ok here but should verify
-  while (val > old.h[offset]) {
-    assumed = old.i;
-    old.h[offset] = atomicCAS(address_as_other, assumed, tmpval.i);
-  }
-
-  return old.h[offset];
-#endif
-};
-
-/**
- * Atomic any version for floats
- *
- * Computes whether either of two floating point values are != 0
- *
- * @param addr
- *   Source and destination for new any
- * @param val
- *   Value to compare against
- */
-template <typename T>
-__MATX_DEVICE__ __MATX_INLINE__ void atomicAny(T *addr, T val)
-{
-  // We don't actually need an atomic operation here since we only write to the
-  // location if any thread has the correct value.
-  if (val != T(0)) {
-    *addr = T(1);
-  }
-};
-
-/**
- * Atomic multiply version for uint32_t
- *
- * Computes the product of two uint32_t atomically
- *
- * @param address
- *   Source and destination for new any
- * @param val
- *   Value to compare against
- */
-template <typename T> __MATX_DEVICE__ T atomicMul(T *address, T val)
-{
-  T old = *address, assumed;
-
-  do {
-    assumed = old;
-    if constexpr (std::is_same_v<T, uint64_t> || std::is_same_v<T, int64_t>) {
-      old = atomicCAS(reinterpret_cast<unsigned long long *>(address),
-                      static_cast<unsigned long long>(assumed),
-                      static_cast<unsigned long long>(val * assumed));
-    }
-    else {
-      old = atomicCAS(address, assumed, val * assumed);
-    }
-
-    // Note: uses integer comparison to avoid hang in case of NaN (since NaN !=
-    // NaN)
-  } while (assumed != old);
-
-  return old;
-}
-
-/**
- * Atomic multiply version for doubles
- *
- * Computes the product of two doubles atomically
- *
- * @param address
- *   Source and destination for new any
- * @param val
- *   Value to compare against
- */
-template <> __MATX_DEVICE__ __MATX_INLINE__ float atomicMul(float *address, float val)
-{
-  unsigned int *address_as_uint = (unsigned int *)address;
-  unsigned int old = *address_as_uint, assumed;
-
-  do {
-    assumed = old;
-    old = atomicCAS(address_as_uint, assumed,
-                    __float_as_uint(val * __uint_as_float(assumed)));
-
-    // Note: uses integer comparison to avoid hang in case of NaN (since NaN !=
-    // NaN)
-  } while (assumed != old);
-
-  return __uint_as_float(old);
-}
-
-/**
- * Atomic all version for floats
- *
- * Computes whether both floating point values are != 0
- *
- * @param addr
- *   Source and destination for new any
- * @param val
- *   Value to compare against
- */
-__MATX_DEVICE__ __MATX_INLINE__ void atomicAll(float *addr, float val)
-{
-  unsigned int *address_as_uint = (unsigned int *)addr;
-  unsigned int old = *address_as_uint, assumed;
-
-  // nan should be ok here but should verify
-  while (val == 0.0 && old != 0.0) {
-    assumed = old;
-    old = atomicCAS(address_as_uint, assumed, 0.0);
-  }
-};
-
-__MATX_DEVICE__ __MATX_INLINE__ void atomicAll(int *addr, int val)
-{
-  int assumed;
-  int old = *addr;
-
-  while (val == 0 && old != 0) {
-    assumed = old;
-    old = atomicCAS(addr, assumed, 0);
-  }
-};
-
-
-__MATX_DEVICE__ __MATX_INLINE__ void atomicAll(unsigned int *addr, unsigned int val)
-{
-  unsigned int assumed;
-  unsigned int old = *addr;
-
-  while (val == 0 && old != 0) {
-    assumed = old;
-    old = atomicCAS(addr, assumed, 0);
-  }
-};
-
-/**
- * Atomic multiply version for doubles
- *
- * Computes the product of two doubles atomically
- *
- * @param address
- *   Source and destination for new any
- * @param val
- *   Value to compare against
- */
-template <> __MATX_DEVICE__ __MATX_INLINE__ double atomicMul(double *address, double val)
-{
-  unsigned long long int *address_as_ull = (unsigned long long int *)address;
-  unsigned long long int old = *address_as_ull, assumed;
-
-  do {
-    assumed = old;
-    old = atomicCAS(address_as_ull, assumed,
-                    __double_as_longlong(val * __longlong_as_double(assumed)));
-
-    // Note: uses integer comparison to avoid hang in case of NaN (since NaN !=
-    // NaN)
-  } while (assumed != old);
-
-  return __longlong_as_double(old);
-}
-
-/**
- * Atomic min version for doubles
- *
- * Computes the minimum of two floating point values atomically
- *
- * @param addr
- *   Source and destination for new minimum
- * @param val
- *   Value to compare against
- */
-__MATX_DEVICE__ __MATX_INLINE__ void atomicMin(double *addr, double val)
-{
-  unsigned long long int *address_as_ull = (unsigned long long int *)addr;
-  unsigned long long int old = *address_as_ull, assumed;
-  unsigned long long int val_ull = __double_as_longlong(val);
-
-  // nan should be ok here but should verify
-  while (val < __longlong_as_double(old)) {
-    assumed = old;
-    old = atomicCAS(address_as_ull, assumed, val_ull);
-  }
-};
-
-/**
- * Atomic max version for doubles
- *
- * Computes the maximum of two floating point values atomically
- *
- * @param addr
- *   Source and destination for new maximum
- * @param val
- *   Value to compare against
- */
-__MATX_DEVICE__ __MATX_INLINE__ void atomicMax(double *addr, double val)
-{
-  unsigned long long int *address_as_ull = (unsigned long long int *)addr;
-  unsigned long long int old = *address_as_ull, assumed;
-  unsigned long long int val_ull = __double_as_longlong(val);
-
-  // nan should be ok here but should verify
-  while (val > __longlong_as_double(old)) {
-    assumed = old;
-    old = atomicCAS(address_as_ull, assumed, val_ull);
-  }
-};
-
-/**
- * Atomic any version for doubles
- *
- * Computes whether either of two double floating point values are non-zero
- * atomically
- *
- * @param addr
- *   Source and destination for new maximum
- * @param val
- *   Value to compare against
- */
-__MATX_DEVICE__ __MATX_INLINE__ void atomicAny(double *addr, double val)
-{
-  // We don't actually need an atomic operation here since we only write to the
-  // location if any thread has the correct value.
-  if (val != 0) {
-    *addr = 1.0;
-  }
-};
-
-/**
- * Atomic all version for double
- *
- * Computes whether both doublest values are != 0
- *
- * @param addr
- *   Source and destination for new any
- * @param val
- *   Value to compare against
- */
-__MATX_DEVICE__ __MATX_INLINE__ void atomicAll(double *addr, double val)
-{
-  unsigned long long int *address_as_ull = (unsigned long long int *)addr;
-  unsigned long long int old = *address_as_ull, assumed;
-
-  // nan should be ok here but should verify
-  while (val == 0.0 && old != 0.0) {
-    assumed = old;
-    old = atomicCAS(address_as_ull, assumed, 0.0);
-  }
-}
-
-
-/**
- * Atomic min version for int64_t
- *
- * Computes the minimum of two int64_t values atomically
- *
- * @param addr
- *   Source and destination for new minimum
- * @param val
- *   Value to compare against
- */
-__MATX_DEVICE__ __MATX_INLINE__ void atomicMin(int64_t *addr, int64_t val)
-{
-  atomicMin(reinterpret_cast<long long int*>(addr), static_cast<long long int>(val));
-};
-
-/**
- * Atomic max version for int64_t
- *
- * Computes the maximum of two int64_t values atomically
- *
- * @param addr
- *   Source and destination for new maximum
- * @param val
- *   Value to compare against
- */
-__MATX_DEVICE__ __MATX_INLINE__ void atomicMax(int64_t *addr, int64_t val)
-{
-  atomicMax(reinterpret_cast<long long int*>(addr), static_cast<long long int>(val));
-};
-
-
-/**
- * Atomic all version for int64_t
- *
- * Computes whether both int64_t values are != 0
- *
- * @param addr
- *   Source and destination for new any
- * @param val
- *   Value to compare against
- */
-__MATX_DEVICE__ __MATX_INLINE__ void atomicAll(int64_t *addr, int64_t val)
-{
-  unsigned long long int *address_as_ull = (unsigned long long int *)addr;
-  unsigned long long int old = *address_as_ull, assumed;
-
-  // nan should be ok here but should verify
-  while (val == 0 && old != 0) {
-    assumed = old;
-    old = atomicCAS(address_as_ull, assumed, 0);
-  }
-}
-
-/**
- * Atomic min version for uint64_t
- *
- * Computes the minimum of two uint64_t values atomically
- *
- * @param addr
- *   Source and destination for new minimum
- * @param val
- *   Value to compare against
- */
-__MATX_DEVICE__ __MATX_INLINE__ void atomicMin(uint64_t *addr, uint64_t val)
-{
-  atomicMin(reinterpret_cast<unsigned long long int*>(addr), static_cast<unsigned long long int>(val));
-};
-
-/**
- * Atomic max version for uint64_t
- *
- * Computes the maximum of two uint64_t values atomically
- *
- * @param addr
- *   Source and destination for new maximum
- * @param val
- *   Value to compare against
- */
-__MATX_DEVICE__ __MATX_INLINE__ void atomicMax(uint64_t *addr, uint64_t val)
-{
-  atomicMax(reinterpret_cast<unsigned long long int*>(addr), static_cast<unsigned long long int>(val));
-};
-
-
-/**
- * Atomic all version for uint64_t
- *
- * Computes whether both uint64_t values are != 0
- *
- * @param addr
- *   Source and destination for new any
- * @param val
- *   Value to compare against
- */
-__MATX_DEVICE__ __MATX_INLINE__ void atomicAll(uint64_t *addr, uint64_t val)
-{
-  unsigned long long int *address_as_ull = (unsigned long long int *)addr;
-  unsigned long long int old = *address_as_ull, assumed;
-
-  // nan should be ok here but should verify
-  while (val == 0 && old != 0) {
-    assumed = old;
-    old = atomicCAS(address_as_ull, assumed, 0);
-  }
-}
-
-/**
- * Atomic add for int64_t
- *
- * @param addr
- *   Source and destination for result
- * @param val
- *   Value to add
- */
-__MATX_DEVICE__ __MATX_INLINE__ void atomicAdd(int64_t *addr,
-                                 int64_t val)
-{
-  unsigned long long int *addri = reinterpret_cast<unsigned long long int *>(addr);
-  atomicAdd(addri, (unsigned long long int)val);
-}
-
-/**
- * Atomic add for uint64_t
- *
- * @param addr
- *   Source and destination for result
- * @param val
- *   Value to add
- */
-__MATX_DEVICE__ __MATX_INLINE__ void atomicAdd(uint64_t *addr,
-                                 uint64_t val)
-{
-  unsigned long long int *addri = reinterpret_cast<unsigned long long int *>(addr);
-  atomicAdd(addri, (unsigned long long int)val);
-}
-
-/**
- * Atomic add for complex floats
- *
- * Atomically adds two complex floating point numbers. Note that
- * the real and imaginary components are added separately, so while
- * each of those alone are atomic, both together are not.
- *
- * @param addr
- *   Source and destination for result
- * @param val
- *   Value to add
- */
-__MATX_DEVICE__ __MATX_INLINE__ void atomicAdd(cuda::std::complex<float> *addr,
-                                 cuda::std::complex<float> val)
-{
-  float *addrf = reinterpret_cast<float *>(addr);
-  atomicAdd(addrf, val.real());
-  atomicAdd(addrf + 1, val.imag());
-}
-
-/**
- * Atomic add for complex doubles
- *
- * Atomically adds two complex double floating point numbers. Note that
- * the real and imaginary components are added separately, so while
- * each of those alone are atomic, both together are not.
- *
- * @param addr
- *   Source and destination for result
- * @param val
- *   Value to add
- */
-__MATX_DEVICE__ __MATX_INLINE__ void atomicAdd(cuda::std::complex<double> *addr,
-                                 cuda::std::complex<double> val)
-{
-  double *addrp = reinterpret_cast<double *>(addr);
-  atomicAdd(addrp, val.real());
-  atomicAdd(addrp + 1, val.imag());
-}
-#endif
 
 namespace matx {
 namespace detail {
@@ -736,29 +111,8 @@ template <typename T> constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T 
 template <typename T> class reduceOpSum {
 public:
   using matx_reduce = bool;
-  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Reduce(const T &v1, const T &v2) const { return v1 + v2; }
-  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(const T &v1, const T &v2) const { return Reduce(v1, v2); }
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(const T &v1, const T &v2) const { return v1 + v2; }
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Init() { return T(0); }
-  __MATX_DEVICE__ __MATX_INLINE__ void atomicReduce(T *addr, T val) {
-    if constexpr (is_complex_v<T>) {
-      if constexpr (is_matx_half_v<typename T::value_type>) {
-        atomicAdd(&reinterpret_cast<typename T::value_type::value_type *>(addr)[0], static_cast<typename T::value_type::value_type>(val.real()));
-        atomicAdd(&reinterpret_cast<typename T::value_type::value_type *>(addr)[1], static_cast<typename T::value_type::value_type>(val.imag()));
-      }
-      else {
-        atomicAdd(&reinterpret_cast<typename T::value_type *>(addr)[0], val.real());
-        atomicAdd(&reinterpret_cast<typename T::value_type *>(addr)[1], val.imag());
-      }
-    }
-    else {
-      if constexpr (is_matx_half_v<T>) {
-        atomicAdd(reinterpret_cast<typename T::value_type *>(addr), static_cast<typename T::value_type>(val));
-      }
-      else {
-        atomicAdd(addr, val);
-      }
-    }
-  }
 };
 
 /**
@@ -770,10 +124,8 @@ public:
 template <typename T> class reduceOpProd {
 public:
   using matx_reduce = bool;
-  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Reduce(const T &v1, const T &v2) const { return v1 * v2; }
-  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(const T &v1, const T &v2) const { return Reduce(v1, v2); }
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(const T &v1, const T &v2) const { return v1 * v2; }
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Init() { return T(1); }
-  __MATX_DEVICE__ __MATX_INLINE__ void atomicReduce(T *addr, T val) { atomicMul(addr, val); }
 };
 
 /**
@@ -787,12 +139,8 @@ template <typename T> class reduceOpMax {
 public:
   using matx_reduce = bool;
   using matx_reduce_index = bool;
-  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Reduce(const T &v1, const T &v2) { return v1 > v2 ? v1 : v2; }
-  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(const T &v1, const T &v2) { Reduce(v1, v2); }
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(const T &v1, const T &v2) { return v1 > v2 ? v1 : v2; }
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Init() { return minVal<T>(); }
-  __MATX_DEVICE__ __MATX_INLINE__ void atomicReduce(T *addr, T val) {
-    atomicMax(reinterpret_cast<convert_matx_type_t<T> *>(addr), static_cast<convert_matx_type_t<T>>(val));
-  }
 };
 
 /**
@@ -838,568 +186,13 @@ template <typename T> class reduceOpMin {
 public:
   using matx_reduce = bool;
   using matx_reduce_index = bool;
-  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Reduce(const T &v1, const T &v2) { return v1 < v2 ? v1 : v2; }
-  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(const T &v1, const T &v2) { Reduce(v1, v2); }
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T operator()(const T &v1, const T &v2) { return v1 < v2 ? v1 : v2; }
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ T Init() { return maxVal<T>(); }
-  __MATX_DEVICE__ __MATX_INLINE__ void atomicReduce(T *addr, T val) { atomicMin(addr, val); }
 };
 
-
-template <typename T, typename Op>
-__MATX_DEVICE__ __MATX_INLINE__ T warpReduceOp(T val, Op op, uint32_t size)
-{
-  if constexpr (is_complex_v<T>) {
-    typename T::value_type re;
-    typename T::value_type im;
-    if constexpr (!is_matx_half_v<typename T::value_type>) {
-      if (size > 16) {
-        re = __shfl_down_sync(0xffffffff, val.real(), 16);
-        im = __shfl_down_sync(0xffffffff, val.imag(), 16);
-        val = op.Reduce(val, {re, im});
-        re = __shfl_down_sync(0xffffffff, val.real(), 8);
-        im = __shfl_down_sync(0xffffffff, val.imag(), 8);
-        val = op.Reduce(val, {re, im});
-        re = __shfl_down_sync(0xffffffff, val.real(), 4);
-        im = __shfl_down_sync(0xffffffff, val.imag(), 4);
-        val = op.Reduce(val, {re, im});
-        re = __shfl_down_sync(0xffffffff, val.real(), 2);
-        im = __shfl_down_sync(0xffffffff, val.imag(), 2);
-        val = op.Reduce(val, {re, im});
-        re = __shfl_down_sync(0xffffffff, val.real(), 1);
-        im = __shfl_down_sync(0xffffffff, val.imag(), 1);
-        val = op.Reduce(val, {re, im});
-      }
-      else if (size > 8) {
-        re = __shfl_down_sync(0xffffffff, val.real(), 8);
-        im = __shfl_down_sync(0xffffffff, val.imag(), 8);
-        val = op.Reduce(val, {re, im});
-        re = __shfl_down_sync(0xffffffff, val.real(), 4);
-        im = __shfl_down_sync(0xffffffff, val.imag(), 4);
-        val = op.Reduce(val, {re, im});
-        re = __shfl_down_sync(0xffffffff, val.real(), 2);
-        im = __shfl_down_sync(0xffffffff, val.imag(), 2);
-        val = op.Reduce(val, {re, im});
-        re = __shfl_down_sync(0xffffffff, val.real(), 1);
-        im = __shfl_down_sync(0xffffffff, val.imag(), 1);
-        val = op.Reduce(val, {re, im});
-      }
-      else if (size > 4) {
-        re = __shfl_down_sync(0xffffffff, val.real(), 4);
-        im = __shfl_down_sync(0xffffffff, val.imag(), 4);
-        val = op.Reduce(val, {re, im});
-        re = __shfl_down_sync(0xffffffff, val.real(), 2);
-        im = __shfl_down_sync(0xffffffff, val.imag(), 2);
-        val = op.Reduce(val, {re, im});
-        re = __shfl_down_sync(0xffffffff, val.real(), 1);
-        im = __shfl_down_sync(0xffffffff, val.imag(), 1);
-        val = op.Reduce(val, {re, im});
-      }
-      else if (size > 2) {
-        re = __shfl_down_sync(0xffffffff, val.real(), 2);
-        im = __shfl_down_sync(0xffffffff, val.imag(), 2);
-        val = op.Reduce(val, {re, im});
-        re = __shfl_down_sync(0xffffffff, val.real(), 1);
-        im = __shfl_down_sync(0xffffffff, val.imag(), 1);
-        val = op.Reduce(val, {re, im});
-      }
-      else if (size > 1) {
-        re = __shfl_down_sync(0xffffffff, val.real(), 1);
-        im = __shfl_down_sync(0xffffffff, val.imag(), 1);
-        val = op.Reduce(val, {re, im});
-      }
-      return val;
-    }
-    else {
-      if (size > 16) {
-        re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 16);
-        im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 16);
-        val = op.Reduce(val, {re, im});
-        re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 8);
-        im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 8);
-        val = op.Reduce(val, {re, im});
-        re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 4);
-        im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 4);
-        val = op.Reduce(val, {re, im});
-        re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 2);
-        im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 2);
-        val = op.Reduce(val, {re, im});
-        re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 1);
-        im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 1);
-        val = op.Reduce(val, {re, im});
-      }
-      else if (size > 8) {
-        re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 8);
-        im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 8);
-        val = op.Reduce(val, {re, im});
-        re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 4);
-        im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 4);
-        val = op.Reduce(val, {re, im});
-        re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 2);
-        im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 2);
-        val = op.Reduce(val, {re, im});
-        re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 1);
-        im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 1);
-        val = op.Reduce(val, {re, im});
-      }
-      else if (size > 4) {
-        re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 4);
-        im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 4);
-        val = op.Reduce(val, {re, im});
-        re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 2);
-        im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 2);
-        val = op.Reduce(val, {re, im});
-        re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 1);
-        im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 1);
-        val = op.Reduce(val, {re, im});
-      }
-      else if (size > 2) {
-        re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 2);
-        im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 2);
-        val = op.Reduce(val, {re, im});
-        re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 1);
-        im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 1);
-        val = op.Reduce(val, {re, im});
-      }
-      else if (size > 1) {
-        re = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.real()), 1);
-        im = __shfl_down_sync(0xffffffff, static_cast<typename T::value_type::value_type>(val.imag()), 1);
-        val = op.Reduce(val, {re, im});
-      }
-      return val;
-    }
-  }
-  else {
-    // breaking this out so common case is faster without branches
-    if constexpr (!is_matx_half_v<T>) {
-      if (size > 16) {
-        val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 16));
-        val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 8));
-        val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 4));
-        val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 2));
-        val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 1));
-      }
-      else if (size > 8) {
-        val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 8));
-        val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 4));
-        val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 2));
-        val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 1));
-      }
-      else if (size > 4) {
-        val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 4));
-        val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 2));
-        val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 1));
-      }
-      else if (size > 2) {
-        val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 2));
-        val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 1));
-      }
-      else if (size > 1) {
-        val = op.Reduce(val, __shfl_down_sync(0xffffffff, val, 1));
-      }
-      return val;
-    }
-    else {
-      if (size > 16) {
-        val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 16));
-        val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 8));
-        val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 4));
-        val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 2));
-        val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 1));
-      }
-      else if (size > 8) {
-        val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 8));
-        val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 4));
-        val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 2));
-        val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 1));
-      }
-      else if (size > 4) {
-        val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 4));
-        val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 2));
-        val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 1));
-      }
-      else if (size > 2) {
-        val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 2));
-        val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 1));
-      }
-      else if (size > 1) {
-        val = op.Reduce(val, __shfl_down_sync(0xffffffff, static_cast<typename T::value_type>(val), 1));
-      }
-      return val;
-    }
-  }
-}
-
-
-template <typename OutType, typename InType, typename ReduceOp>
-__launch_bounds__(1024, 1)
-__global__ void matxReduceKernel(OutType dest, const InType in,
-                                 ReduceOp red, [[maybe_unused]] index_t mult)
-{
-  constexpr uint32_t RANK = OutType::Rank();
-  constexpr uint32_t DRANK = InType::Rank() - RANK;
-  cuda::std::array<index_t, InType::Rank()> indices;
-  using value_type = typename InType::value_type;
-  using T = typename OutType::value_type;
-  [[maybe_unused]] bool valid;
-
-  // This is for 2 stage reduction
-
-  // nvcc limitation here.  we have to declare shared memory with the same type
-  // across all template functions then recast to the type we want
-  extern __shared__ char smemc_[];
-  value_type *smem_ = reinterpret_cast<value_type *>(smemc_);
-
-  unsigned int s2_size, soff;
-  value_type *smem;
-
-  // if blockDim.x > 32 we need a 2 stage reduction
-  if (blockDim.x > 32) {
-
-    // number of shared memory entries per xdim of block
-    s2_size = blockDim.x / 32;
-    // offset into shared memory
-    soff = threadIdx.z * blockDim.y * s2_size + threadIdx.y * s2_size;
-
-    // offset shared memory
-    smem = smem_ + soff;
-  }
-
-  // Read input
-  T in_val = red.Init();
-
-  if constexpr (InType::Rank() == 1) {
-    indices[InType::Rank()-1] = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-    if (indices[InType::Rank()-1] < in.Size(0)) {
-      in_val = in(indices[InType::Rank()-1]);
-    }
-  }
-  else if constexpr (InType::Rank() == 2) {
-    indices[InType::Rank()-1] = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-    indices[InType::Rank()-2] = static_cast<index_t>(blockIdx.y) * blockDim.y + threadIdx.y;
-    if (indices[InType::Rank()-2] < in.Size(0) && indices[InType::Rank()-1] < in.Size(1)) {
-      in_val = in(indices[InType::Rank()-2], indices[InType::Rank()-1]);
-    }
-  }
-  else if constexpr (InType::Rank() == 3) {
-    indices[InType::Rank()-1] = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-    indices[InType::Rank()-2] = static_cast<index_t>(blockIdx.y) * blockDim.y + threadIdx.y;
-    indices[InType::Rank()-3] = static_cast<index_t>(blockIdx.z) * blockDim.z + threadIdx.z;
-    if (indices[InType::Rank()-3] < in.Size(0) && indices[InType::Rank()-2] < in.Size(1) && indices[InType::Rank()-1] < in.Size(2)) {
-      in_val = in(indices[InType::Rank()-3], indices[InType::Rank()-2], indices[InType::Rank()-1]);
-    }
-  }
-  else if constexpr (InType::Rank() == 4) {
-    indices[InType::Rank()-1] = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-    index_t nmy = static_cast<index_t>(blockIdx.y) * blockDim.y + threadIdx.y;
-    indices[InType::Rank()-2] = nmy % in.Size(2);
-    indices[InType::Rank()-3] = nmy / in.Size(2);
-    indices[InType::Rank()-4] = blockIdx.z * blockDim.z + threadIdx.z;
-
-    if (indices[InType::Rank()-4] < in.Size(0) && indices[InType::Rank()-3] < in.Size(1) && indices[InType::Rank()-2] < in.Size(2) &&
-        indices[InType::Rank()-1] < in.Size(3)) {
-      in_val = in(indices[InType::Rank()-4], indices[InType::Rank()-3], indices[InType::Rank()-2], indices[InType::Rank()-1]);
-    }
-  }
-  else {
-    // Compute the index into the operator for this thread. N-D tensors require more computations
-    // since we're limited to 3 dimensions in both grid and block, so we need to iterate to compute
-    // our index.
-    index_t x_abs = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-    index_t ttl = mult * in.Size(0);
-    valid = x_abs < ttl;
-    #pragma unroll
-    for (int r = 0; r < InType::Rank(); r++) {
-      indices[r] = x_abs / mult;
-      x_abs -= indices[r] * mult;
-      mult /= in.Size(r+1);
-    }
-
-    if (valid) {
-      in_val = in(indices);
-    }
-  }
-
-  // Compute offset index based on rank difference
-  #pragma unroll
-  for (int r = 0; r < (int)(InType::Rank() - DRANK); r++) {
-    indices[InType::Rank() - r - 1] = indices[InType::Rank() - (DRANK + 1 + r)];
-  }
-
-  // Compute output location
-  T *out = nullptr;
-
-  // compute output offsets
-  if constexpr (RANK == 0) {
-    out = &dest();
-  }
-  else if constexpr (RANK == 1) {
-    if (indices[InType::Rank()-1] < dest.Size(0))
-      out = &dest(indices[InType::Rank()-1]);
-  }
-  else if constexpr (RANK == 2) {
-    if (indices[InType::Rank()-1] < dest.Size(1) && indices[InType::Rank()-2] < dest.Size(0))
-      out = &dest(indices[InType::Rank()-2], indices[InType::Rank()-1]);
-  }
-  else if constexpr (RANK == 3) {
-    if (indices[InType::Rank()-1] < dest.Size(2) && indices[InType::Rank()-2] < dest.Size(1) && indices[InType::Rank()-3] < dest.Size(0))
-      out = &dest(indices[InType::Rank()-3], indices[InType::Rank()-2], indices[InType::Rank()-1]);
-  }
-  else {
-    // Calculate valid here
-    valid = true;
-    for (int r = 0; r < RANK - 1; r++) {
-      if (indices[r] >= dest.Size(r)) {
-        valid = false;
-      }
-    }
-
-    if (valid) {
-      out  = cuda::std::apply([&] (auto... param) { return dest.GetPointer(param...); }, indices);
-    }
-  }
-
-  // reduce along x dim (warp)
-  in_val = warpReduceOp(in_val, red, blockDim.x);
-
-  if (blockDim.x > 32) {
-    // enter 2 stage reduction
-
-    // first thread of warp write to shared memory
-    if (threadIdx.x % 32 == 0) {
-      smem[threadIdx.x / 32] = in_val;
-    }
-
-    // wait for write
-    __syncthreads();
-
-    if (threadIdx.x < s2_size) {
-      in_val = smem[threadIdx.x];
-    }
-
-    // data is all on first warp now
-    // reduce one more time
-    in_val = warpReduceOp(in_val, red, s2_size);
-  }
-
-  if (out != nullptr && threadIdx.x == 0) {
-    // thread 0 update global memory
-    red.atomicReduce(out, in_val);
-  }
-}
-
-template <typename OutType, typename TensorIndexType, typename InType>
-__global__ void matxIndexKernel(OutType dest, TensorIndexType idest, InType in, [[maybe_unused]] index_t mult)
-{
-  using index_type = typename TensorIndexType::value_type;
-  using T = typename OutType::value_type;
-  T in_val;
-  constexpr uint32_t RANK = TensorIndexType::Rank();
-  constexpr uint32_t DRANK = InType::Rank() - RANK;
-  cuda::std::array<index_t, InType::Rank()> indices;
-  index_t abs_idx = -1;
-  bool valid = false;
-
-  if constexpr (InType::Rank() == 1) {
-    indices[0] = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-    if (indices[InType::Rank()-1] < in.Size(0)) {
-      in_val = in(indices[0]);
-      abs_idx = indices[InType::Rank()-1];
-    }
-  }
-  else if constexpr (InType::Rank() == 2) {
-    indices[InType::Rank()-1] = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-    indices[InType::Rank()-2] = static_cast<index_t>(blockIdx.y) * blockDim.y + threadIdx.y;
-    if (indices[InType::Rank()-2] < in.Size(0) && indices[InType::Rank()-1] < in.Size(1)) {
-      in_val = in(indices[InType::Rank()-2], indices[InType::Rank()-1]);
-      abs_idx = indices[InType::Rank()-2]*in.Size(1) + indices[InType::Rank()-1];
-    }
-  }
-  else if constexpr (InType::Rank() == 3) {
-    indices[InType::Rank()-1] = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-    indices[InType::Rank()-2] = static_cast<index_t>(blockIdx.y) * blockDim.y + threadIdx.y;
-    indices[InType::Rank()-3] = static_cast<index_t>(blockIdx.z) * blockDim.z + threadIdx.z;
-    if (indices[InType::Rank()-3] < in.Size(0) && indices[InType::Rank()-2] < in.Size(1) && indices[InType::Rank()-1] < in.Size(2)) {
-      in_val = in(indices[InType::Rank()-3], indices[InType::Rank()-2], indices[InType::Rank()-1]);
-      abs_idx = indices[InType::Rank()-3]*in.Size(0)*in.Size(1) + indices[InType::Rank()-2]*in.Size(1) + indices[InType::Rank()-1];
-    }
-  }
-  else if constexpr (InType::Rank() == 4) {
-    indices[InType::Rank()-1] = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-    index_t nmy = static_cast<index_t>(blockIdx.y) * blockDim.y + threadIdx.y;
-    indices[InType::Rank()-2] = nmy % in.Size(2);
-    indices[InType::Rank()-3] = nmy / in.Size(2);
-    indices[InType::Rank()-4] = blockIdx.z * blockDim.z + threadIdx.z;
-    if (indices[InType::Rank()-4] < in.Size(0) && indices[InType::Rank()-3] < in.Size(1) && indices[InType::Rank()-2] < in.Size(2) &&
-        indices[InType::Rank()-1] < in.Size(3)) {
-      in_val = in(indices[InType::Rank()-4], indices[InType::Rank()-3], indices[InType::Rank()-2], indices[InType::Rank()-1]);
-      abs_idx = indices[InType::Rank()-4]*in.Size(0)*in.Size(1)*in.Size(2) + indices[InType::Rank()-3]*in.Size(0)*in.Size(1) + indices[InType::Rank()-2]*in.Size(1) + indices[InType::Rank()-1];
-    }
-  }
-  else {
-    // Compute the index into the operator for this thread. N-D tensors require more computations
-    // since we're limited to 3 dimensions in both grid and block, so we need to iterate to compute
-    // our index.
-    index_t x_abs = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-    abs_idx = x_abs;
-    index_t ttl = mult * in.Size(0);
-    valid = x_abs < ttl;
-    #pragma unroll
-    for (int r = 0; r < InType::Rank(); r++) {
-      indices[r] = x_abs / mult;
-      x_abs -= indices[r] * mult;
-      mult /= in.Size(r+1);
-    }
-
-    if (valid) {
-      in_val = in(indices);
-    }
-  }
-
-  #pragma unroll
-  for (int r = 0; r < InType::Rank() - DRANK; r++) {
-    indices[InType::Rank() - r - 1] = indices[InType::Rank() - (DRANK + 1 + r)];
-  }
-
-  // Compute output location
-  T *out = nullptr;
-  index_type *iout = nullptr;
-
-  if (abs_idx != -1) {
-    // compute output offsets
-    if constexpr (RANK == 0) {
-      out  = &dest();
-      iout = &idest();
-      valid = true;
-    }
-    else if constexpr (RANK == 1) {
-        out = &dest(indices[InType::Rank()-1]);
-        iout = &idest(indices[InType::Rank()-1]);
-        valid = true;
-    }
-    else if constexpr (RANK == 2) {
-      out = &dest(indices[InType::Rank()-2], indices[InType::Rank()-1]);
-      iout = &idest(indices[InType::Rank()-2], indices[InType::Rank()-1]);
-      valid = true;
-    }
-    else if constexpr (RANK == 3) {
-      out = &dest(indices[InType::Rank()-3], indices[InType::Rank()-2], indices[InType::Rank()-1]);
-      iout = &idest(indices[InType::Rank()-3], indices[InType::Rank()-2], indices[InType::Rank()-1]);
-      valid = true;
-    }
-    else {
-      // Calculate valid here
-      valid = true;
-      for (int r = RANK-1; r >= 0; r++) {
-        if (indices[r] >= dest.Size(r)) {
-          valid = false;
-        }
-      }
-      if (valid) {
-        iout = cuda::std::apply([&](auto... param) { return idest.GetPointer(param...); }, indices);
-        out  = cuda::std::apply([&] (auto... param) { return dest.GetPointer(param...); }, indices);
-      }
-    }
-  }
-
-  if (valid) {
-    __threadfence();
-
-    // Value matches
-    if (*out == in_val) {
-      atomicMin(iout, abs_idx);
-    }
-  }
-}
 #endif
 
 } // namespace detail
-
-/**
- * Perform a reduction and preserves indices
- *
- * Performs a reduction from tensor "in" into values tensor "dest" and index tensor idest using reduction
- * operation ReduceOp. The output tensor rank dictates which elements the reduction
- * is performed over. In general, the reductions are performed over the
- * innermost dimensions, where the number of dimensions is the difference
- * between the input and output tensor ranks. For example, for a 0D (scalar)
- * output tensor, the reduction is performed over the entire tensor. For
- * anything higher, the reduction is performed across the number of ranks below
- * the input tensor that the output tensor is. For example, if the input tensor
- * is a 4D tensor and the output is a 1D tensor, the reduction is performed
- * across the innermost dimension of the input. If the output is a 2D tensor,
- * the reduction is performed across the two innermost dimensions of the input,
- * and so on.
- *
- * @tparam OutType
- *   Output data type
- * @tparam TensorIndexType
- *   Output index type
- * @tparam InType
- *   Input data type
- * @tparam ReduceOp
- *   Reduction operator to apply
- *
- * @param dest
- *   Destination view of values reduced
- * @param idest
- *   Destination view of indices
- * @param in
- *   Input data to reduce
- * @param op
- *   Reduction operator
- * @param stream
- *   CUDA stream
- * @param init
- *   if true dest will be initialized with ReduceOp::Init()
- *   otherwise the values in the destination will be included
- *   in the reduction.
- */
-template <typename OutType, typename TensorIndexType, typename InType, typename ReduceOp,
-  std::enable_if_t<is_matx_reduction_v<ReduceOp>, bool> = true>
-void __MATX_INLINE__ reduce(OutType dest, [[maybe_unused]] TensorIndexType idest, const InType &in, ReduceOp op,
-                   cudaStream_t stream = 0, bool init = true)
-{
-#ifdef __CUDACC__
-  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-
-  using value_type = typename InType::value_type;
-  using T = typename OutType::value_type;
-
-  static_assert(OutType::Rank() < InType::Rank());
-  static_assert(is_matx_reduction_v<ReduceOp>,  "Must use a reduction operator for reducing");
-
-  if constexpr (OutType::Rank() > 0) {
-    for (int i = 0; i < OutType::Rank(); i++) {
-      MATX_ASSERT(dest.Size(i) == in.Size(i), matxInvalidDim);
-    }
-  }
-  dim3 blocks, threads;
-  cuda::std::array<index_t, InType::Rank()> sizes;
-  for (int i = 0; i < in.Rank(); i++) {
-    sizes[i] = in.Size(i);
-  }
-
-  detail::get_grid_dims<InType::Rank()>(blocks, threads, sizes);
-
-  if (init) {
-    (dest = static_cast<promote_half_t<T>>(op.Init())).run(stream);
-  }
-
-  auto mult = std::accumulate(sizes.begin() + 1, sizes.end(), 1, std::multiplies<index_t>());
-
-  detail::matxReduceKernel<<<blocks, threads, sizeof(value_type) * 32, stream>>>(
-      dest, in, ReduceOp(), mult);
-
-  // If we need the indices too, launch that kernel
-  if constexpr (!std::is_same_v<TensorIndexType, std::nullopt_t>) {
-    (idest = std::numeric_limits<index_t>::max()).run(stream);
-    detail::matxIndexKernel<<<blocks, threads, 0, stream>>>(
-        dest, idest, in, mult);
-  }
-#endif
-}
-
-
 
 /**
  * Perform a reduction
@@ -1442,15 +235,8 @@ void __MATX_INLINE__ reduce(OutType dest, const InType &in, ReduceOp op,
                    cudaStream_t stream = 0, [[maybe_unused]] bool init = true)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-
-  constexpr bool use_cub = OutType::Rank() == 0 || (OutType::Rank() == 1 && InType::Rank() == 2);
   // Use CUB implementation if we have a tensor on the RHS and it's not blocked from using CUB
-  if constexpr (!is_matx_no_cub_reduction_v<ReduceOp> && use_cub) {
-    cub_reduce<OutType, InType, ReduceOp>(dest, in, op.Init(), stream);
-  }
-  else { // Fall back to the slow path of custom implementation
-    reduce(dest, std::nullopt, in, op, stream, init);
-  }
+  cub_reduce<OutType, InType, ReduceOp>(dest, in, op.Init(), stream);
 }
 
 /**
@@ -1478,7 +264,7 @@ void __MATX_INLINE__ reduce(OutType dest, const InType &in, ReduceOp op,
  */
 template <typename OutType, typename InType>
 void __MATX_INLINE__ mean_impl(OutType dest, const InType &in,
-                 cudaExecutor exec = 0)
+                 const cudaExecutor &exec)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("mean_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
@@ -1626,7 +412,7 @@ void __MATX_INLINE__ softmax_impl(OutType dest, const InType &in, PermDims dims,
 
   // Create the shape of the summed tensor based on the permutation params
   cuda::std::array<index_t, InType::Rank() - (int)dims.size()> red_shape{};
-  #pragma unroll
+  MATX_LOOP_UNROLL
   for (int r = 0; r < in.Rank() - (int)dims.size(); r++) {
     red_shape[r] = in.Size(perm[r]);
   }
@@ -1635,7 +421,7 @@ void __MATX_INLINE__ softmax_impl(OutType dest, const InType &in, PermDims dims,
   // We need to clone the summed tensor on the appropriate dims for the final divide.
   cuda::std::array<index_t, InType::Rank()> clone_dims;
   int axis_ptr = 0;
-  #pragma unroll
+  MATX_LOOP_UNROLL
   for (int r = 0; r < InType::Rank(); r++) {
     if (axis_ptr >= 0 && dims[axis_ptr] == r) {
       clone_dims[r] = in.Size(r);
@@ -1683,7 +469,7 @@ void __MATX_INLINE__ softmax_impl(OutType dest, const InType &in, PermDims dims,
  */
 template <typename OutType, typename InType>
 void __MATX_INLINE__ median_impl(OutType dest,
-                   const InType &in, cudaExecutor exec = 0)
+                   const InType &in, const cudaExecutor &exec)
 {
 #ifdef __CUDACC__
   if constexpr ( OutType::Rank() <= 1 && InType::Rank() <=2 ) {
@@ -1855,7 +641,7 @@ void __MATX_INLINE__ median_impl(OutType dest, const InType &in, [[maybe_unused]
  *   CUDA executor
  */
 template <typename OutType, typename InType>
-void __MATX_INLINE__ sum_impl(OutType dest, const InType &in, cudaExecutor exec = 0)
+void __MATX_INLINE__ sum_impl(OutType dest, const InType &in, const cudaExecutor &exec)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("sum_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
@@ -1921,16 +707,14 @@ void __MATX_INLINE__ sum_impl(OutType dest, const InType &in, [[maybe_unused]] c
  *   CUDA executor
  */
 template <typename OutType, typename InType>
-void __MATX_INLINE__ prod_impl(OutType dest, const InType &in, cudaExecutor exec = 0)
+void __MATX_INLINE__ prod_impl(OutType dest, const InType &in, const cudaExecutor &exec)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("prod_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
   cudaStream_t stream = exec.getStream();
-  // example-begin reduce-1
   // Reduce "in" into "dest" using a product operation as the reduction type
   reduce(dest, in, detail::reduceOpProd<typename OutType::value_type>(), stream, true);
-  // example-end reduce-1
 #endif
 }
 
@@ -1995,7 +779,7 @@ void __MATX_INLINE__ prod_impl(OutType dest, const InType &in, [[maybe_unused]] 
  *   CUDA executor or stream ID
  */
 template <typename OutType, typename InType>
-void __MATX_INLINE__ max_impl(OutType dest, const InType &in, cudaExecutor exec = 0)
+void __MATX_INLINE__ max_impl(OutType dest, const InType &in, const cudaExecutor &exec)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("max_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
@@ -2065,12 +849,12 @@ void __MATX_INLINE__ max_impl(OutType dest, const InType &in, [[maybe_unused]] c
  *   CUDA executor or stream ID
  */
 template <typename OutType, typename TensorIndexType, typename InType>
-void __MATX_INLINE__ argmax_impl(OutType dest, TensorIndexType &idest, const InType &in, cudaExecutor exec = 0)
+void __MATX_INLINE__ argmax_impl(OutType dest, TensorIndexType &idest, const InType &in, const cudaExecutor &exec)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("argmax_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
-  const auto initial_value = thrust::make_tuple(static_cast<matx::index_t>(-1), std::numeric_limits<typename InType::value_type>::lowest());
+  const auto initial_value = cuda::std::make_tuple(static_cast<matx::index_t>(-1), std::numeric_limits<typename InType::value_type>::lowest());
   using reduce_param_type = typename detail::ReduceParams_t<typename detail::CustomArgMaxCmp, decltype(initial_value)>;
   auto reduce_params = reduce_param_type{detail::CustomArgMaxCmp{}, initial_value};
 
@@ -2107,12 +891,12 @@ void __MATX_INLINE__ argmax_impl(OutType dest, TensorIndexType &idest, const InT
 
   auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) {
     if constexpr (OutType::Rank() == 0) {
-      *lout = cuda::std::max_element(lin, lin + TotalSize(in)) - lin;
+      *lout = static_cast<index_t>(cuda::std::max_element(lin, lin + TotalSize(in)) - lin);
     }
     else {
       const index_t BATCHES = TotalSize(dest);
       for (index_t b = 0; b < BATCHES; b++) {
-        lout[b] = cuda::std::max_element(lin + lbegin[b], lin + lend[b]) - lin;
+        lout[b] = static_cast<index_t>(cuda::std::max_element(lin + lbegin[b], lin + lend[b]) - lin);
       }
     }
   };
@@ -2143,7 +927,7 @@ void __MATX_INLINE__ argmax_impl(OutType dest, TensorIndexType &idest, const InT
  *   CUDA executor or stream ID
  */
 template <typename OutType, typename InType>
-void __MATX_INLINE__ min_impl(OutType dest, const InType &in, cudaExecutor exec = 0)
+void __MATX_INLINE__ min_impl(OutType dest, const InType &in, const cudaExecutor &exec)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("min_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
@@ -2212,13 +996,13 @@ void __MATX_INLINE__ min_impl(OutType dest, const InType &in, [[maybe_unused]] c
  *   CUDA executor or stream ID
  */
 template <typename OutType, typename TensorIndexType, typename InType>
-void __MATX_INLINE__ argmin_impl(OutType dest, TensorIndexType &idest, const InType &in, cudaExecutor exec = 0)
+void __MATX_INLINE__ argmin_impl(OutType dest, TensorIndexType &idest, const InType &in, const cudaExecutor &exec)
 {
   static_assert(OutType::Rank() == TensorIndexType::Rank());
 #ifdef __CUDACC__
   MATX_NVTX_START("argmin_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
-  const auto initial_value = thrust::make_tuple(static_cast<matx::index_t>(-1), std::numeric_limits<typename InType::value_type>::max());
+  const auto initial_value = cuda::std::make_tuple(static_cast<matx::index_t>(-1), std::numeric_limits<typename InType::value_type>::max());
   using reduce_param_type = typename detail::ReduceParams_t<typename detail::CustomArgMinCmp, decltype(initial_value)>;
   auto reduce_params = reduce_param_type{detail::CustomArgMinCmp{}, initial_value};
 
@@ -2257,12 +1041,12 @@ void __MATX_INLINE__ argmin_impl(OutType dest, TensorIndexType &idest, const InT
 
   auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) {
     if constexpr (OutType::Rank() == 0) {
-      *lout = cuda::std::min_element(lin, lin + TotalSize(in)) - lin;
+      *lout = static_cast<index_t>(cuda::std::min_element(lin, lin + TotalSize(in)) - lin);
     }
     else {
       const index_t BATCHES = TotalSize(dest);
       for (index_t b = 0; b < BATCHES; b++) {
-        lout[b] = cuda::std::min_element(lin + lbegin[b], lin + lend[b]) - lin;
+        lout[b] = static_cast<index_t>(cuda::std::min_element(lin + lbegin[b], lin + lend[b]) - lin);
       }
     }
   };
@@ -2299,13 +1083,13 @@ void __MATX_INLINE__ argmin_impl(OutType dest, TensorIndexType &idest, const InT
  *   CUDA executor or stream ID
  */
 template <typename OutType, typename TensorIndexType, typename InType>
-void __MATX_INLINE__ argminmax_impl(OutType destmin, TensorIndexType &idestmin, OutType destmax, TensorIndexType &idestmax, const InType &in, cudaExecutor exec = 0)
+void __MATX_INLINE__ argminmax_impl(OutType destmin, TensorIndexType &idestmin, OutType destmax, TensorIndexType &idestmax, const InType &in, const cudaExecutor &exec)
 {
   static_assert(OutType::Rank() == TensorIndexType::Rank());
 #ifdef __CUDACC__
   MATX_NVTX_START("argminmax_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
-  const auto initial_value = thrust::make_tuple(
+  const auto initial_value = cuda::std::make_tuple(
     static_cast<matx::index_t>(-1),
     std::numeric_limits<typename InType::value_type>::max(),
     static_cast<matx::index_t>(-1),
@@ -2379,7 +1163,7 @@ void __MATX_INLINE__ argminmax_impl(OutType destmin, TensorIndexType &idestmin, 
  *   CUDA executor or stream ID
  */
 template <typename OutType, typename InType>
-void __MATX_INLINE__ any_impl(OutType dest, const InType &in, cudaExecutor exec = 0)
+void __MATX_INLINE__ any_impl(OutType dest, const InType &in, const cudaExecutor &exec)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("any_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
@@ -2452,7 +1236,7 @@ void __MATX_INLINE__ any_impl(OutType dest, const InType &in, [[maybe_unused]] c
  *   CUDA executor or stream ID
  */
 template <typename OutType, typename InType>
-void __MATX_INLINE__ all_impl(OutType dest, const InType &in, cudaExecutor exec = 0)
+void __MATX_INLINE__ all_impl(OutType dest, const InType &in, const cudaExecutor &exec)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("all_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
@@ -2530,7 +1314,7 @@ void __MATX_INLINE__ all_impl(OutType dest, const InType &in, [[maybe_unused]] c
  *   CUDA executor or stream ID
  */
 template <typename OutType, typename InType1, typename InType2>
-void __MATX_INLINE__ allclose(OutType dest, const InType1 &in1, const InType2 &in2, double rtol, double atol, cudaExecutor exec = 0)
+void __MATX_INLINE__ allclose(OutType dest, const InType1 &in1, const InType2 &in2, double rtol, double atol, const cudaExecutor &exec)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("allclose(" + get_type_str(in1) + ", " + get_type_str(in2) + ")", matx::MATX_NVTX_LOG_API)
@@ -2609,7 +1393,8 @@ void __MATX_INLINE__ allclose(OutType dest, const InType1 &in1, const InType2 &i
  *   to 1 to give an unbiased estimate
  */
 #ifndef DOXYGEN_ONLY
-template <typename OutType, typename InType, typename Executor, std::enable_if_t<is_executor_t<Executor>(), bool> = true>
+template <typename OutType, typename InType, typename Executor>
+  requires is_executor<Executor>
 #else
 template <typename OutType, typename InType, typename Executor>
 #endif
@@ -2671,16 +1456,20 @@ void __MATX_INLINE__ var_impl(OutType dest, const InType &in, Executor &&exec, i
  *   Input data to reduce
  * @param exec
  *   Executor type
+ * @param ddof
+ *   Delta Degrees Of Freedom used in the divisor of the result as N - ddof. Defaults
+ *   to 1 to give an unbiased estimate
  */
 #ifndef DOXYGEN_ONLY
-template <typename OutType, typename InType, typename Executor, std::enable_if_t<is_executor_t<Executor>(), bool> = true>
+template <typename OutType, typename InType, typename Executor>
+  requires is_executor<Executor>
 #else
 template <typename OutType, typename InType, typename Executor>
 #endif
-void __MATX_INLINE__ stdd_impl(OutType dest, InType &&in, Executor &&exec)
+void __MATX_INLINE__ stdd_impl(OutType dest, InType &&in, Executor &&exec, int ddof = 1)
 {
   MATX_NVTX_START("stdd_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
-  var_impl(dest, in, exec, 1);
+  var_impl(dest, in, exec, ddof);
   (dest = sqrt(dest)).run(exec);
 }
 
@@ -2703,7 +1492,8 @@ void __MATX_INLINE__ stdd_impl(OutType dest, InType &&in, Executor &&exec)
  *   Executor type
  */
 #ifndef DOXYGEN_ONLY
-template <typename OutType, typename InType, typename Executor, std::enable_if_t<is_executor_t<Executor>(), bool> = true>
+template <typename OutType, typename InType, typename Executor>
+  requires is_executor<Executor>
 #else
 template <typename OutType, typename InType, typename Executor>
 #endif
@@ -2737,5 +1527,6 @@ void __MATX_INLINE__ trace_impl(OutType dest, const InType &in, int stream = 0)
 {
   return trace(dest, in, cudaExecutor{stream});
 }
+
 
 } // end namespace matx

@@ -5,6 +5,8 @@ isnan
 
 Returns a truth value if operator value is NaN
 
+.. versionadded:: 0.3.0
+
 .. doxygenfunction:: isnan(Op t)
 
 Examples

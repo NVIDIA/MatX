@@ -43,7 +43,7 @@ using namespace matx;
 template <typename T> class MatMulTest : public ::testing::Test {
 protected:
   using GTestType = cuda::std::tuple_element_t<0, T>;
-  using GExecType = cuda::std::tuple_element_t<1, T>;   
+  using GExecType = cuda::std::tuple_element_t<1, T>;
   void SetUp() override
   {
     CheckTestTensorCoreTypeSupport<GTestType>();
@@ -372,10 +372,10 @@ TYPED_TEST(MatMulTestFloatTypes, MediumRectBatched)
   constexpr index_t m = 128;
   constexpr index_t k = 256;
   constexpr index_t n = 512;
-  
+
   tensor_t<TestType, 3> a{{batches, m, k}};
   tensor_t<TestType, 3> b{{batches, k, n}};
-  tensor_t<TestType, 3> c{{batches, m, n}};  
+  tensor_t<TestType, 3> c{{batches, m, n}};
 
   this->pb->template InitAndRunTVGenerator<TestType>(
       "00_transforms", "matmul_operators", "run", {batches, m, k, n});
@@ -405,12 +405,12 @@ TYPED_TEST(MatMulTestFloatTypes, MediumRectBatched0StrideA)
     constexpr index_t m = 3;
     constexpr index_t k = 4;
     constexpr index_t n = 5;
-    
+
     tensor_t<TestType, 2> a0{{m, k}};
     tensor_t<TestType, 3> b{{batches, k, n}};
     tensor_t<TestType, 2> b0{{k, n}};
-    tensor_t<TestType, 3> c{{batches, m, n}};  
-    tensor_t<TestType, 2> c0{{m, n}};  
+    tensor_t<TestType, 3> c{{batches, m, n}};
+    tensor_t<TestType, 2> c0{{m, n}};
 
     this->pb->template InitAndRunTVGenerator<TestType>(
         "00_transforms", "matmul_operators", "run", {m, k, n});
@@ -448,12 +448,12 @@ TYPED_TEST(MatMulTestFloatTypes, MediumRectBatched0StrideB)
     constexpr index_t m = 3;
     constexpr index_t k = 4;
     constexpr index_t n = 5;
-    
+
     tensor_t<TestType, 3> a{{batches, m, k}};
     tensor_t<TestType, 2> a0{{m, k}};
     tensor_t<TestType, 2> b0{{k, n}};
-    tensor_t<TestType, 3> c{{batches, m, n}};  
-    tensor_t<TestType, 2> c0{{m, n}};  
+    tensor_t<TestType, 3> c{{batches, m, n}};
+    tensor_t<TestType, 2> c0{{m, n}};
 
     this->pb->template InitAndRunTVGenerator<TestType>(
         "00_transforms", "matmul_operators", "run", {m, k, n});
@@ -493,10 +493,10 @@ TYPED_TEST(MatMulTestFloatTypes, MediumRectBatched3DStridedBatch)
     constexpr index_t m = 128;
     constexpr index_t k = 256;
     constexpr index_t n = 512;
-    
+
     tensor_t<TestType, 3> a{{batches, m, k}};
     tensor_t<TestType, 3> b{{batches, k, n}};
-    tensor_t<TestType, 3> c{{batches, m, n}};  
+    tensor_t<TestType, 3> c{{batches, m, n}};
 
     auto as = slice(a, {0, 0, 0}, {matxEnd, matxEnd, matxEnd}, {2, 1, 1});
     auto bs = slice(b, {0, 0, 0}, {matxEnd, matxEnd, matxEnd}, {2, 1, 1});
@@ -561,10 +561,10 @@ TYPED_TEST(MatMulTestFloatTypes, MediumRectBatched4D)
     // constexpr index_t m = 128;
     // constexpr index_t k = 256;
     // constexpr index_t n = 512;
-    
+
     auto a = make_tensor<TestType>({5, 5, 128, 256});
     auto b = make_tensor<TestType>({5, 5, 256, 512});
-    auto c = make_tensor<TestType>({5, 5, 128, 512});  
+    auto c = make_tensor<TestType>({5, 5, 128, 512});
 
     this->pb->template InitAndRunTVGenerator<TestType>(
         "00_transforms", "matmul_operators", "run", {5, 5, 128, 256, 512});
@@ -574,6 +574,44 @@ TYPED_TEST(MatMulTestFloatTypes, MediumRectBatched4D)
 
     (c = matmul(a, b)).run(this->exec);
 
+    MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
+  }
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(MatMulTestFloatTypes, MediumRectBatched5D)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  if constexpr (!detail::CheckMatMulSupport<ExecType, TestType>()) {
+    GTEST_SKIP();
+  } else {
+    // Create 5D tensors with batch dimensions of 3x4x5
+    auto a = make_tensor<TestType>({3, 4, 5, 128, 256});
+    auto b = make_tensor<TestType>({3, 4, 5, 256, 512});
+    auto c = make_tensor<TestType>({3, 4, 5, 128, 512});
+
+    // Create 4D tensors for Python comparison
+    auto a_4d = make_tensor<TestType>({4, 5, 128, 256});
+    auto b_4d = make_tensor<TestType>({4, 5, 256, 512});
+    auto c_4d = make_tensor<TestType>({4, 5, 128, 512});
+
+
+    // Get rank 4 test vectors from Python
+    this->pb->template InitAndRunTVGenerator<TestType>(
+        "00_transforms", "matmul_operators", "run", {3, 4, 5, 128, 256, 512});
+
+    this->pb->NumpyToTensorView(a, "a");
+    this->pb->NumpyToTensorView(b, "b");
+
+    // Perform batched matrix multiplication across all 3 batch dimensions
+    (c = matmul(a, b)).run(this->exec);
+    this->exec.sync();
+
+    this->pb->NumpyToTensorView(c, "c");
+
+    // Compare each slice of the 5D result with the Python-generated 4D result
     MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
   }
   MATX_EXIT_HANDLER();
@@ -591,17 +629,17 @@ TYPED_TEST(MatMulTestFloatNonHalfTypes,  MatMulAxis)
     constexpr index_t k = 32;
     constexpr index_t n = 64;
     constexpr index_t b = 8;
-      
+
     tensor_t<TestType, 3> a3{{b, m, k}};
     tensor_t<TestType, 3> b3{{b, k, n}};
     tensor_t<TestType, 3> c3{{b, m, n}};
-      
+
     this->pb->template InitAndRunTVGenerator<TestType>(
       "00_transforms", "matmul_operators", "run", {b, m, k, n});
 
     this->pb->NumpyToTensorView(a3, "a");
     this->pb->NumpyToTensorView(b3, "b");
-    
+
     { // identity permute
       const int axis[2] = {1, 2};
       cuda::std::array<int, 3> perm({0, 1, 2});
@@ -618,7 +656,7 @@ TYPED_TEST(MatMulTestFloatNonHalfTypes,  MatMulAxis)
       (bp = b3).run(this->exec);
 
       (ci = matmul(ai, bi, axis)).run(this->exec);
-      
+
       (c3 = cp).run(this->exec);
 
       this->exec.sync();
@@ -627,7 +665,7 @@ TYPED_TEST(MatMulTestFloatNonHalfTypes,  MatMulAxis)
     }
 
     { // transposing inner dims
-      // example-begin matmul-test-6  
+      // example-begin matmul-test-6
       const int axis[2] = {2, 1};
       cuda::std::array<int, 3> perm({0, 2, 1});
 
@@ -645,8 +683,8 @@ TYPED_TEST(MatMulTestFloatNonHalfTypes,  MatMulAxis)
 
       // Perform a GEMM with the last two dimensions permuted
       (ci = matmul(ai, bi, axis)).run(this->exec);
-      // example-end matmul-test-6    
-      
+      // example-end matmul-test-6
+
       // copy result from permuted output
       (c3 = cp).run(this->exec);
 
@@ -654,7 +692,7 @@ TYPED_TEST(MatMulTestFloatNonHalfTypes,  MatMulAxis)
 
       MATX_TEST_ASSERT_COMPARE(this->pb, c3, "c", this->thresh);
     }
-    
+
     { // first and last
       const int axis[2] = {0 ,2};
       cuda::std::array<int, 3> perm({1, 0, 2});
@@ -672,7 +710,7 @@ TYPED_TEST(MatMulTestFloatNonHalfTypes,  MatMulAxis)
       (bp = b3).run(this->exec);
 
       (ci = matmul(ai, bi, axis)).run(this->exec);
-      
+
       // copy result from permuted output
       (c3 = cp).run(this->exec);
 
@@ -680,7 +718,7 @@ TYPED_TEST(MatMulTestFloatNonHalfTypes,  MatMulAxis)
 
       MATX_TEST_ASSERT_COMPARE(this->pb, c3, "c", this->thresh);
     }
-  
+
     {  // affine not supported
       const int axis[2] = {0, 1};
       cuda::std::array<int, 3> perm({2, 0, 1});
@@ -698,7 +736,7 @@ TYPED_TEST(MatMulTestFloatNonHalfTypes,  MatMulAxis)
       (bp = b3).run(this->exec);
 
       (ci = matmul(ai, bi, axis)).run(this->exec);
-      
+
       // copy result from permuted output
       (c3 = cp).run(this->exec);
 
@@ -722,17 +760,17 @@ TYPED_TEST(MatMulTestFloatNonHalfTypes,  MatMulOp)
     constexpr index_t k = 32;
     constexpr index_t n = 64;
     constexpr index_t b = 8;
-      
+
     tensor_t<TestType, 3> a3{{b, m, k}};
     tensor_t<TestType, 3> b3{{b, k, n}};
     tensor_t<TestType, 3> c3{{b, m, n}};
-      
+
     this->pb->template InitAndRunTVGenerator<TestType>(
       "00_transforms", "matmul_operators", "run", {b, m, k, n});
 
     this->pb->NumpyToTensorView(a3, "a");
     this->pb->NumpyToTensorView(b3, "b");
-    
+
     { // simple identity remaps
 
       auto rb = range<0>({b},0, 1);
@@ -742,7 +780,7 @@ TYPED_TEST(MatMulTestFloatNonHalfTypes,  MatMulOp)
       auto cr = remap<0>(c3, rb);
 
       (cr = matmul(ar, br)).run(this->exec);
-      
+
       MATX_TEST_ASSERT_COMPARE(this->pb, c3, "c", this->thresh);
     }
   }
@@ -997,7 +1035,7 @@ TYPED_TEST(MatMulTestFloatTypes, OuterProduct)
     this->pb->NumpyToTensorView(ba, "ba");
     this->pb->NumpyToTensorView(bb, "bb");
 
-    auto bc = make_tensor<TestType>({batches, an, bn});  
+    auto bc = make_tensor<TestType>({batches, an, bn});
     (bc = outer(ba, bb)).run(this->exec);
 
     this->exec.sync();

@@ -72,9 +72,18 @@ class NormTestFloatTypes
     : public NormTest<TensorType> {
 };
 
+template <typename TensorType>
+class NormalizeTestFloatNonComplexNonHalfAllExecs: public NormTestFloatTypes<TensorType> {
+  using GTestType = cuda::std::tuple_element_t<0, TensorType>;
+  using GExecType = cuda::std::tuple_element_t<1, TensorType>;
+  protected:
+    tensor_t<GTestType, 2> out_m{{a_len, a_len}};
+};
+
 
 
 TYPED_TEST_SUITE(NormTestFloatTypes, MatXTypesFloatNonComplexAllExecs);
+TYPED_TEST_SUITE(NormalizeTestFloatNonComplexNonHalfAllExecs, MatXFloatNonComplexNonHalfTypesAllExecs);
 
 
 TYPED_TEST(NormTestFloatTypes, VectorL1)
@@ -197,3 +206,112 @@ TYPED_TEST(NormTestFloatTypes, MatrixL2)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(NormalizeTestFloatNonComplexNonHalfAllExecs, NormalizeMaxnorm)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  this->pb->template InitTVGenerator<TestType>("00_transforms", "norm_operators", {a_len, a_len});
+  this->pb->RunTVGenerator("normalize_maxnorm");
+  this->pb->NumpyToTensorView(this->in_m, "in_m");
+  this->pb->NumpyToTensorView(this->out_m, "out_m");
+
+  // example-begin normalize-test-maxnorm
+  (this->out_m = normalize(this->in_m, NORMALIZE_RANGE::NORM)).run(this->exec);
+  // example-end normalize-test-maxnorm
+  
+  MATX_TEST_ASSERT_COMPARE(this->pb, this->out_m, "out_m", this->thresh);
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(NormalizeTestFloatNonComplexNonHalfAllExecs, NormalizeLpnorm)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  this->pb->template InitTVGenerator<TestType>("00_transforms", "norm_operators", {a_len, a_len});
+  this->pb->RunTVGenerator("normalize_lpnorm");
+  this->pb->NumpyToTensorView(this->in_m, "in_m");
+  this->pb->NumpyToTensorView(this->out_m, "out_m");
+
+  // example-begin normalize-test-lpnorm
+  (this->out_m = normalize(this->in_m, NORMALIZE_RANGE::NORM, 2.0)).run(this->exec);
+  // example-end normalize-test-lpnorm
+  
+  MATX_TEST_ASSERT_COMPARE(this->pb, this->out_m, "out_m", this->thresh);
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(NormalizeTestFloatNonComplexNonHalfAllExecs, NormalizeZscore)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  this->pb->template InitTVGenerator<TestType>("00_transforms", "norm_operators", {a_len, a_len});
+  this->pb->RunTVGenerator("normalize_zscore");
+  this->pb->NumpyToTensorView(this->in_m, "in_m");
+  this->pb->NumpyToTensorView(this->out_m, "out_m");
+
+  // example-begin normalize-test-zscore
+  (this->out_m = normalize(this->in_m, NORMALIZE_RANGE::ZSCORE)).run(this->exec);
+  // example-end normalize-test-zscore
+  
+  MATX_TEST_ASSERT_COMPARE(this->pb, this->out_m, "out_m", this->thresh);
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(NormalizeTestFloatNonComplexNonHalfAllExecs, NormalizeRange)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  this->pb->template InitTVGenerator<TestType>("00_transforms", "norm_operators", {a_len, a_len});
+  this->pb->RunTVGenerator("normalize_range");
+  this->pb->NumpyToTensorView(this->in_m, "in_m");
+  this->pb->NumpyToTensorView(this->out_m, "out_m");
+
+  // example-begin normalize-test-range
+  (this->out_m = normalize(this->in_m, NORMALIZE_RANGE::RANGE, 0.0f, 1.0f)).run(this->exec);
+  // example-end normalize-test-range
+  
+  MATX_TEST_ASSERT_COMPARE(this->pb, this->out_m, "out_m", this->thresh);
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(NormalizeTestFloatNonComplexNonHalfAllExecs, NormalizeScale)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  this->pb->template InitTVGenerator<TestType>("00_transforms", "norm_operators", {a_len, a_len});
+  this->pb->RunTVGenerator("normalize_scale");
+  this->pb->NumpyToTensorView(this->in_m, "in_m");
+
+  // example-begin normalize-test-scale
+  (this->out_m = normalize(this->in_m, NORMALIZE_RANGE::SCALE)).run(this->exec);
+  // example-end normalize-test-scale
+
+  auto out_m_std = make_tensor<double>({a_len});
+  (out_m_std = stdd(this->out_m, {0}, 1)).run(this->exec); 
+  
+  MATX_TEST_ASSERT_COMPARE(this->pb, out_m_std, "scaled_std", this->thresh);
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(NormalizeTestFloatNonComplexNonHalfAllExecs, NormalizeCenter)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = std::tuple_element_t<0, TypeParam>;
+  this->pb->template InitTVGenerator<TestType>("00_transforms", "norm_operators", {a_len, a_len});
+  this->pb->RunTVGenerator("normalize_center");
+  this->pb->NumpyToTensorView(this->in_m, "in_m");
+  this->pb->NumpyToTensorView(this->out_m, "out_m");
+
+  // example-begin normalize-test-center
+  (this->out_m = normalize(this->in_m, NORMALIZE_RANGE::CENTER)).run(this->exec);
+  // example-end normalize-test-center
+  
+  MATX_TEST_ASSERT_COMPARE(this->pb, this->out_m, "out_m", this->thresh);
+
+  MATX_EXIT_HANDLER();
+}

@@ -48,8 +48,8 @@ namespace matx
    * @param s
    *   Shape of tensor
    */
-  template <typename T = int, typename ShapeType,
-    std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+  template <typename T = int, typename ShapeType>
+    requires (!cuda::std::is_array_v<remove_cvref_t<ShapeType>>)
   inline auto ones(ShapeType &&s)
   {
     return detail::ConstVal<T, ShapeType>(std::forward<ShapeType>(s), T(1));

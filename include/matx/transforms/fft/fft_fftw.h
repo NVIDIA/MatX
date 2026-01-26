@@ -85,9 +85,9 @@ struct FftFFTWParams_t {
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
     FftFFTWParams_t params;
-    constexpr auto RANK = OutTensorType::Rank();   
+    constexpr auto RANK = OutTensorType::Rank();
     using T1    = typename OutTensorType::value_type;
-    using T2    = typename InTensorType::value_type;    
+    using T2    = typename InTensorType::value_type;
 
     params.irank = i.Rank();
     params.orank = o.Rank();
@@ -98,8 +98,7 @@ struct FftFFTWParams_t {
 
     if (fft_rank == 1) {
       params.batch_dims = 0;
-      params.n[0] = (params.transform_type == FFTType::C2R ||
-                      params.transform_type == FFTType::Z2D)
+      params.n[0] = (params.transform_type == FFTType::C2R)
                         ? static_cast<int>(o.Size(RANK - 1))
                         : static_cast<int>(i.Size(RANK - 1));
 
@@ -117,20 +116,19 @@ struct FftFFTWParams_t {
         }
         else {
           params.batch = static_cast<int>(TotalSize(i) / i.Size(RANK - 1));
-          params.batch_dims = 1; 
+          params.batch_dims = 1;
         }
       }
-      
+
       params.inembed[0] = static_cast<int>(i.Size(RANK - 1)); // Unused
       params.onembed[0] = static_cast<int>(o.Size(RANK - 1)); // Unused
       params.istride = static_cast<int>(i.Stride(RANK - 1));
       params.ostride = static_cast<int>(o.Stride(RANK - 1));
-      params.idist = (RANK == 1) ? 1 : static_cast<int>(i.Stride(RANK - 2));  
+      params.idist = (RANK == 1) ? 1 : static_cast<int>(i.Stride(RANK - 2));
       params.odist = (RANK == 1) ? 1 : static_cast<int>(o.Stride(RANK - 2));
     }
     else if (fft_rank == 2) {
-      if (params.transform_type == FFTType::C2R ||
-          params.transform_type == FFTType::Z2D) {
+      if (params.transform_type == FFTType::C2R) {
         params.n[1] = static_cast<int>(o.Size(RANK-1));
         params.n[0] = static_cast<int>(o.Size(RANK-2));
       }
@@ -151,7 +149,7 @@ struct FftFFTWParams_t {
     }
 
     params.is_fp32 = is_fp32_inner_type_v<typename OutTensorType::value_type>;
-    if constexpr (std::is_same_v<typename OutTensorType::value_type, 
+    if constexpr (std::is_same_v<typename OutTensorType::value_type,
                                 typename InTensorType::value_type>) {
       params.in_place = o.Data() == i.Data();
     } else {
@@ -159,24 +157,22 @@ struct FftFFTWParams_t {
     }
 
     if (params.fft_rank == 1) {
-      if (params.transform_type == FFTType::C2R ||
-          params.transform_type == FFTType::Z2D) {
+      if (params.transform_type == FFTType::C2R) {
         if (is_cuda_complex_v<T1> || !is_cuda_complex_v<T2>) {
-          MATX_THROW(matxInvalidType, "FFT types inconsistent with C2R/Z2D transform");
+          MATX_THROW(matxInvalidType, "FFT types inconsistent with C2R transform");
         }
         if (params.n[0] != o.Size(OutTensorType::Rank()-1) ||
           (params.n[0]/2)+1 != i.Size(InTensorType::Rank()-1)) {
-          MATX_THROW(matxInvalidSize, "Tensor sizes inconsistent with C2R/Z2D transform");
+          MATX_THROW(matxInvalidSize, "Tensor sizes inconsistent with C2R transform");
         }
       }
-      else if (params.transform_type == FFTType::R2C ||
-              params.transform_type == FFTType::D2Z) {
+      else if (params.transform_type == FFTType::R2C) {
         if (is_cuda_complex_v<T2> || !is_cuda_complex_v<T1>) {
-          MATX_THROW(matxInvalidType, "FFT types inconsistent with R2C/D2Z transform");
+          MATX_THROW(matxInvalidType, "FFT types inconsistent with R2C transform");
         }
         if (params.n[0] != i.Size(InTensorType::Rank()-1) ||
           (params.n[0]/2)+1 != o.Size(OutTensorType::Rank()-1)) {
-          MATX_THROW(matxInvalidSize, "Tensor sizes inconsistent with R2C/D2Z transform");
+          MATX_THROW(matxInvalidSize, "Tensor sizes inconsistent with R2C transform");
         }
       }
       else {
@@ -187,18 +183,16 @@ struct FftFFTWParams_t {
             params.n[0] != i.Size(OutTensorType::Rank()-1)) {
           MATX_THROW(matxInvalidSize, "Tensor sizes inconsistent with C2C transform");
         }
-      }  
+      }
     }
     else {
-      if (params.transform_type == FFTType::C2R ||
-          params.transform_type == FFTType::Z2D) {
+      if (params.transform_type == FFTType::C2R) {
         MATX_ASSERT((o.Size(RANK-2) * (o.Size(RANK-1) / 2 + 1)) == i.Size(RANK-1) * i.Size(RANK-2),
                     matxInvalidSize);
         MATX_ASSERT(!is_cuda_complex_v<T1> && is_cuda_complex_v<T2>,
                     matxInvalidType);
       }
-      else if (params.transform_type == FFTType::R2C ||
-              params.transform_type == FFTType::D2Z) {
+      else if (params.transform_type == FFTType::R2C) {
         MATX_ASSERT(o.Size(RANK-1) * o.Size(RANK-2) == (i.Size(RANK-2) * (i.Size(RANK-1) / 2 + 1)),
                     matxInvalidSize);
         MATX_ASSERT(!is_cuda_complex_v<T2> && is_cuda_complex_v<T1>,
@@ -213,7 +207,7 @@ struct FftFFTWParams_t {
 
       for (int r = 0; r < RANK - 2; r++) {
         MATX_ASSERT(o.Size(r) == i.Size(r), matxInvalidSize);
-      }         
+      }
     }
 
     MATX_ASSERT_STR(params.idist > 0, matxInvalidDim, "FFTs do not support batch strides of 0 (no cloned views)");
@@ -231,7 +225,7 @@ struct FftFFTWParamsKeyHash {
   {
     return (std::hash<uint64_t>()(k.n[0])) + (std::hash<uint64_t>()(k.n[1])) +
            (std::hash<uint64_t>()(k.fft_rank)) +
-           (std::hash<uint64_t>()(k.batch)) + (std::hash<uint64_t>()(k.istride)) + 
+           (std::hash<uint64_t>()(k.batch)) + (std::hash<uint64_t>()(k.istride)) +
            (std::hash<uint64_t>()(static_cast<uint64_t>(k.dir))) +
            (std::hash<uint64_t>()(static_cast<uint64_t>(k.is_fp32)));
   }
@@ -261,13 +255,13 @@ using fft_fftw_cache_t = std::unordered_map<FftFFTWParams_t, std::any, FftFFTWPa
 /**
  * Class to manage FFTW initialization and cleanup for single and
  * double precision transforms.
- * 
+ *
  */
 class FFTWPlanManager {
 public:
   static void inline InitFFTWF() {
     if (!init_fp32_) {
-      int ret = fftwf_init_threads();
+      [[maybe_unused]] int ret = fftwf_init_threads();
       MATX_ASSERT_STR(ret != 0, matxAssertError, "fftwf_init_threads() failed");
       init_fp32_ = true;
     }
@@ -275,7 +269,7 @@ public:
 
   static void inline InitFFTW() {
     if (!init_fp64_) {
-      int ret = fftw_init_threads();
+      [[maybe_unused]] int ret = fftw_init_threads();
       MATX_ASSERT_STR(ret != 0, matxAssertError, "fftw_init_threads() failed");
       init_fp64_ = true;
     }
@@ -307,14 +301,14 @@ private:
 
 /**
  * Class for FFTW plans
- * 
+ *
  * Once created, the FFT plan can be reused as long as the input and output
  * tensors' dimensions, strides, etc. all match. If the plan was originally
  * created to be in-place or out-of-place, the new tensors must match that to
  * reuse the plan.
- * 
+ *
  * Once the last plan is deallocated, all other persistent data is freed as well.
- * 
+ *
  */
 template<typename OutTensorType, typename InTensorType> class matxFFTWPlan_t {
 public:
@@ -322,9 +316,9 @@ public:
   using plan_type = std::conditional_t<is_fp32_inner_type_v<out_value_type>, fftwf_plan, fftw_plan>;
 
   template <ThreadsMode MODE>
-  matxFFTWPlan_t(OutTensorType &o, 
-                const InTensorType &i, 
-                const FftFFTWParams_t &params, 
+  matxFFTWPlan_t(OutTensorType &o,
+                const InTensorType &i,
+                const FftFFTWParams_t &params,
                 const HostExecutor<MODE> &exec) : params_(params) {
     auto fft_dir = (params_.dir == detail::FFTDirection::FORWARD) ? FFTW_FORWARD : FFTW_BACKWARD;
     auto in_ptr = i.Data();
@@ -334,95 +328,101 @@ public:
       FFTWPlanManager::InitFFTWF();
       fftwf_plan_with_nthreads(exec.GetNumThreads());
       if constexpr (DeduceFFTTransformType<OutTensorType, InTensorType>() == FFTType::C2C) {
-        plan_  = fftwf_plan_many_dft( params_.fft_rank, 
-                                    params_.n, 
-                                    params_.batch, 
-                                    reinterpret_cast<fftwf_complex*>(in_ptr), 
-                                    params_.inembed, 
-                                    params_.istride, 
+        plan_  = fftwf_plan_many_dft( params_.fft_rank,
+                                    params_.n,
+                                    params_.batch,
+                                    reinterpret_cast<fftwf_complex*>(in_ptr),
+                                    params_.inembed,
+                                    params_.istride,
                                     params_.idist,
-                                    reinterpret_cast<fftwf_complex*>(out_ptr), 
-                                    params_.onembed, 
-                                    params_.ostride, 
-                                    params_.odist,  
-                                    fft_dir, 
+                                    reinterpret_cast<fftwf_complex*>(out_ptr),
+                                    params_.onembed,
+                                    params_.ostride,
+                                    params_.odist,
+                                    fft_dir,
                                     FFTW_ESTIMATE);
       }
       else if constexpr (DeduceFFTTransformType<OutTensorType, InTensorType>() == FFTType::C2R) {
-        plan_  = fftwf_plan_many_dft_c2r( params_.fft_rank, 
-                                    params_.n, 
-                                    params_.batch, 
-                                    reinterpret_cast<fftwf_complex*>(in_ptr), 
-                                    params_.inembed, 
-                                    params_.istride, 
+        plan_  = fftwf_plan_many_dft_c2r( params_.fft_rank,
+                                    params_.n,
+                                    params_.batch,
+                                    reinterpret_cast<fftwf_complex*>(in_ptr),
+                                    params_.inembed,
+                                    params_.istride,
                                     params_.idist,
-                                    out_ptr, 
-                                    params_.onembed, 
-                                    params_.ostride, 
-                                    params_.odist,  
+                                    out_ptr,
+                                    params_.onembed,
+                                    params_.ostride,
+                                    params_.odist,
                                     FFTW_ESTIMATE);
       }
-      else if constexpr (DeduceFFTTransformType<OutTensorType, InTensorType>() == FFTType::R2C) {        
-        plan_  = fftwf_plan_many_dft_r2c( params_.fft_rank, 
-                                    params_.n, 
-                                    params_.batch, 
-                                    in_ptr, 
-                                    params_.inembed, 
-                                    params_.istride, 
+      else if constexpr (DeduceFFTTransformType<OutTensorType, InTensorType>() == FFTType::R2C) {
+        plan_  = fftwf_plan_many_dft_r2c( params_.fft_rank,
+                                    params_.n,
+                                    params_.batch,
+                                    in_ptr,
+                                    params_.inembed,
+                                    params_.istride,
                                     params_.idist,
-                                    reinterpret_cast<fftwf_complex*>(out_ptr), 
-                                    params_.onembed, 
-                                    params_.ostride, 
-                                    params_.odist,  
+                                    reinterpret_cast<fftwf_complex*>(out_ptr),
+                                    params_.onembed,
+                                    params_.ostride,
+                                    params_.odist,
                                     FFTW_ESTIMATE);
       }
     }
     else {
       FFTWPlanManager::InitFFTW();
       fftw_plan_with_nthreads(exec.GetNumThreads());
-      if constexpr (DeduceFFTTransformType<OutTensorType, InTensorType>() == FFTType::Z2Z) {
-        plan_  = fftw_plan_many_dft( params_.fft_rank, 
-                                    params_.n, 
-                                    params_.batch, 
-                                    reinterpret_cast<fftw_complex*>(in_ptr), 
-                                    params_.inembed, 
-                                    params_.istride, 
+      if constexpr (DeduceFFTTransformType<OutTensorType, InTensorType>() == FFTType::C2C && 
+                    std::is_same_v<typename InTensorType::value_type, cuda::std::complex<double>> &&
+                    std::is_same_v<typename OutTensorType::value_type, cuda::std::complex<double>>) {
+        plan_  = fftw_plan_many_dft( params_.fft_rank,
+                                    params_.n,
+                                    params_.batch,
+                                    reinterpret_cast<fftw_complex*>(in_ptr),
+                                    params_.inembed,
+                                    params_.istride,
                                     params_.idist,
-                                    reinterpret_cast<fftw_complex*>(out_ptr), 
-                                    params_.onembed, 
-                                    params_.ostride, 
-                                    params_.odist,  
-                                    fft_dir, 
+                                    reinterpret_cast<fftw_complex*>(out_ptr),
+                                    params_.onembed,
+                                    params_.ostride,
+                                    params_.odist,
+                                    fft_dir,
                                     FFTW_ESTIMATE);
       }
-      else if constexpr (DeduceFFTTransformType<OutTensorType, InTensorType>() == FFTType::Z2D) {
-        plan_  = fftw_plan_many_dft_c2r( params_.fft_rank, 
-                                    params_.n, 
-                                    params_.batch, 
-                                    reinterpret_cast<fftw_complex*>(in_ptr), 
-                                    params_.inembed, 
-                                    params_.istride, 
+      else if constexpr (DeduceFFTTransformType<OutTensorType, InTensorType>() == FFTType::C2R && 
+                         std::is_same_v<typename InTensorType::value_type, cuda::std::complex<double>> &&
+                         std::is_same_v<typename OutTensorType::value_type, double>) {
+        plan_  = fftw_plan_many_dft_c2r( params_.fft_rank,
+                                    params_.n,
+                                    params_.batch,
+                                    reinterpret_cast<fftw_complex*>(in_ptr),
+                                    params_.inembed,
+                                    params_.istride,
                                     params_.idist,
-                                    out_ptr, 
-                                    params_.onembed, 
-                                    params_.ostride, 
-                                    params_.odist,  
+                                    out_ptr,
+                                    params_.onembed,
+                                    params_.ostride,
+                                    params_.odist,
                                     FFTW_ESTIMATE);
       }
-      else if constexpr (DeduceFFTTransformType<OutTensorType, InTensorType>() == FFTType::D2Z) {
-        plan_  = fftw_plan_many_dft_r2c( params_.fft_rank, 
-                                    params_.n, 
-                                    params_.batch, 
-                                    in_ptr, 
-                                    params_.inembed, 
-                                    params_.istride, 
+      else if constexpr (DeduceFFTTransformType<OutTensorType, InTensorType>() == FFTType::R2C && 
+                         std::is_same_v<typename InTensorType::value_type, double> &&
+                         std::is_same_v<typename OutTensorType::value_type, cuda::std::complex<double>>) {
+        plan_  = fftw_plan_many_dft_r2c( params_.fft_rank,
+                                    params_.n,
+                                    params_.batch,
+                                    in_ptr,
+                                    params_.inembed,
+                                    params_.istride,
                                     params_.idist,
-                                    reinterpret_cast<fftw_complex*>(out_ptr), 
-                                    params_.onembed, 
-                                    params_.ostride, 
-                                    params_.odist,  
+                                    reinterpret_cast<fftw_complex*>(out_ptr),
+                                    params_.onembed,
+                                    params_.ostride,
+                                    params_.odist,
                                     FFTW_ESTIMATE);
-      } 
+      }
     }
     MATX_ASSERT_STR(plan_ != nullptr, matxAssertError, "fftw plan creation failed");
 
@@ -445,9 +445,9 @@ public:
 
   /**
    * @brief Execute the cached FFTW plan
-   * 
-   * @param o 
-   * @param i 
+   *
+   * @param o
+   * @param i
    */
   void inline Exec(OutTensorType &o, const InTensorType &i) {
     auto out = o.Data();
@@ -455,35 +455,41 @@ public:
 
     if constexpr (is_fp32_) {
       if constexpr (DeduceFFTTransformType<OutTensorType, InTensorType>() == FFTType::C2C) {
-        fftwf_execute_dft(plan_, 
-                          reinterpret_cast<fftwf_complex*>(in), 
+        fftwf_execute_dft(plan_,
+                          reinterpret_cast<fftwf_complex*>(in),
                           reinterpret_cast<fftwf_complex*>(out));
       }
       else if constexpr (DeduceFFTTransformType<OutTensorType, InTensorType>() == FFTType::C2R) {
-        fftwf_execute_dft_c2r(plan_, 
-                          reinterpret_cast<fftwf_complex*>(in), 
+        fftwf_execute_dft_c2r(plan_,
+                          reinterpret_cast<fftwf_complex*>(in),
                           out);
       }
-      else if constexpr (DeduceFFTTransformType<OutTensorType, InTensorType>() == FFTType::R2C) {     
-        fftwf_execute_dft_r2c(plan_, 
-                          in, 
+      else if constexpr (DeduceFFTTransformType<OutTensorType, InTensorType>() == FFTType::R2C) {
+        fftwf_execute_dft_r2c(plan_,
+                          in,
                           reinterpret_cast<fftwf_complex*>(out));
       }
-    } 
+    }
     else {
-      if constexpr (DeduceFFTTransformType<OutTensorType, InTensorType>() == FFTType::Z2Z) {
-        fftw_execute_dft(plan_, 
-                          reinterpret_cast<fftw_complex*>(in), 
+      if constexpr (DeduceFFTTransformType<OutTensorType, InTensorType>() == FFTType::C2C && 
+                    std::is_same_v<typename InTensorType::value_type, cuda::std::complex<double>> &&
+                    std::is_same_v<typename OutTensorType::value_type, cuda::std::complex<double>>) {
+        fftw_execute_dft(plan_,
+                          reinterpret_cast<fftw_complex*>(in),
                           reinterpret_cast<fftw_complex*>(out));
       }
-      else if constexpr (DeduceFFTTransformType<OutTensorType, InTensorType>() == FFTType::Z2D) {
-        fftw_execute_dft_c2r(plan_, 
-                          reinterpret_cast<fftw_complex*>(in), 
+      else if constexpr (DeduceFFTTransformType<OutTensorType, InTensorType>() == FFTType::C2R && 
+                         std::is_same_v<typename InTensorType::value_type, cuda::std::complex<double>> &&
+                         std::is_same_v<typename OutTensorType::value_type, double>) {
+        fftw_execute_dft_c2r(plan_,
+                          reinterpret_cast<fftw_complex*>(in),
                           out);
       }
-      else if constexpr (DeduceFFTTransformType<OutTensorType, InTensorType>() == FFTType::D2Z) {     
-        fftw_execute_dft_r2c(plan_, 
-                          in, 
+      else if constexpr (DeduceFFTTransformType<OutTensorType, InTensorType>() == FFTType::R2C && 
+                         std::is_same_v<typename InTensorType::value_type, double> &&
+                         std::is_same_v<typename OutTensorType::value_type, cuda::std::complex<double>>) {
+        fftw_execute_dft_r2c(plan_,
+                          in,
                           reinterpret_cast<fftw_complex*>(out));
       }
     }
@@ -519,7 +525,7 @@ private:
         return true;
       }
     };
-    
+
     return GetSupportedTensor(in, support_func, MATX_HOST_MALLOC_MEMORY);
   }
 
@@ -543,18 +549,18 @@ private:
         return true;
       }
     };
-    
+
     return GetSupportedTensor(in, support_func, MATX_HOST_MALLOC_MEMORY);
-  }  
+  }
 
 
   template <typename OutputTensor, typename InputTensor, ThreadsMode MODE>
-  __MATX_INLINE__ void fft_exec([[maybe_unused]] OutputTensor &o, 
-                                [[maybe_unused]] const InputTensor &i, 
-                                [[maybe_unused]] const FftFFTWParams_t &params, 
+  __MATX_INLINE__ void fft_exec([[maybe_unused]] OutputTensor &o,
+                                [[maybe_unused]] const InputTensor &i,
+                                [[maybe_unused]] const FftFFTWParams_t &params,
                                 [[maybe_unused]] detail::FFTDirection dir,
                                 [[maybe_unused]] const HostExecutor<MODE> &exec) {
-#if MATX_EN_CPU_FFT                                  
+#if MATX_EN_CPU_FFT
     using cache_val_type = detail::matxFFTWPlan_t<OutputTensor, InputTensor>;
     detail::GetCache().LookupAndExec<detail::fft_fftw_cache_t>(
       detail::GetCacheIdFromType<detail::fft_fftw_cache_t>(),
@@ -564,17 +570,18 @@ private:
       },
       [&](std::shared_ptr<cache_val_type> ctype) {
         ctype->Exec(o, i);
-      }
+      },
+      exec
     );
 #endif
   }
 
   template <typename OutputTensor, typename InputTensor, ThreadsMode MODE>
   __MATX_INLINE__ void fft1d_dispatch(OutputTensor o, const InputTensor i,
-          uint64_t fft_size, detail::FFTDirection dir, FFTNorm norm, const HostExecutor<MODE> &exec)
+          index_t fft_size, detail::FFTDirection dir, FFTNorm norm, const HostExecutor<MODE> &exec)
   {
     MATX_STATIC_ASSERT_STR(OutputTensor::Rank() == InputTensor::Rank(), matxInvalidDim,
-      "Input and output tensor ranks must match");  
+      "Input and output tensor ranks must match");
 
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
@@ -582,7 +589,7 @@ private:
 
     // converts operators to tensors
     auto out = getFFTW1DSupportedTensor(o);
-    auto in_t = getFFTW1DSupportedTensor(i); 
+    auto in_t = getFFTW1DSupportedTensor(i);
 
     if(!in_t.isSameView(i)) {
       (in_t = i).run(exec);
@@ -619,8 +626,8 @@ private:
         (o *= s_one / std::sqrt(factor)).run(exec);
       } else if (norm == FFTNorm::BACKWARD) {
         (o *= s_one / factor).run(exec);
-      }    
-    }  
+      }
+    }
   }
 
 
@@ -629,15 +636,15 @@ private:
           detail::FFTDirection dir, FFTNorm norm, const HostExecutor<MODE> &exec)
   {
     MATX_STATIC_ASSERT_STR(OutputTensor::Rank() == InputTensor::Rank(), matxInvalidDim,
-      "Input and output tensor ranks must match");  
+      "Input and output tensor ranks must match");
     MATX_ASSERT_STR(TotalSize(i) < std::numeric_limits<int>::max(), matxInvalidSize, "Dimensions too large for host FFT currently");
 
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
     // converts operators to tensors
     auto out = getFFTW2DSupportedTensor(o);
-    auto in = getFFTW2DSupportedTensor(i); 
-    
+    auto in = getFFTW2DSupportedTensor(i);
+
     if(!in.isSameView(i)) {
       (in = i).run(exec);
     }
@@ -671,21 +678,21 @@ private:
         (o *= s_one / std::sqrt(factor)).run(exec);
       } else if (norm == FFTNorm::BACKWARD) {
         (o *= s_one / factor).run(exec);
-      }    
-    }  
-  }  
+      }
+    }
+  }
 
 
   template <typename OutputTensor, typename InputTensor, ThreadsMode MODE>
   __MATX_INLINE__ void fft_impl(OutputTensor o, const InputTensor i,
-          uint64_t fft_size, FFTNorm norm, const HostExecutor<MODE> &exec)
+          index_t fft_size, FFTNorm norm, const HostExecutor<MODE> &exec)
   {
     MATX_STATIC_ASSERT_STR(OutputTensor::Rank() == InputTensor::Rank(), matxInvalidDim,
-      "Input and output tensor ranks must match");  
+      "Input and output tensor ranks must match");
     MATX_STATIC_ASSERT_STR( (is_fp32_inner_type_v<typename OutputTensor::value_type> ||
                             is_fp64_inner_type_v<typename InputTensor::value_type>), matxInvalidType,
-                            "Host FFTs only support single or double precision floats");    
-    
+                            "Host FFTs only support single or double precision floats");
+
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
     MATX_ASSERT_STR(MATX_EN_CPU_FFT, matxInvalidExecutor, "Trying to run a host FFT executor but host FFT support is not configured");
@@ -696,14 +703,14 @@ private:
 
   template <typename OutputTensor, typename InputTensor, ThreadsMode MODE>
   __MATX_INLINE__ void ifft_impl(OutputTensor o, const InputTensor i,
-          uint64_t fft_size, FFTNorm norm, const HostExecutor<MODE> &exec)
+          index_t fft_size, FFTNorm norm, const HostExecutor<MODE> &exec)
   {
     MATX_STATIC_ASSERT_STR(OutputTensor::Rank() == InputTensor::Rank(), matxInvalidDim,
-      "Input and output tensor ranks must match");  
+      "Input and output tensor ranks must match");
     MATX_STATIC_ASSERT_STR( (is_fp32_inner_type_v<typename OutputTensor::value_type> ||
                             is_fp64_inner_type_v<typename InputTensor::value_type>), matxInvalidType,
-                            "Host FFTs only support single or double precision floats");      
-    
+                            "Host FFTs only support single or double precision floats");
+
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
     MATX_ASSERT_STR(MATX_EN_CPU_FFT, matxInvalidExecutor, "Trying to run a host FFT executor but host FFT support is not configured");
@@ -714,16 +721,16 @@ private:
 
 
   template <typename OutputTensor, typename InputTensor, ThreadsMode MODE>
-  __MATX_INLINE__ void fft2_impl(OutputTensor o, const InputTensor i, FFTNorm norm, 
+  __MATX_INLINE__ void fft2_impl(OutputTensor o, const InputTensor i, FFTNorm norm,
             const HostExecutor<MODE> &exec)
   {
     MATX_STATIC_ASSERT_STR(OutputTensor::Rank() == InputTensor::Rank(), matxInvalidDim,
       "Input and output tensor ranks must match");
-    MATX_STATIC_ASSERT_STR(InputTensor::Rank() >= 2, matxInvalidSize, "2D FFT must be rank 2 tensor or higher");      
+    MATX_STATIC_ASSERT_STR(InputTensor::Rank() >= 2, matxInvalidSize, "2D FFT must be rank 2 tensor or higher");
     MATX_STATIC_ASSERT_STR( (is_fp32_inner_type_v<typename OutputTensor::value_type> ||
                             is_fp64_inner_type_v<typename InputTensor::value_type>), matxInvalidType,
-                            "Host FFTs only support single or double precision floats");     
-    
+                            "Host FFTs only support single or double precision floats");
+
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
     MATX_ASSERT_STR(MATX_EN_CPU_FFT, matxInvalidExecutor, "Trying to run a host FFT executor but host FFT support is not configured");
@@ -732,23 +739,23 @@ private:
   }
 
   template <typename OutputTensor, typename InputTensor, ThreadsMode MODE>
-  __MATX_INLINE__ void ifft2_impl(OutputTensor o, const InputTensor i, FFTNorm norm, 
+  __MATX_INLINE__ void ifft2_impl(OutputTensor o, const InputTensor i, FFTNorm norm,
             const HostExecutor<MODE> &exec)
   {
     MATX_STATIC_ASSERT_STR(OutputTensor::Rank() == InputTensor::Rank(), matxInvalidDim,
-      "Input and output tensor ranks must match");  
-    MATX_STATIC_ASSERT_STR(InputTensor::Rank() >= 2, matxInvalidSize, "2D FFT must be rank 2 tensor or higher");      
+      "Input and output tensor ranks must match");
+    MATX_STATIC_ASSERT_STR(InputTensor::Rank() >= 2, matxInvalidSize, "2D FFT must be rank 2 tensor or higher");
     MATX_STATIC_ASSERT_STR( (is_fp32_inner_type_v<typename OutputTensor::value_type> ||
                             is_fp64_inner_type_v<typename InputTensor::value_type>), matxInvalidType,
-                            "Host FFTs only support single or double precision floats");      
-    
+                            "Host FFTs only support single or double precision floats");
+
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
     MATX_ASSERT_STR(MATX_EN_CPU_FFT, matxInvalidExecutor, "Trying to run a host FFT executor but host FFT support is not configured");
 
-    fft2d_dispatch(o, i, FFTDirection::BACKWARD, norm, exec);  
+    fft2d_dispatch(o, i, FFTDirection::BACKWARD, norm, exec);
   }
-    
+
 } // end namespace detail
 
 

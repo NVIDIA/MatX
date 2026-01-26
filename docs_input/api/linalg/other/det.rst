@@ -5,6 +5,8 @@ det
 
 Compute the determinant of a tensor.
 
+.. versionadded:: 0.6.0
+
 .. doxygenfunction:: det(const OpA &a)
 
 Examples

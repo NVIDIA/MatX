@@ -4,10 +4,13 @@ linspace
 ========
 
 Return a range of linearly-spaced numbers using first and last value. The step size is
-determined by the shape.
+determined by the `count` parameter. `axis` (either 0 or 1) can be used to make the increasing
+sequence along the specified axis.
 
-.. doxygenfunction:: matx::linspace(ShapeType &&s, T first, T last)
-.. doxygenfunction:: matx::linspace(const index_t (&s)[RANK], T first, T last)
+
+.. versionadded:: 0.1.0
+.. doxygenfunction:: matx::linspace(T first, T last, index_t count, int axis = 0)
+.. doxygenfunction:: matx::linspace(const T (&firsts)[NUM_RC], const T (&lasts)[NUM_RC], index_t count, int axis = 0)
 
 Examples
 ~~~~~~~~

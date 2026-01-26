@@ -30,6 +30,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
+#include <cinttypes>
 #include <matx/core/type_utils.h>
 
 namespace matx {
@@ -160,7 +161,7 @@ namespace matx {
         // A sparse tensor has no strides, so show the level sizes instead.
         // These are obtained by translating dims to levels using the format.
         cuda::std::array<index_t, Op::Format::LVL> lvlsz;
-        Op::Format::dim2lvl(op.Shape().data(), lvlsz.data(), /*asSize=*/true);
+        Op::Format::template dim2lvl<true>(op.Shape().data(), lvlsz.data());
         fprintf(fp, "], Levels:[");
         for (int lvlIdx = 0; lvlIdx < Op::Format::LVL; lvlIdx++) {
           fprintf(fp, "%" MATX_INDEX_T_FMT, lvlsz[lvlIdx]);
@@ -221,6 +222,7 @@ namespace matx {
           if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_DEFAULT) {
             fprintf(fp, "%06" MATX_INDEX_T_FMT ": ", _k);
           }
+
           PrintVal(fp, op.operator()(_k));
           if (_k == (op.Size(0)-1)) {
             if ((PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) || (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON)) {
@@ -514,11 +516,9 @@ namespace matx {
       }
     }
 
-    template <typename Op,
-    typename... Args,
-            std::enable_if_t<((std::is_integral_v<Args>)&&...) &&
-                                  (Op::Rank() == 0 || sizeof...(Args) > 0),
-                              bool> = true>
+    template <typename Op, typename... Args>
+      requires (((std::is_integral_v<Args>)&&...) &&
+                (Op::Rank() == 0 || sizeof...(Args) > 0))
     void DevicePrint(FILE*fp, [[maybe_unused]] const Op &op, [[maybe_unused]] Args... dims) {
   #ifdef __CUDACC__
       if constexpr (PRINT_ON_DEVICE) {
@@ -554,10 +554,9 @@ namespace matx {
      * @param op input Operator
      * @param dims Number of values to print for each dimension
      */
-    template <typename Op, typename... Args,
-              std::enable_if_t<((std::is_integral_v<Args>)&&...) &&
-                                    (Op::Rank() == 0 || sizeof...(Args) > 0),
-                                bool> = true>
+    template <typename Op, typename... Args>
+      requires (((std::is_integral_v<Args>)&&...) &&
+                (Op::Rank() == 0 || sizeof...(Args) > 0))
     void PrintData(FILE* fp, const Op &op, Args... dims) {
       MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
@@ -565,31 +564,35 @@ namespace matx {
       cudaDeviceSynchronize();
       if constexpr (is_sparse_tensor_v<Op>) {
         using Format = typename Op::Format;
-	index_t nse = op.Nse();
-        fprintf(fp, "nse    = %" MATX_INDEX_T_FMT "\n", nse);
         fprintf(fp, "format = ");
-	Format::print();
-        for (int lvlIdx = 0; lvlIdx < Format::LVL; lvlIdx++) {
-	  if (const index_t pend = op.posSize(lvlIdx)) {
-            fprintf(fp, "pos[%d] = (", lvlIdx);
-            for (index_t i = 0; i < pend; i++) {
-              PrintVal(fp, op.POSData(lvlIdx)[i]);
+        Format::print();
+        const auto kind = GetPointerKind(op.Data());
+        fprintf(fp, "space  = %s\n", SpaceString(kind).c_str());
+        const auto nse = op.Nse();
+        fprintf(fp, "nse    = %" MATX_INDEX_T_FMT "\n", nse);
+        if (HostPrintable(kind)) {
+          for (int lvlIdx = 0; lvlIdx < Format::LVL; lvlIdx++) {
+            if (const index_t pend = op.posSize(lvlIdx)) {
+              fprintf(fp, "pos[%d] = (", lvlIdx);
+              for (index_t i = 0; i < pend; i++) {
+                PrintVal(fp, op.POSData(lvlIdx)[i]);
+              }
+              fprintf(fp, ")\n");
             }
-            fprintf(fp, ")\n");
-          }
-          if (const index_t cend = op.crdSize(lvlIdx)) {
-            fprintf(fp, "crd[%d] = (", lvlIdx);
-            for (index_t i = 0; i < cend; i++) {
-              PrintVal(fp, op.CRDData(lvlIdx)[i]);
+            if (const index_t cend = op.crdSize(lvlIdx)) {
+              fprintf(fp, "crd[%d] = (", lvlIdx);
+              for (index_t i = 0; i < cend; i++) {
+                PrintVal(fp, op.CRDData(lvlIdx)[i]);
+              }
+              fprintf(fp, ")\n");
             }
-            fprintf(fp, ")\n");
           }
+          fprintf(fp, "values = (");
+          for (index_t i = 0; i < nse; i++) {
+            PrintVal(fp, op.Data()[i]);
+          }
+          fprintf(fp, ")\n");
         }
-        fprintf(fp, "values = (");
-        for (index_t i = 0; i < nse; i++) {
-          PrintVal(fp, op.Data()[i]);
-        }
-        fprintf(fp, ")\nspace  = %s\n", SpaceString(GetPointerKind(op.Data())).c_str());
       }
       else if constexpr (is_tensor_view_v<Op>) {
         // If the user is printing a tensor with a const pointer underlying the data, we need to do the lookup
@@ -662,10 +665,9 @@ namespace matx {
    * @param dims Number of values to print for each dimension
    */
   #ifndef DOXYGEN_ONLY
-  template <typename Op, typename... Args,
-            std::enable_if_t<((std::is_integral_v<Args>)&&...) &&
-                                  (Op::Rank() == 0 || sizeof...(Args) > 0),
-                              bool> = true>
+  template <typename Op, typename... Args>
+    requires (((std::is_integral_v<Args>)&&...) &&
+              (Op::Rank() == 0 || sizeof...(Args) > 0))
   #else
   template <typename Op, typename... Args>
   #endif
@@ -699,8 +701,8 @@ namespace matx {
    * @param op Operator input
    * @param dims Bounds for printing
    */
-  template <typename Op, typename... Args,
-            std::enable_if_t<(Op::Rank() > 0 && sizeof...(Args) == 0), bool> = true>
+  template <typename Op, typename... Args>
+    requires (Op::Rank() > 0 && sizeof...(Args) == 0)
   void fprint(FILE* fp, const Op &op, [[maybe_unused]] Args... dims) {
     cuda::std::array<int, Op::Rank()> arr = {0};
     auto tp = cuda::std::tuple_cat(arr);
@@ -726,8 +728,8 @@ namespace matx {
    * @param op Operator input
    * @param dims Bounds for printing
    */
-  template <typename Op, typename... Args,
-            std::enable_if_t<(Op::Rank() > 0 && sizeof...(Args) == 0), bool> = true>
+  template <typename Op, typename... Args>
+    requires (Op::Rank() > 0 && sizeof...(Args) == 0)
   void print(const Op &op, [[maybe_unused]] Args... dims) {
     cuda::std::array<int, Op::Rank()> arr = {0};
     auto tp = cuda::std::tuple_cat(arr);
@@ -743,8 +745,8 @@ namespace matx {
    * @tparam Op Operator input type
    * @param op Operator input
    */
-  template <typename Op, typename... Args,
-            std::enable_if_t<(Op::Rank() > 0 && sizeof...(Args) > 0), bool> = true>
+  template <typename Op, typename... Args>
+    requires (Op::Rank() > 0 && sizeof...(Args) > 0)
   void print(const Op &op, [[maybe_unused]] Args... dims) {
     fprint(stdout, op, dims...);
   }
@@ -757,8 +759,8 @@ namespace matx {
    * @tparam Op Operator input type
    * @param op Operator input
    */
-  template <typename Op,
-          std::enable_if_t<(Op::Rank() == 0), bool> = true>
+  template <typename Op>
+    requires (Op::Rank() == 0)
   void print(const Op &op)
   {
     fprint(stdout, op);

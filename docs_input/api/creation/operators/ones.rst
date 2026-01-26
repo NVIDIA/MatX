@@ -5,6 +5,8 @@ ones
 
 Generate an operator of ones
 
+
+.. versionadded:: 0.1.0
 .. doxygenfunction:: matx::ones(ShapeType &&s)
 .. doxygenfunction:: matx::ones(const index_t (&s)[RANK])
 

@@ -477,15 +477,18 @@ void filter_impl([[maybe_unused]] OutType &o, [[maybe_unused]] const InType &i,
   params.hash = rhash + nrhash;
 
   using cache_val_type = detail::matxFilter_t<NR, NNR, OutType, InType, FilterType>;
+  auto cache_id = detail::GetCacheIdFromType<detail::filter_cache_t>();
+  MATX_LOG_DEBUG("Filter transform: cache_id={}, NR={}, NNR={}", cache_id, NR, NNR);
   detail::GetCache().LookupAndExec<detail::filter_cache_t>(
-    detail::GetCacheIdFromType<detail::filter_cache_t>(),
+    cache_id,
     params,
     [&]() {
       return matxMakeFilter(o, i, h_rec, h_nonrec);
     },
     [&](std::shared_ptr<cache_val_type> ctype) {
       ctype->Exec(o, i, exec);
-    }
+    },
+    exec
   );
 }
 

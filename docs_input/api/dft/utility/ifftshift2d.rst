@@ -5,6 +5,8 @@ ifftshift2D
 
 Perform a 2D inverse by shifting a zero-frequency-shifted version back to the original
 
+.. versionadded:: 0.3.0
+
 .. doxygenfunction:: ifftshift2D
 
 Examples

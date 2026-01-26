@@ -33,42 +33,246 @@
 #pragma once
 
 #include "matx/generators/range.h"
+#include "matx/core/log.h"
 
 namespace matx
 {
   namespace detail {
-    template <class T> class LinspaceOp {
+    template <class T, int NUM_RC> class LinspaceOp : public BaseOp<LinspaceOp<T, NUM_RC>> {
       private:
-        Range<T> range_;
-
+        cuda::std::array<T, NUM_RC> steps_;
+        cuda::std::array<T, NUM_RC> firsts_;
+        int axis_;
+        index_t count_;
       public:
         using value_type = T;
         using matxop = bool;
 
-        __MATX_INLINE__ std::string str() const { return "linspace"; }
+#ifdef MATX_EN_JIT
+        struct JIT_Storage {
+          // No runtime members - all become constexpr
+        };
 
-
-        inline LinspaceOp(T first, T last, index_t count)
-        {
-#ifdef __CUDA_ARCH__
-          range_ = Range<T>{first, (last - first) / static_cast<T>(count - 1)};
-#else
-          // Host has no support for most half precision operators/intrinsics
-          if constexpr (is_matx_half_v<T>) {
-            range_ = Range<T>{static_cast<float>(first),
-              (static_cast<float>(last) - static_cast<float>(first)) /
-                static_cast<float>(count - 1)};
-          }
-          else {
-            range_ = Range<T>{first, (last - first) / static_cast<T>(count - 1)};
-          }
-#endif
+        JIT_Storage ToJITStorage() const {
+          return JIT_Storage{};
         }
 
-        __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ T operator()(index_t idx) const { return range_(idx); }
+        __MATX_INLINE__ std::string get_jit_class_name() const {
+          return std::format("JITLinspace_axis{}_count{}_numrc{}", axis_, count_, NUM_RC);
+        }
+
+        __MATX_INLINE__ auto get_jit_op_str() const {
+          std::string func_name = get_jit_class_name();
+          
+          std::string steps_init = "{ ";
+          std::string firsts_init = "{ ";
+          for (int i = 0; i < NUM_RC; i++) {
+            steps_init += std::format("{}", steps_[i]);
+            firsts_init += std::format("{}", firsts_[i]);
+            if (i < NUM_RC - 1) {
+              steps_init += ", ";
+              firsts_init += ", ";
+            }
+          }
+          steps_init += " }";
+          firsts_init += " }";
+          
+          return cuda::std::make_tuple(
+            func_name,
+            std::format("template <typename T> struct {} {{\n"
+                "  using value_type = T;\n"
+                "  using matxop = bool;\n"
+                "  constexpr static int axis_ = {};\n"
+                "  constexpr static index_t count_ = {};\n"
+                "  constexpr static int NUM_RC = {};\n"
+                "  constexpr static cuda::std::array<T, NUM_RC> steps_ = {};\n"
+                "  constexpr static cuda::std::array<T, NUM_RC> firsts_ = {};\n"
+                "  template <typename CapType, typename... Is>\n"
+                "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(Is... indices) const\n"
+                "  {{\n"
+                "    cuda::std::array idx{{indices...}};\n"
+                "    if constexpr (sizeof...(indices) == 1) {{\n"
+                "      return firsts_[0] + steps_[0] * static_cast<T>(idx[0]);\n"
+                "    }} else {{\n"
+                "      if (axis_ == 0) {{\n"
+                "        return firsts_[idx[1]] + steps_[idx[1]] * static_cast<T>(idx[0]);\n"
+                "      }} else {{\n"
+                "        return firsts_[idx[0]] + steps_[idx[0]] * static_cast<T>(idx[1]);\n"
+                "      }}\n"
+                "    }}\n"
+                "  }}\n"
+                "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return (NUM_RC == 1) ? 1 : 2; }}\n"
+                "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const\n"
+                "  {{\n"
+                "    if constexpr (NUM_RC == 1) return count_;\n"
+                "    else return (dim != axis_) ? NUM_RC : count_;\n"
+                "  }}\n"
+                "}};\n",
+                func_name, axis_, count_, NUM_RC, steps_init, firsts_init)
+          );
+        }
+#endif
+
+        __MATX_INLINE__ std::string str() const { return "linspace"; }
+
+        static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { 
+          if constexpr (NUM_RC == 1) {
+            return 1; 
+          }
+          else {
+            return 2;
+          }
+        }  
+
+        inline LinspaceOp(const T (&firsts)[NUM_RC], const T (&lasts)[NUM_RC], index_t count, int axis) 
+        {
+          MATX_LOG_TRACE("LinspaceOp constructor: NUM_RC={}, count={}, axis={}", NUM_RC, count, axis);
+          axis_ = axis;
+          count_ = count;
+          for (int i = 0; i < NUM_RC; ++i) {
+            firsts_[i] = firsts[i];
+            steps_[i] = (lasts[i] - firsts[i]) / static_cast<T>(count - 1);
+          }
+        }
+
+        template <OperatorCapability Cap, typename InType>
+        __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
+          if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+#ifdef MATX_EN_JIT
+            return get_jit_class_name() + "<" + type_to_string<T>() + ">";
+#else
+            return "";
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+#ifdef MATX_EN_JIT
+            return true;
+#else
+            return false;
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+#ifdef MATX_EN_JIT
+            const auto [key, value] = get_jit_op_str();
+            if (in.find(key) == in.end()) {
+              in[key] = value;
+            }
+            return true;
+#else
+            return false;
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+            return my_cap;
+          } else {          
+            auto self_has_cap = detail::capability_attributes<Cap>::default_value;
+            return self_has_cap;
+          }
+        }
+
+        template <typename CapType, typename... Is>
+        __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(Is... indices) const { 
+          static_assert(sizeof...(indices) == NUM_RC, "Number of indices incorrect in linspace");
+          cuda::std::array idx{indices...};
+          if constexpr (sizeof...(indices) == 1) {
+            return firsts_[0] + steps_[0] * static_cast<T>(idx[0]);
+          } else {
+            if (axis_ == 0) {
+              return firsts_[idx[1]] + steps_[idx[1]] * static_cast<T>(idx[0]);
+            } else {
+              return firsts_[idx[0]] + steps_[idx[0]] * static_cast<T>(idx[1]);
+            }
+          }
+        }
+
+        template <typename... Is>
+        __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(Is... indices) const { 
+          return this->operator()<DefaultCapabilities>(indices...);
+        }
+
+      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
+      {
+        if constexpr (NUM_RC == 1) {
+          return count_;
+        } else {
+          if (dim != axis_) {
+            return NUM_RC;
+          } else {
+            return count_;
+          }
+        }
+      }        
     };
   }
 
+
+  /**
+   * @brief Create a matrix linearly-spaced range of values
+   *
+   * Creates a set of values using starts and stops that are linearly-
+   * spaced apart over the set of values. Distance is determined
+   * by the count parameter
+   * 
+   * @tparam NUM_RC Number of rows or columns, depending on the axis
+   * @tparam T Type of the values
+   * @param firsts First values
+   * @param lasts Last values
+   * @param count Number of values in a row or column, depending on the axis
+   * @param axis Axis to operate over
+   * @return Operator with linearly-spaced values 
+   */
+  template <int NUM_RC, typename T = float>
+  inline auto linspace(const T (&firsts)[NUM_RC], const T (&lasts)[NUM_RC], index_t count, int axis = 0)
+  {
+    return detail::LinspaceOp<T, NUM_RC>(firsts, lasts, count, axis);
+  }   
+
+  /**
+   * @brief Create a linearly-spaced vector of values
+   *
+   * Creates a set of values using startsand stop that are linearly-
+   * spaced apart over the set of values. Distance is determined
+   * by the count parameter
+   * 
+   * @tparam T Type of the values
+   * @param first First value
+   * @param last Last value
+   * @param count Number of values in a row or column, depending on the axis
+   * @param axis Axis to operate over
+   * @return Operator with linearly-spaced values 
+   */
+  template <typename T = float>
+  inline auto linspace(T first, T last, index_t count, int axis = 0)
+  {
+    const T firsts[] = {first};
+    const T lasts[] = {last};
+    return linspace(firsts, lasts, count, axis);
+  }
+
+  /**
+   * @brief Create a linearly-spaced range of values
+   *
+   * Creates a set of values using a start and end that are linearly-
+   * spaced apart over the set of values. Distance is determined
+   * by the shape and selected dimension.
+   * 
+   * @tparam Dim Dimension to operate over
+   * @tparam NUM_RC Rank of shape
+   * @tparam T Operator type
+   * @param s Array of sizes
+   * @param first First value
+   * @param last Last value
+   * @return Operator with linearly-spaced values 
+   */
+  template <int Dim, int NUM_RC, typename T>
+  [[deprecated("Use matx::linspace(T first, T last, index_t count, int axis = 0) instead.")]]  
+  inline auto linspace([[maybe_unused]]const index_t (&s)[NUM_RC], T first, T last)
+  {
+    const T firsts[] = {first};
+    const T lasts[] = {last};   
+    return linspace(firsts, lasts, NUM_RC, 0);
+  }  
 
   /**
    * @brief Create a linearly-spaced range of values
@@ -85,35 +289,16 @@ namespace matx
    * @param last Last value
    * @return Operator with linearly-spaced values 
    */
-  template <int Dim, typename ShapeType, typename T,
-           std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
-             inline auto linspace(ShapeType &&s, T first, T last)
-             {
-               constexpr int RANK = cuda::std::tuple_size<std::decay_t<ShapeType>>::value;
-               static_assert(RANK > Dim);
-               auto count =  *(s.begin() + Dim);
-               detail::LinspaceOp<T> l(first, last, count);
-               return detail::matxGenerator1D_t<detail::LinspaceOp<T>, Dim, ShapeType>(std::forward<ShapeType>(s), l);
-             }
-
-  /**
-   * @brief Create a linearly-spaced range of values
-   *
-   * Creates a set of values using a start and end that are linearly-
-   * spaced apart over the set of values. Distance is determined
-   * by the shape and selected dimension.
-   * 
-   * @tparam Dim Dimension to operate over
-   * @tparam RANK Rank of shape
-   * @tparam T Operator type
-   * @param s Array of sizes
-   * @param first First value
-   * @param last Last value
-   * @return Operator with linearly-spaced values 
-   */
-  template <int Dim, int RANK, typename T>
-    inline auto linspace(const index_t (&s)[RANK], T first, T last)
-    {
-      return linspace<Dim>(detail::to_array(s), first, last);
-    }
+  template <int Dim, typename ShapeType, typename T>
+    requires (!cuda::std::is_array_v<remove_cvref_t<ShapeType>>)
+  [[deprecated("Use matx::linspace(T first, T last, index_t count, int axis = 0) instead.")]]           
+  inline auto linspace(ShapeType &&s, T first, T last)
+  {
+    constexpr int NUM_RC = cuda::std::tuple_size<std::decay_t<ShapeType>>::value;
+    static_assert(NUM_RC > Dim);
+    auto count =  *(s.begin() + Dim);
+    const T firsts[] = {first};
+    const T lasts[] = {last};       
+    return linspace(firsts, lasts, count, 0);
+  }  
 } // end namespace matx

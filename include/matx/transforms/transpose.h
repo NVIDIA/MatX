@@ -60,7 +60,7 @@ namespace matx
    */
   template <typename OutputTensor, typename InputTensor>
     __MATX_INLINE__ void transpose_matrix_impl([[maybe_unused]] OutputTensor &out,
-        const InputTensor &in, cudaExecutor exec)
+        const InputTensor &in, const cudaExecutor &exec)
     {
       MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
       
@@ -98,7 +98,7 @@ namespace matx
         transpose_kernel_oop<<<grid, block, shm, stream>>>(out, in);
       }
 #else
-     MATX_THROW(matxNotSupported, "Transpose not supported on host");
+     MATX_THROW(matxNotSupported, "Transpose not supported on host with a CUDA executor");
 #endif    
     };
   

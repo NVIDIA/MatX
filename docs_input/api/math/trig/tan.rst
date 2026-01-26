@@ -5,6 +5,8 @@ tan
 
 Tangent in radians
 
+.. versionadded:: 0.3.0
+
 .. doxygenfunction:: tan(Op t)  
   
 Examples

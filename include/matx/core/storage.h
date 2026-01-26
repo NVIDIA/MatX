@@ -35,600 +35,181 @@
 #include "matx/core/type_utils.h"
 #include "matx/core/allocator.h"
 #include "matx/core/error.h"
+#include <cstring>
+#include <type_traits>
+#include <utility>
+#include <memory>
 
 namespace matx
 {
   /**
-   * @brief Raw pointer buffer
-   * 
-   * Used to store a raw pointer backing a tensor. Supports ownership through a shared_ptr
-   * internally.
-   * 
+   * @brief Concept to detect duck-typed allocator interface
    */
-  template <typename T, typename Allocator = matx_allocator<T>>
-  class raw_pointer_buffer
-  {
+  template<typename T>
+  concept has_allocator_interface_c = requires(T alloc, size_t sz, void* ptr) {
+    { alloc.allocate(sz) } -> std::convertible_to<void*>;
+    { alloc.deallocate(ptr, sz) } -> std::same_as<void>;
+  };
+
+  /**
+   * @brief Concept to detect duck-typed allocator pointer interface
+   */
+  template<typename T>
+  concept has_allocator_ptr_interface_c = std::is_pointer_v<T> && requires(T alloc, size_t sz, void* ptr) {
+    { alloc->allocate(sz) } -> std::convertible_to<void*>;
+    { alloc->deallocate(ptr, sz) } -> std::same_as<void>;
+  };
+
+  /**
+   * @brief Combined concept for any allocator type
+   */
+  template<typename T>
+  concept has_allocator_interface_any = has_allocator_interface_c<T> || has_allocator_ptr_interface_c<T>;
+
+  // Legacy struct for backward compatibility
+  template<typename T>
+  struct has_allocator_interface : std::bool_constant<has_allocator_interface_any<T>> {};
+
+  /**
+   * @brief Unified storage class for both owning and non-owning pointers
+   * 
+   * Supports duck-typed custom allocators while avoiding virtual functions
+   * and pointer members in tensors.
+   */
+  template <typename T>
+  class Storage {
   public:
-    using value_type = T; ///< Type trait for value_type
-    using iterator = T *; ///< Type trait for iterator value
-    using citerator = T const *; ///< Type trait for const iterator value
-    using matx_storage_container = bool; ///< Type trait to indicate this is a storage type
+    using value_type = T;
+    using iterator = T*;
+    using const_iterator = const T*;
 
-    /** 
-     * @brief Default construct a raw_pointer_buffer. This should only be used when temporarily
-     * creating an empty tensor for construction later.
-    */
-    raw_pointer_buffer() { }
+    // Default constructor - creates empty storage
+    Storage() : size_(0), data_() {}
+
+    // Non-owning constructor - wraps existing pointer
+    Storage(T* ptr, size_t size) 
+      : size_(size), data_(ptr, [](T*){}) {}
     
-    /**
-     * @brief Construct a new raw pointer buffer object and allocate space
-     * 
-     * @param size Size of allocation
-     */
-    raw_pointer_buffer(size_t size) : size_(size), owning_(true) {
-      T *tmp = alloc_.allocate(size);
-      ConfigureShared(tmp, size); 
-    }
-
-    /**
-     * @brief Construct a new raw pointer buffer object from an existing pointer and size
-     * 
-     * @param ptr Previously-allocated pointer
-     * @param size Size of allocation
-     * @param owning if this class owns memory
-     */
-    raw_pointer_buffer(T *ptr, size_t size, bool owning = false) : size_(size), owning_(owning) { 
-      ConfigureShared(ptr, size);  
-    }
-
-    /**
-     * @brief Default copy constructor
-     * 
-     */
-    raw_pointer_buffer(const raw_pointer_buffer &rhs) = default;
-
-    /**
-     * @brief Default copy assignment constructor
-     * 
-     */      
-    raw_pointer_buffer& operator=(const raw_pointer_buffer &) = default;
-
-    /**
-     * @brief Default move assignment constructor
-     * 
-     */      
-    raw_pointer_buffer& operator=(raw_pointer_buffer &&) = default;
-
-    /**
-     * @brief Move constructor
-     * 
-     */      
-    raw_pointer_buffer(raw_pointer_buffer &&rhs) noexcept {
-      size_ = rhs.size_; 
-      data_ = std::move(rhs.data_);
-      owning_ = rhs.owning_;
-    } 
-
-    /**
-     * @brief Destroy the raw pointer buffer object
-     * 
-     */
-    ~raw_pointer_buffer() = default;
-
-    /** Swaps two raw_pointer_buffers
-     *
-     * Swaps members of two raw_pointer_buffers
-     *
-     * @param lhs
-     *   Left argument
-     * @param rhs
-     *   Right argument
-     */
-    friend void swap(raw_pointer_buffer<T> &lhs, raw_pointer_buffer<T> &rhs) noexcept
-    {
-      using std::swap;
-
-      swap(lhs.size_, rhs.size_);
-      swap(lhs.owning_, rhs.owning_);
-      swap(lhs.alloc_, rhs.alloc_);
-      swap(lhs.data_, rhs.data_);
-    }          
-
-    /**
-     * @brief Get underlying data pointer
-     * 
-     * @return Pointer to start of data
-     */
-    [[nodiscard]] __MATX_INLINE__ T *data() noexcept
-    {
-      return data_.get();
-    }
-
-    /**
-     * @brief Get begin iterator
-     * 
-     * @return Beginning iterator
-     */
-    [[nodiscard]] __MATX_INLINE__ iterator begin() noexcept
-    {
-      return data();
-    }
-
-    /**
-     * @brief Get end iterator
-     * 
-     * @return Ending iterator
-     */
-    [[nodiscard]] __MATX_INLINE__ iterator end() noexcept
-    {
-      return data() + size_;
-    }
-
-    /**
-     * @brief Get constant begin iterator
-     * 
-     * @return Beginning iterator
-     */
-    [[nodiscard]] __MATX_INLINE__ citerator cbegin() const noexcept
-    {
-      return data();
-    }
-
-    /**
-     * @brief Get constant end iterator
-     * 
-     * @return Ending iterator
-     */
-    [[nodiscard]] __MATX_INLINE__ citerator cend() const noexcept
-    {
-      return data() + size_;
-    }
-
-    /**
-     * @brief Get size of allocation
-     * 
-     * @return Size of allocation 
-     */
-    __MATX_INLINE__ size_t size() const
-    {
-      return size_;
-    }
-
-    /**
-     * @brief Set the data pointer in an object
-     * 
-     * @param data New value of data pointer
-     */
-    void SetData(T *const data) noexcept
-    {
-      data_.reset(data, [](auto ){});
-    }   
-
-    /**
-     * @brief Allocate storage from container
-     * 
-     * @param size Size in bytes to allocate
-     */
-    __MATX_INLINE__ T* allocate(size_t size)
-    {
-      return alloc_.allocate(size);
-    }
-
-    /**
-     * @brief Get storage capacity of container
-     * 
-     * @return auto 
-     */
-    auto capacity() const noexcept {
-      return size_;
-    }     
-
-    /**
-     * Get the reference count
-     *
-     * @returns Reference count or 0 if not tracked
-     *
-     */
-    __MATX_INLINE__ __MATX_HOST__ auto use_count() const noexcept
-    {
-      return data_.use_count();
-    }     
-
-  private:
-    Allocator alloc_ = {};
-    size_t size_;
-    bool owning_;
-
-    std::shared_ptr<T> data_;
-    
-    void ConfigureShared(T *ptr, [[maybe_unused]] size_t size) {
-      if constexpr (std::is_const_v<T>) {
-        if (!owning_) {
-          data_ = std::shared_ptr<T>(ptr, [](auto){});
-        }
-        else {
-          MATX_ASSERT_STR(false, matxInvalidParameter, "Cannot use an owning tensor type with const data");
-        }
+    // Owning constructor with default allocator
+    Storage(size_t size) 
+      : size_(size) {
+      if (size == 0) {
+        // For zero size, create empty storage without allocation
+        data_ = std::shared_ptr<T>();
+      } else {
+        T* ptr = matx_allocator<T>{}.allocate(size * sizeof(T));
+        data_ = std::shared_ptr<T>(ptr, [size](T* p) {
+          matx_allocator<T>{}.deallocate(p, size * sizeof(T));
+        });
       }
-      else {
-        if (!owning_) {
-          data_ = std::shared_ptr<T>(ptr, [](auto){});
-        }
-        else {
-          data_ = std::shared_ptr<T>(ptr, [size, &alloc = alloc_](auto p) { alloc.deallocate(reinterpret_cast<void*>(p), size); });
-        }
-      }   
     }
-  };
-
-  /**
-   * @brief Storage class for smart pointers (unique and shared)
-   * 
-   * Used when an existing shared or unique_ptr object exists and MatX needs to take either shared or full
-   * ownership
-   * 
-   * @tparam T Type to store in smart pointer
-   */
-  template <typename T>
-  class smart_pointer_buffer
-  {
-  public:
-    using value_type = T; ///< Type trait for value_type
-    using iterator = T *; ///< Type trait for iterator value
-    using citerator = T const *; ///< Type trait for const iterator value
-    using matx_storage_container = bool; ///< Type trait to indicate this is a container
-
-    /** 
-     * @brief Default construct a smart_pointer_buffer. This should only be used when temporarily
-     * creating an empty tensor for construction later.
-    */
-    smart_pointer_buffer() {};
-
-    /**
-     * @brief Construct a new smart pointer buffer from an existing object
-     * 
-     * @param ptr Smart poiner object
-     * @param size Size of allocation
-     */
-    smart_pointer_buffer(T &&ptr, size_t size) : data_(std::forward<T>(ptr)), size_(size) {
-      static_assert(is_smart_ptr_v<T>);
+    
+    // Owning constructor with any allocator that has allocate/deallocate methods
+    template<typename Allocator>
+      requires has_allocator_interface_any<std::decay_t<Allocator>>
+    Storage(size_t size, Allocator&& alloc)
+      : size_(size) {
+      if (size == 0) {
+        // For zero size, create empty storage without allocation
+        data_ = std::shared_ptr<T>();
+      } else if constexpr (std::is_pointer_v<std::decay_t<Allocator>>) {
+        // Handle allocator pointers (any pointer to object with allocate/deallocate methods)
+        T* ptr = static_cast<T*>(alloc->allocate(size * sizeof(T)));
+        data_ = std::shared_ptr<T>(ptr, [size, alloc](T* p) {
+          alloc->deallocate(p, size * sizeof(T));
+        });
+      } else {
+        // Handle allocator objects with duck typing
+        T* ptr = static_cast<T*>(alloc.allocate(size * sizeof(T)));
+        data_ = std::shared_ptr<T>(ptr, [size, alloc](T* p) mutable {
+          alloc.deallocate(p, size * sizeof(T));
+        });
+      }
     }
-
-    /** Swaps two smart_pointer_buffer
-     *
-     * Swaps members of two smart_pointer_buffers
-     *
-     * @param lhs
-     *   Left argument
-     * @param rhs
-     *   Right argument
-     */
-    friend void swap(smart_pointer_buffer<T> &lhs, smart_pointer_buffer<T> &rhs) noexcept
-    {
-      using std::swap;
-
-      swap(lhs.size_, rhs.size_);
-      swap(lhs.data_, rhs.data_);
-    }      
-
-    /**
-     * @brief Default const copy constructor
-     * 
-     */      
-    smart_pointer_buffer& operator=(const smart_pointer_buffer &) = default;
-
-    /**
-     * @brief Default move assignment constructor
-     * 
-     */      
-    smart_pointer_buffer& operator=(smart_pointer_buffer &&) = default;
-
-    /**
-     * @brief Move a smart pointer buffer object
-     * 
-     * @param rhs Object to move from
-     */
-    smart_pointer_buffer(smart_pointer_buffer<T> &&rhs) {
-      size_ = rhs.size_; 
-      data_ = std::move(rhs.data_);
-    }    
-
-    /**
-     * @brief Default destructor
-     * 
-     */  
-    ~smart_pointer_buffer() = default;
-
-    /**
-     * @brief Get underlying data pointer
-     * 
-     * @return Pointer to start of data
-     */
-    [[nodiscard]] __MATX_INLINE__ T *data() noexcept
-    {
-      return data_.get();
+    
+    // Constructor from existing shared_ptr
+    Storage(std::shared_ptr<T> ptr, size_t size)
+      : size_(size), data_(ptr) {}
+    
+    // Owning constructor with memory space
+    Storage(size_t size, matxMemorySpace_t space, cudaStream_t stream = 0)
+      : size_(size) {
+      if (size == 0) {
+        // For zero size, create empty storage without allocation
+        data_ = std::shared_ptr<T>();
+      } else {
+        void* ptr;
+        matxAlloc(&ptr, size * sizeof(T), space, stream);
+        data_ = std::shared_ptr<T>(static_cast<T*>(ptr), [stream](T* p) {
+          matxFree(p, stream);
+        });
+      }
     }
 
-    /**
-     * @brief Get begin iterator
-     * 
-     * @return Beginning iterator
-     */
-    [[nodiscard]] __MATX_INLINE__ iterator begin() noexcept
-    {
-      return data();
-    }
+    // Core interface
+    T* data() noexcept { return data_.get(); }
+    const T* data() const noexcept { return data_.get(); }
+    size_t size() const noexcept { return size_; }
+    size_t capacity() const noexcept { return size_; }
+    size_t use_count() const noexcept { return data_.use_count(); }
+    
+    // Iterator interface
+    iterator begin() noexcept { return data(); }
+    iterator end() noexcept { return data() + size(); }
+    const_iterator begin() const noexcept { return data(); }
+    const_iterator end() const noexcept { return data() + size(); }
+    const_iterator cbegin() const noexcept { return data(); }
+    const_iterator cend() const noexcept { return data() + size(); }
 
-    /**
-     * @brief Get end iterator
-     * 
-     * @return Ending iterator
-     */
-    [[nodiscard]] __MATX_INLINE__ iterator end() noexcept
-    {
-      return data() + size_;
-    }
-
-    /**
-     * @brief Get constant begin iterator
-     * 
-     * @return Beginning iterator
-     */
-    [[nodiscard]] __MATX_INLINE__ citerator cbegin() const noexcept
-    {
-      return data();
-    }
-
-    /**
-     * @brief Get constant end iterator
-     * 
-     * @return Ending iterator
-     */
-    [[nodiscard]] __MATX_INLINE__ citerator cend() const noexcept
-    {
-      return data() + size_;
-    }
-
-    /**
-     * @brief Get size of container in bytes
-     * 
-     * @return Size in bytes 
-     */
-    size_t size() const
-    {
-      return size_;
-    }
-
-    /**
-     * @brief Set the data pointer in an object
-     * 
-     * @param data New value of data pointer
-     */
-    void SetData(T *const data) noexcept
-    {
-      data_.reset(data, [](auto){});
-    }
-
-    /**
-     * @brief Get storage capacity of container
-     * 
-     * @return auto 
-     */
-    auto capacity() const noexcept {
-      return size_;
-    }
-
-    /**
-     * @brief Allocate storage from container
-     * 
-     * @param size Size in bytes to allocate
-     */
-    __MATX_INLINE__ T* allocate([[maybe_unused]] size_t size)
-    {
-      MATX_THROW(matxInvalidParameter, "Cannot call allocate on a smart pointer storage type");
-    }
-
-    /**
-     * Get the reference count
-     *
-     * @returns Reference count or 0 if not tracked
-     *
-     */
-    __MATX_INLINE__ __MATX_HOST__ auto use_count() const noexcept
-    {
-      return data_.use_count();
-    }         
+    // Utility functions
+    size_t bytes() const noexcept { return sizeof(T) * capacity(); }
 
   private:
     size_t size_;
-    T data_;
+    std::shared_ptr<T> data_;
   };
+
+
 
   /**
-   * @brief Primitive class to hold storage objects
-   * 
+   * @brief Factory function to create owning storage with default allocator
    */
-  template <typename C>
-  class basic_storage
-  {
-  public:
-    using value_type = typename C::value_type; ///< Type trait for value_type
-    using T = value_type; ///< Type trait for type
-    using iterator = value_type*; ///< Type trait for iterator value
-    using citerator = value_type const *; ///< Type trait for const iterator value
-    using matx_storage = bool; ///< Type trait to indicate this is a storage type
-    using container = C; ///< Storage container type
-
-    /** Swaps two basic_storages
-     *
-     * Swaps members of two basic_storages
-     *
-     * @param lhs
-     *   Left argument
-     * @param rhs
-     *   Right argument
-     */
-    friend void swap(basic_storage<C> &lhs, basic_storage<C> &rhs) noexcept
-    {
-      using std::swap;
-
-      swap(lhs.container_, rhs.container_);
-    }      
-
-    /**
-     * @brief Set the data pointer in an object
-     * 
-     * @param data New value of data pointer
-     */
-    void SetData(T *const data) noexcept
-    {
-      static_assert(is_matx_storage_container_v<C>, "Must use MatX storage container type if trying to set data pointer");
-      
-      container_.SetData(data);
-    }
-
-    /**
-     * @brief Construct an empty storage container
-     * 
-     */
-    __MATX_INLINE__ basic_storage()
-    {
-    }    
-
-    /**
-     * @brief Construct a storage container
-     * 
-     * @tparam C2 Unused
-     * @param obj Storage object
-     */
-    template <typename C2, std::enable_if_t<!is_matx_storage_v<C2>, bool> = true>
-    __MATX_INLINE__ basic_storage(C2 &&obj) : container_(std::forward<C2>(obj))
-    {
-    }
-
-    /**
-     * @brief Default copy constructor
-     * 
-     */
-    __MATX_INLINE__ basic_storage(const basic_storage &) = default;
-
-    /**
-     * @brief Default move constructor
-     * 
-     */    
-    __MATX_INLINE__ basic_storage(basic_storage &&) = default;
-
-    /**
-     * @brief Default copy assignment constructor
-     * 
-     */    
-    __MATX_INLINE__ basic_storage& operator=(const basic_storage &) = default;
-
-    /**
-     * @brief Default desctructor
-     * 
-     */    
-    __MATX_INLINE__ ~basic_storage() = default;
-
-    /**
-     * @brief Get underlying data pointer
-     * 
-     * @return Pointer to start of data
-     */
-    [[nodiscard]] __MATX_INLINE__ T *data() noexcept
-    {
-      return container_.data();
-    }    
-
-    /**
-     * @brief Get begin iterator
-     * 
-     * @return Beginning iterator
-     */
-    [[nodiscard]] __MATX_INLINE__ iterator begin() noexcept
-    {
-      return container_.begin();
-    }
-
-    /**
-     * @brief Get end iterator
-     * 
-     * @return Ending iterator
-     */
-    [[nodiscard]] __MATX_INLINE__ iterator end() noexcept
-    {
-      return container_.end();
-    }
-
-    /**
-     * @brief Get constant begin iterator
-     * 
-     * @return Beginning iterator
-     */
-    [[nodiscard]] __MATX_INLINE__ citerator cbegin() const noexcept
-    {
-      return container_.cbegin();
-    }
-
-    /**
-     * @brief Get constant end iterator
-     * 
-     * @return Ending iterator
-     */
-    [[nodiscard]] __MATX_INLINE__ citerator cend() const noexcept
-    {
-      return container_.cend();
-    }
-
-    /**
-     * @brief Allocate storage from container
-     * 
-     * @param size Size in bytes to allocate
-     */
-    __MATX_INLINE__ T* allocate(size_t size)
-    {
-      return container_.allocate(size);
-    }
-
-    /**
-     * @brief Get size of container in bytes
-     *
-     * @return Size in bytes
-     */
-    __MATX_INLINE__ auto size() const
-    {
-      return container_.size();
-    }
-
-    /**
-     * Get the reference count
-     *
-     * @returns Reference count or 0 if not tracked
-     *
-     */
-    __MATX_INLINE__ auto use_count() const noexcept
-    {
-      return container_.use_count();
-    }
-
-    /**
-     * Get the total size of the underlying data, including the multiple of the
-     * type
-     *
-     * @return
-     *    The size (in bytes) of all dimensions combined
-     */
-    __MATX_INLINE__ size_t Bytes() const noexcept { return sizeof(T) * container_.capacity(); };    
-
-  private:
-    C container_;
-  };
-
-/**
- * @brief Default storage type using ownership semantics and the default MatX allocator
- * 
- * @tparam T Type of pointer
- */
   template <typename T>
-  using DefaultStorage = basic_storage<raw_pointer_buffer<T, matx_allocator<T>>>;
+  Storage<T> make_owning_storage(size_t size) {
+    return Storage<T>(size);
+  }
+
+  /**
+   * @brief Factory function to create owning storage with custom allocator (supports duck typing)
+   */
+  template <typename T, typename Allocator>
+  Storage<T> make_owning_storage(size_t size, Allocator&& alloc) {
+    return Storage<T>(size, std::forward<Allocator>(alloc));
+  }
+
+  /**
+   * @brief Factory function to create owning storage with MatX memory space
+   */
+  template <typename T>
+  Storage<T> make_owning_storage(size_t size, matxMemorySpace_t space, cudaStream_t stream = 0) {
+    return Storage<T>(size, space, stream);
+  }
+
+  /**
+   * @brief Factory function to create storage from existing shared_ptr
+   */
+  template <typename T>
+  Storage<T> make_storage_from_shared_ptr(std::shared_ptr<T> ptr, size_t size) {
+    return Storage<T>(ptr, size);
+  }
+
+  /**
+   * @brief Factory function to create non-owning storage
+   */
+  template <typename T>
+  Storage<T> make_non_owning_storage(T* ptr, size_t size) {
+    return Storage<T>(ptr, size);
+  }
+
+
 };

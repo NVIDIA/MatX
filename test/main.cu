@@ -33,10 +33,16 @@
 #include "gtest/gtest.h"
 #include <pybind11/embed.h>
 
+#include "matx.h"
+
 int main(int argc, char **argv) 
 {
   printf("Running MatX unit tests. Press Ctrl+\\ (SIGQUIT) to kill tests\n");
 
   ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
+  const int result = RUN_ALL_TESTS();
+
+  matx::ClearCachesAndAllocations();
+
+  return result;
 }

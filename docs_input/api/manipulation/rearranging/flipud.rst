@@ -5,6 +5,8 @@ flipud
 
 Flips an operator up to down
 
+.. versionadded:: 0.3.0
+
 .. doxygenfunction:: flipud
 
 Examples

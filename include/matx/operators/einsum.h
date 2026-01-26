@@ -58,7 +58,9 @@ namespace detail {
       using einsum_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "einsum()"; }
-      __MATX_INLINE__ EinsumOp(const std::string &subscripts, const OpA&... ops) : subscripts_(subscripts), a_(ops...) { };
+      __MATX_INLINE__ EinsumOp(const std::string &subscripts, const OpA&... ops) : subscripts_(subscripts), a_(ops...) {
+        MATX_LOG_TRACE("{} constructor: subscripts=\"{}\"", str(), subscripts);
+      };
 
       // This should never be called
       template <typename... Is>
@@ -69,7 +71,7 @@ namespace detail {
         static_assert(is_cuda_executor_v<Executor>, "einsum() only supports the CUDA executor currently");   
 
         cuda::std::apply([&](auto... args) {
-          ::matx::cutensor::einsum_impl(cuda::std::get<0>(out), subscripts_, ex.getStream(), args...);
+          ::matx::cutensor::einsum_impl(cuda::std::get<0>(out), subscripts_, ex, args...);
         }, a_);
       }
 
@@ -112,6 +114,15 @@ namespace detail {
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size([[maybe_unused]] int dim) const
       {
         return 0;
+      }
+
+      template <OperatorCapability Cap, typename InType>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
+        auto self_has_cap = capability_attributes<Cap>::default_value;
+        return combine_capabilities<Cap>(
+          self_has_cap,
+          get_combined_ops_capability<Cap>(in, a_)
+        );
       }
 
   };

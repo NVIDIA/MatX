@@ -65,7 +65,7 @@ TYPED_TEST(OperatorTestsNumericNonComplexAllExecs, Overlap)
 
   // Test with an operator input
   // example-begin overlap-test-1  
-  auto aop = linspace<0>(a.Shape(), (TestType)0, (TestType)9);
+  auto aop = linspace((TestType)0, (TestType)9, a.Size(0));
   tensor_t<TestType, 2> b4out{{4, 3}};
 
   // Input is {0, 1, 2, 3, 4, 5, 6, 7, 8, 9}

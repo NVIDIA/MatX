@@ -75,12 +75,42 @@ TYPED_TEST(FileIoTestsNonComplexFloatTypes, SmallCSVRead)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(FileIoTestsNonComplexFloatTypes, CSVReadFileNotFound)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  tensor_t<TestType, 2> t{{10, 2}};
+  
+  // Test reading a non-existent CSV file
+  const std::string non_existent_file = "../test/00_io/non_existent_file.csv";
+  ASSERT_THROW({
+    io::read_csv(t, non_existent_file, ",");
+  }, matx::detail::matxException);
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(FileIoTestsComplexFloatTypes, SmallCSVRead)
 {
   MATX_ENTER_HANDLER();
 
   io::read_csv(this->Av, this->small_complex_csv, ",");
   MATX_TEST_ASSERT_COMPARE(this->pb, this->Av, this->small_complex_csv.c_str(), 0.01);
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(FileIoTestsComplexFloatTypes, CSVReadFileNotFound)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  tensor_t<TestType, 2> t{{10, 2}};
+  
+  // Test reading a non-existent CSV file with complex types
+  const std::string non_existent_file = "../test/00_io/non_existent_complex_file.csv";
+  ASSERT_THROW({
+    io::read_csv(t, non_existent_file, ",");
+  }, matx::detail::matxException);
 
   MATX_EXIT_HANDLER();
 }
@@ -112,6 +142,26 @@ TYPED_TEST(FileIoTestsNonComplexFloatTypes, MATRead)
   io::read_mat(t, "../test/00_io/test.mat", "myvar");
   // example-end read_mat-test-1
   ASSERT_NEAR(t(0,0), 1.456, 0.001);
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(FileIoTestsNonComplexFloatTypes, MATReadFileNotFound)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  auto t = make_tensor<TestType>({1,10});
+
+  // Test reading a non-existent MAT file
+  const std::string non_existent_file = "../test/00_io/non_existent_file.mat";
+  ASSERT_THROW({
+    io::read_mat(t, non_existent_file, "myvar");
+  }, matx::detail::matxException);
+
+  // Test the overloaded read_mat that returns a tensor  
+  ASSERT_THROW({
+    auto t2 = io::read_mat<decltype(t)>(non_existent_file, "myvar");
+  }, matx::detail::matxException);
 
   MATX_EXIT_HANDLER();
 }
@@ -230,6 +280,42 @@ TYPED_TEST(FileIoTestsComplexFloatTypes, MATWriteRank5GetShape)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(FileIoTestsComplexFloatTypes, MATReadFileNotFound)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  auto t = make_tensor<TestType>({1,10});
+
+  // Test reading a non-existent MAT file with complex types
+  const std::string non_existent_file = "../test/00_io/non_existent_complex_file.mat";
+  ASSERT_THROW({
+    io::read_mat(t, non_existent_file, "myvar");
+  }, matx::detail::matxException);
+
+  // Test the overloaded read_mat that returns a tensor  
+  ASSERT_THROW({
+    auto t2 = io::read_mat<decltype(t)>(non_existent_file, "myvar");
+  }, matx::detail::matxException);
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(FileIoTestsComplexFloatTypes, NPYReadFileNotFound)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+
+  auto t = make_tensor<TestType>({2, 3});
+
+  // Test reading a non-existent NPY file with complex types
+  const std::string non_existent_file = "../test/00_io/non_existent_complex_file.npy";
+  ASSERT_THROW({
+    io::read_npy(t, non_existent_file);
+  }, matx::detail::matxException);
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(FileIoTestsNonComplexFloatTypes, NPYRead)
 {
   MATX_ENTER_HANDLER();
@@ -248,6 +334,22 @@ TYPED_TEST(FileIoTestsNonComplexFloatTypes, NPYRead)
   ASSERT_NEAR(t(1, 0), 4.5, 0.001);
   ASSERT_NEAR(t(1, 1), 5.5, 0.001);
   ASSERT_NEAR(t(1, 2), 6.5, 0.001);
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(FileIoTestsNonComplexFloatTypes, NPYReadFileNotFound)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+
+  auto t = make_tensor<TestType>({2, 3});
+
+  // Test reading a non-existent NPY file
+  const std::string non_existent_file = "../test/00_io/non_existent_file.npy";
+  ASSERT_THROW({
+    io::read_npy(t, non_existent_file);
+  }, matx::detail::matxException);
 
   MATX_EXIT_HANDLER();
 }

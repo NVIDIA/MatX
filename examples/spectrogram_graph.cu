@@ -62,11 +62,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   cudaStream_t stream;
   cudaStreamCreate(&stream);
 
-  cudaExecutor exec{stream};
-
-  cudaEvent_t start, stop;
-  cudaEventCreate(&start);
-  cudaEventCreate(&stop);
+  cudaExecutor exec{stream, true}; // Enable profiling
 
   float fs = 10000;
   index_t N = 100000;
@@ -78,30 +74,26 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   constexpr uint32_t num_iterations = 20;
   float time_ms;
 
-  cuda::std::array<index_t, 1> num_samps{N};
-  cuda::std::array<index_t, 1> half_win{nfft / 2 + 1};
-  cuda::std::array<index_t, 1> s_time_shape{(N - noverlap) / nstep};
-
   tensor_t<float, 1> time({N});
   tensor_t<float, 1> modulation({N});
   tensor_t<float, 1> carrier({N});
   tensor_t<float, 1> noise({N});
   tensor_t<float, 1> x({N});
-  auto freqs = make_tensor<float>(half_win);
+  auto freqs = make_tensor<float>({nfft / 2 + 1});
   tensor_t<complex, 2> fftStackedMatrix(
       {(N - noverlap) / nstep, nfft / 2 + 1});
   tensor_t<float, 1> s_time({(N - noverlap) / nstep});
 
   // Set up all static buffers
   // time = np.arange(N) / float(fs)
-  (time = linspace<0>(num_samps, 0.0f, static_cast<float>(N) - 1.0f) / fs)
+  (time = linspace(0.0f, static_cast<float>(N) - 1.0f, N) / fs)
       .run(exec);
   // mod = 500 * np.cos(2*np.pi*0.25*time)
-  (modulation = 500 * cos(2 * M_PI * 0.25 * time)).run(exec);
+  (modulation = 500.f * cos(2.f * static_cast<float>(M_PI) * 0.25f * time)).run(exec);
   // carrier = amp * np.sin(2*np.pi*3e3*time + modulation)
-  (carrier = amp * sin(2 * M_PI * 3000 * time + modulation)).run(exec);
+  (carrier = amp * sin(2.f * static_cast<float>(M_PI) * 3000.f * time + modulation)).run(exec);
   // noise = 0.01 * fs / 2 * np.random.randn(time.shape)
-  (noise = sqrt(0.01 * fs / 2) * random<float>({N}, NORMAL)).run(exec);
+  (noise = sqrt(0.01f * fs / 2.f) * random<float>({N}, NORMAL)).run(exec);
   // noise *= np.exp(-time/5)
   (noise = noise * exp(-1.0f * time / 5.0f)).run(exec);
   // x = carrier + noise
@@ -114,8 +106,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     }
 
     // DFT Sample Frequencies (rfftfreq)
-    (freqs = (1.0 / (static_cast<float>(nfft) * 1 / fs)) *
-               linspace<0>(half_win, 0.0f, static_cast<float>(nfft) / 2.0f))
+    (freqs = (1.0f / (static_cast<float>(nfft) * 1.0f / fs)) *
+               linspace(0.0f, static_cast<float>(nfft) / 2.0f, nfft / 2 + 1))
         .run(exec);
 
     // Create overlapping matrix of segments.
@@ -129,8 +121,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     [[maybe_unused]] auto Sxx = fftStackedMatrix.RealView().Permute({1, 0});
 
     // Spectral time axis
-    (s_time = linspace<0>(s_time_shape, static_cast<float>(nperseg) / 2.0f,
-                           static_cast<float>(N - nperseg) / 2.0f + 1) /
+    (s_time = linspace(static_cast<float>(nperseg) / 2.0f,
+                           static_cast<float>(N - nperseg) / 2.0f + 1.0f, (N - noverlap) / nstep) /
                 fs)
         .run(exec);
 
@@ -150,19 +142,17 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
   exec.sync();
   // Time graph execution of same kernels
-  cudaEventRecord(start, stream);
+  exec.start_timer();
   for (uint32_t i = 0; i < 10; i++) {
     cudaGraphLaunch(instance, stream);
   }
-  cudaEventRecord(stop, stream);
+  exec.stop_timer();
   exec.sync();
-  cudaEventElapsedTime(&time_ms, start, stop);
+  time_ms = exec.get_time_ms();
 
   printf("Spectrogram Time With Graphs = %.2fus per iteration\n",
          time_ms * 1e3 / num_iterations);
 
-  cudaEventDestroy(start);
-  cudaEventDestroy(stop);
   cudaStreamDestroy(stream);
   MATX_CUDA_CHECK_LAST_ERROR();
   MATX_EXIT_HANDLER();

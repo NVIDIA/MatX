@@ -32,6 +32,7 @@
 
 #pragma once
 
+#include "matx/core/log.h"
 
 namespace matx
 {
@@ -49,6 +50,54 @@ namespace matx
       using matxop = bool;
       using value_type = T;
 
+#ifdef MATX_EN_JIT
+      struct JIT_Storage {
+        // No runtime members - all become constexpr
+      };
+
+      JIT_Storage ToJITStorage() const {
+        return JIT_Storage{};
+      }
+
+      __MATX_INLINE__ std::string get_jit_class_name() const {
+        std::string val_str;
+        if constexpr (std::is_floating_point_v<T>) {
+          val_str = std::format("{}", val_);
+        } else {
+          val_str = std::to_string(val_);
+        }
+        return std::format("JITDiagGen_rank{}_val{}", Rank(), val_str);
+      }
+
+      __MATX_INLINE__ auto get_jit_op_str() const {
+        std::string func_name = get_jit_class_name();
+        cuda::std::array<index_t, Rank()> out_dims_;
+        for (int i = 0; i < Rank(); ++i) {
+          out_dims_[i] = Size(i);
+        }
+        
+        return cuda::std::make_tuple(
+          func_name,
+          std::format("template <typename T> struct {} {{\n"
+              "  using value_type = T;\n"
+              "  using matxop = bool;\n"
+              "  constexpr static int Rank_ = {};\n"
+              "  constexpr static cuda::std::array<index_t, Rank_> out_dims_ = {{ {} }};\n"
+              "  constexpr static T val_ = static_cast<T>({});\n"
+              "  template <typename CapType, typename... Is>\n"
+              "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(Is... indices) const\n"
+              "  {{\n"
+              "    if (((pp_get<0>(indices...) == indices) && ...)) return T(val_);\n"
+              "    else return T(0.0f);\n"
+              "  }}\n"
+              "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return Rank_; }}\n"
+              "  constexpr __MATX_INLINE__ __MATX_DEVICE__ auto Size(int dim) const {{ return out_dims_[dim]; }}\n"
+              "}};\n",
+              func_name, Rank(), detail::array_to_string(out_dims_), val_)
+        );
+      }
+#endif
+
        __MATX_INLINE__ std::string str() const { return "diag"; }
 
       Diag(ShapeType &&s, T val) : s_(std::forward<ShapeType>(s)), val_(val)
@@ -56,17 +105,59 @@ namespace matx
         if constexpr (!is_noshape_v<ShapeType>) {
           static_assert(Rank() > 1, "Diagonal generator must be used with an operator of rank 1 or higher");
         }
+        MATX_LOG_TRACE("Diag constructor: rank={}, val={}", Rank(), val);
       };
 
-      template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
-          if (((pp_get<0>(indices...) == indices) && ...)) {
-            return T(val_);
-          }
-          else {
-            return T(0.0f);
-          }
+      template <OperatorCapability Cap, typename InType>
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
+        if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+#ifdef MATX_EN_JIT
+          return get_jit_class_name() + "<" + type_to_string<T>() + ">";
+#else
+          return "";
+#endif
         }
+        else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+#ifdef MATX_EN_JIT
+            return true;
+#else
+            return false;
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+#ifdef MATX_EN_JIT
+          const auto [key, value] = get_jit_op_str();
+          if (in.find(key) == in.end()) {
+            in[key] = value;
+          }
+          return true;
+#else
+          return false;
+#endif
+        }
+        else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+          const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+          return my_cap;
+        } else {        
+          return detail::capability_attributes<Cap>::default_value;
+        }
+      }
+
+      // Does not support vectorization yet
+      template <typename CapType, typename... Is>
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const {
+        if (((pp_get<0>(indices...) == indices) && ...)) {
+          return T(val_);
+        }
+        else {
+          return T(0.0f);
+        }
+      }
+
+      template <typename... Is>
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const {
+        return this->operator()<DefaultCapabilities>(indices...);
+      }
 
       constexpr inline __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const
       {
@@ -103,7 +194,8 @@ namespace matx
    * @param val Value to return
    *
    */
-  template <typename T = int, std::enable_if_t<std::is_arithmetic_v<T>, bool> = true>
+  template <typename T = int>
+    requires cuda::std::is_arithmetic_v<T>
   inline auto diag(T val)
   {
     return detail::Diag<T, detail::NoShape>(detail::NoShape{}, T(val));
@@ -120,9 +212,9 @@ namespace matx
    *   Data type
    *
    */
-  template <typename T = int, typename ShapeType,
-  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type> &&
-                   !is_matx_op<ShapeType>(), bool> = true>
+  template <typename T = int, typename ShapeType>
+    requires (!cuda::std::is_array_v<remove_cvref_t<ShapeType>> &&
+              !is_matx_op_c<ShapeType>)
   inline auto diag(ShapeType &&s, T val)
   {
     return detail::Diag<T, ShapeType>(std::forward<ShapeType>(s), val);
@@ -159,8 +251,8 @@ namespace matx
    *   Data type
    *
    */
-  template <typename T = int, typename ShapeType,
-  std::enable_if_t<!std::is_array_v<typename remove_cvref<ShapeType>::type>, bool> = true>
+  template <typename T = int, typename ShapeType>
+    requires (!cuda::std::is_array_v<remove_cvref_t<ShapeType>>)
   inline auto eye(ShapeType &&s)
   {
     return detail::Diag<T, ShapeType>(std::forward<ShapeType>(s), T(1));
