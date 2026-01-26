@@ -75,6 +75,33 @@ struct FltFltMul {
     }
 };
 
+struct FltFltFma {
+    __MATX_HOST__ __MATX_DEVICE__ double operator()(fltflt a, fltflt b, fltflt c) const
+    {
+      return static_cast<double>(fltflt_fma(a, b, c));
+    }
+    __MATX_HOST__ __MATX_DEVICE__ double operator()(float a, fltflt b, fltflt c) const
+    {
+      return static_cast<double>(fltflt_fma(a, b, c));
+    }
+    __MATX_HOST__ __MATX_DEVICE__ double operator()(fltflt a, float b, fltflt c) const
+    {
+      return static_cast<double>(fltflt_fma(a, b, c));
+    }
+    __MATX_HOST__ __MATX_DEVICE__ double operator()(fltflt a, fltflt b, float c) const
+    {
+      return static_cast<double>(fltflt_fma(a, b, c));
+    }
+    __MATX_HOST__ __MATX_DEVICE__ double operator()(fltflt a, float b, float c) const
+    {
+      return static_cast<double>(fltflt_fma(a, b, c));
+    }
+    __MATX_HOST__ __MATX_DEVICE__ double operator()(float a, fltflt b, float c) const
+    {
+      return static_cast<double>(fltflt_fma(a, b, c));
+    }
+};
+
 struct FltFltSub {
   __MATX_HOST__ __MATX_DEVICE__ double operator()(fltflt a, fltflt b) const
   {
@@ -327,6 +354,52 @@ TYPED_TEST(FltFltExecutorTests, Multiplication) {
     EXPECT_GE(numMatchingMantissaBits(mul_result(), pi_sqr_ref_f64), 44);
     EXPECT_GE(numMatchingMantissaBits(mul_result_lhs_f32(), pi_sqr_ref_one_f32), 44);
     EXPECT_GE(numMatchingMantissaBits(mul_result_rhs_f32(), pi_sqr_ref_one_f32), 44);
+}
+
+TYPED_TEST(FltFltExecutorTests, FusedMultiplyAdd) {
+    auto pi = make_tensor<fltflt>({});
+    auto e = make_tensor<fltflt>({});
+    auto sqrt2 = make_tensor<fltflt>({});
+    auto pi_f32 = make_tensor<float>({});
+    auto e_f32 = make_tensor<float>({});
+    auto sqrt2_f32 = make_tensor<float>({});
+    (pi = static_cast<fltflt>(std::numbers::pi)).run(this->exec);
+    (e = static_cast<fltflt>(std::numbers::e)).run(this->exec);
+    (sqrt2 = static_cast<fltflt>(std::numbers::sqrt2)).run(this->exec);
+    (pi_f32 = std::numbers::pi_v<float>).run(this->exec);
+    (e_f32 = std::numbers::e_v<float>).run(this->exec);
+    (sqrt2_f32 = std::numbers::sqrt2_v<float>).run(this->exec);
+
+    auto fma_result = make_tensor<double>({});
+    auto fma_result_a_f32 = make_tensor<double>({});
+    auto fma_result_b_f32 = make_tensor<double>({});
+    auto fma_result_c_f32 = make_tensor<double>({});
+    auto fma_result_bc_f32 = make_tensor<double>({});
+    auto fma_result_ac_f32 = make_tensor<double>({});
+    (fma_result = matx::apply(FltFltFma{}, pi, e, sqrt2)).run(this->exec);
+    (fma_result_a_f32 = matx::apply(FltFltFma{}, pi_f32, e, sqrt2)).run(this->exec);
+    (fma_result_b_f32 = matx::apply(FltFltFma{}, pi, e_f32, sqrt2)).run(this->exec);
+    (fma_result_c_f32 = matx::apply(FltFltFma{}, pi, e, sqrt2_f32)).run(this->exec);
+    (fma_result_bc_f32 = matx::apply(FltFltFma{}, pi, e_f32, sqrt2_f32)).run(this->exec);
+    (fma_result_ac_f32 = matx::apply(FltFltFma{}, pi_f32, e, sqrt2_f32)).run(this->exec);
+    this->exec.sync();
+
+    const double fma_ref_f64 = std::numbers::pi * std::numbers::e + std::numbers::sqrt2;
+    const double fma_ref_f32 = std::numbers::pi_v<float> * std::numbers::e_v<float> + std::numbers::sqrt2_v<float>;
+    const double fma_ref_a_f32 = std::numbers::pi_v<float> * std::numbers::e + std::numbers::sqrt2;
+    const double fma_ref_b_f32 = std::numbers::pi * std::numbers::e_v<float> + std::numbers::sqrt2;
+    const double fma_ref_c_f32 = std::numbers::pi * std::numbers::e + std::numbers::sqrt2_v<float>;
+    const double fma_ref_bc_f32 = std::numbers::pi * std::numbers::e_v<float> + std::numbers::sqrt2_v<float>;
+    const double fma_ref_ac_f32 = std::numbers::pi_v<float> * std::numbers::e + std::numbers::sqrt2_v<float>;
+
+    EXPECT_LE(numMatchingMantissaBits(fma_ref_f32, fma_ref_f64), 24);
+
+    EXPECT_GE(numMatchingMantissaBits(fma_result(), fma_ref_f64), 44);
+    EXPECT_GE(numMatchingMantissaBits(fma_result_a_f32(), fma_ref_a_f32), 44);
+    EXPECT_GE(numMatchingMantissaBits(fma_result_b_f32(), fma_ref_b_f32), 44);
+    EXPECT_GE(numMatchingMantissaBits(fma_result_c_f32(), fma_ref_c_f32), 44);
+    EXPECT_GE(numMatchingMantissaBits(fma_result_bc_f32(), fma_ref_bc_f32), 44);
+    EXPECT_GE(numMatchingMantissaBits(fma_result_ac_f32(), fma_ref_ac_f32), 44);
 }
 
 TYPED_TEST(FltFltExecutorTests, Subtraction) {
