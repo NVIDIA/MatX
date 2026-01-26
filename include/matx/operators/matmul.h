@@ -213,6 +213,15 @@ namespace matx
             in_copy.permutes_input_output = true;
             return combine_capabilities<Cap>(detail::get_operator_capability<Cap>(a_, in_copy), detail::get_operator_capability<Cap>(b_, in_copy));
           }
+          else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)            
+            auto result = ElementsPerThread::ONE;
+            MATX_LOG_DEBUG("cuBLASDx ELEMENTS_PER_THREAD: {}", static_cast<int>(result));
+            return cuda::std::array<ElementsPerThread, 2>{result, result};
+#else
+            return combine_capabilities<Cap>(capability_attributes<Cap>::default_value, detail::get_operator_capability<Cap>(a_, in), detail::get_operator_capability<Cap>(b_, in));
+#endif
+          }
           else if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
             auto result = combine_capabilities<Cap>(dx_gemm_helper_.GetShmRequired(), 
                                                     detail::get_operator_capability<Cap>(a_, in),

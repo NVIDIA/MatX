@@ -336,7 +336,6 @@ inline bool get_grid_dims_block_2d(dim3 &blocks, dim3 &threads,
     constexpr int kMaxGridDim = 65535;
     if (blocks.x > kMaxGridDim || blocks.y > kMaxGridDim) {
       MATX_THROW(matxInvalidParameter, "Block2D grid dims exceed CUDA limit (65535)");
-      return true;
     }
   }
   

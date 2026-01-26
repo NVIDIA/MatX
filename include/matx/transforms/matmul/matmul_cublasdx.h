@@ -98,7 +98,8 @@ namespace matx {
   }
 
   if (max_size == 0) {
-    return false;
+    // If we made it here, the type or architecture is unsupported -- throw an error.
+    MATX_THROW(matxNotSupported, "IscuBLASDxSupported: Combination of data type and compute capability not supported by cuBLASDx");
   }
 
   const auto max_shm = static_cast<size_t>(max_size) * static_cast<size_t>(max_size) * sizeof(T) * 2; // Most SHM both A and B can use
@@ -283,7 +284,7 @@ namespace matx {
         size_t a_size = static_cast<size_t>(m_) * static_cast<size_t>(k_) * sizeof(InputType);
         size_t b_size = static_cast<size_t>(k_) * static_cast<size_t>(n_) * sizeof(InputType);
         size_t c_size = static_cast<size_t>(m_) * static_cast<size_t>(n_) * sizeof(InputType);
-        
+
         // Total shared memory requirement
         size_t total_shm = a_size + b_size + c_size;
         
@@ -435,18 +436,10 @@ namespace matx {
           
           // Each thread returns its portion of the result
           // For vectorized execution, return a Vector; for scalar, return scalar
+          static_assert(CapType::ept == ElementsPerThread::ONE, "cuBLASDx only supports ONE elements per thread");
           if constexpr (CapType::ept == ElementsPerThread::ONE) {
             const int output_idx = threadIdx.x;
             return smem_c[output_idx];
-          } else {
-            constexpr int EPT = static_cast<int>(CapType::ept);
-            const int output_idx = threadIdx.x * EPT;
-            Vector<value_type, EPT> result;
-            MATX_LOOP_UNROLL
-            for (int i = 0; i < EPT; ++i) {
-              result.data[i] = smem_c[output_idx + i];
-            }
-            return result;
           }
         )";
 
