@@ -332,6 +332,14 @@ inline bool get_grid_dims_block_2d(dim3 &blocks, dim3 &threads,
     return true;
   }
   
+  if constexpr (RANK >= 2 && RANK <= 4) {
+    constexpr int kMaxGridDim = 65535;
+    if (blocks.x > kMaxGridDim || blocks.y > kMaxGridDim) {
+      MATX_THROW(matxInvalidParameter, "Block2D grid dims exceed CUDA limit (65535)");
+      return true;
+    }
+  }
+  
   MATX_LOG_DEBUG("Block2D: Blocks {}x{}x{} Threads {}x{}x{}", blocks.x, blocks.y, blocks.z, threads.x, threads.y, threads.z);
   
   // No stride needed for now - could be extended for very large batches
