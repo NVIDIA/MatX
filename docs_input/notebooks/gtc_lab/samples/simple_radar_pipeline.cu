@@ -50,7 +50,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   std::cout << "Iterations: " << iterations << std::endl;
   std::cout << "numChannels: " << numChannels << std::endl;
   std::cout << "numPulses: " << numPulses << std::endl;
-  std::cout << "numNumSamples: " << numSamples << std::endl;
+  std::cout << "numSamples: " << numSamples << std::endl;
   std::cout << "waveformLength: " << waveformLength << std::endl;
 
   // cuda stream to place work in
