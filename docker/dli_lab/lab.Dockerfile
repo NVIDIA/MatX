@@ -51,7 +51,7 @@ COPY ./run_matx.py /root/.ipython/extensions/
 ENV PYTHONPATH="${PYTHONPATH}:/root/.ipython/extensions"
 
 RUN git clone https://github.com/NVIDIA/MatX.git /MatX
-RUN cd /MatX && git checkout tylera/gtc_2025_tutorials && mkdir build && cd build && cmake .. -DMATX_EN_X86_FFTW=ON -DMATX_EN_FILEIO=ON -DMATX_EN_OPENBLAS=ON
+RUN cd /MatX && mkdir build && cd build && cmake .. -DMATX_EN_X86_FFTW=ON -DMATX_EN_FILEIO=ON -DMATX_EN_OPENBLAS=ON
 
 # Expose Jupyter port
 EXPOSE 8888
