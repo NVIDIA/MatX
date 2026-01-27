@@ -7,6 +7,10 @@ Perform a 1D FFT. Batching is supported for any tensor with a rank higher than 1
 
 .. versionadded:: 0.6.0
 
+.. note::
+
+    FFT kernel fusion is supported by cuFFTDx if ``-DMATX_EN_MATHDX=ON`` is enabled.
+
 .. doxygenfunction:: fft(const OpA &a, uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD)
 .. doxygenfunction:: fft(const OpA &a, const int32_t (&axis)[1], uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD)
 

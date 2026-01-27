@@ -221,35 +221,64 @@ class tensor_impl_t {
              "      return GetValC<EPT, 0, Is...>(cuda::std::make_tuple(indices...));\n" +
              "    }\n" +
              "  }\n" +                         
-             "  template <typename CapType, int M = RANK, typename... Is,\n" +
-             "            cuda::std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>\n" +
-             "  __MATX_INLINE__  __MATX_DEVICE__ decltype(auto) operator()(Is... indices) const noexcept" + "{\n" +
-             "    static_assert(sizeof...(Is) == M, \"Number of indices of operator() must match rank of tensor\");\n" +
-             "     constexpr int EPT_int = static_cast<int>(CapType::ept);\n" +
-             "     const index_t offset = GetOffsetOptimized<CapType::ept>(indices...);\n" +
-             "     if constexpr (CapType::ept == detail::ElementsPerThread::ONE) {\n" +
-             "       return ldata_[offset];\n" +
-             "     } else if constexpr (EPT_int * sizeof(T) <= MAX_VEC_WIDTH_BYTES ) {\n" +
-             "       return *reinterpret_cast<detail::Vector<T, EPT_int>*>(ldata_ + offset);\n" +
-             "     } else {\n" +
-             "       detail::Vector<T, EPT_int> vec;\n" +
-             "       vec.template load<EPT_int>(ldata_ + offset);\n" +
-             "       return vec;\n" +
-             "     }\n" +
+             "  template <typename CapType, int I = 0, typename... Is>\n" +
+             "  __MATX_INLINE__ __MATX_DEVICE__ bool CheckBounds(cuda::std::tuple<Is...> tup) const {\n" +
+             "    if constexpr (I < sizeof...(Is)) {\n" +
+             "      constexpr int EPT_int = static_cast<int>(CapType::ept);\n" +
+             "      if constexpr (I == sizeof...(Is) - 1 && EPT_int > 1) {\n" +
+             "        // Last dimension with EPT > 1: check all elements [idx*EPT, idx*EPT+EPT-1] are in bounds\n" +
+             "        if ((cuda::std::get<I>(tup) + 1) * EPT_int > sizes_[I]) return false;\n" +
+             "      } else {\n" +
+             "        if (cuda::std::get<I>(tup) >= sizes_[I]) return false;\n" +
+             "      }\n" +
+             "      return CheckBounds<CapType, I+1>(tup);\n" +
+             "    }\n" +
+             "    return true;\n" +
              "  }\n" +
              "  template <typename CapType, int M = RANK, typename... Is,\n" +
              "            cuda::std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>\n" +
-             "  __MATX_INLINE__  __MATX_DEVICE__ decltype(auto) operator()(Is... indices) noexcept\n" +
+             "  __MATX_INLINE__  __MATX_DEVICE__ auto operator()(Is... indices) const noexcept" + "{\n" +
+             "    static_assert(sizeof...(Is) == M, \"Number of indices of operator() must match rank of tensor\");\n" +
+             "    constexpr int EPT_int = static_cast<int>(CapType::ept);\n" +
+             "    using ReturnType = cuda::std::conditional_t<CapType::ept == detail::ElementsPerThread::ONE, T, detail::Vector<T, EPT_int>>;\n" +
+             "    if constexpr (CapType::pass_through_threads) {\n" +
+             "      if (!CheckBounds<CapType, 0>(cuda::std::make_tuple(indices...))) {\n" +
+             "        return ReturnType{};\n" +
+             "      }\n" +
+             "    }\n" +
+             "    const index_t offset = GetOffsetOptimized<CapType::ept>(indices...);\n" +
+             "    if constexpr (CapType::ept == detail::ElementsPerThread::ONE) {\n" +
+             "      return ldata_[offset];\n" +
+             "    } else if constexpr (EPT_int * sizeof(T) <= MAX_VEC_WIDTH_BYTES ) {\n" +
+             "      return *reinterpret_cast<detail::Vector<T, EPT_int>*>(ldata_ + offset);\n" +
+             "    } else {\n" +
+             "      detail::Vector<T, EPT_int> vec;\n" +
+             "      vec.template load<EPT_int>(ldata_ + offset);\n" +
+             "      return vec;\n" +
+             "    }\n" +
+             "  }\n" +
+             "  template <typename CapType, int M = RANK, typename... Is,\n" +
+             "            cuda::std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>\n" +
+             "  __MATX_INLINE__  __MATX_DEVICE__ auto operator()(Is... indices) noexcept\n" +
+             "    -> cuda::std::conditional_t<CapType::ept == detail::ElementsPerThread::ONE, T&, detail::Vector<T, static_cast<int>(CapType::ept)>&>\n" +
              "  {\n" +
              "    static_assert(sizeof...(Is) == M, \"Number of indices of operator() must match rank of tensor\");\n" +
              "    constexpr int EPT_int = static_cast<int>(CapType::ept);\n" +
+             "    if constexpr (CapType::pass_through_threads) {\n" +
+             "      using ReturnType = cuda::std::conditional_t<CapType::ept == detail::ElementsPerThread::ONE, T, detail::Vector<T, EPT_int>>;\n" +
+             "      __align__(alignof(ReturnType)) __shared__ unsigned char dummy_storage[sizeof(ReturnType)];\n" +
+             "      auto &dummy_ = *reinterpret_cast<ReturnType *>(dummy_storage);\n" +
+             "      if (!CheckBounds<CapType, 0>(cuda::std::make_tuple(indices...))) {\n" +
+             "        return dummy_;\n" +
+             "      }\n" +
+             "    }\n" +
              "    const index_t offset = GetOffsetOptimized<CapType::ept>(indices...);\n" +
              "    if constexpr (CapType::ept == detail::ElementsPerThread::ONE) {\n" +
              "      return ldata_[offset];\n" +
              "    } else {\n" +
              "      return *reinterpret_cast<detail::Vector<T, EPT_int>*>(ldata_ + offset);\n" +
-            "    }\n" +
-            "  }\n" +
+             "    }\n" +
+             "  }\n" +
             "  template <typename CapType>\n" +
             "  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(const cuda::std::array<index_t, RANK> &idx) const noexcept\n" +
             "  {\n" +

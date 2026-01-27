@@ -11,6 +11,10 @@ is supported for any tensor with a rank higher than 2.
 
 .. versionadded:: 0.6.0
 
+.. note::
+
+    GEMM kernel fusion is supported by cuBLASDx if ``-DMATX_EN_MATHDX=ON`` is enabled.   
+
 .. doxygenfunction:: matmul(const OpA &A, const OpB &B, float alpha = 1.0, float beta = 0.0)
 .. doxygenfunction:: matmul(const OpA &A, const OpB &B, const int32_t (&axis)[2], float alpha = 1.0, float beta = 0.0)
 

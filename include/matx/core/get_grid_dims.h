@@ -33,6 +33,7 @@
 #pragma once
 
 #include "matx/core/defines.h"
+#include "matx/core/error.h"
 #include <cuda/std/array>
 #include <cuda/std/functional>
 #include <cuda/std/__numeric/accumulate.h>
@@ -297,6 +298,51 @@ inline bool get_grid_dims_block(dim3 &blocks, dim3 &threads, const cuda::std::ar
 
   MATX_LOG_DEBUG("Blocks {}x{}x{} Threads {}x{}x{} groups_per_block={}", blocks.x, blocks.y, blocks.z, threads.x, threads.y, threads.z, groups_per_block);
   return stride;
+}
+
+// For 2D block operators (e.g., cuBLASDx GEMM) where all threads in a block cooperate 
+// on the last 2 dimensions and blockIdx is used purely for batching
+template <int RANK>
+inline bool get_grid_dims_block_2d(dim3 &blocks, dim3 &threads, 
+                                    const cuda::std::array<index_t, RANK> &sizes,
+                                    int block_dim) {
+  // Threads are set to block_dim in x, y and z are 1
+  // All threads cooperate via flattened thread ID in the kernel
+  threads.x = block_dim;
+  threads.y = 1;
+  threads.z = 1;
+  
+  // Grid covers batch dimensions only (dims 0 to RANK-3)
+  blocks.x = 1;
+  blocks.y = 1;
+  blocks.z = 1;
+  
+  if constexpr (RANK == 2) {
+    blocks.x = 1;  // Single block for entire 2D output
+  }
+  else if constexpr (RANK == 3) {
+    blocks.x = static_cast<int>(sizes[0]);  // Batch dim
+  }
+  else if constexpr (RANK == 4) {
+    blocks.x = static_cast<int>(sizes[1]);  // Second-to-last batch
+    blocks.y = static_cast<int>(sizes[0]);  // First batch dim
+  }
+  else if constexpr (RANK > 4) {
+    MATX_THROW(matxNotSupported, "Block2D grid dims not supported for rank > 4");
+    return true;
+  }
+  
+  if constexpr (RANK >= 2 && RANK <= 4) {
+    constexpr int kMaxGridDim = 65535;
+    if (blocks.x > kMaxGridDim || blocks.y > kMaxGridDim) {
+      MATX_THROW(matxInvalidParameter, "Block2D grid dims exceed CUDA limit (65535)");
+    }
+  }
+  
+  MATX_LOG_DEBUG("Block2D: Blocks {}x{}x{} Threads {}x{}x{}", blocks.x, blocks.y, blocks.z, threads.x, threads.y, threads.z);
+  
+  // No stride needed for now - could be extended for very large batches
+  return false;
 }
 } // end namespace detail
 } // end namespace matx

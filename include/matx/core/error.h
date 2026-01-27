@@ -63,6 +63,7 @@ namespace matx
     matxInvalidSize,
     matxCudaError,
     matxCufftError,
+    matxLibMathdxError,
     matxMatMulError,
     matxAssertError,
     matxInvalidType,
@@ -107,8 +108,12 @@ namespace matx
       return "matxInverseError";
     case matxSolverError:
       return "matxSolverError";
+    case matxLibMathdxError:
+      return "matxLibMathdxError";
     case matxcuTensorError:
-      break;
+      return "matxcuTensorError";
+    case matxInvalidExecutor:
+      return "matxInvalidExecutor";
     default:
       return "Unknown";
     };
