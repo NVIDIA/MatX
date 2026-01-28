@@ -40,7 +40,5 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     (A = B * cos(C)/D).run(exec);
     MATX_NVTX_END_RANGE(fused_range);
   }
-
-  MATX_EXIT_HANDLER();
   MATX_EXIT_HANDLER();
 }
