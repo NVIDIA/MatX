@@ -29,16 +29,17 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   for (int i = 0; i < 10; i++) {
 
     // first individual, independent kernels
-    MATX_NVTX_START_RANGE("Unfused Kernels");
+    [[maybe_unused]] int unfused_range = MATX_NVTX_START_RANGE("Unfused Kernels");
     (result = cos(C)).run(exec);
     (result = result / D).run(exec);
     (result = result * B).run(exec);
     MATX_NVTX_END_RANGE(unfused_range);
 
     // now, as a fused operation
-    MATX_NVTX_START_RANGE("Fused Operation");
+    [[maybe_unused]] int fused_range = MATX_NVTX_START_RANGE("Fused Operation");
     (A = B * cos(C)/D).run(exec);
     MATX_NVTX_END_RANGE(fused_range);
+
   }
   MATX_EXIT_HANDLER();
 }
