@@ -135,7 +135,7 @@ def parse_benchmark_output(output):
             continue
 
         # Skip header and separator lines
-        if 'GPU Time' in line or '---' in line or 'T' in line.split('|')[1]:
+        if 'GPU Time' in line or '---' in line or len(line.split('|')) < 2 or 'T' in line.split('|')[1]:
             continue
 
         cols = [col.strip() for col in line.split('|')]
