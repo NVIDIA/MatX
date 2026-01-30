@@ -20,6 +20,8 @@ flexibility in changing storage formats by merely changing annotations in the
 type definitions, which allows for rapid experimentation with different ways
 of storing sparse tensors in a MatX computation.
 
+More information on the Universal Sparse Tensor can be found in this `UST_Blog_post`_.
+
 Quick Start
 -----------
 
@@ -317,3 +319,4 @@ briefly discussed in this online documentation.
 .. _make_sparse_tensor.h: https://github.com/NVIDIA/MatX/blob/main/include/matx/core/make_sparse_tensor.h
 .. _sparse_tensor.h: https://github.com/NVIDIA/MatX/blob/main/include/matx/core/sparse_tensor.h
 .. _sparse_tensor_format.h: https://github.com/NVIDIA/MatX/blob/main/include/matx/core/sparse_tensor_format.h
+.. _UST_Blog_Post: https://developer.nvidia.com/blog/establishing-a-scalable-sparse-ecosystem-with-the-universal-sparse-tensor
