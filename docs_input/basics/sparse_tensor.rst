@@ -20,7 +20,7 @@ flexibility in changing storage formats by merely changing annotations in the
 type definitions, which allows for rapid experimentation with different ways
 of storing sparse tensors in a MatX computation.
 
-More information on the Universal Sparse Tensor can be found in this `UST_Blog_post`_.
+More information on the Universal Sparse Tensor can be found in this `UST_Blog_Post`_.
 
 Quick Start
 -----------
