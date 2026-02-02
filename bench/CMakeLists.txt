@@ -1,4 +1,5 @@
 set (bench_sources
+    00_misc/fltflt_arithmetic.cu
     00_transform/matmul.cu
     00_transform/fft.cu
     00_transform/conv.cu

@@ -408,6 +408,9 @@ static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_abs(fltflt a)
     return a;
 }
 
+// Scalar abs overload so unary operator dispatch can handle fltflt expressions
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt abs(fltflt a) { return fltflt_abs(a); }
+
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt operator+(fltflt a, fltflt b) { return fltflt_add(a, b); }
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt operator+(fltflt a, float b) { return fltflt_add(a, b); }
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt operator+(float a, fltflt b) { return fltflt_add(b, a); }
