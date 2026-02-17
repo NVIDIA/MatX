@@ -408,13 +408,11 @@ static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_div(float a, 
 static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_round_to_nearest(fltflt a) {
     constexpr float FAST_PATH_THRESHOLD = 8388608.0f;
     if (fabs(a.hi) < FAST_PATH_THRESHOLD) {
-        // const float magic = copysignf(MAGIC_NUMBER_FAST_PATH, a.hi);
-        // const float candidate = detail::fsub_rn(detail::fadd_rn(a.hi, magic), magic);
         const float candidate = nearbyintf(a.hi);
 
         const float err = detail::fsub_rn(a.hi, candidate);
 
-        if (fabsf(err) < 0.5f) {
+        if (fabsf(err) != 0.5f) {
             return fltflt{ candidate, 0.0f };
         } else {
             // We should not have errors > 0.5 ulp(a.hi). Since ulp is at most 1, the max error should
@@ -432,16 +430,16 @@ static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_round_to_near
             return result;
         }
     } else { // |a.hi| >= 2^23, so a.hi is an integer
-        // const float magic = copysignf(MAGIC_NUMBER_FAST_PATH, a.lo);
-        // float r_lo = detail::fsub_rn(detail::fadd_rn(a.lo, magic), magic);
         float r_lo = nearbyintf(a.lo);
         const float frac = detail::fsub_rn(a.lo, r_lo);
 
         if (fabsf(frac) > 0.5f) {
             r_lo = detail::fadd_rn(r_lo, copysignf(1.0f, frac));
         } else if (fabsf(frac) == 0.5f) {
-            // hi is always even, so hi + lo is even iff lo is even
-            if (fmodf(r_lo, 2.0f) != 0.0f) {
+            // Check if hi + r_lo would be odd (sum is odd iff parities differ)
+            bool hi_is_odd = (fmodf(a.hi, 2.0f) != 0.0f);
+            bool rlo_is_odd = (fmodf(r_lo, 2.0f) != 0.0f);
+            if (hi_is_odd != rlo_is_odd) {  // XOR of parities
                 r_lo = detail::fadd_rn(r_lo, copysignf(1.0f, frac));
             }
         }
@@ -479,6 +477,22 @@ static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_round_toward_
             }
         }
         return fltflt_fast_two_sum(a.hi, lo_trunc);
+    }
+}
+
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_floor(fltflt a) {
+    if (fabsf(a.hi) < 8388608.0f) { // |a.hi| < 2^23, so a.hi might not be an integer
+        const float hi_floor = floorf(a.hi);
+        // If hi was exactly an integer and lo is negative,
+        // the actual value is just below hi, so floor should be hi - 1
+        if (hi_floor == a.hi && a.lo < 0.0f) {
+            return fltflt{ a.hi - 1.0f, 0.0f };
+        }
+        return fltflt{ hi_floor, 0.0f };
+    } else { // |a.hi| >= 2^23, so a.hi is already an integer
+        const float lo_floor = floorf(a.lo);
+        // Renormalize the result
+        return fltflt_fast_two_sum(a.hi, lo_floor);
     }
 }
 
@@ -555,16 +569,6 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator<=(float a, fltflt b)
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator>=(fltflt a, fltflt b) { return a > b || a == b; }
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator>=(fltflt a, float b) { return a > b || a == b; }
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator>=(float a, fltflt b) { return a > b || a == b; }
-
-static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_round_to_zero(fltflt a) {
-    const fltflt r = fltflt_round_to_nearest(a);
-    if (r > a && a > 0.0f) {
-        return fltflt_sub(r, 1.0f);
-    } else if (r < a && a < 0.0f) {
-        return fltflt_add(r, 1.0f);
-    }
-    return r;
-}
 
 static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_fmod(fltflt a, fltflt b) {
     float sign = 1.0f;

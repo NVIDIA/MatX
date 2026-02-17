@@ -767,6 +767,82 @@ NVBENCH_BENCH_TYPES(fltflt_bench_trunc, NVBENCH_TYPE_AXES(precision_types))
   .add_int64_axis("Iterations", {250});
 
 //==============================================================================
+// Floor Benchmark
+//==============================================================================
+template <typename T>
+__global__ void iterative_floor_kernel(T* __restrict__ result, int64_t size, int32_t iterations)
+{
+  int64_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx < size) {
+    T val[ILP_FACTOR];
+    T init_val = static_cast<T>(6.55557238028172302e+09);
+
+    #pragma unroll
+    for (int ilp = 0; ilp < ILP_FACTOR; ilp++) {
+      if constexpr (std::is_same_v<T, fltflt>) {
+        val[ilp] = fltflt_floor(init_val);
+      } else if constexpr (std::is_same_v<T, float>) {
+        val[ilp] = floorf(init_val);
+      } else {
+        val[ilp] = floor(init_val);
+      }
+    }
+
+    #pragma unroll 1
+    for (int32_t i = 1; i < iterations; i++) {
+      #pragma unroll
+      for (int ilp = 0; ilp < ILP_FACTOR; ilp++) {
+        if constexpr (std::is_same_v<T, fltflt>) {
+          val[ilp] = val[ilp].hi + fltflt_floor(init_val);
+          asm volatile("" : "+f"(val[ilp].hi), "+f"(val[ilp].lo));
+        } else if constexpr (std::is_same_v<T, float>) {
+          val[ilp] = val[ilp] + floorf(init_val);
+          asm volatile("" : "+f"(val[ilp]));
+        } else {
+          val[ilp] = val[ilp] + floor(init_val);
+          asm volatile("" : "+d"(val[ilp]));
+        }
+      }
+      init_val = init_val + static_cast<T>(2048.0f);
+    }
+
+    T result_val = val[0];
+    #pragma unroll
+    for (int ilp = 1; ilp < ILP_FACTOR; ilp++) {
+      result_val = result_val + val[ilp];
+    }
+    result[idx] = result_val;
+  }
+}
+
+template <typename PrecisionType>
+void fltflt_bench_floor(nvbench::state &state, nvbench::type_list<PrecisionType>)
+{
+  const index_t size = static_cast<index_t>(state.get_int64("Array Size"));
+  const int32_t iterations = static_cast<int32_t>(state.get_int64("Iterations"));
+  cudaExecutor exec{0};
+
+  auto result = make_tensor<PrecisionType>({size});
+
+  state.add_element_count(size, "NumElements");
+  state.add_global_memory_writes<PrecisionType>(size);
+
+  constexpr int block_size = 256;
+  int grid_size = static_cast<int>((size + block_size - 1) / block_size);
+
+  exec.sync();
+
+  state.exec([&](nvbench::launch &launch) {
+    iterative_floor_kernel<<<grid_size, block_size, 0, (cudaStream_t)launch.get_stream()>>>(
+      result.Data(), size, iterations);
+  });
+}
+
+NVBENCH_BENCH_TYPES(fltflt_bench_floor, NVBENCH_TYPE_AXES(precision_types))
+  .add_int64_power_of_two_axis("Array Size", nvbench::range(24, 24, 1))
+  .add_int64_axis("Iterations", {250});
+
+//==============================================================================
 // Cast to Double Benchmark
 //==============================================================================
 template <typename T>

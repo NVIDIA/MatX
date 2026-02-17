@@ -146,6 +146,27 @@ struct FltFltAbs {
   }
 };
 
+struct FltFltFloor {
+  __MATX_HOST__ __MATX_DEVICE__ double operator()(fltflt a) const
+  {
+    return static_cast<double>(fltflt_floor(a));
+  }
+};
+
+struct FltFltRoundToNearest {
+  __MATX_HOST__ __MATX_DEVICE__ double operator()(fltflt a) const
+  {
+    return static_cast<double>(fltflt_round_to_nearest(a));
+  }
+};
+
+struct FltFltRoundTowardZero {
+  __MATX_HOST__ __MATX_DEVICE__ double operator()(fltflt a) const
+  {
+    return static_cast<double>(fltflt_round_toward_zero(a));
+  }
+};
+
 struct FltFltCmpEq {
   __MATX_HOST__ __MATX_DEVICE__ bool operator()(fltflt a, fltflt b) const
   {
@@ -530,6 +551,619 @@ TYPED_TEST(FltFltExecutorTests, AbsoluteValue) {
   EXPECT_GE(numMatchingMantissaBits(abs_result_neg_pi(), std::numbers::pi), 44);
   EXPECT_GE(numMatchingMantissaBits(abs_result_e(), std::numbers::e), 44);
   EXPECT_GE(numMatchingMantissaBits(abs_result_neg_e(), std::numbers::e), 44);
+}
+
+TYPED_TEST(FltFltExecutorTests, Floor) {
+  // Test positive values with fractional parts
+  {
+    auto pi = make_tensor<fltflt>({});
+    (pi = static_cast<fltflt>(std::numbers::pi)).run(this->exec);
+
+    auto floor_result = make_tensor<double>({});
+    (floor_result = matx::apply(FltFltFloor{}, pi)).run(this->exec);
+    this->exec.sync();
+
+    const double pi_floor_ref_f64 = std::floor(std::numbers::pi);
+    const float pi_floor_ref_f32 = std::floor(std::numbers::pi_v<float>);
+
+    // For floor of pi, the result should be exactly 3.0 (which is representable exactly)
+    EXPECT_EQ(floor_result(), 3.0);
+    EXPECT_EQ(pi_floor_ref_f64, 3.0);
+  }
+  // Test negative values with fractional parts
+  {
+    auto neg_pi = make_tensor<fltflt>({});
+    (neg_pi = static_cast<fltflt>(-std::numbers::pi)).run(this->exec);
+
+    auto floor_result = make_tensor<double>({});
+    (floor_result = matx::apply(FltFltFloor{}, neg_pi)).run(this->exec);
+    this->exec.sync();
+
+    const double neg_pi_floor_ref_f64 = std::floor(-std::numbers::pi);
+
+    // floor(-pi) should be -4.0
+    EXPECT_EQ(floor_result(), -4.0);
+    EXPECT_EQ(neg_pi_floor_ref_f64, -4.0);
+  }
+
+  // Test edge case: hi is an integer, but lo is negative
+  // This tests the critical case where the value is just below an integer
+  {
+    auto val = make_tensor<fltflt>({});
+    const fltflt test_val{3.0f, -1.0e-7f}; // 3.0 - 1e-7, just below 3.0
+    (val = test_val).run(this->exec);
+
+    auto floor_result = make_tensor<double>({});
+    (floor_result = matx::apply(FltFltFloor{}, val)).run(this->exec);
+    this->exec.sync();
+
+    // floor(3.0 - epsilon) should be 2.0
+    EXPECT_EQ(floor_result(), 2.0);
+  }
+
+  // Test edge case: hi is an integer, lo is positive
+  {
+    auto val = make_tensor<fltflt>({});
+    const fltflt test_val{3.0f, 1.0e-7f}; // 3.0 + 1e-7, just above 3.0
+    (val = test_val).run(this->exec);
+
+    auto floor_result = make_tensor<double>({});
+    (floor_result = matx::apply(FltFltFloor{}, val)).run(this->exec);
+    this->exec.sync();
+
+    // floor(3.0 + epsilon) should be 3.0
+    EXPECT_EQ(floor_result(), 3.0);
+  }
+
+  // Test edge case: hi is an integer, lo is zero
+  {
+    auto val = make_tensor<fltflt>({});
+    const fltflt test_val{5.0f, 0.0f}; // exactly 5.0
+    (val = test_val).run(this->exec);
+
+    auto floor_result = make_tensor<double>({});
+    (floor_result = matx::apply(FltFltFloor{}, val)).run(this->exec);
+    this->exec.sync();
+
+    // floor(5.0) should be 5.0
+    EXPECT_EQ(floor_result(), 5.0);
+  }
+
+  // Test large value where |hi| >= 2^23 (8388608.0)
+  // In this case, hi is already an integer, so we need to floor lo and renormalize
+  {
+    auto val = make_tensor<fltflt>({});
+    const fltflt test_val{10000000.0f, 3.5f}; // 10^7 + 3.5
+    (val = test_val).run(this->exec);
+
+    auto floor_result = make_tensor<double>({});
+    (floor_result = matx::apply(FltFltFloor{}, val)).run(this->exec);
+    this->exec.sync();
+
+    // floor(10000000.0 + 3.5) should be 10000003.0
+    EXPECT_EQ(floor_result(), 10000003.0);
+  }
+
+  // Test large negative value with fractional lo
+  {
+    auto val = make_tensor<fltflt>({});
+    const fltflt test_val{-10000000.0f, -3.5f}; // -10^7 - 3.5
+    (val = test_val).run(this->exec);
+
+    auto floor_result = make_tensor<double>({});
+    (floor_result = matx::apply(FltFltFloor{}, val)).run(this->exec);
+    this->exec.sync();
+
+    // floor(-10000000.0 - 3.5) should be -10000004.0
+    EXPECT_EQ(floor_result(), -10000004.0);
+  }
+
+  // Test with e (another irrational constant)
+  {
+    auto e = make_tensor<fltflt>({});
+    (e = static_cast<fltflt>(std::numbers::e)).run(this->exec);
+
+    auto floor_result = make_tensor<double>({});
+    (floor_result = matx::apply(FltFltFloor{}, e)).run(this->exec);
+    this->exec.sync();
+
+    const double e_floor_ref_f64 = std::floor(std::numbers::e);
+
+    // floor(e) should be 2.0
+    EXPECT_EQ(floor_result(), 2.0);
+    EXPECT_EQ(e_floor_ref_f64, 2.0);
+  }
+
+  // Test precision: floor of a value computed with float-float precision
+  // should still maintain correct integer result even for complex expressions
+  {
+    auto pi = make_tensor<fltflt>({});
+    auto e = make_tensor<fltflt>({});
+    (pi = static_cast<fltflt>(std::numbers::pi)).run(this->exec);
+    (e = static_cast<fltflt>(std::numbers::e)).run(this->exec);
+
+    auto sum = make_tensor<fltflt>({});
+    (sum = pi + e).run(this->exec);
+
+    auto floor_result = make_tensor<double>({});
+    (floor_result = matx::apply(FltFltFloor{}, sum)).run(this->exec);
+    this->exec.sync();
+
+    const double sum_ref_f64 = std::numbers::pi + std::numbers::e;
+    const double floor_ref_f64 = std::floor(sum_ref_f64);
+
+    // floor(pi + e) should be 5.0
+    EXPECT_EQ(floor_result(), 5.0);
+    EXPECT_EQ(floor_ref_f64, 5.0);
+  }
+
+  // Test zero
+  {
+    auto zero = make_tensor<fltflt>({});
+    (zero = static_cast<fltflt>(0.0)).run(this->exec);
+
+    auto floor_result = make_tensor<double>({});
+    (floor_result = matx::apply(FltFltFloor{}, zero)).run(this->exec);
+    this->exec.sync();
+
+    EXPECT_EQ(floor_result(), 0.0);
+  }
+
+  // Test negative zero
+  {
+    auto neg_zero = make_tensor<fltflt>({});
+    const fltflt test_val{-0.0f, 0.0f};
+    (neg_zero = test_val).run(this->exec);
+
+    auto floor_result = make_tensor<double>({});
+    (floor_result = matx::apply(FltFltFloor{}, neg_zero)).run(this->exec);
+    this->exec.sync();
+
+    EXPECT_EQ(floor_result(), 0.0);
+  }
+}
+
+TYPED_TEST(FltFltExecutorTests, RoundToNearest) {
+  // Test positive value rounding up
+  {
+    auto val = make_tensor<fltflt>({});
+    const fltflt test_val{2.7f, 0.0f};
+    (val = test_val).run(this->exec);
+
+    auto round_result = make_tensor<double>({});
+    (round_result = matx::apply(FltFltRoundToNearest{}, val)).run(this->exec);
+    this->exec.sync();
+
+    EXPECT_EQ(round_result(), 3.0);
+  }
+
+  // Test positive value rounding down
+  {
+    auto val = make_tensor<fltflt>({});
+    const fltflt test_val{2.3f, 0.0f};
+    (val = test_val).run(this->exec);
+
+    auto round_result = make_tensor<double>({});
+    (round_result = matx::apply(FltFltRoundToNearest{}, val)).run(this->exec);
+    this->exec.sync();
+
+    EXPECT_EQ(round_result(), 2.0);
+  }
+
+  // Test negative value rounding down (toward more negative)
+  {
+    auto val = make_tensor<fltflt>({});
+    const fltflt test_val{-2.7f, 0.0f};
+    (val = test_val).run(this->exec);
+
+    auto round_result = make_tensor<double>({});
+    (round_result = matx::apply(FltFltRoundToNearest{}, val)).run(this->exec);
+    this->exec.sync();
+
+    EXPECT_EQ(round_result(), -3.0);
+  }
+
+  // Test negative value rounding up (toward zero)
+  {
+    auto val = make_tensor<fltflt>({});
+    const fltflt test_val{-2.3f, 0.0f};
+    (val = test_val).run(this->exec);
+
+    auto round_result = make_tensor<double>({});
+    (round_result = matx::apply(FltFltRoundToNearest{}, val)).run(this->exec);
+    this->exec.sync();
+
+    EXPECT_EQ(round_result(), -2.0);
+  }
+
+  // Test tie-breaking: round half to even (0.5 -> 0, banker's rounding)
+  {
+    auto val = make_tensor<fltflt>({});
+    const fltflt test_val{0.5f, 0.0f};
+    (val = test_val).run(this->exec);
+
+    auto round_result = make_tensor<double>({});
+    (round_result = matx::apply(FltFltRoundToNearest{}, val)).run(this->exec);
+    this->exec.sync();
+
+    // 0.5 should round to 0 (even)
+    EXPECT_EQ(round_result(), 0.0);
+  }
+
+  // Test tie-breaking: round half to even (1.5 -> 2, banker's rounding)
+  {
+    auto val = make_tensor<fltflt>({});
+    const fltflt test_val{1.5f, 0.0f};
+    (val = test_val).run(this->exec);
+
+    auto round_result = make_tensor<double>({});
+    (round_result = matx::apply(FltFltRoundToNearest{}, val)).run(this->exec);
+    this->exec.sync();
+
+    // 1.5 should round to 2 (even)
+    EXPECT_EQ(round_result(), 2.0);
+  }
+
+  // Test tie-breaking: round half to even (2.5 -> 2, banker's rounding)
+  {
+    auto val = make_tensor<fltflt>({});
+    const fltflt test_val{2.5f, 0.0f};
+    (val = test_val).run(this->exec);
+
+    auto round_result = make_tensor<double>({});
+    (round_result = matx::apply(FltFltRoundToNearest{}, val)).run(this->exec);
+    this->exec.sync();
+
+    // 2.5 should round to 2 (even)
+    EXPECT_EQ(round_result(), 2.0);
+  }
+
+  // Test tie-breaking: round half to even (3.5 -> 4, banker's rounding)
+  {
+    auto val = make_tensor<fltflt>({});
+    const fltflt test_val{3.5f, 0.0f};
+    (val = test_val).run(this->exec);
+
+    auto round_result = make_tensor<double>({});
+    (round_result = matx::apply(FltFltRoundToNearest{}, val)).run(this->exec);
+    this->exec.sync();
+
+    // 3.5 should round to 4 (even)
+    EXPECT_EQ(round_result(), 4.0);
+  }
+
+  // Test tie with positive lo component (should break tie upward)
+  {
+    auto val = make_tensor<fltflt>({});
+    const fltflt test_val{2.5f, 1.0e-8f}; // 2.5 + epsilon
+    (val = test_val).run(this->exec);
+
+    auto round_result = make_tensor<double>({});
+    (round_result = matx::apply(FltFltRoundToNearest{}, val)).run(this->exec);
+    this->exec.sync();
+
+    // 2.5 + epsilon should round to 3.0 (not a perfect tie)
+    EXPECT_EQ(round_result(), 3.0);
+  }
+
+  // Test tie with negative lo component (should break tie downward)
+  {
+    auto val = make_tensor<fltflt>({});
+    const fltflt test_val{2.5f, -1.0e-8f}; // 2.5 - epsilon
+    (val = test_val).run(this->exec);
+
+    auto round_result = make_tensor<double>({});
+    (round_result = matx::apply(FltFltRoundToNearest{}, val)).run(this->exec);
+    this->exec.sync();
+
+    // 2.5 - epsilon should round to 2.0 (not a perfect tie)
+    EXPECT_EQ(round_result(), 2.0);
+  }
+
+  // Test rounding pi
+  {
+    auto pi = make_tensor<fltflt>({});
+    (pi = static_cast<fltflt>(std::numbers::pi)).run(this->exec);
+
+    auto round_result = make_tensor<double>({});
+    (round_result = matx::apply(FltFltRoundToNearest{}, pi)).run(this->exec);
+    this->exec.sync();
+
+    EXPECT_EQ(round_result(), 3.0);
+  }
+
+  // Test rounding e
+  {
+    auto e = make_tensor<fltflt>({});
+    (e = static_cast<fltflt>(std::numbers::e)).run(this->exec);
+
+    auto round_result = make_tensor<double>({});
+    (round_result = matx::apply(FltFltRoundToNearest{}, e)).run(this->exec);
+    this->exec.sync();
+
+    EXPECT_EQ(round_result(), 3.0);
+  }
+
+  // Test large value where |hi| >= 2^23
+  {
+    auto val = make_tensor<fltflt>({});
+    const fltflt test_val{10000000.0f, 3.5f}; // 10^7 + 3.5
+    (val = test_val).run(this->exec);
+
+    auto round_result = make_tensor<double>({});
+    (round_result = matx::apply(FltFltRoundToNearest{}, val)).run(this->exec);
+    this->exec.sync();
+
+    // 10000000.0 + 3.5 should round to 10000004.0
+    EXPECT_EQ(round_result(), 10000004.0);
+  }
+
+  // Test large value with exact half (should use tie-to-even)
+  {
+    auto val = make_tensor<fltflt>({});
+    const fltflt test_val{10000000.0f, 3.5f}; // lo is 3.5, rounds to 4 (even)
+    (val = test_val).run(this->exec);
+
+    auto round_result = make_tensor<double>({});
+    (round_result = matx::apply(FltFltRoundToNearest{}, val)).run(this->exec);
+    this->exec.sync();
+
+    EXPECT_EQ(round_result(), 10000004.0);
+  }
+
+  // Test exact integer
+  {
+    auto val = make_tensor<fltflt>({});
+    const fltflt test_val{5.0f, 0.0f};
+    (val = test_val).run(this->exec);
+
+    auto round_result = make_tensor<double>({});
+    (round_result = matx::apply(FltFltRoundToNearest{}, val)).run(this->exec);
+    this->exec.sync();
+
+    EXPECT_EQ(round_result(), 5.0);
+  }
+
+  // Test zero
+  {
+    auto zero = make_tensor<fltflt>({});
+    (zero = static_cast<fltflt>(0.0)).run(this->exec);
+
+    auto round_result = make_tensor<double>({});
+    (round_result = matx::apply(FltFltRoundToNearest{}, zero)).run(this->exec);
+    this->exec.sync();
+
+    EXPECT_EQ(round_result(), 0.0);
+  }
+}
+
+TYPED_TEST(FltFltExecutorTests, RoundTowardZero) {
+  // Test positive value truncating down
+  {
+    auto val = make_tensor<fltflt>({});
+    const fltflt test_val{2.7f, 0.0f};
+    (val = test_val).run(this->exec);
+
+    auto trunc_result = make_tensor<double>({});
+    (trunc_result = matx::apply(FltFltRoundTowardZero{}, val)).run(this->exec);
+    this->exec.sync();
+
+    EXPECT_EQ(trunc_result(), 2.0);
+  }
+
+  // Test positive value already at integer
+  {
+    auto val = make_tensor<fltflt>({});
+    const fltflt test_val{2.0f, 0.0f};
+    (val = test_val).run(this->exec);
+
+    auto trunc_result = make_tensor<double>({});
+    (trunc_result = matx::apply(FltFltRoundTowardZero{}, val)).run(this->exec);
+    this->exec.sync();
+
+    EXPECT_EQ(trunc_result(), 2.0);
+  }
+
+  // Test negative value truncating up (toward zero)
+  {
+    auto val = make_tensor<fltflt>({});
+    const fltflt test_val{-2.7f, 0.0f};
+    (val = test_val).run(this->exec);
+
+    auto trunc_result = make_tensor<double>({});
+    (trunc_result = matx::apply(FltFltRoundTowardZero{}, val)).run(this->exec);
+    this->exec.sync();
+
+    EXPECT_EQ(trunc_result(), -2.0);
+  }
+
+  // Test critical case: hi is positive integer, lo is negative
+  // This means the actual value is slightly below hi
+  {
+    auto val = make_tensor<fltflt>({});
+    const fltflt test_val{3.0f, -1.0e-7f}; // 3.0 - epsilon
+    (val = test_val).run(this->exec);
+
+    auto trunc_result = make_tensor<double>({});
+    (trunc_result = matx::apply(FltFltRoundTowardZero{}, val)).run(this->exec);
+    this->exec.sync();
+
+    // trunc(3.0 - epsilon) should be 2.0 (toward zero)
+    EXPECT_EQ(trunc_result(), 2.0);
+  }
+
+  // Test critical case: hi is negative integer, lo is positive
+  // This means the actual value is slightly above hi (closer to zero)
+  {
+    auto val = make_tensor<fltflt>({});
+    const fltflt test_val{-3.0f, 1.0e-7f}; // -3.0 + epsilon
+    (val = test_val).run(this->exec);
+
+    auto trunc_result = make_tensor<double>({});
+    (trunc_result = matx::apply(FltFltRoundTowardZero{}, val)).run(this->exec);
+    this->exec.sync();
+
+    // trunc(-3.0 + epsilon) should be -2.0 (toward zero)
+    EXPECT_EQ(trunc_result(), -2.0);
+  }
+
+  // Test critical case: hi is positive integer, lo is positive
+  {
+    auto val = make_tensor<fltflt>({});
+    const fltflt test_val{3.0f, 1.0e-7f}; // 3.0 + epsilon
+    (val = test_val).run(this->exec);
+
+    auto trunc_result = make_tensor<double>({});
+    (trunc_result = matx::apply(FltFltRoundTowardZero{}, val)).run(this->exec);
+    this->exec.sync();
+
+    // trunc(3.0 + epsilon) should be 3.0 (toward zero)
+    EXPECT_EQ(trunc_result(), 3.0);
+  }
+
+  // Test critical case: hi is negative integer, lo is negative
+  {
+    auto val = make_tensor<fltflt>({});
+    const fltflt test_val{-3.0f, -1.0e-7f}; // -3.0 - epsilon
+    (val = test_val).run(this->exec);
+
+    auto trunc_result = make_tensor<double>({});
+    (trunc_result = matx::apply(FltFltRoundTowardZero{}, val)).run(this->exec);
+    this->exec.sync();
+
+    // trunc(-3.0 - epsilon) should be -3.0 (toward zero)
+    EXPECT_EQ(trunc_result(), -3.0);
+  }
+
+  // Test with pi
+  {
+    auto pi = make_tensor<fltflt>({});
+    (pi = static_cast<fltflt>(std::numbers::pi)).run(this->exec);
+
+    auto trunc_result = make_tensor<double>({});
+    (trunc_result = matx::apply(FltFltRoundTowardZero{}, pi)).run(this->exec);
+    this->exec.sync();
+
+    EXPECT_EQ(trunc_result(), 3.0);
+  }
+
+  // Test with -pi
+  {
+    auto neg_pi = make_tensor<fltflt>({});
+    (neg_pi = static_cast<fltflt>(-std::numbers::pi)).run(this->exec);
+
+    auto trunc_result = make_tensor<double>({});
+    (trunc_result = matx::apply(FltFltRoundTowardZero{}, neg_pi)).run(this->exec);
+    this->exec.sync();
+
+    EXPECT_EQ(trunc_result(), -3.0);
+  }
+
+  // Test with e
+  {
+    auto e = make_tensor<fltflt>({});
+    (e = static_cast<fltflt>(std::numbers::e)).run(this->exec);
+
+    auto trunc_result = make_tensor<double>({});
+    (trunc_result = matx::apply(FltFltRoundTowardZero{}, e)).run(this->exec);
+    this->exec.sync();
+
+    EXPECT_EQ(trunc_result(), 2.0);
+  }
+
+  // Test large positive value where |hi| >= 2^23
+  {
+    auto val = make_tensor<fltflt>({});
+    const fltflt test_val{10000000.0f, 3.7f}; // 10^7 + 3.7
+    (val = test_val).run(this->exec);
+
+    auto trunc_result = make_tensor<double>({});
+    (trunc_result = matx::apply(FltFltRoundTowardZero{}, val)).run(this->exec);
+    this->exec.sync();
+
+    // trunc(10000000.0 + 3.7) should be 10000003.0
+    EXPECT_EQ(trunc_result(), 10000003.0);
+  }
+
+  // Test large negative value where |hi| >= 2^23
+  {
+    auto val = make_tensor<fltflt>({});
+    const fltflt test_val{-10000000.0f, -3.7f}; // -10^7 - 3.7
+    (val = test_val).run(this->exec);
+
+    auto trunc_result = make_tensor<double>({});
+    (trunc_result = matx::apply(FltFltRoundTowardZero{}, val)).run(this->exec);
+    this->exec.sync();
+
+    // trunc(-10000000.0 - 3.7) should be -10000003.0
+    EXPECT_EQ(trunc_result(), -10000003.0);
+  }
+
+  // Test large value with opposite signs (hi positive, lo negative)
+  {
+    auto val = make_tensor<fltflt>({});
+    const fltflt test_val{10000000.0f, -0.5f}; // 10^7 - 0.5
+    (val = test_val).run(this->exec);
+
+    auto trunc_result = make_tensor<double>({});
+    (trunc_result = matx::apply(FltFltRoundTowardZero{}, val)).run(this->exec);
+    this->exec.sync();
+
+    // trunc(10000000.0 - 0.5) should be 9999999.0
+    EXPECT_EQ(trunc_result(), 9999999.0);
+  }
+
+  // Test large value with opposite signs (hi negative, lo positive)
+  {
+    auto val = make_tensor<fltflt>({});
+    const fltflt test_val{-10000000.0f, 0.5f}; // -10^7 + 0.5
+    (val = test_val).run(this->exec);
+
+    auto trunc_result = make_tensor<double>({});
+    (trunc_result = matx::apply(FltFltRoundTowardZero{}, val)).run(this->exec);
+    this->exec.sync();
+
+    // trunc(-10000000.0 + 0.5) should be -9999999.0
+    EXPECT_EQ(trunc_result(), -9999999.0);
+  }
+
+  // Test zero
+  {
+    auto zero = make_tensor<fltflt>({});
+    (zero = static_cast<fltflt>(0.0)).run(this->exec);
+
+    auto trunc_result = make_tensor<double>({});
+    (trunc_result = matx::apply(FltFltRoundTowardZero{}, zero)).run(this->exec);
+    this->exec.sync();
+
+    EXPECT_EQ(trunc_result(), 0.0);
+  }
+
+  // Test small positive fraction
+  {
+    auto val = make_tensor<fltflt>({});
+    const fltflt test_val{0.9f, 0.0f};
+    (val = test_val).run(this->exec);
+
+    auto trunc_result = make_tensor<double>({});
+    (trunc_result = matx::apply(FltFltRoundTowardZero{}, val)).run(this->exec);
+    this->exec.sync();
+
+    EXPECT_EQ(trunc_result(), 0.0);
+  }
+
+  // Test small negative fraction
+  {
+    auto val = make_tensor<fltflt>({});
+    const fltflt test_val{-0.9f, 0.0f};
+    (val = test_val).run(this->exec);
+
+    auto trunc_result = make_tensor<double>({});
+    (trunc_result = matx::apply(FltFltRoundTowardZero{}, val)).run(this->exec);
+    this->exec.sync();
+
+    EXPECT_EQ(trunc_result(), 0.0);
+  }
 }
 
 TYPED_TEST(FltFltExecutorTests, CmpEq) {
