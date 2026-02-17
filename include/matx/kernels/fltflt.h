@@ -54,11 +54,9 @@ struct fltflt {
     float lo;
 
     // The default constructor does not initialize the components, so the value is indeterminate.
-    __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ constexpr fltflt() = default;
-    __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ constexpr explicit fltflt(double x) {
-        this->hi = static_cast<float>(x);
-        this->lo = static_cast<float>(x - static_cast<double>(this->hi));
-    }
+    __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt() = default;
+    __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ constexpr explicit fltflt(double x)
+        : hi(static_cast<float>(x)), lo(static_cast<float>(x - static_cast<double>(hi))) {}
     __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ constexpr explicit fltflt(float x) : hi(x), lo(0.0f) {}
     __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ constexpr explicit fltflt(float hi_, float lo_) : hi(hi_), lo(lo_) {}
     __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ constexpr explicit operator double() const {
