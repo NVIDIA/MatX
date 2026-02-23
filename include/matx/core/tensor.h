@@ -1093,17 +1093,18 @@ MATX_LOOP_UNROLL
     return Clone<N>(detail::to_array(clones));
   }
 
-  __MATX_INLINE__ __MATX_HOST__ bool IsManagedPointer() {
-    bool managed;
-    [[maybe_unused]] const CUresult retval = cuPointerGetAttribute(&managed, CU_POINTER_ATTRIBUTE_IS_MANAGED, (CUdeviceptr)this->Data());
-    MATX_ASSERT(retval == CUDA_SUCCESS, matxNotSupported);
-    return managed;
+  __MATX_INLINE__ __MATX_HOST__ bool IsHostAccessiblePointer() {
+    void* hostPtr = nullptr;
+    [[maybe_unused]] const CUresult retval =
+        cuPointerGetAttribute(&hostPtr, CU_POINTER_ATTRIBUTE_HOST_POINTER, (CUdeviceptr)this->Data());
+    MATX_ASSERT_STR_EXP(retval, CUDA_SUCCESS, matxNotSupported, "Pointer is not host-accessible");
+    return hostPtr != nullptr;
   }
 
   /**
    * Rank-0 initializer list setting
    *
-   * Note that for performance reasons only CUDA managed pointers are supported with SetVals
+   * Note that for performance reasons only host-accessible pointers are supported with SetVals
    * at the moment.
    *
    * @param val
@@ -1118,14 +1119,14 @@ MATX_LOOP_UNROLL
 
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-    MATX_ASSERT_STR(IsManagedPointer(), matxNotSupported, "SetVals only supports CUDA managed pointers");
+    MATX_ASSERT_STR(IsHostAccessiblePointer(), matxNotSupported, "SetVals only supports host-accessible pointers (managed, host-pinned, or ATS-mapped)");
     this->operator()() = val;
   }
 
   /**
    * Rank-1 non-complex or rank-0 initializer list setting
    *
-   * Note that for performance reasons only CUDA managed pointers are supported with SetVals
+   * Note that for performance reasons only host-accessible pointers are supported with SetVals
    * at the moment.
    *
    * @param vals
@@ -1138,7 +1139,7 @@ MATX_LOOP_UNROLL
   {
     static_assert(((!is_cuda_complex_v<T> && RANK == 1) || (is_cuda_complex_v<T> && RANK == 0)),
       "Single initializer list on SetVals only for non-complex rank 1 tensor or complex rank 0 tensors");
-    MATX_ASSERT_STR(IsManagedPointer(), matxNotSupported, "SetVals only supports CUDA managed pointers");
+    MATX_ASSERT_STR(IsHostAccessiblePointer(), matxNotSupported, "SetVals only supports host-accessible pointers (managed, host-pinned, or ATS-mapped)");
 
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
@@ -1157,7 +1158,7 @@ MATX_LOOP_UNROLL
   /**
    * Rank-2 non-complex or rank-1 initializer list setting
    *
-   * Note that for performance reasons only CUDA managed pointers are supported with SetVals
+   * Note that for performance reasons only host-accessible pointers are supported with SetVals
    * at the moment.
    *
    * @param vals
@@ -1172,7 +1173,7 @@ MATX_LOOP_UNROLL
   {
     static_assert(((!is_cuda_complex_v<T> && RANK == 2) || (is_cuda_complex_v<T> && RANK == 1)),
       "Double initializer list on SetVals only for non-complex rank 2 tensor or complex rank 1 tensors");
-    MATX_ASSERT_STR(IsManagedPointer(), matxNotSupported, "SetVals only supports CUDA managed pointers");
+    MATX_ASSERT_STR(IsHostAccessiblePointer(), matxNotSupported, "SetVals only supports host-accessible pointers (managed, host-pinned, or ATS-mapped)");
 
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
@@ -1196,7 +1197,7 @@ MATX_LOOP_UNROLL
   /**
    * Rank-3 non-complex or rank-2 complex initializer list setting
    *
-   * Note that for performance reasons only CUDA managed pointers are supported with SetVals
+   * Note that for performance reasons only host-accessible pointers are supported with SetVals
    * at the moment.
    *
    * @param vals
@@ -1212,7 +1213,7 @@ MATX_LOOP_UNROLL
   {
     static_assert(((!is_cuda_complex_v<T> && RANK == 3) || (is_cuda_complex_v<T> && RANK == 2)),
       "Triple initializer list on SetVals only for non-complex rank 3 tensor or complex rank 2 tensors");
-    MATX_ASSERT_STR(IsManagedPointer(), matxNotSupported, "SetVals only supports CUDA managed pointers");
+    MATX_ASSERT_STR(IsHostAccessiblePointer(), matxNotSupported, "SetVals only supports host-accessible pointers (managed, host-pinned, or ATS-mapped)");
 
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
@@ -1239,7 +1240,7 @@ MATX_LOOP_UNROLL
   /**
    * Rank-4 non-complex or rank-3 complex initializer list setting
    *
-   * Note that for performance reasons only CUDA managed pointers are supported with SetVals
+   * Note that for performance reasons only host-accessible pointers are supported with SetVals
    * at the moment.
    *
    * @param vals
@@ -1255,7 +1256,7 @@ MATX_LOOP_UNROLL
   {
     static_assert(((!is_cuda_complex_v<T> && RANK == 4) || (is_cuda_complex_v<T> && RANK == 3)),
       "Quad initializer list on SetVals only for non-complex rank 4 tensor or complex rank 3 tensors");
-    MATX_ASSERT_STR(IsManagedPointer(), matxNotSupported, "SetVals only supports CUDA managed pointers");
+    MATX_ASSERT_STR(IsHostAccessiblePointer(), matxNotSupported, "SetVals only supports host-accessible pointers (managed, host-pinned, or ATS-mapped)");
 
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
@@ -1291,7 +1292,7 @@ MATX_LOOP_UNROLL
   /**
    * Rank-4 complex initializer list setting
    *
-   * Note that for performance reasons only CUDA managed pointers are supported with SetVals
+   * Note that for performance reasons only host-accessible pointers are supported with SetVals
    * at the moment.
    *
    * @param vals
@@ -1308,7 +1309,7 @@ MATX_LOOP_UNROLL
   {
     static_assert((is_cuda_complex_v<T> && RANK == 4),
           "Quintuple initializer list on SetVals only for complex rank 3 tensors");
-    MATX_ASSERT_STR(IsManagedPointer(), matxNotSupported, "SetVals only supports CUDA managed pointers");
+    MATX_ASSERT_STR(IsHostAccessiblePointer(), matxNotSupported, "SetVals only supports host-accessible pointers (managed, host-pinned, or ATS-mapped)");
 
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
