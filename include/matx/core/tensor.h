@@ -1095,7 +1095,7 @@ MATX_LOOP_UNROLL
 
   __MATX_INLINE__ __MATX_HOST__ bool IsHostAccessiblePointer() {
     void* hostPtr = nullptr;
-    const CUresult retval =
+    [[maybe_unused]] const CUresult retval =
         cuPointerGetAttribute(&hostPtr, CU_POINTER_ATTRIBUTE_HOST_POINTER, (CUdeviceptr)this->Data());
     MATX_ASSERT_STR_EXP(retval, CUDA_SUCCESS, matxNotSupported, "Pointer is not host-accessible");
     return hostPtr != nullptr;
