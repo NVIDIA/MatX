@@ -34,6 +34,7 @@ Stage0 += packages(ospackages=[
     'lcov',
     'ninja-build',
     'numactl',
+    'python3-numpy',
     'python3-pip',
     'python3-dev',
     'python3-venv',
@@ -54,9 +55,16 @@ Stage0 += shell(commands=["cd /tmp && wget https://doxygen.nl/files/doxygen-{}.s
 Stage0 += shell(commands=["python3 --version"])
 
 # Note: Configure and build twice.  First for float, second for double.
+# SSE2/AVX2/AVX512 are x86-only; omit on aarch64.
+if cpu_target == 'x86_64':
+    fftw_configure_float = "./configure --enable-sse2 --enable-avx2 --enable-avx512 --enable-openmp --enable-float --enable-shared && make -j && make install"
+    fftw_configure_double = "./configure --enable-sse2 --enable-avx2 --enable-avx512 --enable-openmp                --enable-shared && make -j && make install"
+else:
+    fftw_configure_float = "./configure --enable-openmp --enable-float --enable-shared && make -j && make install"
+    fftw_configure_double = "./configure --enable-openmp                --enable-shared && make -j && make install"
 Stage0 += shell(commands=[f"cd /tmp && wget https://www.fftw.org/fftw-{FFTW_VER}.tar.gz && tar -xzf fftw-{FFTW_VER}.tar.gz && cd fftw-{FFTW_VER}",
-                          f"./configure --enable-sse2 --enable-avx2 --enable-avx512 --enable-openmp --enable-float --enable-shared && make -j && make install",
-                          f"./configure --enable-sse2 --enable-avx2 --enable-avx512 --enable-openmp                --enable-shared && make -j && make install"])
+                          fftw_configure_float,
+                          fftw_configure_double])
 
 # Stage0 += shell(commands=[f"cd /tmp && wget https://github.com/OpenMathLib/OpenBLAS/releases/download/v{OPENBLAS_VER}/OpenBLAS-{OPENBLAS_VER}.tar.gz && tar -zxvf OpenBLAS-{OPENBLAS_VER}.tar.gz && cd OpenBLAS-{OPENBLAS_VER}",
 #                          "make -j && sudo make USE_OPENMP=1 INTERFACE64=1 install"])
