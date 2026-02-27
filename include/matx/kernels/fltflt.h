@@ -403,6 +403,10 @@ static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_div(float a, 
     return fltflt_add(prod, yn);
 }
 
+// fltflt_round_to_nearest() rounds a float-float value to the nearest integer with
+// ties rounded toward even. Note that rounding "toward even" means that, in the case
+// of a tie, the least significant bit of the mantissa is set to 0 (i.e., we round to
+// the even significand).
 static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_round_to_nearest(fltflt a) {
     constexpr float FAST_PATH_THRESHOLD = 8388608.0f;
     if (fabs(a.hi) < FAST_PATH_THRESHOLD) {
@@ -447,6 +451,9 @@ static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_round_to_near
     }
 }
 
+// fltflt_round_toward_zero() truncates a fltflt value to an integer with the
+// result being truncated toward zero (vs floor, which will truncate toward
+// negative infinity).
 static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_round_toward_zero(fltflt a) {
     if (fabsf(a.hi) < 8388608.0f) { // |a.hi| < 2^23, so a.hi is not an integer
         const float hi_trunc = truncf(a.hi);
@@ -478,6 +485,8 @@ static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_round_toward_
     }
 }
 
+// fltflt_floor() returns an integer truncated toward negative infinity. This is
+// the largest integer that is not larger than the value a.
 static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_floor(fltflt a) {
     if (fabsf(a.hi) < 8388608.0f) { // |a.hi| < 2^23, so a.hi might not be an integer
         const float hi_floor = floorf(a.hi);
@@ -568,6 +577,9 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator>=(fltflt a, fltflt b
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator>=(fltflt a, float b) { return a > b || a == b; }
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator>=(float a, fltflt b) { return a > b || a == b; }
 
+// fltflt_fmod() computes the floating-point remainder of division. In other words,
+// fltflt_fmod(a, b) = a - n * b where n = trunc(a/b) and trunc() truncates to an integer
+// toward zero.
 static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_fmod(fltflt a, fltflt b) {
     float sign = 1.0f;
     if (a < 0.0f) {
@@ -592,6 +604,8 @@ static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_fmod(fltflt a
     return fltflt{ sign * result.hi, sign * result.lo };
 }
 
+// This overload for fltflt_fmod() is an optimized version where b is a float rather than
+// a fltflt.
 static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_fmod(fltflt a, float b) {
     float sign = 1.0f;
     if (a < 0.0f) {
