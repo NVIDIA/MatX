@@ -54,17 +54,15 @@ struct fltflt {
     float lo;
 
     // The default constructor does not initialize the components, so the value is indeterminate.
-    __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt() {}
-    __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ explicit fltflt(double x) {
-        this->hi = static_cast<float>(x);
-        this->lo = static_cast<float>(x - static_cast<double>(this->hi));
-    }
-    __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ explicit fltflt(float x) : hi(x), lo(0.0f) {}
-    __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ explicit fltflt(float hi_, float lo_) : hi(hi_), lo(lo_) {}
-    __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ explicit operator double() const {
+    __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt() = default;
+    __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ constexpr explicit fltflt(double x)
+        : hi(static_cast<float>(x)), lo(static_cast<float>(x - static_cast<double>(hi))) {}
+    __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ constexpr explicit fltflt(float x) : hi(x), lo(0.0f) {}
+    __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ constexpr explicit fltflt(float hi_, float lo_) : hi(hi_), lo(lo_) {}
+    __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ constexpr explicit operator double() const {
         return static_cast<double>(hi) + static_cast<double>(lo);
     }
-    __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ explicit operator float() const { return hi; }
+    __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ constexpr explicit operator float() const { return hi; }
 };
 
 // The constructors and conversion operators in the fltflt struct allow conversion to double and float
@@ -206,6 +204,32 @@ static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_add(fltflt a,
 // a float, and thus b.lo is zero.
 static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_add(float a, fltflt b) {
     return fltflt_add(b, a);
+}
+
+// fltflt_add_same_sign() is an optimized version of fltflt_add() suitable for cases where a
+// and b have the same sign. This version uses 11 FLOPs versus 20 FLOPs for the more general
+// fltflt_add(). This implementation corresponds to the original version from Dekker and is
+// given in Algorithm 14.1 of "Handbook of Floating-Point Arithmetic" by Muller et al. Rather
+// than include a conditional on the magnitude of a and b to use fltflt_fast_two_sum(), we
+// use fltflt_two_sum() at the cost of more FLOPs but without a branch.
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_add_same_sign(fltflt a, fltflt b) {
+    const fltflt r = fltflt_two_sum(a.hi, b.hi);
+    const float s = detail::fadd_rn(detail::fadd_rn(r.lo, b.lo), a.lo);
+    return fltflt_fast_two_sum(r.hi, s);
+}
+
+// This overload is an optimization of fltflt_add_same_sign() for the case where b is
+// a float, and thus b.lo is zero.
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_add_same_sign(fltflt a, float b) {
+    const fltflt r = fltflt_two_sum(a.hi, b);
+    const float s = detail::fadd_rn(r.lo, a.lo);
+    return fltflt_fast_two_sum(r.hi, s);
+}
+
+// This overload is an optimization of fltflt_add_same_sign() for the case where a is
+// a float, and thus a.lo is zero.
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_add_same_sign(float a, fltflt b) {
+    return fltflt_add_same_sign(b, a);
 }
 
 // fltflt_sub() subtracts b from a. It delegates to fltflt_add() with a negated b.
@@ -379,6 +403,106 @@ static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_div(float a, 
     return fltflt_add(prod, yn);
 }
 
+// fltflt_round_to_nearest() rounds a float-float value to the nearest integer with
+// ties rounded toward even. Note that rounding "toward even" means that, in the case
+// of a tie, the least significant bit of the mantissa is set to 0 (i.e., we round to
+// the even significand).
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_round_to_nearest(fltflt a) {
+    constexpr float FAST_PATH_THRESHOLD = 8388608.0f;
+    if (fabs(a.hi) < FAST_PATH_THRESHOLD) {
+        const float candidate = nearbyintf(a.hi);
+
+        const float err = detail::fsub_rn(a.hi, candidate);
+
+        if (fabsf(err) != 0.5f) {
+            return fltflt{ candidate, 0.0f };
+        } else {
+            // We should not have errors > 0.5 ulp(a.hi). Since ulp is at most 1, the max error should
+            // be 0.5 for the boundary case.
+            fltflt result{ candidate, 0.0f };
+            if (a.lo == 0.0f) {
+                // Perfect tie, round to even
+                const float corrected = (fmodf(candidate, 2.0f) == 0.0f) ? candidate : candidate + copysignf(1.0f, err);
+                result.hi = corrected;
+            } else if ((err > 0 && a.lo > 0) || (err < 0 && a.lo < 0)) {
+                result.hi = detail::fadd_rn(candidate, copysignf(1.0f, err));
+            }
+            // We do not need to renormalize because we know the full integral part fits
+            // exactly in hi due to the original magnitude check.
+            return result;
+        }
+    } else { // |a.hi| >= 2^23, so a.hi is an integer
+        float r_lo = nearbyintf(a.lo);
+        const float frac = detail::fsub_rn(a.lo, r_lo);
+
+        if (fabsf(frac) > 0.5f) {
+            r_lo = detail::fadd_rn(r_lo, copysignf(1.0f, frac));
+        } else if (fabsf(frac) == 0.5f) {
+            // Check if hi + r_lo would be odd (sum is odd iff parities differ)
+            bool hi_is_odd = (fmodf(a.hi, 2.0f) != 0.0f);
+            bool rlo_is_odd = (fmodf(r_lo, 2.0f) != 0.0f);
+            if (hi_is_odd != rlo_is_odd) {  // XOR of parities
+                r_lo = detail::fadd_rn(r_lo, copysignf(1.0f, frac));
+            }
+        }
+
+        // Renormalize
+        return fltflt_fast_two_sum(a.hi, r_lo);
+    }
+}
+
+// fltflt_round_toward_zero() truncates a fltflt value to an integer with the
+// result being truncated toward zero (vs floor, which will truncate toward
+// negative infinity).
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_round_toward_zero(fltflt a) {
+    if (fabsf(a.hi) < 8388608.0f) { // |a.hi| < 2^23, so a.hi is not an integer
+        const float hi_trunc = truncf(a.hi);
+        // If hi is exactly an integer, then lo can cause a boundary crossing
+        if (hi_trunc == a.hi) {
+            // If hi is 1.0 and lo is -1e-9, value is 0.999... -> trunc to 0.0
+            // This happens when signs are opposite.
+            if ((a.hi > 0.0f && a.lo < 0.0f) || (a.hi < 0.0f && a.lo > 0.0f)) {
+                // Pull toward zero by 1 unit
+                return fltflt{ a.hi + (a.hi > 0.0f ? -1.0f : 1.0f), 0.0f };
+            } else {
+                // Signs match or lo is 0: truncation is just hi. Fallthrough case.
+            }
+        }
+        return fltflt{ hi_trunc, 0.0f };
+    } else { // |a.hi| >= 2^23, so a.hi is an integer
+        float lo_trunc = truncf(a.lo);
+        if (lo_trunc != a.lo) { // lo has a fractional part, so we may need a correction
+            // If lo is opposite sign of hi,
+            // the fractional part nudges us across an integer boundary.
+            if ((a.hi > 0.0f && a.lo < 0.0f) || (a.hi < 0.0f && a.lo > 0.0f)) {
+                // If hi=pos, lo=neg (e.g., 10, -0.5), we need 9.
+                // If hi=neg, lo=pos (e.g., -10, 0.5), we need -9.
+                const float adj = (a.hi > 0.0f) ? -1.0f : 1.0f;
+                lo_trunc = lo_trunc + adj;
+            }
+        }
+        return fltflt_fast_two_sum(a.hi, lo_trunc);
+    }
+}
+
+// fltflt_floor() returns an integer truncated toward negative infinity. This is
+// the largest integer that is not larger than the value a.
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_floor(fltflt a) {
+    if (fabsf(a.hi) < 8388608.0f) { // |a.hi| < 2^23, so a.hi might not be an integer
+        const float hi_floor = floorf(a.hi);
+        // If hi was exactly an integer and lo is negative,
+        // the actual value is just below hi, so floor should be hi - 1
+        if (hi_floor == a.hi && a.lo < 0.0f) {
+            return fltflt{ a.hi - 1.0f, 0.0f };
+        }
+        return fltflt{ hi_floor, 0.0f };
+    } else { // |a.hi| >= 2^23, so a.hi is already an integer
+        const float lo_floor = floorf(a.lo);
+        // Renormalize the result
+        return fltflt_fast_two_sum(a.hi, lo_floor);
+    }
+}
+
 // fltflt_sqrt() is the df64_sqrt() function given by Thall, which he attributes to Karp.
 // This function implements Algorithm 7 from Thall's paper. It uses the
 // two_prod_fma() function for the hi components followed by subtraction of the square
@@ -452,5 +576,58 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator<=(float a, fltflt b)
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator>=(fltflt a, fltflt b) { return a > b || a == b; }
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator>=(fltflt a, float b) { return a > b || a == b; }
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator>=(float a, fltflt b) { return a > b || a == b; }
+
+// fltflt_fmod() computes the floating-point remainder of division. In other words,
+// fltflt_fmod(a, b) = a - n * b where n = trunc(a/b) and trunc() truncates to an integer
+// toward zero.
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_fmod(fltflt a, fltflt b) {
+    float sign = 1.0f;
+    if (a < 0.0f) {
+        sign = -1.0f;
+        a = -a;
+    }
+    if (b < 0.0f) {
+        b = -b;
+    }
+
+    const fltflt q = fltflt_div(a, b);
+    const fltflt trunc_q = fltflt_round_toward_zero(q);
+    fltflt result = -fltflt_fma(trunc_q, b, -a);
+
+    while (result >= b) {
+        result = fltflt_sub(result, b);
+    }
+    while (result < 0.0f) {
+        result = fltflt_add(result, b);
+    }
+
+    return fltflt{ sign * result.hi, sign * result.lo };
+}
+
+// This overload for fltflt_fmod() is an optimized version where b is a float rather than
+// a fltflt.
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_fmod(fltflt a, float b) {
+    float sign = 1.0f;
+    if (a < 0.0f) {
+        sign = -1.0f;
+        a = -a;
+    }
+    if (b < 0.0f) {
+        b = -b;
+    }
+
+    const fltflt q = fltflt_div(a, b);
+    const fltflt trunc_q = fltflt_round_toward_zero(q);
+    fltflt result = -fltflt_fma(trunc_q, b, -a);
+
+    while (result >= b) {
+        result = fltflt_sub(result, b);
+    }
+    while (result < 0.0f) {
+        result = fltflt_add(result, b);
+    }
+
+    return fltflt{ sign * result.hi, sign * result.lo };
+}
 
 } // namespace matx

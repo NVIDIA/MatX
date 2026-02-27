@@ -206,7 +206,7 @@ def print_summary(results, relative):
     print("-" * 66)
 
     # Order benchmarks
-    bench_order = ['add', 'sub', 'mul', 'div', 'sqrt', 'abs', 'fma', 'madd']
+    bench_order = ['add', 'sub', 'mul', 'div', 'sqrt', 'abs', 'fma', 'madd', 'round', 'trunc', 'floor', 'fmod', 'cast2dbl', 'cast2fltflt']
 
     for bench in bench_order:
         if bench not in relative:
@@ -299,7 +299,7 @@ def main():
     print()
 
     # List of benchmarks to run
-    benchmarks = ['add', 'sub', 'mul', 'div', 'sqrt', 'abs', 'fma', 'madd']
+    benchmarks = ['add', 'sub', 'mul', 'div', 'sqrt', 'abs', 'fma', 'madd', 'round', 'trunc', 'floor', 'fmod', 'cast2dbl', 'cast2fltflt']
 
     all_results = {}
 
