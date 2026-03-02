@@ -167,6 +167,17 @@ struct FltFltRoundTowardZero {
   }
 };
 
+struct FltFltFmod {
+  __MATX_HOST__ __MATX_DEVICE__ fltflt operator()(fltflt a, fltflt b) const
+  {
+    return fltflt_fmod(a, b);
+  }
+  __MATX_HOST__ __MATX_DEVICE__ fltflt operator()(fltflt a, float b) const
+  {
+    return fltflt_fmod(a, b);
+  }
+};
+
 struct FltFltCmpEq {
   __MATX_HOST__ __MATX_DEVICE__ bool operator()(fltflt a, fltflt b) const
   {
@@ -1796,4 +1807,277 @@ TYPED_TEST(FltFltExecutorTests, ExampleQuadraticEquation) {
 
   EXPECT_GE(numMatchingMantissaBits(static_cast<double>(norm()), ref_f64), 44);
   EXPECT_LE(numMatchingMantissaBits(ref_f32, ref_f64), 24);
+}
+
+TYPED_TEST(FltFltExecutorTests, Fmod) {
+  // Test fmod with both arguments as fltflt
+  {
+    auto a = make_tensor<fltflt>({});
+    auto b = make_tensor<fltflt>({});
+    auto result = make_tensor<fltflt>({});
+
+    const double a_dbl = 10.7;
+    const double b_dbl = 3.2;
+
+    // Test: fmod(10.7, 3.2)
+    (a = static_cast<fltflt>(a_dbl)).run(this->exec);
+    (b = static_cast<fltflt>(b_dbl)).run(this->exec);
+    (result = matx::apply(FltFltFmod{}, a, b)).run(this->exec);
+    this->exec.sync();
+
+    const double ref = std::fmod(a_dbl, b_dbl);
+    // Expect at least 40 bits of precision for fltflt-fltflt inputs
+    EXPECT_GE(numMatchingMantissaBits(static_cast<double>(result()), ref), 40);
+  }
+
+  // Test fmod with b as float
+  {
+    auto a = make_tensor<fltflt>({});
+    auto b = make_tensor<float>({});
+    auto result = make_tensor<fltflt>({});
+
+    const double a_dbl = 10.7;
+    const float b_flt = 3.2f;
+
+    // Test: fmod(10.7, 3.2)
+    // Note: a is extended precision fltflt, but b is single precision float.
+    // The result precision is limited by b, so we expect ~23 bits of precision.
+    (a = static_cast<fltflt>(a_dbl)).run(this->exec);
+    (b = static_cast<float>(b_flt)).run(this->exec);
+    (result = matx::apply(FltFltFmod{}, a, b)).run(this->exec);
+    this->exec.sync();
+
+    // For mixed precision, compute reference using single-precision b to match actual computation
+    const double a_as_double = a_dbl;
+    const double ref = std::fmod(a_as_double, b_flt);
+    // Expect at least 20 bits of precision (limited by single-precision b)
+    EXPECT_GE(numMatchingMantissaBits(static_cast<double>(result()), ref), 20);
+  }
+
+  // Test fmod with negative values (both arguments as fltflt)
+  {
+    auto a = make_tensor<fltflt>({});
+    auto b = make_tensor<fltflt>({});
+    auto result = make_tensor<fltflt>({});
+
+    const double a_dbl = -7.5;
+    const double b_dbl = 2.3;
+
+    // Test: fmod(-7.5, 2.3)
+    (a = static_cast<fltflt>(a_dbl)).run(this->exec);
+    (b = static_cast<fltflt>(b_dbl)).run(this->exec);
+    (result = matx::apply(FltFltFmod{}, a, b)).run(this->exec);
+    this->exec.sync();
+
+    const double ref = std::fmod(a_dbl, b_dbl);
+    // Expect at least 40 bits of precision for fltflt-fltflt inputs
+    EXPECT_GE(numMatchingMantissaBits(static_cast<double>(result()), ref), 40);
+  }
+
+  // Test fmod with negative divisor (b as float)
+  {
+    auto a = make_tensor<fltflt>({});
+    auto b = make_tensor<float>({});
+    auto result = make_tensor<fltflt>({});
+
+    const double a_dbl = 7.5;
+    const float b_flt = -2.3f;
+
+    // Test: fmod(7.5, -2.3)
+    (a = static_cast<fltflt>(a_dbl)).run(this->exec);
+    (b = static_cast<float>(b_flt)).run(this->exec);
+    (result = matx::apply(FltFltFmod{}, a, b)).run(this->exec);
+    this->exec.sync();
+
+    // For mixed precision, use single-precision b in reference
+    const double a_as_double = a_dbl;
+    const double ref = std::fmod(a_as_double, b_flt);
+    // Expect at least 20 bits of precision (limited by single-precision b)
+    EXPECT_GE(numMatchingMantissaBits(static_cast<double>(result()), ref), 20);
+  }
+
+  // Test fmod with b == 0 (fltflt), should return {NaN, NaN}
+  {
+    auto a = make_tensor<fltflt>({});
+    auto b = make_tensor<fltflt>({});
+    auto result = make_tensor<fltflt>({});
+
+    (a = static_cast<fltflt>(7.5)).run(this->exec);
+    (b = static_cast<fltflt>(0.0)).run(this->exec);
+    (result = matx::apply(FltFltFmod{}, a, b)).run(this->exec);
+    this->exec.sync();
+
+    // Check that result is NaN
+    const fltflt result_val = result();
+    EXPECT_TRUE(std::isnan(result_val.hi));
+    EXPECT_TRUE(std::isnan(result_val.lo));
+  }
+
+  // Test fmod with b == 0 (float), should return {NaN, NaN}
+  {
+    auto a = make_tensor<fltflt>({});
+    auto b = make_tensor<float>({});
+    auto result = make_tensor<fltflt>({});
+
+    (a = static_cast<fltflt>(7.5)).run(this->exec);
+    (b = 0.0f).run(this->exec);
+    (result = matx::apply(FltFltFmod{}, a, b)).run(this->exec);
+    this->exec.sync();
+
+    // Check that result is NaN
+    const fltflt result_val = result();
+    EXPECT_TRUE(std::isnan(result_val.hi));
+    EXPECT_TRUE(std::isnan(result_val.lo));
+  }
+
+  // Test fmod with larger values
+  {
+    auto a = make_tensor<fltflt>({});
+    auto b = make_tensor<fltflt>({});
+    auto result = make_tensor<fltflt>({});
+
+    const double a_dbl = std::numbers::pi * 100.0;
+    const double b_dbl = std::numbers::e;
+
+    // Test: fmod(pi * 100, e)
+    (a = static_cast<fltflt>(a_dbl)).run(this->exec);
+    (b = static_cast<fltflt>(b_dbl)).run(this->exec);
+    (result = matx::apply(FltFltFmod{}, a, b)).run(this->exec);
+    this->exec.sync();
+
+    const double ref = std::fmod(a_dbl, b_dbl);
+    // Expect at least 40 bits of precision for fltflt-fltflt inputs
+    EXPECT_GE(numMatchingMantissaBits(static_cast<double>(result()), ref), 40);
+  }
+
+  // Test fmod with result smaller than divisor (b as float)
+  {
+    auto a = make_tensor<fltflt>({});
+    auto b = make_tensor<float>({});
+    auto result = make_tensor<fltflt>({});
+
+    const double a_dbl = 1.5;
+    const float b_flt = 2.0f;
+
+    // Test: fmod(1.5, 2.0) = 1.5
+    (a = static_cast<fltflt>(a_dbl)).run(this->exec);
+    (b = static_cast<float>(b_flt)).run(this->exec);
+    (result = matx::apply(FltFltFmod{}, a, b)).run(this->exec);
+    this->exec.sync();
+
+    // For mixed precision, use single-precision b in reference
+    const double a_as_double = a_dbl;
+    const double ref = std::fmod(a_as_double, b_flt);
+    // Expect at least 20 bits of precision (limited by single-precision b)
+    EXPECT_GE(numMatchingMantissaBits(static_cast<double>(result()), ref), 20);
+  }
+
+  // Test fmod with very large values (both arguments as fltflt)
+  {
+    auto a = make_tensor<fltflt>({});
+    auto b = make_tensor<fltflt>({});
+    auto result = make_tensor<fltflt>({});
+
+    const double a_dbl = std::numbers::pi * 1e8;
+    const double b_dbl = std::numbers::e;
+
+    // Test: fmod(pi * 1e8, e)
+    // Note: The quotient is ~1.156e8. Due to fltflt precision limits at magnitude 1e8
+    // (absolute precision ~1e8 * 2^(-44) ≈ 5.7e-6), the intermediate quotient cannot be
+    // represented precisely enough, leading to reduced precision in the result.
+    (a = static_cast<fltflt>(a_dbl)).run(this->exec);
+    (b = static_cast<fltflt>(b_dbl)).run(this->exec);
+    (result = matx::apply(FltFltFmod{}, a, b)).run(this->exec);
+    this->exec.sync();
+
+    const double ref = std::fmod(a_dbl, b_dbl);
+    // Expect at least 20 bits - limited by fltflt precision at 1e8 magnitude
+    EXPECT_GE(numMatchingMantissaBits(static_cast<double>(result()), ref), 20);
+  }
+
+  // Test fmod with very large dividend and float divisor
+  {
+    auto a = make_tensor<fltflt>({});
+    auto b = make_tensor<float>({});
+    auto result = make_tensor<fltflt>({});
+
+    const double a_dbl = std::numbers::pi * 1e8;
+    const float b_flt = 7.0f;
+
+    // Test: fmod(pi * 1e8, 7.0)
+    (a = static_cast<fltflt>(a_dbl)).run(this->exec);
+    (b = static_cast<float>(b_flt)).run(this->exec);
+    (result = matx::apply(FltFltFmod{}, a, b)).run(this->exec);
+    this->exec.sync();
+
+    // For mixed precision, use single-precision b in reference
+    const double a_as_double = a_dbl;
+    const double ref = std::fmod(a_as_double, b_flt);
+    // Expect at least 20 bits of precision (limited by single-precision b)
+    EXPECT_GE(numMatchingMantissaBits(static_cast<double>(result()), ref), 20);
+  }
+
+  // Test fmod with very large values for both dividend and divisor (both fltflt)
+  {
+    auto a = make_tensor<fltflt>({});
+    auto b = make_tensor<fltflt>({});
+    auto result = make_tensor<fltflt>({});
+
+    const double a_dbl = std::numbers::pi * 1e8;
+    const double b_dbl = std::numbers::sqrt2 * 1e8;
+
+    // Test: fmod(pi * 1e8, sqrt(2) * 1e8)
+    (a = static_cast<fltflt>(a_dbl)).run(this->exec);
+    (b = static_cast<fltflt>(b_dbl)).run(this->exec);
+    (result = matx::apply(FltFltFmod{}, a, b)).run(this->exec);
+    this->exec.sync();
+
+    const double ref = std::fmod(a_dbl, b_dbl);
+    // Expect at least 40 bits of precision for fltflt-fltflt inputs
+    EXPECT_GE(numMatchingMantissaBits(static_cast<double>(result()), ref), 40);
+  }
+
+  // Test fmod with very large dividend and large float divisor
+  {
+    auto a = make_tensor<fltflt>({});
+    auto b = make_tensor<float>({});
+    auto result = make_tensor<fltflt>({});
+
+    const double a_dbl = std::numbers::e * 1e10;
+    const float b_flt = 1e8f;
+
+    // Test: fmod(e * 1e10, 1e8)
+    (a = static_cast<fltflt>(a_dbl)).run(this->exec);
+    (b = static_cast<float>(b_flt)).run(this->exec);
+    (result = matx::apply(FltFltFmod{}, a, b)).run(this->exec);
+    this->exec.sync();
+
+    // For mixed precision, use single-precision b in reference
+    const double a_as_double = a_dbl;
+    const double ref = std::fmod(a_as_double, b_flt);
+    // Expect at least 20 bits of precision (limited by single-precision b)
+    EXPECT_GE(numMatchingMantissaBits(static_cast<double>(result()), ref), 20);
+  }
+
+  // Test fmod with negative very large value (both fltflt)
+  {
+    auto a = make_tensor<fltflt>({});
+    auto b = make_tensor<fltflt>({});
+    auto result = make_tensor<fltflt>({});
+
+    const double a_dbl = -std::numbers::pi * 1e8;
+    const double b_dbl = std::numbers::e * 1e3;
+
+    // Test: fmod(-pi * 1e8, e * 1e3)
+    // Note: The quotient is ~-1.156e5. Similar to above, fltflt precision limits at
+    // magnitude 1e5 yield reduced precision in the final result.
+    (a = static_cast<fltflt>(a_dbl)).run(this->exec);
+    (b = static_cast<fltflt>(b_dbl)).run(this->exec);
+    (result = matx::apply(FltFltFmod{}, a, b)).run(this->exec);
+    this->exec.sync();
+
+    const double ref = std::fmod(a_dbl, b_dbl);
+    // Expect at least 30 bits - limited by fltflt precision at 1e5 magnitude
+    EXPECT_GE(numMatchingMantissaBits(static_cast<double>(result()), ref), 30);
+  }
 }

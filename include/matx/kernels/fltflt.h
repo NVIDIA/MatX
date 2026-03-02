@@ -409,7 +409,7 @@ static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_div(float a, 
 // the even significand).
 static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_round_to_nearest(fltflt a) {
     constexpr float FAST_PATH_THRESHOLD = 8388608.0f;
-    if (fabs(a.hi) < FAST_PATH_THRESHOLD) {
+    if (fabsf(a.hi) < FAST_PATH_THRESHOLD) {
         const float candidate = nearbyintf(a.hi);
 
         const float err = detail::fsub_rn(a.hi, candidate);
@@ -579,16 +579,24 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator>=(float a, fltflt b)
 
 // fltflt_fmod() computes the floating-point remainder of division. In other words,
 // fltflt_fmod(a, b) = a - n * b where n = trunc(a/b) and trunc() truncates to an integer
-// toward zero.
+// toward zero. If b is zero, returns {NaN, NaN}.
+//
+// Note: For very large quotients (|a/b| > 10^6), precision is limited by the fltflt type's
+// absolute precision at large magnitudes (~|value| * 2^-44). The current implementation does
+// not use range reduction or similar techniques to improve precision in these cases, but a
+// future implementation may do so.
 static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_fmod(fltflt a, fltflt b) {
+    if (b.hi == 0.0f && b.lo == 0.0f) {
+        return fltflt{cuda::std::numeric_limits<float>::quiet_NaN(),
+                      cuda::std::numeric_limits<float>::quiet_NaN()};
+    }
+
     float sign = 1.0f;
     if (a < 0.0f) {
         sign = -1.0f;
         a = -a;
     }
-    if (b < 0.0f) {
-        b = -b;
-    }
+    b = fltflt_abs(b);
 
     const fltflt q = fltflt_div(a, b);
     const fltflt trunc_q = fltflt_round_toward_zero(q);
@@ -604,17 +612,19 @@ static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_fmod(fltflt a
     return fltflt{ sign * result.hi, sign * result.lo };
 }
 
-// This overload for fltflt_fmod() is an optimized version where b is a float rather than
-// a fltflt.
+// fltflt_fmod() overload where b is a float.
 static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_fmod(fltflt a, float b) {
+    if (b == 0.0f) {
+        return fltflt{cuda::std::numeric_limits<float>::quiet_NaN(),
+                      cuda::std::numeric_limits<float>::quiet_NaN()};
+    }
+
     float sign = 1.0f;
     if (a < 0.0f) {
         sign = -1.0f;
         a = -a;
     }
-    if (b < 0.0f) {
-        b = -b;
-    }
+    b = fabsf(b);
 
     const fltflt q = fltflt_div(a, b);
     const fltflt trunc_q = fltflt_round_toward_zero(q);
