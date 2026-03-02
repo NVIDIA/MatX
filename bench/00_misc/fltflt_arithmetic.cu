@@ -544,8 +544,7 @@ __global__ void iterative_round_kernel(T* __restrict__ result, int64_t size, int
   int64_t idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < size) {
     T val[ILP_FACTOR];
-    //const T init_val = static_cast<T>(std::numbers::e);
-    const T init_val = static_cast<T>(33554432.5);
+    constexpr T init_val = static_cast<T>(33554432.5);
 
     #pragma unroll
     for (int ilp = 0; ilp < ILP_FACTOR; ilp++) {
