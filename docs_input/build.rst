@@ -19,7 +19,7 @@ the CPM documentation or the documentation for each package for more information
 
 System Requirements
 -------------------
-MatX requires **CUDA 11.8** or **CUDA 12.2.1** or higher, and **g++ 9.3+**, **clang 17+**, or **nvc++ 24.5** for the host compiler. See the CUDA toolkit documentation
+MatX requires **CUDA 12.2.1** or higher, and **g++ 9.3+**, **clang 17+**, or **nvc++ 24.5** for the host compiler. See the CUDA toolkit documentation
 for supported host compilers. Other requirements for optional components are listed below.
 
 .. warning:: Using MatX with an unsupported compiler may result in compiler and/or runtime errors.
@@ -27,7 +27,7 @@ for supported host compilers. Other requirements for optional components are lis
 Required Third-party Dependencies
 ---------------------------------
 
-- `CCCL <https://github.com/NVIDIA/cccl>`_ 3.0.0 or higher
+- `CCCL <https://github.com/NVIDIA/cccl>`_ 3.3.0 or higher
 
 
 Optional Third-party Dependencies
