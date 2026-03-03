@@ -36,8 +36,10 @@
 
 #ifdef MATX_ENABLE_PYBIND11
 
+MATX_IGNORE_WARNING_PUSH_GCC("-Wnull-dereference")
 #include <pybind11/embed.h>
 #include <pybind11/numpy.h>
+MATX_IGNORE_WARNING_POP_GCC
 #include <optional>
 #include <filesystem>
 
