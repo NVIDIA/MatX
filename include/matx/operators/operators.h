@@ -116,6 +116,7 @@
 #include "matx/operators/toeplitz.h"
 #include "matx/operators/trace.h"
 #include "matx/operators/transpose.h"
+#include "matx/operators/unwrap.h"
 #include "matx/operators/unique.h"
 #include "matx/operators/updownsample.h"
 #include "matx/operators/var.h"

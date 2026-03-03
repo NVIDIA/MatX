@@ -153,6 +153,34 @@ class toeplitz:
             'out3': sl.toeplitz(c, r2)
         }
 
+class unwrap_operator:
+    def __init__(self, dtype: str, size: List[int]):
+        self.size = size
+        self.dtype = dtype
+        np.random.seed(1234)
+
+    def run(self) -> Dict[str, np.array]:
+        n = self.size[0]
+        m = self.size[1]
+        k = self.size[2]
+        dtype = np.dtype(self.dtype)
+
+        phase_1d = np.linspace(0.0, 7.0 * np.pi, n) + 0.2 * np.random.randn(n)
+        in1 = np.angle(np.exp(1j * phase_1d)).astype(dtype)
+
+        phase_2d = np.linspace(0.0, 9.0 * np.pi, m * k).reshape((m, k))
+        phase_2d = phase_2d + 0.25 * np.random.randn(m, k)
+        in2 = np.angle(np.exp(1j * phase_2d)).astype(dtype)
+
+        return {
+            'in1': in1,
+            'in2': in2,
+            'out1_default': np.unwrap(in1).astype(dtype),
+            'out1_period': np.unwrap(in1, discont=2.5, period=4.0).astype(dtype),
+            'out2_axis1': np.unwrap(in2, axis=1).astype(dtype),
+            'out2_axis0': np.unwrap(in2, axis=0, discont=1.0, period=6.0).astype(dtype)
+        }
+
 class pwelch_operators:
     def __init__(self, dtype: str, cfg: Dict): #PWelchGeneratorCfg):
         self.dtype = dtype

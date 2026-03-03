@@ -67,6 +67,7 @@ set(OPERATOR_TEST_FILES
   toeplitz_test.cu
   transpose_test.cu
   trig_funcs_test.cu
+  unwrap_test.cu
   updownsample_test.cu 
   zipvec_test.cu
 )
