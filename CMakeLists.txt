@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25.2)
 
-set(MATX_VERSION 0.9.4)
+set(MATX_VERSION 1.0.0)
 
 # Used for config file generation
 if(NOT DEFINED PROJECT_NAME)
