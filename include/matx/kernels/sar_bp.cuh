@@ -143,6 +143,14 @@ using strict_compute_param_t = typename std::conditional<ComputeType == SarBpCom
 template <SarBpComputeType ComputeType>
 using loose_compute_param_t = typename std::conditional<ComputeType == SarBpComputeType::Double, double, float>::type;
 
+template <SarBpComputeType ComputeType>
+struct SarBpSharedMemory {};
+
+template <>
+struct SarBpSharedMemory<SarBpComputeType::FloatFloat> {
+    __shared__ fltflt ant_pos[PULSE_BLOCK_SIZE][4];
+};
+
 template <SarBpComputeType ComputeType, typename OutImageType, typename InitialImageType, typename RangeProfilesType, typename PlatPosType, typename VoxLocType, typename RangeToMcpType, bool PhaseLUT>
 __launch_bounds__(16*16)
 __global__ void SarBp(OutImageType output, const InitialImageType initial_image, const __grid_constant__ RangeProfilesType range_profiles, const __grid_constant__ PlatPosType platform_positions, const __grid_constant__ VoxLocType voxel_locations, const __grid_constant__ RangeToMcpType range_to_mcp,
@@ -181,11 +189,7 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
     const index_t ix = static_cast<index_t>(blockIdx.x * blockDim.x + threadIdx.x);
     const index_t iy = static_cast<index_t>(blockIdx.y * blockDim.y + threadIdx.y);
 
-    // Currently only used for FloatFloat compute type. nvcc will eliminate sh_ant_pos
-    // as dead code if no code paths access it. Please report any cases where sh_ant_pos
-    // has not been eliminated (and thus static shared memory is allocated) for other
-    // compute types as that would impact performance.
-    __shared__ fltflt sh_ant_pos[PULSE_BLOCK_SIZE][4];
+    __shared__ SarBpSharedMemory<ComputeType> sh_mem;
 
     const bool is_valid = ix < image_width && iy < image_height;
     if constexpr (ComputeType != SarBpComputeType::FloatFloat) {
@@ -260,15 +264,15 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
                 const int p = block * PULSE_BLOCK_SIZE + ip;
                 if constexpr (PlatPosType::Rank() == 1) {
                     const plat_pos_t ant_pos_p = platform_positions.operator()(p);
-                    sh_ant_pos[ip][0] = static_cast<fltflt>(ant_pos_p.x);
-                    sh_ant_pos[ip][1] = static_cast<fltflt>(ant_pos_p.y);
-                    sh_ant_pos[ip][2] = static_cast<fltflt>(ant_pos_p.z);
+                    sh_mem.ant_pos[ip][0] = static_cast<fltflt>(ant_pos_p.x);
+                    sh_mem.ant_pos[ip][1] = static_cast<fltflt>(ant_pos_p.y);
+                    sh_mem.ant_pos[ip][2] = static_cast<fltflt>(ant_pos_p.z);
                 } else {
-                    sh_ant_pos[ip][0] = static_cast<fltflt>(platform_positions.operator()(p, 0));
-                    sh_ant_pos[ip][1] = static_cast<fltflt>(platform_positions.operator()(p, 1));
-                    sh_ant_pos[ip][2] = static_cast<fltflt>(platform_positions.operator()(p, 2));
+                    sh_mem.ant_pos[ip][0] = static_cast<fltflt>(platform_positions.operator()(p, 0));
+                    sh_mem.ant_pos[ip][1] = static_cast<fltflt>(platform_positions.operator()(p, 1));
+                    sh_mem.ant_pos[ip][2] = static_cast<fltflt>(platform_positions.operator()(p, 2));
                 }
-                sh_ant_pos[ip][3] = static_cast<fltflt>(r_to_mcp(p));
+                sh_mem.ant_pos[ip][3] = static_cast<fltflt>(r_to_mcp(p));
             }
             __syncthreads();
             if (! is_valid) {
@@ -282,7 +286,7 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
             loose_compute_t bin;
             if constexpr (ComputeType == SarBpComputeType::FloatFloat) {
                 const fltflt diffR_ff = ComputeRangeToPixelFloatFloat(
-                    sh_ant_pos[ip][0], sh_ant_pos[ip][1], sh_ant_pos[ip][2], px, py, pz) - sh_ant_pos[ip][3];
+                    sh_mem.ant_pos[ip][0], sh_mem.ant_pos[ip][1], sh_mem.ant_pos[ip][2], px, py, pz) - sh_mem.ant_pos[ip][3];
                 bin = static_cast<loose_compute_t>(diffR_ff * dr_inv_fltflt) + bin_offset;
                 // diffR is otherwise unused for FloatFloat and thus not set
             } else {
