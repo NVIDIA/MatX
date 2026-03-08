@@ -86,7 +86,9 @@ inline void sar_bp_impl(OutImageType &out, const InitialImageType &initial_image
     const bool PhaseLUT = true;
     const double phase_correction_partial = 4.0 * M_PI * params.del_r * (params.center_frequency / SPEED_OF_LIGHT);
 
-    void *workspace = detail::GetCache().GetStreamAlloc(stream, sizeof(cuda::std::complex<double>) * range_profiles.Size(1));
+    const size_t workspace_elem_size = (params.compute_type == SarBpComputeType::Double) ?
+      sizeof(cuda::std::complex<double>) : sizeof(cuda::std::complex<float>);
+    void *workspace = detail::GetCache().GetStreamAlloc(stream, workspace_elem_size * range_profiles.Size(1));
     const dim3 lut_block(128);
     const dim3 lut_grid(static_cast<uint32_t>((range_profiles.Size(1) + lut_block.x - 1) / lut_block.x));
 

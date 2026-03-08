@@ -39,7 +39,14 @@ import re
 import sys
 import argparse
 from pathlib import Path
-from collections import defaultdict
+
+# Regex to strip ANSI escape codes from nvbench colored output
+ANSI_ESCAPE = re.compile(r'\x1b\[[0-9;]*[mK]')
+
+
+def strip_ansi(text):
+    """Remove ANSI escape codes from a string."""
+    return ANSI_ESCAPE.sub('', text)
 
 def find_benchmark_executable(build_dir):
     """Find the matx_bench executable."""
@@ -51,7 +58,7 @@ def find_benchmark_executable(build_dir):
     print(f"Error: Could not find matx_bench at {benchmark_path}")
     return None
 
-def run_benchmark(executable_path, benchmark_name):
+def run_benchmark(executable_path, benchmark_name, verbose=False):
     """Run a specific benchmark and capture output."""
     print(f"Running benchmark: {benchmark_name}")
 
@@ -68,6 +75,9 @@ def run_benchmark(executable_path, benchmark_name):
             print(f"  stderr: {result.stderr}")
             return None
 
+        if verbose:
+            print(f"  Raw output:\n{result.stdout}")
+
         return result.stdout
     except subprocess.TimeoutExpired:
         print(f"  Benchmark timed out after 10 minutes")
@@ -78,7 +88,7 @@ def run_benchmark(executable_path, benchmark_name):
 
 def parse_time_value(time_str):
     """Parse time string like '668.707 us' or '6.785 ms' and convert to seconds."""
-    time_str = time_str.strip()
+    time_str = strip_ansi(time_str).strip()
 
     # Match number and unit
     match = re.match(r'([\d.]+)\s*(us|ms|ns|s)', time_str)
@@ -100,7 +110,7 @@ def parse_time_value(time_str):
     else:
         return value
 
-def parse_benchmark_output(output):
+def parse_benchmark_output(output, verbose=False):
     """
     Parse the table format output from nvbench for sarbp benchmarks.
 
@@ -111,6 +121,7 @@ def parse_benchmark_output(output):
     |         2000 | ... | 987.654 ms | ...
     """
     results = {}
+    output = strip_ansi(output)
     lines = output.strip().split('\n')
 
     # Find the header line to locate GPU Time and Problem Size columns
@@ -121,11 +132,15 @@ def parse_benchmark_output(output):
             # Split by | and find column indices
             cols = [col.strip() for col in line.split('|')]
             for j, col in enumerate(cols):
-                if 'GPU Time' in col:
+                if col == 'GPU Time':
                     gpu_time_col_idx = j
-                elif 'Problem Size' in col:
+                elif col == 'Problem Size':
                     problem_size_col_idx = j
-            break
+            if gpu_time_col_idx is not None and problem_size_col_idx is not None:
+                if verbose:
+                    print(f"  Found GPU Time at column index {gpu_time_col_idx}, "
+                          f"Problem Size at column index {problem_size_col_idx} in: {line.rstrip()}")
+                break
 
     if gpu_time_col_idx is None:
         print("  Warning: Could not find GPU Time column in output")
@@ -161,7 +176,11 @@ def parse_benchmark_output(output):
         gpu_time_s = parse_time_value(gpu_time_str)
 
         if gpu_time_s is not None:
+            if verbose:
+                print(f"  Parsed: problem_size={problem_size}, gpu_time_col={gpu_time_str!r}, value={gpu_time_s*1000:.6f} ms")
             results[problem_size] = gpu_time_s
+        elif verbose:
+            print(f"  Warning: Could not parse GPU time from col {gpu_time_col_idx}: {gpu_time_str!r}")
 
     return results
 
@@ -300,6 +319,11 @@ def main():
              "then common locations relative to the script are searched.",
     )
     parser.add_argument(
+        "--verbose", "-v",
+        action="store_true",
+        help="Print verbose output including raw benchmark output and parsed values.",
+    )
+    parser.add_argument(
         "--variants",
         nargs="+",
         default=None,
@@ -365,14 +389,14 @@ def main():
     for variant in variants:
         bench_name = f"sarbp_{variant}"
         print(f"\n{'=' * 100}")
-        output = run_benchmark(benchmark_exe, bench_name)
+        output = run_benchmark(benchmark_exe, bench_name, verbose=args.verbose)
 
         if output is None:
             print(f"  Skipping {variant} due to error")
             continue
 
         # Parse results
-        results = parse_benchmark_output(output)
+        results = parse_benchmark_output(output, verbose=args.verbose)
 
         if not results:
             print(f"  Warning: Could not parse results for {variant}")

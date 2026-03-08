@@ -178,7 +178,10 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
     const index_t ix = static_cast<index_t>(blockIdx.x * blockDim.x + threadIdx.x);
     const index_t iy = static_cast<index_t>(blockIdx.y * blockDim.y + threadIdx.y);
 
-    // Currently only used for FloatFloat compute type
+    // Currently only used for FloatFloat compute type. nvcc will eliminate sh_ant_pos
+    // as dead code if no code paths access it. Please report any cases where sh_ant_pos
+    // has not been eliminated (and thus static shared memory is allocated) for other
+    // compute types as that would impact performance.
     __shared__ fltflt sh_ant_pos[PULSE_BLOCK_SIZE][4];
 
     const bool is_valid = ix < image_width && iy < image_height;
@@ -246,90 +249,90 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
     const loose_compute_t max_bin_f = static_cast<loose_compute_t>(num_range_bins) - static_cast<loose_compute_t>(2.0);
     const int num_pulse_blocks = (num_pulses + PULSE_BLOCK_SIZE - 1) / PULSE_BLOCK_SIZE;
     for (int block = 0; block < num_pulse_blocks; ++block) {
-    const int num_pulses_in_block = num_pulses - block * PULSE_BLOCK_SIZE < PULSE_BLOCK_SIZE ?
-        num_pulses - block * PULSE_BLOCK_SIZE : PULSE_BLOCK_SIZE;
-    if constexpr (ComputeType == SarBpComputeType::FloatFloat) {
-        __syncthreads();
-        for (index_t ip = tid; ip < num_pulses_in_block; ip += blockDim.x * blockDim.y) {
-            const int p = block * PULSE_BLOCK_SIZE + ip;
-            if constexpr (PlatPosType::Rank() == 1) {
-                const plat_pos_t ant_pos_p = platform_positions.operator()(p);
-                sh_ant_pos[ip][0] = static_cast<fltflt>(ant_pos_p.x);
-                sh_ant_pos[ip][1] = static_cast<fltflt>(ant_pos_p.y);
-                sh_ant_pos[ip][2] = static_cast<fltflt>(ant_pos_p.z);
-            } else {
-                sh_ant_pos[ip][0] = static_cast<fltflt>(platform_positions.operator()(p, 0));
-                sh_ant_pos[ip][1] = static_cast<fltflt>(platform_positions.operator()(p, 1));
-                sh_ant_pos[ip][2] = static_cast<fltflt>(platform_positions.operator()(p, 2));
-            }
-            sh_ant_pos[ip][3] = static_cast<fltflt>(r_to_mcp(p));
-        }
-        __syncthreads();
-        if (! is_valid) {
-            continue;
-        }
-    }
-    #pragma unroll 4
-    for (index_t ip = 0; ip < num_pulses_in_block; ++ip) {
-        const int p = block * PULSE_BLOCK_SIZE + ip;
-        [[maybe_unused]] strict_compute_t diffR{};
-        loose_compute_t bin;
+        const int num_pulses_in_block = num_pulses - block * PULSE_BLOCK_SIZE < PULSE_BLOCK_SIZE ?
+            num_pulses - block * PULSE_BLOCK_SIZE : PULSE_BLOCK_SIZE;
         if constexpr (ComputeType == SarBpComputeType::FloatFloat) {
-            const fltflt diffR_ff = ComputeRangeToPixelFloatFloat(
-                sh_ant_pos[ip][0], sh_ant_pos[ip][1], sh_ant_pos[ip][2], px, py, pz) - sh_ant_pos[ip][3];
-            bin = static_cast<loose_compute_t>(diffR_ff * dr_inv_fltflt) + bin_offset;
-            // diffR is otherwise unused for FloatFloat and thus not set
-        } else {
-            diffR = ComputeRangeToPixel<PlatPosType, ComputeType, strict_compute_t, loose_compute_t>(
-                platform_positions, p, px, py, pz) - static_cast<strict_compute_t>(r_to_mcp(p));
-            bin = static_cast<loose_compute_t>(diffR * dr_inv) + bin_offset;
-        }
-        if (bin >= 0.0f && bin < max_bin_f) {
-            loose_compute_t bin_floor;
-            if constexpr (std::is_same_v<loose_compute_t, float>) {
-                bin_floor = ::floorf(bin);
-            } else {
-                bin_floor = ::floor(bin);
-            }
-            const loose_compute_t w = bin - bin_floor;
-            const index_t bin_floor_int = static_cast<index_t>(bin_floor);
-
-            range_profiles_t sample_lo, sample_hi;
-
-            cuda::std::apply([&sample_lo, &range_profiles](auto &&...args) {
-                sample_lo = range_profiles.operator()(args...);
-            }, cuda::std::make_tuple(p, bin_floor_int));
-
-            cuda::std::apply([&sample_hi, &range_profiles](auto &&...args) {
-                sample_hi = range_profiles.operator()(args...);
-            }, cuda::std::make_tuple(p, bin_floor_int + 1));
-
-            const loose_complex_compute_t sample = [&sample_lo, &sample_hi, &w]() -> loose_complex_compute_t {
-                const loose_complex_compute_t loose_sample_lo = static_cast<loose_complex_compute_t>(sample_lo);
-                const loose_complex_compute_t loose_sample_hi = static_cast<loose_complex_compute_t>(sample_hi);
-                if constexpr (std::is_same_v<loose_compute_t, float>) {
-                    return loose_complex_compute_t{
-                        __fmaf_rn(w, loose_sample_hi.real(), __fmaf_rn(-w, loose_sample_lo.real(), loose_sample_lo.real())),
-                        __fmaf_rn(w, loose_sample_hi.imag(), __fmaf_rn(-w, loose_sample_lo.imag(), loose_sample_lo.imag()))
-                    };
+            __syncthreads();
+            for (index_t ip = tid; ip < num_pulses_in_block; ip += blockDim.x * blockDim.y) {
+                const int p = block * PULSE_BLOCK_SIZE + ip;
+                if constexpr (PlatPosType::Rank() == 1) {
+                    const plat_pos_t ant_pos_p = platform_positions.operator()(p);
+                    sh_ant_pos[ip][0] = static_cast<fltflt>(ant_pos_p.x);
+                    sh_ant_pos[ip][1] = static_cast<fltflt>(ant_pos_p.y);
+                    sh_ant_pos[ip][2] = static_cast<fltflt>(ant_pos_p.z);
                 } else {
-                    return loose_complex_compute_t{
-                        fma(w, loose_sample_hi.real(), fma(-w, loose_sample_lo.real(), loose_sample_lo.real())),
-                        fma(w, loose_sample_hi.imag(), fma(-w, loose_sample_lo.imag(), loose_sample_lo.imag()))
-                    };
+                    sh_ant_pos[ip][0] = static_cast<fltflt>(platform_positions.operator()(p, 0));
+                    sh_ant_pos[ip][1] = static_cast<fltflt>(platform_positions.operator()(p, 1));
+                    sh_ant_pos[ip][2] = static_cast<fltflt>(platform_positions.operator()(p, 2));
                 }
-            }();
-
-            // diffR is unset for FloatFloat mode, but PhaseLUT == true is currently required for
-            // FloatFloat mode due to missing fltflt sin/cos implementations, so diffR will not be
-            // used in get_reference_phase() below.
-            static_assert(ComputeType != SarBpComputeType::FloatFloat || PhaseLUT == true, "SarBp: FloatFloat compute type requires PhaseLUT optimization");
-            const loose_complex_compute_t ref_phase = get_reference_phase(diffR, bin_floor_int, w);
-
-            accum += sample * ref_phase;
+                sh_ant_pos[ip][3] = static_cast<fltflt>(r_to_mcp(p));
+            }
+            __syncthreads();
+            if (! is_valid) {
+                continue;
+            }
         }
-    }
-    }
+        #pragma unroll 4
+        for (index_t ip = 0; ip < num_pulses_in_block; ++ip) {
+            const int p = block * PULSE_BLOCK_SIZE + ip;
+            [[maybe_unused]] strict_compute_t diffR{};
+            loose_compute_t bin;
+            if constexpr (ComputeType == SarBpComputeType::FloatFloat) {
+                const fltflt diffR_ff = ComputeRangeToPixelFloatFloat(
+                    sh_ant_pos[ip][0], sh_ant_pos[ip][1], sh_ant_pos[ip][2], px, py, pz) - sh_ant_pos[ip][3];
+                bin = static_cast<loose_compute_t>(diffR_ff * dr_inv_fltflt) + bin_offset;
+                // diffR is otherwise unused for FloatFloat and thus not set
+            } else {
+                diffR = ComputeRangeToPixel<PlatPosType, ComputeType, strict_compute_t, loose_compute_t>(
+                    platform_positions, p, px, py, pz) - static_cast<strict_compute_t>(r_to_mcp(p));
+                bin = static_cast<loose_compute_t>(diffR * dr_inv) + bin_offset;
+            }
+            if (bin >= 0.0f && bin < max_bin_f) {
+                loose_compute_t bin_floor;
+                if constexpr (std::is_same_v<loose_compute_t, float>) {
+                    bin_floor = ::floorf(bin);
+                } else {
+                    bin_floor = ::floor(bin);
+                }
+                const loose_compute_t w = bin - bin_floor;
+                const index_t bin_floor_int = static_cast<index_t>(bin_floor);
+
+                range_profiles_t sample_lo, sample_hi;
+
+                cuda::std::apply([&sample_lo, &range_profiles](auto &&...args) {
+                    sample_lo = range_profiles.operator()(args...);
+                }, cuda::std::make_tuple(p, bin_floor_int));
+
+                cuda::std::apply([&sample_hi, &range_profiles](auto &&...args) {
+                    sample_hi = range_profiles.operator()(args...);
+                }, cuda::std::make_tuple(p, bin_floor_int + 1));
+
+                const loose_complex_compute_t sample = [&sample_lo, &sample_hi, &w]() -> loose_complex_compute_t {
+                    const loose_complex_compute_t loose_sample_lo = static_cast<loose_complex_compute_t>(sample_lo);
+                    const loose_complex_compute_t loose_sample_hi = static_cast<loose_complex_compute_t>(sample_hi);
+                    if constexpr (std::is_same_v<loose_compute_t, float>) {
+                        return loose_complex_compute_t{
+                            __fmaf_rn(w, loose_sample_hi.real(), __fmaf_rn(-w, loose_sample_lo.real(), loose_sample_lo.real())),
+                            __fmaf_rn(w, loose_sample_hi.imag(), __fmaf_rn(-w, loose_sample_lo.imag(), loose_sample_lo.imag()))
+                        };
+                    } else {
+                        return loose_complex_compute_t{
+                            fma(w, loose_sample_hi.real(), fma(-w, loose_sample_lo.real(), loose_sample_lo.real())),
+                            fma(w, loose_sample_hi.imag(), fma(-w, loose_sample_lo.imag(), loose_sample_lo.imag()))
+                        };
+                    }
+                }();
+
+                // diffR is unset for FloatFloat mode, but PhaseLUT == true is currently required for
+                // FloatFloat mode due to missing fltflt sin/cos implementations, so diffR will not be
+                // used in get_reference_phase() below.
+                static_assert(ComputeType != SarBpComputeType::FloatFloat || PhaseLUT == true, "SarBp: FloatFloat compute type requires PhaseLUT optimization");
+                const loose_complex_compute_t ref_phase = get_reference_phase(diffR, bin_floor_int, w);
+
+                accum += sample * ref_phase;
+            }
+        } // pulse
+    } // pulse block
 
     if (is_valid) {
         initial_image_t initial_image_voxel = initial_image.operator()(iy, ix);
