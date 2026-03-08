@@ -65,6 +65,16 @@ inline void sar_bp_impl(OutImageType &out, const InitialImageType &initial_image
     MATX_THROW(matxInvalidParameter, "sar_bp: FloatFloat compute type requires phase LUT optimization");
   }
 
+  const index_t num_pulses = range_profiles.Size(0);
+  if (platform_positions.Size(0) != num_pulses) {
+    MATX_THROW(matxInvalidParameter, "sar_bp: number of pulses in range profiles and platform positions must match");
+  }
+  if constexpr (PlatPosType::Rank() == 2) {
+    if (platform_positions.Size(1) != 3) {
+      MATX_THROW(matxInvalidParameter, "sar_bp: platform positions must be either a 1D tensor or a 2D tensor with size 3 (x,y,z) in the second dimension");
+    }
+  }
+
   const double dr_inv = 1.0 / params.del_r;
 
   const dim3 block(16, 16);
@@ -112,8 +122,9 @@ inline void sar_bp_impl(OutImageType &out, const InitialImageType &initial_image
       SarBp<SarBpComputeType::Mixed, OutImageType, InitialImageType, RangeProfilesType, PlatPosType, VoxLocType, RangeToMcpType, PhaseLUT><<<grid, block, 0, stream>>>(
         out, initial_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, dr_inv, phase_correction_partial, nullptr);
     } else if (params.compute_type == SarBpComputeType::FloatFloat) {
-      SarBp<SarBpComputeType::FloatFloat, OutImageType, InitialImageType, RangeProfilesType, PlatPosType, VoxLocType, RangeToMcpType, PhaseLUT><<<grid, block, 0, stream>>>(
-        out, initial_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, dr_inv, phase_correction_partial, nullptr);
+        // We currently require that phase LUT optimization be enabled for the FloatFloat compute type. See comment
+        // in run-time check higher in this function.
+        MATX_THROW(matxInvalidParameter, "sar_bp: FloatFloat compute type requires phase LUT optimization");
     } else {
       SarBp<SarBpComputeType::Float, OutImageType, InitialImageType, RangeProfilesType, PlatPosType, VoxLocType, RangeToMcpType, PhaseLUT><<<grid, block, 0, stream>>>(
         out, initial_image, range_profiles, platform_positions, voxel_locations, range_to_mcp,

@@ -49,7 +49,7 @@ namespace matx {
 
 // fltflt represents an unevaluated floating point sum of two non-overlapping fp32 components.
 // The hi component is the most significant part of the sum, and the lo component is the least significant part.
-struct fltflt {
+struct alignas(8) fltflt {
     float hi;
     float lo;
 

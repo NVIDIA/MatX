@@ -5,6 +5,7 @@ set (bench_sources
     00_transform/conv.cu
     00_transform/cub.cu
     00_transform/einsum.cu
+    00_transform/sarbp.cu
     00_transform/svd_power.cu
     00_transform/qr.cu
     00_operators/operators.cu

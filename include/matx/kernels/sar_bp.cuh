@@ -45,7 +45,7 @@
 #include "matx/core/tensor_utils.h"
 #include "matx/kernels/fltflt.h"
 
-#define PULSE_BLOCK_SIZE 1024
+#define PULSE_BLOCK_SIZE 512
 
 namespace matx {
 
@@ -80,12 +80,21 @@ template <typename PlatPosType, SarBpComputeType ComputeType, typename strict_co
 __device__ inline strict_compute_t ComputeRangeToPixel(const PlatPosType &ant_pos, const index_t pulse_idx, const loose_compute_t px, const loose_compute_t py, const loose_compute_t z0) {
     using plat_pos_t = typename PlatPosType::value_type;
 
-    static_assert(std::is_same_v<plat_pos_t, double3> || std::is_same_v<plat_pos_t, double4> ||
-        std::is_same_v<plat_pos_t, float3> || std::is_same_v<plat_pos_t, float4>, "ComputeRangeToPixel: plat_pos_t must be a 3D or 4D vector");
-    const plat_pos_t ant_pos_p = ant_pos.operator()(pulse_idx);
-    const strict_compute_t dx = static_cast<strict_compute_t>(px) - static_cast<strict_compute_t>(ant_pos_p.x);
-    const strict_compute_t dy = static_cast<strict_compute_t>(py) - static_cast<strict_compute_t>(ant_pos_p.y);
-    const strict_compute_t dz = static_cast<strict_compute_t>(z0) - static_cast<strict_compute_t>(ant_pos_p.z);
+    strict_compute_t dx, dy, dz;
+    static_assert((PlatPosType::Rank() == 1 && (std::is_same_v<plat_pos_t, double3> || std::is_same_v<plat_pos_t, double4> ||
+        std::is_same_v<plat_pos_t, float3> || std::is_same_v<plat_pos_t, float4>)) || PlatPosType::Rank() == 2,
+        "ComputeRangeToPixel: plat_pos_t must be a 1D tensor of 3D or 4D vectorized type or a 2D tensor with size 3 (x,y,z) in the second dimension");
+
+    if constexpr (PlatPosType::Rank() == 1) {
+        const plat_pos_t ant_pos_p = ant_pos.operator()(pulse_idx);
+        dx = static_cast<strict_compute_t>(px) - static_cast<strict_compute_t>(ant_pos_p.x);
+        dy = static_cast<strict_compute_t>(py) - static_cast<strict_compute_t>(ant_pos_p.y);
+        dz = static_cast<strict_compute_t>(z0) - static_cast<strict_compute_t>(ant_pos_p.z);
+    } else {
+        dx = static_cast<strict_compute_t>(px) - static_cast<strict_compute_t>(ant_pos.operator()(pulse_idx, 0));
+        dy = static_cast<strict_compute_t>(py) - static_cast<strict_compute_t>(ant_pos.operator()(pulse_idx, 1));
+        dz = static_cast<strict_compute_t>(z0) - static_cast<strict_compute_t>(ant_pos.operator()(pulse_idx, 2));
+    }
 
     if constexpr (ComputeType == SarBpComputeType::Float) {
         return ::sqrtf(dx*dx + dy*dy + dz*dz);
@@ -141,16 +150,17 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
     static_assert(OutImageType::Rank() == 2, "Output image must be a 2D tensor");
     static_assert(InitialImageType::Rank() == 2, "Initial image must be a 2D tensor");
     static_assert(RangeProfilesType::Rank() == 2, "Range profiles must be a 2D tensor");
-    static_assert(PlatPosType::Rank() == 1, "Platform positions must be a 1D tensor");
+    static_assert(PlatPosType::Rank() == 1 || PlatPosType::Rank() == 2, "Platform positions must be a 1D or 2D tensor");
     static_assert(VoxLocType::Rank() == 2, "Voxel locations must be a 2D tensor");
     static_assert(is_complex_v<typename OutImageType::value_type>, "Output image must be complex");
     static_assert(is_complex_v<typename InitialImageType::value_type>, "Initial image must be complex");
     static_assert(is_complex_v<typename RangeProfilesType::value_type>, "Range profiles must be complex");
 
     static_assert(
-        (is_matx_op<RangeToMcpType>() && (RangeToMcpType::Rank() == 0 || RangeToMcpType::Rank() == 1) && (std::is_same_v<typename RangeToMcpType::value_type, float> || std::is_same_v<typename RangeToMcpType::value_type, double>)) ||
-        (std::is_same_v<RangeToMcpType, float> || std::is_same_v<RangeToMcpType, double>),
-        "RangeToMcpType must currently be a 0D tensor or scalar of type float or double");
+        (is_matx_op<RangeToMcpType>() && (RangeToMcpType::Rank() == 0 || RangeToMcpType::Rank() == 1) &&
+        (std::is_same_v<typename RangeToMcpType::value_type, float> || std::is_same_v<typename RangeToMcpType::value_type, double> || std::is_same_v<typename RangeToMcpType::value_type, fltflt>)) ||
+        (std::is_same_v<RangeToMcpType, float> || std::is_same_v<RangeToMcpType, double> || std::is_same_v<RangeToMcpType, fltflt>),
+        "RangeToMcpType must currently be a 0D tensor or scalar of type float, double, or fltflt");
 
     using initial_image_t = typename InitialImageType::value_type;
     using image_t = typename OutImageType::value_type;
@@ -181,10 +191,9 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
     const index_t num_pulses = range_profiles.Size(0);
     const index_t num_range_bins = range_profiles.Size(1);
 
-    constexpr loose_compute_t half = static_cast<loose_compute_t>(0.5);
     static_assert(std::is_same_v<voxel_loc_t, double3> || std::is_same_v<voxel_loc_t, double4> ||
         std::is_same_v<voxel_loc_t, float3> || std::is_same_v<voxel_loc_t, float4>, "SarBp: VoxLocType must represent a 2D operator of type double3, double4, float3, or float4");
-    const voxel_loc_t voxel_loc = voxel_locations(iy, ix);
+    const voxel_loc_t voxel_loc = is_valid ? voxel_locations(iy, ix) : voxel_loc_t{};
     const loose_compute_t py = voxel_loc.y;
     const loose_compute_t px = voxel_loc.x;
     const loose_compute_t pz = voxel_loc.z;
@@ -201,7 +210,7 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
         }
     };
 
-    const loose_compute_t phase_correction_partial_loose = static_cast<loose_compute_t>(phase_correction_partial);
+    [[maybe_unused]] const loose_compute_t phase_correction_partial_loose = static_cast<loose_compute_t>(phase_correction_partial);
     const auto get_reference_phase = [&phase_lut, &phase_correction_partial, &phase_correction_partial_loose](strict_compute_t diffR, index_t bin_floor_int, loose_compute_t w) -> loose_complex_compute_t {
         if constexpr (PhaseLUT) {
             const loose_complex_compute_t base_phase = phase_lut[bin_floor_int];
@@ -226,6 +235,8 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
 
     [[maybe_unused]] fltflt dr_inv_fltflt{};
     if constexpr (ComputeType == SarBpComputeType::FloatFloat) {
+        // We could perform this in only a single thread and store the result to shared memory, but
+        // in initial tests that did not improve performance.
         dr_inv_fltflt = static_cast<fltflt>(dr_inv);
     }
     [[maybe_unused]] const int tid = threadIdx.x + threadIdx.y * blockDim.x;
@@ -241,10 +252,16 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
         __syncthreads();
         for (index_t ip = tid; ip < num_pulses_in_block; ip += blockDim.x * blockDim.y) {
             const int p = block * PULSE_BLOCK_SIZE + ip;
-            const plat_pos_t ant_pos_p = platform_positions.operator()(p);
-            sh_ant_pos[ip][0] = static_cast<fltflt>(ant_pos_p.x);
-            sh_ant_pos[ip][1] = static_cast<fltflt>(ant_pos_p.y);
-            sh_ant_pos[ip][2] = static_cast<fltflt>(ant_pos_p.z);
+            if constexpr (PlatPosType::Rank() == 1) {
+                const plat_pos_t ant_pos_p = platform_positions.operator()(p);
+                sh_ant_pos[ip][0] = static_cast<fltflt>(ant_pos_p.x);
+                sh_ant_pos[ip][1] = static_cast<fltflt>(ant_pos_p.y);
+                sh_ant_pos[ip][2] = static_cast<fltflt>(ant_pos_p.z);
+            } else {
+                sh_ant_pos[ip][0] = static_cast<fltflt>(platform_positions.operator()(p, 0));
+                sh_ant_pos[ip][1] = static_cast<fltflt>(platform_positions.operator()(p, 1));
+                sh_ant_pos[ip][2] = static_cast<fltflt>(platform_positions.operator()(p, 2));
+            }
             sh_ant_pos[ip][3] = static_cast<fltflt>(r_to_mcp(p));
         }
         __syncthreads();
@@ -264,18 +281,17 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
             // diffR is otherwise unused for FloatFloat and thus not set
         } else {
             diffR = ComputeRangeToPixel<PlatPosType, ComputeType, strict_compute_t, loose_compute_t>(
-                platform_positions, p, px, py, pz) - r_to_mcp(p);
+                platform_positions, p, px, py, pz) - static_cast<strict_compute_t>(r_to_mcp(p));
             bin = static_cast<loose_compute_t>(diffR * dr_inv) + bin_offset;
         }
         if (bin >= 0.0f && bin < max_bin_f) {
-            loose_compute_t bin_floor, w;
+            loose_compute_t bin_floor;
             if constexpr (std::is_same_v<loose_compute_t, float>) {
                 bin_floor = ::floorf(bin);
-                w = (bin - bin_floor);
             } else {
                 bin_floor = ::floor(bin);
-                w = (bin - bin_floor);
             }
+            const loose_compute_t w = bin - bin_floor;
             const index_t bin_floor_int = static_cast<index_t>(bin_floor);
 
             range_profiles_t sample_lo, sample_hi;
@@ -288,16 +304,32 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
                 sample_hi = range_profiles.operator()(args...);
             }, cuda::std::make_tuple(p, bin_floor_int + 1));
 
-            const loose_complex_compute_t sample =
-                (static_cast<loose_compute_t>(1.0) - w) * static_cast<loose_complex_compute_t>(sample_lo) +
-                w * static_cast<loose_complex_compute_t>(sample_hi);
+            const loose_complex_compute_t sample = [&sample_lo, &sample_hi, &w]() -> loose_complex_compute_t {
+                const loose_complex_compute_t loose_sample_lo = static_cast<loose_complex_compute_t>(sample_lo);
+                const loose_complex_compute_t loose_sample_hi = static_cast<loose_complex_compute_t>(sample_hi);
+                if constexpr (std::is_same_v<loose_compute_t, float>) {
+                    return loose_complex_compute_t{
+                        __fmaf_rn(w, loose_sample_hi.real(), __fmaf_rn(-w, loose_sample_lo.real(), loose_sample_lo.real())),
+                        __fmaf_rn(w, loose_sample_hi.imag(), __fmaf_rn(-w, loose_sample_lo.imag(), loose_sample_lo.imag()))
+                    };
+                } else {
+                    return loose_complex_compute_t{
+                        fma(w, loose_sample_hi.real(), fma(-w, loose_sample_lo.real(), loose_sample_lo.real())),
+                        fma(w, loose_sample_hi.imag(), fma(-w, loose_sample_lo.imag(), loose_sample_lo.imag()))
+                    };
+                }
+            }();
 
+            // diffR is unset for FloatFloat mode, but PhaseLUT == true is currently required for
+            // FloatFloat mode due to missing fltflt sin/cos implementations, so diffR will not be
+            // used in get_reference_phase() below.
+            static_assert(ComputeType != SarBpComputeType::FloatFloat || PhaseLUT == true, "SarBp: FloatFloat compute type requires PhaseLUT optimization");
             const loose_complex_compute_t ref_phase = get_reference_phase(diffR, bin_floor_int, w);
 
             accum += sample * ref_phase;
         }
     }
-}
+    }
 
     if (is_valid) {
         initial_image_t initial_image_voxel = initial_image.operator()(iy, ix);
