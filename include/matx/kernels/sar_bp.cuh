@@ -57,6 +57,9 @@ static constexpr double SPEED_OF_LIGHT = 2.997291625155841e+08;
 // initial estimate is computed using a single-precision square root.
 static __device__ __forceinline__ double NewtonRaphsonSqrt(double x) {
     const float est = sqrtf(static_cast<float>(x));
+    // We perform this comparison after the sqrtf() to avoid the fp64 comparison.
+    // It is rare that x will be 0, so there is generally not much advantage to an early exit.
+    if (est == 0.0f) return 0.0;
     const float est_2_inv = __fdividef(1.0f, 2.0f * est);
     const double est_f64 = static_cast<double>(est);
     const double est_2_inv_f64 = static_cast<double>(est_2_inv);
