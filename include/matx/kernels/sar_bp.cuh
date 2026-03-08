@@ -148,7 +148,7 @@ struct SarBpSharedMemory {};
 
 template <>
 struct SarBpSharedMemory<SarBpComputeType::FloatFloat> {
-    __shared__ fltflt ant_pos[PULSE_BLOCK_SIZE][4];
+    fltflt ant_pos[PULSE_BLOCK_SIZE][4];
 };
 
 template <SarBpComputeType ComputeType, typename OutImageType, typename InitialImageType, typename RangeProfilesType, typename PlatPosType, typename VoxLocType, typename RangeToMcpType, bool PhaseLUT>
