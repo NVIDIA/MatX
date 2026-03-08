@@ -1,4 +1,4 @@
-////////////////////////////////////////////////////////////////////////////////
+g///////////////////////////////////////////////////////////////////////////////
 // BSD 3-Clause License
 //
 // Copyright (c) 2026, NVIDIA Corporation
@@ -124,9 +124,9 @@ inline void sar_bp_impl(OutImageType &out, const InitialImageType &initial_image
       SarBp<SarBpComputeType::Mixed, OutImageType, InitialImageType, RangeProfilesType, PlatPosType, VoxLocType, RangeToMcpType, PhaseLUT><<<grid, block, 0, stream>>>(
         out, initial_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, dr_inv, phase_correction_partial, nullptr);
     } else if (params.compute_type == SarBpComputeType::FloatFloat) {
-        // We currently require that phase LUT optimization be enabled for the FloatFloat compute type. See comment
-        // in run-time check higher in this function.
-        MATX_THROW(matxInvalidParameter, "sar_bp: FloatFloat compute type requires phase LUT optimization");
+      // We currently require that phase LUT optimization be enabled for the FloatFloat compute type. See comment
+      // in run-time check higher in this function.
+      MATX_THROW(matxInvalidParameter, "sar_bp: FloatFloat compute type requires phase LUT optimization");
     } else {
       SarBp<SarBpComputeType::Float, OutImageType, InitialImageType, RangeProfilesType, PlatPosType, VoxLocType, RangeToMcpType, PhaseLUT><<<grid, block, 0, stream>>>(
         out, initial_image, range_profiles, platform_positions, voxel_locations, range_to_mcp,

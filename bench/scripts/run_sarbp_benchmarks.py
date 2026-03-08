@@ -48,6 +48,7 @@ def strip_ansi(text):
     """Remove ANSI escape codes from a string."""
     return ANSI_ESCAPE.sub('', text)
 
+
 def find_benchmark_executable(build_dir):
     """Find the matx_bench executable."""
     benchmark_path = build_dir / "bench" / "matx_bench"
@@ -57,6 +58,7 @@ def find_benchmark_executable(build_dir):
 
     print(f"Error: Could not find matx_bench at {benchmark_path}")
     return None
+
 
 def run_benchmark(executable_path, benchmark_name, verbose=False):
     """Run a specific benchmark and capture output."""
@@ -86,6 +88,7 @@ def run_benchmark(executable_path, benchmark_name, verbose=False):
         print(f"  Error running benchmark: {e}")
         return None
 
+
 def parse_time_value(time_str):
     """Parse time string like '668.707 us' or '6.785 ms' and convert to seconds."""
     time_str = strip_ansi(time_str).strip()
@@ -109,6 +112,7 @@ def parse_time_value(time_str):
         return value
     else:
         return value
+
 
 def parse_benchmark_output(output, verbose=False):
     """
@@ -184,6 +188,7 @@ def parse_benchmark_output(output, verbose=False):
 
     return results
 
+
 def calculate_gproj_per_sec(problem_size, time_seconds):
     """
     Calculate gigabackprojections per second.
@@ -199,6 +204,7 @@ def calculate_gproj_per_sec(problem_size, time_seconds):
     gproj_per_sec = giga_operations / time_seconds
     return gproj_per_sec
 
+
 def print_summary(all_results):
     """Print a formatted summary table."""
     print("\n")
@@ -213,7 +219,8 @@ def print_summary(all_results):
     print()
 
     # Print detailed results for each variant
-    variants = ['float', 'double', 'mixed', 'fltflt']
+    # Use only the variants that were actually run
+    variants = sorted(all_results.keys())
 
     for variant in variants:
         if variant not in all_results:
@@ -265,46 +272,50 @@ def print_summary(all_results):
                 row += f" {'N/A':<15}"
         print(row)
 
-    # Print relative performance (relative to float)
-    print("\n")
-    print("=" * 100)
-    print("RELATIVE PERFORMANCE (float = 1.0x baseline)")
-    print("=" * 100)
-    print()
+    # Print relative performance (relative to float) - only if float was run
+    if 'float' in all_results:
+        print("\n")
+        print("=" * 100)
+        print("RELATIVE PERFORMANCE (float = 1.0x baseline)")
+        print("=" * 100)
+        print()
 
-    # Print header
-    header = f"{'Problem Size':<15}"
-    for variant in variants:
-        if variant in all_results:
-            header += f" {variant:<15}"
-    print(header)
-    print("-" * 100)
-
-    # Print data rows
-    for problem_size in all_problem_sizes:
-        row = f"{problem_size:<15}"
-
-        # Get float baseline
-        float_gproj_s = None
-        if 'float' in all_results and problem_size in all_results['float']:
-            time_s = all_results['float'][problem_size]
-            float_gproj_s = calculate_gproj_per_sec(problem_size, time_s)
-
+        # Print header
+        header = f"{'Problem Size':<15}"
         for variant in variants:
-            if variant in all_results and problem_size in all_results[variant]:
-                time_s = all_results[variant][problem_size]
-                gproj_s = calculate_gproj_per_sec(problem_size, time_s)
+            if variant in all_results:
+                header += f" {variant:<15}"
+        print(header)
+        print("-" * 100)
 
-                if float_gproj_s is not None and float_gproj_s > 0:
-                    relative = gproj_s / float_gproj_s
-                    row += f" {relative:<15.3f}"
+        # Print data rows
+        for problem_size in all_problem_sizes:
+            row = f"{problem_size:<15}"
+
+            # Get float baseline
+            float_gproj_s = None
+            if problem_size in all_results['float']:
+                time_s = all_results['float'][problem_size]
+                float_gproj_s = calculate_gproj_per_sec(problem_size, time_s)
+
+            for variant in variants:
+                if variant in all_results and problem_size in all_results[variant]:
+                    time_s = all_results[variant][problem_size]
+                    gproj_s = calculate_gproj_per_sec(problem_size, time_s)
+
+                    if float_gproj_s is not None and float_gproj_s > 0:
+                        relative = gproj_s / float_gproj_s
+                        row += f" {relative:<15.3f}"
+                    else:
+                        row += f" {1.0:<15.3f}" if variant == 'float' else f" {'N/A':<15}"
                 else:
-                    row += f" {1.0:<15.3f}" if variant == 'float' else f" {'N/A':<15}"
-            else:
-                row += f" {'N/A':<15}"
-        print(row)
+                    row += f" {'N/A':<15}"
+            print(row)
 
-    print("=" * 100)
+        print("=" * 100)
+    else:
+        print("=" * 100)
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -382,6 +393,14 @@ def main():
     # List of SAR BP benchmark variants
     all_variants = ['float', 'double', 'mixed', 'fltflt']
     variants = args.variants if args.variants is not None else all_variants
+
+    # Validate user-provided variants
+    if args.variants is not None:
+        invalid_variants = [v for v in args.variants if v not in all_variants]
+        if invalid_variants:
+            print(f"Error: Unknown variant(s): {', '.join(invalid_variants)}")
+            print(f"Valid variants are: {', '.join(all_variants)}")
+            sys.exit(1)
 
     all_results = {}
 

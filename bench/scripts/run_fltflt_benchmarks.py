@@ -253,8 +253,10 @@ def print_summary(results, relative):
     print(f"{'Benchmark':<15} {'float':<12} {'double':<12} {'fltflt':<12} {'fltflt vs dbl':<15}")
     print("-" * 66)
 
-    # Order benchmarks
+    # Order benchmarks - use the canonical order but only show benchmarks that were actually run
     bench_order = ['add', 'sub', 'mul', 'div', 'sqrt', 'abs', 'fma', 'madd', 'round', 'trunc', 'floor', 'fmod', 'cast2dbl', 'cast2fltflt']
+    # Filter to only benchmarks present in results
+    bench_order = [b for b in bench_order if b in results]
 
     for bench in bench_order:
         if bench not in relative:
@@ -389,6 +391,14 @@ def main():
     # List of benchmarks to run
     all_benchmarks = ['add', 'sub', 'mul', 'div', 'sqrt', 'abs', 'fma', 'madd', 'round', 'trunc', 'floor', 'fmod', 'cast2dbl', 'cast2fltflt']
     benchmarks = args.benchmarks if args.benchmarks is not None else all_benchmarks
+
+    # Validate user-provided benchmarks
+    if args.benchmarks is not None:
+        invalid_benchmarks = [b for b in args.benchmarks if b not in all_benchmarks]
+        if invalid_benchmarks:
+            print(f"Error: Unknown benchmark(s): {', '.join(invalid_benchmarks)}")
+            print(f"Valid benchmarks are: {', '.join(all_benchmarks)}")
+            sys.exit(1)
 
     all_results = {}
 
