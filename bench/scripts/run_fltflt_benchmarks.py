@@ -291,9 +291,6 @@ def print_summary(results, relative):
     print("-" * 75)
 
     for bench in bench_order:
-        if bench not in results:
-            continue
-
         timings = results[bench]
 
         float_time = timings.get('float', None)

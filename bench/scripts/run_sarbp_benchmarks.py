@@ -223,9 +223,6 @@ def print_summary(all_results):
     variants = sorted(all_results.keys())
 
     for variant in variants:
-        if variant not in all_results:
-            continue
-
         print(f"\n{variant.upper()} Precision:")
         print("-" * 80)
         print(f"{'Problem Size':<15} {'Operations':<18} {'Time (ms)':<15} {'Gproj/s':<15}")
