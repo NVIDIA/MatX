@@ -95,6 +95,7 @@ void sarbp_float(nvbench::state &state)
   range_to_mcp.PrefetchDevice(0);
   platform_positions.PrefetchDevice(0);
   image.PrefetchDevice(0);
+  exec.sync();
 
   state.exec([&](nvbench::launch &launch) {
     (image = matx::experimental::sar_bp(zero_image, range_profiles, platform_positions,
@@ -164,6 +165,7 @@ void sarbp_double(nvbench::state &state)
   range_to_mcp.PrefetchDevice(0);
   platform_positions.PrefetchDevice(0);
   image.PrefetchDevice(0);
+  exec.sync();
 
   state.exec([&](nvbench::launch &launch) {
     (image = matx::experimental::sar_bp(zero_image, range_profiles, platform_positions,
@@ -234,6 +236,7 @@ void sarbp_mixed(nvbench::state &state)
   range_to_mcp.PrefetchDevice(0);
   platform_positions.PrefetchDevice(0);
   image.PrefetchDevice(0);
+  exec.sync();
 
   state.exec([&](nvbench::launch &launch) {
     (image = matx::experimental::sar_bp(zero_image, range_profiles, platform_positions,
@@ -305,6 +308,7 @@ void sarbp_fltflt(nvbench::state &state)
   range_to_mcp.PrefetchDevice(0);
   platform_positions.PrefetchDevice(0);
   image.PrefetchDevice(0);
+  exec.sync();
 
   state.exec([&](nvbench::launch &launch) {
     (image = matx::experimental::sar_bp(zero_image, range_profiles, platform_positions,
