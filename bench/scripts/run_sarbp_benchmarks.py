@@ -252,8 +252,7 @@ def print_summary(all_results):
     # Print header
     header = f"{'Problem Size':<15}"
     for variant in variants:
-        if variant in all_results:
-            header += f" {variant:<15}"
+        header += f" {variant:<15}"
     print(header)
     print("-" * 100)
 
@@ -261,7 +260,7 @@ def print_summary(all_results):
     for problem_size in all_problem_sizes:
         row = f"{problem_size:<15}"
         for variant in variants:
-            if variant in all_results and problem_size in all_results[variant]:
+            if problem_size in all_results[variant]:
                 time_s = all_results[variant][problem_size]
                 gproj_s = calculate_gproj_per_sec(problem_size, time_s)
                 row += f" {gproj_s:<15.3f}"
@@ -280,8 +279,7 @@ def print_summary(all_results):
         # Print header
         header = f"{'Problem Size':<15}"
         for variant in variants:
-            if variant in all_results:
-                header += f" {variant:<15}"
+            header += f" {variant:<15}"
         print(header)
         print("-" * 100)
 
@@ -296,7 +294,7 @@ def print_summary(all_results):
                 float_gproj_s = calculate_gproj_per_sec(problem_size, time_s)
 
             for variant in variants:
-                if variant in all_results and problem_size in all_results[variant]:
+                if problem_size in all_results[variant]:
                     time_s = all_results[variant][problem_size]
                     gproj_s = calculate_gproj_per_sec(problem_size, time_s)
 

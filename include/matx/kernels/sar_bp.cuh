@@ -294,7 +294,7 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
                     platform_positions, p, px, py, pz) - static_cast<strict_compute_t>(r_to_mcp(p));
                 bin = static_cast<loose_compute_t>(diffR * dr_inv) + bin_offset;
             }
-            if (bin >= 0.0f && bin < max_bin_f) {
+            if (bin >= static_cast<loose_compute_t>(0.0) && bin < max_bin_f) {
                 loose_compute_t bin_floor;
                 if constexpr (std::is_same_v<loose_compute_t, float>) {
                     bin_floor = ::floorf(bin);
