@@ -120,3 +120,55 @@ TYPED_TEST(CovarianceTestFloatTypes, BatchedCov)
 
   MATX_EXIT_HANDLER();
 }
+
+// Test cases where we have mismatched batch dimensions, which should result in an exception.
+TYPED_TEST(CovarianceTestFloatTypes, BatchDimensionMismatch)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+
+  // Test rank-4 tensors with mismatched batch dimension 0
+  {
+    auto a_good = make_tensor<TestType>({3, 4, this->cov_dim1, this->cov_dim2});
+    auto c_good = make_tensor<TestType>({3, 4, this->cov_dim2, this->cov_dim2});
+
+    // This should work - matching batch dimensions
+    ASSERT_NO_THROW({
+      auto handle = matx::detail::matxCovHandle_t(c_good, a_good, 0);
+    });
+
+    // Mismatched batch dimension 0: a has size 3, c has size 5
+    auto a_bad0 = make_tensor<TestType>({3, 4, this->cov_dim1, this->cov_dim2});
+    auto c_bad0 = make_tensor<TestType>({5, 4, this->cov_dim2, this->cov_dim2});
+
+    // This should throw matxInvalidSize, but with the bug it won't
+    ASSERT_THROW({
+      auto handle = matx::detail::matxCovHandle_t(c_bad0, a_bad0, 0);
+    }, matx::detail::matxException);
+  }
+
+  // Test rank-4 tensors with mismatched batch dimension 1
+  {
+    // Mismatched batch dimension 1: a has size 4, c has size 6
+    auto a_bad1 = make_tensor<TestType>({3, 4, this->cov_dim1, this->cov_dim2});
+    auto c_bad1 = make_tensor<TestType>({3, 6, this->cov_dim2, this->cov_dim2});
+
+    // This should throw matxInvalidSize, but with the bug it won't
+    ASSERT_THROW({
+      auto handle = matx::detail::matxCovHandle_t(c_bad1, a_bad1, 0);
+    }, matx::detail::matxException);
+  }
+
+  // Test rank-5 tensors to ensure higher batch dimensions still work
+  {
+    // Mismatched batch dimension 0
+    auto a_rank5 = make_tensor<TestType>({2, 3, 4, this->cov_dim1, this->cov_dim2});
+    auto c_rank5_bad = make_tensor<TestType>({7, 3, 4, this->cov_dim2, this->cov_dim2});
+
+    ASSERT_THROW({
+      auto handle = matx::detail::matxCovHandle_t(c_rank5_bad, a_rank5, 0);
+    }, matx::detail::matxException);
+  }
+
+  MATX_EXIT_HANDLER();
+}
