@@ -31,14 +31,24 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 Run fltflt arithmetic benchmarks and summarize results.
-Shows performance relative to single-precision (1x baseline).
+Shows performance relative to single-precision (float = 1.0x baseline).
 """
 
 import subprocess
 import re
 import sys
+import argparse
 from pathlib import Path
 from collections import defaultdict
+
+# Regex to strip ANSI escape codes from nvbench colored output
+ANSI_ESCAPE = re.compile(r'\x1b\[[0-9;]*[mK]')
+
+
+def strip_ansi(text):
+    """Remove ANSI escape codes from a string."""
+    return ANSI_ESCAPE.sub('', text)
+
 
 def find_benchmark_executable(build_dir):
     """Find the matx_bench executable."""
@@ -50,7 +60,8 @@ def find_benchmark_executable(build_dir):
     print(f"Error: Could not find matx_bench at {benchmark_path}")
     return None
 
-def run_benchmark(executable_path, benchmark_name):
+
+def run_benchmark(executable_path, benchmark_name, verbose=False):
     """Run a specific benchmark and capture output."""
     print(f"Running benchmark: {benchmark_name}")
 
@@ -67,6 +78,9 @@ def run_benchmark(executable_path, benchmark_name):
             print(f"  stderr: {result.stderr}")
             return None
 
+        if verbose:
+            print(f"  Raw output:\n{result.stdout}")
+
         return result.stdout
     except subprocess.TimeoutExpired:
         print(f"  Benchmark timed out after 5 minutes")
@@ -75,9 +89,10 @@ def run_benchmark(executable_path, benchmark_name):
         print(f"  Error running benchmark: {e}")
         return None
 
+
 def parse_time_value(time_str):
     """Parse time string like '668.707 us' or '6.785 ms' and convert to milliseconds."""
-    time_str = time_str.strip()
+    time_str = strip_ansi(time_str).strip()
 
     # Match number and unit
     match = re.match(r'([\d.]+)\s*(us|ms|ns|s)', time_str)
@@ -99,7 +114,8 @@ def parse_time_value(time_str):
     else:
         return value
 
-def parse_benchmark_output(output):
+
+def parse_benchmark_output(output, verbose=False):
     """
     Parse the table format output from nvbench.
 
@@ -111,6 +127,8 @@ def parse_benchmark_output(output):
     | matx::fltflt | ...                   |   6.785 ms | ...
     """
     results = {}
+    # Strip ANSI codes from the entire output before line-by-line processing
+    output = strip_ansi(output)
     lines = output.strip().split('\n')
 
     # Find the header line to locate GPU Time column
@@ -120,10 +138,13 @@ def parse_benchmark_output(output):
             # Split by | and find GPU Time column index
             cols = [col.strip() for col in line.split('|')]
             for j, col in enumerate(cols):
-                if 'GPU Time' in col:
+                if col == 'GPU Time':
                     gpu_time_col_idx = j
                     break
-            break
+            if gpu_time_col_idx is not None:
+                if verbose:
+                    print(f"  Found GPU Time at column index {gpu_time_col_idx} in: {line.rstrip()}")
+                break
 
     if gpu_time_col_idx is None:
         print("  Warning: Could not find GPU Time column in output")
@@ -134,22 +155,31 @@ def parse_benchmark_output(output):
         if '|' not in line:
             continue
 
-        # Skip header and separator lines
-        if 'GPU Time' in line or '---' in line or len(line.split('|')) < 2 or 'T' in line.split('|')[1]:
+        # Skip header and separator lines:
+        #   - any line containing 'GPU Time' is a column header
+        #   - any line with '---' is a separator/divider row
+        #   - lines where the type column (stripped) is exactly 'T' are header rows
+        #     (nvbench labels the type axis column as 'T')
+        cols_raw = line.split('|')
+        if len(cols_raw) < 3:
             continue
 
-        cols = [col.strip() for col in line.split('|')]
+        type_col_raw = cols_raw[1]  # unstripped, between first two '|'
+        if 'GPU Time' in line or '---' in line or type_col_raw.strip() == 'T':
+            continue
+
+        cols = [col.strip() for col in cols_raw]
 
         if len(cols) <= gpu_time_col_idx:
             continue
 
-        # Get type column (usually first or second)
-        type_col = cols[1] if len(cols) > 1 else None
+        # Get type column (first data column after the leading empty string)
+        type_col = cols[1]
 
         if not type_col:
             continue
 
-        # Map type names
+        # Map type names (nvbench aliases float->F32, double->F64)
         if 'F32' in type_col:
             precision = 'float'
         elif 'F64' in type_col:
@@ -164,9 +194,26 @@ def parse_benchmark_output(output):
         gpu_time_ms = parse_time_value(gpu_time_str)
 
         if gpu_time_ms is not None:
+            if verbose:
+                print(f"  Parsed: type={precision}, gpu_time_col={gpu_time_str!r}, value={gpu_time_ms:.6f} ms")
             results[precision] = gpu_time_ms
+        elif verbose:
+            print(f"  Warning: Could not parse GPU time from col {gpu_time_col_idx}: {gpu_time_str!r}")
 
     return results
+
+
+def format_time(time_ms):
+    """Format a time in ms with appropriate precision and units."""
+    if time_ms is None:
+        return "N/A"
+    if time_ms < 0.001:
+        return f"{time_ms * 1e6:.3f} ns"
+    elif time_ms < 1.0:
+        return f"{time_ms * 1000.0:.3f} us"
+    else:
+        return f"{time_ms:.3f} ms"
+
 
 def calculate_relative_performance(results):
     """
@@ -190,6 +237,7 @@ def calculate_relative_performance(results):
 
     return relative
 
+
 def print_summary(results, relative):
     """Print a formatted summary table."""
     print("\n")
@@ -205,8 +253,10 @@ def print_summary(results, relative):
     print(f"{'Benchmark':<15} {'float':<12} {'double':<12} {'fltflt':<12} {'fltflt vs dbl':<15}")
     print("-" * 66)
 
-    # Order benchmarks
+    # Order benchmarks - use the canonical order but only show benchmarks that were actually run
     bench_order = ['add', 'sub', 'mul', 'div', 'sqrt', 'abs', 'fma', 'madd', 'round', 'trunc', 'floor', 'fmod', 'cast2dbl', 'cast2fltflt']
+    # Filter to only benchmarks present in results
+    bench_order = [b for b in bench_order if b in results]
 
     for bench in bench_order:
         if bench not in relative:
@@ -235,15 +285,12 @@ def print_summary(results, relative):
 
     print()
     print("-" * 80)
-    print("Raw timings (milliseconds):")
+    print("Raw timings (auto-scaled units):")
     print()
-    print(f"{'Benchmark':<15} {'float':<12} {'double':<12} {'fltflt':<12} {'fltflt vs dbl':<15}")
-    print("-" * 66)
+    print(f"{'Benchmark':<15} {'float':<15} {'double':<15} {'fltflt':<15} {'fltflt vs dbl':<15}")
+    print("-" * 75)
 
     for bench in bench_order:
-        if bench not in results:
-            continue
-
         timings = results[bench]
 
         float_time = timings.get('float', None)
@@ -255,37 +302,77 @@ def print_summary(results, relative):
         if double_time is not None and fltflt_time is not None:
             fltflt_vs_double = double_time / fltflt_time
 
-        float_str = f"{float_time:.3f}" if float_time is not None else "N/A"
-        double_str = f"{double_time:.3f}" if double_time is not None else "N/A"
-        fltflt_str = f"{fltflt_time:.3f}" if fltflt_time is not None else "N/A"
+        float_str = format_time(float_time)
+        double_str = format_time(double_time)
+        fltflt_str = format_time(fltflt_time)
         speedup_str = f"{fltflt_vs_double:.2f}x" if fltflt_vs_double is not None else "N/A"
 
-        print(f"{bench:<15} {float_str:<12} {double_str:<12} {fltflt_str:<12} {speedup_str:<15}")
+        print(f"{bench:<15} {float_str:<15} {double_str:<15} {fltflt_str:<15} {speedup_str:<15}")
 
     print("=" * 80)
 
+
 def main():
+    parser = argparse.ArgumentParser(
+        description="Run fltflt arithmetic benchmarks and summarize results."
+    )
+    parser.add_argument(
+        "--build-dir",
+        type=Path,
+        default=None,
+        help="Path to the MatX build directory containing bench/matx_bench. "
+             "If not specified, common locations are searched automatically.",
+    )
+    parser.add_argument(
+        "--verbose", "-v",
+        action="store_true",
+        help="Print verbose output including raw benchmark output and parsed values.",
+    )
+    parser.add_argument(
+        "--benchmarks",
+        nargs="+",
+        default=None,
+        metavar="BENCH",
+        help="Run only specific benchmarks (e.g. add sub mul). "
+             "Defaults to all benchmarks.",
+    )
+    args = parser.parse_args()
+
     # Find MatX build directory
-    script_dir = Path(__file__).parent
+    if args.build_dir is not None:
+        build_dir = args.build_dir
+        if not build_dir.exists():
+            print(f"Error: Specified build directory does not exist: {build_dir}")
+            sys.exit(1)
+    else:
+        script_dir = Path(__file__).parent
 
-    # Try common build directory locations
-    possible_build_dirs = [
-        script_dir / "build",
-        script_dir / "repos" / "MatX" / "build",
-        script_dir / "../build",
-        script_dir / "../../build",
-    ]
+        # Check if the current working directory looks like a valid build directory
+        # (i.e. it already contains bench/matx_bench). This lets users run the script
+        # from any build directory without needing --build-dir.
+        cwd = Path.cwd()
+        if (cwd / "bench" / "matx_bench").exists():
+            build_dir = cwd
+        else:
+            # Fall back to searching common locations relative to the script
+            possible_build_dirs = [
+                script_dir / "build",
+                script_dir / "repos" / "MatX" / "build",
+                script_dir / "../build",
+                script_dir / "../../build",
+            ]
 
-    build_dir = None
-    for bd in possible_build_dirs:
-        if bd.exists():
-            build_dir = bd
-            break
+            build_dir = None
+            for bd in possible_build_dirs:
+                bd_resolved = bd.resolve()
+                if bd_resolved.exists() and (bd_resolved / "bench" / "matx_bench").exists():
+                    build_dir = bd_resolved
+                    break
 
-    if build_dir is None:
-        print("Error: Could not find MatX build directory")
-        print("Please run this script from the MatX source directory or specify build path")
-        sys.exit(1)
+            if build_dir is None:
+                print("Error: Could not find MatX build directory")
+                print("Try running from a build directory, or use --build-dir to specify one")
+                sys.exit(1)
 
     print(f"Using build directory: {build_dir}")
 
@@ -299,7 +386,16 @@ def main():
     print()
 
     # List of benchmarks to run
-    benchmarks = ['add', 'sub', 'mul', 'div', 'sqrt', 'abs', 'fma', 'madd', 'round', 'trunc', 'floor', 'fmod', 'cast2dbl', 'cast2fltflt']
+    all_benchmarks = ['add', 'sub', 'mul', 'div', 'sqrt', 'abs', 'fma', 'madd', 'round', 'trunc', 'floor', 'fmod', 'cast2dbl', 'cast2fltflt']
+    benchmarks = args.benchmarks if args.benchmarks is not None else all_benchmarks
+
+    # Validate user-provided benchmarks
+    if args.benchmarks is not None:
+        invalid_benchmarks = [b for b in args.benchmarks if b not in all_benchmarks]
+        if invalid_benchmarks:
+            print(f"Error: Unknown benchmark(s): {', '.join(invalid_benchmarks)}")
+            print(f"Valid benchmarks are: {', '.join(all_benchmarks)}")
+            sys.exit(1)
 
     all_results = {}
 
@@ -307,14 +403,14 @@ def main():
     for bench in benchmarks:
         bench_name = f"fltflt_bench_{bench}"
         print(f"\n{'=' * 80}")
-        output = run_benchmark(benchmark_exe, bench_name)
+        output = run_benchmark(benchmark_exe, bench_name, verbose=args.verbose)
 
         if output is None:
             print(f"  Skipping {bench} due to error")
             continue
 
         # Parse results
-        results = parse_benchmark_output(output)
+        results = parse_benchmark_output(output, verbose=args.verbose)
 
         if not results:
             print(f"  Warning: Could not parse results for {bench}")
@@ -323,7 +419,8 @@ def main():
             continue
 
         all_results[bench] = results
-        print(f"  Parsed: {', '.join([f'{k}={v:.3f}ms' for k, v in results.items()])}")
+        parsed_parts = [f"{k}={format_time(v)}" for k, v in results.items()]
+        print(f"  Parsed: {', '.join(parsed_parts)}")
 
     print(f"\n{'=' * 80}")
 

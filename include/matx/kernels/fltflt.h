@@ -49,7 +49,7 @@ namespace matx {
 
 // fltflt represents an unevaluated floating point sum of two non-overlapping fp32 components.
 // The hi component is the most significant part of the sum, and the lo component is the least significant part.
-struct fltflt {
+struct alignas(8) fltflt {
     float hi;
     float lo;
 
@@ -130,7 +130,10 @@ static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ float fmaf_rn(float a, floa
 static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ float fdividef_rn(float a, float b)
 {
 #if defined(__CUDA_ARCH__)
-    return __fdividef(a, b);
+    // In many cases, __fdividef() is sufficient (e.g., when computing an initial estimate
+    // for a Newton-Raphson iteration). However, for now we stick with the more accurate
+    // __fdiv_rn() intrinsic until we have more robust error bounds.
+    return __fdiv_rn(a, b);
 #else
     return a / b;
 #endif
