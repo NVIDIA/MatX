@@ -147,7 +147,7 @@ namespace matx
     matxException(matxError_t error, const std::string &s, const char *file, int line)
         : e(error)
     {
-      snprintf(str, s.size(), "matxException (%s: %s) - %s:%d\n",
+      snprintf(str, sizeof(str), "matxException (%s: %s) - %s:%d\n",
                matxErrorString(error), s.c_str(), file, line);
       detail::printStackTrace(stack);
     }
