@@ -60,12 +60,16 @@ namespace matx
           return "cov(" + get_type_str(a_) + ")";
         }
 
-        __MATX_INLINE__ CovOp(const OpA &A) : 
+        __MATX_INLINE__ CovOp(const OpA &A) :
               a_(A) {
           MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
-          for (int r = 0; r < Rank(); r++) {
+          for (int r = 0; r < Rank() - 2; r++) {
             out_dims_[r] = a_.Size(r);
           }
+          // Covariance output dimensions are {M, M} where M is the last dimension of input
+          static_assert(Rank() >= 2, "cov input operator rank must be >= 2");
+          out_dims_[Rank() - 2] = a_.Size(Rank() - 1);
+          out_dims_[Rank() - 1] = a_.Size(Rank() - 1);
         }
 
         template <typename CapType, typename... Is>

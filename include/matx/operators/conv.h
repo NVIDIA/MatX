@@ -340,8 +340,12 @@ namespace detail {
           }
 
           for (int r = max_rank - 2; r < max_rank; r++) {
-            const auto max_axis = cuda::std::max(a_.Size(r), b_.Size(r));
-            const auto min_axis = cuda::std::min(a_.Size(r), b_.Size(r));
+            // We need the max_rank - OpA::Rank() and max_rank - OpB::Rank() to get the
+            // correct dimension index for each tensor when ranks differ.
+            const int a_idx = r - (max_rank - OpA::Rank());
+            const int b_idx = r - (max_rank - OpB::Rank());
+            const auto max_axis = cuda::std::max(a_.Size(a_idx), b_.Size(b_idx));
+            const auto min_axis = cuda::std::min(a_.Size(a_idx), b_.Size(b_idx));
             if (mode_ == MATX_C_MODE_FULL) {
               out_dims_[r] = max_axis + min_axis - 1;
             }
@@ -351,7 +355,7 @@ namespace detail {
             else if (mode_ == MATX_C_MODE_VALID) {
               out_dims_[r] = max_axis - min_axis + 1;
             }
-          }     
+          }
         }
       }
 

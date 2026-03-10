@@ -85,7 +85,7 @@ public:
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
     // Ensure batch dimensions are equal
-    for (int i = 2; i < RANK - 2; i++) {
+    for (int i = 0; i < RANK - 2; i++) {
       MATX_ASSERT(a.Size(i) == c.Size(i), matxInvalidSize);
     }
 
