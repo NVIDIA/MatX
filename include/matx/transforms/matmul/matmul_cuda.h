@@ -98,20 +98,19 @@ template <typename I1, typename T>
 __MATX_INLINE__ auto CanonicalizeMatMulInput(
     const matxUnaryOp<I1, ConjOp<T>> &op)
 {
-  // Only remap when conj is applied to a transposed tensor view. A plain
-  // conj(X) must keep its original layout and should not be force-lowered to OP_C.
+  // Keep a stable return type for template deduction and only toggle forceOp.
+  bool force_op = false;
   if constexpr (is_tensor_view_v<detail::base_type_t<I1>>) {
     const auto &in = op.InputOp();
-    if (in.Stride(in.Rank() - 2) == 1 && in.Size(in.Rank() - 1) != 1) {
-      auto base = transpose_matrix(in);
-      constexpr auto forced_op =
-          is_complex_v<typename I1::value_type> ? CUBLAS_OP_C : CUBLAS_OP_T;
-      return MatMulInputCanonicalized_t<decltype(base)>{base, true, forced_op};
-    }
+    // Only remap when conj is applied to a transposed tensor view. A plain
+    // conj(X) must keep its original layout and should not be force-lowered.
+    force_op = (in.Stride(in.Rank() - 2) == 1 && in.Size(in.Rank() - 1) != 1);
   }
 
+  constexpr auto forced_op =
+      is_complex_v<typename I1::value_type> ? CUBLAS_OP_C : CUBLAS_OP_T;
   return MatMulInputCanonicalized_t<matxUnaryOp<I1, ConjOp<T>>>{
-      op, false, CUBLAS_OP_N};
+      op, force_op, force_op ? forced_op : CUBLAS_OP_N};
 }
 
 
@@ -1235,7 +1234,9 @@ struct MatMulCUDAParamsKeyHash {
            std::hash<uint64_t>()(static_cast<uint64_t>(k.applyOpA)) +
            std::hash<uint64_t>()(static_cast<uint64_t>(k.applyOpB)) +
            std::hash<uint64_t>()(static_cast<uint64_t>(k.conjOpA)) +
-           std::hash<uint64_t>()(static_cast<uint64_t>(k.conjOpB));
+           std::hash<uint64_t>()(static_cast<uint64_t>(k.conjOpB)) +
+           std::hash<uint64_t>()(static_cast<uint64_t>(k.a_col_major)) +
+           std::hash<uint64_t>()(static_cast<uint64_t>(k.b_col_major));
   }
 };
 
@@ -1257,7 +1258,8 @@ struct MatMulCUDAParamsKeyEq {
            l.prov == t.prov && l.dtype == t.dtype && l.opA == t.opA &&
            l.opB == t.opB && l.rank == t.rank &&
            l.applyOpA == t.applyOpA && l.applyOpB == t.applyOpB &&
-           l.conjOpA == t.conjOpA && l.conjOpB == t.conjOpB;
+           l.conjOpA == t.conjOpA && l.conjOpB == t.conjOpB &&
+           l.a_col_major == t.a_col_major && l.b_col_major == t.b_col_major;
   }
 };
 
