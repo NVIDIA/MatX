@@ -199,6 +199,50 @@ TYPED_TEST(MatMulTestFloatTypes, SmallRectBTranspose)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(MatMulTestFloatNonHalfTypes, HermitianOperandFusionEquivalent)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  if constexpr (!detail::CheckMatMulSupport<ExecType, TestType>()) {
+    GTEST_SKIP();
+  } else if constexpr (!is_complex_v<TestType>) {
+    GTEST_SKIP();
+  } else {
+    constexpr index_t m = 4;
+    constexpr index_t k = 8;
+    constexpr index_t n = 16;
+
+    tensor_t<TestType, 2> a{{k, m}};
+    tensor_t<TestType, 2> b{{k, n}};
+    tensor_t<TestType, 2> c_expr{{m, n}};
+    tensor_t<TestType, 2> c_herm{{m, n}};
+    tensor_t<TestType, 2> c_temp{{m, n}};
+    tensor_t<TestType, 2> a_temp{{m, k}};
+
+    this->pb->template InitAndRunTVGenerator<TestType>(
+        "00_transforms", "matmul_operators", "run_a_transpose", {m, k, n});
+
+    this->pb->NumpyToTensorView(a, "a");
+    this->pb->NumpyToTensorView(b, "b");
+
+    (c_expr = matmul(conj(transpose_matrix(a)), b)).run(this->exec);
+    (c_herm = matmul(hermitianT(a), b)).run(this->exec);
+    (a_temp = conj(transpose_matrix(a))).run(this->exec);
+    (c_temp = matmul(a_temp, b)).run(this->exec);
+
+    this->exec.sync();
+
+    for (index_t i = 0; i < m; i++) {
+      for (index_t j = 0; j < n; j++) {
+        EXPECT_TRUE(MatXUtils::MatXTypeCompare(c_temp(i, j), c_expr(i, j), this->thresh));
+        EXPECT_TRUE(MatXUtils::MatXTypeCompare(c_temp(i, j), c_herm(i, j), this->thresh));
+      }
+    }
+  }
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(MatMulTestFloatNonHalfTypes, SmallRectCTranspose)
 {
   MATX_ENTER_HANDLER();

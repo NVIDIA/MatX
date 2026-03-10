@@ -47,6 +47,9 @@
 #include "matx/core/error.h"
 #include "matx/core/nvtx.h"
 #include "matx/core/tensor.h"
+#include "matx/operators/hermitian.h"
+#include "matx/operators/transpose.h"
+#include "matx/operators/unary_operators.h"
 #include "matx/transforms/matmul/matmul_common.h"
 
 namespace matx {
@@ -68,6 +71,49 @@ typedef enum {
 namespace detail {
 // Configurable tensor rank threshold for single batch operation
 static constexpr int MATMUL_BATCH_RANK_THRESHOLD = 4;
+
+template <typename Op>
+struct MatMulInputCanonicalized_t {
+  Op op;
+  bool forceOp = false;
+  cublasOperation_t forcedOp = CUBLAS_OP_N;
+};
+
+template <typename Op>
+__MATX_INLINE__ auto CanonicalizeMatMulInput(const Op &op)
+{
+  return MatMulInputCanonicalized_t<Op>{op, false, CUBLAS_OP_N};
+}
+
+template <typename T1, int DIM>
+__MATX_INLINE__ auto CanonicalizeMatMulInput(const HermitianTransOp<T1, DIM> &op)
+{
+  constexpr auto forced_op =
+      is_complex_v<typename T1::value_type> ? CUBLAS_OP_C : CUBLAS_OP_T;
+  return MatMulInputCanonicalized_t<detail::base_type_t<T1>>{
+      op.InputOp(), true, forced_op};
+}
+
+template <typename I1, typename T>
+__MATX_INLINE__ auto CanonicalizeMatMulInput(
+    const matxUnaryOp<I1, ConjOp<T>> &op)
+{
+  // Only remap when conj is applied to a transposed tensor view. A plain
+  // conj(X) must keep its original layout and should not be force-lowered to OP_C.
+  if constexpr (is_tensor_view_v<detail::base_type_t<I1>>) {
+    const auto &in = op.InputOp();
+    if (in.Stride(in.Rank() - 2) == 1 && in.Size(in.Rank() - 1) != 1) {
+      auto base = transpose_matrix(in);
+      constexpr auto forced_op =
+          is_complex_v<typename I1::value_type> ? CUBLAS_OP_C : CUBLAS_OP_T;
+      return MatMulInputCanonicalized_t<decltype(base)>{base, true, forced_op};
+    }
+  }
+
+  return MatMulInputCanonicalized_t<matxUnaryOp<I1, ConjOp<T>>>{
+      op, false, CUBLAS_OP_N};
+}
+
 
 typedef enum {
   MEM_ORDER_ROW_MAJOR = 0,
@@ -138,6 +184,12 @@ struct MatMulCUDAParams_t {
   MatXDataType_t dtype;
   cublasOperation_t opA;
   cublasOperation_t opB;
+  bool applyOpA = false;
+  bool applyOpB = false;
+  bool conjOpA = false;
+  bool conjOpB = false;
+  bool a_col_major = false;
+  bool b_col_major = false;
 };
 
 template <typename TensorTypeC, typename TensorTypeA, typename TensorTypeB,
@@ -183,14 +235,37 @@ public:
    *
    */
   MatMulCUDAHandle_t(TensorTypeC &c, const TensorTypeA &a,
-                     const TensorTypeB &b)
+                     const TensorTypeB &b, bool forceOpA = false,
+                     cublasOperation_t forcedOpA = CUBLAS_OP_N,
+                     bool forceOpB = false,
+                     cublasOperation_t forcedOpB = CUBLAS_OP_N)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
     static_assert(RANK >= 2);
-    MATX_ASSERT(a.Size(TensorTypeA::Rank() - 1) == b.Size(TensorTypeB::Rank() - 2), matxInvalidSize);
-    MATX_ASSERT(c.Size(RANK - 1) == b.Size(TensorTypeB::Rank() - 1), matxInvalidSize);
-    MATX_ASSERT(c.Size(RANK - 2) == a.Size(TensorTypeA::Rank() - 2), matxInvalidSize);
+    const auto is_transpose_op = [](cublasOperation_t op) {
+      return op == CUBLAS_OP_T || op == CUBLAS_OP_C;
+    };
+
+    const bool a_is_transposed = forceOpA && is_transpose_op(forcedOpA);
+    const bool b_is_transposed = forceOpB && is_transpose_op(forcedOpB);
+
+    const index_t a_rows =
+        a_is_transposed ? a.Size(TensorTypeA::Rank() - 1)
+                        : a.Size(TensorTypeA::Rank() - 2);
+    const index_t a_cols =
+        a_is_transposed ? a.Size(TensorTypeA::Rank() - 2)
+                        : a.Size(TensorTypeA::Rank() - 1);
+    const index_t b_rows =
+        b_is_transposed ? b.Size(TensorTypeB::Rank() - 1)
+                        : b.Size(TensorTypeB::Rank() - 2);
+    const index_t b_cols =
+        b_is_transposed ? b.Size(TensorTypeB::Rank() - 2)
+                        : b.Size(TensorTypeB::Rank() - 1);
+
+    MATX_ASSERT(a_cols == b_rows, matxInvalidSize);
+    MATX_ASSERT(c.Size(RANK - 1) == b_cols, matxInvalidSize);
+    MATX_ASSERT(c.Size(RANK - 2) == a_rows, matxInvalidSize);
 
     // Ensure batch dimensions are equal
     for (int i = 0; i < RANK - 2; i++) {
@@ -203,7 +278,7 @@ public:
     }
 
     // This must come before the things below to properly set class parameters
-    params_ = GetGemmParams(c, a, b);
+    params_ = GetGemmParams(c, a, b, forceOpA, forcedOpA, forceOpB, forcedOpB);
 
     if constexpr (PROV == PROVIDER_TYPE_CUBLASLT) {
       // The recommended cublas workspace size is 4 MiB for pre-Hopper and 32 MiB for Hopper+:
@@ -260,7 +335,10 @@ public:
   }
 
   static detail::MatMulCUDAParams_t GetGemmParams(TensorTypeC &c, const TensorTypeA &a,
-                     const TensorTypeB &b)
+                     const TensorTypeB &b, bool forceOpA = false,
+                     cublasOperation_t forcedOpA = CUBLAS_OP_N,
+                     bool forceOpB = false,
+                     cublasOperation_t forcedOpB = CUBLAS_OP_N)
   {
     /* If a user passes in a tensor where the last two dimensions are transposed we retain
        the original size parameters, but tell the underlying libraries that the tensors are
@@ -367,21 +445,27 @@ public:
         if constexpr (is_complex_half_v<typename TensorTypeA::value_type>) {
           // For half complex we always copy to a new tensor so it is always cublas op N
           params.opA = CUBLAS_OP_N;
+          params.a_col_major = false;
         } else if ( a.Stride(TensorTypeA::Rank()-1) > 1 // last stride > 1
                   || (a.Stride(TensorTypeA::Rank()-1) == 1 && a.Stride(TensorTypeA::Rank()-2) == 1 && a.Size(TensorTypeA::Rank()-1) != 1)) { // last strides both equal 1 and size > 1
           params.opA = CUBLAS_OP_T;
+          params.a_col_major = true;
         } else { // otherwise row major
           params.opA = CUBLAS_OP_N;
+          params.a_col_major = false;
         }
 
         if constexpr (is_complex_half_v<typename TensorTypeB::value_type>) {
           // For half complex we always copy to a new tensor so it is always cublas op N
           params.opB = CUBLAS_OP_N;
+          params.b_col_major = false;
         } else if ( b.Stride(TensorTypeB::Rank()-1) > 1 // last stride > 1
                   || (b.Stride(TensorTypeB::Rank()-1) == 1 && b.Stride(TensorTypeB::Rank()-2) == 1 && b.Size(TensorTypeB::Rank()-1) != 1)) { // last strides both equal 1 and size > 1
           params.opB = CUBLAS_OP_T;
+          params.b_col_major = true;
         } else { // otherwise row major
           params.opB = CUBLAS_OP_N;
+          params.b_col_major = false;
         }
 
         params.a_rows = a.Size(TensorTypeA::Rank() - 2);
@@ -418,8 +502,11 @@ public:
           params.lda = a.Size(TensorTypeA::Rank()-1);
         }
 
-        params.c_rows = params.a_rows;
-        params.c_cols = params.b_cols;
+        // C descriptor dimensions must always match the output tensor view.
+        // Forced transpose/hermitian modes can change matmul op semantics
+        // without changing A/B storage descriptors.
+        params.c_rows = c.Size(RANK - 2);
+        params.c_cols = c.Size(RANK - 1);
         params.ldc = c.Stride(RANK - 2);
 
       }
@@ -433,6 +520,42 @@ public:
         params.lda = static_cast<int>(a.Stride(TensorTypeA::Rank() - 2));
         params.ldb = static_cast<int>(b.Stride(TensorTypeB::Rank() - 2));
         params.ldc = static_cast<int>(c.Stride(RANK - 2));
+      }
+    }
+
+    if constexpr (PROV == PROVIDER_TYPE_CUBLASLT) {
+      if (forceOpA) {
+        if constexpr (is_complex_half_v<typename TensorTypeA::value_type>) {
+          if (forcedOpA == CUBLAS_OP_C) {
+            // cublasLt complex-half does not reliably support OP_C. Encode
+            // hermitian as OP_T and fold conjugation into planar packing.
+            params.opA = CUBLAS_OP_T;
+            params.conjOpA = true;
+          }
+          else {
+            params.opA = forcedOpA;
+          }
+        }
+        else {
+          params.opA = forcedOpA;
+        }
+        params.applyOpA = true;
+      }
+
+      if (forceOpB) {
+        if constexpr (is_complex_half_v<typename TensorTypeB::value_type>) {
+          if (forcedOpB == CUBLAS_OP_C) {
+            params.opB = CUBLAS_OP_T;
+            params.conjOpB = true;
+          }
+          else {
+            params.opB = forcedOpB;
+          }
+        }
+        else {
+          params.opB = forcedOpB;
+        }
+        params.applyOpB = true;
       }
     }
 
@@ -558,17 +681,21 @@ private:
     cublasLtOrder_t rowOrder = CUBLASLT_ORDER_ROW;
     cublasLtOrder_t colOrder = CUBLASLT_ORDER_COL;
 
-    auto op = CUBLAS_OP_N;
+    const cublasOperation_t transA =
+        params_.applyOpA ? params_.opA : CUBLAS_OP_N;
+    const cublasOperation_t transB =
+        params_.applyOpB ? params_.opB : CUBLAS_OP_N;
+
     // A operation
     ret = cublasLtMatmulDescSetAttribute(
-                    operationDesc, CUBLASLT_MATMUL_DESC_TRANSA, &op,
-                    sizeof(op));
+                    operationDesc, CUBLASLT_MATMUL_DESC_TRANSA, &transA,
+                    sizeof(transA));
     MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
 
     // B operation
     ret = cublasLtMatmulDescSetAttribute(
-                    operationDesc, CUBLASLT_MATMUL_DESC_TRANSB, &op,
-                    sizeof(op));
+                    operationDesc, CUBLASLT_MATMUL_DESC_TRANSB, &transB,
+                    sizeof(transB));
     MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
 
     // Update this later when we're more flexible on compute type
@@ -609,7 +736,7 @@ private:
     MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
 
     // Matrix data order
-    if (params_.opA == CUBLAS_OP_T) {
+    if (params_.a_col_major) {
       ret = cublasLtMatrixLayoutSetAttribute(
                       Adesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &colOrder,
                       sizeof(colOrder));
@@ -621,7 +748,7 @@ private:
     }
     MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
 
-    if (params_.opB == CUBLAS_OP_T) {
+    if (params_.b_col_major) {
       ret = cublasLtMatrixLayoutSetAttribute(
                       Bdesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &colOrder,
                       sizeof(colOrder));
@@ -792,9 +919,22 @@ private:
       }
       auto c_planar = make_tensor<typename T1::value_type>(reinterpret_cast<typename T1::value_type*>(c_hp), c_shape, false);
 
-      // Convert A/B to planar layout
-      (a_planar = planar(a)).run(stream);
-      (b_planar = planar(b)).run(stream);
+      // Convert A/B to planar layout. For complex-half hermitian lowering, fold
+      // conjugation into this conversion so no separate hermitian temporary is
+      // materialized.
+      if (params_.conjOpA) {
+        (a_planar = planar(conj(a))).run(stream);
+      }
+      else {
+        (a_planar = planar(a)).run(stream);
+      }
+
+      if (params_.conjOpB) {
+        (b_planar = planar(conj(b))).run(stream);
+      }
+      else {
+        (b_planar = planar(b)).run(stream);
+      }
 
       // update pointers to planar data.
       // must use Reset because types for planar are different
@@ -1089,7 +1229,13 @@ struct MatMulCUDAParamsKeyHash {
     return std::hash<uint64_t>()(k.m) + std::hash<uint64_t>()(k.n) +
            std::hash<uint64_t>()(k.k) + std::hash<uint64_t>()(k.batch) +
            std::hash<uint64_t>()(k.prov) +
-           std::hash<uint64_t>()((size_t)k.stream);
+           std::hash<uint64_t>()((size_t)k.stream) +
+           std::hash<uint64_t>()(static_cast<uint64_t>(k.opA)) +
+           std::hash<uint64_t>()(static_cast<uint64_t>(k.opB)) +
+           std::hash<uint64_t>()(static_cast<uint64_t>(k.applyOpA)) +
+           std::hash<uint64_t>()(static_cast<uint64_t>(k.applyOpB)) +
+           std::hash<uint64_t>()(static_cast<uint64_t>(k.conjOpA)) +
+           std::hash<uint64_t>()(static_cast<uint64_t>(k.conjOpB));
   }
 };
 
@@ -1109,7 +1255,9 @@ struct MatMulCUDAParamsKeyEq {
            l.stream == t.stream && l.lda == t.lda &&
            l.ldb == t.ldb && l.ldc == t.ldc && l.batch == t.batch &&
            l.prov == t.prov && l.dtype == t.dtype && l.opA == t.opA &&
-           l.opB == t.opB && l.rank == t.rank;
+           l.opB == t.opB && l.rank == t.rank &&
+           l.applyOpA == t.applyOpA && l.applyOpB == t.applyOpB &&
+           l.conjOpA == t.conjOpA && l.conjOpB == t.conjOpB;
   }
 };
 
@@ -1185,9 +1333,16 @@ void matmul_impl(TensorTypeC C, const TensorTypeA A,
     static_assert(is_a_complex || is_b_complex, "If C is complex then either A or B should be complex ");
   }
 
-  // promote A and B to the type of C
-  auto A_ = as_type<typename TensorTypeC::value_type>(A);
-  auto B_ = as_type<typename TensorTypeC::value_type>(B);
+  // Canonicalize first so wrappers like hermitianT/conj(transpose(...)) are
+  // preserved even after type promotion to C's value type.
+  auto aCanonIn = detail::CanonicalizeMatMulInput(A);
+  auto bCanonIn = detail::CanonicalizeMatMulInput(B);
+  auto A_ = as_type<typename TensorTypeC::value_type>(aCanonIn.op);
+  auto B_ = as_type<typename TensorTypeC::value_type>(bCanonIn.op);
+  auto aCanon = detail::MatMulInputCanonicalized_t<decltype(A_)>{
+      A_, aCanonIn.forceOp, aCanonIn.forcedOp};
+  auto bCanon = detail::MatMulInputCanonicalized_t<decltype(B_)>{
+      B_, bCanonIn.forceOp, bCanonIn.forcedOp};
 
   static_assert(detail::CompatibleGemmCUDATypes<decltype(A_), decltype(B_), TensorTypeC, PROV>(),
       "Combination of A/B/C types are not supported");
@@ -1195,19 +1350,19 @@ void matmul_impl(TensorTypeC C, const TensorTypeA A,
   // CublasLt does not support operators and certain transpose modes.
   // Grab a suppported tensor here and copy in if necessary.
   auto c = getCublasSupportedTensor(C, stream);
-  auto a = getCublasSupportedTensor(A_, stream);
-  auto b = getCublasSupportedTensor(B_, stream);
+  auto a = getCublasSupportedTensor(aCanon.op, stream);
+  auto b = getCublasSupportedTensor(bCanon.op, stream);
 
   typedef decltype(c) ctype;
   typedef decltype(a) atype;
   typedef decltype(b) btype;
 
-  if(!is_matx_transform_op<TensorTypeA>() && !a.isSameView(A_)) {
-    (a = A_).run(stream);
+  if(!is_matx_transform_op<decltype(aCanon.op)>() && !a.isSameView(aCanon.op)) {
+    (a = aCanon.op).run(stream);
   }
 
-  if(!is_matx_transform_op<TensorTypeB>() && !b.isSameView(B_)) {
-    (b = B_).run(stream);
+  if(!is_matx_transform_op<decltype(bCanon.op)>() && !b.isSameView(bCanon.op)) {
+    (b = bCanon.op).run(stream);
   }
 
   if(beta != 0 && !c.isSameView(C)) {
@@ -1226,7 +1381,10 @@ void matmul_impl(TensorTypeC C, const TensorTypeA A,
   {
     // Get parameters required by these tensors
     auto params =
-      detail::MatMulCUDAHandle_t<ctype, atype, btype, PROV>::GetGemmParams(c, a, b);
+      detail::MatMulCUDAHandle_t<ctype, atype, btype, PROV>::GetGemmParams(
+        c, a, b,
+        (PROV == PROVIDER_TYPE_CUBLASLT) && aCanon.forceOp, aCanon.forcedOp,
+        (PROV == PROVIDER_TYPE_CUBLASLT) && bCanon.forceOp, bCanon.forcedOp);
     params.stream = stream;
 
     using cache_val_type = detail::MatMulCUDAHandle_t<ctype, atype, btype, PROV>;
@@ -1236,7 +1394,10 @@ void matmul_impl(TensorTypeC C, const TensorTypeA A,
       cache_id,
       params,
       [&]() {
-        return std::make_shared<cache_val_type>(c, a, b);
+        return std::make_shared<cache_val_type>(
+          c, a, b,
+          (PROV == PROVIDER_TYPE_CUBLASLT) && aCanon.forceOp, aCanon.forcedOp,
+          (PROV == PROVIDER_TYPE_CUBLASLT) && bCanon.forceOp, bCanon.forcedOp);
       },
       [&](std::shared_ptr<cache_val_type> cache_type) {
         cache_type->Exec(c, a, b, stream, alpha, beta);
