@@ -103,6 +103,10 @@ struct alignas(alignment_by_type<T>() * N) Vector {
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ void load(T* ptr) {
     if constexpr (sizeof(T) == alignment_by_type<T>()) {
       constexpr int vec_width_elems = (MAX_VEC_WIDTH_BYTES / sizeof(T));
+      static_assert(EPT >= vec_width_elems,
+                    "Vector::load requires EPT >= (MAX_VEC_WIDTH_BYTES / sizeof(T))");
+      static_assert((EPT % vec_width_elems) == 0,
+                    "Vector::load requires EPT to be a multiple of (MAX_VEC_WIDTH_BYTES / sizeof(T))");
       constexpr int num_iterations = EPT / vec_width_elems;
       using vec_load_t = Vector<T, vec_width_elems>;
       MATX_LOOP_UNROLL
