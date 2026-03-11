@@ -102,11 +102,13 @@ struct alignas(alignment_by_type<T>() * N) Vector {
   template <int EPT>
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ void load(T* ptr) {
     if constexpr (sizeof(T) == alignment_by_type<T>()) {
-      constexpr int elements_per_load = (MAX_VEC_WIDTH_BYTES / sizeof(T));
-      constexpr int num_iterations = EPT / elements_per_load;
+      constexpr int vec_width_elems = (MAX_VEC_WIDTH_BYTES / sizeof(T));
+      constexpr int num_iterations = EPT / vec_width_elems;
+      using vec_load_t = Vector<T, vec_width_elems>;
       MATX_LOOP_UNROLL
       for (int i = 0; i < num_iterations; i++) {
-        *reinterpret_cast<float4*>(&data[i*elements_per_load]) = *reinterpret_cast<float4*>(ptr + i * elements_per_load);
+        const int elem_offset = i * vec_width_elems;
+        *reinterpret_cast<vec_load_t*>(&data[elem_offset]) = *reinterpret_cast<vec_load_t*>(ptr + elem_offset);
       }
     } else {
       // If the alignment of the type does not match the types size, then we load it as
