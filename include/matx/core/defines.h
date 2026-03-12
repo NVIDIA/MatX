@@ -117,8 +117,12 @@ enum {
   matxIdxSentinel = matxKeepStride - 1,
 };
 
-// Do this on a per-architecture basis in the future
+// sm_100+ supports 256-bit global load/store transactions.
+#if defined(__CUDA_ARCH__) && (__CUDA_ARCH__ >= 1000)
+static constexpr int MAX_VEC_WIDTH_BYTES = 32;
+#else
 static constexpr int MAX_VEC_WIDTH_BYTES = 16;
+#endif
 
 
 #if defined(__CUDACC__)
