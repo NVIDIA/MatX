@@ -36,17 +36,17 @@ class percentile:
         }
 
     def run(self):
-        self.res['t1e_linear50'] = np.percentile(self.t1e, 50, interpolation='linear')
-        self.res['t1e_linear80'] = np.percentile(self.t1e, 80, interpolation='linear')
-        self.res['t1e_lower50']  = np.percentile(self.t1e, 50, interpolation='lower')
-        self.res['t1e_lower80']  = np.percentile(self.t1e, 80, interpolation='lower')
-        self.res['t1e_higher50'] = np.percentile(self.t1e, 50, interpolation='higher')
-        self.res['t1e_higher80'] = np.percentile(self.t1e, 80, interpolation='higher')
+        self.res['t1e_linear50'] = np.percentile(self.t1e, 50, method='linear')
+        self.res['t1e_linear80'] = np.percentile(self.t1e, 80, method='linear')
+        self.res['t1e_lower50']  = np.percentile(self.t1e, 50, method='lower')
+        self.res['t1e_lower80']  = np.percentile(self.t1e, 80, method='lower')
+        self.res['t1e_higher50'] = np.percentile(self.t1e, 50, method='higher')
+        self.res['t1e_higher80'] = np.percentile(self.t1e, 80, method='higher')
 
-        self.res['t1o_linear50'] = np.percentile(self.t1o, 50, interpolation='linear')
-        self.res['t1o_linear80'] = np.percentile(self.t1o, 80, interpolation='linear')
-        self.res['t1o_lower50']  = np.percentile(self.t1o, 50, interpolation='lower')
-        self.res['t1o_lower80']  = np.percentile(self.t1o, 80, interpolation='lower')
-        self.res['t1o_higher50'] = np.percentile(self.t1o, 50, interpolation='higher')
-        self.res['t1o_higher80'] = np.percentile(self.t1o, 80, interpolation='higher')
+        self.res['t1o_linear50'] = np.percentile(self.t1o, 50, method='linear')
+        self.res['t1o_linear80'] = np.percentile(self.t1o, 80, method='linear')
+        self.res['t1o_lower50']  = np.percentile(self.t1o, 50, method='lower')
+        self.res['t1o_lower80']  = np.percentile(self.t1o, 80, method='lower')
+        self.res['t1o_higher50'] = np.percentile(self.t1o, 50, method='higher')
+        self.res['t1o_higher80'] = np.percentile(self.t1o, 80, method='higher')
         return self.res
