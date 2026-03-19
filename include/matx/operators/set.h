@@ -289,10 +289,12 @@ public:
 #endif
     }
     else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-      // Set assignments must remain scalar for planar complex tensors so writes
-      // can go through the planar proxy path instead of vector reinterpretation.
-      const auto my_cap = cuda::std::array<ElementsPerThread, 2>{
-          ElementsPerThread::ONE, ElementsPerThread::ONE};
+      // Only force scalar EPT for planar-complex outputs. Non-planar SetOp
+      // should retain normal vectorization negotiation with operands.
+      const auto my_cap = is_planar_complex_v<typename T::value_type>
+          ? cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE,
+                                                   ElementsPerThread::ONE}
+          : capability_attributes<Cap>::default_value;
       return combine_capabilities<Cap>(
           my_cap, detail::get_operator_capability<Cap>(out_, in),
           detail::get_operator_capability<Cap>(op_, in));

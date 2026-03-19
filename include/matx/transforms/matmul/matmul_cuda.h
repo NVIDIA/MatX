@@ -430,6 +430,13 @@ public:
         params.c_cols = params.b_cols;
         params.ldc = c.Stride(RANK - 2);
 
+        // For complex half paths we launch as planar row-major. Use compact
+        // row-major leading dimension so planar C metadata matches what cuBLAS
+        // expects, even when the original tensor type is planar.
+        if constexpr (is_complex_half_v<typename TensorTypeC::value_type>) {
+          params.ldc = c.Size(RANK - 1);
+        }
+
       }
       else if constexpr (PROV == PROVIDER_TYPE_CUTLASS) {
         params.opA = CUBLAS_OP_N;
@@ -825,6 +832,10 @@ private:
         auto c_planar = make_tensor<typename T1::value_type>(
             reinterpret_cast<typename T1::value_type*>(c_hp), c_shape, false);
         c_adj.Reset(reinterpret_cast<T3 *>(c_planar.Data()));
+      }
+      else {
+        // Keep C adjustment explicit for the planar-output path.
+        c_adj.Reset(c.Data());
       }
     }
 
