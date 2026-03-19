@@ -135,14 +135,14 @@ struct FltFltDiv {
 struct FltFltSqrt {
   __MATX_HOST__ __MATX_DEVICE__ double operator()(fltflt a) const
   {
-    return static_cast<double>(static_cast<double>(fltflt_sqrt(a)));
+    return static_cast<double>(fltflt_sqrt(a));
   }
 };
 
 struct FltFltSqrtFast {
   __MATX_HOST__ __MATX_DEVICE__ double operator()(fltflt a) const
   {
-    return static_cast<double>(static_cast<double>(fltflt_sqrt_fast(a)));
+    return static_cast<double>(fltflt_sqrt_fast(a));
   }
 };
 
@@ -156,7 +156,7 @@ struct FltFltNorm3d {
 struct FltFltAbs {
   __MATX_HOST__ __MATX_DEVICE__ double operator()(fltflt a) const
   {
-    return static_cast<double>(static_cast<double>(fltflt_abs(a)));
+    return static_cast<double>(fltflt_abs(a));
   }
 };
 
