@@ -146,6 +146,13 @@ struct FltFltSqrtFast {
   }
 };
 
+struct FltFltNorm3d {
+  __MATX_HOST__ __MATX_DEVICE__ double operator()(fltflt a, fltflt b, fltflt c) const
+  {
+    return static_cast<double>(fltflt_norm3d(a, b, c));
+  }
+};
+
 struct FltFltAbs {
   __MATX_HOST__ __MATX_DEVICE__ double operator()(fltflt a) const
   {
@@ -614,6 +621,63 @@ TYPED_TEST(FltFltExecutorTests, MatXSqrtOperator) {
 
   // Expect float-float sqrt to retain high precision.
   EXPECT_GE(numMatchingMantissaBits(static_cast<double>(sqrt_result()), pi_sqrt_ref_f64), 44);
+}
+
+TYPED_TEST(FltFltExecutorTests, Norm3d) {
+  auto dx = make_tensor<fltflt>({});
+  auto dy = make_tensor<fltflt>({});
+  auto dz = make_tensor<fltflt>({});
+  auto norm_result = make_tensor<double>({});
+
+  // Helper lambda: set inputs, run norm3d, check precision
+  auto run_norm3d = [&](double dx_val, double dy_val, double dz_val, [[maybe_unused]] const char *label) {
+    (dx = static_cast<fltflt>(dx_val)).run(this->exec);
+    (dy = static_cast<fltflt>(dy_val)).run(this->exec);
+    (dz = static_cast<fltflt>(dz_val)).run(this->exec);
+    (norm_result = matx::apply(FltFltNorm3d{}, dx, dy, dz)).run(this->exec);
+    this->exec.sync();
+    const double ref = std::sqrt(dx_val * dx_val + dy_val * dy_val + dz_val * dz_val);
+    const int bits = numMatchingMantissaBits(norm_result(), ref);
+    EXPECT_GE(bits, 44);
+  };
+
+  // Positive inputs (moderate values)
+  run_norm3d(std::numbers::pi, std::numbers::e, std::numbers::sqrt2, "positive moderate (pi, e, sqrt2)");
+
+  // Negative inputs
+  run_norm3d(-std::numbers::pi, -std::numbers::e, -std::numbers::sqrt2, "negative moderate (-pi, -e, -sqrt2)");
+
+  // Mixed sign
+  run_norm3d(-std::numbers::pi, std::numbers::e, -std::numbers::sqrt2, "mixed sign (-pi, e, -sqrt2)");
+
+  // All small inputs (< 1e-6)
+  run_norm3d(3.7e-7, -8.2e-8, 1.1e-7, "all small (<1e-6)");
+
+  // All large inputs (> 1e9)
+  run_norm3d(std::numbers::e * 1e10, -std::numbers::pi * 1e10, std::numbers::sqrt2 * 1e10, "all large (>1e9)");
+
+  // Mixed large and small
+  run_norm3d(std::numbers::e * 1e10, 4.5e-7, -std::numbers::pi * 1e10, "mixed large/small");
+
+  // Differences ~1-5 km
+  run_norm3d(3217.456789, -1842.987654, 4501.234567, "differences ~km");
+
+  // Differences ~500-600 km
+  run_norm3d(312847.91837, -487293.18274, 183649.27391, "differences ~500 km");
+
+  // One zero component
+  run_norm3d(std::numbers::pi, 0.0, std::numbers::e, "one zero (pi, 0, e)");
+
+  // Two zero components (collapses to abs)
+  run_norm3d(0.0, 0.0, std::numbers::pi, "two zeros (0, 0, pi)");
+
+  // All zeros
+  (dx = static_cast<fltflt>(0.0)).run(this->exec);
+  (dy = static_cast<fltflt>(0.0)).run(this->exec);
+  (dz = static_cast<fltflt>(0.0)).run(this->exec);
+  (norm_result = matx::apply(FltFltNorm3d{}, dx, dy, dz)).run(this->exec);
+  this->exec.sync();
+  EXPECT_EQ(norm_result(), 0.0);
 }
 
 TYPED_TEST(FltFltExecutorTests, AbsoluteValue) {

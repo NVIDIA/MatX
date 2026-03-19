@@ -308,7 +308,12 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
                 diffR = ComputeRangeToPixel<PlatPosType, ComputeType, strict_compute_t, loose_compute_t>(
                     platform_positions, p, px, py, pz) - static_cast<strict_compute_t>(r_to_mcp(p));
                 const strict_compute_t bin = diffR * dr_inv + bin_offset;
-                const strict_compute_t bin_floor = ::floor(bin);
+                strict_compute_t bin_floor;
+                if constexpr (std::is_same_v<strict_compute_t, double>) {
+                    bin_floor = ::floor(bin);
+                } else {
+                    bin_floor = ::floorf(bin);
+                }
                 w = static_cast<loose_compute_t>(bin - bin_floor);
                 bin_floor_int = static_cast<index_t>(bin_floor);
             }
@@ -340,9 +345,9 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
                     }
                 }();
 
-                // diffR is unset for FloatFloat mode, but PhaseLUT == true is currently required for
-                // FloatFloat mode due to missing fltflt sin/cos implementations, so diffR will not be
-                // used in get_reference_phase() below.
+                // For FloatFloat mode, diffR has been set to the distance to the pixel rather than the differential range to the MCP.
+                // However, FloatFloat mode currently requires PhaseLUT optimization due to missing fltflt sin/cos implementations,
+                // so diffR will not actually be used in get_reference_phase() below.
                 static_assert(ComputeType != SarBpComputeType::FloatFloat || PhaseLUT == true, "SarBp: FloatFloat compute type requires PhaseLUT optimization");
                 const loose_complex_compute_t ref_phase = get_reference_phase(diffR, bin_floor_int, w);
 

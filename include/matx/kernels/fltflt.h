@@ -142,6 +142,10 @@ static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ float fdividef_rn(float a, 
 static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ float fltflt_rsqrt(float x)
 {
 #if defined(__CUDA_ARCH__)
+    // rsqrtf has up to 2 ULP of error. This is less precise than 1.0f / ::sqrtf(x), which
+    // would be 0.5 ULP of error. We currently use rsqrtf() because it is significantly faster
+    // while maintaining 44+ bits of precision in testing thus far, but we may need to revisit
+    // this in the future.
     return rsqrtf(x);
 #else
     return 1.0f / ::sqrtf(x);
