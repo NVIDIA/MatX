@@ -458,7 +458,8 @@ endif()
 if (MATX_BUILD_BENCHMARKS)
     rapids_cpm_nvbench( CPM_ARGS 
                         OPTIONS
-                        CMAKE_CXX_STANDARD=20)
+                        "CMAKE_CXX_STANDARD 20"
+                        "CMAKE_CUDA_STANDARD 20")
     add_subdirectory(bench)
 endif()
 
