@@ -139,6 +139,13 @@ struct FltFltSqrt {
   }
 };
 
+struct FltFltSqrtFast {
+  __MATX_HOST__ __MATX_DEVICE__ double operator()(fltflt a) const
+  {
+    return static_cast<double>(static_cast<double>(fltflt_sqrt_fast(a)));
+  }
+};
+
 struct FltFltAbs {
   __MATX_HOST__ __MATX_DEVICE__ double operator()(fltflt a) const
   {
@@ -500,19 +507,95 @@ TYPED_TEST(FltFltExecutorTests, Division) {
 }
 
 TYPED_TEST(FltFltExecutorTests, SquareRoot) {
-  auto pi = make_tensor<fltflt>({});
-  (pi = static_cast<fltflt>(std::numbers::pi)).run(this->exec);
-
+  auto input = make_tensor<fltflt>({});
   auto sqrt_result = make_tensor<double>({});
-  (sqrt_result = matx::apply(FltFltSqrt{}, pi)).run(this->exec);
+
+  // Test case: pi (moderate value)
+  (input = static_cast<fltflt>(std::numbers::pi)).run(this->exec);
+  (sqrt_result = matx::apply(FltFltSqrt{}, input)).run(this->exec);
   this->exec.sync();
 
   const double pi_sqrt_ref_f64 = std::sqrt(std::numbers::pi);
   const float pi_sqrt_ref_f32 = std::sqrt(std::numbers::pi_v<float>);
 
   EXPECT_LE(numMatchingMantissaBits(pi_sqrt_ref_f32, pi_sqrt_ref_f64), 24);
-
   EXPECT_GE(numMatchingMantissaBits(sqrt_result(), pi_sqrt_ref_f64), 44);
+
+  // Test case: zero
+  (input = static_cast<fltflt>(0.0)).run(this->exec);
+  (sqrt_result = matx::apply(FltFltSqrt{}, input)).run(this->exec);
+  this->exec.sync();
+  EXPECT_EQ(sqrt_result(), 0.0);
+
+  // Test case: small number (1.23e-7)
+  constexpr double small_val = 1.23e-7;
+  const double small_ref = std::sqrt(small_val);
+  (input = static_cast<fltflt>(small_val)).run(this->exec);
+  (sqrt_result = matx::apply(FltFltSqrt{}, input)).run(this->exec);
+  this->exec.sync();
+  EXPECT_GE(numMatchingMantissaBits(sqrt_result(), small_ref), 44);
+
+  // Test case: large number (e * 1e10, 52 active mantissa bits)
+  constexpr double large_val = std::numbers::e * 1e10;
+  const double large_ref = std::sqrt(large_val);
+  (input = static_cast<fltflt>(large_val)).run(this->exec);
+  (sqrt_result = matx::apply(FltFltSqrt{}, input)).run(this->exec);
+  this->exec.sync();
+  EXPECT_GE(numMatchingMantissaBits(sqrt_result(), large_ref), 44);
+
+  // Test case: 1e9*pi + sqrt(2) (52 active mantissa bits, ~3.1e9)
+  const double large_val2 = 1e9 * std::numbers::pi + std::sqrt(2.0);
+  const double large_ref2 = std::sqrt(large_val2);
+  (input = static_cast<fltflt>(large_val2)).run(this->exec);
+  (sqrt_result = matx::apply(FltFltSqrt{}, input)).run(this->exec);
+  this->exec.sync();
+  EXPECT_GE(numMatchingMantissaBits(sqrt_result(), large_ref2), 44);
+}
+
+TYPED_TEST(FltFltExecutorTests, SquareRootFast) {
+  auto input = make_tensor<fltflt>({});
+  auto sqrt_result = make_tensor<double>({});
+
+  // Test case: pi (moderate value)
+  (input = static_cast<fltflt>(std::numbers::pi)).run(this->exec);
+  (sqrt_result = matx::apply(FltFltSqrtFast{}, input)).run(this->exec);
+  this->exec.sync();
+
+  const double pi_sqrt_ref_f64 = std::sqrt(std::numbers::pi);
+  const float pi_sqrt_ref_f32 = std::sqrt(std::numbers::pi_v<float>);
+
+  EXPECT_LE(numMatchingMantissaBits(pi_sqrt_ref_f32, pi_sqrt_ref_f64), 24);
+  EXPECT_GE(numMatchingMantissaBits(sqrt_result(), pi_sqrt_ref_f64), 44);
+
+  // Test case: zero
+  (input = static_cast<fltflt>(0.0)).run(this->exec);
+  (sqrt_result = matx::apply(FltFltSqrtFast{}, input)).run(this->exec);
+  this->exec.sync();
+  EXPECT_EQ(sqrt_result(), 0.0);
+
+  // Test case: small number (1.23e-7)
+  constexpr double small_val = 1.23e-7;
+  const double small_ref = std::sqrt(small_val);
+  (input = static_cast<fltflt>(small_val)).run(this->exec);
+  (sqrt_result = matx::apply(FltFltSqrtFast{}, input)).run(this->exec);
+  this->exec.sync();
+  EXPECT_GE(numMatchingMantissaBits(sqrt_result(), small_ref), 44);
+
+  // Test case: large number (e * 1e10, 52 active mantissa bits)
+  constexpr double large_val = std::numbers::e * 1e10;
+  const double large_ref = std::sqrt(large_val);
+  (input = static_cast<fltflt>(large_val)).run(this->exec);
+  (sqrt_result = matx::apply(FltFltSqrtFast{}, input)).run(this->exec);
+  this->exec.sync();
+  EXPECT_GE(numMatchingMantissaBits(sqrt_result(), large_ref), 44);
+
+  // Test case: 1e9*pi + sqrt(2) (52 active mantissa bits, ~3.1e9)
+  const double large_val2 = 1e9 * std::numbers::pi + std::sqrt(2.0);
+  const double large_ref2 = std::sqrt(large_val2);
+  (input = static_cast<fltflt>(large_val2)).run(this->exec);
+  (sqrt_result = matx::apply(FltFltSqrtFast{}, input)).run(this->exec);
+  this->exec.sync();
+  EXPECT_GE(numMatchingMantissaBits(sqrt_result(), large_ref2), 44);
 }
 
 TYPED_TEST(FltFltExecutorTests, MatXSqrtOperator) {

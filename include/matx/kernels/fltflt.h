@@ -54,7 +54,7 @@ struct alignas(8) fltflt {
     float lo;
 
     // The default constructor does not initialize the components, so the value is indeterminate.
-    __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt() = default;
+    __MATX_INLINE__ fltflt() = default;
     __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ constexpr explicit fltflt(double x)
         : hi(static_cast<float>(x)), lo(static_cast<float>(x - static_cast<double>(hi))) {}
     __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ constexpr explicit fltflt(float x) : hi(x), lo(0.0f) {}
@@ -517,6 +517,60 @@ static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_sqrt(fltflt a
     const fltflt diff = fltflt_sub(a, ynsqr);
     fltflt prod = fltflt_two_prod_fma(xn, 0.5f * diff.hi);
     return fltflt_add(prod, yn);
+}
+
+// fltflt_sqrt_fast() is a faster approximation of fltflt_sqrt() that uses a single FMA to
+// compute the residual a - yn^2 instead of full fltflt subtraction. The FMA computes
+// a.hi - yn*yn exactly (exact multiply, single rounding), and adding a.lo recovers the
+// input's low-order bits. The result has precision comparable to fltflt_sqrt for most
+// values at roughly 1/5 the cost (~7 FLOPs vs ~35+). We do see differences for some
+// inputs. For example, for 1e9*pi + sqrt(2), fltflt_sqrt() matches the fp64
+// baseline in all mantissa bits and fltflt_sqrt_fast() matches the first 45 mantissa bits.
+// This function may eventually become the default sqrt() implementation.
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_sqrt_fast(fltflt a) {
+    const float xn = (a.hi == 0.0f) ? 0.0f : detail::fltflt_rsqrt(a.hi);
+    const float yn = detail::fmul_rn(a.hi, xn);
+    const float residual = detail::fadd_rn(
+        detail::fmaf_rn(-yn, yn, a.hi), a.lo);
+    const float correction = detail::fmul_rn(
+        detail::fmul_rn(xn, 0.5f), residual);
+    return fltflt_fast_two_sum(yn, correction);
+}
+
+// fltflt_norm3d() computes sqrt(dx^2 + dy^2 + dz^2) with minimal intermediate
+// normalizations. Instead of the separate fltflt_mul + fltflt_fma + fltflt_fma + fltflt_sqrt_fast
+// chain (5 normalizations, ~50 ops), this function computes all three exact squares,
+// accumulates with a single normalization, and applies fltflt_sqrt_fast (~39 ops).
+// The three inputs are assumed to be normalized fltflt values.
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_norm3d(fltflt dx, fltflt dy, fltflt dz) {
+    // Exact squares of hi components (each captures full rounding error)
+    const fltflt px = fltflt_two_prod_fma(dx.hi, dx.hi);
+    const fltflt py = fltflt_two_prod_fma(dy.hi, dy.hi);
+    const fltflt pz = fltflt_two_prod_fma(dz.hi, dz.hi);
+
+    // Sum the three .hi values using two_sum to capture rounding errors
+    const fltflt s = fltflt_two_sum(px.hi, py.hi);
+    const fltflt t = fltflt_two_sum(s.hi, pz.hi);
+
+    // Accumulate all eight low-order terms into a single float:
+    //   - two_sum rounding errors: s.lo, t.lo
+    //   - two_prod_fma error terms: px.lo, py.lo, pz.lo
+    //   - cross terms from squaring: 2*dx.hi*dx.lo, 2*dy.hi*dy.lo, 2*dz.hi*dz.lo
+    // All terms are O(eps) relative to t.hi, so their sum is at most 8*eps*|t.hi|.
+    // This may result in slight precision loss due to potential overlap between
+    // lo and t.hi, but this should still be valid for ~44 bits prior to the sqrt.
+    float lo = detail::fadd_rn(t.lo, s.lo);
+    lo = detail::fadd_rn(lo, px.lo);
+    lo = detail::fadd_rn(lo, py.lo);
+    lo = detail::fadd_rn(lo, pz.lo);
+    lo = detail::fmaf_rn(detail::fadd_rn(dx.hi, dx.hi), dx.lo, lo);
+    lo = detail::fmaf_rn(detail::fadd_rn(dy.hi, dy.hi), dy.lo, lo);
+    lo = detail::fmaf_rn(detail::fadd_rn(dz.hi, dz.hi), dz.lo, lo);
+
+    // Single normalization before sqrt
+    const fltflt sum_sq = fltflt_fast_two_sum(t.hi, lo);
+
+    return fltflt_sqrt_fast(sum_sq);
 }
 
 // Scalar sqrt overload so unary operator dispatch can handle fltflt expressions

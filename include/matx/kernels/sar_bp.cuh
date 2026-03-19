@@ -49,7 +49,9 @@
 
 namespace matx {
 
-static constexpr double SPEED_OF_LIGHT = 2.997291625155841e+08;
+// SI-defined speed of light in m/s. The speed of light through the atmosphere will be roughly 0.03% slower
+// than this, but it is assumed that any corrections for atmospheric propagation will be done elsewhere.
+static constexpr double SPEED_OF_LIGHT = 299792458.0;
 
 #ifdef __CUDACC__
 
@@ -75,8 +77,7 @@ __device__ inline fltflt ComputeRangeToPixelFloatFloat(fltflt apx, fltflt apy, f
     const fltflt dx = px - apx;
     const fltflt dy = py - apy;
     const fltflt dz = pz - apz;
-    const fltflt dx2dy2 = fltflt_fma(dx, dx, dy * dy);
-    return fltflt_sqrt(fltflt_fma(dz, dz, dx2dy2));
+    return fltflt_norm3d(dx, dy, dz);
 }
 
 template <typename PlatPosType, SarBpComputeType ComputeType, typename strict_compute_t, typename loose_compute_t>
@@ -141,6 +142,9 @@ template <SarBpComputeType ComputeType>
 using strict_compute_param_t = typename std::conditional<ComputeType == SarBpComputeType::Double || ComputeType == SarBpComputeType::Mixed || ComputeType == SarBpComputeType::FloatFloat, double, float>::type;
 
 template <SarBpComputeType ComputeType>
+using strict_or_ff_compute_param_t = typename std::conditional<ComputeType == SarBpComputeType::FloatFloat, fltflt, strict_compute_param_t<ComputeType>>::type;
+
+template <SarBpComputeType ComputeType>
 using loose_compute_param_t = typename std::conditional<ComputeType == SarBpComputeType::Double, double, float>::type;
 
 template <SarBpComputeType ComputeType>
@@ -154,7 +158,7 @@ struct SarBpSharedMemory<SarBpComputeType::FloatFloat> {
 template <SarBpComputeType ComputeType, typename OutImageType, typename InitialImageType, typename RangeProfilesType, typename PlatPosType, typename VoxLocType, typename RangeToMcpType, bool PhaseLUT>
 __launch_bounds__(16*16)
 __global__ void SarBp(OutImageType output, const InitialImageType initial_image, const __grid_constant__ RangeProfilesType range_profiles, const __grid_constant__ PlatPosType platform_positions, const __grid_constant__ VoxLocType voxel_locations, const __grid_constant__ RangeToMcpType range_to_mcp,
-                      strict_compute_param_t<ComputeType> dr_inv,
+                      strict_or_ff_compute_param_t<ComputeType> dr_inv,
                       strict_compute_param_t<ComputeType> phase_correction_partial,
                       cuda::std::complex<loose_compute_param_t<ComputeType>> *phase_lut)
 {
@@ -180,6 +184,7 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
     using voxel_loc_t = typename VoxLocType::value_type;
     using compute_t = typename std::conditional<ComputeType == SarBpComputeType::Double, double, float>::type;
     using strict_compute_t = typename std::conditional<ComputeType == SarBpComputeType::Double || ComputeType == SarBpComputeType::Mixed, double, float>::type;
+    using strict_or_ff_compute_t = typename std::conditional<ComputeType == SarBpComputeType::FloatFloat, fltflt, strict_compute_t>::type;
     using strict_complex_compute_t = cuda::std::complex<strict_compute_t>;
     using loose_compute_t = typename std::conditional<ComputeType == SarBpComputeType::Double, double, float>::type;
     using loose_complex_compute_t = cuda::std::complex<loose_compute_t>;
@@ -221,7 +226,7 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
     };
 
     [[maybe_unused]] const loose_compute_t phase_correction_partial_loose = static_cast<loose_compute_t>(phase_correction_partial);
-    const auto get_reference_phase = [&phase_lut, &phase_correction_partial, &phase_correction_partial_loose](strict_compute_t diffR, index_t bin_floor_int, loose_compute_t w) -> loose_complex_compute_t {
+    const auto get_reference_phase = [&phase_lut, &phase_correction_partial, &phase_correction_partial_loose](strict_or_ff_compute_t diffR, index_t bin_floor_int, loose_compute_t w) -> loose_complex_compute_t {
         if constexpr (PhaseLUT) {
             const loose_complex_compute_t base_phase = phase_lut[bin_floor_int];
             float incr_sinx, incr_cosx;
@@ -231,7 +236,8 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
                 base_phase.real() * incr_sinx + base_phase.imag() * incr_cosx
             };
         } else {
-            strict_compute_t sinx, cosx;
+            // With PhaseLUT == false, strict_or_ff_compute_t is either float or double, so we can use sincos[f] directly.
+            strict_or_ff_compute_t sinx, cosx;
             if constexpr (std::is_same_v<strict_compute_t, double>) {
                 ::sincos(phase_correction_partial * diffR, &sinx, &cosx);
             } else {
@@ -243,16 +249,11 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
         }
     };
 
-    [[maybe_unused]] fltflt dr_inv_fltflt{};
-    if constexpr (ComputeType == SarBpComputeType::FloatFloat) {
-        // We could perform this in only a single thread and store the result to shared memory, but
-        // in initial tests that did not improve performance.
-        dr_inv_fltflt = static_cast<fltflt>(dr_inv);
-    }
     [[maybe_unused]] const int tid = threadIdx.x + threadIdx.y * blockDim.x;
 
     loose_complex_compute_t accum{};
     const loose_compute_t bin_offset = static_cast<loose_compute_t>(0.5) * static_cast<loose_compute_t>(num_range_bins-1);
+
     const loose_compute_t max_bin_f = static_cast<loose_compute_t>(num_range_bins) - static_cast<loose_compute_t>(2.0);
     const int num_pulse_blocks = (num_pulses + PULSE_BLOCK_SIZE - 1) / PULSE_BLOCK_SIZE;
     for (int block = 0; block < num_pulse_blocks; ++block) {
@@ -272,7 +273,9 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
                     sh_mem.ant_pos[ip][1] = static_cast<fltflt>(platform_positions.operator()(p, 1));
                     sh_mem.ant_pos[ip][2] = static_cast<fltflt>(platform_positions.operator()(p, 2));
                 }
-                sh_mem.ant_pos[ip][3] = static_cast<fltflt>(r_to_mcp(p));
+                const fltflt rtm = static_cast<fltflt>(r_to_mcp(p));
+                const fltflt neg_rtm = fltflt{-rtm.hi, -rtm.lo};
+                sh_mem.ant_pos[ip][3] = fltflt_fma(neg_rtm, dr_inv, bin_offset);
             }
             __syncthreads();
             if (! is_valid) {
@@ -282,27 +285,34 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
         #pragma unroll 4
         for (index_t ip = 0; ip < num_pulses_in_block; ++ip) {
             const int p = block * PULSE_BLOCK_SIZE + ip;
-            [[maybe_unused]] strict_compute_t diffR{};
-            loose_compute_t bin;
+            strict_or_ff_compute_t diffR;
+            loose_compute_t w;
+            index_t bin_floor_int;
             if constexpr (ComputeType == SarBpComputeType::FloatFloat) {
-                const fltflt diffR_ff = ComputeRangeToPixelFloatFloat(
-                    sh_mem.ant_pos[ip][0], sh_mem.ant_pos[ip][1], sh_mem.ant_pos[ip][2], px, py, pz) - sh_mem.ant_pos[ip][3];
-                bin = static_cast<loose_compute_t>(diffR_ff * dr_inv_fltflt) + bin_offset;
-                // diffR is otherwise unused for FloatFloat and thus not set
+                // This is just the distance to the pixel rather than the differential range to the MCP.
+                // We use diffR because otherwise we would need to initialize diffR to avoid a
+                // compiler warning about uninitialized use of diffR.
+                diffR = ComputeRangeToPixelFloatFloat(
+                    sh_mem.ant_pos[ip][0], sh_mem.ant_pos[ip][1], sh_mem.ant_pos[ip][2], px, py, pz);
+                // sh_mem.ant_pos[ip][3] is -mcp * dr_inv + bin_offset, so here we compute
+                // dist * dr_inv + (-mcp * dr_inv + bin_offset) = (dist - mcp) * dr_inv + bin_offset
+                const fltflt bin = fltflt_fma(diffR, dr_inv, sh_mem.ant_pos[ip][3]);
+                float floor_hi = ::floorf(bin.hi);
+                float frac = (bin.hi - floor_hi) + bin.lo;
+                // bin.lo may push bin over a boundary, in which case floor and frac are incorrect.
+                // Compute an adjustment based on whether or not the fractional part is outside (0.0, 1.0).
+                const float adjust = ::floorf(frac);  // -1, 0, or 1
+                bin_floor_int = static_cast<index_t>(floor_hi + adjust);
+                w = frac - adjust;
             } else {
                 diffR = ComputeRangeToPixel<PlatPosType, ComputeType, strict_compute_t, loose_compute_t>(
                     platform_positions, p, px, py, pz) - static_cast<strict_compute_t>(r_to_mcp(p));
-                bin = static_cast<loose_compute_t>(diffR * dr_inv) + bin_offset;
+                const strict_compute_t bin = diffR * dr_inv + bin_offset;
+                const strict_compute_t bin_floor = ::floor(bin);
+                w = static_cast<loose_compute_t>(bin - bin_floor);
+                bin_floor_int = static_cast<index_t>(bin_floor);
             }
-            if (bin >= static_cast<loose_compute_t>(0.0) && bin < max_bin_f) {
-                loose_compute_t bin_floor;
-                if constexpr (std::is_same_v<loose_compute_t, float>) {
-                    bin_floor = ::floorf(bin);
-                } else {
-                    bin_floor = ::floor(bin);
-                }
-                const loose_compute_t w = bin - bin_floor;
-                const index_t bin_floor_int = static_cast<index_t>(bin_floor);
+            if (bin_floor_int >= 0 && bin_floor_int < static_cast<index_t>(num_range_bins-1)) {
 
                 range_profiles_t sample_lo, sample_hi;
 

@@ -106,7 +106,7 @@ inline void sar_bp_impl(OutImageType &out, const InitialImageType &initial_image
       cuda::std::complex<float> *phase_lut = static_cast<cuda::std::complex<float> *>(workspace);
       SarBpFillPhaseLUT<double, float><<<lut_grid, lut_block, 0, stream>>>(phase_lut, params.center_frequency, params.del_r, range_profiles.Size(1));
       SarBp<SarBpComputeType::FloatFloat, OutImageType, InitialImageType, RangeProfilesType, PlatPosType, VoxLocType, RangeToMcpType, PhaseLUT><<<grid, block, 0, stream>>>(
-        out, initial_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, dr_inv, phase_correction_partial, phase_lut);
+        out, initial_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, static_cast<fltflt>(dr_inv), phase_correction_partial, phase_lut);
     } else {
       cuda::std::complex<float> *phase_lut = static_cast<cuda::std::complex<float> *>(workspace);
       SarBpFillPhaseLUT<float, float><<<lut_grid, lut_block, 0, stream>>>(phase_lut, static_cast<float>(params.center_frequency), static_cast<float>(params.del_r), range_profiles.Size(1));
