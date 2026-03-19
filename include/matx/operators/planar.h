@@ -242,5 +242,4 @@ namespace matx
       static_assert(is_complex_v<extract_value_type_t<T1>>, "Input to interleaved operator must be complex-valued");
       return detail::ComplexPlanarOp<T1>(t);
     }
-
 } // end namespace matx
