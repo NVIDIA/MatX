@@ -179,6 +179,7 @@ public:
     detail::tensor_impl_t<T, RANK, Desc>{std::forward<D2>(desc)},
     storage_{std::move(s)}
   {
+    ValidatePlanarLayoutOnCreate_();
     this->SetLocalData(storage_.data());
   }
 
@@ -194,6 +195,7 @@ public:
     detail::tensor_impl_t<T, RANK, D2>{std::forward<D2>(desc)},
     storage_{std::move(s)}
   {
+    ValidatePlanarLayoutOnCreate_();
     this->SetLocalData(ldata);
   }
 
@@ -210,6 +212,7 @@ public:
     detail::tensor_impl_t<T, RANK, D2>{std::forward<D2>(desc)},
     storage_{make_owning_storage<T>(this->desc_.TotalSize())}
   {
+    ValidatePlanarLayoutOnCreate_();
     this->SetLocalData(storage_.data());
   }
 
@@ -225,6 +228,7 @@ public:
     detail::tensor_impl_t<T, RANK, Desc>(cuda::std::array<index_t, 0>{}),
     storage_{make_owning_storage<T>(1)}
   {
+    ValidatePlanarLayoutOnCreate_();
     this->SetLocalData(storage_.data());
   }
 
@@ -239,6 +243,7 @@ public:
     detail::tensor_impl_t<T, RANK, Desc>(shape),
     storage_{make_owning_storage<T>(this->desc_.TotalSize())}
   {
+    ValidatePlanarLayoutOnCreate_();
     this->SetLocalData(storage_.data());
   }
 
@@ -944,6 +949,7 @@ MATX_LOOP_UNROLL
   Reset(T *const data, ShapeType &&shape) noexcept
   {
     this->desc_.InitFromShape(std::forward<ShapeType>(shape));
+    ValidatePlanarLayoutOnCreate_();
     // For non-owning storage, we need to recreate the storage object
     storage_ = make_non_owning_storage<T>(data, this->desc_.TotalSize());
     this->SetData(data);
@@ -965,6 +971,7 @@ MATX_LOOP_UNROLL
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
+    ValidatePlanarLayoutOnCreate_();
     // For non-owning storage, we need to recreate the storage object
     storage_ = make_non_owning_storage<T>(data, this->desc_.TotalSize());
     this->SetData(data);
@@ -986,6 +993,7 @@ MATX_LOOP_UNROLL
   __MATX_HOST__ __MATX_INLINE__ void
   Reset(T *const data, T *const ldata) noexcept
   {
+    ValidatePlanarLayoutOnCreate_();
     // For non-owning storage, we need to recreate the storage object
     storage_ = make_non_owning_storage<T>(data, this->desc_.TotalSize());
     this->SetData(ldata);
@@ -1529,6 +1537,18 @@ MATX_LOOP_UNROLL
   }
 
 private:
+  __MATX_HOST__ __MATX_INLINE__ void ValidatePlanarLayoutOnCreate_() const
+  {
+    if constexpr (is_planar_complex_v<T>) {
+      if constexpr (RANK > 0) {
+        MATX_ASSERT_STR(this->Stride(Rank() - 1) == 1, matxInvalidDim,
+                        "Planar complex tensors must have unit innermost stride");
+      }
+      MATX_ASSERT_STR(this->IsContiguous(), matxInvalidDim,
+                      "Planar complex tensors must be contiguous (non-unity strides are not supported)");
+    }
+  }
+
   Storage<T> storage_;
   std::string name_ = std::string("tensor_") + std::to_string(RANK) + "_" + detail::to_short_str<T>();
 };
