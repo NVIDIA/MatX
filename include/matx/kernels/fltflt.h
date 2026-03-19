@@ -53,7 +53,9 @@ struct alignas(8) fltflt {
     float hi;
     float lo;
 
-    // The default constructor does not initialize the components, so the value is indeterminate.
+    // The default constructor does not initialize the components, so the value is indeterminate. Some versions of
+    // nvcc will warn about __host__ and __device__ annotations on default constructors because default
+    // constructors will not run in all conditions (e.g., in static shared memory CUDA kernel allocations).
     __MATX_INLINE__ fltflt() = default;
     __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ constexpr explicit fltflt(double x)
         : hi(static_cast<float>(x)), lo(static_cast<float>(x - static_cast<double>(hi))) {}
