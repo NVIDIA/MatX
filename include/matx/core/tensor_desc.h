@@ -41,6 +41,7 @@
 #include <type_traits>
 #include <cstdint>
 #include "matx/core/error.h"
+#include "matx/core/type_utils.h"
 
 namespace matx {
 
