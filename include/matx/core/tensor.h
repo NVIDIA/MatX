@@ -1541,7 +1541,7 @@ private:
   {
     if constexpr (is_planar_complex_v<T>) {
       if constexpr (RANK > 0) {
-        MATX_ASSERT_STR(this->Stride(Rank() - 1) == 1, matxInvalidDim,
+        MATX_ASSERT_STR(this->Stride(RANK - 1) == 1, matxInvalidDim,
                         "Planar complex tensors must have unit innermost stride");
       }
       MATX_ASSERT_STR(this->IsContiguous(), matxInvalidDim,
