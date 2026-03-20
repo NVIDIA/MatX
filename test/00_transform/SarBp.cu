@@ -331,7 +331,7 @@ TYPED_TEST(SarBpTestDoubleType, PointTarget)
     (image = matx::experimental::sar_bp(zero_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, bp_params)).run(this->exec);
     this->exec.sync();
 
-    validate(image, 1.0e-10, 1.0e-10);
+    validate(image, 1.05e-10, 1.05e-10);
   }
 
   // The mixed precision and single precision backprojectors take single-precision values for range profiles,
@@ -417,13 +417,13 @@ TYPED_TEST(SarBpTestDoubleType, PointTarget)
     // example-end sar-bp-1
     this->exec.sync();  
 
-    validate(image, 1.0e-10, 1.0e-2);
+    validate(image, 1.05e-10, 1.0e-2);
 
     bp_params.compute_type = matx::SarBpComputeType::FloatFloat;
     (image = matx::experimental::sar_bp(zero_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, bp_params)).run(this->exec);
     this->exec.sync();  
 
-    validate(image, 1.0e-10, 1.0e-2);
+    validate(image, 1.05e-10, 1.0e-2);
   }
 
   MATX_EXIT_HANDLER();

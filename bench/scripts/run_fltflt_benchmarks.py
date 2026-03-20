@@ -203,6 +203,49 @@ def parse_benchmark_output(output, verbose=False):
     return results
 
 
+def parse_benchmark_output_no_type(output, verbose=False):
+    """
+    Parse nvbench output for benchmarks without a type axis (fltflt-only).
+    Returns a dict with a single 'fltflt' key.
+    """
+    results = {}
+    output = strip_ansi(output)
+    lines = output.strip().split('\n')
+
+    gpu_time_col_idx = None
+    for line in lines:
+        if '|' in line and 'GPU Time' in line:
+            cols = [col.strip() for col in line.split('|')]
+            for j, col in enumerate(cols):
+                if col == 'GPU Time':
+                    gpu_time_col_idx = j
+                    break
+            if gpu_time_col_idx is not None:
+                if verbose:
+                    print(f"  Found GPU Time at column index {gpu_time_col_idx} in: {line.rstrip()}")
+                break
+
+    if gpu_time_col_idx is None:
+        print("  Warning: Could not find GPU Time column in output")
+        return results
+
+    for line in lines:
+        if '|' not in line or 'GPU Time' in line or '---' in line:
+            continue
+        cols = [col.strip() for col in line.split('|')]
+        if len(cols) <= gpu_time_col_idx:
+            continue
+        gpu_time_str = cols[gpu_time_col_idx]
+        gpu_time_ms = parse_time_value(gpu_time_str)
+        if gpu_time_ms is not None:
+            if verbose:
+                print(f"  Parsed: type=fltflt, gpu_time_col={gpu_time_str!r}, value={gpu_time_ms:.6f} ms")
+            results['fltflt'] = gpu_time_ms
+            break
+
+    return results
+
+
 def format_time(time_ms):
     """Format a time in ms with appropriate precision and units."""
     if time_ms is None:
@@ -254,7 +297,7 @@ def print_summary(results, relative):
     print("-" * 66)
 
     # Order benchmarks - use the canonical order but only show benchmarks that were actually run
-    bench_order = ['add', 'sub', 'mul', 'div', 'sqrt', 'abs', 'fma', 'madd', 'round', 'trunc', 'floor', 'fmod', 'cast2dbl', 'cast2fltflt']
+    bench_order = ['add', 'sub', 'mul', 'div', 'sqrt', 'sqrt_fast', 'norm3d', 'abs', 'fma', 'madd', 'round', 'trunc', 'floor', 'fmod', 'cast2dbl', 'cast2fltflt']
     # Filter to only benchmarks present in results
     bench_order = [b for b in bench_order if b in results]
 
@@ -386,7 +429,9 @@ def main():
     print()
 
     # List of benchmarks to run
-    all_benchmarks = ['add', 'sub', 'mul', 'div', 'sqrt', 'abs', 'fma', 'madd', 'round', 'trunc', 'floor', 'fmod', 'cast2dbl', 'cast2fltflt']
+    all_benchmarks = ['add', 'sub', 'mul', 'div', 'sqrt', 'sqrt_fast', 'norm3d', 'abs', 'fma', 'madd', 'round', 'trunc', 'floor', 'fmod', 'cast2dbl', 'cast2fltflt']
+    # Benchmarks that only have a fltflt variant (no float/double type axis)
+    fltflt_only_benchmarks = set()
     benchmarks = args.benchmarks if args.benchmarks is not None else all_benchmarks
 
     # Validate user-provided benchmarks
@@ -410,7 +455,10 @@ def main():
             continue
 
         # Parse results
-        results = parse_benchmark_output(output, verbose=args.verbose)
+        if bench in fltflt_only_benchmarks:
+            results = parse_benchmark_output_no_type(output, verbose=args.verbose)
+        else:
+            results = parse_benchmark_output(output, verbose=args.verbose)
 
         if not results:
             print(f"  Warning: Could not parse results for {bench}")

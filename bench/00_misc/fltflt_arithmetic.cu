@@ -410,6 +410,157 @@ NVBENCH_BENCH_TYPES(fltflt_bench_sqrt, NVBENCH_TYPE_AXES(precision_types))
   .add_int64_axis("Iterations", {250});
 
 //==============================================================================
+// Square Root Fast Benchmark
+// For float/double, this is identical to the sqrt benchmark (sqrtf/sqrt).
+// For fltflt, this uses fltflt_sqrt_fast instead of fltflt_sqrt.
+//==============================================================================
+template <typename T>
+__global__ void iterative_sqrt_fast_kernel(T* __restrict__ result, int64_t size, int32_t iterations)
+{
+  int64_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx < size) {
+    T val[ILP_FACTOR];
+    const T init_val = static_cast<T>(2.718281828);
+
+    #pragma unroll
+    for (int ilp = 0; ilp < ILP_FACTOR; ilp++) {
+      if constexpr (std::is_same_v<T, fltflt>) {
+        val[ilp] = fltflt_sqrt_fast(init_val);
+      } else {
+        val[ilp] = sqrt(init_val);
+      }
+    }
+
+    #pragma unroll ITER_UNROLL_FACTOR
+    for (int32_t i = 1; i < iterations; i++) {
+      #pragma unroll
+      for (int ilp = 0; ilp < ILP_FACTOR; ilp++) {
+        if constexpr (std::is_same_v<T, fltflt>) {
+          val[ilp] = fltflt_sqrt_fast(val[ilp]);
+        } else {
+          val[ilp] = sqrt(val[ilp]);
+        }
+      }
+    }
+
+    T result_val = val[0];
+    #pragma unroll
+    for (int ilp = 1; ilp < ILP_FACTOR; ilp++) {
+      result_val = result_val + val[ilp];
+    }
+    result[idx] = result_val;
+  }
+}
+
+template <typename PrecisionType>
+void fltflt_bench_sqrt_fast(nvbench::state &state, nvbench::type_list<PrecisionType>)
+{
+  const index_t size = static_cast<index_t>(state.get_int64("Array Size"));
+  const int32_t iterations = static_cast<int32_t>(state.get_int64("Iterations"));
+  cudaExecutor exec{0};
+
+  auto result = make_tensor<PrecisionType>({size});
+
+  state.add_element_count(size, "NumElements");
+  state.add_global_memory_writes<PrecisionType>(size);
+
+  constexpr int block_size = 256;
+  int grid_size = static_cast<int>((size + block_size - 1) / block_size);
+
+  exec.sync();
+
+  state.exec([&](nvbench::launch &launch) {
+    iterative_sqrt_fast_kernel<<<grid_size, block_size, 0, (cudaStream_t)launch.get_stream()>>>(
+      result.Data(), size, iterations);
+  });
+}
+
+NVBENCH_BENCH_TYPES(fltflt_bench_sqrt_fast, NVBENCH_TYPE_AXES(precision_types))
+  .add_int64_power_of_two_axis("Array Size", nvbench::range(24, 24, 1))
+  .add_int64_axis("Iterations", {250});
+
+//==============================================================================
+// 3D Norm Benchmark: sqrt(dx^2 + dy^2 + dz^2)
+// Each ILP lane has distinct dx values that depend on the previous iteration's
+// result, creating a true dependency chain that prevents CSE across lanes.
+//==============================================================================
+template <typename T>
+__global__ void iterative_norm3d_kernel(T* __restrict__ result, int64_t size, int32_t iterations)
+{
+  int64_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx < size) {
+    // Per-lane dx values create independent dependency chains
+    T dx[ILP_FACTOR];
+    const T dy = static_cast<T>(-487293.18274);
+    const T dz = static_cast<T>(183649.27391);
+
+    #pragma unroll
+    for (int ilp = 0; ilp < ILP_FACTOR; ilp++) {
+      dx[ilp] = static_cast<T>(312847.91837) + static_cast<T>(ilp * 0.1);
+    }
+
+    #pragma unroll ITER_UNROLL_FACTOR
+    for (int32_t i = 0; i < iterations; i++) {
+      #pragma unroll
+      for (int ilp = 0; ilp < ILP_FACTOR; ilp++) {
+        T norm;
+        if constexpr (std::is_same_v<T, fltflt>) {
+          norm = fltflt_norm3d(dx[ilp], dy, dz);
+        } else {
+          norm = sqrt(dx[ilp] * dx[ilp] + dy * dy + dz * dz);
+        }
+        // Feed result back into dx to create a dependency chain.
+        // Add the computed norm and subtract off the approximate
+        // expected norm to keep dx in a stable range while preventing
+        // the compiler from optimizing away the computation.
+        if constexpr (std::is_same_v<T, fltflt>) {
+          // fltflt addition/subtraction is expensive and we do not want to bias the benchmark
+          // too much, so at least keep the expected norm as a float rather than fltflt to
+          // reduce the cost of the subtraction.
+          dx[ilp] = dx[ilp] + (norm - 607499.4f);
+        } else {
+          dx[ilp] = dx[ilp] + (norm - static_cast<T>(607499.4));
+        }
+      }
+    }
+
+    T result_val = dx[0];
+    #pragma unroll
+    for (int ilp = 1; ilp < ILP_FACTOR; ilp++) {
+      result_val = result_val + dx[ilp];
+    }
+    result[idx] = result_val;
+  }
+}
+
+template <typename PrecisionType>
+void fltflt_bench_norm3d(nvbench::state &state, nvbench::type_list<PrecisionType>)
+{
+  const index_t size = static_cast<index_t>(state.get_int64("Array Size"));
+  const int32_t iterations = static_cast<int32_t>(state.get_int64("Iterations"));
+  cudaExecutor exec{0};
+
+  auto result = make_tensor<PrecisionType>({size});
+
+  state.add_element_count(size, "NumElements");
+  state.add_global_memory_writes<PrecisionType>(size);
+
+  constexpr int block_size = 256;
+  int grid_size = static_cast<int>((size + block_size - 1) / block_size);
+
+  exec.sync();
+
+  state.exec([&](nvbench::launch &launch) {
+    iterative_norm3d_kernel<<<grid_size, block_size, 0, (cudaStream_t)launch.get_stream()>>>(
+      result.Data(), size, iterations);
+  });
+}
+
+NVBENCH_BENCH_TYPES(fltflt_bench_norm3d, NVBENCH_TYPE_AXES(precision_types))
+  .add_int64_power_of_two_axis("Array Size", nvbench::range(24, 24, 1))
+  .add_int64_axis("Iterations", {250});
+
+//==============================================================================
 // Absolute Value Benchmark
 //==============================================================================
 template <typename PrecisionType>
