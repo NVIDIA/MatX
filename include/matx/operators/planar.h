@@ -107,6 +107,8 @@ namespace matx
 
         __MATX_INLINE__ std::string str() const { return "planar(" + op_.str() + ")"; }
 
+        __MATX_INLINE__ auto InnerOp() const { return op_; }
+
         __MATX_INLINE__ ComplexPlanarOp(const T1 &op) : op_(op) {
           static_assert(is_complex_v<extract_value_type_t<T1>>, "Complex planar op only works on complex types");
           static_assert(Rank() > 0);

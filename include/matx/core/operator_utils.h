@@ -103,7 +103,7 @@ namespace matx {
         if(supported) {
           return make_tensor<typename Op::value_type>(in.Data(), in.Descriptor());
         } else {
-          return make_tensor<typename Op::value_type>(in.Shape(), space, stream);
+          return make_tensor<typename Op::value_type>(in.Descriptor(), space, stream);
         }
       }
     }

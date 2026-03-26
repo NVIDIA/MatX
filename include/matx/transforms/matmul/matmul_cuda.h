@@ -94,7 +94,9 @@ constexpr bool CompatibleGemmCUDATypes() {
               std::is_same_v<typename OpA::value_type, cuda::std::complex<double>> ||
               std::is_same_v<typename OpA::value_type, int8_t> ||
               std::is_same_v<typename OpA::value_type, matxFp16Complex> ||
-              std::is_same_v<typename OpA::value_type, matxBf16Complex>;
+              std::is_same_v<typename OpA::value_type, matxBf16Complex> ||
+              std::is_same_v<typename OpA::value_type, matxFp16ComplexPlanar> ||
+              std::is_same_v<typename OpA::value_type, matxBf16ComplexPlanar>;
 
     }
     // Accumulator type different from A/B
@@ -138,6 +140,9 @@ struct MatMulCUDAParams_t {
   MatXDataType_t dtype;
   cublasOperation_t opA;
   cublasOperation_t opB;
+  bool a_planar = false;
+  bool b_planar = false;
+  bool c_planar = false;
 };
 
 template <typename TensorTypeC, typename TensorTypeA, typename TensorTypeB,
@@ -274,6 +279,9 @@ public:
     params.dtype = TypeToInt<T1>();
     params.prov = PROV;
     params.rank = c.Rank();
+    params.a_planar = is_planar_complex_v<typename TensorTypeA::value_type>;
+    params.b_planar = is_planar_complex_v<typename TensorTypeB::value_type>;
+    params.c_planar = is_planar_complex_v<typename TensorTypeC::value_type>;
 
     // Batches
     params.batch = 1;
@@ -421,6 +429,13 @@ public:
         params.c_rows = params.a_rows;
         params.c_cols = params.b_cols;
         params.ldc = c.Stride(RANK - 2);
+
+        // For complex half paths we launch as planar row-major. Use compact
+        // row-major leading dimension so planar C metadata matches what cuBLAS
+        // expects, even when the original tensor type is planar.
+        if constexpr (is_complex_half_v<typename TensorTypeC::value_type>) {
+          params.ldc = c.Size(RANK - 1);
+        }
 
       }
       else if constexpr (PROV == PROVIDER_TYPE_CUTLASS) {
@@ -770,37 +785,58 @@ private:
     // If the tensors are complex half precision, we need to do a planar
     // transform since all libraries expect this format at the moment.
     if constexpr (is_complex_half_v<T1>) {
+      constexpr bool a_is_planar = is_planar_complex_v<typename TensorTypeA::value_type>;
+      constexpr bool b_is_planar = is_planar_complex_v<typename TensorTypeB::value_type>;
+      constexpr bool c_is_planar = is_planar_complex_v<typename TensorTypeC::value_type>;
 
-      auto a_shape = a.Shape();
-      *(a_shape.begin() + a.Rank() - 2) = a.Size(a.Rank() - 2) * 2;
-      if (a_hp == nullptr) {
-        matxAlloc(&a_hp, a.Bytes(), MATX_ASYNC_DEVICE_MEMORY, stream);
+      if (!a_is_planar) {
+        auto a_shape = a.Shape();
+        *(a_shape.begin() + a.Rank() - 2) = a.Size(a.Rank() - 2) * 2;
+        if (a_hp == nullptr) {
+          matxAlloc(&a_hp, a.Bytes(), MATX_ASYNC_DEVICE_MEMORY, stream);
+        }
+        auto a_planar = make_tensor<typename T2::value_type>(
+            reinterpret_cast<typename T2::value_type*>(a_hp), a_shape, false);
+
+        // Convert A to planar layout
+        (a_planar = planar(a)).run(stream);
+
+        // update pointers to planar data.
+        // must use Reset because types for planar are different
+        a_adj.Reset(reinterpret_cast<T1 *>(a_planar.Data()));
       }
-      auto a_planar = make_tensor<typename T2::value_type>(reinterpret_cast<typename T2::value_type*>(a_hp), a_shape, false);
 
-      auto b_shape = b.Shape();
-      *(b_shape.begin() + b.Rank() - 2) = b.Size(b.Rank() - 2) * 2;
-      if (b_hp == nullptr) {
-        matxAlloc(&b_hp, b.Bytes(), MATX_ASYNC_DEVICE_MEMORY, stream);
+      if (!b_is_planar) {
+        auto b_shape = b.Shape();
+        *(b_shape.begin() + b.Rank() - 2) = b.Size(b.Rank() - 2) * 2;
+        if (b_hp == nullptr) {
+          matxAlloc(&b_hp, b.Bytes(), MATX_ASYNC_DEVICE_MEMORY, stream);
+        }
+        auto b_planar = make_tensor<typename T3::value_type>(
+            reinterpret_cast<typename T3::value_type*>(b_hp), b_shape, false);
+
+        // Convert B to planar layout
+        (b_planar = planar(b)).run(stream);
+
+        // update pointers to planar data.
+        // must use Reset because types for planar are different
+        b_adj.Reset(reinterpret_cast<T2 *>(b_planar.Data()));
       }
-      auto b_planar = make_tensor<typename T3::value_type>(reinterpret_cast<typename T3::value_type*>(b_hp), b_shape, false);
 
-      auto c_shape = c.Shape();
-      *(c_shape.begin() + c.Rank() - 2) = c.Size(c.Rank() - 2) * 2;
-      if (c_hp == nullptr) {
-        matxAlloc(&c_hp, c.Bytes(), MATX_ASYNC_DEVICE_MEMORY, stream);
+      if (!c_is_planar) {
+        auto c_shape = c.Shape();
+        *(c_shape.begin() + c.Rank() - 2) = c.Size(c.Rank() - 2) * 2;
+        if (c_hp == nullptr) {
+          matxAlloc(&c_hp, c.Bytes(), MATX_ASYNC_DEVICE_MEMORY, stream);
+        }
+        auto c_planar = make_tensor<typename T1::value_type>(
+            reinterpret_cast<typename T1::value_type*>(c_hp), c_shape, false);
+        c_adj.Reset(reinterpret_cast<T3 *>(c_planar.Data()));
       }
-      auto c_planar = make_tensor<typename T1::value_type>(reinterpret_cast<typename T1::value_type*>(c_hp), c_shape, false);
-
-      // Convert A/B to planar layout
-      (a_planar = planar(a)).run(stream);
-      (b_planar = planar(b)).run(stream);
-
-      // update pointers to planar data.
-      // must use Reset because types for planar are different
-      a_adj.Reset(reinterpret_cast<T1 *>(a_planar.Data()));
-      b_adj.Reset(reinterpret_cast<T2 *>(b_planar.Data()));
-      c_adj.Reset(reinterpret_cast<T3 *>(c_planar.Data()));
+      else {
+        // Keep C adjustment explicit for the planar-output path.
+        c_adj.Reset(c.Data());
+      }
     }
 
     // Prep for batch looping
@@ -999,13 +1035,15 @@ private:
     // If the tensors are complex half precisions, we need to convert C back to
     // interleaved format and free all temporary buffers
     if constexpr (is_complex_half_v<T1>) {
-      auto c_shape = c.Shape();
-      *(c_shape.begin() + c.Rank() - 2) = c.Size(c.Rank() - 2) * 2;
-      auto c_planar = make_tensor<typename T3::value_type>(
-          reinterpret_cast<typename T3::value_type *>(c_adj.Data()), c_shape);
+      constexpr bool c_is_planar = is_planar_complex_v<typename TensorTypeC::value_type>;
+      if (!c_is_planar) {
+        auto c_shape = c.Shape();
+        *(c_shape.begin() + c.Rank() - 2) = c.Size(c.Rank() - 2) * 2;
+        auto c_planar = make_tensor<typename T3::value_type>(
+            reinterpret_cast<typename T3::value_type *>(c_adj.Data()), c_shape);
 
-      // Convert A/B to planar layout
-      (c = interleaved(c_planar)).run(stream);
+        (c = interleaved(c_planar)).run(stream);
+      }
     }
   }
 
@@ -1089,6 +1127,9 @@ struct MatMulCUDAParamsKeyHash {
     return std::hash<uint64_t>()(k.m) + std::hash<uint64_t>()(k.n) +
            std::hash<uint64_t>()(k.k) + std::hash<uint64_t>()(k.batch) +
            std::hash<uint64_t>()(k.prov) +
+           std::hash<uint64_t>()(static_cast<uint64_t>(k.a_planar)) +
+           std::hash<uint64_t>()(static_cast<uint64_t>(k.b_planar)) +
+           std::hash<uint64_t>()(static_cast<uint64_t>(k.c_planar)) +
            std::hash<uint64_t>()((size_t)k.stream);
   }
 };
@@ -1109,7 +1150,10 @@ struct MatMulCUDAParamsKeyEq {
            l.stream == t.stream && l.lda == t.lda &&
            l.ldb == t.ldb && l.ldc == t.ldc && l.batch == t.batch &&
            l.prov == t.prov && l.dtype == t.dtype && l.opA == t.opA &&
-           l.opB == t.opB && l.rank == t.rank;
+           l.opB == t.opB && l.rank == t.rank &&
+           l.a_planar == t.a_planar &&
+           l.b_planar == t.b_planar &&
+           l.c_planar == t.c_planar;
   }
 };
 

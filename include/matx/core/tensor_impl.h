@@ -102,6 +102,47 @@ class tensor_impl_t {
     using matxoplvalue = bool;
     using self_type = tensor_impl_t<T, RANK, Desc, TensorData>;
 
+    // Planar complex wrappers store real/imag in separate contiguous planes:
+    // [real_0..real_n-1][imag_0..imag_n-1]. Since there is no contiguous T object
+    // at element i, operator() cannot return a true T&. This proxy provides
+    // reference-like read/write semantics for expression assignment paths.
+    struct PlanarComplexProxy {
+      self_type *self;
+      index_t offset;
+
+      __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ operator T() const
+      {
+        return self->LoadPlanarComplex(offset);
+      }
+
+      __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ PlanarComplexProxy &operator=(const T &rhs)
+      {
+        self->StorePlanarComplex(offset, rhs);
+        return *this;
+      }
+
+      template <typename U>
+      __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ PlanarComplexProxy &operator=(const U &rhs)
+        requires requires(const U &u) { u.real(); u.imag(); }
+      {
+        T tmp{};
+        tmp.real(rhs.real());
+        tmp.imag(rhs.imag());
+        self->StorePlanarComplex(offset, tmp);
+        return *this;
+      }
+
+      __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto real() const
+      {
+        return self->LoadPlanarComplex(offset).real();
+      }
+
+      __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto imag() const
+      {
+        return self->LoadPlanarComplex(offset).imag();
+      }
+    };
+
     // Type specifier for signaling this is a matx operation
     using matxop = bool;
 
@@ -1031,7 +1072,8 @@ MATX_IGNORE_WARNING_POP_GCC
         s[i] = this->Stride(d);
       }
 
-      return Desc{std::move(n), std::move(s)};
+      auto new_desc = Desc{std::move(n), std::move(s)};
+      return new_desc;
     }
 
     __MATX_INLINE__ auto Permute(const cuda::std::array<int32_t, RANK> &dims) const
@@ -1302,7 +1344,12 @@ MATX_IGNORE_WARNING_POP_GCC
         const index_t offset = GetOffsetOptimized<CapType::ept>(indices...);
 
         if constexpr (CapType::ept == detail::ElementsPerThread::ONE) {
-          return data_.ldata_[offset];
+          if constexpr (is_planar_complex_v<T>) {
+            return LoadPlanarComplex(offset);
+          }
+          else {
+            return data_.ldata_[offset];
+          }
         } else if constexpr (EPT_int * sizeof(T) <= MAX_VEC_WIDTH_BYTES ) {
           return *reinterpret_cast<detail::Vector<T, EPT_int>*>(data_.ldata_ + offset);
         } else {
@@ -1366,7 +1413,12 @@ MATX_IGNORE_WARNING_POP_GCC
         const index_t offset = GetOffsetOptimized<CapType::ept>(indices...);
 
         if constexpr (CapType::ept == detail::ElementsPerThread::ONE) {
-          return data_.ldata_[offset];
+          if constexpr (is_planar_complex_v<T>) {
+            return PlanarComplexProxy{this, offset};
+          }
+          else {
+            return data_.ldata_[offset];
+          }
         } else {
           return *reinterpret_cast<detail::Vector<T, EPT_int>*>(data_.ldata_ + offset);
         }
@@ -1386,7 +1438,7 @@ MATX_IGNORE_WARNING_POP_GCC
     template <typename CapType>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(const cuda::std::array<index_t, RANK> &idx) const noexcept
     {
-      return cuda::std::apply([&](auto &&...args) -> T {
+      return cuda::std::apply([&](auto &&...args) -> decltype(auto) {
           return this->operator()<CapType>(args...);
         }, idx);
     }
@@ -1400,7 +1452,7 @@ MATX_IGNORE_WARNING_POP_GCC
     template <typename CapType>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__  decltype(auto) operator()(const cuda::std::array<index_t, RANK> &idx) noexcept
     {
-      return cuda::std::apply([&](auto &&...args) -> T& {
+      return cuda::std::apply([&](auto &&...args) -> decltype(auto) {
           return this->operator()<CapType>(args...);
         }, idx);
     }
@@ -1413,7 +1465,7 @@ MATX_IGNORE_WARNING_POP_GCC
      */
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(const cuda::std::array<index_t, RANK> &idx) const noexcept
     {
-      return cuda::std::apply([&](auto &&...args) -> T {
+      return cuda::std::apply([&](auto &&...args) -> decltype(auto) {
           return this->operator()<DefaultCapabilities>(args...);
         }, idx);
     }
@@ -1426,7 +1478,7 @@ MATX_IGNORE_WARNING_POP_GCC
      */
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__  decltype(auto) operator()(const cuda::std::array<index_t, RANK> &idx) noexcept
     {
-      return cuda::std::apply([&](auto &&...args) -> T& {
+      return cuda::std::apply([&](auto &&...args) -> decltype(auto) {
           return this->operator()<DefaultCapabilities>(args...);
         }, idx);
     }
@@ -1437,6 +1489,10 @@ MATX_IGNORE_WARNING_POP_GCC
       // Since tensors are a "leaf" operator type, we will never have an operator passed to a tensor as the
       // type, but only POD types.
       if constexpr (Cap == detail::OperatorCapability::ELEMENTS_PER_THREAD) {
+        if constexpr (is_planar_complex_v<T>) {
+          return cuda::std::array<detail::ElementsPerThread, 2>{detail::ElementsPerThread::ONE, detail::ElementsPerThread::ONE};
+        }
+
         if constexpr (Rank() == 0) {
           return cuda::std::array<detail::ElementsPerThread, 2>{detail::ElementsPerThread::ONE, detail::ElementsPerThread::ONE};
         }
@@ -1702,6 +1758,27 @@ MATX_IGNORE_WARNING_POP_GCC
   protected:
     TensorData data_;
     Desc desc_;
+
+  private:
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T LoadPlanarComplex(index_t offset) const
+    {
+      using Scalar = typename T::value_type;
+      const auto *base = reinterpret_cast<const Scalar *>(data_.ldata_);
+      const index_t total = this->TotalSize();
+      T out{};
+      out.real(base[offset]);
+      out.imag(base[offset + total]);
+      return out;
+    }
+
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ void StorePlanarComplex(index_t offset, const T &v)
+    {
+      using Scalar = typename T::value_type;
+      auto *base = reinterpret_cast<Scalar *>(data_.ldata_);
+      const index_t total = this->TotalSize();
+      base[offset] = v.real();
+      base[offset + total] = v.imag();
+    }
 };
 
 }
