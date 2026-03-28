@@ -158,6 +158,9 @@ namespace matx
     }
 #endif
 
+    __MATX_INLINE__ const auto &InputOp() const noexcept { return in1_; }
+    __MATX_INLINE__ const auto &UnaryOp() const noexcept { return op_; }
+
     template <OperatorCapability Cap, typename InType>
     __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
       if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
