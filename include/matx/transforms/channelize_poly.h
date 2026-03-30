@@ -58,6 +58,9 @@ constexpr index_t MATX_CHANNELIZE_POLY1D_FUSED_CHAN_KERNEL_THRESHOLD = 6;
 // to balance occupancy and CTA size. For now, we choose a reasonable default.
 constexpr index_t MATX_CHANNELIZE_POLY1D_FULL_SMEM_KERNEL_NOUT_PER_ITER = 4;
 
+// Maximum dynamic shared memory (bytes) for caching filter taps in ChannelizePoly1D.
+constexpr size_t MATX_CHANNELIZE_POLY1D_MAX_FILTER_SMEM_BYTES = 6 * 1024;
+
 template <typename OutType, typename InType, typename FilterType, typename AccumType>
 inline void matxChannelizePoly1DInternal(OutType o, const InType &i,
                                      const FilterType &filter, index_t decimation_factor, cudaStream_t stream)
@@ -69,13 +72,26 @@ inline void matxChannelizePoly1DInternal(OutType o, const InType &i,
   const index_t nout_per_channel = o.Size(OutType::Rank()-2);
   const int num_batches = static_cast<int>(TotalSize(i)/i.Size(i.Rank() - 1));
 
+  using filter_t = typename FilterType::value_type;
+  const index_t filter_len = filter.Size(FilterType::Rank()-1);
+
   const int THREADS = 256;
   const index_t ELTS_PER_THREAD = CHANNELIZE_POLY1D_ELEMS_PER_THREAD * THREADS;
   const int elem_blocks = static_cast<int>(
     (nout_per_channel + ELTS_PER_THREAD - 1) / ELTS_PER_THREAD);
   dim3 grid(elem_blocks, static_cast<int>(num_channels), num_batches);
-  ChannelizePoly1D<THREADS, OutType, InType, FilterType, AccumType><<<grid, THREADS, 0, stream>>>(
-      o, i, filter, decimation_factor);
+  if (decimation_factor == num_channels) {
+    // For M == D, cache one filter phase in dynamic shared memory if it fits.
+    const index_t filter_phase_len = (filter_len + num_channels - 1) / num_channels;
+    const size_t smem_needed = static_cast<size_t>(filter_phase_len) * sizeof(filter_t);
+    const uint32_t smem_bytes = (smem_needed <= MATX_CHANNELIZE_POLY1D_MAX_FILTER_SMEM_BYTES)
+        ? static_cast<uint32_t>(smem_needed) : 0;
+    ChannelizePoly1D<THREADS, true, OutType, InType, FilterType, AccumType><<<grid, THREADS, smem_bytes, stream>>>(
+        o, i, filter, decimation_factor, smem_bytes);
+  } else {
+    ChannelizePoly1D<THREADS, false, OutType, InType, FilterType, AccumType><<<grid, THREADS, 0, stream>>>(
+        o, i, filter, decimation_factor, 0);
+  }
 #endif
 }
 

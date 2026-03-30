@@ -82,9 +82,9 @@ __MATX_DEVICE__ __MATX_INLINE__ auto channelize_cast_input(InputT v)
 }
 } // namespace detail
 
-template <int THREADS, typename OutType, typename InType, typename FilterType, typename AccumType>
+template <int THREADS, bool MaximallyDecimated, typename OutType, typename InType, typename FilterType, typename AccumType>
 __launch_bounds__(THREADS)
-__global__ void ChannelizePoly1D(OutType output, InType input, FilterType filter, index_t decimation_factor)
+__global__ void ChannelizePoly1D(OutType output, InType input, FilterType filter, index_t decimation_factor, uint32_t smem_filter_bytes)
 {
     using output_t = typename OutType::value_type;
     using input_t = typename InType::value_type;
@@ -93,15 +93,6 @@ __global__ void ChannelizePoly1D(OutType output, InType input, FilterType filter
       "channelize_poly: accumulator type must be real; it will be treated as complex when necessary");
     // If the output is complex, then then accumulator is complex. Otherwise, the accumulator is real.
     using accum_t = cuda::std::conditional_t<is_complex_v<output_t>, typename detail::scalar_to_complex<AccumType>::ctype, AccumType>;
-
-    // Opportunistically store the filter taps in shared memory if the static shared memory
-    // size is sufficient. Otherwise, we will read directly from global memory on use.
-    const int SMEM_MAX_FILTER_TAPS = 128;
-    // Versions of CUDA prior to 11.8 do not allow static shared memory allocations of
-    // cuda::std::complex types due to it having no trivial constructor. This workaround
-    // prevents an 'initializer not allowed for __shared__ variable' error.
-    __align__(sizeof(filter_t)) __shared__ uint8_t smem_filter_workaround[sizeof(filter_t)*SMEM_MAX_FILTER_TAPS];
-    filter_t (&smem_filter)[SMEM_MAX_FILTER_TAPS] = reinterpret_cast<filter_t (&)[SMEM_MAX_FILTER_TAPS]>(smem_filter_workaround);
 
     constexpr int InRank = InType::Rank();
     constexpr int OutRank = OutType::Rank();
@@ -123,87 +114,107 @@ __global__ void ChannelizePoly1D(OutType output, InType input, FilterType filter
     const index_t last_out_elem = cuda::std::min(
         output_len_per_channel - 1, first_out_elem + ELEMS_PER_BLOCK - 1);
 
-    // The smem filter cache stores one phase's taps. For D == M the filter
-    // phase is fixed output channel, so the cache is valid across all output
-    // steps. For D < M the serpentine shift causes the phase to rotate per
-    // output step, so we use the global-memory path which computes the
-    // phase index dynamically.
-    const bool use_smem_filter = (filter_phase_len <= SMEM_MAX_FILTER_TAPS) &&
-                                 (decimation_factor == num_channels);
-
-    if (use_smem_filter) {
-        for (index_t t = tid; t < filter_phase_len-1; t += THREADS) {
-            const index_t h_ind = channel + t * num_channels;
-            smem_filter[t] = filter.operator()(h_ind);
-        }
-        if (tid == THREADS-1) {
-            const index_t h_ind = channel + (filter_phase_len-1) * num_channels;
-            smem_filter[filter_phase_len-1] = (h_ind < filter_full_len) ?
-                filter.operator()(h_ind) : static_cast<filter_t>(0);
-        }
-
-        __syncthreads();
-    }
-
     auto indims = BlockToIdx(input, blockIdx.z, 1);
     auto outdims = BlockToIdx(output, blockIdx.z, 2);
     outdims[ChannelRank] = channel;
 
-    if (use_smem_filter) {
-        for (index_t t = first_out_elem+tid; t <= last_out_elem; t += THREADS) {
-            accum_t accum {};
-            const filter_t *h = smem_filter;
-            // Causal commutator model: branch r (= channel) owns input positions
-            // congruent to s = (num_channels-1-channel) mod num_channels. At output
-            // time t, only samples 0..last_arrived have been delivered.
-            const index_t s = num_channels - 1 - channel;
-            const index_t last_arrived = t * decimation_factor + decimation_factor - 1;
-            // Because the filter must fit in shared memory, we know that the maximum
-            // number of iterations fits well within an int.
-            int niter = 0;
-            if (last_arrived >= s) {
-                // A is the number of samples that have arrived since the first sample for this channel. Thus,
-                // A / num_channels is the number of samples that have arrived for this branch since the first
-                // sample for this branch and A % num_channels is the number of samples that have arrived since
-                // the last sample arrived for this branch.
-                const index_t A = last_arrived - s;
-                indims[InRank-1] = last_arrived - (A % num_channels);
-                const index_t causal_count = A / num_channels + 1;
-                // Right boundary: skip one tap if newest input index >= input_len
+    if constexpr (MaximallyDecimated) {
+        // === Maximally decimated (D == M): filter phase is fixed per channel ===
+        // Dynamic shared memory holds one phase's taps when the dispatch provides
+        // enough smem. When smem_bytes == 0 the filter is read from global memory.
+        // When D == M: phase = channel (fixed), A % M = channel,
+        // indims = s + t*M, causal_count = t + 1, and last_arrived >= s
+        // is always true for t >= 0.
+        const index_t s = num_channels - 1 - channel;
+
+        extern __shared__ uint8_t __attribute((aligned(16))) smem_raw[];
+        filter_t *smem_filter = reinterpret_cast<filter_t *>(smem_raw);
+        const bool use_smem_filter = (smem_filter_bytes >= sizeof(filter_t) * filter_phase_len);
+
+        if (use_smem_filter) {
+            for (index_t t = tid; t < filter_phase_len-1; t += THREADS) {
+                const index_t h_ind = channel + t * num_channels;
+                smem_filter[t] = filter.operator()(h_ind);
+            }
+            if (tid == THREADS-1) {
+                const index_t h_ind = channel + (filter_phase_len-1) * num_channels;
+                smem_filter[filter_phase_len-1] = (h_ind < filter_full_len) ?
+                    filter.operator()(h_ind) : static_cast<filter_t>(0);
+            }
+
+            __syncthreads();
+        }
+
+        if (use_smem_filter) {
+            for (index_t t = first_out_elem+tid; t <= last_out_elem; t += THREADS) {
+                accum_t accum {};
+                const filter_t *h = smem_filter;
+                indims[InRank-1] = s + t * num_channels;
                 index_t h_skip = 0;
                 if (indims[InRank-1] >= input_len) {
                     h_skip = 1;
                     indims[InRank-1] -= num_channels;
                     h++;
                 }
-                niter = static_cast<int>(cuda::std::min(filter_phase_len - h_skip, causal_count - h_skip));
+                int niter = static_cast<int>(cuda::std::min(filter_phase_len - h_skip, t + 1 - h_skip));
+                input_t in_val;
+                for (int i = 0; i < niter; i++) {
+                    cuda::std::apply([&in_val, &input](auto &&...args) {
+                        in_val = input.operator()(args...);
+                    }, indims);
+                    accum += detail::channelize_cast_filter<accum_t>(*h) *
+                             detail::channelize_cast_input<accum_t>(in_val);
+                    indims[InRank-1] -= num_channels;
+                    h++;
+                }
+                outdims[OutElemRank] = t;
+                cuda::std::apply([accum, &output](auto &&...args) {
+                    output.operator()(args...) = static_cast<output_t>(accum);
+                }, outdims);
             }
-            input_t in_val;
-            for (int i = 0; i < niter; i++) {
-                cuda::std::apply([&in_val, &input](auto &&...args) {
-                    in_val = input.operator()(args...);
-                }, indims);
-                accum += detail::channelize_cast_filter<accum_t>(*h) *
-                         detail::channelize_cast_input<accum_t>(in_val);
-                indims[InRank-1] -= num_channels;
-                h++;
+        } else {
+            index_t available_taps = filter_phase_len;
+            {
+                const bool h_is_padded = ((filter_phase_len-1) * num_channels + channel) >= filter_full_len;
+                if (h_is_padded) {
+                    available_taps--;
+                }
             }
-            outdims[OutElemRank] = t;
-            cuda::std::apply([accum, &output](auto &&...args) {
-                output.operator()(args...) = static_cast<output_t>(accum);
-            }, outdims);
+
+            for (index_t t = first_out_elem+tid; t <= last_out_elem; t += THREADS) {
+                accum_t accum {};
+                indims[InRank-1] = s + t * num_channels;
+                index_t h_skip = 0;
+                if (indims[InRank-1] >= input_len) {
+                    h_skip = 1;
+                    indims[InRank-1] -= num_channels;
+                }
+                index_t h_ind = channel + h_skip * num_channels;
+                index_t niter = cuda::std::min(available_taps - h_skip, t + 1 - h_skip);
+                input_t in_val;
+                for (index_t i = 0; i < niter; i++) {
+                    cuda::std::apply([&in_val, &input](auto &&...args) {
+                        in_val = input.operator()(args...);
+                    }, indims);
+                    const filter_t h_val = filter.operator()(h_ind);
+                    accum += detail::channelize_cast_filter<accum_t>(h_val) *
+                             detail::channelize_cast_input<accum_t>(in_val);
+                    h_ind += num_channels;
+                    indims[InRank-1] -= num_channels;
+                }
+                outdims[OutElemRank] = t;
+                cuda::std::apply([accum, &output](auto &&...args) {
+                    output.operator()(args...) = static_cast<output_t>(accum);
+                }, outdims);
+            }
         }
     } else {
+        // === Oversampled (D < M): phase rotates per output step ===
+        // No shared memory — reads filter from global/L2.
         for (index_t t = first_out_elem+tid; t <= last_out_elem; t += THREADS) {
-            // Causal commutator model (global memory path)
             const index_t s = num_channels - 1 - channel;
             const index_t last_arrived = t * decimation_factor + decimation_factor - 1;
             index_t niter = 0;
-            // Serpentine shift phase rotation: when D < M, the commutator
-            // delivers only D samples per output step, advancing the data
-            // by D positions through the 1D prototype filter. Re-partitioning
-            // into M phases rotates the phase assignment by ((t+1)*D) mod M.
-            // For D == M the rotation is always 0.
             const index_t phase = (channel + ((t + 1) * decimation_factor) % num_channels) % num_channels;
             index_t h_ind { phase };
             accum_t accum {};
@@ -212,13 +223,11 @@ __global__ void ChannelizePoly1D(OutType output, InType input, FilterType filter
                 indims[InRank-1] = last_arrived - (A % num_channels);
                 const index_t causal_count = A / num_channels + 1;
                 index_t h_skip = 0;
-                // Right boundary: skip one tap if newest input index >= input_len
                 if (indims[InRank-1] >= input_len) {
                     h_skip = 1;
                     indims[InRank-1] -= num_channels;
                 }
                 h_ind = phase + h_skip * num_channels;
-                // If the last filter tap for this phase is padded zero, exclude it
                 index_t available_taps = filter_phase_len;
                 {
                     const bool h_is_padded = ((filter_phase_len-1) * num_channels + phase) >= filter_full_len;
