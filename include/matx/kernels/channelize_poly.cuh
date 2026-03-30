@@ -84,7 +84,7 @@ __MATX_DEVICE__ __MATX_INLINE__ auto channelize_cast_input(InputT v)
 
 template <int THREADS, typename OutType, typename InType, typename FilterType, typename AccumType>
 __launch_bounds__(THREADS)
-__global__ void ChannelizePoly1D(OutType output, InType input, FilterType filter)
+__global__ void ChannelizePoly1D(OutType output, InType input, FilterType filter, index_t decimation_factor)
 {
     using output_t = typename OutType::value_type;
     using input_t = typename InType::value_type;
@@ -123,7 +123,15 @@ __global__ void ChannelizePoly1D(OutType output, InType input, FilterType filter
     const index_t last_out_elem = cuda::std::min(
         output_len_per_channel - 1, first_out_elem + ELEMS_PER_BLOCK - 1);
 
-    if (filter_phase_len <= SMEM_MAX_FILTER_TAPS) {
+    // The smem filter cache stores one phase's taps. For D == M the filter
+    // phase is fixed output channel, so the cache is valid across all output
+    // steps. For D < M the serpentine shift causes the phase to rotate per
+    // output step, so we use the global-memory path which computes the
+    // phase index dynamically.
+    const bool use_smem_filter = (filter_phase_len <= SMEM_MAX_FILTER_TAPS) &&
+                                 (decimation_factor == num_channels);
+
+    if (use_smem_filter) {
         for (index_t t = tid; t < filter_phase_len-1; t += THREADS) {
             const index_t h_ind = channel + t * num_channels;
             smem_filter[t] = filter.operator()(h_ind);
@@ -141,26 +149,38 @@ __global__ void ChannelizePoly1D(OutType output, InType input, FilterType filter
     auto outdims = BlockToIdx(output, blockIdx.z, 2);
     outdims[ChannelRank] = channel;
 
-    if (filter_phase_len <= SMEM_MAX_FILTER_TAPS) {
+    if (use_smem_filter) {
         for (index_t t = first_out_elem+tid; t <= last_out_elem; t += THREADS) {
-            const index_t first_ind = cuda::std::max(static_cast<index_t>(0), t - filter_phase_len + 1);
             accum_t accum {};
             const filter_t *h = smem_filter;
-            // index_t in MatX should be signed (32 or 64 bit), so j-- below will not underflow
-            static_assert(std::is_signed_v<index_t>, "assumed signed index_t, but it is unsigned");
-            indims[InRank-1] = t * num_channels + (num_channels - 1 - channel);
-            index_t j_start = t;
-            if (indims[InRank-1] >= input_len) {
-                j_start--;
-                indims[InRank-1] -= num_channels;
-                h++;
-            }
+            // Causal commutator model: branch r (= channel) owns input positions
+            // congruent to s = (num_channels-1-channel) mod num_channels. At output
+            // time t, only samples 0..last_arrived have been delivered.
+            const index_t s = num_channels - 1 - channel;
+            const index_t last_arrived = t * decimation_factor + decimation_factor - 1;
             // Because the filter must fit in shared memory, we know that the maximum
             // number of iterations fits well within an int.
-            const int niter = static_cast<int>(j_start - first_ind + 1);
+            int niter = 0;
+            if (last_arrived >= s) {
+                // A is the number of samples that have arrived since the first sample for this channel. Thus,
+                // A / num_channels is the number of samples that have arrived for this branch since the first
+                // sample for this branch and A % num_channels is the number of samples that have arrived since
+                // the last sample arrived for this branch.
+                const index_t A = last_arrived - s;
+                indims[InRank-1] = last_arrived - (A % num_channels);
+                const index_t causal_count = A / num_channels + 1;
+                // Right boundary: skip one tap if newest input index >= input_len
+                index_t h_skip = 0;
+                if (indims[InRank-1] >= input_len) {
+                    h_skip = 1;
+                    indims[InRank-1] -= num_channels;
+                    h++;
+                }
+                niter = static_cast<int>(cuda::std::min(filter_phase_len - h_skip, causal_count - h_skip));
+            }
             input_t in_val;
             for (int i = 0; i < niter; i++) {
-                cuda::std::apply([&in_val, &input](auto &&...args) {                    
+                cuda::std::apply([&in_val, &input](auto &&...args) {
                     in_val = input.operator()(args...);
                 }, indims);
                 accum += detail::channelize_cast_filter<accum_t>(*h) *
@@ -175,31 +195,42 @@ __global__ void ChannelizePoly1D(OutType output, InType input, FilterType filter
         }
     } else {
         for (index_t t = first_out_elem+tid; t <= last_out_elem; t += THREADS) {
-            index_t first_ind = cuda::std::max(static_cast<index_t>(0), t - filter_phase_len + 1);
-            // If we use the last filter tap for this phase (which is the first index because
-            // the filter is flipped), then it may be a padded zero. If so, increment first_ind
-            // by 1 to avoid using the zero. This prevents a bounds-check in the inner loop.
-            if (first_ind == (t - filter_phase_len + 1)) {
-                const bool h_is_padded = ((filter_phase_len-1) * num_channels + channel) >= filter_full_len;
-                if (h_is_padded) {
-                    first_ind++;
-                }
-            }
-            indims[InRank-1] = t * num_channels + (num_channels - 1 - channel);
-            index_t j_start = t;
-            index_t h_ind { channel };
-            // If the last signal element is a zero-pad value, then skip it to prevent needing
-            // per-access bounds checking in the inner loop.
-            if (indims[InRank-1] >= input_len) {
-                j_start--;
-                indims[InRank-1] -= num_channels;
-                h_ind += num_channels;
-            }
-            const index_t niter = j_start - first_ind + 1;
+            // Causal commutator model (global memory path)
+            const index_t s = num_channels - 1 - channel;
+            const index_t last_arrived = t * decimation_factor + decimation_factor - 1;
+            index_t niter = 0;
+            // Serpentine shift phase rotation: when D < M, the commutator
+            // delivers only D samples per output step, advancing the data
+            // by D positions through the 1D prototype filter. Re-partitioning
+            // into M phases rotates the phase assignment by ((t+1)*D) mod M.
+            // For D == M the rotation is always 0.
+            const index_t phase = (channel + ((t + 1) * decimation_factor) % num_channels) % num_channels;
+            index_t h_ind { phase };
             accum_t accum {};
+            if (last_arrived >= s) {
+                const index_t A = last_arrived - s;
+                indims[InRank-1] = last_arrived - (A % num_channels);
+                const index_t causal_count = A / num_channels + 1;
+                index_t h_skip = 0;
+                // Right boundary: skip one tap if newest input index >= input_len
+                if (indims[InRank-1] >= input_len) {
+                    h_skip = 1;
+                    indims[InRank-1] -= num_channels;
+                }
+                h_ind = phase + h_skip * num_channels;
+                // If the last filter tap for this phase is padded zero, exclude it
+                index_t available_taps = filter_phase_len;
+                {
+                    const bool h_is_padded = ((filter_phase_len-1) * num_channels + phase) >= filter_full_len;
+                    if (h_is_padded) {
+                        available_taps--;
+                    }
+                }
+                niter = cuda::std::min(available_taps - h_skip, causal_count - h_skip);
+            }
             input_t in_val;
             for (index_t i = 0; i < niter; i++) {
-                cuda::std::apply([&in_val, &input](auto &&...args) {                    
+                cuda::std::apply([&in_val, &input](auto &&...args) {
                     in_val = input.operator()(args...);
                 }, indims);
                 const filter_t h_val = filter.operator()(h_ind);
@@ -440,14 +471,14 @@ __global__ void ChannelizePoly1D_FusedChan(OutType output, InType input, FilterT
             for (int chan = 0; chan < NUM_CHAN; chan++) {
                 const filter_t h_val = (h_ind < filter_full_len) ? filter.operator()(h_ind) : static_cast<filter_t>(0);
                 if (indims[InRank-1] < input_len) {
-                    cuda::std::apply([&accum, chan, h_val, &input](auto &&...args) {                    
+                    cuda::std::apply([&accum, chan, h_val, &input](auto &&...args) {
                         accum[chan] += detail::channelize_cast_filter<filtering_accum_t>(h_val) *
                                        detail::channelize_cast_input<filtering_accum_t>(input.operator()(args...));
                     }, indims);
                 }
                 h_ind++;
                 indims[InRank-1]--;
-            }        
+            }
         }
         niter--;
 

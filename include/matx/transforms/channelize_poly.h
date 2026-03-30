@@ -60,7 +60,7 @@ constexpr index_t MATX_CHANNELIZE_POLY1D_FULL_SMEM_KERNEL_NOUT_PER_ITER = 4;
 
 template <typename OutType, typename InType, typename FilterType, typename AccumType>
 inline void matxChannelizePoly1DInternal(OutType o, const InType &i,
-                                     const FilterType &filter, cudaStream_t stream)
+                                     const FilterType &filter, index_t decimation_factor, cudaStream_t stream)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
@@ -75,7 +75,7 @@ inline void matxChannelizePoly1DInternal(OutType o, const InType &i,
     (nout_per_channel + ELTS_PER_THREAD - 1) / ELTS_PER_THREAD);
   dim3 grid(elem_blocks, static_cast<int>(num_channels), num_batches);
   ChannelizePoly1D<THREADS, OutType, InType, FilterType, AccumType><<<grid, THREADS, 0, stream>>>(
-      o, i, filter);
+      o, i, filter, decimation_factor);
 #endif
 }
 
@@ -195,9 +195,9 @@ inline void matxChannelizePoly1DUnpackInternal(DataType inout, cudaStream_t stre
 
 /**
  * @brief 1D polyphase channelizer. A channelizer separates an input signal into a set of
- * constituent channels, each corresponding to a band of the input signal bandwidth. The current
- * implementation only supports maximally decimated (i.e., critically sampled) channelizers wherein the
- * decimation factor is equivalent to the number of channels and the channels are non-overlapping.
+ * constituent channels, each corresponding to a band of the input signal bandwidth. Supports both
+ * maximally decimated (critically sampled, decimation_factor == num_channels) and oversampled
+ * (decimation_factor < num_channels) cases, including rational oversampling ratios.
  * 
  * @tparam OutType Type of output
  * @tparam InType Type of input
@@ -208,16 +208,16 @@ inline void matxChannelizePoly1DUnpackInternal(DataType inout, cudaStream_t stre
  * @param in Input operator
  * @param f Filter operator
  * @param num_channels Number of channels in which to separate the signal. Must be greater than 1.
- * @param decimation_factor Factor by which to downsample the input signal into the channels. Currently,
- * the only supported value of decimation_factor is a value equal to num_channels. This corresponds to
- * the maximally decimated, or critically sampled, case. It is also possible for decimation_factor to
- * be less than num_channels, which corresponds to an oversampled case with overlapping channels, but
- * this implementation does not yet support oversampled cases.
+ * @param decimation_factor Factor by which to downsample the input signal into the channels. When
+ * decimation_factor equals num_channels, this is the maximally decimated (critically sampled) case.
+ * When decimation_factor is less than num_channels, this is the oversampled case with overlapping
+ * channels. Both integer (num_channels % decimation_factor == 0) and rational oversampling ratios
+ * are supported.
  * @param stream CUDA stream on which to run the kernel(s)
  */
 template <typename OutType, typename InType, typename FilterType, typename AccumType>
 inline void channelize_poly_impl(OutType out, const InType &in, const FilterType &f,
-                   index_t num_channels, [[maybe_unused]] index_t decimation_factor, cudaStream_t stream = 0) {
+                   index_t num_channels, index_t decimation_factor, cudaStream_t stream = 0) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   using OutputOp = std::remove_cv_t<std::remove_reference_t<OutType>>;
   using InputOp = std::remove_cv_t<std::remove_reference_t<InType>>;
@@ -243,14 +243,14 @@ inline void channelize_poly_impl(OutType out, const InType &in, const FilterType
     "channelize_poly: num_channels must be greater than 1");
   MATX_ASSERT_STR(decimation_factor > 0, matxInvalidParameter,
     "channelize_poly: decimation_factor must be positive");
-  MATX_ASSERT_STR(num_channels == decimation_factor, matxInvalidParameter,
-    "channelize_poly: currently only support decimation_factor == num_channels");
+  MATX_ASSERT_STR(decimation_factor <= num_channels, matxInvalidParameter,
+    "channelize_poly: decimation_factor must be <= num_channels");
 
   for(int i = 0 ; i < IN_RANK-1; i++) {
     MATX_ASSERT_STR(out.Size(i) == in.Size(i), matxInvalidDim, "channelize_poly: input/output must have matched batch sizes");
   }
 
-  [[maybe_unused]] const index_t num_elem_per_channel = (in.Size(IN_RANK-1) + num_channels - 1) / num_channels;
+  [[maybe_unused]] const index_t num_elem_per_channel = (in.Size(IN_RANK-1) + decimation_factor - 1) / decimation_factor;
 
   MATX_ASSERT_STR(out.Size(OUT_RANK-1) == num_channels, matxInvalidDim,
     "channelize_poly: output size OUT_RANK-1 mismatch");
@@ -260,7 +260,8 @@ inline void channelize_poly_impl(OutType out, const InType &in, const FilterType
   // If neither the input nor the filter is complex, then the filtered samples will be real-valued
   // and we will use an R2C transform. Otherwise, we will use a C2C transform.
   if constexpr (! is_complex_v<input_t> && ! is_complex_half_v<input_t> && ! is_complex_v<filter_t> && ! is_complex_half_v<filter_t>) {
-    if (num_channels <= detail::MATX_CHANNELIZE_POLY1D_FUSED_CHAN_KERNEL_THRESHOLD) {
+    // The fused-DFT kernel only supports the maximally decimated case (D == M).
+    if (decimation_factor == num_channels && num_channels <= detail::MATX_CHANNELIZE_POLY1D_FUSED_CHAN_KERNEL_THRESHOLD) {
       matxChannelizePoly1DInternal_FusedChan<OutputOp, InputOp, FilterOp, AccumType>(out, in, f, stream);
     } else {
       index_t start_dims[OUT_RANK], stop_dims[OUT_RANK];
@@ -300,10 +301,11 @@ inline void channelize_poly_impl(OutType out, const InType &in, const FilterType
         }
       }();
 
-      if (matxChannelizePoly1DInternal_ShouldUseSmemKernel(out, in, f)) {
+      // The shared memory kernel currently only supports the maximally decimated case (D == M).
+      if (decimation_factor == num_channels && matxChannelizePoly1DInternal_ShouldUseSmemKernel(out, in, f)) {
         matxChannelizePoly1DInternal_Smem<decltype(fft_in_slice), InputOp, FilterOp, AccumType>(fft_in_slice, in, f, stream);
       } else {
-        matxChannelizePoly1DInternal<decltype(fft_in_slice), InputOp, FilterOp, AccumType>(fft_in_slice, in, f, stream);
+        matxChannelizePoly1DInternal<decltype(fft_in_slice), InputOp, FilterOp, AccumType>(fft_in_slice, in, f, decimation_factor, stream);
       }
       stop_dims[OUT_RANK-1] = (num_channels/2) + 1;
       auto out_packed = slice<OUT_RANK>(out, start_dims, stop_dims);
@@ -311,13 +313,15 @@ inline void channelize_poly_impl(OutType out, const InType &in, const FilterType
       matxChannelizePoly1DUnpackInternal(out, stream);
     }
   } else {
-    if (num_channels <= detail::MATX_CHANNELIZE_POLY1D_FUSED_CHAN_KERNEL_THRESHOLD) {
+    // The fused-DFT kernel only supports the maximally decimated case (D == M).
+    if (decimation_factor == num_channels && num_channels <= detail::MATX_CHANNELIZE_POLY1D_FUSED_CHAN_KERNEL_THRESHOLD) {
       matxChannelizePoly1DInternal_FusedChan<OutputOp, InputOp, FilterOp, AccumType>(out, in, f, stream);
     } else {
-      if (matxChannelizePoly1DInternal_ShouldUseSmemKernel(out, in, f)) {
+      // The shared memory kernel currently only supports the maximally decimated case (D == M).
+      if (decimation_factor == num_channels && matxChannelizePoly1DInternal_ShouldUseSmemKernel(out, in, f)) {
         matxChannelizePoly1DInternal_Smem<OutputOp, InputOp, FilterOp, AccumType>(out, in, f, stream);
       } else {
-        matxChannelizePoly1DInternal<OutputOp, InputOp, FilterOp, AccumType>(out, in, f, stream);
+        matxChannelizePoly1DInternal<OutputOp, InputOp, FilterOp, AccumType>(out, in, f, decimation_factor, stream);
       }
       // Specify FORWARD here to prevent any normalization after the ifft. We do not
       // want any extra scaling on the output values.

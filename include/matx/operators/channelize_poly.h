@@ -78,7 +78,7 @@ namespace detail {
           a_(a), f_(f), num_channels_(num_channels), decimation_factor_(decimation_factor)
       {
         MATX_LOG_TRACE("{} constructor: num_channels={}, decimation_factor={}", str(), num_channels, decimation_factor); 
-        const index_t b_len = (a_.Size(OpA::Rank() - 1) + num_channels - 1) / num_channels;
+        const index_t b_len = (a_.Size(OpA::Rank() - 1) + decimation_factor - 1) / decimation_factor;
 
         for (int r = 0; r < OpA::Rank()-1; r++) {
           out_dims_[r] = a_.Size(r);
@@ -201,12 +201,11 @@ namespace detail {
  * is assumed to contain a single input signal with all preceding dimensions being batch dimensions
  * that are channelized independently.
  * @param f Filter operator that represents the filter coefficients. This must be a 1D tensor.
- * @param num_channels Number of channels to create.
- * @param decimation_factor Factor by which to downsample the input signal into the channels. Currently,
- * the only supported value of decimation_factor is a value equal to num_channels. This corresponds to
- * the maximally decimated, or critically sampled, case. It is also possible for decimation_factor to
- * be less than num_channels, which corresponds to an oversampled case with overlapping channels, but
- * this implementation does not yet support oversampled cases.
+ * @param num_channels Number of channels (or frequency sub-bands) to create.
+ * @param decimation_factor Factor by which to downsample the input signal into the channels. When
+ * decimation_factor equals num_channels, this is the maximally decimated (critically sampled) case.
+ * When decimation_factor is less than num_channels, this is the oversampled case with overlapping
+ * channels. Both integer and rational oversampling ratios are supported.
  * 
  * @returns Operator representing the channelized signal. The output tensor rank is one higher than the
  * input tensor rank. The first Rank-2 dimensions are all batch dimensions. The second-to-last dimension

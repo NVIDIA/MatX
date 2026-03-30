@@ -175,9 +175,9 @@ class channelize_poly_operators:
         signal_len = size[0]
         filter_len = size[1]
         num_channels = size[2]
-        # Remaining dimensions are batch dimensions
-        if len(size) > 3:
-            a_dims = size[3:]
+        # size[3] is decimation_factor; remaining dimensions are batch dimensions
+        if len(size) > 4:
+            a_dims = size[4:]
             a_dims = np.append(a_dims, signal_len)
         else:
             a_dims = [signal_len]
@@ -242,6 +242,80 @@ class channelize_poly_operators:
         else:
             out = np.transpose(np.reshape(out, out.shape[1:]), axes=[1,0])
             out_hreal = np.transpose(np.reshape(out_hreal, out_hreal.shape[1:]), axes=[1,0])
+        self.res['b_random'] = out
+        self.res['b_random_hreal'] = out_hreal
+        return self.res
+
+    def channelize_oversampled(self) -> Dict[str, np.ndarray]:
+        """General polyphase channelizer supporting arbitrary decimation factor D <= M.
+
+        Uses size[3] as decimation_factor (D). When D == M, this produces the same
+        result as channelize(). When D < M, this is the oversampled case.
+        """
+        def idivup(a, b) -> int: return (a+b-1)//b
+
+        h = self.res['filter_random']
+        num_channels = self.res['num_channels']
+        decimation_factor = self.size[3]
+        x = self.res['a']
+
+        M = num_channels
+        D = decimation_factor
+
+        # Polyphase decompose: E[r, q] = h[q*M + r], zero-pad h to multiple of M
+        num_taps_per_channel = idivup(h.size, M)
+        h_padded = h
+        if M * num_taps_per_channel > h.size:
+            h_padded = np.pad(h, (0, M * num_taps_per_channel - h.size))
+        E = np.reshape(h_padded, (M, num_taps_per_channel), order='F')
+
+        num_output_samples = idivup(x.shape[-1], D)
+        num_batches = x.size // x.shape[-1]
+        out = np.zeros((num_batches, num_output_samples, M), dtype=np.complex128)
+        out_hreal = np.zeros((num_batches, num_output_samples, M), dtype=np.complex128)
+        xr = np.reshape(x, (num_batches, x.shape[-1]))
+
+        E_real = np.real(E)
+        n_idx = np.arange(num_output_samples)
+
+        for batch_ind in range(num_batches):
+            xb = xr[batch_ind, :]
+            input_len = xb.shape[-1]
+            filtered = np.zeros((num_output_samples, M), dtype=np.complex128)
+            filtered_hreal = np.zeros((num_output_samples, M), dtype=np.complex128)
+            for r in range(M):
+                s = M - 1 - r  # branch offset (Harris convention)
+                for n in range(num_output_samples):
+                    last_arrived = n * D + D - 1
+                    if last_arrived < s:
+                        continue  # no samples for this branch yet
+                    A = last_arrived - s
+                    newest = last_arrived - (A % M)
+                    causal_count = A // M + 1
+                    # Serpentine shift: when D < M the phase rotates per step
+                    phase = (r + ((n + 1) * D) % M) % M
+                    for q in range(min(num_taps_per_channel, causal_count)):
+                        idx = newest - q * M
+                        if idx < 0 or idx >= input_len:
+                            continue
+                        filtered[n, r] += E[phase, q] * xb[idx]
+                        filtered_hreal[n, r] += E_real[phase, q] * xb[idx]
+            # IFFT across channels, scale by M
+            out[batch_ind, :, :] = ifft(filtered, n=M, axis=1) * M
+            out_hreal[batch_ind, :, :] = ifft(filtered_hreal, n=M, axis=1) * M
+
+        # Reshape output: (num_batches, num_output_samples, M) -> match MatX layout
+        # MatX output is (...batch_dims..., num_output_samples, num_channels)
+        if num_batches > 1:
+            s = list(x.shape)
+            s[-1] = num_output_samples
+            s = np.append(s, M)
+            out = np.reshape(out, s)
+            out_hreal = np.reshape(out_hreal, s)
+        else:
+            out = np.reshape(out, out.shape[1:])
+            out_hreal = np.reshape(out_hreal, out_hreal.shape[1:])
+
         self.res['b_random'] = out
         self.res['b_random_hreal'] = out_hreal
         return self.res

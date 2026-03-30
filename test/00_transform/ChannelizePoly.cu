@@ -153,11 +153,10 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, Simple)
     const index_t a_len = test_cases[i].a_len;
     const index_t f_len = test_cases[i].f_len;
     const index_t num_channels = test_cases[i].num_channels;
-    // Currently do not support oversampled channelization
     const index_t decimation_factor = num_channels;
     [[maybe_unused]] const index_t b_len_per_channel = (a_len + num_channels - 1) / num_channels;
     this->pb->template InitAndRunTVGenerator<TestType>(
-      "00_transforms", "channelize_poly_operators", "channelize", {a_len, f_len, num_channels});
+      "00_transforms", "channelize_poly_operators", "channelize", {a_len, f_len, num_channels, num_channels});
 
     auto a = make_tensor<TestType>({a_len});
     auto f = make_tensor<TestType>({f_len});
@@ -201,7 +200,7 @@ TYPED_TEST(ChannelizePolyTestDoubleType, MixedPrecision)
   const double mixed_thresh = 1e-5;
 
   this->pb->template InitAndRunTVGenerator<double>(
-    "00_transforms", "channelize_poly_operators", "channelize", {a_len, f_len, num_channels});
+    "00_transforms", "channelize_poly_operators", "channelize", {a_len, f_len, num_channels, num_channels});
   auto a64 = make_tensor<double>({a_len});
   auto f64 = make_tensor<double>({f_len});
   this->pb->NumpyToTensorView(a64, "a");
@@ -228,7 +227,7 @@ TYPED_TEST(ChannelizePolyTestDoubleType, MixedPrecision)
   }
 
   this->pb->template InitAndRunTVGenerator<cuda::std::complex<double>>(
-    "00_transforms", "channelize_poly_operators", "channelize", {a_len, f_len, num_channels});
+    "00_transforms", "channelize_poly_operators", "channelize", {a_len, f_len, num_channels, num_channels});
   auto ac64 = make_tensor<cuda::std::complex<double>>({a_len});
   this->pb->NumpyToTensorView(ac64, "a");
   this->pb->NumpyToTensorView(f64, "filter_random_real");
@@ -274,7 +273,7 @@ TYPED_TEST(ChannelizePolyTestDoubleType, AccumProperty)
   const double mixed_thresh_complex_input = 1e-4;
 
   this->pb->template InitAndRunTVGenerator<double>(
-    "00_transforms", "channelize_poly_operators", "channelize", {a_len, f_len, num_channels});
+    "00_transforms", "channelize_poly_operators", "channelize", {a_len, f_len, num_channels, num_channels});
   auto a64 = make_tensor<double>({a_len});
   auto f64 = make_tensor<double>({f_len});
   auto gold_output_hreal = make_tensor<cuda::std::complex<double>>({b_len_per_channel, num_channels});
@@ -323,7 +322,7 @@ TYPED_TEST(ChannelizePolyTestDoubleType, AccumProperty)
   }
 
   this->pb->template InitAndRunTVGenerator<cuda::std::complex<double>>(
-    "00_transforms", "channelize_poly_operators", "channelize", {a_len, f_len, num_channels});
+    "00_transforms", "channelize_poly_operators", "channelize", {a_len, f_len, num_channels, num_channels});
   auto ac64 = make_tensor<cuda::std::complex<double>>({a_len});
   this->pb->NumpyToTensorView(ac64, "a");
   this->pb->NumpyToTensorView(f64, "filter_random_real");
@@ -430,10 +429,9 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, Batched)
     const index_t a_len = test_cases[i].a_len;
     const index_t f_len = test_cases[i].f_len;
     const index_t num_channels = test_cases[i].num_channels;
-    // Currently do not support oversampled channelization
     const index_t decimation_factor = num_channels;
     const index_t b_len_per_channel = (a_len + num_channels - 1) / num_channels;
-    std::vector<index_t> sizes = { a_len, f_len, num_channels };
+    std::vector<index_t> sizes = { a_len, f_len, num_channels, decimation_factor };
     sizes.insert(sizes.end(), test_cases[i].batch_dims.begin(), test_cases[i].batch_dims.end());
     this->pb->template InitAndRunTVGenerator<TestType>(
       "00_transforms", "channelize_poly_operators", "channelize", sizes);
@@ -485,7 +483,7 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, IdentityFilter)
   // cases (a single channel channelizer is just a convolution).
   const index_t num_channels = 2;
   this->pb->template InitAndRunTVGenerator<TestType>(
-    "00_transforms", "channelize_poly_operators", "channelize", { a_len, f_len, num_channels });
+    "00_transforms", "channelize_poly_operators", "channelize", { a_len, f_len, num_channels, num_channels });
 
   auto a = make_tensor<TestType>({a_len});
   auto f = make_tensor<TestType>({f_len});
@@ -536,7 +534,7 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, Operators)
   [[maybe_unused]] const index_t f_len = 90;
   const index_t num_channels = 10;
   this->pb->template InitAndRunTVGenerator<TestType>(
-    "00_transforms", "channelize_poly_operators", "channelize", { a_len, f_len, num_channels });
+    "00_transforms", "channelize_poly_operators", "channelize", { a_len, f_len, num_channels, num_channels });
 
   auto a = make_tensor<TestType>({a_len});
   auto f = make_tensor<TestType>({f_len});
@@ -838,6 +836,268 @@ TYPED_TEST(ChannelizePolyTestDoubleType, Harris2003)
       ASSERT_NEAR(test.real(), gold.real(), this->thresh);
       ASSERT_NEAR(test.imag(), gold.imag(), this->thresh);
     }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+// Oversampled identity filter test: validates the causal commutator behavior.
+// With a single-tap identity filter (E[r,0] = 1 for all r), the filtering step
+// simply selects one input sample per branch. The causal commutator determines
+// which sample each branch sees at each output time:
+//   - Sample k goes to branch (M-1 - k%M)
+//   - At output time n, only samples x[0..n*D+D-1] have arrived
+//   - Branch r's newest sample: largest k <= n*D+D-1 where k%M == M-1-r
+TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, OversampledIdentityFilter)
+{
+  MATX_ENTER_HANDLER();
+
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using InnerType = typename test_types::inner_type<TestType>::type;
+  using ComplexType = typename test_types::complex_type<TestType>::type;
+
+  struct {
+    index_t a_len;
+    index_t num_channels;
+    index_t decimation_factor;
+  } test_cases[] = {
+    { 20, 4, 2 },   // 2x oversampled, M=4
+    { 20, 4, 1 },   // 4x oversampled, M=4
+    { 30, 10, 3 },  // rational oversample, M=10 D=3
+    { 20, 4, 3 },   // rational oversample, M=4 D=3
+    { 20, 2, 1 },   // 2x oversampled, M=2
+    {  2, 4, 4 },   // maximally decimated, a_len < M
+    {  3, 4, 4 },   // maximally decimated, a_len < M
+    {  1, 4, 2 },   // oversampled, a_len < M
+    {  3, 4, 2 },   // oversampled, a_len < M
+    {  2, 6, 3 },   // oversampled rational, a_len < M
+  };
+
+  for (size_t tc = 0; tc < sizeof(test_cases)/sizeof(test_cases[0]); tc++) {
+    const index_t a_len = test_cases[tc].a_len;
+    const index_t M = test_cases[tc].num_channels;
+    const index_t D = test_cases[tc].decimation_factor;
+    const index_t f_len = M;  // identity filter: one tap per phase
+    const index_t num_output = (a_len + D - 1) / D;
+
+    // Use the pybind generator only for random input data and not for the expected output
+    this->pb->template InitAndRunTVGenerator<TestType>(
+      "00_transforms", "channelize_poly_operators", "channelize_oversampled",
+      {a_len, f_len, M, D});
+
+    auto a = make_tensor<TestType>({a_len});
+    auto f = make_tensor<TestType>({f_len});
+    auto b = make_tensor<ComplexType>({num_output, M});
+
+    this->pb->NumpyToTensorView(a, "a");
+
+    // Identity filter: h = [1, 1, ..., 1] of length M
+    // Polyphase decomposition gives E[r, 0] = 1 for all r (single tap per phase)
+    for (index_t i = 0; i < M; i++) { f(i) = static_cast<TestType>(1.0); }
+
+    this->exec.sync();
+
+    (b = channelize_poly(a, f, M, D)).run(this->exec);
+
+    this->exec.sync();
+
+    // Compute expected output using the causal commutator model.
+    // With identity filter, g_r[n] = x[newest_r] if branch r has a sample, else 0.
+    // Then Y[n, :] = M * IFFT(g[n, :])
+    for (index_t n = 0; n < num_output; n++) {
+      const index_t last_arrived = n * D + D - 1;
+
+      // Compute the IDFT (with positive exponential) of the
+      // causal filtered values. This is M * IFFT.
+      for (index_t chan = 0; chan < M; chan++) {
+        ComplexType accum { 0 };
+        for (index_t r = 0; r < M; r++) {
+          const index_t s = M - 1 - r;  // branch offset in input
+
+          // Causal commutator: find newest sample for branch r
+          TestType sample_val = static_cast<TestType>(0.0);
+          if (last_arrived >= s) {
+            const index_t newest = last_arrived - ((last_arrived - s) % M);
+            if (newest < a_len) {
+              sample_val = a(newest);
+            }
+          }
+
+          // IDFT with positive exponential (Harris convention)
+          const double arg = 2.0 * M_PI * static_cast<double>(r) * static_cast<double>(chan) / static_cast<double>(M);
+          double sinx, cosx;
+          sincos(arg, &sinx, &cosx);
+          ComplexType twiddle { static_cast<InnerType>(cosx), static_cast<InnerType>(sinx) };
+          accum += sample_val * twiddle;
+        }
+
+        ComplexType bval { b(n, chan) };
+        ASSERT_NEAR(accum.real(), bval.real(), this->thresh)
+          << "mismatch at n=" << n << " chan=" << chan
+          << " M=" << M << " D=" << D << " a_len=" << a_len;
+        ASSERT_NEAR(accum.imag(), bval.imag(), this->thresh)
+          << "mismatch at n=" << n << " chan=" << chan
+          << " M=" << M << " D=" << D << " a_len=" << a_len;
+      }
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+// Oversampled channelizer tests: integer oversampling (D divides M evenly)
+TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, OversampledInteger)
+{
+  MATX_ENTER_HANDLER();
+
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ComplexType = typename test_types::complex_type<TestType>::type;
+
+  struct {
+    index_t a_len;
+    index_t f_len;
+    index_t num_channels;
+    index_t decimation_factor;
+  } test_cases[] = {
+    // 2x oversampling (D = M/2)
+    { 2500, 170, 10, 5 },
+    { 2500, 187, 10, 5 },
+    { 1800, 120, 8, 4 },
+    { 37193, 41*8+4, 8, 4 },
+    // 5x oversampling (D = M/5)
+    { 2500, 170, 10, 2 },
+    // Large channel count
+    { 35000, 5*180, 180, 90 },
+  };
+
+  for (size_t i = 0; i < sizeof(test_cases)/sizeof(test_cases[0]); i++) {
+    const index_t a_len = test_cases[i].a_len;
+    const index_t f_len = test_cases[i].f_len;
+    const index_t num_channels = test_cases[i].num_channels;
+    const index_t decimation_factor = test_cases[i].decimation_factor;
+    const index_t b_len_per_channel = (a_len + decimation_factor - 1) / decimation_factor;
+    this->pb->template InitAndRunTVGenerator<TestType>(
+      "00_transforms", "channelize_poly_operators", "channelize_oversampled",
+      {a_len, f_len, num_channels, decimation_factor});
+
+    auto a = make_tensor<TestType>({a_len});
+    auto f = make_tensor<TestType>({f_len});
+    auto b = make_tensor<ComplexType>({b_len_per_channel, num_channels});
+
+    this->pb->NumpyToTensorView(a, "a");
+    this->pb->NumpyToTensorView(f, "filter_random");
+    (b = channelize_poly(a, f, num_channels, decimation_factor)).run(this->exec);
+
+    this->exec.sync();
+    MATX_TEST_ASSERT_COMPARE(this->pb, b, "b_random", this->thresh);
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+// Oversampled channelizer tests: rational oversampling (D does not divide M evenly)
+TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, OversampledRational)
+{
+  MATX_ENTER_HANDLER();
+
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ComplexType = typename test_types::complex_type<TestType>::type;
+
+  struct {
+    index_t a_len;
+    index_t f_len;
+    index_t num_channels;
+    index_t decimation_factor;
+  } test_cases[] = {
+    // M=10, D=3 (rational 10/3 oversampling)
+    { 2500, 170, 10, 3 },
+    { 2500, 187, 10, 3 },
+    // M=10, D=7
+    { 2500, 170, 10, 7 },
+    // M=9, D=4
+    { 1800, 120, 9, 4 },
+    // M=8, D=3
+    { 37193, 41*8+4, 8, 3 },
+    // M=11, D=4
+    { 2500, 187, 11, 4 },
+    // Large channel count, rational
+    { 35000, 5*181+17, 181, 60 },
+  };
+
+  for (size_t i = 0; i < sizeof(test_cases)/sizeof(test_cases[0]); i++) {
+    const index_t a_len = test_cases[i].a_len;
+    const index_t f_len = test_cases[i].f_len;
+    const index_t num_channels = test_cases[i].num_channels;
+    const index_t decimation_factor = test_cases[i].decimation_factor;
+    const index_t b_len_per_channel = (a_len + decimation_factor - 1) / decimation_factor;
+    this->pb->template InitAndRunTVGenerator<TestType>(
+      "00_transforms", "channelize_poly_operators", "channelize_oversampled",
+      {a_len, f_len, num_channels, decimation_factor});
+
+    auto a = make_tensor<TestType>({a_len});
+    auto f = make_tensor<TestType>({f_len});
+    auto b = make_tensor<ComplexType>({b_len_per_channel, num_channels});
+
+    this->pb->NumpyToTensorView(a, "a");
+    this->pb->NumpyToTensorView(f, "filter_random");
+    (b = channelize_poly(a, f, num_channels, decimation_factor)).run(this->exec);
+
+    this->exec.sync();
+    MATX_TEST_ASSERT_COMPARE(this->pb, b, "b_random", this->thresh);
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+// Oversampled channelizer with batched inputs
+TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, OversampledBatched)
+{
+  MATX_ENTER_HANDLER();
+
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ComplexType = typename test_types::complex_type<TestType>::type;
+
+  constexpr int BATCH_DIMS = 2;
+  struct {
+    index_t a_len;
+    index_t f_len;
+    index_t num_channels;
+    index_t decimation_factor;
+    cuda::std::array<index_t, BATCH_DIMS> batch_dims;
+  } test_cases[] = {
+    // Integer oversampling, batched
+    { 2500, 170, 10, 5, { 2, 3 } },
+    // Rational oversampling, batched
+    { 2500, 170, 10, 3, { 2, 3 } },
+    { 37193, 41*8+4, 8, 3, { 3, 1 } },
+  };
+
+  for (size_t i = 0; i < sizeof(test_cases)/sizeof(test_cases[0]); i++) {
+    const index_t a_len = test_cases[i].a_len;
+    const index_t f_len = test_cases[i].f_len;
+    const index_t num_channels = test_cases[i].num_channels;
+    const index_t decimation_factor = test_cases[i].decimation_factor;
+    const index_t b_len_per_channel = (a_len + decimation_factor - 1) / decimation_factor;
+    std::vector<index_t> sizes = { a_len, f_len, num_channels, decimation_factor };
+    sizes.insert(sizes.end(), test_cases[i].batch_dims.begin(), test_cases[i].batch_dims.end());
+    this->pb->template InitAndRunTVGenerator<TestType>(
+      "00_transforms", "channelize_poly_operators", "channelize_oversampled", sizes);
+    const cuda::std::array<index_t, BATCH_DIMS+1> a_dims = {
+      test_cases[i].batch_dims[0], test_cases[i].batch_dims[1], a_len
+    };
+    const cuda::std::array<index_t, BATCH_DIMS+2> b_dims = {
+      test_cases[i].batch_dims[0], test_cases[i].batch_dims[1], b_len_per_channel, num_channels
+    };
+    auto a = make_tensor<TestType>(a_dims);
+    auto f = make_tensor<TestType>({f_len});
+    auto b = make_tensor<ComplexType>(b_dims);
+
+    this->pb->NumpyToTensorView(a, "a");
+    this->pb->NumpyToTensorView(f, "filter_random");
+    (b = channelize_poly(a, f, num_channels, decimation_factor)).run(this->exec);
+
+    this->exec.sync();
+    MATX_TEST_ASSERT_COMPARE(this->pb, b, "b_random", this->thresh);
   }
 
   MATX_EXIT_HANDLER();
