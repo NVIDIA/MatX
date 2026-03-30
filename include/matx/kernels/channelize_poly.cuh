@@ -127,10 +127,8 @@ __global__ void ChannelizePoly1D(OutType output, InType input, FilterType filter
         // is always true for t >= 0.
         const index_t s = num_channels - 1 - channel;
 
-        extern __shared__ uint8_t __attribute((aligned(16))) smem_raw[];
-        filter_t *smem_filter = reinterpret_cast<filter_t *>(smem_raw);
+        extern __shared__ filter_t smem_filter[];
         const bool use_smem_filter = (smem_filter_bytes >= sizeof(filter_t) * filter_phase_len);
-
         if (use_smem_filter) {
             for (index_t t = tid; t < filter_phase_len-1; t += THREADS) {
                 const index_t h_ind = channel + t * num_channels;
