@@ -180,7 +180,10 @@ TYPED_TEST(OperatorTestsNumericAllExecs, ShiftOp)
       shifts_col(j) = static_cast<int>(j + 1);  // shifts: 1, 2, 3, 4, 5
     }
 
+    // example-begin shift-test-2
+    // Shift dim 0 of "t2r1" using a 1D operator "shifts_col" so each column is shifted by a different amount
     (t2r1s = shift<0>(t2r1, shifts_col)).run(exec);
+    // example-end shift-test-2
     exec.sync();
 
     for (index_t i = 0; i < rows; i++) {
