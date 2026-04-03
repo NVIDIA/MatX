@@ -173,7 +173,7 @@ namespace matx
 
         template <typename CapType, typename... Is>
         __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(Is... indices) const { 
-          static_assert(sizeof...(indices) == NUM_RC, "Number of indices incorrect in linspace");
+          static_assert(sizeof...(indices) == Rank(), "Number of indices incorrect in linspace");
           cuda::std::array idx{indices...};
           if constexpr (sizeof...(indices) == 1) {
             return firsts_[0] + steps_[0] * static_cast<T>(idx[0]);

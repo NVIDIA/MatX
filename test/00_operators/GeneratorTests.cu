@@ -565,6 +565,63 @@ TYPED_TEST(BasicGeneratorTestsNumericNonComplex, Linspace)
     }
   }
 
+  // Test with NUM_RC > 2 (3 columns, axis=0)
+  {
+    const TestType starts[] = {(TestType)0, (TestType)1, (TestType)2};
+    const TestType stops[] = {(TestType)1, (TestType)3, (TestType)5};
+    const index_t count = 10;
+
+    auto ls = linspace(starts, stops, count);
+
+    EXPECT_EQ(ls.Size(0), count);
+    EXPECT_EQ(ls.Size(1), 3);
+
+    for (int row = 0; row < ls.Size(0); row++) {
+      for (int col = 0; col < ls.Size(1); col++) {
+        TestType step = (stops[col] - starts[col]) / (count - 1);
+        EXPECT_TRUE(MatXUtils::MatXTypeCompare(ls(row, col), starts[col] + step * row));
+      }
+    }
+  }
+
+  // Test with NUM_RC > 2 (3 rows, axis=1)
+  {
+    const TestType starts[] = {(TestType)0, (TestType)1, (TestType)2};
+    const TestType stops[] = {(TestType)1, (TestType)3, (TestType)5};
+    const index_t count = 10;
+
+    auto ls = linspace(starts, stops, count, 1);
+
+    EXPECT_EQ(ls.Size(0), 3);
+    EXPECT_EQ(ls.Size(1), count);
+
+    for (int row = 0; row < ls.Size(0); row++) {
+      for (int col = 0; col < ls.Size(1); col++) {
+        TestType step = (stops[row] - starts[row]) / (count - 1);
+        EXPECT_TRUE(MatXUtils::MatXTypeCompare(ls(row, col), starts[row] + step * col));
+      }
+    }
+  }
+
+  // Test with NUM_RC = 4
+  {
+    const TestType starts[] = {(TestType)0, (TestType)1, (TestType)2, (TestType)3};
+    const TestType stops[] = {(TestType)1, (TestType)3, (TestType)5, (TestType)7};
+    const index_t count = 20;
+
+    auto ls = linspace(starts, stops, count);
+
+    EXPECT_EQ(ls.Size(0), count);
+    EXPECT_EQ(ls.Size(1), 4);
+
+    for (int row = 0; row < ls.Size(0); row++) {
+      for (int col = 0; col < ls.Size(1); col++) {
+        TestType step = (stops[col] - starts[col]) / (count - 1);
+        EXPECT_TRUE(MatXUtils::MatXTypeCompare(ls(row, col), starts[col] + step * row));
+      }
+    }
+  }
+
   MATX_EXIT_HANDLER();
 }
 
