@@ -55,11 +55,9 @@ namespace matx
     {
       private:
         static constexpr int32_t shift_rank_ = detail::get_rank<T2>();
-        // For rank-1 shifts, determine which dimension the shift varies along:
-        // Use the last dimension, unless DIM is the last, then use second-to-last.
-        static constexpr int SHIFT_DIM_ = (DIM == detail::matx_max(detail::get_rank<T1>(), detail::get_rank<T2>()) - 1)
-                                           ? (detail::matx_max(detail::get_rank<T1>(), detail::get_rank<T2>()) - 2)
-                                           : (detail::matx_max(detail::get_rank<T1>(), detail::get_rank<T2>()) - 1);
+        // For rank-1 shifts on rank-2 inputs, the shift varies along the non-DIM dimension.
+        // DIM=0 → SHIFT_DIM_=1, DIM=1 → SHIFT_DIM_=0.
+        static constexpr int SHIFT_DIM_ = (DIM == 0) ? 1 : 0;
 
       public:
         using matxop = bool;
@@ -68,8 +66,8 @@ namespace matx
         using self_type = ShiftOp<DIM, T1, T2>;
 
         static_assert(shift_rank_ <= 1, "Shift operator must be rank 0 or rank 1. Higher-rank shift operators are not supported.");
-        static_assert(shift_rank_ != 1 || detail::get_rank<T1>() >= 2,
-                      "Rank-1 shift operator requires input operator of rank 2 or higher");
+        static_assert(shift_rank_ != 1 || detail::get_rank<T1>() == 2,
+                      "Rank-1 shift operator is only supported for rank-2 input operators");
 
 #ifdef MATX_EN_JIT
         struct JIT_Storage {
@@ -116,7 +114,7 @@ namespace matx
                 "  {{\n"
                 "    if constexpr (CapType::ept == ElementsPerThread::ONE) {{\n"
                 "      cuda::std::array idx{{indices...}};\n"
-                "  {}\n"
+                "      {}\n"
                 "      shift = (shift + idx[DIM_]) % sizes_[DIM_];\n"
                 "      if (shift < 0) shift += sizes_[DIM_];\n"
                 "      idx[DIM_] = shift;\n"
@@ -378,3 +376,4 @@ namespace matx
     };
 
 } // end namespace matx
+
