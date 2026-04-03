@@ -567,11 +567,14 @@ TYPED_TEST(BasicGeneratorTestsNumericNonComplex, Linspace)
 
   // Test with NUM_RC > 2 (3 columns, axis=0)
   {
+    // example-begin linspace-gen-test-4
     const TestType starts[] = {(TestType)0, (TestType)1, (TestType)2};
     const TestType stops[] = {(TestType)1, (TestType)3, (TestType)5};
     const index_t count = 10;
 
+    // Create a 2D operator with 10 rows and 3 columns with linearly-spaced columns
     auto ls = linspace(starts, stops, count);
+    // example-end linspace-gen-test-4
 
     EXPECT_EQ(ls.Size(0), count);
     EXPECT_EQ(ls.Size(1), 3);

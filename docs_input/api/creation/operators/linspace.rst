@@ -21,3 +21,9 @@ Examples
    :end-before: example-end linspace-gen-test-1
    :dedent:
 
+.. literalinclude:: ../../../../test/00_operators/GeneratorTests.cu
+   :language: cpp
+   :start-after: example-begin linspace-gen-test-4
+   :end-before: example-end linspace-gen-test-4
+   :dedent:
+
