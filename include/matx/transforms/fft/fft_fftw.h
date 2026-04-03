@@ -76,6 +76,7 @@ struct FftFFTWParams_t {
   bool is_fp32;
   bool in_place;
   detail::FFTDirection dir;
+  int num_threads = 1;
 };
 
   template <typename OutTensorType, typename InTensorType>
@@ -227,7 +228,8 @@ struct FftFFTWParamsKeyHash {
            (std::hash<uint64_t>()(k.fft_rank)) +
            (std::hash<uint64_t>()(k.batch)) + (std::hash<uint64_t>()(k.istride)) +
            (std::hash<uint64_t>()(static_cast<uint64_t>(k.dir))) +
-           (std::hash<uint64_t>()(static_cast<uint64_t>(k.is_fp32)));
+           (std::hash<uint64_t>()(static_cast<uint64_t>(k.is_fp32))) +
+           (std::hash<uint64_t>()(static_cast<uint64_t>(k.num_threads)));
   }
 };
 
@@ -240,6 +242,7 @@ struct FftFFTWParamsKeyEq {
     return l.n[0] == t.n[0] && l.n[1] == t.n[1] && l.batch == t.batch &&
            l.dir == t.dir && l.fft_rank == t.fft_rank &&
            l.is_fp32 == t.is_fp32 && l.in_place == t.in_place &&
+           l.num_threads == t.num_threads &&
            l.inembed[0] == t.inembed[0] && l.inembed[1] == t.inembed[1] &&
            l.onembed[0] == t.onembed[0] && l.onembed[1] == t.onembed[1] &&
            l.istride == t.istride && l.ostride == t.ostride &&
@@ -599,6 +602,7 @@ private:
 
     // Get parameters required by these tensors
     auto params = GetFFTParams(out, in, 1, dir);
+    params.num_threads = exec.GetNumThreads();
 
     fft_exec(out, in, params, dir, exec);
 
@@ -651,6 +655,7 @@ private:
 
     // Get parameters required by these tensors
     auto params = GetFFTParams(out, in, 2, dir);
+    params.num_threads = exec.GetNumThreads();
 
     fft_exec(out, in, params, dir, exec);
 
