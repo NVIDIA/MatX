@@ -53,11 +53,23 @@ namespace matx
     template <int DIM, typename T1, typename T2>
       class ShiftOp : public BaseOp<ShiftOp<DIM, T1, T2>>
     {
+      private:
+        static constexpr int32_t shift_rank_ = detail::get_rank<T2>();
+        // For rank-1 shifts, determine which dimension the shift varies along:
+        // Use the last dimension, unless DIM is the last, then use second-to-last.
+        static constexpr int SHIFT_DIM_ = (DIM == detail::matx_max(detail::get_rank<T1>(), detail::get_rank<T2>()) - 1)
+                                           ? (detail::matx_max(detail::get_rank<T1>(), detail::get_rank<T2>()) - 2)
+                                           : (detail::matx_max(detail::get_rank<T1>(), detail::get_rank<T2>()) - 1);
+
       public:
         using matxop = bool;
         using matxoplvalue = bool;
         using value_type = typename T1::value_type;
         using self_type = ShiftOp<DIM, T1, T2>;
+
+        static_assert(shift_rank_ <= 1, "Shift operator must be rank 0 or rank 1. Higher-rank shift operators are not supported.");
+        static_assert(shift_rank_ != 1 || detail::get_rank<T1>() >= 2,
+                      "Rank-1 shift operator requires input operator of rank 2 or higher");
 
 #ifdef MATX_EN_JIT
         struct JIT_Storage {
@@ -80,6 +92,14 @@ namespace matx
             out_dims_[i] = Size(i);
           }
           
+          // Generate different shift lookup code for rank-1 vs scalar shifts
+          std::string shift_lookup;
+          if constexpr (shift_rank_ == 1) {
+            shift_lookup = "      index_t shift = -get_value<CapType>(shift_, idx[SHIFT_DIM_]);";
+          } else {
+            shift_lookup = "      index_t shift = -get_value<CapType>(shift_, indices...);";
+          }
+
           return cuda::std::make_tuple(
             func_name,
             std::format("template <typename T1, typename T2> struct {} {{\n"
@@ -87,6 +107,7 @@ namespace matx
                 "  using matxop = bool;\n"
                 "  constexpr static int DIM_ = {};\n"
                 "  constexpr static int Rank_ = {};\n"
+                "  constexpr static int SHIFT_DIM_ = {};\n"
                 "  constexpr static cuda::std::array<index_t, Rank_> sizes_ = {{ {} }};\n"
                 "  typename detail::inner_storage_or_self_t<detail::base_type_t<T1>> op_;\n"
                 "  typename detail::inner_storage_or_self_t<detail::base_type_t<T2>> shift_;\n"
@@ -95,7 +116,7 @@ namespace matx
                 "  {{\n"
                 "    if constexpr (CapType::ept == ElementsPerThread::ONE) {{\n"
                 "      cuda::std::array idx{{indices...}};\n"
-                "      index_t shift = -get_value<CapType>(shift_, indices...);\n"
+                "  {}\n"
                 "      shift = (shift + idx[DIM_]) % sizes_[DIM_];\n"
                 "      if (shift < 0) shift += sizes_[DIM_];\n"
                 "      idx[DIM_] = shift;\n"
@@ -107,7 +128,7 @@ namespace matx
                 "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return Rank_; }}\n"
                 "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const {{ return sizes_[dim]; }}\n"
                 "}};\n",
-                func_name, DIM, Rank(), detail::array_to_string(out_dims_))
+                func_name, DIM, Rank(), SHIFT_DIM_, detail::array_to_string(out_dims_), shift_lookup)
           );
         }
 #endif
@@ -119,14 +140,18 @@ namespace matx
           MATX_LOG_TRACE("{} constructor: dim={}, rank={}", str(), DIM, Rank());
           static_assert(DIM < Rank(), "Dimension to shift must be less than rank of tensor");
 
+          // Output sizes always come from the input operator — shifting doesn't change shape
           MATX_LOOP_UNROLL
           for (int i = 0; i < Rank(); i++) {
-            index_t size1 = detail::get_expanded_size<Rank()>(op_, i);
-            index_t size2 = detail::get_expanded_size<Rank()>(shift_, i);
-            sizes_[i] = detail::matx_max(size1,size2);
+            sizes_[i] = detail::get_expanded_size<Rank()>(op_, i);
           }
 
-          MATX_ASSERT_COMPATIBLE_OP_SIZES(shift_);
+          if constexpr (shift_rank_ == 1) {
+            // Validate shift size matches the non-DIM dimension it maps to
+            MATX_ASSERT_STR(shift_.Size(0) == sizes_[SHIFT_DIM_], matxInvalidSize,
+                            "Rank-1 shift operator size must match the non-shifted dimension size");
+          }
+
           MATX_ASSERT_COMPATIBLE_OP_SIZES(op_);
         }
 
@@ -139,7 +164,15 @@ namespace matx
         {
           if constexpr (CapType::ept == ElementsPerThread::ONE) {
             cuda::std::array idx{indices...};
-            index_t shift = -get_value<CapType>(shiftin, indices...);
+
+            index_t shift;
+            if constexpr (shift_rank_ == 1) {
+              // Rank-1 shift: look up shift using the non-DIM dimension index
+              shift = -get_value<CapType>(shiftin, idx[SHIFT_DIM_]);
+            } else {
+              // Scalar or rank-0 shift: same shift for all elements
+              shift = -get_value<CapType>(shiftin, indices...);
+            }
 
             shift = (shift + idx[DIM]) % sizes[DIM];
 

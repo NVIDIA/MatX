@@ -160,5 +160,101 @@ TYPED_TEST(OperatorTestsNumericAllExecs, ShiftOp)
     }
   }
 
+  // Rank-1 shift operator: shift dim 0 with per-column shifts
+  {
+    index_t rows = 10;
+    index_t cols = 5;
+    tensor_t<TestType, 2> t2r1({rows, cols});
+    tensor_t<TestType, 2> t2r1s({rows, cols});
+    auto shifts_col = make_tensor<int>({cols});
+
+    // Initialize input
+    for (index_t i = 0; i < rows; i++) {
+      for (index_t j = 0; j < cols; j++) {
+        t2r1(i, j) = static_cast<detail::value_promote_t<TestType>>(i * cols + j);
+      }
+    }
+
+    // Each column gets a different shift amount
+    for (index_t j = 0; j < cols; j++) {
+      shifts_col(j) = static_cast<int>(j + 1);  // shifts: 1, 2, 3, 4, 5
+    }
+
+    (t2r1s = shift<0>(t2r1, shifts_col)).run(exec);
+    exec.sync();
+
+    for (index_t i = 0; i < rows; i++) {
+      for (index_t j = 0; j < cols; j++) {
+        index_t shift_amount = static_cast<index_t>(j + 1);
+        index_t src_i = i < shift_amount ? (rows - shift_amount + i) : (i - shift_amount);
+        ASSERT_TRUE(
+            MatXUtils::MatXTypeCompare(t2r1s(i, j), t2r1(src_i, j)));
+      }
+    }
+  }
+
+  // Rank-1 shift operator: shift dim 1 with per-row shifts
+  {
+    index_t rows = 10;
+    index_t cols = 5;
+    tensor_t<TestType, 2> t2r1({rows, cols});
+    tensor_t<TestType, 2> t2r1s({rows, cols});
+    auto shifts_row = make_tensor<int>({rows});
+
+    for (index_t i = 0; i < rows; i++) {
+      for (index_t j = 0; j < cols; j++) {
+        t2r1(i, j) = static_cast<detail::value_promote_t<TestType>>(i * cols + j);
+      }
+    }
+
+    // Each row gets a different shift amount
+    for (index_t i = 0; i < rows; i++) {
+      shifts_row(i) = static_cast<int>(i % 3);  // shifts: 0, 1, 2, 0, 1, 2, ...
+    }
+
+    (t2r1s = shift<1>(t2r1, shifts_row)).run(exec);
+    exec.sync();
+
+    for (index_t i = 0; i < rows; i++) {
+      for (index_t j = 0; j < cols; j++) {
+        index_t shift_amount = static_cast<index_t>(i % 3);
+        index_t src_j = j < shift_amount ? (cols - shift_amount + j) : (j - shift_amount);
+        ASSERT_TRUE(
+            MatXUtils::MatXTypeCompare(t2r1s(i, j), t2r1(i, src_j)));
+      }
+    }
+  }
+
+  // Rank-1 shift operator: negative shifts
+  {
+    index_t rows = 10;
+    index_t cols = 5;
+    tensor_t<TestType, 2> t2r1({rows, cols});
+    tensor_t<TestType, 2> t2r1s({rows, cols});
+    auto shifts_col = make_tensor<int>({cols});
+
+    for (index_t i = 0; i < rows; i++) {
+      for (index_t j = 0; j < cols; j++) {
+        t2r1(i, j) = static_cast<detail::value_promote_t<TestType>>(i * cols + j);
+      }
+    }
+
+    // Negative shifts (shift left)
+    for (index_t j = 0; j < cols; j++) {
+      shifts_col(j) = -static_cast<int>(j + 1);
+    }
+
+    (t2r1s = shift<0>(t2r1, shifts_col)).run(exec);
+    exec.sync();
+
+    for (index_t i = 0; i < rows; i++) {
+      for (index_t j = 0; j < cols; j++) {
+        index_t shift_amount = static_cast<index_t>(j + 1);
+        ASSERT_TRUE(
+            MatXUtils::MatXTypeCompare(t2r1s(i, j), t2r1((i + shift_amount) % rows, j)));
+      }
+    }
+  }
+
   MATX_EXIT_HANDLER();
 }
