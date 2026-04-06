@@ -114,22 +114,6 @@ __MATX_DEVICE__ __MATX_INLINE__ void channelize_cmac(
     }
 }
 
-// Helper to extract a direct data pointer for dense rank-1 tensor views
-// with unit stride, enabling ptr[index] access in the inner loop instead
-// of the full operator()(index) path which involves a runtime stride
-// multiply. Returns nullptr when the optimization does not apply (non-tensor
-// operators, non-unit stride), and the caller falls back to operator().
-template <typename OpType>
-__MATX_DEVICE__ __MATX_INLINE__ auto channelize_get_direct_ptr(const OpType &op)
-    -> const typename OpType::value_type *
-{
-    if constexpr (is_tensor_view_v<OpType> && OpType::Rank() == 1) {
-        return (op.Stride(0) == 1) ? op.Data() : nullptr;
-    } else {
-        return nullptr;
-    }
-}
-
 } // namespace detail
 
 template <int THREADS, bool MaximallyDecimated, typename OutType, typename InType, typename FilterType, typename AccumType>
@@ -261,9 +245,6 @@ __global__ void ChannelizePoly1D(OutType output, InType input, FilterType filter
     } else {
         // === Oversampled (D < M): phase rotates per output step ===
         // No shared memory — reads filter from global/L2.
-        // When the filter is a dense rank-1 tensor, use a direct pointer
-        // to avoid the per-tap stride multiply in operator().
-        const filter_t *filter_direct = detail::channelize_get_direct_ptr(filter);
         for (index_t t = first_out_elem+tid; t <= last_out_elem; t += THREADS) {
             const index_t s = num_channels - 1 - channel;
             const index_t last_arrived = t * decimation_factor + decimation_factor - 1;
@@ -295,17 +276,7 @@ __global__ void ChannelizePoly1D(OutType output, InType input, FilterType filter
                 cuda::std::apply([&in_val, &input](auto &&...args) {
                     in_val = input.operator()(args...);
                 }, indims);
-                // Use direct pointer when available (dense rank-1 tensor
-                // with unit stride) to avoid per-tap stride multiply.
-                // The constexpr check eliminates the branch for operators.
-                filter_t h_val;
-                if constexpr (is_tensor_view_v<FilterType> && FilterType::Rank() == 1) {
-                    h_val = __builtin_expect(filter_direct != nullptr, 1)
-                        ? filter_direct[h_ind]
-                        : filter.operator()(h_ind);
-                } else {
-                    h_val = filter.operator()(h_ind);
-                }
+                const filter_t h_val = filter.operator()(h_ind);
                 detail::channelize_cmac(accum,
                         detail::channelize_cast_filter<accum_t>(h_val),
                         detail::channelize_cast_input<accum_t>(in_val));
@@ -436,13 +407,6 @@ __global__ void ChannelizePoly1D_SmemTiled(
         }
     }
 
-    // When FilterInSmem is false and the filter is a dense rank-1 tensor
-    // with unit stride, use a direct pointer to bypass operator() overhead.
-    [[maybe_unused]] const filter_t *filter_direct = nullptr;
-    if constexpr (!FilterInSmem) {
-        filter_direct = detail::channelize_get_direct_ptr(filter);
-    }
-
     // --- Branch offset and iteration bounds ---
     const int32_t s = active ? (M - 1 - c) : 0;
     const IdxT start_elem = static_cast<IdxT>(blockIdx.x) * elems_per_channel_per_cta;
@@ -469,17 +433,6 @@ __global__ void ChannelizePoly1D_SmemTiled(
             smem_input[buf_row * CTILE + col] = val;
         } else {
             smem_input[buf_row * CTILE + col] = static_cast<input_t>(0);
-        }
-    };
-
-    // Helper: read one filter tap by index
-    auto read_filter = [&](int32_t h_ind) -> filter_t {
-        if constexpr (is_tensor_view_v<FilterType> && FilterType::Rank() == 1) {
-            return __builtin_expect(filter_direct != nullptr, 1)
-                ? filter_direct[h_ind]
-                : filter.operator()(static_cast<index_t>(h_ind));
-        } else {
-            return filter.operator()(static_cast<index_t>(h_ind));
         }
     };
 
@@ -554,7 +507,7 @@ __global__ void ChannelizePoly1D_SmemTiled(
                     if constexpr (FilterInSmem) {
                         hv = smem_filter_base[(p + h_skip) * CTILE + cx];
                     } else {
-                        hv = read_filter(h_ind);
+                        hv = filter.operator()(static_cast<index_t>(h_ind));
                     }
                     const input_t iv = smem_input[my_buf_row * CTILE + cx];
                     detail::channelize_cmac(accum,
@@ -569,7 +522,7 @@ __global__ void ChannelizePoly1D_SmemTiled(
                     if constexpr (FilterInSmem) {
                         hv = smem_filter_base[(p + h_skip) * CTILE + cx];
                     } else {
-                        hv = read_filter(h_ind);
+                        hv = filter.operator()(static_cast<index_t>(h_ind));
                     }
                     const input_t iv = smem_input[my_buf_row * CTILE + cx];
                     detail::channelize_cmac(accum,
@@ -655,7 +608,7 @@ __global__ void ChannelizePoly1D_SmemTiled(
                         if constexpr (FilterInSmem) {
                             hv = smem_filter_base[cx * filter_stride + k * P + (p + h_skip)];
                         } else {
-                            hv = read_filter(h_ind);
+                            hv = filter.operator()(static_cast<index_t>(h_ind));
                         }
                         const input_t iv = smem_input[buf_row * CTILE + cx];
                         detail::channelize_cmac(accum,
@@ -670,7 +623,7 @@ __global__ void ChannelizePoly1D_SmemTiled(
                         if constexpr (FilterInSmem) {
                             hv = smem_filter_base[cx * filter_stride + k * P + (p + h_skip)];
                         } else {
-                            hv = read_filter(h_ind);
+                            hv = filter.operator()(static_cast<index_t>(h_ind));
                         }
                         const input_t iv = smem_input[buf_row * CTILE + cx];
                         detail::channelize_cmac(accum,
