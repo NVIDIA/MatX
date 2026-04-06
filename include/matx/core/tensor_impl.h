@@ -99,6 +99,8 @@ class tensor_impl_t {
     using data_type = TensorData;
     using shape_type = typename Desc::shape_type;
     using stride_type = typename Desc::stride_type;
+    using shape_container = typename Desc::shape_container;
+    using stride_container = typename Desc::stride_container;
     using matxoplvalue = bool;
     using self_type = tensor_impl_t<T, RANK, Desc, TensorData>;
 

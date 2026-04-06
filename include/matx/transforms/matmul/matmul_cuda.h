@@ -417,13 +417,12 @@ public:
         }
 
         // for complex half we have copied to planar row-major
-        if (is_complex_half_v<typename TensorTypeB::value_type>) {
-          params.ldb = b.Size(TensorTypeB::Rank()-1);
+        if constexpr (is_complex_half_v<typename TensorTypeA::value_type>) {
+          params.lda = a.Size(TensorTypeA::Rank()-1);
         }
 
-        // for complex half we have copied to planar row-major
         if constexpr (is_complex_half_v<typename TensorTypeB::value_type>) {
-          params.lda = a.Size(TensorTypeA::Rank()-1);
+          params.ldb = b.Size(TensorTypeB::Rank()-1);
         }
 
         params.c_rows = params.a_rows;

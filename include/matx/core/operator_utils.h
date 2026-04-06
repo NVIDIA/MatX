@@ -103,7 +103,9 @@ namespace matx {
         if(supported) {
           return make_tensor<typename Op::value_type>(in.Data(), in.Descriptor());
         } else {
-          return make_tensor<typename Op::value_type>(in.Descriptor(), space, stream);
+          // Fresh allocation is row-major contiguous; copying an affine stride
+          // descriptor onto it would break transforms (e.g. cuFFT batch distance).
+          return make_tensor<typename Op::value_type>(Shape(in), space, stream);
         }
       }
     }
