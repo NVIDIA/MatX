@@ -1102,3 +1102,295 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, OversampledBatched)
 
   MATX_EXIT_HANDLER();
 }
+
+// SmemTiled kernel tests: maximally decimated with M > 256 (forces SmemTiled
+// because the existing _Smem kernel requires M <= 256)
+TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, SmemTiledMaximallyDecimated)
+{
+  MATX_ENTER_HANDLER();
+
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ComplexType = typename test_types::complex_type<TestType>::type;
+
+  struct {
+    index_t a_len;
+    index_t f_len;
+    index_t num_channels;
+  } test_cases[] = {
+    // M=512, P=10 — exercises MaximallyDecimated SmemTiled with multiple channel tiles
+    { 256000, 10*512, 512 },
+    // M=512, unaligned filter (not a multiple of M)
+    { 256000, 10*512+37, 512 },
+    // M=1024, P=4 — large channel count, small P
+    { 102400, 4*1024, 1024 },
+  };
+
+  for (size_t i = 0; i < sizeof(test_cases)/sizeof(test_cases[0]); i++) {
+    const index_t a_len = test_cases[i].a_len;
+    const index_t f_len = test_cases[i].f_len;
+    const index_t num_channels = test_cases[i].num_channels;
+    const index_t decimation_factor = num_channels;
+    const index_t b_len_per_channel = (a_len + num_channels - 1) / num_channels;
+    this->pb->template InitAndRunTVGenerator<TestType>(
+      "00_transforms", "channelize_poly_operators", "channelize", {a_len, f_len, num_channels, num_channels});
+
+    auto a = make_tensor<TestType>({a_len});
+    auto f = make_tensor<TestType>({f_len});
+    auto b = make_tensor<ComplexType>({b_len_per_channel, num_channels});
+
+    this->pb->NumpyToTensorView(a, "a");
+    this->pb->NumpyToTensorView(f, "filter_random");
+    (b = channelize_poly(a, f, num_channels, decimation_factor)).run(this->exec);
+
+    this->exec.sync();
+    MATX_TEST_ASSERT_COMPARE(this->pb, b, "b_random", this->thresh);
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+// SmemTiled kernel tests: large-M oversampled cases that exercise multi-tile
+// channel tiling in the oversampled path
+TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, SmemTiledOversampledLargeM)
+{
+  MATX_ENTER_HANDLER();
+
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ComplexType = typename test_types::complex_type<TestType>::type;
+
+  struct {
+    index_t a_len;
+    index_t f_len;
+    index_t num_channels;
+    index_t decimation_factor;
+  } test_cases[] = {
+    // M=1024, D=512, 2x integer oversampling, K=2
+    { 256000, 8*1024, 1024, 512 },
+    // M=512, D=256, 2x integer oversampling, K=2
+    { 128000, 10*512, 512, 256 },
+    // M=512, D=256, unaligned filter
+    { 128000, 10*512+19, 512, 256 },
+  };
+
+  for (size_t i = 0; i < sizeof(test_cases)/sizeof(test_cases[0]); i++) {
+    const index_t a_len = test_cases[i].a_len;
+    const index_t f_len = test_cases[i].f_len;
+    const index_t num_channels = test_cases[i].num_channels;
+    const index_t decimation_factor = test_cases[i].decimation_factor;
+    const index_t b_len_per_channel = (a_len + decimation_factor - 1) / decimation_factor;
+    this->pb->template InitAndRunTVGenerator<TestType>(
+      "00_transforms", "channelize_poly_operators", "channelize_oversampled",
+      {a_len, f_len, num_channels, decimation_factor});
+
+    auto a = make_tensor<TestType>({a_len});
+    auto f = make_tensor<TestType>({f_len});
+    auto b = make_tensor<ComplexType>({b_len_per_channel, num_channels});
+
+    this->pb->NumpyToTensorView(a, "a");
+    this->pb->NumpyToTensorView(f, "filter_random");
+    (b = channelize_poly(a, f, num_channels, decimation_factor)).run(this->exec);
+
+    this->exec.sync();
+    MATX_TEST_ASSERT_COMPARE(this->pb, b, "b_random", this->thresh);
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+// SmemTiled kernel tests: rational oversampling with large K (many distinct
+// filter phases) to stress the K-phase filter storage
+TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, SmemTiledOversampledLargeK)
+{
+  MATX_ENTER_HANDLER();
+
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ComplexType = typename test_types::complex_type<TestType>::type;
+
+  struct {
+    index_t a_len;
+    index_t f_len;
+    index_t num_channels;
+    index_t decimation_factor;
+  } test_cases[] = {
+    // M=128, D=97, K=128 (gcd=1, all phases distinct)
+    { 25600, 5*128, 128, 97 },
+    // M=64, D=37, K=64 (gcd=1)
+    { 12800, 8*64, 64, 37 },
+    // M=100, D=30, K=10 (gcd=10), moderate K
+    { 20000, 7*100, 100, 30 },
+  };
+
+  for (size_t i = 0; i < sizeof(test_cases)/sizeof(test_cases[0]); i++) {
+    const index_t a_len = test_cases[i].a_len;
+    const index_t f_len = test_cases[i].f_len;
+    const index_t num_channels = test_cases[i].num_channels;
+    const index_t decimation_factor = test_cases[i].decimation_factor;
+    const index_t b_len_per_channel = (a_len + decimation_factor - 1) / decimation_factor;
+    this->pb->template InitAndRunTVGenerator<TestType>(
+      "00_transforms", "channelize_poly_operators", "channelize_oversampled",
+      {a_len, f_len, num_channels, decimation_factor});
+
+    auto a = make_tensor<TestType>({a_len});
+    auto f = make_tensor<TestType>({f_len});
+    auto b = make_tensor<ComplexType>({b_len_per_channel, num_channels});
+
+    this->pb->NumpyToTensorView(a, "a");
+    this->pb->NumpyToTensorView(f, "filter_random");
+    (b = channelize_poly(a, f, num_channels, decimation_factor)).run(this->exec);
+
+    this->exec.sync();
+    MATX_TEST_ASSERT_COMPARE(this->pb, b, "b_random", this->thresh);
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+// SmemTiled oversampled with FilterInSmem=true.
+// Requires CTILE * K * P * sizeof(filter_t) <= 2048.
+// With K=2 (2x integer oversample) and small P, the filter fits in smem.
+TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, SmemTiledOversampledFilterInSmem)
+{
+  MATX_ENTER_HANDLER();
+
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ComplexType = typename test_types::complex_type<TestType>::type;
+
+  struct {
+    index_t a_len;
+    index_t f_len;
+    index_t num_channels;
+    index_t decimation_factor;
+  } test_cases[] = {
+    // M=1024, D=512, K=2, P=4: filter_smem = 64*2*4*sizeof(filter_t) = 2048 bytes (float)
+    { 102400, 4*1024, 1024, 512 },
+    // M=512, D=256, K=2, P=3: filter_smem = 64*2*3*sizeof(filter_t) = 1536 bytes (float)
+    { 51200, 3*512, 512, 256 },
+    // M=1024, D=512, K=2, P=2: filter_smem = 64*2*2*sizeof(filter_t) = 1024 bytes (float)
+    { 102400, 2*1024, 1024, 512 },
+  };
+
+  for (size_t i = 0; i < sizeof(test_cases)/sizeof(test_cases[0]); i++) {
+    const index_t a_len = test_cases[i].a_len;
+    const index_t f_len = test_cases[i].f_len;
+    const index_t num_channels = test_cases[i].num_channels;
+    const index_t decimation_factor = test_cases[i].decimation_factor;
+    const index_t b_len_per_channel = (a_len + decimation_factor - 1) / decimation_factor;
+    this->pb->template InitAndRunTVGenerator<TestType>(
+      "00_transforms", "channelize_poly_operators", "channelize_oversampled",
+      {a_len, f_len, num_channels, decimation_factor});
+
+    auto a = make_tensor<TestType>({a_len});
+    auto f = make_tensor<TestType>({f_len});
+    auto b = make_tensor<ComplexType>({b_len_per_channel, num_channels});
+
+    this->pb->NumpyToTensorView(a, "a");
+    this->pb->NumpyToTensorView(f, "filter_random");
+    (b = channelize_poly(a, f, num_channels, decimation_factor)).run(this->exec);
+
+    this->exec.sync();
+    MATX_TEST_ASSERT_COMPARE(this->pb, b, "b_random", this->thresh);
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+// Complex filter tests to exercise the complex×complex channelize_cmac path.
+// Previous tests all use real filters.
+TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, ComplexFilter)
+{
+  MATX_ENTER_HANDLER();
+
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ComplexType = typename test_types::complex_type<TestType>::type;
+
+  struct {
+    index_t a_len;
+    index_t f_len;
+    index_t num_channels;
+    index_t decimation_factor;
+  } test_cases[] = {
+    // Complex filter, D==M, small M (FusedChan path)
+    { 1800, 120, 4, 4 },
+    // Complex filter, D==M, medium M (_Smem path)
+    { 2500, 170, 10, 10 },
+    // Complex filter, D==M, large M (SmemTiled path)
+    { 128000, 10*512, 512, 512 },
+    // Complex filter, oversampled (SmemTiled oversampled path)
+    { 2500, 170, 10, 5 },
+    // Complex filter, oversampled, large M
+    { 128000, 10*512, 512, 256 },
+  };
+
+  for (size_t i = 0; i < sizeof(test_cases)/sizeof(test_cases[0]); i++) {
+    const index_t a_len = test_cases[i].a_len;
+    const index_t f_len = test_cases[i].f_len;
+    const index_t num_channels = test_cases[i].num_channels;
+    const index_t decimation_factor = test_cases[i].decimation_factor;
+    const index_t b_len_per_channel = (a_len + decimation_factor - 1) / decimation_factor;
+
+    // Use complex input AND complex filter
+    this->pb->template InitAndRunTVGenerator<ComplexType>(
+      "00_transforms", "channelize_poly_operators", "channelize_oversampled",
+      {a_len, f_len, num_channels, decimation_factor});
+
+    auto a = make_tensor<ComplexType>({a_len});
+    auto f = make_tensor<ComplexType>({f_len});
+    auto b = make_tensor<ComplexType>({b_len_per_channel, num_channels});
+
+    this->pb->NumpyToTensorView(a, "a");
+    this->pb->NumpyToTensorView(f, "filter_random");
+    (b = channelize_poly(a, f, num_channels, decimation_factor)).run(this->exec);
+
+    this->exec.sync();
+    MATX_TEST_ASSERT_COMPARE(this->pb, b, "b_random", this->thresh);
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+// Oversampled with very large P so SmemTiled input buffer exceeds 48KB,
+// falling back to the generic ChannelizePoly1D (MaximallyDecimated=false) path.
+// For complex<float> input: (P+3) * 64 * 8 > 49152 → P > 93.
+TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, GenericOversampledFallback)
+{
+  MATX_ENTER_HANDLER();
+
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ComplexType = typename test_types::complex_type<TestType>::type;
+
+  struct {
+    index_t a_len;
+    index_t f_len;
+    index_t num_channels;
+    index_t decimation_factor;
+  } test_cases[] = {
+    // M=8, D=4, P=100: input_smem = 103*64*8 = 52736 > 49152 for complex<float>
+    { 8000, 100*8, 8, 4 },
+    // M=10, D=5, P=200: clearly exceeds 48KB for any type
+    { 20000, 200*10, 10, 5 },
+  };
+
+  for (size_t i = 0; i < sizeof(test_cases)/sizeof(test_cases[0]); i++) {
+    const index_t a_len = test_cases[i].a_len;
+    const index_t f_len = test_cases[i].f_len;
+    const index_t num_channels = test_cases[i].num_channels;
+    const index_t decimation_factor = test_cases[i].decimation_factor;
+    const index_t b_len_per_channel = (a_len + decimation_factor - 1) / decimation_factor;
+    this->pb->template InitAndRunTVGenerator<TestType>(
+      "00_transforms", "channelize_poly_operators", "channelize_oversampled",
+      {a_len, f_len, num_channels, decimation_factor});
+
+    auto a = make_tensor<TestType>({a_len});
+    auto f = make_tensor<TestType>({f_len});
+    auto b = make_tensor<ComplexType>({b_len_per_channel, num_channels});
+
+    this->pb->NumpyToTensorView(a, "a");
+    this->pb->NumpyToTensorView(f, "filter_random");
+    (b = channelize_poly(a, f, num_channels, decimation_factor)).run(this->exec);
+
+    this->exec.sync();
+    MATX_TEST_ASSERT_COMPARE(this->pb, b, "b_random", this->thresh);
+  }
+
+  MATX_EXIT_HANDLER();
+}

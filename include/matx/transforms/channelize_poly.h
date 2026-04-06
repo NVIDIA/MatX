@@ -61,6 +61,147 @@ constexpr index_t MATX_CHANNELIZE_POLY1D_FULL_SMEM_KERNEL_NOUT_PER_ITER = 4;
 // Maximum dynamic shared memory (bytes) for caching filter taps in ChannelizePoly1D.
 constexpr size_t MATX_CHANNELIZE_POLY1D_MAX_FILTER_SMEM_BYTES = 6 * 1024;
 
+// Constants for the SmemTiled kernel.
+constexpr int MATX_CHANNELIZE_POLY1D_SMEM_TILED_CTILE = 64;
+constexpr int MATX_CHANNELIZE_POLY1D_SMEM_TILED_NOUT  = 4;
+constexpr size_t MATX_CHANNELIZE_POLY1D_SMEM_TILED_MAX_BYTES = 48 * 1024;
+// Maximum filter smem budget. When the filter exceeds this, it is read from
+// global/L2 instead, freeing smem for better occupancy.
+constexpr size_t MATX_CHANNELIZE_POLY1D_SMEM_TILED_MAX_FILTER_BYTES = 2048;
+
+// Compute the shared memory footprint for the SmemTiled filter taps.
+// For D==M: one phase per tile channel → CTILE * P elements.
+// For D<M: K phases per tile channel → CTILE * K * P elements.
+template <typename FilterType>
+inline size_t matxChannelizePoly1DInternal_SmemTiledFilterSmemBytes(
+    index_t num_channels, index_t filter_len, index_t decimation_factor)
+{
+  using filter_t = typename FilterType::value_type;
+  constexpr int CTILE = MATX_CHANNELIZE_POLY1D_SMEM_TILED_CTILE;
+  const index_t P = (filter_len + num_channels - 1) / num_channels;
+  const index_t gcd_val = std::gcd(num_channels, decimation_factor);
+  const index_t K = num_channels / gcd_val;
+  return (decimation_factor == num_channels)
+      ? static_cast<size_t>(CTILE) * P * sizeof(filter_t)
+      : static_cast<size_t>(CTILE) * K * P * sizeof(filter_t);
+}
+
+template <typename OutType, typename InType, typename FilterType>
+inline size_t matxChannelizePoly1DInternal_SmemTiledSizeBytes(
+    const OutType &o, const InType &, const FilterType &filter, index_t decimation_factor)
+{
+  using input_t  = typename InType::value_type;
+
+  constexpr int CTILE = MATX_CHANNELIZE_POLY1D_SMEM_TILED_CTILE;
+  constexpr int NOUT  = MATX_CHANNELIZE_POLY1D_SMEM_TILED_NOUT;
+
+  const index_t M = o.Size(OutType::Rank() - 1);
+  const index_t filter_len = filter.Size(FilterType::Rank() - 1);
+  const index_t P = (filter_len + M - 1) / M;
+  const size_t input_smem = static_cast<size_t>(P + NOUT - 1) * CTILE * sizeof(input_t);
+
+  const size_t filter_smem = matxChannelizePoly1DInternal_SmemTiledFilterSmemBytes<FilterType>(M, filter_len, decimation_factor);
+  if (filter_smem > MATX_CHANNELIZE_POLY1D_SMEM_TILED_MAX_FILTER_BYTES) {
+    return input_smem;
+  }
+
+  const size_t filter_smem_aligned = filter_smem +
+      ((filter_smem % sizeof(input_t)) ? (sizeof(input_t) - filter_smem % sizeof(input_t)) : 0);
+  return filter_smem_aligned + input_smem;
+}
+
+template <typename OutType, typename InType, typename FilterType>
+inline bool matxChannelizePoly1DInternal_ShouldUseSmemTiledKernel(
+    const OutType &o, const InType &in, const FilterType &filter, index_t decimation_factor)
+{
+  // The input circular buffer must fit in smem. The filter may or may not
+  // be included (FilterInSmem is decided separately).
+  return matxChannelizePoly1DInternal_SmemTiledSizeBytes(o, in, filter, decimation_factor)
+      <= MATX_CHANNELIZE_POLY1D_SMEM_TILED_MAX_BYTES;
+}
+
+template <typename OutType, typename InType, typename FilterType, typename AccumType>
+inline void matxChannelizePoly1DInternal_SmemTiled(
+    OutType o, const InType &i, const FilterType &filter,
+    index_t decimation_factor, cudaStream_t stream)
+{
+#ifdef __CUDACC__
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+
+  constexpr int CTILE = MATX_CHANNELIZE_POLY1D_SMEM_TILED_CTILE;
+  constexpr int NOUT  = MATX_CHANNELIZE_POLY1D_SMEM_TILED_NOUT;
+
+  const index_t num_channels = o.Size(OutType::Rank() - 1);
+  const index_t nout_per_channel = o.Size(OutType::Rank() - 2);
+  const int num_batches = static_cast<int>(TotalSize(i) / i.Size(i.Rank() - 1));
+
+  const index_t gcd_val = std::gcd(num_channels, decimation_factor);
+  const int32_t K = static_cast<int32_t>(num_channels / gcd_val);
+
+  const int channel_tiles = static_cast<int>((num_channels + CTILE - 1) / CTILE);
+  const int target_time_blocks = 1024;
+  const int elem_per_block = static_cast<int>(
+      (nout_per_channel + target_time_blocks - 1) / target_time_blocks);
+  const int time_blocks = static_cast<int>(
+      (nout_per_channel + elem_per_block - 1) / elem_per_block);
+
+  dim3 block(CTILE, NOUT);
+  dim3 grid(time_blocks, channel_tiles, num_batches);
+
+  const index_t filter_len = filter.Size(FilterType::Rank() - 1);
+  const bool filter_in_smem = matxChannelizePoly1DInternal_SmemTiledFilterSmemBytes<FilterType>(
+      num_channels, filter_len, decimation_factor) <= MATX_CHANNELIZE_POLY1D_SMEM_TILED_MAX_FILTER_BYTES;
+  const size_t smem_size = matxChannelizePoly1DInternal_SmemTiledSizeBytes(o, i, filter, decimation_factor);
+
+  // Use int32_t for intra-kernel index arithmetic when all tensor dimensions
+  // fit, avoiding 64-bit IMAD.WIDE instructions in the inner loops.
+  const index_t input_len = i.Size(i.Rank() - 1);
+  const bool use_32bit = (sizeof(index_t) <= sizeof(int32_t)) ||
+      (input_len <= std::numeric_limits<int32_t>::max() &&
+       nout_per_channel <= std::numeric_limits<int32_t>::max() &&
+       num_channels <= std::numeric_limits<int32_t>::max());
+
+  // Dispatch on MaximallyDecimated x FilterInSmem x IndexType
+  constexpr bool kMaxDec  = true;
+  constexpr bool kOversampled = false;
+  constexpr bool kFiltSmem = true;
+  constexpr bool kFiltGlobal = false;
+
+  auto launch = [&](auto idx_tag) {
+    using IdxT = decltype(idx_tag);
+    const IdxT epb = static_cast<IdxT>(elem_per_block);
+    const IdxT df  = static_cast<IdxT>(decimation_factor);
+    if (decimation_factor == num_channels) {
+      if (filter_in_smem) {
+        ChannelizePoly1D_SmemTiled<CTILE, NOUT, kMaxDec, kFiltSmem, IdxT, OutType, InType, FilterType, AccumType>
+            <<<grid, block, smem_size, stream>>>(o, i, filter, epb, df, K);
+      } else {
+        ChannelizePoly1D_SmemTiled<CTILE, NOUT, kMaxDec, kFiltGlobal, IdxT, OutType, InType, FilterType, AccumType>
+            <<<grid, block, smem_size, stream>>>(o, i, filter, epb, df, K);
+      }
+    } else {
+      if (filter_in_smem) {
+        ChannelizePoly1D_SmemTiled<CTILE, NOUT, kOversampled, kFiltSmem, IdxT, OutType, InType, FilterType, AccumType>
+            <<<grid, block, smem_size, stream>>>(o, i, filter, epb, df, K);
+      } else {
+        ChannelizePoly1D_SmemTiled<CTILE, NOUT, kOversampled, kFiltGlobal, IdxT, OutType, InType, FilterType, AccumType>
+            <<<grid, block, smem_size, stream>>>(o, i, filter, epb, df, K);
+      }
+    }
+  };
+
+  if constexpr (sizeof(index_t) <= sizeof(int32_t)) {
+    launch(index_t{});
+  } else {
+    if (use_32bit) {
+      launch(int32_t{});
+    } else {
+      launch(index_t{});
+    }
+  }
+#endif
+}
+
 template <typename OutType, typename InType, typename FilterType, typename AccumType>
 inline void matxChannelizePoly1DInternal(OutType o, const InType &i,
                                      const FilterType &filter, index_t decimation_factor, cudaStream_t stream)
@@ -317,9 +458,10 @@ inline void channelize_poly_impl(OutType out, const InType &in, const FilterType
         }
       }();
 
-      // The shared memory kernel currently only supports the maximally decimated case (D == M).
       if (decimation_factor == num_channels && matxChannelizePoly1DInternal_ShouldUseSmemKernel(out, in, f)) {
         matxChannelizePoly1DInternal_Smem<decltype(fft_in_slice), InputOp, FilterOp, AccumType>(fft_in_slice, in, f, stream);
+      } else if (matxChannelizePoly1DInternal_ShouldUseSmemTiledKernel(out, in, f, decimation_factor)) {
+        matxChannelizePoly1DInternal_SmemTiled<decltype(fft_in_slice), InputOp, FilterOp, AccumType>(fft_in_slice, in, f, decimation_factor, stream);
       } else {
         matxChannelizePoly1DInternal<decltype(fft_in_slice), InputOp, FilterOp, AccumType>(fft_in_slice, in, f, decimation_factor, stream);
       }
@@ -333,9 +475,10 @@ inline void channelize_poly_impl(OutType out, const InType &in, const FilterType
     if (decimation_factor == num_channels && num_channels <= detail::MATX_CHANNELIZE_POLY1D_FUSED_CHAN_KERNEL_THRESHOLD) {
       matxChannelizePoly1DInternal_FusedChan<OutputOp, InputOp, FilterOp, AccumType>(out, in, f, stream);
     } else {
-      // The shared memory kernel currently only supports the maximally decimated case (D == M).
       if (decimation_factor == num_channels && matxChannelizePoly1DInternal_ShouldUseSmemKernel(out, in, f)) {
         matxChannelizePoly1DInternal_Smem<OutputOp, InputOp, FilterOp, AccumType>(out, in, f, stream);
+      } else if (matxChannelizePoly1DInternal_ShouldUseSmemTiledKernel(out, in, f, decimation_factor)) {
+        matxChannelizePoly1DInternal_SmemTiled<OutputOp, InputOp, FilterOp, AccumType>(out, in, f, decimation_factor, stream);
       } else {
         matxChannelizePoly1DInternal<OutputOp, InputOp, FilterOp, AccumType>(out, in, f, decimation_factor, stream);
       }

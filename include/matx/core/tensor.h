@@ -1001,7 +1001,7 @@ MATX_LOOP_UNROLL
    * @returns Stride (in elements) in dimension
    *
    */
-  __MATX_INLINE__ __MATX_HOST__ typename Desc::stride_type Stride(uint32_t dim) const
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ typename Desc::stride_type Stride(uint32_t dim) const
   {
     static_assert(RANK >= 1, "Indexed strides are only available on tensors of rank 1 or higher.");
     return this->desc_.Stride(dim);
