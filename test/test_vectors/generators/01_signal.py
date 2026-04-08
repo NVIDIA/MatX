@@ -42,6 +42,24 @@ class chirp:
             'Y': Y
         }
 
+class cchirp:
+    def __init__(self, dtype: str, size: List[int]):
+        self.size = size
+        self.dtype = dtype
+
+    def run(self):
+        N = self.size[0]
+        end = self.size[1]
+        f0 = self.size[2]
+        f1 = self.size[3]
+
+        t = np.linspace(0, end, N)
+        Y = ss.chirp(t, f0, t[-1], f1, 'linear', complex=True)
+
+        return {
+            'Y': Y
+        }
+
 class fftfreq:
     def __init__(self, dtype: str, size: List[int]):
         self.size = size
