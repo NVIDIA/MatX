@@ -792,8 +792,10 @@ public:
     static_assert(is_complex_v<T>, "RealView() only works with complex types");
 
     using Type = typename U::value_type;
+    using OutDesc = DefaultDescriptor<RANK>;
     Type *data = reinterpret_cast<Type *>(this->Data());
-    cuda::std::array<typename Desc::stride_type, RANK> strides;
+    cuda::std::array<stride_type, RANK> strides;
+    auto shape = this->desc_.Shape();
 
 MATX_LOOP_UNROLL
     for (int i = 0; i < RANK; i++) {
@@ -807,11 +809,11 @@ MATX_LOOP_UNROLL
       }
     }
 
-    // Copy descriptor and call ctor with shape
-    Desc new_desc{this->desc_.Shape(), std::move(strides)};
+    // RealView changes strides, so always use a dynamic descriptor
+    OutDesc new_desc{std::move(shape), std::move(strides)};
     // Create non-owning storage with the correct type for the real view
     auto real_storage = make_non_owning_storage<Type>(data, storage_.size() * 2);
-    return tensor_t<Type, RANK, Desc>{real_storage, std::move(new_desc), data};
+    return tensor_t<Type, RANK, OutDesc>{real_storage, std::move(new_desc), data};
   }
 
   /**
@@ -839,8 +841,10 @@ MATX_LOOP_UNROLL
     static_assert(is_complex_v<T>, "ImagView() only works with complex types");
 
     using Type = typename U::value_type;
+    using OutDesc = DefaultDescriptor<RANK>;
     Type *data = reinterpret_cast<Type *>(this->Data()) + 1;
     cuda::std::array<stride_type, RANK> strides;
+    auto shape = this->desc_.Shape();
 MATX_LOOP_UNROLL
     for (int i = 0; i < RANK; i++) {
       strides[i] = this->Stride(i);
@@ -853,10 +857,11 @@ MATX_LOOP_UNROLL
       }
     }
 
-    Desc new_desc{this->desc_.Shape(), std::move(strides)};
-    // Create non-owning storage with the correct type for the imaginary view  
+    // ImagView changes strides, so always use a dynamic descriptor
+    OutDesc new_desc{std::move(shape), std::move(strides)};
+    // Create non-owning storage with the correct type for the imaginary view
     auto imag_storage = make_non_owning_storage<Type>(data, storage_.size() * 2);
-    return tensor_t<Type, RANK, Desc>{imag_storage, std::move(new_desc), data};
+    return tensor_t<Type, RANK, OutDesc>{imag_storage, std::move(new_desc), data};
   }
 
   /**

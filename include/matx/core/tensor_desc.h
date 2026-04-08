@@ -399,7 +399,7 @@ public:
    *
    * @return Strides container
    */
-  static constexpr auto Strides() {
+  static constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Strides() {
     return stride_;
   }
 
@@ -408,21 +408,21 @@ public:
    *
    * @return Descriptor rank
    */
-  static constexpr int Rank() { return shape_.size(); }
+  static constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ int Rank() { return shape_.size(); }
 
   /**
    * @brief Get underlying shape object
    *
    * @return Shape object
    */
-  static constexpr auto Shape() { return shape_; }
+  static constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Shape() { return shape_; }
 
   /**
    * @brief Get total size of descriptor
    *
    * @return Product of all sizes
    */
-  static constexpr auto TotalSize() {
+  static constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto TotalSize() {
       return cuda::std::accumulate(shape_.begin(), shape_.end(), static_cast<index_t>(1), cuda::std::multiplies<index_t>());
   }
 
