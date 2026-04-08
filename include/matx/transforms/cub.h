@@ -655,7 +655,7 @@ inline void ExecSort(OutputTensor &a_out,
     // type of reduction where there's not a single output, since any type of reduction can be generalized
     // to a segmented type
     if constexpr (OutputTensor::Rank() > 0) {
-#if CUB_MAJOR_VERSION >= 3 && CUB_MINOR_VERSION >= 2
+#if CUB_MAJOR_VERSION > 3 || (CUB_MAJOR_VERSION == 3 && CUB_MINOR_VERSION >= 2)
       [[maybe_unused]] cudaError_t err;
       if constexpr(is_tensor_view_v<InputOperator>) {
         if( a.IsContiguous() && a_out.IsContiguous()) {
@@ -727,7 +727,7 @@ inline void ExecSort(OutputTensor &a_out,
     // to a segmented type
     if constexpr (OutputTensor::Rank() > 0) {
       // Check if fixed-size reductions are supported
-#if CUB_MAJOR_VERSION >= 3 && CUB_MINOR_VERSION >= 2
+#if CUB_MAJOR_VERSION > 3 || (CUB_MAJOR_VERSION == 3 && CUB_MINOR_VERSION >= 2)
       [[maybe_unused]] cudaError_t err;
       if constexpr (is_tensor_view_v<InputOperator>) {
         if(a.IsContiguous() && a_out.IsContiguous()) {
@@ -791,7 +791,7 @@ inline void ExecSort(OutputTensor &a_out,
     // type of reduction where there's not a single output, since any type of reduction can be generalized
     // to a segmented type
     if constexpr (OutputTensor::Rank() > 0) {
-#if CUB_MAJOR_VERSION >= 3 && CUB_MINOR_VERSION >= 2
+#if CUB_MAJOR_VERSION > 3 || (CUB_MAJOR_VERSION == 3 && CUB_MINOR_VERSION >= 2)
       [[maybe_unused]] cudaError_t err;
       if constexpr (is_tensor_view_v<InputOperator>) {
         if(a.IsContiguous() && a_out.IsContiguous()) {
@@ -855,7 +855,7 @@ inline void ExecSort(OutputTensor &a_out,
     // type of reduction where there's not a single output, since any type of reduction can be generalized
     // to a segmented type
     if constexpr (OutputTensor::Rank() > 0) {
-#if CUB_MAJOR_VERSION >= 3 && CUB_MINOR_VERSION >= 2
+#if CUB_MAJOR_VERSION > 3 || (CUB_MAJOR_VERSION == 3 && CUB_MINOR_VERSION >= 2)
       [[maybe_unused]] cudaError_t err;
       if constexpr (is_tensor_view_v<InputOperator>) {
         if(a.IsContiguous() && a_out.IsContiguous()) {
