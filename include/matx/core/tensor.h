@@ -792,10 +792,14 @@ public:
     static_assert(is_complex_v<T>, "RealView() only works with complex types");
 
     using Type = typename U::value_type;
-    using OutDesc = DefaultDescriptor<RANK>;
+    // Static descriptors have no runtime constructor, so fall back to a
+    // dynamic descriptor whose shape/stride types match the original.
+    using OutDesc = std::conditional_t<
+      is_matx_static_descriptor<Desc>,
+      tensor_desc_cr_ds_t<typename Desc::shape_type, typename Desc::stride_type, RANK>,
+      Desc>;
     Type *data = reinterpret_cast<Type *>(this->Data());
-    cuda::std::array<stride_type, RANK> strides;
-    auto shape = this->desc_.Shape();
+    cuda::std::array<typename Desc::stride_type, RANK> strides;
 
 MATX_LOOP_UNROLL
     for (int i = 0; i < RANK; i++) {
@@ -809,8 +813,8 @@ MATX_LOOP_UNROLL
       }
     }
 
-    // RealView changes strides, so always use a dynamic descriptor
-    OutDesc new_desc{std::move(shape), std::move(strides)};
+    // Copy descriptor and call ctor with shape
+    OutDesc new_desc{this->desc_.Shape(), std::move(strides)};
     // Create non-owning storage with the correct type for the real view
     auto real_storage = make_non_owning_storage<Type>(data, storage_.size() * 2);
     return tensor_t<Type, RANK, OutDesc>{real_storage, std::move(new_desc), data};
@@ -841,10 +845,14 @@ MATX_LOOP_UNROLL
     static_assert(is_complex_v<T>, "ImagView() only works with complex types");
 
     using Type = typename U::value_type;
-    using OutDesc = DefaultDescriptor<RANK>;
+    // Static descriptors have no runtime constructor, so fall back to a
+    // dynamic descriptor whose shape/stride types match the original.
+    using OutDesc = std::conditional_t<
+      is_matx_static_descriptor<Desc>,
+      tensor_desc_cr_ds_t<typename Desc::shape_type, typename Desc::stride_type, RANK>,
+      Desc>;
     Type *data = reinterpret_cast<Type *>(this->Data()) + 1;
     cuda::std::array<stride_type, RANK> strides;
-    auto shape = this->desc_.Shape();
 MATX_LOOP_UNROLL
     for (int i = 0; i < RANK; i++) {
       strides[i] = this->Stride(i);
@@ -857,8 +865,7 @@ MATX_LOOP_UNROLL
       }
     }
 
-    // ImagView changes strides, so always use a dynamic descriptor
-    OutDesc new_desc{std::move(shape), std::move(strides)};
+    OutDesc new_desc{this->desc_.Shape(), std::move(strides)};
     // Create non-owning storage with the correct type for the imaginary view
     auto imag_storage = make_non_owning_storage<Type>(data, storage_.size() * 2);
     return tensor_t<Type, RANK, OutDesc>{imag_storage, std::move(new_desc), data};
