@@ -1057,6 +1057,86 @@ using matxBf16Complex = matxHalfComplex<matxBf16>; ///< Alias for a MatXbf16 com
 
 }; // namespace matx
 
+// cuda::std::numeric_limits specializations for matxFp16Complex and matxBf16Complex
+// These forward scalar properties from the underlying half type's limits.
+namespace cuda { namespace std {
+
+template <>
+class numeric_limits<matx::matxFp16Complex> {
+  using _ScalarLimits = numeric_limits<matx::matxFp16>;
+public:
+  static constexpr bool is_specialized    = true;
+  static constexpr bool is_signed         = _ScalarLimits::is_signed;
+  static constexpr bool is_integer        = _ScalarLimits::is_integer;
+  static constexpr bool is_exact          = _ScalarLimits::is_exact;
+  static constexpr int  digits            = _ScalarLimits::digits;
+  static constexpr int  digits10          = _ScalarLimits::digits10;
+  static constexpr int  max_digits10      = _ScalarLimits::max_digits10;
+  static constexpr int  radix             = _ScalarLimits::radix;
+  static constexpr int  min_exponent      = _ScalarLimits::min_exponent;
+  static constexpr int  min_exponent10    = _ScalarLimits::min_exponent10;
+  static constexpr int  max_exponent      = _ScalarLimits::max_exponent;
+  static constexpr int  max_exponent10    = _ScalarLimits::max_exponent10;
+  static constexpr bool has_infinity      = _ScalarLimits::has_infinity;
+  static constexpr bool has_quiet_NaN     = _ScalarLimits::has_quiet_NaN;
+  static constexpr bool has_signaling_NaN = _ScalarLimits::has_signaling_NaN;
+  static constexpr bool is_iec559         = _ScalarLimits::is_iec559;
+  static constexpr bool is_bounded        = _ScalarLimits::is_bounded;
+  static constexpr bool is_modulo         = _ScalarLimits::is_modulo;
+  static constexpr bool traps             = _ScalarLimits::traps;
+  static constexpr bool tinyness_before   = _ScalarLimits::tinyness_before;
+  static constexpr float_round_style round_style = _ScalarLimits::round_style;
+
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxFp16Complex min() noexcept          { return matx::matxFp16Complex(_ScalarLimits::min()); }
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxFp16Complex max() noexcept          { return matx::matxFp16Complex(_ScalarLimits::max()); }
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxFp16Complex lowest() noexcept       { return matx::matxFp16Complex(_ScalarLimits::lowest()); }
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxFp16Complex epsilon() noexcept      { return matx::matxFp16Complex(_ScalarLimits::epsilon()); }
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxFp16Complex round_error() noexcept  { return matx::matxFp16Complex(_ScalarLimits::round_error()); }
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxFp16Complex infinity() noexcept     { return matx::matxFp16Complex(_ScalarLimits::infinity()); }
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxFp16Complex quiet_NaN() noexcept    { return matx::matxFp16Complex(_ScalarLimits::quiet_NaN()); }
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxFp16Complex signaling_NaN() noexcept { return matx::matxFp16Complex(_ScalarLimits::signaling_NaN()); }
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxFp16Complex denorm_min() noexcept   { return matx::matxFp16Complex(_ScalarLimits::denorm_min()); }
+};
+
+template <>
+class numeric_limits<matx::matxBf16Complex> {
+  using _ScalarLimits = numeric_limits<matx::matxBf16>;
+public:
+  static constexpr bool is_specialized    = true;
+  static constexpr bool is_signed         = _ScalarLimits::is_signed;
+  static constexpr bool is_integer        = _ScalarLimits::is_integer;
+  static constexpr bool is_exact          = _ScalarLimits::is_exact;
+  static constexpr int  digits            = _ScalarLimits::digits;
+  static constexpr int  digits10          = _ScalarLimits::digits10;
+  static constexpr int  max_digits10      = _ScalarLimits::max_digits10;
+  static constexpr int  radix             = _ScalarLimits::radix;
+  static constexpr int  min_exponent      = _ScalarLimits::min_exponent;
+  static constexpr int  min_exponent10    = _ScalarLimits::min_exponent10;
+  static constexpr int  max_exponent      = _ScalarLimits::max_exponent;
+  static constexpr int  max_exponent10    = _ScalarLimits::max_exponent10;
+  static constexpr bool has_infinity      = _ScalarLimits::has_infinity;
+  static constexpr bool has_quiet_NaN     = _ScalarLimits::has_quiet_NaN;
+  static constexpr bool has_signaling_NaN = _ScalarLimits::has_signaling_NaN;
+  static constexpr bool is_iec559         = _ScalarLimits::is_iec559;
+  static constexpr bool is_bounded        = _ScalarLimits::is_bounded;
+  static constexpr bool is_modulo         = _ScalarLimits::is_modulo;
+  static constexpr bool traps             = _ScalarLimits::traps;
+  static constexpr bool tinyness_before   = _ScalarLimits::tinyness_before;
+  static constexpr float_round_style round_style = _ScalarLimits::round_style;
+
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxBf16Complex min() noexcept          { return matx::matxBf16Complex(_ScalarLimits::min()); }
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxBf16Complex max() noexcept          { return matx::matxBf16Complex(_ScalarLimits::max()); }
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxBf16Complex lowest() noexcept       { return matx::matxBf16Complex(_ScalarLimits::lowest()); }
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxBf16Complex epsilon() noexcept      { return matx::matxBf16Complex(_ScalarLimits::epsilon()); }
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxBf16Complex round_error() noexcept  { return matx::matxBf16Complex(_ScalarLimits::round_error()); }
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxBf16Complex infinity() noexcept     { return matx::matxBf16Complex(_ScalarLimits::infinity()); }
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxBf16Complex quiet_NaN() noexcept    { return matx::matxBf16Complex(_ScalarLimits::quiet_NaN()); }
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxBf16Complex signaling_NaN() noexcept { return matx::matxBf16Complex(_ScalarLimits::signaling_NaN()); }
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxBf16Complex denorm_min() noexcept   { return matx::matxBf16Complex(_ScalarLimits::denorm_min()); }
+};
+
+}} // namespace cuda::std
+
 #ifndef __CUDACC_RTC__
 #if __has_include(<format>)
 // Add std::formatter specializations for matxFp16Complex and matxBf16Complex

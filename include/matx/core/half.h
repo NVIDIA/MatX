@@ -35,6 +35,7 @@
 #include <cuda/std/cstdint>
 #include <cuda/std/bit>
 #include <cuda/std/cmath>
+#include <cuda/std/limits>
 #include <cuda/std/type_traits>
 
 #include "cuda_bf16.h"
@@ -1432,6 +1433,89 @@ using matxFp16 = matxHalf<__half>; ///< Alias for fp16
 using matxBf16 = matxHalf<__nv_bfloat16>; ///< Alias for bf16
 
 }; // namespace matx
+
+// cuda::std::numeric_limits specializations for matxFp16 and matxBf16
+// These delegate to the underlying __half / __nv_bfloat16 specializations,
+// wrapping return values in the matxHalf wrapper type.
+namespace cuda { namespace std {
+
+template <>
+class numeric_limits<matx::matxFp16> {
+  using _Base = numeric_limits<__half>;
+public:
+  static constexpr bool is_specialized    = true;
+  static constexpr bool is_signed         = _Base::is_signed;
+  static constexpr bool is_integer        = _Base::is_integer;
+  static constexpr bool is_exact          = _Base::is_exact;
+  static constexpr int  digits            = _Base::digits;
+  static constexpr int  digits10          = _Base::digits10;
+  static constexpr int  max_digits10      = _Base::max_digits10;
+  static constexpr int  radix             = _Base::radix;
+  static constexpr int  min_exponent      = _Base::min_exponent;
+  static constexpr int  min_exponent10    = _Base::min_exponent10;
+  static constexpr int  max_exponent      = _Base::max_exponent;
+  static constexpr int  max_exponent10    = _Base::max_exponent10;
+  static constexpr bool has_infinity      = _Base::has_infinity;
+  static constexpr bool has_quiet_NaN     = _Base::has_quiet_NaN;
+  static constexpr bool has_signaling_NaN = _Base::has_signaling_NaN;
+  static constexpr bool is_iec559         = _Base::is_iec559;
+  static constexpr bool is_bounded        = _Base::is_bounded;
+  static constexpr bool is_modulo         = _Base::is_modulo;
+  static constexpr bool traps             = _Base::traps;
+  static constexpr bool tinyness_before   = _Base::tinyness_before;
+  static constexpr float_round_style round_style = _Base::round_style;
+
+  // bit_cast from __half to matxFp16 since they are layout-compatible (matxHalf<__half>
+  // contains a single __half member with the same size and alignment).
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxFp16 min() noexcept           { return cuda::std::bit_cast<matx::matxFp16>(_Base::min()); }
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxFp16 max() noexcept           { return cuda::std::bit_cast<matx::matxFp16>(_Base::max()); }
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxFp16 lowest() noexcept        { return cuda::std::bit_cast<matx::matxFp16>(_Base::lowest()); }
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxFp16 epsilon() noexcept       { return cuda::std::bit_cast<matx::matxFp16>(_Base::epsilon()); }
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxFp16 round_error() noexcept   { return cuda::std::bit_cast<matx::matxFp16>(_Base::round_error()); }
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxFp16 infinity() noexcept      { return cuda::std::bit_cast<matx::matxFp16>(_Base::infinity()); }
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxFp16 quiet_NaN() noexcept     { return cuda::std::bit_cast<matx::matxFp16>(_Base::quiet_NaN()); }
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxFp16 signaling_NaN() noexcept { return cuda::std::bit_cast<matx::matxFp16>(_Base::signaling_NaN()); }
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxFp16 denorm_min() noexcept    { return cuda::std::bit_cast<matx::matxFp16>(_Base::denorm_min()); }
+};
+
+template <>
+class numeric_limits<matx::matxBf16> {
+  using _Base = numeric_limits<__nv_bfloat16>;
+public:
+  static constexpr bool is_specialized    = true;
+  static constexpr bool is_signed         = _Base::is_signed;
+  static constexpr bool is_integer        = _Base::is_integer;
+  static constexpr bool is_exact          = _Base::is_exact;
+  static constexpr int  digits            = _Base::digits;
+  static constexpr int  digits10          = _Base::digits10;
+  static constexpr int  max_digits10      = _Base::max_digits10;
+  static constexpr int  radix             = _Base::radix;
+  static constexpr int  min_exponent      = _Base::min_exponent;
+  static constexpr int  min_exponent10    = _Base::min_exponent10;
+  static constexpr int  max_exponent      = _Base::max_exponent;
+  static constexpr int  max_exponent10    = _Base::max_exponent10;
+  static constexpr bool has_infinity      = _Base::has_infinity;
+  static constexpr bool has_quiet_NaN     = _Base::has_quiet_NaN;
+  static constexpr bool has_signaling_NaN = _Base::has_signaling_NaN;
+  static constexpr bool is_iec559         = _Base::is_iec559;
+  static constexpr bool is_bounded        = _Base::is_bounded;
+  static constexpr bool is_modulo         = _Base::is_modulo;
+  static constexpr bool traps             = _Base::traps;
+  static constexpr bool tinyness_before   = _Base::tinyness_before;
+  static constexpr float_round_style round_style = _Base::round_style;
+
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxBf16 min() noexcept           { return cuda::std::bit_cast<matx::matxBf16>(_Base::min()); }
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxBf16 max() noexcept           { return cuda::std::bit_cast<matx::matxBf16>(_Base::max()); }
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxBf16 lowest() noexcept        { return cuda::std::bit_cast<matx::matxBf16>(_Base::lowest()); }
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxBf16 epsilon() noexcept       { return cuda::std::bit_cast<matx::matxBf16>(_Base::epsilon()); }
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxBf16 round_error() noexcept   { return cuda::std::bit_cast<matx::matxBf16>(_Base::round_error()); }
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxBf16 infinity() noexcept      { return cuda::std::bit_cast<matx::matxBf16>(_Base::infinity()); }
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxBf16 quiet_NaN() noexcept     { return cuda::std::bit_cast<matx::matxBf16>(_Base::quiet_NaN()); }
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxBf16 signaling_NaN() noexcept { return cuda::std::bit_cast<matx::matxBf16>(_Base::signaling_NaN()); }
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxBf16 denorm_min() noexcept    { return cuda::std::bit_cast<matx::matxBf16>(_Base::denorm_min()); }
+};
+
+}} // namespace cuda::std
 
 #ifndef __CUDACC_RTC__
 #if __has_include(<format>)
