@@ -56,16 +56,17 @@ constexpr index_t CHANNELIZE_POLY1D_ELEMS_PER_THREAD = 1;
 constexpr int MATX_CHANNELIZE_POLY1D_SMEM_TILED_MAX_ROTATIONS = 32;
 
 // Phase rotation convention for the oversampled (D < M) channelizer.
-// Controls which filter phase is applied at output step t for channel c:
-//   phase = (c + ((t + FIRST_PHASE_ROTATION) * D) % M) % M
+// Controls which filter phase is applied at output step t for branch r:
+//   r_remapped = (r + M - D) % M     (logical-to-internal branch remap)
+//   phase = (r_remapped + ((t + FIRST_PHASE_ROTATION) * D) % M) % M
+//
+// The branch remap shifts the DFT input vector so that the newest D samples
+// populate branches D-1..0 (Harris convention) rather than M-1..M-D.
 //
 // 0: Harris convention — no rotation at t=0 (matches receiver_40z.m).
 // 1: MATLAB dsp.Channelizer convention — one rotation at t=0 (after
 //    priming the channelizer with one zero sample).
-//
-// Set to 1 for validation against dsp.Channelizer. Set to 0 for the
-// textbook polyphase commutator model.
-constexpr int CHANNELIZE_POLY1D_OVERSAMPLED_FIRST_PHASE_ROTATION = 1;
+constexpr int CHANNELIZE_POLY1D_OVERSAMPLED_FIRST_PHASE_ROTATION = 0;
 
 #ifdef __CUDACC__ 
 
@@ -262,8 +263,12 @@ __global__ void ChannelizePoly1D(OutType output, InType input, FilterType filter
     } else {
         // === Oversampled (D < M): phase rotates per output step ===
         // No shared memory — reads filter from global/L2.
+        // Branch remap for Harris convention: r_remapped changes the input
+        // sample mapping so newest D samples land in branches D-1..0.
+        // Phase uses the original logical channel index (not remapped).
+        const index_t r_remapped = (channel + num_channels - decimation_factor) % num_channels;
         for (index_t t = first_out_elem+tid; t <= last_out_elem; t += THREADS) {
-            const index_t s = num_channels - 1 - channel;
+            const index_t s = num_channels - 1 - r_remapped;
             const index_t last_arrived = t * decimation_factor + decimation_factor - 1;
             index_t niter = 0;
             const index_t phase = (channel + ((t + CHANNELIZE_POLY1D_OVERSAMPLED_FIRST_PHASE_ROTATION) * decimation_factor) % num_channels) % num_channels;
@@ -370,6 +375,9 @@ __global__ void ChannelizePoly1D_SmemTiled(
     const int32_t c = tile_base + cx;
     const bool active = (c < M);
 
+    // Branch remap offset for Harris convention (oversampled only; 0 for D == M).
+    const int32_t L = MaximallyDecimated ? 0 : (M - static_cast<int32_t>(decimation_factor));
+
     // --- Shared memory layout ---
     const int32_t filter_stride = K * P; // per-channel filter block size
     const int32_t height = P + NOUT - 1;
@@ -412,6 +420,7 @@ __global__ void ChannelizePoly1D_SmemTiled(
                 const int32_t p  = kp % P;
                 const int32_t global_channel = tile_base + local_channel;
                 if (global_channel < M && k < K) {
+                    // Phase uses the original logical channel (not remapped)
                     const int32_t phase = (global_channel + rotations[k]) % M;
                     const int32_t h_ind = phase + p * M;
                     smem_filter_base[i] = (h_ind < filter_full_len)
@@ -425,7 +434,10 @@ __global__ void ChannelizePoly1D_SmemTiled(
     }
 
     // --- Branch offset and iteration bounds ---
-    const int32_t s = active ? (M - 1 - c) : 0;
+    // r_remapped changes the input sample mapping for Harris convention.
+    // Phase and output channel use the original logical index c.
+    const int32_t r_remapped = (c + L) % M;
+    const int32_t s = active ? (M - 1 - r_remapped) : 0;
     const IdxT start_elem = static_cast<IdxT>(blockIdx.x) * elems_per_channel_per_cta;
     const IdxT last_elem = cuda::std::min(
         output_len_per_channel - 1,
@@ -438,7 +450,8 @@ __global__ void ChannelizePoly1D_SmemTiled(
     // Helper: load one input sample into smem at (buf_row, col)
     auto load_smem_elem = [&](int32_t buf_row, int32_t col, IdxT global_row) {
         const int32_t gc = tile_base + col;
-        const int32_t branch_s = (gc < M) ? (M - 1 - gc) : 0;
+        const int32_t gc_remapped = MaximallyDecimated ? gc : ((gc + L) % M);
+        const int32_t branch_s = (gc < M) ? (M - 1 - gc_remapped) : 0;
         const IdxT raw_idx = static_cast<IdxT>(branch_s) + global_row * M;
         if (gc < M && global_row >= 0 && raw_idx >= 0 && raw_idx < input_len) {
             auto dims = indims;
@@ -598,6 +611,7 @@ __global__ void ChannelizePoly1D_SmemTiled(
                     const IdxT causal_count = bidx + 1;
 
                     const int32_t k = static_cast<int32_t>(t % K);
+                    // Phase uses the original logical channel (not remapped)
                     const int32_t phase = static_cast<int32_t>(
                         (c + ((t + CHANNELIZE_POLY1D_OVERSAMPLED_FIRST_PHASE_ROTATION) * decimation_factor) % M) % M);
 

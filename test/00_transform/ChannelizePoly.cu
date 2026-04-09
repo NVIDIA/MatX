@@ -841,6 +841,42 @@ TYPED_TEST(ChannelizePolyTestDoubleType, Harris2003)
   MATX_EXIT_HANDLER();
 }
 
+// Oversampled channelizer test based on Harris 2003 receiver_40z.m.
+// M=40, D=28, 600-tap filter designed with remez. Golden input and output
+// are from the reference implementation. This test validates the oversampled
+// phase rotation convention. Currently requires
+// CHANNELIZE_POLY1D_OVERSAMPLED_FIRST_PHASE_ROTATION == 0 (Harris convention)
+// to match the golden output.
+TYPED_TEST(ChannelizePolyTestDoubleType, Harris2003Oversampled)
+{
+  MATX_ENTER_HANDLER();
+
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ComplexType = cuda::std::complex<TestType>;
+
+  const index_t input_len = 5600;
+  const index_t M = 40;
+  const index_t D = 28;
+  const index_t num_output = (input_len + D - 1) / D;
+
+  this->pb->template InitAndRunTVGenerator<ComplexType>(
+    "00_transforms", "harris2003_oversampled_operators", "channelize",
+    {input_len});
+
+  auto a = make_tensor<ComplexType>({input_len});
+  auto f = make_tensor<TestType>({600});
+  auto b = make_tensor<ComplexType>({num_output, M});
+
+  this->pb->NumpyToTensorView(a, "a");
+  this->pb->NumpyToTensorView(f, "filter");
+  (b = channelize_poly(a, f, M, D)).run(this->exec);
+
+  this->exec.sync();
+  MATX_TEST_ASSERT_COMPARE(this->pb, b, "b_golden", this->thresh);
+
+  MATX_EXIT_HANDLER();
+}
+
 // Oversampled identity filter test: validates the causal commutator behavior.
 // With a single-tap identity filter (E[r,0] = 1 for all r), the filtering step
 // simply selects one input sample per branch. The causal commutator determines
@@ -912,7 +948,9 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, OversampledIdentityFilter)
       for (index_t chan = 0; chan < M; chan++) {
         ComplexType accum { 0 };
         for (index_t r = 0; r < M; r++) {
-          const index_t s = M - 1 - r;  // branch offset in input
+          // Branch remap for Harris convention input mapping (D < M only)
+          const index_t r_remapped = (D < M) ? ((r + M - D) % M) : r;
+          const index_t s = M - 1 - r_remapped;  // remapped for input access
 
           // Causal commutator: find newest sample for branch r
           TestType sample_val = static_cast<TestType>(0.0);
