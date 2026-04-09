@@ -1096,7 +1096,9 @@ public:
   __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxFp16Complex round_error() noexcept  { return matx::matxFp16Complex(_ScalarLimits::round_error()); }
   __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxFp16Complex infinity() noexcept     { return matx::matxFp16Complex(_ScalarLimits::infinity()); }
   __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxFp16Complex quiet_NaN() noexcept    { return matx::matxFp16Complex(_ScalarLimits::quiet_NaN()); }
-  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxFp16Complex signaling_NaN() noexcept { return matx::matxFp16Complex(_ScalarLimits::signaling_NaN()); }
+  // Use two-argument constructor to avoid the float round-trip in the scalar
+  // constructor, which would quiet the signaling NaN.
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxFp16Complex signaling_NaN() noexcept { return matx::matxFp16Complex(_ScalarLimits::signaling_NaN(), matx::matxFp16(0.0f)); }
   __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxFp16Complex denorm_min() noexcept   { return matx::matxFp16Complex(_ScalarLimits::denorm_min()); }
 };
 
@@ -1135,7 +1137,9 @@ public:
   __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxBf16Complex round_error() noexcept  { return matx::matxBf16Complex(_ScalarLimits::round_error()); }
   __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxBf16Complex infinity() noexcept     { return matx::matxBf16Complex(_ScalarLimits::infinity()); }
   __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxBf16Complex quiet_NaN() noexcept    { return matx::matxBf16Complex(_ScalarLimits::quiet_NaN()); }
-  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxBf16Complex signaling_NaN() noexcept { return matx::matxBf16Complex(_ScalarLimits::signaling_NaN()); }
+  // Use two-argument constructor to avoid the float round-trip in the scalar
+  // constructor, which would quiet the signaling NaN.
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxBf16Complex signaling_NaN() noexcept { return matx::matxBf16Complex(_ScalarLimits::signaling_NaN(), matx::matxBf16(0.0f)); }
   __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::matxBf16Complex denorm_min() noexcept   { return matx::matxBf16Complex(_ScalarLimits::denorm_min()); }
 };
 
