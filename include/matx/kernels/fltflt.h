@@ -747,7 +747,7 @@ public:
   __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::fltflt infinity() noexcept     { return matx::fltflt(_FloatLimits::infinity()); }
   __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::fltflt quiet_NaN() noexcept    { return matx::fltflt(_FloatLimits::quiet_NaN(), _FloatLimits::quiet_NaN()); }
   __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::fltflt signaling_NaN() noexcept { return matx::fltflt(_FloatLimits::signaling_NaN(), _FloatLimits::signaling_NaN()); }
-  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::fltflt denorm_min() noexcept   { return matx::fltflt(0.0f, _FloatLimits::denorm_min()); }
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::fltflt denorm_min() noexcept   { return matx::fltflt(_FloatLimits::denorm_min()); }
 };
 
 }} // namespace cuda::std
