@@ -945,6 +945,262 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Min)
   MATX_EXIT_HANDLER();
 }
 
+// Tests for segmented (partial) reductions on contiguous tensors.
+// These exercise the fast path added for CUB 3.2+ where contiguous tensor_views
+// bypass iterator creation and use DeviceSegmentedReduce with fixed segment sizes.
+// This is the pattern described in issue #940: sum(b, {1}) on a contiguous 2D tensor
+// should dispatch directly to segmented reduction without creating an input iterator.
+TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, SegmentedSum)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+
+  ExecType exec{};
+
+  // 2D -> 1D: sum(b, {1}) on a contiguous tensor_view — the exact pattern from issue #940
+  {
+    auto b = make_tensor<TestType>({4, 5});
+    auto out = make_tensor<TestType>({4});
+
+    for (index_t i = 0; i < b.Size(0); i++) {
+      for (index_t j = 0; j < b.Size(1); j++) {
+        b(i, j) = static_cast<TestType>(j + 1);  // each row: {1,2,3,4,5}
+      }
+    }
+
+    (out = sum(b, {1})).run(exec);
+    exec.sync();
+    for (index_t i = 0; i < out.Size(0); i++) {
+      // Sum of each row: 1+2+3+4+5 = 15
+      ASSERT_TRUE(MatXUtils::MatXTypeCompare(out(i), static_cast<TestType>(15)));
+    }
+  }
+
+  // 3D -> 2D: reduce last dim on contiguous tensor
+  {
+    auto t3 = make_tensor<TestType>({3, 4, 5});
+    auto t2 = make_tensor<TestType>({3, 4});
+
+    for (index_t i = 0; i < t3.Size(0); i++) {
+      for (index_t j = 0; j < t3.Size(1); j++) {
+        for (index_t k = 0; k < t3.Size(2); k++) {
+          t3(i, j, k) = static_cast<TestType>(1);
+        }
+      }
+    }
+
+    (t2 = sum(t3, {2})).run(exec);
+    exec.sync();
+    for (index_t i = 0; i < t2.Size(0); i++) {
+      for (index_t j = 0; j < t2.Size(1); j++) {
+        ASSERT_TRUE(MatXUtils::MatXTypeCompare(t2(i, j), static_cast<TestType>(5)));
+      }
+    }
+  }
+
+  // 3D -> 1D: reduce last 2 dims on contiguous tensor
+  {
+    auto t3 = make_tensor<TestType>({3, 4, 5});
+    auto t1 = make_tensor<TestType>({3});
+
+    for (index_t i = 0; i < t3.Size(0); i++) {
+      for (index_t j = 0; j < t3.Size(1); j++) {
+        for (index_t k = 0; k < t3.Size(2); k++) {
+          t3(i, j, k) = static_cast<TestType>(1);
+        }
+      }
+    }
+
+    (t1 = sum(t3, {1, 2})).run(exec);
+    exec.sync();
+    for (index_t i = 0; i < t1.Size(0); i++) {
+      ASSERT_TRUE(MatXUtils::MatXTypeCompare(t1(i), static_cast<TestType>(20)));
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, SegmentedMin)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+
+  ExecType exec{};
+
+  // 2D -> 1D: reduce last dim (contiguous fast path for tensor_view input)
+  {
+    auto t2 = make_tensor<TestType>({4, 5});
+    auto t1 = make_tensor<TestType>({4});
+
+    for (index_t i = 0; i < t2.Size(0); i++) {
+      for (index_t j = 0; j < t2.Size(1); j++) {
+        t2(i, j) = static_cast<TestType>((i + 1) * 10 + j);
+      }
+    }
+
+    // Each row is {10,11,12,13,14}, {20,21,...}, etc. Min of each row is first element.
+    (t1 = min(t2, {1})).run(exec);
+    exec.sync();
+    for (index_t i = 0; i < t1.Size(0); i++) {
+      ASSERT_TRUE(MatXUtils::MatXTypeCompare(t1(i), static_cast<TestType>((i + 1) * 10)));
+    }
+  }
+
+  // 3D -> 2D: reduce last dim
+  {
+    auto t3 = make_tensor<TestType>({3, 4, 5});
+    auto t2 = make_tensor<TestType>({3, 4});
+
+    for (index_t i = 0; i < t3.Size(0); i++) {
+      for (index_t j = 0; j < t3.Size(1); j++) {
+        for (index_t k = 0; k < t3.Size(2); k++) {
+          t3(i, j, k) = static_cast<TestType>(i * 100 + j * 10 + k + 1);
+        }
+      }
+    }
+
+    (t2 = min(t3, {2})).run(exec);
+    exec.sync();
+    for (index_t i = 0; i < t2.Size(0); i++) {
+      for (index_t j = 0; j < t2.Size(1); j++) {
+        ASSERT_TRUE(MatXUtils::MatXTypeCompare(t2(i, j), static_cast<TestType>(i * 100 + j * 10 + 1)));
+      }
+    }
+  }
+
+  // 3D -> 1D: reduce last 2 dims
+  {
+    auto t3 = make_tensor<TestType>({3, 4, 5});
+    auto t1 = make_tensor<TestType>({3});
+
+    for (index_t i = 0; i < t3.Size(0); i++) {
+      for (index_t j = 0; j < t3.Size(1); j++) {
+        for (index_t k = 0; k < t3.Size(2); k++) {
+          t3(i, j, k) = static_cast<TestType>(i * 100 + j * 10 + k + 1);
+        }
+      }
+    }
+
+    (t1 = min(t3, {1, 2})).run(exec);
+    exec.sync();
+    for (index_t i = 0; i < t1.Size(0); i++) {
+      // Min of each outer slice is (i*100 + 0*10 + 0 + 1) = i*100 + 1
+      ASSERT_TRUE(MatXUtils::MatXTypeCompare(t1(i), static_cast<TestType>(i * 100 + 1)));
+    }
+  }
+
+  // Full reduction to scalar (should still work)
+  {
+    auto t2 = make_tensor<TestType>({4, 5});
+    auto t0 = make_tensor<TestType>({});
+
+    for (index_t i = 0; i < t2.Size(0); i++) {
+      for (index_t j = 0; j < t2.Size(1); j++) {
+        t2(i, j) = static_cast<TestType>(i * 10 + j + 1);
+      }
+    }
+
+    (t0 = min(t2)).run(exec);
+    exec.sync();
+    ASSERT_TRUE(MatXUtils::MatXTypeCompare(t0(), static_cast<TestType>(1)));
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, SegmentedMax)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+
+  ExecType exec{};
+
+  // 2D -> 1D: reduce last dim (contiguous fast path for tensor_view input)
+  {
+    auto t2 = make_tensor<TestType>({4, 5});
+    auto t1 = make_tensor<TestType>({4});
+
+    for (index_t i = 0; i < t2.Size(0); i++) {
+      for (index_t j = 0; j < t2.Size(1); j++) {
+        t2(i, j) = static_cast<TestType>((i + 1) * 10 + j);
+      }
+    }
+
+    // Each row is {10,11,12,13,14}, {20,21,...}, etc. Max of each row is last element.
+    (t1 = max(t2, {1})).run(exec);
+    exec.sync();
+    for (index_t i = 0; i < t1.Size(0); i++) {
+      ASSERT_TRUE(MatXUtils::MatXTypeCompare(t1(i), static_cast<TestType>((i + 1) * 10 + 4)));
+    }
+  }
+
+  // 3D -> 2D: reduce last dim
+  {
+    auto t3 = make_tensor<TestType>({3, 4, 5});
+    auto t2 = make_tensor<TestType>({3, 4});
+
+    for (index_t i = 0; i < t3.Size(0); i++) {
+      for (index_t j = 0; j < t3.Size(1); j++) {
+        for (index_t k = 0; k < t3.Size(2); k++) {
+          t3(i, j, k) = static_cast<TestType>(i * 100 + j * 10 + k + 1);
+        }
+      }
+    }
+
+    (t2 = max(t3, {2})).run(exec);
+    exec.sync();
+    for (index_t i = 0; i < t2.Size(0); i++) {
+      for (index_t j = 0; j < t2.Size(1); j++) {
+        // Max is last element in inner dim: i*100 + j*10 + 5
+        ASSERT_TRUE(MatXUtils::MatXTypeCompare(t2(i, j), static_cast<TestType>(i * 100 + j * 10 + 5)));
+      }
+    }
+  }
+
+  // 3D -> 1D: reduce last 2 dims
+  {
+    auto t3 = make_tensor<TestType>({3, 4, 5});
+    auto t1 = make_tensor<TestType>({3});
+
+    for (index_t i = 0; i < t3.Size(0); i++) {
+      for (index_t j = 0; j < t3.Size(1); j++) {
+        for (index_t k = 0; k < t3.Size(2); k++) {
+          t3(i, j, k) = static_cast<TestType>(i * 100 + j * 10 + k + 1);
+        }
+      }
+    }
+
+    (t1 = max(t3, {1, 2})).run(exec);
+    exec.sync();
+    for (index_t i = 0; i < t1.Size(0); i++) {
+      // Max of each outer slice is i*100 + 3*10 + 5 = i*100 + 35
+      ASSERT_TRUE(MatXUtils::MatXTypeCompare(t1(i), static_cast<TestType>(i * 100 + 35)));
+    }
+  }
+
+  // Full reduction to scalar (should still work)
+  {
+    auto t2 = make_tensor<TestType>({4, 5});
+    auto t0 = make_tensor<TestType>({});
+
+    for (index_t i = 0; i < t2.Size(0); i++) {
+      for (index_t j = 0; j < t2.Size(1); j++) {
+        t2(i, j) = static_cast<TestType>(i * 10 + j + 1);
+      }
+    }
+
+    (t0 = max(t2)).run(exec);
+    exec.sync();
+    ASSERT_TRUE(MatXUtils::MatXTypeCompare(t0(), static_cast<TestType>(35)));
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, ArgMax)
 {
   MATX_ENTER_HANDLER();
