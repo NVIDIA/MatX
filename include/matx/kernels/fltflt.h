@@ -730,6 +730,8 @@ public:
   static constexpr bool has_infinity      = true;
   static constexpr bool has_quiet_NaN     = true;
   static constexpr bool has_signaling_NaN = true;
+  static constexpr float_denorm_style has_denorm = denorm_present;
+  static constexpr bool has_denorm_loss   = false;
   static constexpr bool is_iec559         = false;     // not an IEEE 754 format
   static constexpr bool is_bounded        = true;
   static constexpr bool is_modulo         = false;

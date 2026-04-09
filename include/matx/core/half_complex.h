@@ -1080,6 +1080,8 @@ public:
   static constexpr bool has_infinity      = _ScalarLimits::has_infinity;
   static constexpr bool has_quiet_NaN     = _ScalarLimits::has_quiet_NaN;
   static constexpr bool has_signaling_NaN = _ScalarLimits::has_signaling_NaN;
+  static constexpr float_denorm_style has_denorm = _ScalarLimits::has_denorm;
+  static constexpr bool has_denorm_loss   = _ScalarLimits::has_denorm_loss;
   static constexpr bool is_iec559         = _ScalarLimits::is_iec559;
   static constexpr bool is_bounded        = _ScalarLimits::is_bounded;
   static constexpr bool is_modulo         = _ScalarLimits::is_modulo;
@@ -1117,6 +1119,8 @@ public:
   static constexpr bool has_infinity      = _ScalarLimits::has_infinity;
   static constexpr bool has_quiet_NaN     = _ScalarLimits::has_quiet_NaN;
   static constexpr bool has_signaling_NaN = _ScalarLimits::has_signaling_NaN;
+  static constexpr float_denorm_style has_denorm = _ScalarLimits::has_denorm;
+  static constexpr bool has_denorm_loss   = _ScalarLimits::has_denorm_loss;
   static constexpr bool is_iec559         = _ScalarLimits::is_iec559;
   static constexpr bool is_bounded        = _ScalarLimits::is_bounded;
   static constexpr bool is_modulo         = _ScalarLimits::is_modulo;

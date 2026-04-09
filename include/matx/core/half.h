@@ -1458,6 +1458,8 @@ public:
   static constexpr bool has_infinity      = _Base::has_infinity;
   static constexpr bool has_quiet_NaN     = _Base::has_quiet_NaN;
   static constexpr bool has_signaling_NaN = _Base::has_signaling_NaN;
+  static constexpr float_denorm_style has_denorm = _Base::has_denorm;
+  static constexpr bool has_denorm_loss   = _Base::has_denorm_loss;
   static constexpr bool is_iec559         = _Base::is_iec559;
   static constexpr bool is_bounded        = _Base::is_bounded;
   static constexpr bool is_modulo         = _Base::is_modulo;
@@ -1497,6 +1499,8 @@ public:
   static constexpr bool has_infinity      = _Base::has_infinity;
   static constexpr bool has_quiet_NaN     = _Base::has_quiet_NaN;
   static constexpr bool has_signaling_NaN = _Base::has_signaling_NaN;
+  static constexpr float_denorm_style has_denorm = _Base::has_denorm;
+  static constexpr bool has_denorm_loss   = _Base::has_denorm_loss;
   static constexpr bool is_iec559         = _Base::is_iec559;
   static constexpr bool is_bounded        = _Base::is_bounded;
   static constexpr bool is_modulo         = _Base::is_modulo;
