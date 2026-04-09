@@ -68,10 +68,16 @@ constexpr size_t MATX_CHANNELIZE_POLY1D_SMEM_TILED_MAX_BYTES = 48 * 1024;
 // Maximum filter smem budget. When the filter exceeds this, it is read from
 // global/L2 instead, freeing smem for better occupancy.
 constexpr size_t MATX_CHANNELIZE_POLY1D_SMEM_TILED_MAX_FILTER_BYTES = 2048;
+// Maximum number of per-channel filter rotations (K) that can be cached in
+// shared memory. Also sizes the local rotations[] array in the kernel.
+// K = M / gcd(M, D); for D == M, K = 1; for 2x oversampling, K = 2.
+constexpr int MATX_CHANNELIZE_POLY1D_SMEM_TILED_MAX_ROTATIONS = 32;
 
 // Compute the shared memory footprint for the SmemTiled filter taps.
 // For D==M: one phase per tile channel → CTILE * P elements.
 // For D<M: K phases per tile channel → CTILE * K * P elements.
+// Returns a value exceeding the filter budget when K exceeds the rotation
+// limit, which causes FilterInSmem=false in the dispatch.
 template <typename FilterType>
 inline size_t matxChannelizePoly1DInternal_SmemTiledFilterSmemBytes(
     index_t num_channels, index_t filter_len, index_t decimation_factor)
@@ -79,11 +85,15 @@ inline size_t matxChannelizePoly1DInternal_SmemTiledFilterSmemBytes(
   using filter_t = typename FilterType::value_type;
   constexpr int CTILE = MATX_CHANNELIZE_POLY1D_SMEM_TILED_CTILE;
   const index_t P = (filter_len + num_channels - 1) / num_channels;
+  if (decimation_factor == num_channels) {
+    return static_cast<size_t>(CTILE) * P * sizeof(filter_t);
+  }
   const index_t gcd_val = std::gcd(num_channels, decimation_factor);
   const index_t K = num_channels / gcd_val;
-  return (decimation_factor == num_channels)
-      ? static_cast<size_t>(CTILE) * P * sizeof(filter_t)
-      : static_cast<size_t>(CTILE) * K * P * sizeof(filter_t);
+  if (K > MATX_CHANNELIZE_POLY1D_SMEM_TILED_MAX_ROTATIONS) {
+    return MATX_CHANNELIZE_POLY1D_SMEM_TILED_MAX_FILTER_BYTES + 1; // exceeds budget → FilterInSmem=false
+  }
+  return static_cast<size_t>(CTILE) * K * P * sizeof(filter_t);
 }
 
 template <typename OutType, typename InType, typename FilterType>
@@ -139,7 +149,9 @@ inline void matxChannelizePoly1DInternal_SmemTiled(
   const int32_t K = static_cast<int32_t>(num_channels / gcd_val);
 
   const int channel_tiles = static_cast<int>((num_channels + CTILE - 1) / CTILE);
-  const int target_time_blocks = 1024;
+  // Target ~1024 spatial blocks (time × channel tiles) to saturate the GPU.
+  // For large channel counts, fewer time blocks are needed.
+  const int target_time_blocks = cuda::std::max(1, (1024 + channel_tiles - 1) / channel_tiles);
   const int elem_per_block = static_cast<int>(
       (nout_per_channel + target_time_blocks - 1) / target_time_blocks);
   const int time_blocks = static_cast<int>(

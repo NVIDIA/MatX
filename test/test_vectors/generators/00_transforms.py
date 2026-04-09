@@ -246,6 +246,12 @@ class channelize_poly_operators:
         self.res['b_random_hreal'] = out_hreal
         return self.res
 
+    # Phase rotation convention for the oversampled channelizer.
+    # Must match CHANNELIZE_POLY1D_OVERSAMPLED_FIRST_PHASE_ROTATION in channelize_poly.cuh.
+    # 0: Harris convention (no rotation at t=0).
+    # 1: MATLAB dsp.Channelizer convention (one rotation at t=0, after priming with one zero).
+    OVERSAMPLED_FIRST_PHASE_ROTATION = 1
+
     def channelize_oversampled(self) -> Dict[str, np.ndarray]:
         """General polyphase channelizer supporting arbitrary decimation factor D <= M.
 
@@ -293,7 +299,7 @@ class channelize_poly_operators:
                     newest = last_arrived - (A % M)
                     causal_count = A // M + 1
                     # Serpentine shift: when D < M the phase rotates per step
-                    phase = (r + ((n + 1) * D) % M) % M
+                    phase = (r + ((n + channelize_poly_operators.OVERSAMPLED_FIRST_PHASE_ROTATION) * D) % M) % M
                     for q in range(min(num_taps_per_channel, causal_count)):
                         idx = newest - q * M
                         if idx < 0 or idx >= input_len:
