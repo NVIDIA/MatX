@@ -827,11 +827,33 @@ TYPED_TEST(BasicGeneratorTestsFloatNonComplexNonHalf, Chirp)
 
   MATX_TEST_ASSERT_COMPARE(pb, t1, "Y", 0.01);
 
+  pb.reset();
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(BasicGeneratorTestsFloatNonComplexNonHalf, CChirp)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  ExecType exec{};
+
+  index_t count = 1500;
+  TestType end = 10;
+  TestType f0 = -200;
+  TestType f1 = 300;
+
+  auto pb = std::make_unique<detail::MatXPybind>();
+  pb->template InitAndRunTVGenerator<cuda::std::complex<TestType>>(
+      "01_signal", "cchirp", "run", {count, static_cast<index_t>(end), static_cast<index_t>(f0), static_cast<index_t>(f1)});
+
   // example-begin cchirp-gen-test-1
   auto t1c = make_tensor<cuda::std::complex<TestType>>({count});
-  // Create a complex chirp of length "count" and assign it to tensor "t1"
+  // Create a complex chirp of length "count" and assign it to tensor "t1c"
   (t1c = cchirp(count, end, f0, end, f1, ChirpMethod::CHIRP_METHOD_LINEAR)).run(exec);
   // example-end cchirp-gen-test-1
+
+  MATX_TEST_ASSERT_COMPARE(pb, t1c, "Y", 0.01);
 
   pb.reset();
   MATX_EXIT_HANDLER();
