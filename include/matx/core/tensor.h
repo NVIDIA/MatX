@@ -792,6 +792,12 @@ public:
     static_assert(is_complex_v<T>, "RealView() only works with complex types");
 
     using Type = typename U::value_type;
+    // Static descriptors have no runtime constructor, so fall back to a
+    // dynamic descriptor whose shape/stride types match the original.
+    using OutDesc = std::conditional_t<
+      is_matx_static_descriptor<Desc>,
+      tensor_desc_cr_ds_t<typename Desc::shape_type, typename Desc::stride_type, RANK>,
+      Desc>;
     Type *data = reinterpret_cast<Type *>(this->Data());
     cuda::std::array<typename Desc::stride_type, RANK> strides;
 
@@ -808,10 +814,10 @@ MATX_LOOP_UNROLL
     }
 
     // Copy descriptor and call ctor with shape
-    Desc new_desc{this->desc_.Shape(), std::move(strides)};
+    OutDesc new_desc{this->desc_.Shape(), std::move(strides)};
     // Create non-owning storage with the correct type for the real view
     auto real_storage = make_non_owning_storage<Type>(data, storage_.size() * 2);
-    return tensor_t<Type, RANK, Desc>{real_storage, std::move(new_desc), data};
+    return tensor_t<Type, RANK, OutDesc>{real_storage, std::move(new_desc), data};
   }
 
   /**
@@ -839,6 +845,12 @@ MATX_LOOP_UNROLL
     static_assert(is_complex_v<T>, "ImagView() only works with complex types");
 
     using Type = typename U::value_type;
+    // Static descriptors have no runtime constructor, so fall back to a
+    // dynamic descriptor whose shape/stride types match the original.
+    using OutDesc = std::conditional_t<
+      is_matx_static_descriptor<Desc>,
+      tensor_desc_cr_ds_t<typename Desc::shape_type, typename Desc::stride_type, RANK>,
+      Desc>;
     Type *data = reinterpret_cast<Type *>(this->Data()) + 1;
     cuda::std::array<stride_type, RANK> strides;
 MATX_LOOP_UNROLL
@@ -853,10 +865,10 @@ MATX_LOOP_UNROLL
       }
     }
 
-    Desc new_desc{this->desc_.Shape(), std::move(strides)};
-    // Create non-owning storage with the correct type for the imaginary view  
+    OutDesc new_desc{this->desc_.Shape(), std::move(strides)};
+    // Create non-owning storage with the correct type for the imaginary view
     auto imag_storage = make_non_owning_storage<Type>(data, storage_.size() * 2);
-    return tensor_t<Type, RANK, Desc>{imag_storage, std::move(new_desc), data};
+    return tensor_t<Type, RANK, OutDesc>{imag_storage, std::move(new_desc), data};
   }
 
   /**
