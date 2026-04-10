@@ -33,6 +33,7 @@
 #pragma once
 
 #include <cmath>
+#include <cuda/std/limits>
 
 namespace matx {
 
@@ -704,3 +705,49 @@ static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_fmod(fltflt a
 }
 
 } // namespace matx
+
+// cuda::std::numeric_limits specialization for fltflt (double-single extended precision).
+// fltflt has the same exponent range as float but approximately 2x the mantissa precision
+// (~48 significant binary digits from two non-overlapping fp32 components).
+namespace cuda { namespace std {
+
+template <>
+class numeric_limits<matx::fltflt> {
+  using _FloatLimits = numeric_limits<float>;
+public:
+  static constexpr bool is_specialized    = true;
+  static constexpr bool is_signed         = true;
+  static constexpr bool is_integer        = false;
+  static constexpr bool is_exact          = false;
+  static constexpr int  digits            = 48;        // ~2 * 24 mantissa bits (including implicit)
+  static constexpr int  digits10          = 14;        // floor(48 * log10(2))
+  static constexpr int  max_digits10      = 16;        // ceil(48 * log10(2) + 1)
+  static constexpr int  radix             = 2;
+  static constexpr int  min_exponent      = _FloatLimits::min_exponent;    // same dynamic range as float
+  static constexpr int  min_exponent10    = _FloatLimits::min_exponent10;
+  static constexpr int  max_exponent      = _FloatLimits::max_exponent;
+  static constexpr int  max_exponent10    = _FloatLimits::max_exponent10;
+  static constexpr bool has_infinity      = true;
+  static constexpr bool has_quiet_NaN     = true;
+  static constexpr bool has_signaling_NaN = true;
+  static constexpr float_denorm_style has_denorm = denorm_present;
+  static constexpr bool has_denorm_loss   = false;
+  static constexpr bool is_iec559         = false;     // not an IEEE 754 format
+  static constexpr bool is_bounded        = true;
+  static constexpr bool is_modulo         = false;
+  static constexpr bool traps             = false;
+  static constexpr bool tinyness_before   = false;
+  static constexpr float_round_style round_style = round_to_nearest;
+
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::fltflt min() noexcept          { return matx::fltflt(_FloatLimits::min()); }
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::fltflt max() noexcept          { return matx::fltflt(_FloatLimits::max()); }
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::fltflt lowest() noexcept       { return matx::fltflt(-_FloatLimits::max()); }
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::fltflt epsilon() noexcept      { return matx::fltflt(7.105427357601002e-15f, 0.0f); } // ~2^-47
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::fltflt round_error() noexcept  { return matx::fltflt(0.5f); }
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::fltflt infinity() noexcept     { return matx::fltflt(_FloatLimits::infinity()); }
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::fltflt quiet_NaN() noexcept    { return matx::fltflt(_FloatLimits::quiet_NaN(), _FloatLimits::quiet_NaN()); }
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::fltflt signaling_NaN() noexcept { return matx::fltflt(_FloatLimits::signaling_NaN(), _FloatLimits::signaling_NaN()); }
+  __MATX_HOST__ __MATX_DEVICE__ static constexpr matx::fltflt denorm_min() noexcept   { return matx::fltflt(_FloatLimits::denorm_min()); }
+};
+
+}} // namespace cuda::std
