@@ -246,12 +246,6 @@ class channelize_poly_operators:
         self.res['b_random_hreal'] = out_hreal
         return self.res
 
-    # Phase rotation convention for the oversampled channelizer.
-    # Must match CHANNELIZE_POLY1D_OVERSAMPLED_FIRST_PHASE_ROTATION in channelize_poly.cuh.
-    # 0: Harris convention (no rotation at t=0).
-    # 1: MATLAB dsp.Channelizer convention (one rotation at t=0, after priming with one zero).
-    OVERSAMPLED_FIRST_PHASE_ROTATION = 0
-
     def channelize_oversampled(self) -> Dict[str, np.ndarray]:
         """General polyphase channelizer supporting arbitrary decimation factor D <= M.
 
@@ -298,7 +292,7 @@ class channelize_poly_operators:
         newest = np.where(valid, last_arrived - (A % M), 0)     # [nout, M]
         causal_count = np.where(valid, A // M + 1, 0)           # [nout, M]
         phase = np.where(valid,
-            (r_all + ((n_all + channelize_poly_operators.OVERSAMPLED_FIRST_PHASE_ROTATION) * D) % M) % M,
+            (r_all + (n_all * D) % M) % M,
             0).astype(int)                                       # [nout, M] (original r, NOT remapped)
 
         for batch_ind in range(num_batches):

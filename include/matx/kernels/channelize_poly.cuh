@@ -51,22 +51,8 @@ namespace matx {
 constexpr index_t CHANNELIZE_POLY1D_ELEMS_PER_THREAD = 1;
 
 // Maximum number of per-channel filter rotations (K) for SmemTiled FilterInSmem.
-// Sizes the local rotations[] array in the kernel. Must match the value in
-// channelize_poly.h that gates the FilterInSmem dispatch decision.
+// Sizes the local rotations[] array in the kernel.
 constexpr int MATX_CHANNELIZE_POLY1D_SMEM_TILED_MAX_ROTATIONS = 32;
-
-// Phase rotation convention for the oversampled (D < M) channelizer.
-// Controls which filter phase is applied at output step t for branch r:
-//   r_remapped = (r + M - D) % M     (logical-to-internal branch remap)
-//   phase = (r_remapped + ((t + FIRST_PHASE_ROTATION) * D) % M) % M
-//
-// The branch remap shifts the DFT input vector so that the newest D samples
-// populate branches D-1..0 (Harris convention) rather than M-1..M-D.
-//
-// 0: Harris convention — no rotation at t=0 (matches receiver_40z.m).
-// 1: MATLAB dsp.Channelizer convention — one rotation at t=0 (after
-//    priming the channelizer with one zero sample).
-constexpr int CHANNELIZE_POLY1D_OVERSAMPLED_FIRST_PHASE_ROTATION = 0;
 
 #ifdef __CUDACC__ 
 
@@ -271,7 +257,7 @@ __global__ void ChannelizePoly1D(OutType output, InType input, FilterType filter
             const index_t s = num_channels - 1 - r_remapped;
             const index_t last_arrived = t * decimation_factor + decimation_factor - 1;
             index_t niter = 0;
-            const index_t phase = (channel + ((t + CHANNELIZE_POLY1D_OVERSAMPLED_FIRST_PHASE_ROTATION) * decimation_factor) % num_channels) % num_channels;
+            const index_t phase = (channel + (t * decimation_factor) % num_channels) % num_channels;
             index_t h_ind { phase };
             accum_t accum {};
             if (last_arrived >= s) {
@@ -411,7 +397,7 @@ __global__ void ChannelizePoly1D_SmemTiled(
         } else {
             int32_t rotations[MATX_CHANNELIZE_POLY1D_SMEM_TILED_MAX_ROTATIONS];
             for (int32_t k = 0; k < K && k < MATX_CHANNELIZE_POLY1D_SMEM_TILED_MAX_ROTATIONS; k++) {
-                rotations[k] = static_cast<int32_t>(((static_cast<int64_t>(k) + CHANNELIZE_POLY1D_OVERSAMPLED_FIRST_PHASE_ROTATION) * decimation_factor) % M);
+                rotations[k] = static_cast<int32_t>((static_cast<int64_t>(k) * decimation_factor) % M);
             }
             for (int32_t i = tid; i < CTILE * filter_stride; i += nthreads) {
                 const int32_t local_channel = i / filter_stride;
@@ -613,7 +599,7 @@ __global__ void ChannelizePoly1D_SmemTiled(
                     const int32_t k = static_cast<int32_t>(t % K);
                     // Phase uses the original logical channel (not remapped)
                     const int32_t phase = static_cast<int32_t>(
-                        (c + ((t + CHANNELIZE_POLY1D_OVERSAMPLED_FIRST_PHASE_ROTATION) * decimation_factor) % M) % M);
+                        (c + (t * decimation_factor) % M) % M);
 
                     int32_t available_taps = P;
                     if (((P - 1) * M + phase) >= filter_full_len) {

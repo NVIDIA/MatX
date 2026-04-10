@@ -35,6 +35,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <type_traits>
+#include <numeric>
 
 #include "matx/core/error.h"
 #include "matx/core/nvtx.h"
@@ -68,10 +69,6 @@ constexpr size_t MATX_CHANNELIZE_POLY1D_SMEM_TILED_MAX_BYTES = 48 * 1024;
 // Maximum filter smem budget. When the filter exceeds this, it is read from
 // global/L2 instead, freeing smem for better occupancy.
 constexpr size_t MATX_CHANNELIZE_POLY1D_SMEM_TILED_MAX_FILTER_BYTES = 2048;
-// Maximum number of per-channel filter rotations (K) that can be cached in
-// shared memory. Also sizes the local rotations[] array in the kernel.
-// K = M / gcd(M, D); for D == M, K = 1; for 2x oversampling, K = 2.
-constexpr int MATX_CHANNELIZE_POLY1D_SMEM_TILED_MAX_ROTATIONS = 32;
 
 // Compute the shared memory footprint for the SmemTiled filter taps.
 // For D==M: one phase per tile channel → CTILE * P elements.
@@ -91,7 +88,7 @@ inline size_t matxChannelizePoly1DInternal_SmemTiledFilterSmemBytes(
   const index_t gcd_val = std::gcd(num_channels, decimation_factor);
   const index_t K = num_channels / gcd_val;
   if (K > MATX_CHANNELIZE_POLY1D_SMEM_TILED_MAX_ROTATIONS) {
-    return MATX_CHANNELIZE_POLY1D_SMEM_TILED_MAX_FILTER_BYTES + 1; // exceeds budget → FilterInSmem=false
+    return MATX_CHANNELIZE_POLY1D_SMEM_TILED_MAX_FILTER_BYTES + 1; // exceeds budget, so FilterInSmem=false
   }
   return static_cast<size_t>(CTILE) * K * P * sizeof(filter_t);
 }
@@ -124,6 +121,13 @@ template <typename OutType, typename InType, typename FilterType>
 inline bool matxChannelizePoly1DInternal_ShouldUseSmemTiledKernel(
     const OutType &o, const InType &in, const FilterType &filter, index_t decimation_factor)
 {
+  const index_t num_channels = o.Size(OutType::Rank() - 1);
+  // Skip SmemTiled for small channel counts where most of CTILE would be
+  // idle threads. The generic ChannelizePoly1D kernel is more efficient
+  // in this regime.
+  if (num_channels <= MATX_CHANNELIZE_POLY1D_SMEM_TILED_CTILE * 3 / 4) {
+    return false;
+  }
   // The input circular buffer must fit in smem. The filter may or may not
   // be included (FilterInSmem is decided separately).
   return matxChannelizePoly1DInternal_SmemTiledSizeBytes(o, in, filter, decimation_factor)

@@ -51,8 +51,8 @@ constexpr int NUM_WARMUP_ITERATIONS = 2;
 // Number of iterations per timed test. Iteration times are averaged in the report.
 constexpr int NUM_ITERATIONS = 20;
 
-template <typename InType, typename OutType>
-void ChannelizePolyBench(matx::index_t channel_start, matx::index_t channel_stop)
+template <typename InType, typename OutType, typename FilterType = InType>
+void ChannelizePolyBench(matx::index_t channel_start, matx::index_t channel_stop, matx::index_t oversample_factor = -1)
 {
   struct {
     matx::index_t num_batches;
@@ -65,6 +65,8 @@ void ChannelizePolyBench(matx::index_t channel_start, matx::index_t channel_stop
     { 1, 17, 256000 },
     { 42, 17, 256000 },
     { 128, 17, 256000 },
+    { 1, 17, 8192*1024 },
+    { 42, 17, 8192*1024 }
   };
 
   cudaStream_t stream;
@@ -79,14 +81,19 @@ void ChannelizePolyBench(matx::index_t channel_start, matx::index_t channel_stop
     for (matx::index_t num_channels = channel_start; num_channels <= channel_stop; num_channels++) {
       const matx::index_t num_batches = test_cases[i].num_batches;
       const matx::index_t filter_len = test_cases[i].filter_len_per_channel * num_channels;
+      const matx::index_t decimation_factor = (oversample_factor < 0) ? num_channels : num_channels / oversample_factor;
       const matx::index_t input_len = test_cases[i].input_len;
-      const matx::index_t output_len_per_channel = (input_len + num_channels - 1) / num_channels;
+      const matx::index_t output_len_per_channel = (input_len + decimation_factor - 1) / decimation_factor;
+
+      if (input_len < num_channels * 100) {
+        continue;
+      }
 
       auto input = matx::make_tensor<InType, 2>({num_batches, input_len});
-      auto filter = matx::make_tensor<InType, 1>({filter_len});
+      auto filter = matx::make_tensor<FilterType, 1>({filter_len});
       auto output = matx::make_tensor<OutType, 3>({num_batches, output_len_per_channel, num_channels});
-
-      const matx::index_t decimation_factor = num_channels;
+      (input = InType{1.0f,1.0f}).run(exec);
+      (filter = static_cast<FilterType>(1.0f)).run(exec);
 
       for (int k = 0; k < NUM_WARMUP_ITERATIONS; k++) {
         (output = channelize_poly(input, filter, num_channels, decimation_factor)).run(exec);
@@ -105,9 +112,9 @@ void ChannelizePolyBench(matx::index_t channel_start, matx::index_t channel_stop
       cudaEventElapsedTime(&elapsed_ms, start, stop);
 
       const double avg_elapsed_us = (static_cast<double>(elapsed_ms)/NUM_ITERATIONS)*1.0e3;
-      printf("Batches: %5" MATX_INDEX_T_FMT " Channels: %5" MATX_INDEX_T_FMT " FilterLen: %5" MATX_INDEX_T_FMT
+      printf("Batches: %5" MATX_INDEX_T_FMT " Channels: %5" MATX_INDEX_T_FMT " Decimation: %5" MATX_INDEX_T_FMT " FilterLen: %5" MATX_INDEX_T_FMT
         " InputLen: %7" MATX_INDEX_T_FMT " Elapsed Usecs: %12.1f MPts/sec: %12.3f\n",
-        num_batches, num_channels, filter_len, input_len, avg_elapsed_us,
+        num_batches, num_channels, decimation_factor, filter_len, input_len, avg_elapsed_us,
         static_cast<double>(num_batches*num_channels*output_len_per_channel)/1.0e6/(avg_elapsed_us/1.0e6));
     }
     printf("\n");
@@ -124,20 +131,24 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 {
   MATX_ENTER_HANDLER();
 
-  const matx::index_t channel_start = 3;
-  const matx::index_t channel_stop = 10;
+  [[maybe_unused]] const matx::index_t channel_start = 2;
+  [[maybe_unused]] const matx::index_t channel_stop = 12;
+  const matx::index_t oversampling_factor = 2;
 
-  // printf("Benchmarking float -> complex<float>\n");
-  // ChannelizePolyBench<float,cuda::std::complex<float>>(channel_start, channel_stop);
+  using input_t = cuda::std::complex<float>;
+  using output_t = cuda::std::complex<float>;
+  using filter_t = float;
 
   printf("Benchmarking complex<float> -> complex<float>\n");
-  ChannelizePolyBench<cuda::std::complex<float>,cuda::std::complex<float>>(channel_start, channel_stop);
+  ChannelizePolyBench<input_t, output_t, filter_t>(channel_start, channel_stop);
 
-  // printf("Benchmarking double -> complex<double>\n");
-  // ChannelizePolyBench<double,cuda::std::complex<double>>(channel_start, channel_stop);
+  ChannelizePolyBench<input_t, output_t, filter_t>(40, 40);
 
-  // printf("Benchmarking complex<double> -> complex<double>\n");
-  // ChannelizePolyBench<cuda::std::complex<double>,cuda::std::complex<double>>(channel_start, channel_stop);
+  ChannelizePolyBench<input_t, output_t, filter_t>(40, 40, oversampling_factor);
+
+  ChannelizePolyBench<input_t, output_t, filter_t>(8192, 8192);
+
+  ChannelizePolyBench<input_t, output_t, filter_t>(8192, 8192, oversampling_factor);
 
   matx::ClearCachesAndAllocations();
 
