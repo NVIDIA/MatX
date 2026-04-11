@@ -173,7 +173,7 @@ inline void matxChannelizePoly1DInternal_SmemTiled(
   // fit, avoiding 64-bit IMAD.WIDE instructions in the inner loops.
   const index_t input_len = i.Size(i.Rank() - 1);
   const bool use_32bit = (sizeof(index_t) <= sizeof(int32_t)) ||
-      (input_len <= std::numeric_limits<int32_t>::max() &&
+      (static_cast<int64_t>(input_len) + num_channels <= std::numeric_limits<int32_t>::max() &&
        nout_per_channel <= std::numeric_limits<int32_t>::max() &&
        num_channels <= std::numeric_limits<int32_t>::max());
 
