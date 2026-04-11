@@ -164,7 +164,7 @@ __global__ void ChannelizePoly1D(OutType output, InType input, FilterType filter
         // is always true for t >= 0.
         const index_t s = num_channels - 1 - channel;
 
-        __align__(sizeof(filter_t)) extern __shared__ uint8_t smem_filter_raw[];
+        extern __shared__ __align__(16) uint8_t smem_filter_raw[];
         filter_t *smem_filter = reinterpret_cast<filter_t *>(smem_filter_raw);
         const bool use_smem_filter = (smem_filter_bytes >= sizeof(filter_t) * filter_phase_len);
         if (use_smem_filter) {
@@ -252,8 +252,8 @@ __global__ void ChannelizePoly1D(OutType output, InType input, FilterType filter
         // sample mapping so newest D samples land in branches D-1..0.
         // Phase uses the original logical channel index (not remapped).
         const index_t r_remapped = (channel + num_channels - decimation_factor) % num_channels;
+        const index_t s = num_channels - 1 - r_remapped;
         for (index_t t = first_out_elem+tid; t <= last_out_elem; t += THREADS) {
-            const index_t s = num_channels - 1 - r_remapped;
             const index_t last_arrived = t * decimation_factor + decimation_factor - 1;
             index_t niter = 0;
             const index_t phase = (channel + t * decimation_factor) % num_channels;
@@ -338,7 +338,7 @@ __global__ void ChannelizePoly1D_SmemTiled(
     using accum_t = cuda::std::conditional_t<is_complex_v<output_t>,
         typename detail::scalar_to_complex<AccumType>::ctype, AccumType>;
 
-    extern __shared__ uint8_t smem_raw[];
+    extern __shared__ __align__(16) uint8_t smem_raw[];
 
     constexpr int InRank  = InType::Rank();
     constexpr int OutRank = OutType::Rank();
@@ -570,7 +570,7 @@ __global__ void ChannelizePoly1D_SmemTiled(
                 __syncthreads();
 
                 // Load NOUT new rows. For D==M, exactly NOUT new samples arrive.
-                // Each ty-lane loads one row (its cx column). NOUT <= new_rows.
+                // Each ty-lane loads one row (its cx column).
                 {
                     const IdxT next_end = cuda::std::min(next_start + static_cast<IdxT>(2 * NOUT) - 1, last_elem);
                     const int32_t new_rows = static_cast<int32_t>(max_bidx(next_end) - loaded_up_to);
@@ -705,7 +705,7 @@ __global__ void ChannelizePoly1D_Smem(OutType output, InType input, FilterType f
     // If the output is complex, then accumulator is complex. Otherwise, the accumulator is real.
     using accum_t = cuda::std::conditional_t<is_complex_v<output_t>, typename detail::scalar_to_complex<AccumType>::ctype, AccumType>;
 
-    extern __shared__ uint8_t __attribute((aligned(16))) smem_dyn_align16[];
+    extern __shared__ __align__(16) uint8_t smem_dyn_align16[];
 
     constexpr int InRank = InType::Rank();
     constexpr int OutRank = OutType::Rank();
@@ -881,7 +881,7 @@ __global__ void ChannelizePoly1D_FusedChan(OutType output, InType input, FilterT
     // Versions of CUDA prior to 11.8 do not allow static shared memory allocations of
     // cuda::std::complex types due to it having no trivial constructor. This workaround
     // prevents an 'initializer not allowed for __shared__ variable' error.
-    __align__(sizeof(complex_accum_t)) __shared__ uint8_t smem_eij_workaround[sizeof(complex_accum_t)*NUM_CHAN*NUM_CHAN];
+    __shared__ __align__(16) uint8_t smem_eij_workaround[sizeof(complex_accum_t)*NUM_CHAN*NUM_CHAN];
     complex_accum_t (&smem_eij)[NUM_CHAN][NUM_CHAN] = reinterpret_cast<complex_accum_t (&)[NUM_CHAN][NUM_CHAN]>(smem_eij_workaround);
     // Pre-compute the DFT complex exponentials and store in shared memory
     for (int t = tid; t < NUM_CHAN*NUM_CHAN; t += THREADS) {

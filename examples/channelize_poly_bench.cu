@@ -91,7 +91,7 @@ void ChannelizePolyBench(matx::index_t channel_start, matx::index_t channel_stop
     for (matx::index_t num_channels = channel_start; num_channels <= channel_stop; num_channels++) {
       const matx::index_t num_batches = test_cases[i].num_batches;
       const matx::index_t filter_len = test_cases[i].filter_len_per_channel * num_channels;
-      const matx::index_t decimation_factor = (oversample_factor < 0) ? num_channels : num_channels / oversample_factor;
+      const matx::index_t decimation_factor = (oversample_factor <= 0) ? num_channels : num_channels / oversample_factor;
       const matx::index_t input_len = test_cases[i].input_len;
       const matx::index_t output_len_per_channel = (input_len + decimation_factor - 1) / decimation_factor;
 
