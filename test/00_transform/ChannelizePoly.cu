@@ -844,9 +844,7 @@ TYPED_TEST(ChannelizePolyTestDoubleType, Harris2003)
 // Oversampled channelizer test based on Harris 2003 receiver_40z.m.
 // M=40, D=28, 600-tap filter designed with remez. Golden input and output
 // are from the reference implementation. This test validates the oversampled
-// phase rotation convention. Currently requires
-// CHANNELIZE_POLY1D_OVERSAMPLED_FIRST_PHASE_ROTATION == 0 (Harris convention)
-// to match the golden output.
+// phase rotation convention.
 TYPED_TEST(ChannelizePolyTestDoubleType, Harris2003Oversampled)
 {
   MATX_ENTER_HANDLER();

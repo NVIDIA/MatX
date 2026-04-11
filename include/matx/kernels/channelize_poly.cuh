@@ -248,7 +248,7 @@ __global__ void ChannelizePoly1D(OutType output, InType input, FilterType filter
         }
     } else {
         // === Oversampled (D < M): phase rotates per output step ===
-        // No shared memory — reads filter from global/L2.
+        // No shared memory. Reads filter from global/L2.
         // Branch remap for Harris convention: r_remapped changes the input
         // sample mapping so newest D samples land in branches D-1..0.
         // Phase uses the original logical channel index (not remapped).
@@ -257,7 +257,7 @@ __global__ void ChannelizePoly1D(OutType output, InType input, FilterType filter
             const index_t s = num_channels - 1 - r_remapped;
             const index_t last_arrived = t * decimation_factor + decimation_factor - 1;
             index_t niter = 0;
-            const index_t phase = (channel + (t * decimation_factor) % num_channels) % num_channels;
+            const index_t phase = (channel + t * decimation_factor) % num_channels;
             index_t h_ind { phase };
             accum_t accum {};
             if (last_arrived >= s) {
@@ -364,7 +364,6 @@ __global__ void ChannelizePoly1D_SmemTiled(
     // Branch remap offset for Harris convention (oversampled only; 0 for D == M).
     const int32_t L = MaximallyDecimated ? 0 : (M - static_cast<int32_t>(decimation_factor));
 
-    // --- Shared memory layout ---
     const int32_t filter_stride = K * P; // per-channel filter block size
     const int32_t height = P + NOUT - 1;
 
@@ -382,8 +381,8 @@ __global__ void ChannelizePoly1D_SmemTiled(
         smem_input = reinterpret_cast<input_t *>(smem_raw);
     }
 
-    // --- Load filter into smem (one-time, only when FilterInSmem) ---
     if constexpr (FilterInSmem) {
+        // Load filter into smem
         if constexpr (MaximallyDecimated) {
             for (int32_t i = tid; i < P * CTILE; i += nthreads) {
                 const int32_t p  = i / CTILE;
@@ -395,17 +394,25 @@ __global__ void ChannelizePoly1D_SmemTiled(
                     : static_cast<filter_t>(0);
             }
         } else {
+            // The dispatch must not select FilterInSmem when K exceeds the
+            // rotations[] array size. Assert this invariant at runtime.
+            assert(K <= MATX_CHANNELIZE_POLY1D_SMEM_TILED_MAX_ROTATIONS);
             int32_t rotations[MATX_CHANNELIZE_POLY1D_SMEM_TILED_MAX_ROTATIONS];
-            for (int32_t k = 0; k < K && k < MATX_CHANNELIZE_POLY1D_SMEM_TILED_MAX_ROTATIONS; k++) {
+            for (int32_t k = 0; k < K; k++) {
                 rotations[k] = static_cast<int32_t>((static_cast<int64_t>(k) * decimation_factor) % M);
             }
+            // TODO-PERF: Each channel rotates through K filter phases. Currently, we store all K phases
+            // per channel in shared memory. It is possible for K * CTILE to exceed the total number
+            // of channels, in which case we would be better off storing the full filter in shared memory.
+            // Furthermore, if there are fewer than K output points per channel generated in this CTA,
+            // then we could store only the required phases.
             for (int32_t i = tid; i < CTILE * filter_stride; i += nthreads) {
                 const int32_t local_channel = i / filter_stride;
                 const int32_t kp = i % filter_stride;
                 const int32_t k  = kp / P;
                 const int32_t p  = kp % P;
                 const int32_t global_channel = tile_base + local_channel;
-                if (global_channel < M && k < K) {
+                if (global_channel < M) {
                     // Phase uses the original logical channel (not remapped)
                     const int32_t phase = (global_channel + rotations[k]) % M;
                     const int32_t h_ind = phase + p * M;
@@ -419,8 +426,11 @@ __global__ void ChannelizePoly1D_SmemTiled(
         }
     }
 
-    // --- Branch offset and iteration bounds ---
-    // r_remapped changes the input sample mapping for Harris convention.
+    // r_remapped changes the input sample mapping to match the Harris convention. We conceptually populate commutator branches
+    // starting at M-1 and continuing counter-clockwise. That matches the Harris convention for the maximally decimated
+    // case where L == 0. For the oversampled case, Harris populates branches from M-1 to 0 for each M inputs, shifting
+    // older samples through the 2D filter bank. We stick with the M-1 to 0 convention, but then have to remap the
+    // branch indices to match the Harris convention.
     // Phase and output channel use the original logical index c.
     const int32_t r_remapped = (c + L) % M;
     const int32_t s = active ? (M - 1 - r_remapped) : 0;
@@ -440,19 +450,17 @@ __global__ void ChannelizePoly1D_SmemTiled(
         const int32_t branch_s = (gc < M) ? (M - 1 - gc_remapped) : 0;
         const IdxT raw_idx = static_cast<IdxT>(branch_s) + global_row * M;
         if (gc < M && global_row >= 0 && raw_idx >= 0 && raw_idx < input_len) {
-            auto dims = indims;
-            dims[InRank - 1] = raw_idx;
+            indims[InRank - 1] = raw_idx;
             input_t val;
             cuda::std::apply([&val, &input](auto &&...args) {
                 val = input.operator()(args...);
-            }, dims);
+            }, indims);
             smem_input[buf_row * CTILE + col] = val;
         } else {
             smem_input[buf_row * CTILE + col] = static_cast<input_t>(0);
         }
     };
 
-    // For MaximallyDecimated: max_bidx(t) = t. For oversampled: floor(((t+1)*D-1)/M).
     auto max_bidx = [&](IdxT t) -> IdxT {
         if constexpr (MaximallyDecimated) {
             return t;
@@ -461,7 +469,7 @@ __global__ void ChannelizePoly1D_SmemTiled(
         }
     };
 
-    // --- Initial fill of circular buffer ---
+    // Initial fill of circular buffer
     const IdxT first_iter_end = cuda::std::min(start_elem + static_cast<IdxT>(NOUT) - 1, last_elem);
     IdxT loaded_up_to = max_bidx(first_iter_end);
     const IdxT buf_base = loaded_up_to - (height - 1);
@@ -482,19 +490,18 @@ __global__ void ChannelizePoly1D_SmemTiled(
 
     __syncthreads();
 
-    // --- Main iteration loop ---
     if constexpr (MaximallyDecimated) {
-        // === D == M: simplified path ===
         // bidx = t, causal_count = t+1, last_arrived >= s always true.
         // Track buf_row incrementally across iterations to avoid modulo.
 
         // Seed buf_row for ty=0 at start_elem
         int32_t buf_row_base = static_cast<int32_t>(start_elem % height);
-        // Per-iteration advance: NOUT output steps = NOUT buf_row advance
+        // Per-iteration advance: NOUT output steps = NOUT buf_row advance. This is a defensive modulo
+        // so that we can keep buf_row_base in [0, height) with only a conditional subtraction.
         const int32_t nout_wrap = NOUT % height;
 
-        IdxT next_start = start_elem;
-        for (;;) {
+        const IdxT last_start = start_elem + ((last_elem - start_elem) / NOUT) * NOUT;
+        for (IdxT next_start = start_elem; next_start <= last_start; next_start += NOUT) {
             const IdxT t = next_start + ty;
             if (t <= last_elem && active) {
                 accum_t accum{};
@@ -554,38 +561,36 @@ __global__ void ChannelizePoly1D_SmemTiled(
                 }, outdims);
             }
 
-            // Advance
-            next_start += NOUT;
-            if (next_start > last_elem) break;
+            if (next_start < last_start) {
+                // Incremental buf_row_base advance (no modulo)
+                buf_row_base += nout_wrap;
+                if (buf_row_base >= height) buf_row_base -= height;
 
-            // Incremental buf_row_base advance (no modulo)
-            buf_row_base += nout_wrap;
-            if (buf_row_base >= height) buf_row_base -= height;
+                // Ensure all threads have finished reading smem_input before overwriting
+                __syncthreads();
 
-            // Ensure all threads have finished reading smem_input before overwriting
-            __syncthreads();
-
-            // Load NOUT new rows. For D==M, exactly NOUT new samples arrive.
-            // Each ty-lane loads one row (its cx column). NOUT <= new_rows.
-            {
-                const IdxT next_end = cuda::std::min(next_start + static_cast<IdxT>(NOUT) - 1, last_elem);
-                const int32_t new_rows = static_cast<int32_t>(max_bidx(next_end) - loaded_up_to);
-                int32_t lr = static_cast<int32_t>((loaded_up_to + 1) % height);
-                if (ty < new_rows) {
-                    int32_t my_lr = lr + ty;
-                    if (my_lr >= height) my_lr -= height;
-                    load_smem_elem(my_lr, cx, loaded_up_to + 1 + ty);
+                // Load NOUT new rows. For D==M, exactly NOUT new samples arrive.
+                // Each ty-lane loads one row (its cx column). NOUT <= new_rows.
+                {
+                    const IdxT next_end = cuda::std::min(next_start + static_cast<IdxT>(2 * NOUT) - 1, last_elem);
+                    const int32_t new_rows = static_cast<int32_t>(max_bidx(next_end) - loaded_up_to);
+                    int32_t lr = static_cast<int32_t>((loaded_up_to + 1) % height);
+                    if (ty < new_rows) {
+                        int32_t my_lr = lr + ty;
+                        if (my_lr >= height) my_lr -= height;
+                        load_smem_elem(my_lr, cx, loaded_up_to + 1 + ty);
+                    }
+                    loaded_up_to += new_rows;
                 }
-                loaded_up_to += new_rows;
-            }
 
-            // Ensure new rows are visible before next iteration's compute
-            __syncthreads();
+                // Ensure new rows are visible before next iteration's compute
+                __syncthreads();
+            }
         }
     } else {
         // === D < M: oversampled path ===
-        IdxT next_start = start_elem;
-        for (;;) {
+        const IdxT last_start = start_elem + ((last_elem - start_elem) / NOUT) * NOUT;
+        for (IdxT next_start = start_elem; next_start <= last_start; next_start += NOUT) {
             const IdxT t = next_start + ty;
             if (t <= last_elem && active) {
                 accum_t accum{};
@@ -599,7 +604,7 @@ __global__ void ChannelizePoly1D_SmemTiled(
                     const int32_t k = static_cast<int32_t>(t % K);
                     // Phase uses the original logical channel (not remapped)
                     const int32_t phase = static_cast<int32_t>(
-                        (c + (t * decimation_factor) % M) % M);
+                        (c + t * decimation_factor) % M);
 
                     int32_t available_taps = P;
                     if (((P - 1) * M + phase) >= filter_full_len) {
@@ -616,9 +621,7 @@ __global__ void ChannelizePoly1D_SmemTiled(
                         cuda::std::min(static_cast<IdxT>(available_taps - h_skip),
                                        causal_count - h_skip));
 
-                    int32_t buf_row = static_cast<int32_t>(bidx - h_skip);
-                    while (buf_row >= height) buf_row -= height;
-                    if (buf_row < 0) buf_row += height;
+                    int32_t buf_row = static_cast<int32_t>((bidx - h_skip) % height);
 
                     const int32_t prologue = cuda::std::min(buf_row + 1, niter);
                     const int32_t epilogue = niter - prologue;
@@ -661,32 +664,30 @@ __global__ void ChannelizePoly1D_SmemTiled(
                 }, outdims);
             }
 
-            // Advance
-            next_start += NOUT;
-            if (next_start > last_elem) break;
+            if (next_start < last_start) {
+                // Ensure all threads have finished reading smem_input before overwriting
+                __syncthreads();
 
-            // Ensure all threads have finished reading smem_input before overwriting
-            __syncthreads();
+                // Load new rows for next iteration
+                const IdxT next_iter_end = cuda::std::min(next_start + static_cast<IdxT>(2 * NOUT) - 1, last_elem);
+                const IdxT needed_up_to = max_bidx(next_iter_end);
+                const int32_t new_rows = static_cast<int32_t>(needed_up_to - loaded_up_to);
 
-            // Load new rows for next iteration
-            const IdxT next_iter_end = cuda::std::min(next_start + static_cast<IdxT>(NOUT) - 1, last_elem);
-            const IdxT needed_up_to = max_bidx(next_iter_end);
-            const int32_t new_rows = static_cast<int32_t>(needed_up_to - loaded_up_to);
-
-            // Each ty-lane loads one row (its cx column)
-            {
-                int32_t lr = static_cast<int32_t>((loaded_up_to + 1) % height);
-                if (ty < new_rows) {
-                    int32_t my_lr = lr + ty;
-                    if (my_lr >= height) my_lr -= height;
-                    load_smem_elem(my_lr, cx, loaded_up_to + 1 + ty);
+                // Each ty-lane loads one row (its cx column)
+                {
+                    int32_t lr = static_cast<int32_t>((loaded_up_to + 1) % height);
+                    if (ty < new_rows) {
+                        int32_t my_lr = lr + ty;
+                        if (my_lr >= height) my_lr -= height;
+                        load_smem_elem(my_lr, cx, loaded_up_to + 1 + ty);
+                    }
                 }
+
+                loaded_up_to = needed_up_to;
+
+                // Ensure new rows are visible before next iteration's compute
+                __syncthreads();
             }
-
-            loaded_up_to = needed_up_to;
-
-            // Ensure new rows are visible before next iteration's compute
-            __syncthreads();
         }
     }
 }
