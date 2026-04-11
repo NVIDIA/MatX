@@ -62,7 +62,7 @@ const char *TypeName() {
 }
 
 template <typename InType, typename OutType, typename FilterType>
-void ChannelizePolyBench(matx::index_t channel_start, matx::index_t channel_stop, matx::index_t oversample_factor = -1)
+void ChannelizePolyBench(matx::index_t num_channels, matx::index_t decimation_factor)
 {
   struct {
     matx::index_t num_batches;
@@ -88,46 +88,42 @@ void ChannelizePolyBench(matx::index_t channel_start, matx::index_t channel_stop
   cudaExecutor exec{};
 
   for (size_t i = 0; i < sizeof(test_cases)/sizeof(test_cases[0]); i++) {
-    for (matx::index_t num_channels = channel_start; num_channels <= channel_stop; num_channels++) {
-      const matx::index_t num_batches = test_cases[i].num_batches;
-      const matx::index_t filter_len = test_cases[i].filter_len_per_channel * num_channels;
-      const matx::index_t decimation_factor = (oversample_factor <= 0) ? num_channels : num_channels / oversample_factor;
-      const matx::index_t input_len = test_cases[i].input_len;
-      const matx::index_t output_len_per_channel = (input_len + decimation_factor - 1) / decimation_factor;
+    const matx::index_t num_batches = test_cases[i].num_batches;
+    const matx::index_t filter_len = test_cases[i].filter_len_per_channel * num_channels;
+    const matx::index_t input_len = test_cases[i].input_len;
+    const matx::index_t output_len_per_channel = (input_len + decimation_factor - 1) / decimation_factor;
 
-      if (input_len < num_channels * 100) {
-        continue;
-      }
-
-      auto input = matx::make_tensor<InType, 2>({num_batches, input_len});
-      auto filter = matx::make_tensor<FilterType, 1>({filter_len});
-      auto output = matx::make_tensor<OutType, 3>({num_batches, output_len_per_channel, num_channels});
-      (input = static_cast<InType>(1)).run(exec);
-      (filter = static_cast<FilterType>(1)).run(exec);
-
-      for (int k = 0; k < NUM_WARMUP_ITERATIONS; k++) {
-        (output = channelize_poly(input, filter, num_channels, decimation_factor)).run(exec);
-      }
-
-      exec.sync();
-
-      float elapsed_ms = 0.0f;
-      cudaEventRecord(start, stream);
-      for (int k = 0; k < NUM_ITERATIONS; k++) {
-        (output = channelize_poly(input, filter, num_channels, decimation_factor)).run(exec);
-      }
-      cudaEventRecord(stop, stream);
-      exec.sync();
-      MATX_CUDA_CHECK_LAST_ERROR();
-      cudaEventElapsedTime(&elapsed_ms, start, stop);
-
-      const double avg_elapsed_us = (static_cast<double>(elapsed_ms)/NUM_ITERATIONS)*1.0e3;
-      printf("Batches: %5" MATX_INDEX_T_FMT " Channels: %5" MATX_INDEX_T_FMT " Decimation: %5" MATX_INDEX_T_FMT " FilterLen: %5" MATX_INDEX_T_FMT
-        " InputLen: %7" MATX_INDEX_T_FMT " Elapsed Usecs: %12.1f MPts/sec: %12.3f\n",
-        num_batches, num_channels, decimation_factor, filter_len, input_len, avg_elapsed_us,
-        static_cast<double>(num_batches*num_channels*output_len_per_channel)/1.0e6/(avg_elapsed_us/1.0e6));
+    if (input_len < num_channels * 100) {
+      continue;
     }
-    printf("\n");
+
+    auto input = matx::make_tensor<InType, 2>({num_batches, input_len});
+    auto filter = matx::make_tensor<FilterType, 1>({filter_len});
+    auto output = matx::make_tensor<OutType, 3>({num_batches, output_len_per_channel, num_channels});
+    (input = static_cast<InType>(1)).run(exec);
+    (filter = static_cast<FilterType>(1)).run(exec);
+
+    for (int k = 0; k < NUM_WARMUP_ITERATIONS; k++) {
+      (output = channelize_poly(input, filter, num_channels, decimation_factor)).run(exec);
+    }
+
+    exec.sync();
+
+    float elapsed_ms = 0.0f;
+    cudaEventRecord(start, stream);
+    for (int k = 0; k < NUM_ITERATIONS; k++) {
+      (output = channelize_poly(input, filter, num_channels, decimation_factor)).run(exec);
+    }
+    cudaEventRecord(stop, stream);
+    exec.sync();
+    MATX_CUDA_CHECK_LAST_ERROR();
+    cudaEventElapsedTime(&elapsed_ms, start, stop);
+
+    const double avg_elapsed_us = (static_cast<double>(elapsed_ms)/NUM_ITERATIONS)*1.0e3;
+    printf("Batches: %5" MATX_INDEX_T_FMT " Channels: %5" MATX_INDEX_T_FMT " Decimation: %5" MATX_INDEX_T_FMT " FilterLen: %5" MATX_INDEX_T_FMT
+      " InputLen: %7" MATX_INDEX_T_FMT " Elapsed Usecs: %12.1f MPts/sec: %12.3f\n",
+      num_batches, num_channels, decimation_factor, filter_len, input_len, avg_elapsed_us,
+      static_cast<double>(num_batches*num_channels*output_len_per_channel)/1.0e6/(avg_elapsed_us/1.0e6));
   }
 
   MATX_CUDA_CHECK_LAST_ERROR();
@@ -145,18 +141,16 @@ struct BenchConfig {
   Domain    input_domain = Domain::Complex;
   Precision filter_prec  = Precision::Float;
   Domain    filter_domain = Domain::Real;
-  matx::index_t channel_start = 2;
-  matx::index_t channel_stop  = 12;
-  matx::index_t oversample_factor = -1;
+  matx::index_t M = 10;   // number of channels
+  matx::index_t D = -1;   // decimation factor (-1 means D = M)
 };
 
 void PrintUsage(const char *prog) {
   printf("Usage: %s [options]\n", prog);
   printf("  --input-type   <type>   Input type: float, double, cf, cd (default: cf)\n");
   printf("  --filter-type  <type>   Filter type: float, double, cf, cd (default: float)\n");
-  printf("  --channel-start <N>     First channel count (default: 2)\n");
-  printf("  --channel-stop  <N>     Last channel count (default: 12)\n");
-  printf("  --oversample    <N>     Oversampling factor; channels/N = decimation (default: none)\n");
+  printf("  -M <N>                  Number of channels (default: 10)\n");
+  printf("  -D <N>                  Decimation factor, 0 < D <= M (default: M)\n");
   printf("\n");
   printf("Type shorthands: float, double, cf (complex<float>), cd (complex<double>)\n");
 }
@@ -167,14 +161,6 @@ bool ParseType(const char *s, Precision &prec, Domain &dom) {
   if (strcmp(s, "cf") == 0)          { prec = Precision::Float;  dom = Domain::Complex; return true; }
   if (strcmp(s, "cd") == 0)          { prec = Precision::Double; dom = Domain::Complex; return true; }
   return false;
-}
-
-const char *TypeLabel(Precision prec, Domain dom) {
-  if (prec == Precision::Float  && dom == Domain::Real)    return "float";
-  if (prec == Precision::Float  && dom == Domain::Complex) return "complex<float>";
-  if (prec == Precision::Double && dom == Domain::Real)    return "double";
-  if (prec == Precision::Double && dom == Domain::Complex) return "complex<double>";
-  return "unknown";
 }
 
 template <typename T>
@@ -189,19 +175,12 @@ void DispatchBench(const BenchConfig &cfg) {
 
   printf("Input: %-16s  Filter: %-16s  Output: %-16s\n",
       TypeName<InType>(), TypeName<FilterType>(), TypeName<OutType>());
-  printf("Channels: %" MATX_INDEX_T_FMT " - %" MATX_INDEX_T_FMT, cfg.channel_start, cfg.channel_stop);
-  if (cfg.oversample_factor > 0) {
-    printf("  Oversample: %" MATX_INDEX_T_FMT "x", cfg.oversample_factor);
-  }
-  printf("\n\n");
+  printf("M: %" MATX_INDEX_T_FMT "  D: %" MATX_INDEX_T_FMT "\n\n", cfg.M, cfg.D);
 
-  ChannelizePolyBench<InType, OutType, FilterType>(cfg.channel_start, cfg.channel_stop, cfg.oversample_factor);
+  ChannelizePolyBench<InType, OutType, FilterType>(cfg.M, cfg.D);
 }
 
 void RunBench(const BenchConfig &cfg) {
-  // Dispatch on (input, filter) type combination. Each lambda instantiates
-  // only the single combination selected at runtime, keeping compile time
-  // proportional to the number of supported types rather than their product.
   auto go = [&](auto in_tag, auto filt_tag) {
     DispatchBench<decltype(in_tag), decltype(filt_tag)>(cfg);
   };
@@ -247,17 +226,31 @@ int main(int argc, char **argv)
         fprintf(stderr, "Unknown filter type: %s\n", argv[i]);
         return 1;
       }
-    } else if (strcmp(argv[i], "--channel-start") == 0 && i + 1 < argc) {
-      cfg.channel_start = static_cast<matx::index_t>(atol(argv[++i]));
-    } else if (strcmp(argv[i], "--channel-stop") == 0 && i + 1 < argc) {
-      cfg.channel_stop = static_cast<matx::index_t>(atol(argv[++i]));
-    } else if (strcmp(argv[i], "--oversample") == 0 && i + 1 < argc) {
-      cfg.oversample_factor = static_cast<matx::index_t>(atol(argv[++i]));
+    } else if (strcmp(argv[i], "-M") == 0 && i + 1 < argc) {
+      cfg.M = static_cast<matx::index_t>(atol(argv[++i]));
+    } else if (strcmp(argv[i], "-D") == 0 && i + 1 < argc) {
+      cfg.D = static_cast<matx::index_t>(atol(argv[++i]));
     } else {
       fprintf(stderr, "Unknown option: %s\n", argv[i]);
       PrintUsage(argv[0]);
       return 1;
     }
+  }
+
+  // Default D to M (maximally decimated) if not specified
+  if (cfg.D <= 0) {
+    cfg.D = cfg.M;
+  }
+
+  if (cfg.D <= 0 || cfg.D > cfg.M) {
+    fprintf(stderr, "Error: decimation factor D must satisfy 0 < D <= M (got M=%" MATX_INDEX_T_FMT ", D=%" MATX_INDEX_T_FMT ")\n",
+        cfg.M, cfg.D);
+    return 1;
+  }
+
+  if (cfg.M < 2) {
+    fprintf(stderr, "Error: number of channels M must be >= 2 (got M=%" MATX_INDEX_T_FMT ")\n", cfg.M);
+    return 1;
   }
 
   RunBench(cfg);
