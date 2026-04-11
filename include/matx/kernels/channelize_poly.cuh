@@ -50,13 +50,12 @@ namespace matx {
 // Number of output elements generated per thread
 constexpr index_t CHANNELIZE_POLY1D_ELEMS_PER_THREAD = 1;
 
-// Maximum number of per-channel filter rotations (K) for SmemTiled FilterInSmem.
-// Sizes the local rotations[] array in the kernel.
-constexpr int MATX_CHANNELIZE_POLY1D_SMEM_TILED_MAX_ROTATIONS = 32;
-
 #ifdef __CUDACC__ 
 
 namespace detail {
+
+constexpr int MATX_CHANNELIZE_POLY1D_SMEM_TILED_MAX_ROTATIONS = 32;
+
 template <typename AccumT, typename FilterT>
 __MATX_DEVICE__ __MATX_INLINE__ auto channelize_cast_filter(FilterT v)
 {
@@ -157,7 +156,7 @@ __global__ void ChannelizePoly1D(OutType output, InType input, FilterType filter
     outdims[ChannelRank] = channel;
 
     if constexpr (MaximallyDecimated) {
-        // === Maximally decimated (D == M): filter phase is fixed per channel ===
+        // Maximally decimated (D == M) path: filter phase is fixed per channel
         // Dynamic shared memory holds one phase's taps when the dispatch provides
         // enough smem. When smem_bytes == 0 the filter is read from global memory.
         // When D == M: phase = channel (fixed), A % M = channel,
@@ -247,7 +246,7 @@ __global__ void ChannelizePoly1D(OutType output, InType input, FilterType filter
             }
         }
     } else {
-        // === Oversampled (D < M): phase rotates per output step ===
+        // Oversampled (D < M) path: phase rotates per output step
         // No shared memory. Reads filter from global/L2.
         // Branch remap for Harris convention: r_remapped changes the input
         // sample mapping so newest D samples land in branches D-1..0.
@@ -356,6 +355,7 @@ __global__ void ChannelizePoly1D_SmemTiled(
     const int32_t cx = static_cast<int32_t>(threadIdx.x);
     const int32_t ty = static_cast<int32_t>(threadIdx.y);
     const int32_t tid = ty * CTILE + cx;
+    assert(blockDim.x * blockDim.y == CTILE * NOUT && blockDim.z == 1);
     const int32_t nthreads = CTILE * NOUT;
     const int32_t tile_base = static_cast<int32_t>(blockIdx.y) * CTILE;
     const int32_t c = tile_base + cx;
@@ -396,8 +396,8 @@ __global__ void ChannelizePoly1D_SmemTiled(
         } else {
             // The dispatch must not select FilterInSmem when K exceeds the
             // rotations[] array size. Assert this invariant at runtime.
-            assert(K <= MATX_CHANNELIZE_POLY1D_SMEM_TILED_MAX_ROTATIONS);
-            int32_t rotations[MATX_CHANNELIZE_POLY1D_SMEM_TILED_MAX_ROTATIONS];
+            assert(K <= detail::MATX_CHANNELIZE_POLY1D_SMEM_TILED_MAX_ROTATIONS);
+            int32_t rotations[detail::MATX_CHANNELIZE_POLY1D_SMEM_TILED_MAX_ROTATIONS];
             for (int32_t k = 0; k < K; k++) {
                 rotations[k] = static_cast<int32_t>((static_cast<int64_t>(k) * decimation_factor) % M);
             }
@@ -588,7 +588,7 @@ __global__ void ChannelizePoly1D_SmemTiled(
             }
         }
     } else {
-        // === D < M: oversampled path ===
+        // D < M: oversampled path
         const IdxT last_start = start_elem + ((last_elem - start_elem) / NOUT) * NOUT;
         for (IdxT next_start = start_elem; next_start <= last_start; next_start += NOUT) {
             const IdxT t = next_start + ty;
@@ -702,7 +702,7 @@ __global__ void ChannelizePoly1D_Smem(OutType output, InType input, FilterType f
     using filter_t = typename FilterType::value_type;
     static_assert(! is_complex_v<AccumType>,
         "channelize_poly: accumulator type must be real; it will be treated as complex when necessary");
-    // If the output is complex, then then accumulator is complex. Otherwise, the accumulator is real.
+    // If the output is complex, then accumulator is complex. Otherwise, the accumulator is real.
     using accum_t = cuda::std::conditional_t<is_complex_v<output_t>, typename detail::scalar_to_complex<AccumType>::ctype, AccumType>;
 
     extern __shared__ uint8_t __attribute((aligned(16))) smem_dyn_align16[];
@@ -765,7 +765,7 @@ __global__ void ChannelizePoly1D_Smem(OutType output, InType input, FilterType f
                 smem_input[smem_ind] = input.operator()(args...);
             }, indims);
         } else {
-            smem_input[smem_ind] = static_cast<filter_t>(0);
+            smem_input[smem_ind] = static_cast<input_t>(0);
         }
     }
 
@@ -789,7 +789,7 @@ __global__ void ChannelizePoly1D_Smem(OutType output, InType input, FilterType f
                     smem_input[smem_ind] = input.operator()(args...);
                 }, indims);
             } else {
-                smem_input[smem_ind] = static_cast<filter_t>(0);
+                smem_input[smem_ind] = static_cast<input_t>(0);
             }
         }
 

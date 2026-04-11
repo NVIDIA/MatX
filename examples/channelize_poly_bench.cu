@@ -34,6 +34,7 @@
 #include <cassert>
 #include <cstdio>
 #include <cmath>
+#include <cstring>
 #include <memory>
 #include <fstream>
 #include <istream>
@@ -51,7 +52,16 @@ constexpr int NUM_WARMUP_ITERATIONS = 2;
 // Number of iterations per timed test. Iteration times are averaged in the report.
 constexpr int NUM_ITERATIONS = 20;
 
-template <typename InType, typename OutType, typename FilterType = InType>
+template <typename T>
+const char *TypeName() {
+  if constexpr (std::is_same_v<T, float>) return "float";
+  else if constexpr (std::is_same_v<T, double>) return "double";
+  else if constexpr (std::is_same_v<T, cuda::std::complex<float>>) return "complex<float>";
+  else if constexpr (std::is_same_v<T, cuda::std::complex<double>>) return "complex<double>";
+  else return "unknown";
+}
+
+template <typename InType, typename OutType, typename FilterType>
 void ChannelizePolyBench(matx::index_t channel_start, matx::index_t channel_stop, matx::index_t oversample_factor = -1)
 {
   struct {
@@ -92,8 +102,8 @@ void ChannelizePolyBench(matx::index_t channel_start, matx::index_t channel_stop
       auto input = matx::make_tensor<InType, 2>({num_batches, input_len});
       auto filter = matx::make_tensor<FilterType, 1>({filter_len});
       auto output = matx::make_tensor<OutType, 3>({num_batches, output_len_per_channel, num_channels});
-      (input = InType{1.0f,1.0f}).run(exec);
-      (filter = static_cast<FilterType>(1.0f)).run(exec);
+      (input = static_cast<InType>(1)).run(exec);
+      (filter = static_cast<FilterType>(1)).run(exec);
 
       for (int k = 0; k < NUM_WARMUP_ITERATIONS; k++) {
         (output = channelize_poly(input, filter, num_channels, decimation_factor)).run(exec);
@@ -127,28 +137,130 @@ void ChannelizePolyBench(matx::index_t channel_start, matx::index_t channel_stop
   cudaStreamDestroy(stream);
 }
 
-int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
+enum class Precision { Float, Double };
+enum class Domain { Real, Complex };
+
+struct BenchConfig {
+  Precision input_prec   = Precision::Float;
+  Domain    input_domain = Domain::Complex;
+  Precision filter_prec  = Precision::Float;
+  Domain    filter_domain = Domain::Real;
+  matx::index_t channel_start = 2;
+  matx::index_t channel_stop  = 12;
+  matx::index_t oversample_factor = -1;
+};
+
+void PrintUsage(const char *prog) {
+  printf("Usage: %s [options]\n", prog);
+  printf("  --input-type   <type>   Input type: float, double, cf, cd (default: cf)\n");
+  printf("  --filter-type  <type>   Filter type: float, double, cf, cd (default: float)\n");
+  printf("  --channel-start <N>     First channel count (default: 2)\n");
+  printf("  --channel-stop  <N>     Last channel count (default: 12)\n");
+  printf("  --oversample    <N>     Oversampling factor; channels/N = decimation (default: none)\n");
+  printf("\n");
+  printf("Type shorthands: float, double, cf (complex<float>), cd (complex<double>)\n");
+}
+
+bool ParseType(const char *s, Precision &prec, Domain &dom) {
+  if (strcmp(s, "float") == 0)       { prec = Precision::Float;  dom = Domain::Real;    return true; }
+  if (strcmp(s, "double") == 0)      { prec = Precision::Double; dom = Domain::Real;    return true; }
+  if (strcmp(s, "cf") == 0)          { prec = Precision::Float;  dom = Domain::Complex; return true; }
+  if (strcmp(s, "cd") == 0)          { prec = Precision::Double; dom = Domain::Complex; return true; }
+  return false;
+}
+
+const char *TypeLabel(Precision prec, Domain dom) {
+  if (prec == Precision::Float  && dom == Domain::Real)    return "float";
+  if (prec == Precision::Float  && dom == Domain::Complex) return "complex<float>";
+  if (prec == Precision::Double && dom == Domain::Real)    return "double";
+  if (prec == Precision::Double && dom == Domain::Complex) return "complex<double>";
+  return "unknown";
+}
+
+template <typename T>
+struct ScalarType { using type = T; };
+template <typename T>
+struct ScalarType<cuda::std::complex<T>> { using type = T; };
+
+template <typename InType, typename FilterType>
+void DispatchBench(const BenchConfig &cfg) {
+  using in_scalar = typename ScalarType<InType>::type;
+  using OutType = cuda::std::complex<in_scalar>;
+
+  printf("Input: %-16s  Filter: %-16s  Output: %-16s\n",
+      TypeName<InType>(), TypeName<FilterType>(), TypeName<OutType>());
+  printf("Channels: %" MATX_INDEX_T_FMT " - %" MATX_INDEX_T_FMT, cfg.channel_start, cfg.channel_stop);
+  if (cfg.oversample_factor > 0) {
+    printf("  Oversample: %" MATX_INDEX_T_FMT "x", cfg.oversample_factor);
+  }
+  printf("\n\n");
+
+  ChannelizePolyBench<InType, OutType, FilterType>(cfg.channel_start, cfg.channel_stop, cfg.oversample_factor);
+}
+
+void RunBench(const BenchConfig &cfg) {
+  // Dispatch on (input, filter) type combination. Each lambda instantiates
+  // only the single combination selected at runtime, keeping compile time
+  // proportional to the number of supported types rather than their product.
+  auto go = [&](auto in_tag, auto filt_tag) {
+    DispatchBench<decltype(in_tag), decltype(filt_tag)>(cfg);
+  };
+
+  auto dispatch_filter = [&](auto in_tag) {
+    if (cfg.filter_prec == Precision::Float && cfg.filter_domain == Domain::Real)
+      go(in_tag, float{});
+    else if (cfg.filter_prec == Precision::Double && cfg.filter_domain == Domain::Real)
+      go(in_tag, double{});
+    else if (cfg.filter_prec == Precision::Float && cfg.filter_domain == Domain::Complex)
+      go(in_tag, cuda::std::complex<float>{});
+    else
+      go(in_tag, cuda::std::complex<double>{});
+  };
+
+  if (cfg.input_prec == Precision::Float && cfg.input_domain == Domain::Real)
+    dispatch_filter(float{});
+  else if (cfg.input_prec == Precision::Double && cfg.input_domain == Domain::Real)
+    dispatch_filter(double{});
+  else if (cfg.input_prec == Precision::Float && cfg.input_domain == Domain::Complex)
+    dispatch_filter(cuda::std::complex<float>{});
+  else
+    dispatch_filter(cuda::std::complex<double>{});
+}
+
+int main(int argc, char **argv)
 {
   MATX_ENTER_HANDLER();
 
-  [[maybe_unused]] const matx::index_t channel_start = 2;
-  [[maybe_unused]] const matx::index_t channel_stop = 12;
-  const matx::index_t oversampling_factor = 2;
+  BenchConfig cfg;
 
-  using input_t = cuda::std::complex<float>;
-  using output_t = cuda::std::complex<float>;
-  using filter_t = float;
+  for (int i = 1; i < argc; i++) {
+    if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
+      PrintUsage(argv[0]);
+      return 0;
+    } else if (strcmp(argv[i], "--input-type") == 0 && i + 1 < argc) {
+      if (!ParseType(argv[++i], cfg.input_prec, cfg.input_domain)) {
+        fprintf(stderr, "Unknown input type: %s\n", argv[i]);
+        return 1;
+      }
+    } else if (strcmp(argv[i], "--filter-type") == 0 && i + 1 < argc) {
+      if (!ParseType(argv[++i], cfg.filter_prec, cfg.filter_domain)) {
+        fprintf(stderr, "Unknown filter type: %s\n", argv[i]);
+        return 1;
+      }
+    } else if (strcmp(argv[i], "--channel-start") == 0 && i + 1 < argc) {
+      cfg.channel_start = static_cast<matx::index_t>(atol(argv[++i]));
+    } else if (strcmp(argv[i], "--channel-stop") == 0 && i + 1 < argc) {
+      cfg.channel_stop = static_cast<matx::index_t>(atol(argv[++i]));
+    } else if (strcmp(argv[i], "--oversample") == 0 && i + 1 < argc) {
+      cfg.oversample_factor = static_cast<matx::index_t>(atol(argv[++i]));
+    } else {
+      fprintf(stderr, "Unknown option: %s\n", argv[i]);
+      PrintUsage(argv[0]);
+      return 1;
+    }
+  }
 
-  printf("Benchmarking complex<float> -> complex<float>\n");
-  ChannelizePolyBench<input_t, output_t, filter_t>(channel_start, channel_stop);
-
-  ChannelizePolyBench<input_t, output_t, filter_t>(40, 40);
-
-  ChannelizePolyBench<input_t, output_t, filter_t>(40, 40, oversampling_factor);
-
-  ChannelizePolyBench<input_t, output_t, filter_t>(8192, 8192);
-
-  ChannelizePolyBench<input_t, output_t, filter_t>(8192, 8192, oversampling_factor);
+  RunBench(cfg);
 
   matx::ClearCachesAndAllocations();
 
