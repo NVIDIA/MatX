@@ -47,14 +47,21 @@
 
 namespace matx {
 
-// Number of output elements generated per thread
-constexpr index_t CHANNELIZE_POLY1D_ELEMS_PER_THREAD = 1;
+// detail constants that require both host and device visibility at compile time
+namespace detail {
+    // Number of output elements generated per thread
+    constexpr index_t CHANNELIZE_POLY1D_ELEMS_PER_THREAD = 1;
+
+    // Maximum number of filter rotations per channel for the SmemTiled kernel.
+    // This is used to determine if the filter can be stored in shared memory. The
+    // number of rotations can exceed this value, but the filter will be read from
+    // global memory rather than cached in shared memory.
+    constexpr int MATX_CHANNELIZE_POLY1D_SMEM_TILED_MAX_ROTATIONS = 32;
+}
 
 #ifdef __CUDACC__ 
 
 namespace detail {
-
-constexpr int MATX_CHANNELIZE_POLY1D_SMEM_TILED_MAX_ROTATIONS = 32;
 
 template <typename AccumT, typename FilterT>
 __MATX_DEVICE__ __MATX_INLINE__ auto channelize_cast_filter(FilterT v)
@@ -146,8 +153,8 @@ __global__ void ChannelizePoly1D(OutType output, InType input, FilterType filter
     const int channel = blockIdx.y;
     const int tid = threadIdx.x;
 
-    constexpr index_t ELEMS_PER_BLOCK = CHANNELIZE_POLY1D_ELEMS_PER_THREAD * THREADS;
-    const index_t first_out_elem = elem_block * CHANNELIZE_POLY1D_ELEMS_PER_THREAD * THREADS;
+    constexpr index_t ELEMS_PER_BLOCK = detail::CHANNELIZE_POLY1D_ELEMS_PER_THREAD * THREADS;
+    const index_t first_out_elem = elem_block * detail::CHANNELIZE_POLY1D_ELEMS_PER_THREAD * THREADS;
     const index_t last_out_elem = cuda::std::min(
         output_len_per_channel - 1, first_out_elem + ELEMS_PER_BLOCK - 1);
 
@@ -873,8 +880,8 @@ __global__ void ChannelizePoly1D_FusedChan(OutType output, InType input, FilterT
     auto indims = BlockToIdx(input, blockIdx.z, 1);
     auto outdims = BlockToIdx(output, blockIdx.z, 2);
 
-    constexpr index_t ELEMS_PER_BLOCK = CHANNELIZE_POLY1D_ELEMS_PER_THREAD * THREADS;
-    const index_t first_out_elem = elem_block * CHANNELIZE_POLY1D_ELEMS_PER_THREAD * THREADS;
+    constexpr index_t ELEMS_PER_BLOCK = detail::CHANNELIZE_POLY1D_ELEMS_PER_THREAD * THREADS;
+    const index_t first_out_elem = elem_block * detail::CHANNELIZE_POLY1D_ELEMS_PER_THREAD * THREADS;
     const index_t last_out_elem = cuda::std::min(
         output_len_per_channel - 1, first_out_elem + ELEMS_PER_BLOCK - 1);
 

@@ -87,7 +87,7 @@ inline size_t matxChannelizePoly1DInternal_SmemTiledFilterSmemBytes(
   }
   const index_t gcd_val = std::gcd(num_channels, decimation_factor);
   const index_t K = num_channels / gcd_val;
-  if (K > MATX_CHANNELIZE_POLY1D_SMEM_TILED_MAX_ROTATIONS) {
+  if (K > detail::MATX_CHANNELIZE_POLY1D_SMEM_TILED_MAX_ROTATIONS) {
     return MATX_CHANNELIZE_POLY1D_SMEM_TILED_MAX_FILTER_BYTES + 1; // exceeds budget, so FilterInSmem=false
   }
   return static_cast<size_t>(CTILE) * K * P * sizeof(filter_t);
@@ -233,7 +233,7 @@ inline void matxChannelizePoly1DInternal(OutType o, const InType &i,
   const index_t filter_len = filter.Size(FilterType::Rank()-1);
 
   const int THREADS = 256;
-  const index_t ELTS_PER_THREAD = CHANNELIZE_POLY1D_ELEMS_PER_THREAD * THREADS;
+  const index_t ELTS_PER_THREAD = detail::CHANNELIZE_POLY1D_ELEMS_PER_THREAD * THREADS;
   const int elem_blocks = static_cast<int>(
     (nout_per_channel + ELTS_PER_THREAD - 1) / ELTS_PER_THREAD);
   dim3 grid(elem_blocks, static_cast<int>(num_channels), num_batches);
@@ -322,7 +322,7 @@ inline void matxChannelizePoly1DInternal_FusedChan(OutType o, const InType &i,
   const int num_batches = static_cast<int>(TotalSize(i)/i.Size(i.Rank() - 1));
 
   const int THREADS = 256;
-  const index_t ELTS_PER_THREAD = CHANNELIZE_POLY1D_ELEMS_PER_THREAD * THREADS;
+  const index_t ELTS_PER_THREAD = detail::CHANNELIZE_POLY1D_ELEMS_PER_THREAD * THREADS;
   const int elem_blocks = static_cast<int>(
     (nout_per_channel + ELTS_PER_THREAD - 1) / ELTS_PER_THREAD);
   dim3 grid(elem_blocks, 1, num_batches);
