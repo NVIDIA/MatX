@@ -1222,8 +1222,8 @@ MATX_IGNORE_WARNING_POP_GCC
     template <int DIM, int RANK_VAL, typename CapType>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type
     DimStride(index_t idx_val) const {
-      constexpr bool is_unit = CapType::unit_stride_last && (DIM == RANK_VAL - 1);
       constexpr bool is_last = (DIM == RANK_VAL - 1);
+      constexpr bool is_unit = CapType::unit_stride_last && is_last;
       constexpr bool has_ept = (CapType::ept != detail::ElementsPerThread::ONE) && is_last;
 
       if constexpr (is_unit && has_ept) {

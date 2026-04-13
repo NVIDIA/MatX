@@ -186,7 +186,7 @@ __global__ void matxOpT4StrideKernel(Op op, index_t size0, index_t size1, index_
  * @param sizes sizes of each dimension
  * @param mult Product of sizes of all but first dimension
  */
-template <class Op>
+template <typename CapType, class Op>
 __global__ void matxOpTDKernel(Op op, const cuda::std::array<index_t, Op::Rank()> sizes, index_t mult) {
   cuda::std::array<index_t, Op::Rank()> indices;
 
@@ -211,12 +211,12 @@ __global__ void matxOpTDKernel(Op op, const cuda::std::array<index_t, Op::Rank()
 
     if constexpr (cuda::std::is_pointer_v<Op>) {
       cuda::std::apply([&](auto... args){
-        (*op)(args...);
+        (*op).template operator()<CapType>(args...);
       }, indices);
     }
     else {
       cuda::std::apply([&](auto... args){
-        op(args...);
+        op.template operator()<CapType>(args...);
       }, indices);
     }
   }
