@@ -79,14 +79,20 @@ public:
   matxCovHandle_t(TensorTypeC &c, const TensorTypeA &a, cudaStream_t stream = 0)
   {
     static_assert(RANK >= 2);
-    MATX_ASSERT(c.Size(RANK - 1) == c.Size(RANK - 2), matxInvalidSize);
-    MATX_ASSERT(a.Size(RANK - 1) == c.Size(RANK - 1), matxInvalidSize);
+    if (c.Size(RANK - 1) != c.Size(RANK - 2)) {
+      MATX_THROW(matxInvalidSize, "Covariance output matrix must be square in last two dimensions");
+    }
+    if (a.Size(RANK - 1) != c.Size(RANK - 1)) {
+      MATX_THROW(matxInvalidSize, "Input and output matrix inner dimensions must match");
+    }
 
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
     // Ensure batch dimensions are equal
     for (int i = 0; i < RANK - 2; i++) {
-      MATX_ASSERT(a.Size(i) == c.Size(i), matxInvalidSize);
+      if (a.Size(i) != c.Size(i)) {
+        MATX_THROW(matxInvalidSize, "Batch dimensions of input and output must match");
+      }
     }
 
     // This must come before the things below to properly set class parameters

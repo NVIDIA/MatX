@@ -183,6 +183,10 @@ namespace matx
           if constexpr (is_jit_cuda_executor_t<Ex>()) {
             ex.Exec(*tp);
           }
+          else if constexpr (is_dynamic_rank_op_v<T>) {
+            static_assert(!is_dynamic_rank_op_v<T>,
+              "Dynamic-rank expressions can only be executed through CUDAJITExecutor");
+          }
           else if constexpr (is_mtie<T>() ) {
             detail::check_mtie_aliased_memory(*tp);
             tp->Exec(ex);

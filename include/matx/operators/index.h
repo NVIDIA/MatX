@@ -51,6 +51,10 @@ namespace matx
       public:
         using matxop = bool;
         using value_type = index_t;
+        using self_type = IndexOp;
+
+        // No child operators, so never dynamic
+        using dynamic_tensor_expr = cuda::std::false_type;
 
 #ifdef MATX_EN_JIT
         struct JIT_Storage {
@@ -121,6 +125,15 @@ namespace matx
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size([[maybe_unused]] int dim) const
         {
           return index_t(0);
+        }
+
+        __MATX_INLINE__ __MATX_HOST__ int32_t DynRank() const {
+          return Rank();
+        }
+
+        __MATX_INLINE__ __MATX_HOST__ int32_t jit_rank() const {
+          if constexpr (is_dynamic_rank_op_v<self_type>) return DynRank();
+          else return Rank();
         }
 
         template <OperatorCapability Cap, typename InType>

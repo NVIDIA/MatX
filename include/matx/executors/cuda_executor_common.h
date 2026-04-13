@@ -60,14 +60,14 @@ namespace detail
        * @param stream CUDA stream
        * @param profiling Whether to enable profiling
        */
-      CudaExecutorBase(cudaStream_t stream, bool profiling = false) : stream_(stream), profiling_(profiling) {
+      CudaExecutorBase(cudaStream_t stream, bool profiling = false) : stream_(stream), profiling_(profiling), start_(nullptr), stop_(nullptr) {
         if (profiling_) {
           MATX_CUDA_CHECK(cudaEventCreate(&start_));
           MATX_CUDA_CHECK(cudaEventCreate(&stop_));
         }
       }
 
-      CudaExecutorBase(int stream, bool profiling = false) : stream_(reinterpret_cast<cudaStream_t>(stream)), profiling_(profiling) {
+      CudaExecutorBase(int stream, bool profiling = false) : stream_(reinterpret_cast<cudaStream_t>(stream)), profiling_(profiling), start_(nullptr), stop_(nullptr) {
         if (profiling_) {
           MATX_CUDA_CHECK(cudaEventCreate(&start_));
           MATX_CUDA_CHECK(cudaEventCreate(&stop_));
@@ -78,7 +78,7 @@ namespace detail
        * @brief Construct a new CudaExecutorBase object using the default stream
        * 
        */
-      CudaExecutorBase() : stream_(0), profiling_(false) {
+      CudaExecutorBase() : stream_(0), profiling_(false), start_(nullptr), stop_(nullptr) {
         if (profiling_) {
           MATX_CUDA_CHECK(cudaEventCreate(&start_));
           MATX_CUDA_CHECK(cudaEventCreate(&stop_));
@@ -126,7 +126,9 @@ namespace detail
        * This will block until the event is synchronized
        */
       float get_time_ms() {
-        MATX_ASSERT_STR(profiling_, matxInvalidParameter, "Profiling not enabled when using get_time_ms()");
+        if (!profiling_) {
+          MATX_THROW(matxInvalidParameter, "Profiling not enabled when using get_time_ms()");
+        }
         float time;
         cudaEventSynchronize(stop_);
         cudaEventElapsedTime(&time, start_, stop_);

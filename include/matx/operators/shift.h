@@ -68,6 +68,10 @@ namespace matx
         static_assert(shift_rank_ <= 1, "Shift operator must be rank 0 or rank 1. Higher-rank shift operators are not supported.");
         static_assert(shift_rank_ != 1 || detail::get_rank<T1>() == 2,
                       "Rank-1 shift operator is only supported for rank-2 input operators");
+        // Propagate dynamic tensor marker through expression tree
+        using dynamic_tensor_expr = cuda::std::bool_constant<
+          is_dynamic_tensor_v<T1> || is_dynamic_tensor_v<T2> ||
+          is_dynamic_rank_op_v<T1> || is_dynamic_rank_op_v<T2>>;
 
 #ifdef MATX_EN_JIT
         struct JIT_Storage {
@@ -85,8 +89,9 @@ namespace matx
 
         __MATX_INLINE__ auto get_jit_op_str() const {
           std::string func_name = get_jit_class_name();
+          const int actual_rank = jit_rank();
           cuda::std::array<index_t, Rank()> out_dims_;
-          for (int i = 0; i < Rank(); ++i) {
+          for (int i = 0; i < actual_rank; ++i) {
             out_dims_[i] = Size(i);
           }
           
@@ -126,7 +131,7 @@ namespace matx
                 "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return Rank_; }}\n"
                 "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const {{ return sizes_[dim]; }}\n"
                 "}};\n",
-                func_name, DIM, Rank(), SHIFT_DIM_, detail::array_to_string(out_dims_), shift_lookup)
+                func_name, DIM, actual_rank, SHIFT_DIM_, detail::array_to_string(out_dims_, actual_rank), shift_lookup)
           );
         }
 #endif
@@ -290,6 +295,15 @@ namespace matx
           return sizes_[dim];
         }
 
+        __MATX_INLINE__ __MATX_HOST__ int32_t DynRank() const {
+          return detail::matx_max(detail::get_dyn_rank(op_), detail::get_dyn_rank(shift_));
+        }
+
+        __MATX_INLINE__ __MATX_HOST__ int32_t jit_rank() const {
+          if constexpr (is_dynamic_rank_op_v<self_type>) return DynRank();
+          else return Rank();
+        }
+
         ~ShiftOp() = default;
         ShiftOp(const ShiftOp &rhs) = default;
 
@@ -376,4 +390,3 @@ namespace matx
     };
 
 } // end namespace matx
-

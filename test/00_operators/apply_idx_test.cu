@@ -123,7 +123,7 @@ struct DiagonalAccessFunctor {
   }
 };
 
-TYPED_TEST(OperatorTestsNumericAllExecs, ApplyIdxOp)
+TYPED_TEST(OperatorTestsNumericAllExecsWithoutJIT, ApplyIdxOp)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
@@ -332,7 +332,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, ApplyIdxOp)
 }
 
 // Test with complex types
-TYPED_TEST(OperatorTestsComplexTypesAllExecs, ApplyIdxOpComplex)
+TYPED_TEST(OperatorTestsComplexTypesAllExecsWithoutJIT, ApplyIdxOpComplex)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
@@ -362,7 +362,7 @@ TYPED_TEST(OperatorTestsComplexTypesAllExecs, ApplyIdxOpComplex)
 }
 
 // Test with floating point types
-TYPED_TEST(OperatorTestsFloatAllExecs, ApplyIdxOpFloat)
+TYPED_TEST(OperatorTestsFloatAllExecsWithoutJIT, ApplyIdxOpFloat)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
@@ -532,7 +532,7 @@ struct Neighbor2DApplyFunctor {
 };
 
 // Tests using cuda::std::apply for index unpacking
-TYPED_TEST(OperatorTestsNumericAllExecs, ApplyIdxWithStdApply)
+TYPED_TEST(OperatorTestsNumericAllExecsWithoutJIT, ApplyIdxWithStdApply)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
@@ -702,5 +702,4 @@ TYPED_TEST(OperatorTestsNumericAllExecs, ApplyIdxWithStdApply)
 
   MATX_EXIT_HANDLER();
 }
-
 

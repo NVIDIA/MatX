@@ -54,6 +54,11 @@ namespace matx
       public:
         using matxop = bool;
         using value_type = typename T1::value_type;
+        using self_type = HermitianTransOp<T1, DIM>;
+
+        // Propagate dynamic tensor marker through expression tree
+        using dynamic_tensor_expr = cuda::std::bool_constant<
+          is_dynamic_tensor_v<T1> || is_dynamic_rank_op_v<T1>>;
 
 #ifdef MATX_EN_JIT
         struct JIT_Storage {
@@ -69,9 +74,10 @@ namespace matx
         }
 
         __MATX_INLINE__ auto get_jit_op_str() const {
+          const int actual_rank = jit_rank();
           std::string func_name = get_jit_class_name();
           cuda::std::array<index_t, Rank()> out_dims_;
-          for (int i = 0; i < Rank(); ++i) {
+          for (int i = 0; i < actual_rank; ++i) {
             out_dims_[i] = Size(i);
           }
           
@@ -100,7 +106,7 @@ namespace matx
                 "    return (dim < (Rank_ - 2)) ? out_dims_[dim] : out_dims_[(dim == Rank_ - 1) ? Rank_ - 2 : Rank_ - 1];\n"
                 "  }}\n"
                 "}};\n",
-                func_name, Rank(), detail::array_to_string(out_dims_))
+                func_name, actual_rank, detail::array_to_string(out_dims_, actual_rank))
           );
         }
 #endif
@@ -137,6 +143,15 @@ namespace matx
         {
           // Optimize these branches later
           return (dim < (Rank() - 2)) ? op_.Size(dim) : op_.Size((dim == Rank() - 1) ? Rank() - 2 : Rank() - 1);
+        }
+
+        __MATX_INLINE__ __MATX_HOST__ int32_t DynRank() const {
+          return detail::get_dyn_rank(op_);
+        }
+
+        __MATX_INLINE__ __MATX_HOST__ int32_t jit_rank() const {
+          if constexpr (is_dynamic_rank_op_v<self_type>) return DynRank();
+          else return Rank();
         }
 
         template <typename ShapeType, typename Executor>

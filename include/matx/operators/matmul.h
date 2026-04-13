@@ -75,6 +75,12 @@ namespace matx
         using value_type = typename OpA::value_type;
         using matx_transform_op = bool;
         using matmul_xform_op = bool;
+        using self_type = MatMulOp<OpA, OpB, PermDims>;
+
+        // Propagate dynamic tensor marker through expression tree
+        using dynamic_tensor_expr = cuda::std::bool_constant<
+          is_dynamic_tensor_v<OpA> || is_dynamic_rank_op_v<OpA> ||
+          is_dynamic_tensor_v<OpB> || is_dynamic_rank_op_v<OpB>>;
 
         __MATX_INLINE__ std::string str() const { 
             return "matmul(" + get_type_str(a_) + "," + get_type_str(b_) + ")";
@@ -104,13 +110,14 @@ namespace matx
         }
 
         __MATX_INLINE__ auto get_jit_op_str() const {
+          const int actual_rank = jit_rank();
           const std::string class_name = get_jit_class_name();
           const std::string gemm_func_name = std::string(GEMM_DX_FUNC_PREFIX) + "_" + dx_gemm_helper_.GetSymbolName();
-          
+
           return cuda::std::make_tuple(
-             class_name, 
+             class_name,
              std::string(
-                 " extern \"C\" __device__ void " + gemm_func_name + "(" + 
+                 " extern \"C\" __device__ void " + gemm_func_name + "(" +
                  detail::type_to_string<typename OpA::value_type>() + "*, " +
                  detail::type_to_string<typename OpA::value_type>() + "*, " +
                  detail::type_to_string<typename OpA::value_type>() + "*, " +
@@ -122,8 +129,8 @@ namespace matx
                  "  using value_type = input_type;\n" +
                  "  typename detail::inner_storage_or_self_t<detail::base_type_t<OpA>> a_;\n" +
                  "  typename detail::inner_storage_or_self_t<detail::base_type_t<OpB>> b_;\n" +
-                 "  constexpr static cuda::std::array<index_t, " + std::to_string(Rank()) + "> out_dims_ = { " + 
-                 detail::array_to_string(out_dims_) + " };\n" +
+                 "  constexpr static cuda::std::array<index_t, " + std::to_string(actual_rank) + "> out_dims_ = { " +
+                 detail::array_to_string(out_dims_, actual_rank) + " };\n" +
                  "  static constexpr index_t m_ = " + std::to_string(dx_gemm_helper_.get_m()) + ";\n" +
                  "  static constexpr index_t n_ = " + std::to_string(dx_gemm_helper_.get_n()) + ";\n" +
                  "  static constexpr index_t k_ = " + std::to_string(dx_gemm_helper_.get_k()) + ";\n" +
@@ -134,7 +141,7 @@ namespace matx
                  "  }\n" +
                  "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank()\n" +
                  "  {\n" +
-                 "    return " + std::to_string(Rank()) + ";\n" +
+                 "    return " + std::to_string(actual_rank) + ";\n" +
                  "  }\n" +
                  "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const\n" +
                  "  {\n" +
@@ -338,6 +345,15 @@ namespace matx
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
         {
           return out_dims_[dim];
+        }
+
+        __MATX_INLINE__ __MATX_HOST__ int32_t DynRank() const {
+          return detail::matx_max(detail::get_dyn_rank(a_), detail::get_dyn_rank(b_));
+        }
+
+        __MATX_INLINE__ __MATX_HOST__ int32_t jit_rank() const {
+          if constexpr (is_dynamic_rank_op_v<self_type>) return DynRank();
+          else return Rank();
         }
 
         __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }

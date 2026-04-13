@@ -68,6 +68,10 @@ namespace matx
     using value_type = typename Op::value_type;
     using self_type = matxUnaryOp<I1, Op>;
 
+    // Propagate dynamic tensor marker through expression tree
+    using dynamic_tensor_expr = cuda::std::bool_constant<
+      is_dynamic_tensor_v<I1> || is_dynamic_rank_op_v<I1>>;
+
 #ifdef MATX_EN_JIT
     struct JIT_Storage {
       typename detail::inner_storage_or_self_t<detail::base_type_t<I1>> in1_;
@@ -122,32 +126,35 @@ namespace matx
 
     __MATX_INLINE__ auto get_jit_op_str() const {
       std::string func_name = get_jit_class_name();
-      cuda::std::array<index_t, Rank()> out_dims_;
-      for (int i = 0; i < Rank(); ++i) {
-        out_dims_[i] = Size(i);
+      const int actual_rank = jit_rank();
+      std::string dims_str;
+      for (int i = 0; i < actual_rank; ++i) {
+        if (i > 0) dims_str += ", ";
+        dims_str += std::to_string(Size(i));
       }
-      
+
       return cuda::std::make_tuple(
         func_name,
         std::string("template <typename I1, typename Op> struct " + func_name + " {\n") +
             "  using value_type = typename Op::value_type;\n" +
             "  using matxop = bool;\n" +
-            "  constexpr static cuda::std::array<index_t, " + std::to_string(Rank()) + "> out_dims_ = { " +
-            detail::array_to_string(out_dims_) + " };\n" +
+            "  constexpr static cuda::std::array<index_t, " + std::to_string(actual_rank) + "> out_dims_ = { " +
+            dims_str + " };\n" +
             "  typename detail::inner_storage_or_self_t<detail::base_type_t<I1>> in1_;\n" +
             "  typename detail::inner_storage_or_self_t<detail::base_type_t<Op>> op_;\n" +
             "  template <typename CapType, typename... Is>\n" +
             "  __MATX_INLINE__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) const\n" +
             "  {\n" +
-            "    if ((threadIdx.x * static_cast<int>(CapType::ept)) > Size(Rank() - 1)) {\n" +
-            "      return detail::GetJitSentinelValue<CapType, value_type>();\n" +
-            "    }\n" +
+            (actual_rank > 0 ?
+            "    if ((threadIdx.x * static_cast<int>(CapType::ept)) > Size(Rank() - 1)) {\n"
+            "      return detail::GetJitSentinelValue<CapType, value_type>();\n"
+            "    }\n" : "") +
             "    auto i1 = get_value<CapType>(in1_, indices...);\n" +
             "    return op_.template operator()<CapType>(i1);\n" +
             "  }\n" +
             "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank()\n" +
             "  {\n" +
-            "    return detail::get_rank<I1>();\n" +
+            "    return " + std::to_string(actual_rank) + ";\n" +
             "  }\n" +
             "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const\n" +
             "  {\n" +
@@ -206,6 +213,15 @@ namespace matx
     constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
     {
       return size_[dim];
+    }
+
+    __MATX_INLINE__ __MATX_HOST__ int32_t DynRank() const {
+      return detail::get_dyn_rank(in1_);
+    }
+
+    __MATX_INLINE__ __MATX_HOST__ int32_t jit_rank() const {
+      if constexpr (is_dynamic_rank_op_v<self_type>) return DynRank();
+      else return Rank();
     }
 
     template <typename ShapeType, typename Executor>

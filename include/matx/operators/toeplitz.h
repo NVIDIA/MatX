@@ -53,6 +53,12 @@ namespace matx
       public:
         using matxop = bool;
         using value_type = typename T1::value_type;
+        using self_type = ToeplitzOp<T1, T2>;
+
+        // Propagate dynamic tensor marker through expression tree
+        using dynamic_tensor_expr = cuda::std::bool_constant<
+          is_dynamic_tensor_v<T1> || is_dynamic_rank_op_v<T1> ||
+          is_dynamic_tensor_v<T2> || is_dynamic_rank_op_v<T2>>;
 
 #ifdef MATX_EN_JIT
         struct JIT_Storage {
@@ -267,6 +273,15 @@ namespace matx
           else {
             return (dim == 0) ? op1_.size() : op2_.size();
           }
+        }
+
+        __MATX_INLINE__ __MATX_HOST__ int32_t DynRank() const {
+          return detail::matx_max(detail::get_dyn_rank(op1_), detail::get_dyn_rank(op2_));
+        }
+
+        __MATX_INLINE__ __MATX_HOST__ int32_t jit_rank() const {
+          if constexpr (is_dynamic_rank_op_v<self_type>) return DynRank();
+          else return Rank();
         }
     };
   }

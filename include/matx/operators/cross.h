@@ -63,6 +63,12 @@ namespace matx
       public:
         using matxop = bool;
         using value_type = typename OpA::value_type;
+        using self_type = CrossOp<OpA, OpB>;
+
+        // Propagate dynamic tensor marker through expression tree
+        using dynamic_tensor_expr = cuda::std::bool_constant<
+          is_dynamic_tensor_v<OpA> || is_dynamic_rank_op_v<OpA> ||
+          is_dynamic_tensor_v<OpB> || is_dynamic_rank_op_v<OpB>>;
 
 #ifdef MATX_EN_JIT
         struct JIT_Storage {
@@ -304,6 +310,15 @@ namespace matx
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size([[maybe_unused]] int dim) const
         {
           return out_dims_[dim];
+        }
+
+        __MATX_INLINE__ __MATX_HOST__ int32_t DynRank() const {
+          return detail::matx_max(detail::get_dyn_rank(a_), detail::get_dyn_rank(b_));
+        }
+
+        __MATX_INLINE__ __MATX_HOST__ int32_t jit_rank() const {
+          if constexpr (is_dynamic_rank_op_v<self_type>) return DynRank();
+          else return Rank();
         }
 
         template <typename ShapeType, typename Executor>

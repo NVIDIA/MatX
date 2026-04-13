@@ -105,12 +105,25 @@ MATX_LOOP_UNROLL
       static_cast<index_t>(chunk_id) * blockDim.x * RECURSIVE_VALS_PER_THREAD +
       threadIdx.x;
 
+MATX_LOOP_UNROLL
+  for (index_t r = 0; r < RECURSIVE_VALS_PER_THREAD; r++) {
+    if constexpr (is_cuda_complex_v<InType>) {
+      vals[r] = make_cuFloatComplex(0.0, 0.0);
+    }
+    else {
+      vals[r] = 0;
+    }
+  }
+
   // Copy signal input. If we're a thread that needs to share data with other
   // blocks for the map step, store that value as well
   if (tid < len) {
 MATX_LOOP_UNROLL
     for (index_t r = 0; r < RECURSIVE_VALS_PER_THREAD; r++) {
-      vals[r] = d_in(static_cast<index_t>(blockIdx.y), static_cast<index_t>(tid + BLOCK_SIZE_RECURSIVE * r));
+      const index_t gidx = tid + BLOCK_SIZE_RECURSIVE * r;
+      if (gidx < len) {
+        vals[r] = d_in(static_cast<index_t>(blockIdx.y), static_cast<index_t>(gidx));
+      }
     }
 
     if (lane > WARP_SIZE - num_non_recursive) {
@@ -133,8 +146,11 @@ MATX_LOOP_UNROLL
         }
       }
       else {
+        const index_t gidx =
+            static_cast<index_t>(chunk_id) * blockDim.x * RECURSIVE_VALS_PER_THREAD -
+            threadIdx.x - 1;
         s_exch[threadIdx.x] =
-            d_in(static_cast<index_t>(blockIdx.y), static_cast<index_t>(chunk_id * blockDim.x - threadIdx.x - 1));
+            d_in(static_cast<index_t>(blockIdx.y), static_cast<index_t>(gidx));
       }
     }
   }
@@ -167,7 +183,7 @@ MATX_LOOP_UNROLL
         }
       }
 
-      if ((blockIdx.x * RECURSIVE_VALS_PER_THREAD + threadIdx.x * r) <
+      if ((tid + BLOCK_SIZE_RECURSIVE * static_cast<index_t>(r)) <
           static_cast<uint32_t>(len)) { // Make sure this value is within bounds of the signal
         if constexpr (is_cuda_complex_v<InType>) {
           vals[r] = cuCmulf(vals[r], r_nonr[0]);
@@ -226,7 +242,7 @@ MATX_LOOP_UNROLL
       tmp[0] = __shfl_sync(~0, vals[r], 0, 2);
     }
 
-    if ((blockIdx.x * RECURSIVE_VALS_PER_THREAD + threadIdx.x * r) <
+    if ((tid + BLOCK_SIZE_RECURSIVE * static_cast<index_t>(r)) <
         len) { // Make sure this value is within bounds of the signal
       if ((threadIdx.x & 1) == 1) {
         if constexpr (is_cuda_complex_v<InType>) {
@@ -269,7 +285,7 @@ MATX_LOOP_UNROLL
         }
       }
 
-      if ((blockIdx.x * RECURSIVE_VALS_PER_THREAD + threadIdx.x * r) <
+      if ((tid + BLOCK_SIZE_RECURSIVE * static_cast<index_t>(r)) <
           static_cast<uint32_t>(len)) { // Make sure this value is within bounds of the signal
 // Now apply those values
 MATX_LOOP_UNROLL
@@ -334,7 +350,7 @@ MATX_LOOP_UNROLL
     if (sub_group_idx >= 0) {
 MATX_LOOP_UNROLL
       for (uint32_t vpt = 0; vpt < RECURSIVE_VALS_PER_THREAD; vpt++) {
-        if ((blockIdx.x * RECURSIVE_VALS_PER_THREAD + threadIdx.x * vpt) <
+        if ((tid + BLOCK_SIZE_RECURSIVE * static_cast<index_t>(vpt)) <
             len) { // Make sure this value is within bounds of the signal
 MATX_LOOP_UNROLL
           for (uint32_t r = 0; r < num_recursive; r++) {
@@ -383,7 +399,7 @@ MATX_LOOP_UNROLL
 
       __syncthreads();
 
-      if ((blockIdx.x * RECURSIVE_VALS_PER_THREAD + threadIdx.x * block_idx) <
+      if ((tid + BLOCK_SIZE_RECURSIVE * static_cast<index_t>(block_idx)) <
           len) { // Make sure this value is within bounds of the signal
 MATX_LOOP_UNROLL
         for (uint32_t r = 0; r < num_recursive; r++) {
@@ -556,7 +572,7 @@ MATX_LOOP_UNROLL
     do {
 MATX_LOOP_UNROLL
       for (uint32_t r = 0; r < num_recursive; r++) {
-        if ((blockIdx.x * RECURSIVE_VALS_PER_THREAD + threadIdx.x * r) < len) {
+        if ((tid + BLOCK_SIZE_RECURSIVE * static_cast<index_t>(block_idx)) < len) {
           if constexpr (is_cuda_complex_v<InType>) {
             vals[block_idx] = cuCaddf(
                 vals[block_idx],
@@ -571,7 +587,7 @@ MATX_LOOP_UNROLL
       __syncthreads();
 
       if (threadIdx.x >= BLOCK_SIZE_RECURSIVE - num_recursive) {
-        s_exch[BLOCK_SIZE_RECURSIVE - threadIdx.x - 1] = vals[block_idx - 1];
+        s_exch[BLOCK_SIZE_RECURSIVE - threadIdx.x - 1] = vals[block_idx];
       }
 
       __syncthreads();

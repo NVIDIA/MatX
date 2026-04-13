@@ -50,18 +50,94 @@
 #include <vector>
 #include <string>
 #include <mutex>
+#include <cctype>
 
 
 namespace matx {
 
 namespace detail {  
 
+inline bool is_valid_nvrtc_arch(const std::string &arch) {
+    if (arch.empty()) {
+      return false;
+    }
+
+    size_t i = 0;
+    while (i < arch.size() && std::isdigit(static_cast<unsigned char>(arch[i])) != 0) {
+      i++;
+    }
+
+    // Require leading digits. Allow optional single architecture suffix letter (e.g. 90a).
+    if (i == 0) {
+      return false;
+    }
+    if (i == arch.size()) {
+      return true;
+    }
+    return (i + 1 == arch.size()) &&
+           (std::isalpha(static_cast<unsigned char>(arch[i])) != 0);
+}
+
+inline std::string get_runtime_cuda_arch() {
+    int device = 0;
+    auto dev_result = cudaGetDevice(&device);
+    if (dev_result != cudaSuccess) {
+      MATX_LOG_WARN("cudaGetDevice failed while resolving NVRTC arch ({}). Falling back to sm_80",
+                    cudaGetErrorString(dev_result));
+      return "80";
+    }
+
+    cudaDeviceProp props{};
+    auto prop_result = cudaGetDeviceProperties(&props, device);
+    if (prop_result != cudaSuccess) {
+      MATX_LOG_WARN("cudaGetDeviceProperties failed while resolving NVRTC arch ({}). Falling back to sm_80",
+                    cudaGetErrorString(prop_result));
+      return "80";
+    }
+
+    return std::to_string(props.major * 10 + props.minor);
+}
+
+inline std::string resolve_nvrtc_cuda_arch() {
+#ifdef NVRTC_CUDA_ARCH
+    const std::string configured = NVRTC_CUDA_ARCH;
+    if (is_valid_nvrtc_arch(configured)) {
+      return configured;
+    }
+
+    MATX_LOG_WARN("Configured NVRTC_CUDA_ARCH='{}' is invalid for NVRTC. Falling back to runtime device architecture",
+                  configured);
+#endif
+
+    return get_runtime_cuda_arch();
+}
+
+inline std::filesystem::path resolve_build_dir_for_deps() {
+    auto cur = std::filesystem::current_path();
+
+    while (true) {
+      if (std::filesystem::exists(cur / "_deps" / "cccl-src")) {
+        return cur;
+      }
+
+      const auto parent = cur.parent_path();
+      if (parent == cur) {
+        break;
+      }
+      cur = parent;
+    }
+
+    MATX_LOG_WARN("Could not locate build directory containing _deps from cwd '{}'. Using cwd for NVRTC include paths",
+                  std::filesystem::current_path().string());
+    return std::filesystem::current_path();
+}
+
 std::vector<std::string> __MATX_HOST__ __MATX_INLINE__ get_preprocessor_options() {
     // Get the project root from the current file's location
     const auto source_path = std::filesystem::path(std::source_location::current().file_name());
     // This assumes nvrtc.h is in <root>/include/matx/core/
     const auto matx_root = source_path.parent_path().parent_path().parent_path().parent_path();
-    const auto build_dir = std::filesystem::current_path();
+    const auto build_dir = resolve_build_dir_for_deps();
 
     std::vector<std::string> options;
     options.push_back("-DMATX_EN_MATHDX");
@@ -81,12 +157,8 @@ std::vector<std::string> __MATX_HOST__ __MATX_INLINE__ get_preprocessor_options(
     std::string cuda_inc_dir = cuda_path ? std::string(cuda_path) + "/include" : "/usr/local/cuda/include";
     options.push_back("-I" + cuda_inc_dir);
     
-    // Use CMake-configured CUDA architecture and C++ standard
-    #ifdef NVRTC_CUDA_ARCH
-        options.push_back("-arch=sm_" NVRTC_CUDA_ARCH);
-    #else
-        options.push_back("-arch=sm_80");  // fallback
-    #endif
+    const std::string nvrtc_arch = resolve_nvrtc_cuda_arch();
+    options.push_back("-arch=sm_" + nvrtc_arch);
     
     options.push_back("-std=c++20");
 
@@ -167,13 +239,18 @@ inline std::string get_jit_includes_path() {
 
 template <typename Op>
 std::string get_kernel_name([[maybe_unused]] const Op &op, bool stride, bool global_kernel, bool pass_through_threads = false) {
-  if constexpr (Op::Rank() == 0) {
+  return get_kernel_name_for_rank<Op::Rank()>(stride, global_kernel, pass_through_threads);
+}
+
+template <int RANK>
+std::string get_kernel_name_for_rank(bool stride, bool global_kernel, bool pass_through_threads = false) {
+  if constexpr (RANK == 0) {
     return "matx::detail::matxOpT0Kernel";
-  }  
-  else if constexpr (Op::Rank() == 1) {
+  }
+  else if constexpr (RANK == 1) {
     return global_kernel ? "matx::detail::matxOpT1Kernel" : "matx::detail::matxOpT1KernelBlock";
   }
-  else if constexpr (Op::Rank() == 2) {
+  else if constexpr (RANK == 2) {
     if (pass_through_threads) {
       return "matx::detail::matxOpT2KernelBlock2D";
     } else if (stride) {
@@ -182,7 +259,7 @@ std::string get_kernel_name([[maybe_unused]] const Op &op, bool stride, bool glo
       return global_kernel ? "matx::detail::matxOpT2Kernel" : "matx::detail::matxOpT2KernelBlock";
     }
   }
-  else if constexpr (Op::Rank() == 3) {
+  else if constexpr (RANK == 3) {
     if (pass_through_threads) {
       return "matx::detail::matxOpT3KernelBlock2D";
     } else if (stride) {
@@ -191,7 +268,7 @@ std::string get_kernel_name([[maybe_unused]] const Op &op, bool stride, bool glo
       return global_kernel ? "matx::detail::matxOpT3Kernel" : "matx::detail::matxOpT3KernelBlock";
     }
   }
-  else if constexpr (Op::Rank() == 4) {
+  else if constexpr (RANK == 4) {
     if (pass_through_threads) {
       return "matx::detail::matxOpT4KernelBlock2D";
     } else if (stride) {
@@ -308,6 +385,10 @@ inline std::string qualify_jit_type_names(const std::string& type_str) {
 
 template <typename Op, typename SizeArray>
 auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, const SizeArray &sa, dim3 &blocks, dim3 &threads, ElementsPerThread ept, bool stride, int dynamic_shmem_size, int osize, bool global_kernel, bool pass_through_threads = false) {
+  // The actual rank comes from the size array, which may differ from Op::Rank()
+  // for dynamic tensor expressions (where Op::Rank() = MATX_MAX_DYNAMIC_RANK).
+  constexpr int RANK = std::tuple_size_v<SizeArray>;
+
   // Pure NVRTC implementation
   // Cache both module and function to prevent resource leaks
   // CUmodule must remain loaded for CUfunction to be valid
@@ -322,7 +403,7 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, cons
   auto capstr = generate_capability_params_string(op, ept, false, osize, threads.x, pass_through_threads);
   const auto kernel_op_type = detail::get_operator_capability<OperatorCapability::JIT_TYPE_QUERY>(op);
   
-  std::string kernel_name = get_kernel_name(op, stride, global_kernel, pass_through_threads);
+  std::string kernel_name = get_kernel_name_for_rank<RANK>(stride, global_kernel, pass_through_threads);
   std::string cache_key = kernel_name + "_" + kernel_op_type;
 
   MATX_LOG_DEBUG("nvrtc_compile_and_run called with operator type: {}", typeid(op).name());
@@ -445,7 +526,7 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, cons
       NVRTC_CHECK(nvrtcGetProgramLog(prog, log.data()));
       MATX_LOG_DEBUG("NVRTC Compilation log:\n{}", log.data());
     }
-    
+
     if (compile_result != NVRTC_SUCCESS) {
       MATX_LOG_ERROR("NVRTC compilation failed!");
       nvrtcDestroyProgram(&prog);
@@ -474,7 +555,8 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, cons
 
     // Link and LTO-IR files if needed
     nvJitLinkHandle handle {};
-    std::vector<std::string> link_options = { "-lto", std::string("-arch=sm_") + std::string(NVRTC_CUDA_ARCH) };
+    const std::string nvrtc_arch = resolve_nvrtc_cuda_arch();
+    std::vector<std::string> link_options = { "-lto", std::string("-arch=sm_") + nvrtc_arch };
 
     std::vector<const char*> lto_opts;
     for (const auto& o : link_options) {
@@ -552,16 +634,16 @@ launch_kernel:
   auto storage = op.ToJITStorage();
   
   // Prepare kernel arguments
-  if constexpr (Op::Rank() > 4) {
-    // ND kernel: matxOpTDKernel(Op op, const cuda::std::array<matx::index_t, Op::Rank()> sizes, matx::index_t mult)
+  if constexpr (RANK > 4) {
+    // ND kernel: matxOpTDKernel(Op op, const cuda::std::array<matx::index_t, RANK> sizes, matx::index_t mult)
     // mult is the product of all sizes except the first
     index_t mult = cuda::std::accumulate(cuda::std::begin(sa) + 1, cuda::std::end(sa), 1, cuda::std::multiplies<index_t>());
-    
+
     void* args[3];
     args[0] = &storage;
     args[1] = const_cast<void*>(reinterpret_cast<const void*>(&sa));
     args[2] = &mult;
-    
+
     MATX_LOG_DEBUG("Launching kernel with grid=({}, {}, {}), block=({}, {}, {}), dynamic_shmem_size={} bytes",
                    blocks.x, blocks.y, blocks.z, threads.x, threads.y, threads.z, dynamic_shmem_size);
     // Launch kernel
@@ -575,21 +657,21 @@ launch_kernel:
   }
   else {
     // Rank 0-4 kernels: Pass individual size parameters
-    void* args[Op::Rank() + 1];
+    void* args[RANK + 1];
     args[0] = &storage;
-    if constexpr (Op::Rank() >= 1) {
+    if constexpr (RANK >= 1) {
       args[1] = const_cast<void*>(reinterpret_cast<const void*>(&sa[0]));
     }
-    if constexpr (Op::Rank() >= 2) {
+    if constexpr (RANK >= 2) {
       args[2] = const_cast<void*>(reinterpret_cast<const void*>(&sa[1]));
     }
-    if constexpr (Op::Rank() >= 3) {
+    if constexpr (RANK >= 3) {
       args[3] = const_cast<void*>(reinterpret_cast<const void*>(&sa[2]));
     }
-    if constexpr (Op::Rank() == 4) {
+    if constexpr (RANK == 4) {
       args[4] = const_cast<void*>(reinterpret_cast<const void*>(&sa[3]));
     }
-    
+
     MATX_LOG_DEBUG("Launching kernel with grid=({}, {}, {}), block=({}, {}, {}), dynamic_shmem_size={} bytes",
                    blocks.x, blocks.y, blocks.z, threads.x, threads.y, threads.z, dynamic_shmem_size);
     // Launch kernel

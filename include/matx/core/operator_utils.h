@@ -50,7 +50,31 @@ namespace matx {
         }
       }
     }
-  };  
+  };
+
+  namespace detail {
+    /**
+     * @brief Get the runtime rank from an operator, handling dynamic tensors.
+     *
+     * Returns DynRank() for dynamic tensor types and expression trees
+     * containing them, otherwise returns the compile-time Rank().
+     */
+    template <typename T>
+    __MATX_INLINE__ __MATX_HOST__ int32_t get_dyn_rank(const T& op) {
+      if constexpr (!is_matx_op<T>()) {
+        return 0;  // scalar
+      }
+      else if constexpr (is_dynamic_tensor_v<remove_cvref_t<T>>) {
+        return op.DynRank();
+      }
+      else if constexpr (requires { op.DynRank(); }) {
+        return op.DynRank();
+      }
+      else {
+        return T::Rank();
+      }
+    }
+  }
 
   constexpr bool RankGTE(int32_t rank1, int32_t rank2) {
     return rank1 >= rank2 || rank1 == matxNoRank;

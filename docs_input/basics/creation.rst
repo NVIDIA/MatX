@@ -89,10 +89,10 @@ runtime of a kernel
 Creating Tensors
 ----------------
 With the tensor terminology out of the way, it's time to discuss how to create tensors. If there's one thing to take from this article, it's that you
-should use ``make_tensor`` or ``make_static_tensor`` wherever possible.
+should use ``make_tensor`` wherever possible.
 
 .. note::
-    Prefer ``make_tensor`` or ``make_static_tensor`` over constructing tensors directly
+    Prefer ``make_tensor`` over constructing tensors directly
 
 Using these helper functions has many benefits:
 
@@ -172,7 +172,7 @@ When the sizes are known at compile time the static version of ``make_`` should 
 
 .. code-block:: cpp
 
-    auto t = make_static_tensor<float, 10, 20, 30>();
+    auto t = make_tensor<float, 10, 20, 30>();
 
 Notice the sizes are now template parameters instead of function parameters. Both ways can be used interchangeable in MatX code, but the static version
 can lead to higher performance.
@@ -262,4 +262,3 @@ To create a descriptor:
     DefaultDescriptor<RANK> desc{arr};
 
 In this case we create a default descriptor (based on ``index_t`` sizes) using a C-style array.
-
