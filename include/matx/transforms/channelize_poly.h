@@ -35,6 +35,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <type_traits>
+#include <numeric>
 
 #include "matx/core/error.h"
 #include "matx/core/nvtx.h"
@@ -58,9 +59,168 @@ constexpr index_t MATX_CHANNELIZE_POLY1D_FUSED_CHAN_KERNEL_THRESHOLD = 6;
 // to balance occupancy and CTA size. For now, we choose a reasonable default.
 constexpr index_t MATX_CHANNELIZE_POLY1D_FULL_SMEM_KERNEL_NOUT_PER_ITER = 4;
 
+// Maximum dynamic shared memory (bytes) for caching filter taps in ChannelizePoly1D.
+constexpr size_t MATX_CHANNELIZE_POLY1D_MAX_FILTER_SMEM_BYTES = 6 * 1024;
+
+// Constants for the SmemTiled kernel.
+constexpr int MATX_CHANNELIZE_POLY1D_SMEM_TILED_CTILE = 64;
+constexpr int MATX_CHANNELIZE_POLY1D_SMEM_TILED_NOUT  = 4;
+constexpr size_t MATX_CHANNELIZE_POLY1D_SMEM_TILED_MAX_BYTES = 48 * 1024;
+// Maximum filter smem budget. When the filter exceeds this, it is read from
+// global/L2 instead, freeing smem for better occupancy.
+constexpr size_t MATX_CHANNELIZE_POLY1D_SMEM_TILED_MAX_FILTER_BYTES = 2048;
+
+// Compute the shared memory footprint for the SmemTiled filter taps.
+// For D==M: one phase per tile channel → CTILE * P elements.
+// For D<M: K phases per tile channel → CTILE * K * P elements.
+// Returns a value exceeding the filter budget when K exceeds the rotation
+// limit, which causes FilterInSmem=false in the dispatch.
+template <typename FilterType>
+inline size_t matxChannelizePoly1DInternal_SmemTiledFilterSmemBytes(
+    index_t num_channels, index_t filter_len, index_t decimation_factor)
+{
+  using filter_t = typename FilterType::value_type;
+  constexpr int CTILE = MATX_CHANNELIZE_POLY1D_SMEM_TILED_CTILE;
+  const index_t P = (filter_len + num_channels - 1) / num_channels;
+  if (decimation_factor == num_channels) {
+    return static_cast<size_t>(CTILE) * P * sizeof(filter_t);
+  }
+  const index_t gcd_val = std::gcd(num_channels, decimation_factor);
+  const index_t K = num_channels / gcd_val;
+  if (K > detail::MATX_CHANNELIZE_POLY1D_SMEM_TILED_MAX_ROTATIONS) {
+    return MATX_CHANNELIZE_POLY1D_SMEM_TILED_MAX_FILTER_BYTES + 1; // exceeds budget, so FilterInSmem=false
+  }
+  return static_cast<size_t>(CTILE) * K * P * sizeof(filter_t);
+}
+
+template <typename OutType, typename InType, typename FilterType>
+inline size_t matxChannelizePoly1DInternal_SmemTiledSizeBytes(
+    const OutType &o, const InType &, const FilterType &filter, index_t decimation_factor)
+{
+  using input_t  = typename InType::value_type;
+
+  constexpr int CTILE = MATX_CHANNELIZE_POLY1D_SMEM_TILED_CTILE;
+  constexpr int NOUT  = MATX_CHANNELIZE_POLY1D_SMEM_TILED_NOUT;
+
+  const index_t M = o.Size(OutType::Rank() - 1);
+  const index_t filter_len = filter.Size(FilterType::Rank() - 1);
+  const index_t P = (filter_len + M - 1) / M;
+  const size_t input_smem = static_cast<size_t>(P + NOUT - 1) * CTILE * sizeof(input_t);
+
+  const size_t filter_smem = matxChannelizePoly1DInternal_SmemTiledFilterSmemBytes<FilterType>(M, filter_len, decimation_factor);
+  if (filter_smem > MATX_CHANNELIZE_POLY1D_SMEM_TILED_MAX_FILTER_BYTES) {
+    return input_smem;
+  }
+
+  const size_t filter_smem_aligned = filter_smem +
+      ((filter_smem % sizeof(input_t)) ? (sizeof(input_t) - filter_smem % sizeof(input_t)) : 0);
+  return filter_smem_aligned + input_smem;
+}
+
+template <typename OutType, typename InType, typename FilterType>
+inline bool matxChannelizePoly1DInternal_ShouldUseSmemTiledKernel(
+    const OutType &o, const InType &in, const FilterType &filter, index_t decimation_factor)
+{
+  const index_t num_channels = o.Size(OutType::Rank() - 1);
+  // Skip SmemTiled for small channel counts where most of CTILE would be
+  // idle threads. The generic ChannelizePoly1D kernel is more efficient
+  // in this regime.
+  if (num_channels <= MATX_CHANNELIZE_POLY1D_SMEM_TILED_CTILE * 3 / 4) {
+    return false;
+  }
+  // The input circular buffer must fit in smem. The filter may or may not
+  // be included (FilterInSmem is decided separately).
+  return matxChannelizePoly1DInternal_SmemTiledSizeBytes(o, in, filter, decimation_factor)
+      <= MATX_CHANNELIZE_POLY1D_SMEM_TILED_MAX_BYTES;
+}
+
+template <typename OutType, typename InType, typename FilterType, typename AccumType>
+inline void matxChannelizePoly1DInternal_SmemTiled(
+    OutType o, const InType &i, const FilterType &filter,
+    index_t decimation_factor, cudaStream_t stream)
+{
+#ifdef __CUDACC__
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+
+  constexpr int CTILE = MATX_CHANNELIZE_POLY1D_SMEM_TILED_CTILE;
+  constexpr int NOUT  = MATX_CHANNELIZE_POLY1D_SMEM_TILED_NOUT;
+
+  const index_t num_channels = o.Size(OutType::Rank() - 1);
+  const index_t nout_per_channel = o.Size(OutType::Rank() - 2);
+  const int num_batches = static_cast<int>(TotalSize(i) / i.Size(i.Rank() - 1));
+
+  const index_t gcd_val = std::gcd(num_channels, decimation_factor);
+  const int32_t K = static_cast<int32_t>(num_channels / gcd_val);
+
+  const int channel_tiles = static_cast<int>((num_channels + CTILE - 1) / CTILE);
+  // Target ~1024 spatial blocks (time × channel tiles) to saturate the GPU.
+  // For large channel counts, fewer time blocks are needed.
+  const int target_time_blocks = cuda::std::max(1, (1024 + channel_tiles - 1) / channel_tiles);
+  const int elem_per_block = static_cast<int>(
+      (nout_per_channel + target_time_blocks - 1) / target_time_blocks);
+  const int time_blocks = static_cast<int>(
+      (nout_per_channel + elem_per_block - 1) / elem_per_block);
+
+  dim3 block(CTILE, NOUT);
+  dim3 grid(time_blocks, channel_tiles, num_batches);
+
+  const index_t filter_len = filter.Size(FilterType::Rank() - 1);
+  const bool filter_in_smem = matxChannelizePoly1DInternal_SmemTiledFilterSmemBytes<FilterType>(
+      num_channels, filter_len, decimation_factor) <= MATX_CHANNELIZE_POLY1D_SMEM_TILED_MAX_FILTER_BYTES;
+  const size_t smem_size = matxChannelizePoly1DInternal_SmemTiledSizeBytes(o, i, filter, decimation_factor);
+
+  // Use int32_t for intra-kernel index arithmetic when all tensor dimensions
+  // fit, avoiding 64-bit IMAD.WIDE instructions in the inner loops.
+  const index_t input_len = i.Size(i.Rank() - 1);
+  const bool use_32bit = (sizeof(index_t) <= sizeof(int32_t)) ||
+      (static_cast<int64_t>(input_len) + num_channels <= std::numeric_limits<int32_t>::max() &&
+       nout_per_channel <= std::numeric_limits<int32_t>::max() &&
+       num_channels <= std::numeric_limits<int32_t>::max());
+
+  // Dispatch on MaximallyDecimated x FilterInSmem x IndexType
+  constexpr bool kMaxDec  = true;
+  constexpr bool kOversampled = false;
+  constexpr bool kFiltSmem = true;
+  constexpr bool kFiltGlobal = false;
+
+  auto launch = [&](auto idx_tag) {
+    using IdxT = decltype(idx_tag);
+    const IdxT epb = static_cast<IdxT>(elem_per_block);
+    const IdxT df  = static_cast<IdxT>(decimation_factor);
+    if (decimation_factor == num_channels) {
+      if (filter_in_smem) {
+        ChannelizePoly1D_SmemTiled<CTILE, NOUT, kMaxDec, kFiltSmem, IdxT, OutType, InType, FilterType, AccumType>
+            <<<grid, block, smem_size, stream>>>(o, i, filter, epb, df, K);
+      } else {
+        ChannelizePoly1D_SmemTiled<CTILE, NOUT, kMaxDec, kFiltGlobal, IdxT, OutType, InType, FilterType, AccumType>
+            <<<grid, block, smem_size, stream>>>(o, i, filter, epb, df, K);
+      }
+    } else {
+      if (filter_in_smem) {
+        ChannelizePoly1D_SmemTiled<CTILE, NOUT, kOversampled, kFiltSmem, IdxT, OutType, InType, FilterType, AccumType>
+            <<<grid, block, smem_size, stream>>>(o, i, filter, epb, df, K);
+      } else {
+        ChannelizePoly1D_SmemTiled<CTILE, NOUT, kOversampled, kFiltGlobal, IdxT, OutType, InType, FilterType, AccumType>
+            <<<grid, block, smem_size, stream>>>(o, i, filter, epb, df, K);
+      }
+    }
+  };
+
+  if constexpr (sizeof(index_t) <= sizeof(int32_t)) {
+    launch(index_t{});
+  } else {
+    if (use_32bit) {
+      launch(int32_t{});
+    } else {
+      launch(index_t{});
+    }
+  }
+#endif
+}
+
 template <typename OutType, typename InType, typename FilterType, typename AccumType>
 inline void matxChannelizePoly1DInternal(OutType o, const InType &i,
-                                     const FilterType &filter, cudaStream_t stream)
+                                     const FilterType &filter, index_t decimation_factor, cudaStream_t stream)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
@@ -69,13 +229,26 @@ inline void matxChannelizePoly1DInternal(OutType o, const InType &i,
   const index_t nout_per_channel = o.Size(OutType::Rank()-2);
   const int num_batches = static_cast<int>(TotalSize(i)/i.Size(i.Rank() - 1));
 
+  using filter_t = typename FilterType::value_type;
+  const index_t filter_len = filter.Size(FilterType::Rank()-1);
+
   const int THREADS = 256;
-  const index_t ELTS_PER_THREAD = CHANNELIZE_POLY1D_ELEMS_PER_THREAD * THREADS;
+  const index_t ELTS_PER_THREAD = detail::CHANNELIZE_POLY1D_ELEMS_PER_THREAD * THREADS;
   const int elem_blocks = static_cast<int>(
     (nout_per_channel + ELTS_PER_THREAD - 1) / ELTS_PER_THREAD);
   dim3 grid(elem_blocks, static_cast<int>(num_channels), num_batches);
-  ChannelizePoly1D<THREADS, OutType, InType, FilterType, AccumType><<<grid, THREADS, 0, stream>>>(
-      o, i, filter);
+  if (decimation_factor == num_channels) {
+    // For M == D, cache one filter phase in dynamic shared memory if it fits.
+    const index_t filter_phase_len = (filter_len + num_channels - 1) / num_channels;
+    const size_t smem_needed = static_cast<size_t>(filter_phase_len) * sizeof(filter_t);
+    const uint32_t smem_bytes = (smem_needed <= MATX_CHANNELIZE_POLY1D_MAX_FILTER_SMEM_BYTES)
+        ? static_cast<uint32_t>(smem_needed) : 0;
+    ChannelizePoly1D<THREADS, true, OutType, InType, FilterType, AccumType><<<grid, THREADS, smem_bytes, stream>>>(
+        o, i, filter, decimation_factor, smem_bytes);
+  } else {
+    ChannelizePoly1D<THREADS, false, OutType, InType, FilterType, AccumType><<<grid, THREADS, 0, stream>>>(
+        o, i, filter, decimation_factor, 0);
+  }
 #endif
 }
 
@@ -149,7 +322,7 @@ inline void matxChannelizePoly1DInternal_FusedChan(OutType o, const InType &i,
   const int num_batches = static_cast<int>(TotalSize(i)/i.Size(i.Rank() - 1));
 
   const int THREADS = 256;
-  const index_t ELTS_PER_THREAD = CHANNELIZE_POLY1D_ELEMS_PER_THREAD * THREADS;
+  const index_t ELTS_PER_THREAD = detail::CHANNELIZE_POLY1D_ELEMS_PER_THREAD * THREADS;
   const int elem_blocks = static_cast<int>(
     (nout_per_channel + ELTS_PER_THREAD - 1) / ELTS_PER_THREAD);
   dim3 grid(elem_blocks, 1, num_batches);
@@ -195,9 +368,9 @@ inline void matxChannelizePoly1DUnpackInternal(DataType inout, cudaStream_t stre
 
 /**
  * @brief 1D polyphase channelizer. A channelizer separates an input signal into a set of
- * constituent channels, each corresponding to a band of the input signal bandwidth. The current
- * implementation only supports maximally decimated (i.e., critically sampled) channelizers wherein the
- * decimation factor is equivalent to the number of channels and the channels are non-overlapping.
+ * constituent channels, each corresponding to a band of the input signal bandwidth. Supports both
+ * maximally decimated (critically sampled, decimation_factor == num_channels) and oversampled
+ * (decimation_factor < num_channels) cases, including rational oversampling ratios.
  * 
  * @tparam OutType Type of output
  * @tparam InType Type of input
@@ -208,16 +381,16 @@ inline void matxChannelizePoly1DUnpackInternal(DataType inout, cudaStream_t stre
  * @param in Input operator
  * @param f Filter operator
  * @param num_channels Number of channels in which to separate the signal. Must be greater than 1.
- * @param decimation_factor Factor by which to downsample the input signal into the channels. Currently,
- * the only supported value of decimation_factor is a value equal to num_channels. This corresponds to
- * the maximally decimated, or critically sampled, case. It is also possible for decimation_factor to
- * be less than num_channels, which corresponds to an oversampled case with overlapping channels, but
- * this implementation does not yet support oversampled cases.
+ * @param decimation_factor Factor by which to downsample the input signal into the channels. When
+ * decimation_factor equals num_channels, this is the maximally decimated (critically sampled) case.
+ * When decimation_factor is less than num_channels, this is the oversampled case with overlapping
+ * channels. Both integer (num_channels % decimation_factor == 0) and rational oversampling ratios
+ * are supported.
  * @param stream CUDA stream on which to run the kernel(s)
  */
 template <typename OutType, typename InType, typename FilterType, typename AccumType>
 inline void channelize_poly_impl(OutType out, const InType &in, const FilterType &f,
-                   index_t num_channels, [[maybe_unused]] index_t decimation_factor, cudaStream_t stream = 0) {
+                   index_t num_channels, index_t decimation_factor, cudaStream_t stream = 0) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   using OutputOp = std::remove_cv_t<std::remove_reference_t<OutType>>;
   using InputOp = std::remove_cv_t<std::remove_reference_t<InType>>;
@@ -243,14 +416,14 @@ inline void channelize_poly_impl(OutType out, const InType &in, const FilterType
     "channelize_poly: num_channels must be greater than 1");
   MATX_ASSERT_STR(decimation_factor > 0, matxInvalidParameter,
     "channelize_poly: decimation_factor must be positive");
-  MATX_ASSERT_STR(num_channels == decimation_factor, matxInvalidParameter,
-    "channelize_poly: currently only support decimation_factor == num_channels");
+  MATX_ASSERT_STR(decimation_factor <= num_channels, matxInvalidParameter,
+    "channelize_poly: decimation_factor must be <= num_channels");
 
   for(int i = 0 ; i < IN_RANK-1; i++) {
     MATX_ASSERT_STR(out.Size(i) == in.Size(i), matxInvalidDim, "channelize_poly: input/output must have matched batch sizes");
   }
 
-  [[maybe_unused]] const index_t num_elem_per_channel = (in.Size(IN_RANK-1) + num_channels - 1) / num_channels;
+  [[maybe_unused]] const index_t num_elem_per_channel = (in.Size(IN_RANK-1) + decimation_factor - 1) / decimation_factor;
 
   MATX_ASSERT_STR(out.Size(OUT_RANK-1) == num_channels, matxInvalidDim,
     "channelize_poly: output size OUT_RANK-1 mismatch");
@@ -260,7 +433,8 @@ inline void channelize_poly_impl(OutType out, const InType &in, const FilterType
   // If neither the input nor the filter is complex, then the filtered samples will be real-valued
   // and we will use an R2C transform. Otherwise, we will use a C2C transform.
   if constexpr (! is_complex_v<input_t> && ! is_complex_half_v<input_t> && ! is_complex_v<filter_t> && ! is_complex_half_v<filter_t>) {
-    if (num_channels <= detail::MATX_CHANNELIZE_POLY1D_FUSED_CHAN_KERNEL_THRESHOLD) {
+    // The fused-DFT kernel only supports the maximally decimated case (D == M).
+    if (decimation_factor == num_channels && num_channels <= detail::MATX_CHANNELIZE_POLY1D_FUSED_CHAN_KERNEL_THRESHOLD) {
       matxChannelizePoly1DInternal_FusedChan<OutputOp, InputOp, FilterOp, AccumType>(out, in, f, stream);
     } else {
       index_t start_dims[OUT_RANK], stop_dims[OUT_RANK];
@@ -300,10 +474,12 @@ inline void channelize_poly_impl(OutType out, const InType &in, const FilterType
         }
       }();
 
-      if (matxChannelizePoly1DInternal_ShouldUseSmemKernel(out, in, f)) {
+      if (decimation_factor == num_channels && matxChannelizePoly1DInternal_ShouldUseSmemKernel(out, in, f)) {
         matxChannelizePoly1DInternal_Smem<decltype(fft_in_slice), InputOp, FilterOp, AccumType>(fft_in_slice, in, f, stream);
+      } else if (matxChannelizePoly1DInternal_ShouldUseSmemTiledKernel(out, in, f, decimation_factor)) {
+        matxChannelizePoly1DInternal_SmemTiled<decltype(fft_in_slice), InputOp, FilterOp, AccumType>(fft_in_slice, in, f, decimation_factor, stream);
       } else {
-        matxChannelizePoly1DInternal<decltype(fft_in_slice), InputOp, FilterOp, AccumType>(fft_in_slice, in, f, stream);
+        matxChannelizePoly1DInternal<decltype(fft_in_slice), InputOp, FilterOp, AccumType>(fft_in_slice, in, f, decimation_factor, stream);
       }
       stop_dims[OUT_RANK-1] = (num_channels/2) + 1;
       auto out_packed = slice<OUT_RANK>(out, start_dims, stop_dims);
@@ -311,13 +487,16 @@ inline void channelize_poly_impl(OutType out, const InType &in, const FilterType
       matxChannelizePoly1DUnpackInternal(out, stream);
     }
   } else {
-    if (num_channels <= detail::MATX_CHANNELIZE_POLY1D_FUSED_CHAN_KERNEL_THRESHOLD) {
+    // The fused-DFT kernel only supports the maximally decimated case (D == M).
+    if (decimation_factor == num_channels && num_channels <= detail::MATX_CHANNELIZE_POLY1D_FUSED_CHAN_KERNEL_THRESHOLD) {
       matxChannelizePoly1DInternal_FusedChan<OutputOp, InputOp, FilterOp, AccumType>(out, in, f, stream);
     } else {
-      if (matxChannelizePoly1DInternal_ShouldUseSmemKernel(out, in, f)) {
+      if (decimation_factor == num_channels && matxChannelizePoly1DInternal_ShouldUseSmemKernel(out, in, f)) {
         matxChannelizePoly1DInternal_Smem<OutputOp, InputOp, FilterOp, AccumType>(out, in, f, stream);
+      } else if (matxChannelizePoly1DInternal_ShouldUseSmemTiledKernel(out, in, f, decimation_factor)) {
+        matxChannelizePoly1DInternal_SmemTiled<OutputOp, InputOp, FilterOp, AccumType>(out, in, f, decimation_factor, stream);
       } else {
-        matxChannelizePoly1DInternal<OutputOp, InputOp, FilterOp, AccumType>(out, in, f, stream);
+        matxChannelizePoly1DInternal<OutputOp, InputOp, FilterOp, AccumType>(out, in, f, decimation_factor, stream);
       }
       // Specify FORWARD here to prevent any normalization after the ifft. We do not
       // want any extra scaling on the output values.

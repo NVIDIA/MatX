@@ -78,7 +78,7 @@ namespace detail {
           a_(a), f_(f), num_channels_(num_channels), decimation_factor_(decimation_factor)
       {
         MATX_LOG_TRACE("{} constructor: num_channels={}, decimation_factor={}", str(), num_channels, decimation_factor); 
-        const index_t b_len = (a_.Size(OpA::Rank() - 1) + num_channels - 1) / num_channels;
+        const index_t b_len = (a_.Size(OpA::Rank() - 1) + decimation_factor - 1) / decimation_factor;
 
         for (int r = 0; r < OpA::Rank()-1; r++) {
           out_dims_[r] = a_.Size(r);
@@ -201,16 +201,56 @@ namespace detail {
  * is assumed to contain a single input signal with all preceding dimensions being batch dimensions
  * that are channelized independently.
  * @param f Filter operator that represents the filter coefficients. This must be a 1D tensor.
- * @param num_channels Number of channels to create.
- * @param decimation_factor Factor by which to downsample the input signal into the channels. Currently,
- * the only supported value of decimation_factor is a value equal to num_channels. This corresponds to
- * the maximally decimated, or critically sampled, case. It is also possible for decimation_factor to
- * be less than num_channels, which corresponds to an oversampled case with overlapping channels, but
- * this implementation does not yet support oversampled cases.
+ * @param num_channels Number of channels (or frequency sub-bands) to create.
+ * @param decimation_factor Factor by which to downsample the input signal into the channels. When
+ * decimation_factor equals num_channels, this is the maximally decimated (critically sampled) case.
+ * When decimation_factor is less than num_channels, this is the oversampled case with overlapping
+ * channels. Both integer and rational oversampling ratios are supported.
  * 
  * @returns Operator representing the channelized signal. The output tensor rank is one higher than the
  * input tensor rank. The first Rank-2 dimensions are all batch dimensions. The second-to-last dimension
- * is the sample dimension and the last dimension is the channel dimension.
+ * is the sample dimension and the last dimension is the channel dimension. The per-channel output
+ * size is (in.Size(InType::Rank()-1) + decimation_factor - 1) / decimation_factor.
+ *
+ * Let the letters M and D denote the number of channels and the decimation factor,
+ * respectively. The case where M == D is the maximally decimated (critically sampled) case. In this case,
+ * the channelizer generates M output samples (one per channel) for each M input samples. The case where
+ * D < M is the oversampled case. In this case, the channelizer generates M output samples (one per channel)
+ * for each D input samples. Thus, the total output sample count is roughly M/D times the input sample count.
+ *
+ * Logically, the polyphase channelizer delivers samples to a set of M commutator branches,
+ * each representing a channel or frequency sub-band. For each output step, the samples in that commutator branch are convolved
+ * with a phase of the prototype filter. The outputs of these convolutions are then the inputs to an M-point
+ * IFFT. The results obtained depend on the order in which samples are delivered to the commutator branches
+ * and the filter phase used per branch for each output.
+ *
+ * In MatX, samples are always delivered to the commutator branches in counter-clockwise order. In the
+ * maximally decimated case, the sample-to-branch order is M-1, M-2, ..., 0 as in the
+ * paper by Harris et al [1]. The filter phases are fixed per channel, so channel 0 corresponds to phase 0,
+ * channel 1 corresponds to phase 1, etc. If comparing to another implementation that starts with a different
+ * commutator branch (say, branch 0) and then proceeds in the same order (counter-clockwise), one can either prime the
+ * other channelizer with a single zero input (discarding the outputs, if M outputs are generated after the
+ * first sample) or prime the MatX channelizer with an appropriate number of zeros (e.g., M-1 to match an
+ * implementation that starts at branch 0) to obtain equivalent results.
+ *
+ * The oversampled case, where D < M, is more complicated. The order
+ * in which samples are delivered to the commutator branches is still counter-clockwise, but the samples
+ * are logically delivered to branches D-1, D-2, ..., 0 for each set of D inputs. With each new set of D
+ * inputs, the previous samples are logically shifted through the 2D filter bank. As an implementation detail,
+ * rather than shifting samples, we rotate the filter phases applied to a given commutator branch. Each
+ * branch rotates through a set of K = M / gcd(M, D) phases, where gcd(M, D) is the greatest common divisor
+ * of M and D. Note that the maximally decimated case is a special case of the oversampled case where samples
+ * shift through the 2D filter bank in groups of M, thus maintaining the same filter phase for each channel/branch.
+ *
+ * Comparing the oversampled case to another channelizer with a different convention can be difficult due
+ * to the rotation of the filter phases. For example, for a channelizer that starts at branch 0 and delivers
+ * M outputs after the first sample, that first sample will effectively rotate the filter phases as a result
+ * of generating a set of M outputs. This is unlike the maximally decimated case where the filter phases are
+ * fixed per channel, so we cannot simply prime the other channelizer with a single zero input to obtain equivalent
+ * results. Instead, we need to provide enough zero inputs to the other channelizer so that the two channelizers
+ * will start with the same filter phases. For a channelizer that starts at branch 0 and delivers M outputs
+ * after a single sample, proceeding with the D-1, D-2, ..., 0 order thereafter, priming requires
+ * 1 + (K - 1) * D zero samples, where K = M / gcd(M, D) as before.
  *
  * The polyphase channelizer supports the following properties:
  * - PropAccum: Type of accumulator. This type should always be real, but it will be promoted to
@@ -219,7 +259,12 @@ namespace detail {
  *
  * The default accumulator type is the output type, but the output type is context-dependent. The
  * PropOutput property allows the user to explicitly set the output type and the PropAccum property
- * allows the user to explicitly set the accumulator type.
+ * allows the user to explicitly set the accumulator type. See the examples section for an example
+ * of the property syntax.
+ *
+ * [1] "Digital Receivers and Transmitters Using Polyphase Filter Banks for Wireless Communications",
+ * F. J. Harris, C. Dick, M. Rice, IEEE Transactions on Microwave Theory and Techniques,
+ * Vol. 51, No. 4, Apr. 2003.
  */
 template <typename InType, typename FilterType>
 inline auto channelize_poly(const InType &in, const FilterType &f, index_t num_channels, index_t decimation_factor) {

@@ -175,9 +175,9 @@ class channelize_poly_operators:
         signal_len = size[0]
         filter_len = size[1]
         num_channels = size[2]
-        # Remaining dimensions are batch dimensions
-        if len(size) > 3:
-            a_dims = size[3:]
+        # size[3] is decimation_factor; remaining dimensions are batch dimensions
+        if len(size) > 4:
+            a_dims = size[4:]
             a_dims = np.append(a_dims, signal_len)
         else:
             a_dims = [signal_len]
@@ -245,6 +245,157 @@ class channelize_poly_operators:
         self.res['b_random'] = out
         self.res['b_random_hreal'] = out_hreal
         return self.res
+
+    def channelize_oversampled(self) -> Dict[str, np.ndarray]:
+        """General polyphase channelizer supporting arbitrary decimation factor D <= M.
+
+        Uses size[3] as decimation_factor (D). When D == M, this produces the same
+        result as channelize(). When D < M, this is the oversampled case.
+        """
+        def idivup(a, b) -> int: return (a+b-1)//b
+
+        h = self.res['filter_random']
+        num_channels = self.res['num_channels']
+        decimation_factor = self.size[3]
+        x = self.res['a']
+
+        M = num_channels
+        D = decimation_factor
+
+        # Polyphase decompose: E[r, q] = h[q*M + r], zero-pad h to multiple of M
+        num_taps_per_channel = idivup(h.size, M)
+        h_padded = h
+        if M * num_taps_per_channel > h.size:
+            h_padded = np.pad(h, (0, M * num_taps_per_channel - h.size))
+        E = np.reshape(h_padded, (M, num_taps_per_channel), order='F')
+
+        num_output_samples = idivup(x.shape[-1], D)
+        num_batches = x.size // x.shape[-1]
+        out = np.zeros((num_batches, num_output_samples, M), dtype=np.complex128)
+        out_hreal = np.zeros((num_batches, num_output_samples, M), dtype=np.complex128)
+        xr = np.reshape(x, (num_batches, x.shape[-1]))
+
+        E_real = np.real(E)
+        n_idx = np.arange(num_output_samples)
+
+        # Precompute per-(n, r) quantities as 2D arrays [num_output_samples, M]
+        # Branch remap: r_remapped = (r + M - D) % M changes the input sample
+        # mapping so newest D samples land in Harris convention branches.
+        # Phase uses the original logical branch index r (not remapped).
+        n_all = np.arange(num_output_samples)[:, np.newaxis]  # [nout, 1]
+        r_all = np.arange(M)[np.newaxis, :]                    # [1, M]
+        r_remapped = (r_all + M - D) % M                       # [1, M]
+        s_all = M - 1 - r_remapped                              # [1, M] (remapped for input access)
+        last_arrived = n_all * D + D - 1                        # [nout, 1] broadcast
+        valid = last_arrived >= s_all                            # [nout, M]
+        A = np.where(valid, last_arrived - s_all, 0)            # [nout, M]
+        newest = np.where(valid, last_arrived - (A % M), 0)     # [nout, M]
+        causal_count = np.where(valid, A // M + 1, 0)           # [nout, M]
+        phase = np.where(valid,
+            (r_all + (n_all * D) % M) % M,
+            0).astype(int)                                       # [nout, M] (original r, NOT remapped)
+
+        for batch_ind in range(num_batches):
+            xb = xr[batch_ind, :]
+            input_len = xb.shape[-1]
+            filtered = np.zeros((num_output_samples, M), dtype=np.complex128)
+            filtered_hreal = np.zeros((num_output_samples, M), dtype=np.complex128)
+
+            # Loop only over taps (P iterations, typically small)
+            for q in range(num_taps_per_channel):
+                idx = newest - q * M                             # [nout, M]
+                tap_valid = valid & (idx >= 0) & (idx < input_len) & (q < causal_count)
+                if not np.any(tap_valid):
+                    continue
+                # Gather input samples and filter taps for all valid (n, r) pairs
+                inp_vals = np.where(tap_valid, xb[np.clip(idx, 0, input_len - 1).astype(int)], 0)
+                h_vals = E[phase, q]                             # [nout, M]
+                h_real_vals = E_real[phase, q]
+                filtered += np.where(tap_valid, h_vals * inp_vals, 0)
+                filtered_hreal += np.where(tap_valid, h_real_vals * inp_vals, 0)
+            # IFFT across channels, scale by M
+            out[batch_ind, :, :] = ifft(filtered, n=M, axis=1) * M
+            out_hreal[batch_ind, :, :] = ifft(filtered_hreal, n=M, axis=1) * M
+
+        # Reshape output: (num_batches, num_output_samples, M) -> match MatX layout
+        # MatX output is (...batch_dims..., num_output_samples, num_channels)
+        if num_batches > 1:
+            s = list(x.shape)
+            s[-1] = num_output_samples
+            s = np.append(s, M)
+            out = np.reshape(out, s)
+            out_hreal = np.reshape(out_hreal, s)
+        else:
+            out = np.reshape(out, out.shape[1:])
+            out_hreal = np.reshape(out_hreal, out_hreal.shape[1:])
+
+        self.res['b_random'] = out
+        self.res['b_random_hreal'] = out_hreal
+        return self.res
+
+class harris2003_oversampled_operators:
+    """Test case based on the oversampled channelizer from Harris 2003
+    (receiver_40z.m): M=40, D=28, 600-tap filter designed with remez.
+
+    Golden input and output are read from a binary file. The filter is
+    designed using scipy.signal.remez with the same specification as the
+    reference implementation (verified to match within machine epsilon).
+    The binary file layout is:
+      [real(xx), 5600 doubles][imag(xx), 5600 doubles]
+      [real(yy), 40*200 doubles][imag(yy), 40*200 doubles]
+    where yy is [40, 200] stored column-major (channels × output steps)
+    with fftshift applied (DC centered).
+    """
+    def __init__(self, dtype: str, size: List[int]):
+        self.size = size
+        self.dtype = dtype
+
+    def channelize(self) -> Dict[str, np.ndarray]:
+        import os
+        import scipy.signal
+
+        M = 40
+        D = 28
+        input_len = 5600
+        num_output = 200
+
+        # Design the 600-tap prototype filter using Parks-McClellan (remez)
+        # with the same specification as the Harris 2003 reference.
+        freqs = np.array([0, 12, 17, 56, 57, 84, 85, 112, 113, 140,
+                          141, 168, 169, 196, 197, 224, 225, 252, 253, 280,
+                          281, 308, 309, 336, 337, 364, 365, 392, 393, 420,
+                          421, 448, 449, 476, 477, 504, 505, 532, 533, 560]) / 560.0
+        gains = [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        weights = [1, 6, 7, 9, 11, 13, 15, 17, 19, 21,
+                   23, 25, 27, 29, 31, 33, 35, 37, 39, 41]
+        h = scipy.signal.remez(600, freqs, gains, weight=weights, fs=2)
+        h = h.astype(np.float64)
+
+        # Read golden input and output from binary test vector file
+        tv_dir = os.path.join(os.path.dirname(__file__), '..', 'channelize_poly')
+        tv_path = os.path.join(tv_dir, 'harris2003_oversampled_testvector.bin')
+        data = np.fromfile(tv_path, dtype=np.float64)
+
+        offset = 0
+        xx_re = data[offset:offset + input_len]; offset += input_len
+        xx_im = data[offset:offset + input_len]; offset += input_len
+        a = (xx_re + 1j * xx_im).astype(np.complex128)
+
+        yy_re = data[offset:offset + M * num_output]; offset += M * num_output
+        yy_im = data[offset:offset + M * num_output]; offset += M * num_output
+        # The reference output uses fftshift (DC centered). Apply ifftshift
+        # to convert to our convention (DC at index 0).
+        from scipy.fft import ifftshift
+        yy = (yy_re + 1j * yy_im).reshape((M, num_output), order='F')
+        b = ifftshift(yy, axes=0).T
+
+        res = {
+            'a': a,
+            'filter': h,
+            'b_golden': b,
+        }
+        return res
+
 
 class fft_operators:
     def __init__(self, dtype: str, size: List[int]):
