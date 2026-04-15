@@ -594,14 +594,8 @@ TYPED_TEST(MatMulTestComplexHalfPlanarTypes, ComplexHalfPlanarLayoutAnnotation)
     this->pb->NumpyToTensorView(a, "a");
     this->pb->NumpyToTensorView(b, "b");
 
-    // Interleaved reference path on a separate stream/executor to avoid
-    // matmul cache type collisions with the planar-layout path.
-    cudaStream_t ref_stream = 0;
-    cudaStreamCreate(&ref_stream);
-    cudaExecutor ref_exec{ref_stream};
-    (c_ref = matmul(a, b)).run(ref_exec);
-    ref_exec.sync();
-    cudaStreamDestroy(ref_stream);
+    // Interleaved reference path.
+    (c_ref = matmul(a, b)).run(this->exec);
 
     // Materialize planar typed inputs/outputs into temporary tensors before GEMM.
     tensor_t<PlanarTestType, 2> a_planar_tmp{{m, k}};
