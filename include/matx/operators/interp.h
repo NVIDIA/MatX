@@ -166,13 +166,19 @@ namespace matx {
       }
 
       template <detail::OperatorCapability Cap, typename InType>
-      __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType&) const {
+      __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
         if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
           const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
           return my_cap;
         } else {
           auto self_has_cap = detail::capability_attributes<Cap>::default_value;
-          return self_has_cap;
+          return combine_capabilities<Cap>(self_has_cap,
+                                           detail::get_operator_capability<Cap>(dl_, in),
+                                           detail::get_operator_capability<Cap>(d_, in),
+                                           detail::get_operator_capability<Cap>(du_, in),
+                                           detail::get_operator_capability<Cap>(b_, in),
+                                           detail::get_operator_capability<Cap>(x_, in),
+                                           detail::get_operator_capability<Cap>(v_, in));
         }
       }
 
@@ -508,7 +514,10 @@ namespace matx {
         } else {
           auto self_has_cap = detail::capability_attributes<Cap>::default_value;
           // Note: m_ is a temporary internal tensor, not an input operator passed to constructor
-          return self_has_cap;
+          return combine_capabilities<Cap>(self_has_cap,
+                                           detail::get_operator_capability<Cap>(x_, in),
+                                           detail::get_operator_capability<Cap>(v_, in),
+                                           detail::get_operator_capability<Cap>(xq_, in));
         }
       }
 

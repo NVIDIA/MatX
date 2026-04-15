@@ -72,6 +72,7 @@ namespace detail {
     ALIASED_MEMORY, // Whether the operator's input and output pointers alias
     GLOBAL_KERNEL, // Kernel operates entirely on a global level per chunk of data. False when at least one operator works on a block level
     PASS_THROUGH_THREADS, // All threads must call operator() on nested operators; bounds checking done at tensor level
+    UNIT_STRIDE_LAST, // Whether all leaf tensors have stride[RANK-1] == 1
     // Add more capabilities as needed
   };
 
@@ -89,17 +90,18 @@ namespace detail {
   
 
 #if !defined(__CUDACC_RTC__)
-  template <ElementsPerThread EPT, bool JIT>
+  template <ElementsPerThread EPT, bool JIT, bool UNIT_STRIDE_LAST = false>
   struct CapabilityParams {
     static constexpr ElementsPerThread ept = EPT;
     static constexpr bool jit = JIT;
+    static constexpr bool unit_stride_last = UNIT_STRIDE_LAST;
     static constexpr int osize = 0;
     static constexpr int block_size = 0;
 
     // For JIT there will be other capabilties patched in with a string
-  };  
+  };
 
-  using DefaultCapabilities = CapabilityParams<ElementsPerThread::ONE, false>;  
+  using DefaultCapabilities = CapabilityParams<ElementsPerThread::ONE, false, false>;  
   
   // Concept to detect scoped enums
   template<typename T>
@@ -256,6 +258,18 @@ namespace detail {
     static constexpr bool default_value = false;  // Default: operators do their own bounds checking
     static constexpr bool or_identity = false;
     static constexpr bool and_identity = true;
+  };
+
+  template <>
+  struct capability_attributes<OperatorCapability::UNIT_STRIDE_LAST> {
+    using type = bool;
+    using input_type = VoidCapabilityType;
+    // Non-tensor ops (scalars, generators) are trivially unit-stride, so default those to true
+    // since we will AND all unit stride capabilities in the expression tree. Tensor-like
+    // types should handle the unit stride query in their get_capability() method.
+    static constexpr bool default_value = true;
+    static constexpr bool or_identity = false;
+    static constexpr bool and_identity = true;
   };    
 
 
@@ -324,6 +338,8 @@ namespace detail {
         return CapabilityQueryType::AND_QUERY; // The expression should generate LTOIR code if all its children generate it.
       case OperatorCapability::PASS_THROUGH_THREADS:
         return CapabilityQueryType::OR_QUERY; // If ANY operator needs pass-through, all threads must call operator()
+      case OperatorCapability::UNIT_STRIDE_LAST:
+        return CapabilityQueryType::AND_QUERY; // All leaf tensors must have stride[RANK-1] == 1
       default:
         // Default to OR_QUERY or handle as an error/assertion if a capability isn't mapped.
         return CapabilityQueryType::OR_QUERY; 

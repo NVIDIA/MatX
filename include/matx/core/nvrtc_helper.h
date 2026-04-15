@@ -245,6 +245,8 @@ std::string generate_capability_params_string([[maybe_unused]] const Op &op, Ele
          "struct CapabilityParams {\n"
          "  static constexpr ElementsPerThread ept = EPT;\n"
          "  static constexpr bool jit = JIT;\n"
+         // Note: no unit_stride_last here. JIT bakes strides as constexpr
+         // values, so the compiler already eliminates multiply-by-1.
          "  static constexpr int osize = " + std::to_string(osize) + ";\n"
          "  static constexpr int block_size = " + std::to_string(block_size) + ";\n"
          "  static constexpr bool pass_through_threads = " + pass_through_str + ";\n"

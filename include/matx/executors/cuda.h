@@ -106,14 +106,19 @@ namespace matx
             // Find the best launch parameters
             auto [best_ept, shm_size, block_size, groups_per_block] = detail::find_best_launch_params(op, kernel_provider, 256, false);
 
+            // Check if all leaf tensors have unit stride in the last dimension.
+            // This allows eliding one ULDC + IMAD per tensor access.
+            const bool unit_stride_last = detail::get_operator_capability<detail::OperatorCapability::UNIT_STRIDE_LAST>(op);
+
             // Helper lambda to handle kernel dispatch. This is templated on the EPT
-            // type since that's what the kernels are templated on.
-            auto dispatch_kernel = [&]<detail::ElementsPerThread EPT>(auto&& kernel_handler) {
+            // and unit-stride-last flag since those are what the kernels are templated on.
+            auto dispatch_kernel = [&]<detail::ElementsPerThread EPT, bool USL>(auto&& kernel_handler) {
               int max_tpb = 256;
 
               bool stride = detail::get_grid_dims<Op::Rank()>(blocks, threads, sizes, static_cast<int>(EPT), max_tpb);
 
-              using CapType = detail::CapabilityParams<EPT, false>;
+              constexpr bool JIT = false;
+              using CapType = detail::CapabilityParams<EPT, JIT, USL>;
               
               if constexpr (Op::Rank() == 0) {
                 kernel_handler([&]() {
@@ -160,14 +165,19 @@ namespace matx
               }
             };
 
-            // Helper lambda to launch kernel
+            // Helper lambda to launch kernel, branching on unit_stride_last
             auto launch_kernel = [&]<detail::ElementsPerThread EPT>() {
-              dispatch_kernel.template operator()<EPT>([&](auto launch_func) {
-                MATX_LOG_DEBUG("Launching CUDA kernel: rank={}, blocks=({},{},{}), threads=({},{},{}), EPT={}, stream={}", 
-                               Op::Rank(), blocks.x, blocks.y, blocks.z, threads.x, threads.y, threads.z, 
-                               static_cast<int>(EPT), reinterpret_cast<void*>(stream_));
+              auto handler = [&](auto launch_func) {
+                MATX_LOG_DEBUG("Launching CUDA kernel: rank={}, blocks=({},{},{}), threads=({},{},{}), EPT={}, USL={}, stream={}",
+                               Op::Rank(), blocks.x, blocks.y, blocks.z, threads.x, threads.y, threads.z,
+                               static_cast<int>(EPT), unit_stride_last, reinterpret_cast<void*>(stream_));
                 launch_func();
-              });
+              };
+              if (unit_stride_last) {
+                dispatch_kernel.template operator()<EPT, true>(handler);
+              } else {
+                dispatch_kernel.template operator()<EPT, false>(handler);
+              }
             };
 
             // Launch the correct kernel based on the best EPT found
@@ -196,10 +206,20 @@ namespace matx
           }
           else {
             auto ept_type = detail::EPTQueryInput{false};
-            const auto ept_bounds = detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(op, ept_type);              
-            bool stride = detail::get_grid_dims<Op::Rank()>(blocks, threads, sizes, static_cast<int>(ept_bounds[1]), 1024);   
+            const auto ept_bounds = detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(op, ept_type);
+            bool stride = detail::get_grid_dims<Op::Rank()>(blocks, threads, sizes, static_cast<int>(ept_bounds[1]), 1024);
             index_t dims = cuda::std::accumulate(cuda::std::begin(sizes) + 1, cuda::std::end(sizes), 1, cuda::std::multiplies<index_t>());
-            detail::matxOpTDKernel<<<blocks, threads, 0, stream_>>>(op, sizes, dims);
+            constexpr bool JIT = false;
+            const bool usl = detail::get_operator_capability<detail::OperatorCapability::UNIT_STRIDE_LAST>(op);
+            if (usl) {
+              constexpr bool USL = true;
+              using CapType = detail::CapabilityParams<detail::ElementsPerThread::ONE, JIT, USL>;
+              detail::matxOpTDKernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes, dims);
+            } else {
+              constexpr bool USL = false;
+              using CapType = detail::CapabilityParams<detail::ElementsPerThread::ONE, JIT, USL>;
+              detail::matxOpTDKernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes, dims);
+            }
           }            
 #else
           MATX_ASSERT_STR(false, matxInvalidParameter, "Cannot call device executor using host compiler");
