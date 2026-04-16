@@ -38,6 +38,50 @@
 
 using namespace matx;
 
+namespace {
+
+struct DlpackOwnershipContext {
+  float *ptr;
+  bool *freed;
+};
+
+void DlpackOwnershipDeleter(DLManagedTensor *self)
+{
+  auto *ctx = static_cast<DlpackOwnershipContext *>(self->manager_ctx);
+  if (ctx != nullptr && !*ctx->freed) {
+    *ctx->freed = (cudaFree(ctx->ptr) == cudaSuccess);
+  }
+
+  if (self->dl_tensor.shape != nullptr) {
+    delete[] self->dl_tensor.shape;
+    self->dl_tensor.shape = nullptr;
+  }
+  if (self->dl_tensor.strides != nullptr) {
+    delete[] self->dl_tensor.strides;
+    self->dl_tensor.strides = nullptr;
+  }
+
+  delete ctx;
+  self->manager_ctx = nullptr;
+}
+
+DLManagedTensor MakeDlManagedTensor(float *ptr, index_t size, bool *freed)
+{
+  DLManagedTensor dlp_tensor{};
+  dlp_tensor.dl_tensor.data = ptr;
+  dlp_tensor.dl_tensor.device = DLDevice{kDLCUDA, 0};
+  dlp_tensor.dl_tensor.ndim = 1;
+  dlp_tensor.dl_tensor.dtype = DLDataType{kDLFloat, 32, 1};
+  dlp_tensor.dl_tensor.shape = new int64_t[1]{static_cast<int64_t>(size)};
+  dlp_tensor.dl_tensor.strides = new int64_t[1]{1};
+  dlp_tensor.dl_tensor.byte_offset = 0;
+  dlp_tensor.manager_ctx = new DlpackOwnershipContext{ptr, freed};
+  dlp_tensor.deleter = DlpackOwnershipDeleter;
+  return dlp_tensor;
+}
+
+} // namespace
+
 template <typename T> struct BasicTensorTestsData {
   using GTestType = cuda::std::tuple_element_t<0, T>;
   using GExecType = cuda::std::tuple_element_t<1, T>;    
@@ -564,3 +608,37 @@ TYPED_TEST(BasicTensorTestsAll, DLPack)
   MATX_EXIT_HANDLER();
 }
 
+TEST(BasicTensorTests, DLPackOwning)
+{
+  MATX_ENTER_HANDLER();
+
+  constexpr index_t size = 8;
+
+  bool non_owning_freed = false;
+  float *non_owning_ptr = nullptr;
+  ASSERT_EQ(cudaMalloc(reinterpret_cast<void **>(&non_owning_ptr), sizeof(float) * size), cudaSuccess);
+  auto non_owning_dlp = MakeDlManagedTensor(non_owning_ptr, size, &non_owning_freed);
+
+  {
+    tensor_t<float, 1> t{{size}};
+    make_tensor(t, non_owning_dlp, false);
+    ASSERT_EQ(t.Data(), non_owning_ptr);
+  }
+  ASSERT_FALSE(non_owning_freed);
+  non_owning_dlp.deleter(&non_owning_dlp);
+  ASSERT_TRUE(non_owning_freed);
+
+  bool owning_freed = false;
+  float *owning_ptr = nullptr;
+  ASSERT_EQ(cudaMalloc(reinterpret_cast<void **>(&owning_ptr), sizeof(float) * size), cudaSuccess);
+  auto owning_dlp = MakeDlManagedTensor(owning_ptr, size, &owning_freed);
+
+  {
+    tensor_t<float, 1> t{{size}};
+    make_tensor(t, owning_dlp, true);
+    ASSERT_EQ(t.Data(), owning_ptr);
+  }
+  ASSERT_TRUE(owning_freed);
+
+  MATX_EXIT_HANDLER();
+}

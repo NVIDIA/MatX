@@ -160,7 +160,8 @@ auto make_tensor_p( const index_t (&shape)[RANK],
 template <typename T, typename ShapeType>
   requires (!is_matx_shape<ShapeType> &&
             !is_matx_descriptor<ShapeType> &&
-            !std::is_array_v<remove_cvref_t<ShapeType>>)
+            !std::is_array_v<remove_cvref_t<ShapeType>> &&
+            !std::is_same_v<remove_cvref_t<ShapeType>, DLManagedTensor>)
 auto make_tensor( ShapeType &&shape,
                   matxMemorySpace_t space = MATX_MANAGED_MEMORY,
                   cudaStream_t stream = 0) {
@@ -193,7 +194,9 @@ auto make_tensor( ShapeType &&shape,
  *
  **/
 template <typename TensorType, typename ShapeType>
-  requires (is_tensor<TensorType> && !std::is_array_v<remove_cvref_t<ShapeType>>)
+  requires (is_tensor<TensorType> &&
+            !std::is_array_v<remove_cvref_t<ShapeType>> &&
+            !std::is_same_v<remove_cvref_t<ShapeType>, DLManagedTensor>)
 auto make_tensor( TensorType &tensor,
                   ShapeType &&shape,
                   matxMemorySpace_t space = MATX_MANAGED_MEMORY,
@@ -522,7 +525,8 @@ auto make_tensor( const index_t (&shape)[RANK],
  **/
 template <typename T, typename ShapeType, typename Allocator>
   requires (!is_matx_shape<ShapeType> && !is_matx_descriptor<ShapeType> &&
-            !std::is_array_v<remove_cvref_t<ShapeType>>)
+            !std::is_array_v<remove_cvref_t<ShapeType>> &&
+            !std::is_same_v<remove_cvref_t<ShapeType>, DLManagedTensor>)
 auto make_tensor( ShapeType &&shape,
                   Allocator&& alloc) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
@@ -576,7 +580,8 @@ void make_tensor( TensorType &tensor,
  **/
 template <typename TensorType, typename ShapeType, typename Allocator>
   requires (is_tensor<TensorType> &&
-            !std::is_array_v<remove_cvref_t<ShapeType>>)
+            !std::is_array_v<remove_cvref_t<ShapeType>> &&
+            !std::is_same_v<remove_cvref_t<ShapeType>, DLManagedTensor>)
 void make_tensor( TensorType &tensor,
                   ShapeType &&shape,
                   Allocator&& alloc) {
@@ -781,10 +786,12 @@ auto make_static_tensor() {
 template <typename TensorType>
   requires is_tensor<TensorType>
 auto make_tensor( TensorType &tensor,
-                  const DLManagedTensor dlp_tensor) {
+                  DLManagedTensor &dlp_tensor,
+                  bool owning = false) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   
-  MATX_LOG_DEBUG("make_tensor(tensor&, DLManagedTensor): ptr={}", dlp_tensor.dl_tensor.data);
+  MATX_LOG_DEBUG("make_tensor(tensor&, DLManagedTensor, owning): ptr={}, owning={}", 
+                 dlp_tensor.dl_tensor.data, owning);
 
   using T = typename TensorType::value_type;
   const DLTensor &dt = dlp_tensor.dl_tensor;
@@ -901,14 +908,40 @@ auto make_tensor( TensorType &tensor,
 
   index_t strides[TensorType::Rank()];
   index_t shape[TensorType::Rank()];
+  cuda::std::array<index_t, TensorType::Rank()> shape_arr{};
+  cuda::std::array<index_t, TensorType::Rank()> strides_arr{};
 
   for (int r = 0; r < TensorType::Rank(); r++) {
     strides[r] = dt.strides[r];
     shape[r]   = dt.shape[r];
+    strides_arr[r] = strides[r];
+    shape_arr[r]   = shape[r];
   }
 
-  auto tmp = make_tensor<typename TensorType::value_type, TensorType::Rank()>(
-          reinterpret_cast<typename TensorType::value_type*>(dt.data), shape, strides, false);
+  if (!owning) {
+    auto tmp = make_tensor<typename TensorType::value_type, TensorType::Rank()>(
+            reinterpret_cast<typename TensorType::value_type*>(dt.data), shape, strides, false);
+    tensor.Shallow(tmp);
+    return;
+  }
+
+  DefaultDescriptor<TensorType::Rank()> desc{std::move(shape_arr), std::move(strides_arr)};
+  auto data_ptr = reinterpret_cast<typename TensorType::value_type *>(dt.data);
+  auto managed_ptr = &dlp_tensor;
+  MATX_ASSERT_STR(managed_ptr->deleter != nullptr, matxInvalidParameter,
+                  "Owning DLPack tensor requires a non-null deleter");
+  auto storage = make_storage_from_shared_ptr<typename TensorType::value_type>(
+      std::shared_ptr<typename TensorType::value_type>(
+          data_ptr,
+          [managed_ptr](typename TensorType::value_type *) {
+            if (managed_ptr->deleter != nullptr) {
+              managed_ptr->deleter(managed_ptr);
+            }
+          }),
+      desc.TotalSize());
+
+  auto tmp = tensor_t<typename TensorType::value_type, TensorType::Rank(), decltype(desc)>{
+      std::move(storage), std::move(desc), data_ptr};
   tensor.Shallow(tmp);
 }
 
