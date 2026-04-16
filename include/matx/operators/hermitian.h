@@ -139,6 +139,8 @@ namespace matx
           return (dim < (Rank() - 2)) ? op_.Size(dim) : op_.Size((dim == Rank() - 1) ? Rank() - 2 : Rank() - 1);
         }
 
+        __MATX_INLINE__ const auto &InputOp() const noexcept { return op_; }
+
         template <typename ShapeType, typename Executor>
         __MATX_INLINE__ void PreRun(ShapeType &&shape, Executor &&ex) const noexcept
         {
