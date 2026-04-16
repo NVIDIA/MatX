@@ -778,16 +778,11 @@ auto make_static_tensor() {
   return tensor_t<T, desc.Rank(), decltype(desc)>{std::move(storage), std::move(desc)};
 }
 
+namespace detail {
 template <typename TensorType>
   requires is_tensor<TensorType>
-auto make_tensor( TensorType &tensor,
-                  const DLManagedTensor dlp_tensor) {
-  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  
-  MATX_LOG_DEBUG("make_tensor(tensor&, DLManagedTensor): ptr={}", dlp_tensor.dl_tensor.data);
-
+void validate_dlpack_tensor_type(const DLTensor &dt) {
   using T = typename TensorType::value_type;
-  const DLTensor &dt = dlp_tensor.dl_tensor;
 
   // MatX doesn't track the memory type or device ID, so we don't need to copy it
   MATX_ASSERT_STR_EXP(dt.ndim, TensorType::Rank(), matxInvalidDim, "DLPack rank doesn't match MatX rank!");
@@ -898,17 +893,69 @@ auto make_tensor( TensorType &tensor,
       break;
     }
   }
+}
 
-  index_t strides[TensorType::Rank()];
-  index_t shape[TensorType::Rank()];
-
+template <typename TensorType>
+  requires is_tensor<TensorType>
+void dlpack_shape_and_strides(const DLTensor &dt,
+                              index_t (&shape)[TensorType::Rank()],
+                              index_t (&strides)[TensorType::Rank()]) {
   for (int r = 0; r < TensorType::Rank(); r++) {
     strides[r] = dt.strides[r];
     shape[r]   = dt.shape[r];
   }
+}
+} // namespace detail
+
+template <typename TensorType>
+  requires is_tensor<TensorType>
+auto make_tensor( TensorType &tensor,
+                  const DLManagedTensor dlp_tensor) {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
+  MATX_LOG_DEBUG("make_tensor(tensor&, DLManagedTensor): ptr={}", dlp_tensor.dl_tensor.data);
+
+  const DLTensor &dt = dlp_tensor.dl_tensor;
+  detail::validate_dlpack_tensor_type<TensorType>(dt);
+
+  index_t strides[TensorType::Rank()];
+  index_t shape[TensorType::Rank()];
+  detail::dlpack_shape_and_strides<TensorType>(dt, shape, strides);
 
   auto tmp = make_tensor<typename TensorType::value_type, TensorType::Rank()>(
           reinterpret_cast<typename TensorType::value_type*>(dt.data), shape, strides, false);
+  tensor.Shallow(tmp);
+}
+
+template <typename TensorType>
+  requires is_tensor<TensorType>
+auto make_tensor( TensorType &tensor,
+                  DLManagedTensor *dlp_tensor) {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  MATX_ASSERT_STR(dlp_tensor != nullptr, matxInvalidParameter, "DLManagedTensor pointer cannot be null");
+
+  MATX_LOG_DEBUG("make_tensor(tensor&, DLManagedTensor*): ptr={}", dlp_tensor->dl_tensor.data);
+
+  using T = typename TensorType::value_type;
+  const DLTensor &dt = dlp_tensor->dl_tensor;
+  detail::validate_dlpack_tensor_type<TensorType>(dt);
+
+  index_t strides[TensorType::Rank()];
+  index_t shape[TensorType::Rank()];
+  detail::dlpack_shape_and_strides<TensorType>(dt, shape, strides);
+
+  constexpr int RANK = TensorType::Rank();
+  DefaultDescriptor<RANK> desc{detail::to_array(shape), detail::to_array(strides)};
+  auto owner = std::shared_ptr<DLManagedTensor>(dlp_tensor, [](DLManagedTensor *managed) {
+    if (managed != nullptr && managed->deleter != nullptr) {
+      managed->deleter(managed);
+    }
+  });
+  auto data = std::shared_ptr<T>(owner, reinterpret_cast<T*>(dt.data));
+  auto storage = make_storage_from_shared_ptr<T>(std::move(data), desc.TotalSize());
+  auto tmp = tensor_t<T, TensorType::Rank(), decltype(desc)>{
+      std::move(storage), std::move(desc), reinterpret_cast<T*>(dt.data)};
+
   tensor.Shallow(tmp);
 }
 
