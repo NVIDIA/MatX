@@ -927,7 +927,7 @@ auto make_tensor( TensorType &tensor,
 
   DefaultDescriptor<TensorType::Rank()> desc{std::move(shape_arr), std::move(strides_arr)};
   auto data_ptr = reinterpret_cast<typename TensorType::value_type *>(dt.data);
-  auto managed_ptr = &dlp_tensor;
+  auto managed_ptr = new DLManagedTensor{dlp_tensor};
   MATX_ASSERT_STR(managed_ptr->deleter != nullptr, matxInvalidParameter,
                   "Owning DLPack tensor requires a non-null deleter");
   auto storage = make_storage_from_shared_ptr<typename TensorType::value_type>(

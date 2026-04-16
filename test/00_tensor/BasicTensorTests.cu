@@ -80,6 +80,17 @@ DLManagedTensor MakeDlManagedTensor(float *ptr, index_t size, bool *freed)
   return dlp_tensor;
 }
 
+tensor_t<float, 1> MakeTensorFromScopedDlpack(float *ptr, index_t size, bool *freed)
+{
+  tensor_t<float, 1> t{{size}};
+  {
+    auto dlp = MakeDlManagedTensor(ptr, size, freed);
+    make_tensor(t, dlp, true);
+  }
+
+  return t;
+}
+
 } // namespace
 
 template <typename T> struct BasicTensorTestsData {
@@ -639,6 +650,26 @@ TEST(BasicTensorTests, DLPackOwning)
     ASSERT_EQ(t.Data(), owning_ptr);
   }
   ASSERT_TRUE(owning_freed);
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(BasicTensorTests, DLPackOwningScopedInputLifetime)
+{
+  MATX_ENTER_HANDLER();
+
+  constexpr index_t size = 8;
+  bool freed = false;
+  float *ptr = nullptr;
+  ASSERT_EQ(cudaMalloc(reinterpret_cast<void **>(&ptr), sizeof(float) * size), cudaSuccess);
+
+  {
+    auto t = MakeTensorFromScopedDlpack(ptr, size, &freed);
+    ASSERT_EQ(t.Data(), ptr);
+    ASSERT_FALSE(freed);
+  }
+
+  ASSERT_TRUE(freed);
 
   MATX_EXIT_HANDLER();
 }
