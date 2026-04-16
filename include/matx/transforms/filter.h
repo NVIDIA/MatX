@@ -96,6 +96,8 @@ public:
       static_assert(RANK == 4);
     }
 
+    num_chunks = (sig_len + RECURSIVE_CHUNK_SIZE - 1) / RECURSIVE_CHUNK_SIZE;
+
     Alloc(h_nonrec, h_rec);
   }
 
@@ -118,14 +120,14 @@ public:
                 sizeof(FilterType) * num_recursive * CORR_COLS,
                 MATX_DEVICE_MEMORY);
       matxAlloc((void **)&d_status,
-                sizeof(int) * (sig_len / RECURSIVE_CHUNK_SIZE + 1) * batches);
+                sizeof(int) * num_chunks * batches);
       matxAlloc((void **)&d_full_carries,
                 sizeof(*d_full_carries) * num_recursive *
-                    (sig_len / RECURSIVE_CHUNK_SIZE) * batches,
+                    num_chunks * batches,
                 MATX_DEVICE_MEMORY);
       matxAlloc((void **)&d_part_carries,
                 sizeof(*d_part_carries) * num_recursive *
-                    (sig_len / RECURSIVE_CHUNK_SIZE) * batches,
+                    num_chunks * batches,
                 MATX_DEVICE_MEMORY);
       matxAlloc((void **)&d_last_carries,
                 sizeof(*d_last_carries) * num_recursive, MATX_DEVICE_MEMORY);
@@ -193,15 +195,13 @@ private:
     if (num_recursive > 0) {
       MATX_CUDA_CHECK(cudaMemset(
           (void *)d_status, 0,
-          sizeof(int) * (sig_len / RECURSIVE_CHUNK_SIZE + 1) * batches));
+          sizeof(int) * num_chunks * batches));
       MATX_CUDA_CHECK(cudaMemset(d_full_carries, 0,
                                  sizeof(*d_full_carries) * num_recursive *
-                                     (sig_len / RECURSIVE_CHUNK_SIZE) *
-                                     batches));
+                                     num_chunks * batches));
       MATX_CUDA_CHECK(cudaMemset(d_part_carries, 0,
                                  sizeof(*d_part_carries) * num_recursive *
-                                     (sig_len / RECURSIVE_CHUNK_SIZE) *
-                                     batches));
+                                     num_chunks * batches));
     }
   }
 
@@ -291,6 +291,7 @@ private:
   FilterType *d_last_carries = nullptr;
   index_t batches;
   index_t sig_len;
+  index_t num_chunks;
 };
 
 /**
