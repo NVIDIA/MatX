@@ -906,27 +906,24 @@ auto make_tensor( TensorType &tensor,
     }
   }
 
-  index_t strides[TensorType::Rank()];
-  index_t shape[TensorType::Rank()];
   cuda::std::array<index_t, TensorType::Rank()> shape_arr{};
   cuda::std::array<index_t, TensorType::Rank()> strides_arr{};
+  auto data_ptr = reinterpret_cast<typename TensorType::value_type *>(dt.data);
 
   for (int r = 0; r < TensorType::Rank(); r++) {
-    strides[r] = dt.strides[r];
-    shape[r]   = dt.shape[r];
-    strides_arr[r] = strides[r];
-    shape_arr[r]   = shape[r];
+    strides_arr[r] = dt.strides[r];
+    shape_arr[r]   = dt.shape[r];
   }
 
   if (!owning) {
-    auto tmp = make_tensor<typename TensorType::value_type, TensorType::Rank()>(
-            reinterpret_cast<typename TensorType::value_type*>(dt.data), shape, strides, false);
+    DefaultDescriptor<TensorType::Rank()> desc{std::move(shape_arr), std::move(strides_arr)};
+    auto tmp = make_tensor<typename TensorType::value_type, decltype(desc)>(
+            data_ptr, std::move(desc), false);
     tensor.Shallow(tmp);
     return;
   }
 
   DefaultDescriptor<TensorType::Rank()> desc{std::move(shape_arr), std::move(strides_arr)};
-  auto data_ptr = reinterpret_cast<typename TensorType::value_type *>(dt.data);
   auto managed_ptr = new DLManagedTensor{dlp_tensor};
   MATX_ASSERT_STR(managed_ptr->deleter != nullptr, matxInvalidParameter,
                   "Owning DLPack tensor requires a non-null deleter");
