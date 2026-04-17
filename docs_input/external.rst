@@ -114,7 +114,7 @@ until the matching DLPack `deleter` is called.
 Importing external DLPack tensors into MatX
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-When importing into MatX, use the `make_tensor` overloads to which consume a
+When importing into MatX, use the `make_tensor` overloads that consume a
 pointer to a `DLManagedTensorVersioned` or `DLManagedTensor` object. For
 example, to convert a libtorch tensor to a MatX tensor:
 
