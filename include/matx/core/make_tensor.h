@@ -836,6 +836,18 @@ void validate_dlpack_tensor_type(const DLTensor &dt) {
       }
       break;
     }
+    case kDLBfloat: {
+      switch (dt.dtype.bits) {
+        case 16: {
+          [[maybe_unused]] constexpr bool same = std::is_same_v<T, matxBf16>;
+          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch");
+          break;
+        }
+        default:
+          MATX_THROW(matxInvalidSize, "Invalid bfloat size from DLPack");
+      }
+      break;
+    }
     case kDLInt: {
       switch (dt.dtype.bits) {
         case 64: {
@@ -895,6 +907,8 @@ void validate_dlpack_tensor_type(const DLTensor &dt) {
       MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch");
       break;
     }
+    default:
+      MATX_THROW(matxInvalidType, "Unsupported DLPack data type code");
   }
 }
 
