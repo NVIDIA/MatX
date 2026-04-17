@@ -31,196 +31,128 @@
 /////////////////////////////////////////////////////////////////////////////////
 
 #include <pybind11/pybind11.h>
-#include <pybind11/numpy.h>
-#include <stdio.h>
+#include <cstring>
+#include <stdexcept>
+#include <string>
 #include <matx.h>
 #include <matx/core/dlpack.h>
 
 namespace py = pybind11;
 
-const char* get_capsule_name(py::capsule capsule)
-{
-  return capsule.name();
-}
 
-typedef DLManagedTensor* PTR_DLManagedTensor;
-int attempt_unpack_dlpack(py::capsule dlpack_capsule, PTR_DLManagedTensor& p_dlpack)
+/**
+ * @brief Import a Python DLPack capsule into a MatX tensor with ownership transfer.
+ *
+ * This helper consumes the capsule exactly once by renaming it to the
+ * corresponding used state (`used_dltensor` or `used_dltensor_versioned`)
+ * before calling MatX's pointer-owning `make_tensor` overload. After this call,
+ * the capsule must not be reused.
+ *
+ * @tparam TensorType Destination MatX tensor type
+ * @param tensor Destination tensor to be shallow-populated
+ * @param dlpack_capsule Python capsule named `dltensor` or `dltensor_versioned`
+ *
+ * @throws py::value_error If capsule name/pointer is invalid
+ * @throws std::runtime_error If the capsule cannot be marked as consumed
+ */
+template <typename TensorType>
+void make_tensor_from_capsule(TensorType &tensor, py::capsule dlpack_capsule)
 {
   const char* capsule_name = dlpack_capsule.name();
-
-  if (strncmp(capsule_name,"dltensor",8) != 0)
-  {
-    fprintf(stderr,"capsule_name %s\n",capsule_name);
-    return -1;
+  if (capsule_name == nullptr) {
+    throw py::value_error("DLPack capsule name is null");
   }
 
-  p_dlpack = static_cast<PTR_DLManagedTensor>(dlpack_capsule.get_pointer());
-
-  if (p_dlpack == nullptr) {
-    fprintf(stderr,"p_dlpack == nullptr\n");
-    return -2;
-  }
-
-  return 0;
-}
-
-int check_dlpack_status(py::capsule dlpack_capsule)
-{
-  PTR_DLManagedTensor unused;
-  return attempt_unpack_dlpack(dlpack_capsule, unused);
-}
-
-const char* dlpack_device_type_to_string(DLDeviceType device_type)
-{
-  switch(device_type)
-  {
-    case kDLCPU: return "kDLCPU";
-    case kDLCUDA: return "kDLCUDA";
-    case kDLCUDAHost: return "kDLCUDAHost";
-    case kDLOpenCL: return "kDLOpenCL";
-    case kDLVulkan: return "kDLVulkan";
-    case kDLMetal: return "kDLMetal";
-    case kDLVPI: return "kDLVPI";
-    case kDLROCM: return "kDLROCM";
-    case kDLROCMHost: return "kDLROCMHost";
-    case kDLExtDev: return "kDLExtDev";
-    case kDLCUDAManaged: return "kDLCUDAManaged";
-    case kDLOneAPI: return "kDLOneAPI";
-    case kDLWebGPU: return "kDLWebGPU";
-    case kDLHexagon: return "kDLHexagon";
-    default: return "Unknown DLDeviceType";
-  }
-}
-
-const char* dlpack_code_to_string(uint8_t code)
-{
-  switch(code)
-  {
-    case kDLInt: return "kDLInt";
-    case kDLUInt: return "kDLUInt";
-    case kDLFloat: return "kDLFloat";
-    case kDLOpaqueHandle: return "kDLOpaqueHandle";
-    case kDLBfloat: return "kDLBfloat";
-    case kDLComplex: return "kDLComplex";
-    case kDLBool: return "kDLBool";
-    default: return "Unknown DLDataTypeCode";
-  }
-}
-
-void print_dlpack_info(py::capsule dlpack_capsule) {
-  PTR_DLManagedTensor p_tensor;
-  if (attempt_unpack_dlpack(dlpack_capsule, p_tensor))
-  {
-    fprintf(stderr,"Error: capsule not valid dlpack");
+  if (strcmp(capsule_name, "dltensor") == 0) {
+    /* Consume the legacy DLPack capsule */
+    auto *managed = static_cast<DLManagedTensor*>(dlpack_capsule.get_pointer());
+    if (managed == nullptr) {
+      throw py::value_error("Legacy DLPack capsule pointer is null");
+    }
+    /* Mark the capsule as consumed */
+    if (PyCapsule_SetName(dlpack_capsule.ptr(), "used_dltensor") != 0) {
+      PyErr_Clear();
+      throw std::runtime_error("Failed to mark DLPack capsule as consumed");
+    }
+    /* Create the MatX tensor, consuming the capsule */
+    matx::make_tensor(tensor, managed);
     return;
   }
 
-  printf("  data: %p\n",p_tensor->dl_tensor.data);
-  printf("  device: device_type %s, device_id %d\n",
-    dlpack_device_type_to_string(p_tensor->dl_tensor.device.device_type),
-    p_tensor->dl_tensor.device.device_id
-  );
-  printf("  ndim: %d\n",p_tensor->dl_tensor.ndim);
-  printf("  dtype: code %s, bits %u, lanes %u\n",
-    dlpack_code_to_string(p_tensor->dl_tensor.dtype.code),
-    p_tensor->dl_tensor.dtype.bits,
-    p_tensor->dl_tensor.dtype.lanes
-  );
-  printf("  shape: ");
-  for (int k=0; k<p_tensor->dl_tensor.ndim; k++)
-  {
-    printf("%ld, ",p_tensor->dl_tensor.shape[k]);
+  if (strcmp(capsule_name, "dltensor_versioned") == 0) {
+    /* Consume the versioned DLPack capsule */
+    auto *managed = static_cast<DLManagedTensorVersioned*>(dlpack_capsule.get_pointer());
+    if (managed == nullptr) {
+      throw py::value_error("Versioned DLPack capsule pointer is null");
+    }
+    /* Mark the capsule as consumed */
+    if (PyCapsule_SetName(dlpack_capsule.ptr(), "used_dltensor_versioned") != 0) {
+      PyErr_Clear();
+      throw std::runtime_error("Failed to mark DLPack capsule as consumed");
+    }
+    /* Create the MatX tensor, consuming the capsule */
+    matx::make_tensor(tensor, managed);
+    return;
   }
-  printf("\n");
-  printf("  strides: ");
-  for (int k=0; k<p_tensor->dl_tensor.ndim; k++)
-  {
-    printf("%ld, ",p_tensor->dl_tensor.strides[k]);
-  }
-  printf("\n");
-  printf("  byte_offset: %lu\n",p_tensor->dl_tensor.byte_offset);
+
+  /* Capsule name is unsupported */
+  throw py::value_error(std::string("Unsupported DLPack capsule name: ") + capsule_name);
 }
 
 template<typename T, int RANK>
 void print(py::capsule dlpack_capsule)
 {
-  PTR_DLManagedTensor p_tensor;
-  if (attempt_unpack_dlpack(dlpack_capsule, p_tensor))
-  {
-    fprintf(stderr,"Error: capsule not valid dlpack");
-    return;
-  }
-
   matx::tensor_t<T, RANK> a;
-  matx::make_tensor(a, *p_tensor);
+  make_tensor_from_capsule(a, dlpack_capsule);
+
   matx::print(a);
 }
 
-void call_python_example(py::capsule dlpack_capsule)
+template<typename T, int RANK>
+void python_print(py::capsule dlpack_capsule)
 {
-  PTR_DLManagedTensor p_tensor;
-  if (attempt_unpack_dlpack(dlpack_capsule, p_tensor))
-  {
-    fprintf(stderr,"Error: capsule not valid dlpack");
-    return;
-  }
-
-  matx::tensor_t<float, 2> a;
-  matx::make_tensor(a, *p_tensor);
+  // Create a MatX tensor from the DLPack capsule
+  matx::tensor_t<T, RANK> a;
+  make_tensor_from_capsule(a, dlpack_capsule);
 
   auto pb = matx::detail::MatXPybind{};
+  // Convert the MatX tensor to a DLPack capsule
+  auto out = a.ToDlPack();
+  py::capsule out_capsule(out, "dltensor", [](PyObject *capsule) {
+    const char *name = PyCapsule_GetName(capsule);
+    if (name != nullptr && strcmp(name, "used_dltensor") == 0) {
+      return;
+    }
 
-  // Example use of python's print
-  pybind11::print("  Example use of python's print function from C++: ", 1, 2.0, "three");
-  pybind11::print("  The dlpack_capsule is a ", dlpack_capsule);
+    auto *managed = static_cast<DLManagedTensor *>(PyCapsule_GetPointer(capsule, "dltensor"));
+    if (managed != nullptr && managed->deleter != nullptr) {
+      managed->deleter(managed);
+    }
+  });
 
+  // Example use calling python code from C++
   auto mypythonlib = pybind11::module_::import("mypythonlib");
-  mypythonlib.attr("my_func")(dlpack_capsule);
+  mypythonlib.attr("python_print")(out_capsule);
 }
 
 template<typename T, int RANK>
 void add(py::capsule capsule_c, py::capsule capsule_a, py::capsule capsule_b, int64_t stream = 0)
 {
-  PTR_DLManagedTensor p_tensor_c;
-  PTR_DLManagedTensor p_tensor_a;
-  PTR_DLManagedTensor p_tensor_b;
-
-  // TODO these should matx throw
-  if (attempt_unpack_dlpack(capsule_c, p_tensor_c))
-  {
-    fprintf(stderr,"Error: capsule c not valid dlpack\n");
-    return;
-  }
-
-  if (attempt_unpack_dlpack(capsule_a, p_tensor_a))
-  {
-    fprintf(stderr,"Error: capsule a not valid dlpack\n");
-    return;
-  }
-
-  if (attempt_unpack_dlpack(capsule_b, p_tensor_b))
-  {
-    fprintf(stderr,"Error: capsule b not valid dlpack\n");
-    return;
-  }
-
   matx::tensor_t<T, RANK> c;
   matx::tensor_t<T, RANK> a;
   matx::tensor_t<T, RANK> b;
-  matx::make_tensor(c, *p_tensor_c);
-  matx::make_tensor(a, *p_tensor_a);
-  matx::make_tensor(b, *p_tensor_b);
+
+  make_tensor_from_capsule(c, capsule_c);
+  make_tensor_from_capsule(a, capsule_a);
+  make_tensor_from_capsule(b, capsule_b);
 
   matx::cudaExecutor exec{reinterpret_cast<cudaStream_t>(stream)};
   (c = a + b).run(exec);
 }
 
 PYBIND11_MODULE(matxutil, m) {
-    m.def("get_capsule_name", &get_capsule_name, "Returns PyCapsule name");
-    m.def("print_dlpack_info", &print_dlpack_info, "Print the DLPack tensor metadata");
-    m.def("check_dlpack_status", &check_dlpack_status, "Returns 0 if DLPack is valid, negative error code otherwise");
-    m.def("print_float_2D", &print<float,2>, "Prints a float32 2D tensor");
-    m.def("call_python_example", &call_python_example, "Example C++ function that calls python code");
+    m.def("print_float_2D", &print<float,2>, "Prints a float32 2D tensor", py::arg("dlpack_capsule"));
+    m.def("python_print_float_2D", &python_print<float,2>, "Example C++ function that calls python code", py::arg("dlpack_capsule"));
     m.def("add_float_2D",
           &add<float,2>,
           "Add two float32 2D tensors together",
