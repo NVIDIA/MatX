@@ -240,6 +240,10 @@ template <typename T> constexpr MatXDataType_t TypeToInt()
     return MATX_TYPE_COMPLEX_FP16;
   if constexpr (std::is_same_v<T, matxBf16Complex>)
     return MATX_TYPE_COMPLEX_BF16;
+  if constexpr (std::is_same_v<T, matxFp16ComplexPlanar>)
+    return MATX_TYPE_COMPLEX_FP16;
+  if constexpr (std::is_same_v<T, matxBf16ComplexPlanar>)
+    return MATX_TYPE_COMPLEX_BF16;
   if constexpr (std::is_same_v<T, float>)
     return MATX_TYPE_FP32;
   if constexpr (std::is_same_v<T, double>)
@@ -348,6 +352,12 @@ template <typename T> constexpr cudaDataType_t MatXTypeToCudaType()
   if constexpr (std::is_same_v<T, matxBf16Complex>) {
     return CUDA_C_16BF;
   }
+  if constexpr (std::is_same_v<T, matxFp16ComplexPlanar>) {
+    return CUDA_C_16F;
+  }
+  if constexpr (std::is_same_v<T, matxBf16ComplexPlanar>) {
+    return CUDA_C_16BF;
+  }
 
   return CUDA_C_32F;
 }
@@ -357,7 +367,9 @@ template <typename T> constexpr cublasComputeType_t MatXTypeToCudaComputeType()
   if constexpr (std::is_same_v<T, cuda::std::complex<float>> ||
                 std::is_same_v<T, float> || is_matx_half_v<T> ||
                 std::is_same_v<T, matxFp16Complex> ||
-                std::is_same_v<T, matxBf16Complex>) {
+                std::is_same_v<T, matxBf16Complex> ||
+                std::is_same_v<T, matxFp16ComplexPlanar> ||
+                std::is_same_v<T, matxBf16ComplexPlanar>) {
     return CUBLAS_COMPUTE_32F;
   }
   if constexpr (std::is_same_v<T, cuda::std::complex<double>> ||

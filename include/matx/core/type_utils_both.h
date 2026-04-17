@@ -417,14 +417,18 @@ template <class T>
 concept is_complex = cuda::std::is_same_v<remove_cvref_t<T>, cuda::std::complex<float>> ||
                      cuda::std::is_same_v<remove_cvref_t<T>, cuda::std::complex<double>> ||
                      cuda::std::is_same_v<remove_cvref_t<T>, matxFp16Complex> ||
-                     cuda::std::is_same_v<remove_cvref_t<T>, matxBf16Complex>;
+                     cuda::std::is_same_v<remove_cvref_t<T>, matxBf16Complex> ||
+                     cuda::std::is_same_v<remove_cvref_t<T>, matxFp16ComplexPlanar> ||
+                     cuda::std::is_same_v<remove_cvref_t<T>, matxBf16ComplexPlanar>;
 
 // Legacy variable for backwards compatibility
 template <class T> 
 inline constexpr bool is_complex_v = cuda::std::is_same_v<remove_cvref_t<T>, cuda::std::complex<float>> ||
                                      cuda::std::is_same_v<remove_cvref_t<T>, cuda::std::complex<double>> ||
                                      cuda::std::is_same_v<remove_cvref_t<T>, matxFp16Complex> ||
-                                     cuda::std::is_same_v<remove_cvref_t<T>, matxBf16Complex>;
+                                     cuda::std::is_same_v<remove_cvref_t<T>, matxBf16Complex> ||
+                                     cuda::std::is_same_v<remove_cvref_t<T>, matxFp16ComplexPlanar> ||
+                                     cuda::std::is_same_v<remove_cvref_t<T>, matxBf16ComplexPlanar>;
 
 namespace detail {
 template <typename T> struct scalar_to_complex {
@@ -505,11 +509,13 @@ struct inner_op_type_t<T> {
  */
 template <class T> 
 concept is_bf16_type = cuda::std::is_same_v<T, matxBf16Complex> ||
+                       cuda::std::is_same_v<T, matxBf16ComplexPlanar> ||
                        cuda::std::is_same_v<T, matxBf16>;
 
 // Legacy variable for backwards compatibility
 template <class T> 
 inline constexpr bool is_bf16_type_v = cuda::std::is_same_v<T, matxBf16Complex> ||
+                                       cuda::std::is_same_v<T, matxBf16ComplexPlanar> ||
                                        cuda::std::is_same_v<T, matxBf16>;
 
 /**
@@ -519,11 +525,13 @@ inline constexpr bool is_bf16_type_v = cuda::std::is_same_v<T, matxBf16Complex> 
  */
 template <class T> 
 concept is_fp16_type = cuda::std::is_same_v<T, matxFp16Complex> ||
+                       cuda::std::is_same_v<T, matxFp16ComplexPlanar> ||
                        cuda::std::is_same_v<T, matxFp16>;
 
 // Legacy variable for backwards compatibility
 template <class T> 
 inline constexpr bool is_fp16_type_v = cuda::std::is_same_v<T, matxFp16Complex> ||
+                                       cuda::std::is_same_v<T, matxFp16ComplexPlanar> ||
                                        cuda::std::is_same_v<T, matxFp16>;
 
 /**
@@ -564,12 +572,21 @@ inline constexpr bool is_matx_shape_v = requires { typename remove_cvref_t<T>::m
  */
 template <class T>
 concept is_complex_half = cuda::std::is_same_v<cuda::std::remove_cv_t<T>, matxFp16Complex> ||
-                          cuda::std::is_same_v<cuda::std::remove_cv_t<T>, matxBf16Complex>;
+                          cuda::std::is_same_v<cuda::std::remove_cv_t<T>, matxBf16Complex> ||
+                          cuda::std::is_same_v<cuda::std::remove_cv_t<T>, matxFp16ComplexPlanar> ||
+                          cuda::std::is_same_v<cuda::std::remove_cv_t<T>, matxBf16ComplexPlanar>;
 
 // Legacy variable for backwards compatibility
 template <class T>
 inline constexpr bool is_complex_half_v = cuda::std::is_same_v<cuda::std::remove_cv_t<T>, matxFp16Complex> ||
-                                          cuda::std::is_same_v<cuda::std::remove_cv_t<T>, matxBf16Complex>;
+                                          cuda::std::is_same_v<cuda::std::remove_cv_t<T>, matxBf16Complex> ||
+                                          cuda::std::is_same_v<cuda::std::remove_cv_t<T>, matxFp16ComplexPlanar> ||
+                                          cuda::std::is_same_v<cuda::std::remove_cv_t<T>, matxBf16ComplexPlanar>;
+
+template <typename T>
+inline constexpr bool is_planar_complex_v =
+    cuda::std::is_same_v<remove_cvref_t<T>, matxFp16ComplexPlanar> ||
+    cuda::std::is_same_v<remove_cvref_t<T>, matxBf16ComplexPlanar>;
 
 /**
  * @brief Tests if a type is a half precision floating point
@@ -619,14 +636,18 @@ template <class T>
 concept is_matx_type = cuda::std::is_same_v<cuda::std::remove_cv_t<T>, matxFp16> ||
                        cuda::std::is_same_v<cuda::std::remove_cv_t<T>, matxBf16> ||
                        cuda::std::is_same_v<cuda::std::remove_cv_t<T>, matxFp16Complex> ||
-                       cuda::std::is_same_v<cuda::std::remove_cv_t<T>, matxBf16Complex>;
+                       cuda::std::is_same_v<cuda::std::remove_cv_t<T>, matxBf16Complex> ||
+                       cuda::std::is_same_v<cuda::std::remove_cv_t<T>, matxFp16ComplexPlanar> ||
+                       cuda::std::is_same_v<cuda::std::remove_cv_t<T>, matxBf16ComplexPlanar>;
 
 // Legacy variable for backwards compatibility
 template <class T>
 inline constexpr bool is_matx_type_v = cuda::std::is_same_v<cuda::std::remove_cv_t<T>, matxFp16> ||
                                        cuda::std::is_same_v<cuda::std::remove_cv_t<T>, matxBf16> ||
                                        cuda::std::is_same_v<cuda::std::remove_cv_t<T>, matxFp16Complex> ||
-                                       cuda::std::is_same_v<cuda::std::remove_cv_t<T>, matxBf16Complex>;
+                                       cuda::std::is_same_v<cuda::std::remove_cv_t<T>, matxBf16Complex> ||
+                                       cuda::std::is_same_v<cuda::std::remove_cv_t<T>, matxFp16ComplexPlanar> ||
+                                       cuda::std::is_same_v<cuda::std::remove_cv_t<T>, matxBf16ComplexPlanar>;
 
 namespace detail {
 template <typename T>
@@ -994,7 +1015,17 @@ namespace detail {
   };
   
   template <> 
+  struct inner_precision<matxFp16ComplexPlanar> {
+    using type = __half;
+  };
+  
+  template <> 
   struct inner_precision<matxBf16Complex> {
+    using type = __nv_bfloat16;
+  };
+  
+  template <> 
+  struct inner_precision<matxBf16ComplexPlanar> {
     using type = __nv_bfloat16;
   };  
 }

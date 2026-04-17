@@ -316,6 +316,12 @@ __MATX_INLINE__ __MATX_HOST__  std::string type_to_string()
   else if constexpr (std::is_same_v<T, matxBf16Complex>) {
     return "matx::matxBf16Complex";
   }
+  else if constexpr (std::is_same_v<T, matxFp16ComplexPlanar>) {
+    return "matx::matxFp16ComplexPlanar";
+  }
+  else if constexpr (std::is_same_v<T, matxBf16ComplexPlanar>) {
+    return "matx::matxBf16ComplexPlanar";
+  }
   // CCCL complex types
   else if constexpr (std::is_same_v<T, cuda::std::complex<float>>) {
     return "cuda::std::complex<float>";
@@ -371,6 +377,12 @@ __MATX_INLINE__ __MATX_HOST__  std::string type_to_string_c_name()
   }
   else if constexpr (std::is_same_v<T, matxBf16Complex>) {
     return "matx_matxBf16Complex";
+  }
+  else if constexpr (std::is_same_v<T, matxFp16ComplexPlanar>) {
+    return "matx_matxFp16ComplexPlanar";
+  }
+  else if constexpr (std::is_same_v<T, matxBf16ComplexPlanar>) {
+    return "matx_matxBf16ComplexPlanar";
   }
   else {
     return type_to_string<T>();

@@ -310,8 +310,25 @@ void sparse_matmul_impl(TensorTypeC &C, const TensorTypeA &a,
                   c.Size(RANKC - 1) == b.Size(RANKB - 1) &&
                   c.Size(RANKC - 2) == a.Size(RANKA - 2),
               matxInvalidSize);
-  MATX_ASSERT(b.Stride(RANKB - 1) == 1 && c.Stride(RANKC - 1) == 1,
-              matxInvalidParameter);
+
+  // cuSPARSE SpMM requires unit innermost stride for dense inputs/outputs.
+  // If either view is not compatible (e.g., transformed/permuted output),
+  // materialize contiguous temporaries, execute, then copy back.
+  if (b.Stride(RANKB - 1) != 1 || c.Stride(RANKC - 1) != 1) {
+    auto b_contig =
+        make_tensor<TB>(b.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
+    auto c_contig =
+        make_tensor<TC>(c.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
+    (b_contig = b).run(stream);
+
+    sparse_matmul_impl(c_contig, a, b_contig, exec, alpha, beta);
+
+    (c = c_contig).run(stream);
+    if (!c.isSameView(C)) {
+      (C = c).run(stream);
+    }
+    return;
+  }
 
   // Get parameters required by these tensors (for caching).
   auto params =

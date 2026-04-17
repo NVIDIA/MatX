@@ -1055,6 +1055,30 @@ tanh(const matxHalfComplex<T> &x)
 using matxFp16Complex = matxHalfComplex<matxFp16>; ///< Alias for a MatX fp16 complex wrapper
 using matxBf16Complex = matxHalfComplex<matxBf16>; ///< Alias for a MatXbf16 complex wrapper
 
+struct matxFp16ComplexPlanar : public matxFp16Complex {
+  using matxFp16Complex::matxFp16Complex;
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxFp16ComplexPlanar() = default;
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxFp16ComplexPlanar(const matxFp16Complex &rhs) : matxFp16Complex(rhs) {}
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxFp16ComplexPlanar &operator=(const matxFp16Complex &rhs)
+  {
+    this->x = rhs.x;
+    this->y = rhs.y;
+    return *this;
+  }
+};
+
+struct matxBf16ComplexPlanar : public matxBf16Complex {
+  using matxBf16Complex::matxBf16Complex;
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxBf16ComplexPlanar() = default;
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxBf16ComplexPlanar(const matxBf16Complex &rhs) : matxBf16Complex(rhs) {}
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxBf16ComplexPlanar &operator=(const matxBf16Complex &rhs)
+  {
+    this->x = rhs.x;
+    this->y = rhs.y;
+    return *this;
+  }
+};
+
 }; // namespace matx
 
 // cuda::std::numeric_limits specializations for matxFp16Complex and matxBf16Complex

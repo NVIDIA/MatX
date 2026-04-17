@@ -355,7 +355,19 @@ namespace matx
             }
           }
           else if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
-            matmul_impl(permute(cuda::std::get<0>(out), perm_), a_, b_, ex, alpha_, beta_);
+            bool perm_is_identity = true;
+            for (int32_t i = 0; i < Rank(); i++) {
+              if (perm_[static_cast<size_t>(i)] != i) {
+                perm_is_identity = false;
+                break;
+              }
+            }
+            auto &tout = cuda::std::get<0>(out);
+            if (perm_is_identity) {
+              matmul_impl(tout, a_, b_, ex, alpha_, beta_);
+            } else {
+              matmul_impl(permute(tout, perm_), a_, b_, ex, alpha_, beta_);
+            }
           }
           else {
             matmul_impl(cuda::std::get<0>(out), a_, b_, ex, alpha_, beta_);

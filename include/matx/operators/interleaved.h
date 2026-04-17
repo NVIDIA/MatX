@@ -35,6 +35,7 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
+#include "matx/operators/planar.h"
 
 namespace matx
 {
@@ -109,6 +110,8 @@ namespace matx
 #endif
 
         __MATX_INLINE__ std::string str() const { return "interleaved(" + op_.str() + ")"; }
+
+        __MATX_INLINE__ auto InnerOp() const { return op_; }
 
         __MATX_INLINE__ ComplexInterleavedOp(const T1 &op) : op_(op) {
           MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
@@ -244,4 +247,17 @@ namespace matx
       static_assert(!is_complex_v<extract_value_type_t<T1>>, "Input to interleaved operator must be real-valued");
       return detail::ComplexInterleavedOp<T1>(t);
     }
+
+  template <typename T1>
+  auto interleaved(const detail::ComplexPlanarOp<T1> &t)
+  {
+    return t.InnerOp();
+  }
+
+  template <typename T1>
+  auto planar(const detail::ComplexInterleavedOp<T1> &t)
+  {
+    return t.InnerOp();
+  }
+
 } // end namespace matx
