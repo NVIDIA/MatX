@@ -958,10 +958,15 @@ auto make_tensor( TensorType &tensor,
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   MATX_ASSERT_STR(dlp_tensor != nullptr, matxInvalidParameter, "DLManagedTensor pointer cannot be null");
 
-  MATX_LOG_DEBUG("make_tensor(tensor&, DLManagedTensor*): ptr={}", dlp_tensor->dl_tensor.data);
+  auto owner = std::shared_ptr<DLManagedTensor>(dlp_tensor, [](DLManagedTensor *managed) {
+    if (managed != nullptr && managed->deleter != nullptr) {
+      managed->deleter(managed);
+    }
+  });
+  MATX_LOG_DEBUG("make_tensor(tensor&, DLManagedTensor*): ptr={}", owner->dl_tensor.data);
 
   using T = typename TensorType::value_type;
-  const DLTensor &dt = dlp_tensor->dl_tensor;
+  const DLTensor &dt = owner->dl_tensor;
   detail::validate_dlpack_tensor_type<TensorType>(dt);
 
   index_t strides[TensorType::Rank()];
@@ -970,11 +975,6 @@ auto make_tensor( TensorType &tensor,
 
   constexpr int RANK = TensorType::Rank();
   DefaultDescriptor<RANK> desc{detail::to_array(shape), detail::to_array(strides)};
-  auto owner = std::shared_ptr<DLManagedTensor>(dlp_tensor, [](DLManagedTensor *managed) {
-    if (managed != nullptr && managed->deleter != nullptr) {
-      managed->deleter(managed);
-    }
-  });
   auto data = std::shared_ptr<T>(owner, reinterpret_cast<T*>(dt.data));
   auto storage = make_storage_from_shared_ptr<T>(std::move(data), desc.TotalSize());
   auto tmp = tensor_t<T, TensorType::Rank(), decltype(desc)>{
@@ -1001,13 +1001,18 @@ auto make_tensor( TensorType &tensor,
                   DLManagedTensorVersioned *dlp_tensor) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   MATX_ASSERT_STR(dlp_tensor != nullptr, matxInvalidParameter, "DLManagedTensorVersioned pointer cannot be null");
-  MATX_ASSERT_STR_EXP(dlp_tensor->version.major, DLPACK_MAJOR_VERSION, matxInvalidParameter,
-                      "Unsupported DLPack major version");
 
-  MATX_LOG_DEBUG("make_tensor(tensor&, DLManagedTensorVersioned*): ptr={}", dlp_tensor->dl_tensor.data);
+  auto owner = std::shared_ptr<DLManagedTensorVersioned>(dlp_tensor, [](DLManagedTensorVersioned *managed) {
+    if (managed != nullptr && managed->deleter != nullptr) {
+      managed->deleter(managed);
+    }
+  });
+  MATX_ASSERT_STR_EXP(owner->version.major, DLPACK_MAJOR_VERSION, matxInvalidParameter,
+                      "Unsupported DLPack major version");
+  MATX_LOG_DEBUG("make_tensor(tensor&, DLManagedTensorVersioned*): ptr={}", owner->dl_tensor.data);
 
   using T = typename TensorType::value_type;
-  const DLTensor &dt = dlp_tensor->dl_tensor;
+  const DLTensor &dt = owner->dl_tensor;
   detail::validate_dlpack_tensor_type<TensorType>(dt);
 
   index_t strides[TensorType::Rank()];
@@ -1016,11 +1021,6 @@ auto make_tensor( TensorType &tensor,
 
   constexpr int RANK = TensorType::Rank();
   DefaultDescriptor<RANK> desc{detail::to_array(shape), detail::to_array(strides)};
-  auto owner = std::shared_ptr<DLManagedTensorVersioned>(dlp_tensor, [](DLManagedTensorVersioned *managed) {
-    if (managed != nullptr && managed->deleter != nullptr) {
-      managed->deleter(managed);
-    }
-  });
   auto data = std::shared_ptr<T>(owner, reinterpret_cast<T*>(dt.data));
   auto storage = make_storage_from_shared_ptr<T>(std::move(data), desc.TotalSize());
   auto tmp = tensor_t<T, TensorType::Rank(), decltype(desc)>{
