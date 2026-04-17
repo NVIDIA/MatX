@@ -203,7 +203,14 @@ namespace matx
                 MATX_THROW(matxInvalidParameter, "Possible aliased memory detected: LHS and RHS memory ranges overlap");
               }
 
-              if (tp->get_lhs().IsContiguous() && tp->get_rhs().IsContiguous() && tp->get_lhs().Rank() == tp->get_rhs().Rank()) {
+              using lhs_value_type = remove_cvref_t<typename T::tensor_type::value_type>;
+              using rhs_value_type = remove_cvref_t<typename T::op_type::value_type>;
+              constexpr bool same_value_type = std::is_same_v<lhs_value_type, rhs_value_type>;
+
+              if (same_value_type &&
+                  tp->get_lhs().IsContiguous() &&
+                  tp->get_rhs().IsContiguous() &&
+                  tp->get_lhs().Rank() == tp->get_rhs().Rank()) {
                 MATX_ASSERT_STR(tp->get_lhs().Bytes() >= tp->get_rhs().Bytes(), matxInvalidSize, "LHS tensor is smaller than RHS tensor in assignment");
                 MATX_LOG_TRACE("Copying {} bytes from {} to {} using cudaMemcpyAsync",
                   tp->get_lhs().Bytes(), reinterpret_cast<void*>(tp->get_rhs().Data()), reinterpret_cast<void*>(tp->get_lhs().Data()));

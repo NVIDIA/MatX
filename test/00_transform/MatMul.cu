@@ -35,6 +35,7 @@
 #include "test_types.h"
 #include "utilities.h"
 #include "gtest/gtest.h"
+#include <vector>
 
 using namespace matx;
 
@@ -81,10 +82,14 @@ class MatMulTestFloatNonHalfTypes : public MatMulTest<TensorType> {
 template <typename TensorType>
 class MatMulTestFloatNonComplexTypes : public MatMulTest<TensorType> {
 };
+template <typename TensorType>
+class MatMulTestComplexHalfPlanarTypes : public MatMulTest<TensorType> {
+};
 
 TYPED_TEST_SUITE(MatMulTestFloatTypes, MatXTypesFloatAllExecs);
 TYPED_TEST_SUITE(MatMulTestFloatNonHalfTypes, MatXFloatNonHalfTypesAllExecs);
 TYPED_TEST_SUITE(MatMulTestFloatNonComplexTypes, MatXTypesFloatNonComplexAllExecs);
+TYPED_TEST_SUITE(MatMulTestComplexHalfPlanarTypes, MatXComplexHalfPlanarTypesAllExecs);
 
 template <typename T>
 struct float_to_complex
@@ -106,6 +111,22 @@ struct float_to_complex<matxBf16>
 
 template <typename T>
 using float_to_complex_t = typename float_to_complex<T>::type;
+
+template <typename T>
+struct planar_to_interleaved;
+
+template <>
+struct planar_to_interleaved<matxFp16ComplexPlanar> {
+  using type = matxFp16Complex;
+};
+
+template <>
+struct planar_to_interleaved<matxBf16ComplexPlanar> {
+  using type = matxBf16Complex;
+};
+
+template <typename T>
+using planar_to_interleaved_t = typename planar_to_interleaved<T>::type;
 
 TYPED_TEST(MatMulTestFloatTypes, SmallRect)
 {
@@ -545,6 +566,138 @@ TYPED_TEST(MatMulTestFloatNonComplexTypes, MixedTypes)
 
     (c = matmul(a, b)).run(this->exec);
     MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);
+  }
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(MatMulTestComplexHalfPlanarTypes, ComplexHalfPlanarLayoutAnnotation)
+{
+  MATX_ENTER_HANDLER();
+  using PlanarTestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using TestType = planar_to_interleaved_t<PlanarTestType>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  if constexpr (!detail::CheckMatMulSupport<ExecType, TestType>()) {
+    GTEST_SKIP();
+  }
+  else {
+    constexpr index_t m = 4;
+    constexpr index_t k = 8;
+    constexpr index_t n = 16;
+
+    tensor_t<TestType, 2> a{{m, k}};
+    tensor_t<TestType, 2> b{{k, n}};
+    tensor_t<TestType, 2> c_ref{{m, n}};
+    tensor_t<TestType, 2> c_from_planar{{m, n}};
+
+    this->pb->template InitAndRunTVGenerator<TestType>(
+        "00_transforms", "matmul_operators", "run", {m, k, n});
+    this->pb->NumpyToTensorView(a, "a");
+    this->pb->NumpyToTensorView(b, "b");
+
+    // Interleaved reference path.
+    (c_ref = matmul(a, b)).run(this->exec);
+
+    // Materialize planar typed inputs/outputs into temporary tensors before GEMM.
+    tensor_t<PlanarTestType, 2> a_planar_tmp{{m, k}};
+    tensor_t<PlanarTestType, 2> b_planar_tmp{{k, n}};
+    tensor_t<PlanarTestType, 2> c_planar_tmp{{m, n}};
+
+    EXPECT_TRUE(is_planar_complex_v<typename decltype(a_planar_tmp)::value_type>);
+    EXPECT_TRUE(is_planar_complex_v<typename decltype(b_planar_tmp)::value_type>);
+    EXPECT_TRUE(is_planar_complex_v<typename decltype(c_planar_tmp)::value_type>);
+
+    // Write interleaved tensors into planar-typed temporaries.
+    (a_planar_tmp = a).run(this->exec);
+    (b_planar_tmp = b).run(this->exec);
+
+    // Planar path (using planar-typed temporary tensors as matmul inputs/outputs).
+    (c_planar_tmp = matmul(a_planar_tmp, b_planar_tmp)).run(this->exec);
+    (c_from_planar = c_planar_tmp).run(this->exec);
+
+    this->exec.sync();
+    for (index_t i = 0; i < m; i++) {
+      for (index_t j = 0; j < n; j++) {
+        EXPECT_TRUE(MatXUtils::MatXTypeCompare(c_ref(i, j), c_from_planar(i, j), this->thresh));
+      }
+    }
+  }
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(MatMulTestComplexHalfPlanarTypes, ComplexHalfPlanarRawStorageMatchesInterleavedReference)
+{
+  MATX_ENTER_HANDLER();
+  using PlanarTestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using TestType = planar_to_interleaved_t<PlanarTestType>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  if constexpr (!detail::CheckMatMulSupport<ExecType, TestType>()) {
+    GTEST_SKIP();
+  }
+  else {
+    constexpr index_t m = 7;
+    constexpr index_t k = 9;
+    constexpr index_t n = 5;
+    constexpr index_t a_elems = m * k;
+    constexpr index_t b_elems = k * n;
+
+    using ScalarType = typename PlanarTestType::value_type;
+
+    tensor_t<PlanarTestType, 2> a_planar{{m, k}};
+    tensor_t<PlanarTestType, 2> b_planar{{k, n}};
+    tensor_t<PlanarTestType, 2> c_planar{{m, n}};
+
+    tensor_t<TestType, 2> a_interleaved{{m, k}};
+    tensor_t<TestType, 2> b_interleaved{{k, n}};
+    tensor_t<TestType, 2> c_interleaved{{m, n}};
+    tensor_t<TestType, 2> c_from_planar{{m, n}};
+
+    std::vector<ScalarType> a_raw(static_cast<size_t>(a_elems * 2));
+    std::vector<ScalarType> b_raw(static_cast<size_t>(b_elems * 2));
+
+    for (index_t i = 0; i < a_elems; i++) {
+      a_raw[static_cast<size_t>(i)] = ScalarType{static_cast<float>((i % 13) - 6)};
+      a_raw[static_cast<size_t>(i + a_elems)] =
+          ScalarType{static_cast<float>((i % 9) - 4)};
+    }
+
+    for (index_t i = 0; i < b_elems; i++) {
+      b_raw[static_cast<size_t>(i)] = ScalarType{static_cast<float>((i % 11) - 5)};
+      b_raw[static_cast<size_t>(i + b_elems)] =
+          ScalarType{static_cast<float>(3 - (i % 7))};
+    }
+
+    ASSERT_EQ(cudaMemcpy(a_planar.Data(), a_raw.data(),
+                         a_raw.size() * sizeof(ScalarType), cudaMemcpyHostToDevice),
+              cudaSuccess);
+    ASSERT_EQ(cudaMemcpy(b_planar.Data(), b_raw.data(),
+                         b_raw.size() * sizeof(ScalarType), cudaMemcpyHostToDevice),
+              cudaSuccess);
+
+    EXPECT_TRUE(is_planar_complex_v<typename decltype(a_planar)::value_type>);
+    EXPECT_TRUE(is_planar_complex_v<typename decltype(b_planar)::value_type>);
+    EXPECT_TRUE(is_planar_complex_v<typename decltype(c_planar)::value_type>);
+
+    // Build interleaved references from the same logical planar tensors.
+    (a_interleaved = a_planar).run(this->exec);
+    (b_interleaved = b_planar).run(this->exec);
+
+    // Interleaved path should still perform the required conversion.
+    (c_interleaved = matmul(a_interleaved, b_interleaved)).run(this->exec);
+
+    // Planar typed tensors should be consumed directly by matmul.
+    (c_planar = matmul(a_planar, b_planar)).run(this->exec);
+    (c_from_planar = c_planar).run(this->exec);
+
+    this->exec.sync();
+
+    for (index_t i = 0; i < m; i++) {
+      for (index_t j = 0; j < n; j++) {
+        EXPECT_TRUE(MatXUtils::MatXTypeCompare(c_interleaved(i, j),
+                                               c_from_planar(i, j),
+                                               this->thresh))
+            << "Mismatch at (" << i << ", " << j << ")";
+      }
+    }
   }
   MATX_EXIT_HANDLER();
 }

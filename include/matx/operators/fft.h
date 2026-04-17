@@ -446,11 +446,26 @@ namespace matx
             }
           }
           else {
-            if constexpr (Direction == detail::FFTDirection::FORWARD) { 
-              fft_impl(permute(cuda::std::get<0>(out), perm_), permute(a_, perm_), fft_size_, norm_, ex);
+            bool perm_is_identity = true;
+            for (int32_t i = 0; i < Rank(); i++) {
+              if (perm_[static_cast<size_t>(i)] != i) {
+                perm_is_identity = false;
+                break;
+              }
             }
-            else {
-              ifft_impl(permute(cuda::std::get<0>(out), perm_), permute(a_, perm_), fft_size_, norm_, ex);
+            auto &tout = cuda::std::get<0>(out);
+            if (perm_is_identity) {
+              if constexpr (Direction == detail::FFTDirection::FORWARD) {
+                fft_impl(tout, a_, fft_size_, norm_, ex);
+              } else {
+                ifft_impl(tout, a_, fft_size_, norm_, ex);
+              }
+            } else {
+              if constexpr (Direction == detail::FFTDirection::FORWARD) {
+                fft_impl(permute(tout, perm_), permute(a_, perm_), fft_size_, norm_, ex);
+              } else {
+                ifft_impl(permute(tout, perm_), permute(a_, perm_), fft_size_, norm_, ex);
+              }
             }
           }        
         }
@@ -788,11 +803,26 @@ namespace matx
             }
           }
           else {
-            if constexpr (Direction == detail::FFTDirection::FORWARD) { 
-              fft2_impl(permute(cuda::std::get<0>(out), perm_), permute(a_, perm_), norm_, ex);
+            bool perm_is_identity = true;
+            for (int32_t i = 0; i < Rank(); i++) {
+              if (perm_[static_cast<size_t>(i)] != i) {
+                perm_is_identity = false;
+                break;
+              }
             }
-            else {
-              ifft2_impl(permute(cuda::std::get<0>(out), perm_), permute(a_, perm_), norm_, ex);
+            auto &tout = cuda::std::get<0>(out);
+            if (perm_is_identity) {
+              if constexpr (Direction == detail::FFTDirection::FORWARD) {
+                fft2_impl(tout, a_, norm_, ex);
+              } else {
+                ifft2_impl(tout, a_, norm_, ex);
+              }
+            } else {
+              if constexpr (Direction == detail::FFTDirection::FORWARD) {
+                fft2_impl(permute(tout, perm_), permute(a_, perm_), norm_, ex);
+              } else {
+                ifft2_impl(permute(tout, perm_), permute(a_, perm_), norm_, ex);
+              }
             }
           }
         }

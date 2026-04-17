@@ -114,9 +114,17 @@ public:
   // functions, so we have to make a separate one.
   template <typename CapType, typename... Ts>
   __MATX_DEVICE__ __MATX_HOST__ inline auto _internal_mapply(Ts&&... args) const noexcept {
-    const auto r = detail::get_value<CapType>(op_, args...);
-    out_(args...) = r;
-    return r;
+    if constexpr (is_planar_complex_v<typename T::value_type>) {
+      const auto r = detail::get_value<detail::DefaultCapabilities>(
+          static_cast<const decltype(op_)&>(op_), args...);
+      out_.template operator()<detail::DefaultCapabilities>(args...) = r;
+      return r;
+    }
+    else {
+      const auto r = detail::get_value<CapType>(static_cast<const decltype(op_)&>(op_), args...);
+      out_.template operator()<CapType>(args...) = r;
+      return r;
+    }
   }
 
   template <typename CapType, typename ShapeType>
@@ -133,17 +141,25 @@ public:
   template <typename CapType, typename... Is>
   __MATX_DEVICE__ __MATX_HOST__ inline decltype(auto) operator()(Is... indices) const noexcept
   {
-    const auto in_val = detail::get_value<CapType>(op_, indices...);
-    using out_type = decltype(out_.template operator()<CapType>(indices...));
-    
-    if constexpr (!is_vector_v<decltype(in_val)> && is_vector_v<out_type>) {
-      Vector<remove_cvref_t<decltype(in_val)>, static_cast<size_t>(CapType::ept)> vec{in_val};
-      out_.template operator()<CapType>(indices...) = vec;
+    if constexpr (is_planar_complex_v<typename T::value_type>) {
+      const auto in_val = detail::get_value<detail::DefaultCapabilities>(
+          static_cast<const decltype(op_)&>(op_), indices...);
+      out_.template operator()<detail::DefaultCapabilities>(indices...) = in_val;
+      return in_val;
     }
     else {
-      out_.template operator()<CapType>(indices...) = in_val;
+      const auto in_val = detail::get_value<CapType>(static_cast<const decltype(op_)&>(op_), indices...);
+      using out_type = decltype(out_.template operator()<CapType>(indices...));
+      
+      if constexpr (!is_vector_v<decltype(in_val)> && is_vector_v<out_type>) {
+        Vector<remove_cvref_t<decltype(in_val)>, static_cast<size_t>(CapType::ept)> vec{in_val};
+        out_.template operator()<CapType>(indices...) = vec;
+      }
+      else {
+        out_.template operator()<CapType>(indices...) = in_val;
+      }
+      return in_val;
     }
-    return in_val;
   } 
   
 #ifdef MATX_EN_JIT
@@ -271,7 +287,18 @@ public:
 #else
       return false;
 #endif
-    }      
+    }
+    else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+      // Only force scalar EPT for planar-complex outputs. Non-planar SetOp
+      // should retain normal vectorization negotiation with operands.
+      const auto my_cap = is_planar_complex_v<typename T::value_type>
+          ? cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE,
+                                                   ElementsPerThread::ONE}
+          : capability_attributes<Cap>::default_value;
+      return combine_capabilities<Cap>(
+          my_cap, detail::get_operator_capability<Cap>(out_, in),
+          detail::get_operator_capability<Cap>(op_, in));
+    }
     else {
       auto self_has_cap = capability_attributes<Cap>::default_value;
 

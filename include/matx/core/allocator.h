@@ -128,24 +128,36 @@ struct MemTracker {
 
     matxMemoryStats.currentBytesAllocated -= bytes;
 
+    // Check if the CUDA context is still valid before attempting to free.
+    // During static destruction at program exit, the CUDA context may already
+    // be destroyed, making cudaFree/cudaFreeAsync calls fail with
+    // CUDA_ERROR_CONTEXT_IS_DESTROYED.
+    auto is_cuda_free = [&]() {
+      if (iter->second.kind == MATX_HOST_MALLOC_MEMORY) return true; // not CUDA
+      int dev;
+      return cudaGetDevice(&dev) == cudaSuccess;
+    };
+
     switch (iter->second.kind) {
     case MATX_MANAGED_MEMORY:
       [[fallthrough]];
     case MATX_DEVICE_MEMORY:
-      cudaFree(ptr);
+      if (is_cuda_free()) cudaFree(ptr);
       break;
     case MATX_HOST_MEMORY:
-      cudaFreeHost(ptr);
+      if (is_cuda_free()) cudaFreeHost(ptr);
       break;
     case MATX_HOST_MALLOC_MEMORY:
       free(ptr);
       break;
     case MATX_ASYNC_DEVICE_MEMORY:
-      if constexpr (std::is_same_v<no_stream_t, StreamType>) {
-        cudaFreeAsync(ptr, iter->second.stream);
-      }
-      else {
-        cudaFreeAsync(ptr, st.stream);
+      if (is_cuda_free()) {
+        if constexpr (std::is_same_v<no_stream_t, StreamType>) {
+          cudaFreeAsync(ptr, iter->second.stream);
+        }
+        else {
+          cudaFreeAsync(ptr, st.stream);
+        }
       }
       break;
     default:

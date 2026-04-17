@@ -129,14 +129,22 @@ namespace matx
           return "f32";
         if constexpr (std::is_same_v<T, double>)
           return "f64";
-        if constexpr (std::is_same_v<T, matxHalf<__half>>)
+        if constexpr (std::is_same_v<T, matxFp16>)
           return "f16";
-        if constexpr (std::is_same_v<T, matxHalf<__nv_bfloat16>>)
+        if constexpr (std::is_same_v<T, matxBf16>)
           return "bf16";
         else
           return "x" + std::to_string(sizeof(T)*8);
       }
       else {
+        if constexpr (std::is_same_v<T, matxFp16ComplexPlanar>)
+          return "f16cp";
+        if constexpr (std::is_same_v<T, matxBf16ComplexPlanar>)
+          return "bf16cp";
+        if constexpr (std::is_same_v<T, matxFp16Complex>)
+          return "f16c";
+        if constexpr (std::is_same_v<T, matxBf16Complex>)
+          return "bf16c";
         if constexpr (std::is_same_v<typename T::value_type, int32_t>)
           return "i32c";
         if constexpr (std::is_same_v<typename T::value_type, uint32_t>)
@@ -149,10 +157,6 @@ namespace matx
           return "f32c";
         if constexpr (std::is_same_v<typename T::value_type, double>)
           return "f64c";
-        if constexpr (std::is_same_v<typename T::value_type, matxHalf<__half>>)
-          return "f16";
-        if constexpr (std::is_same_v<typename T::value_type, matxHalf<__nv_bfloat16>>)
-          return "bf16";
         else
           return "x" + std::to_string(sizeof(typename T::value_type)*8) + "c";
       }
@@ -198,6 +202,10 @@ namespace matx
       if constexpr (std::is_same_v<T, matxFp16Complex>)
         return {kDLComplex, 32, 1};
       if constexpr (std::is_same_v<T, matxBf16Complex>)
+        return {kDLComplex, 32, 1}; // Wrong, but no other choice
+      if constexpr (std::is_same_v<T, matxFp16ComplexPlanar>)
+        return {kDLComplex, 32, 1};
+      if constexpr (std::is_same_v<T, matxBf16ComplexPlanar>)
         return {kDLComplex, 32, 1}; // Wrong, but no other choice
       if constexpr (std::is_same_v<T, float>)
         return {kDLFloat, 32, 1};

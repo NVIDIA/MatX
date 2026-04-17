@@ -294,7 +294,6 @@ TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, FFT2Axis)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-; 
   const int d1 = 8;
   const int d2 = 16;
   const int d3 = 32;

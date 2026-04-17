@@ -249,7 +249,20 @@ void sparse2dense_impl(OutputTensorType &O, const InputTensorType &a,
                     std::is_same_v<TO, cuda::std::complex<float>> ||
                     std::is_same_v<TO, cuda::std::complex<double>>,
                 "unsupported data type");
-  MATX_ASSERT(o.Stride(RANKO - 1) == 1, matxInvalidParameter);
+
+  // cuSPARSE sparse-to-dense conversion requires unit innermost stride.
+  // For transformed/view outputs (e.g., transpose(output)), materialize
+  // into a contiguous temporary and copy back.
+  if (o.Stride(RANKO - 1) != 1) {
+    auto o_contig =
+        make_tensor<TO>(o.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream);
+    sparse2dense_impl(o_contig, a, exec);
+    (o = o_contig).run(stream);
+    if (!o.isSameView(O)) {
+      (O = o).run(stream);
+    }
+    return;
+  }
 
   // Get parameters required by these tensors (for caching).
   auto params =

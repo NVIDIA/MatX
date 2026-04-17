@@ -236,7 +236,7 @@ public:
       params.idist = (RANK == 1) ? 1 : i.Stride(RANK - 2);
       params.odist = (RANK == 1) ? 1 : o.Stride(RANK - 2);
 
-      if constexpr (is_complex_half_v<T1> || is_complex_half_v<T1>) {
+      if constexpr (is_complex_half_v<T1> || is_complex_half_v<T2>) {
         if ((params.n[0] & (params.n[0] - 1)) != 0) {
           MATX_THROW(matxInvalidDim,
                      "Half precision only supports power of two transforms");

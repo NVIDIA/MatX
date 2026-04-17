@@ -32,12 +32,23 @@
 
 #pragma once
 
+#include <initializer_list>
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
 
 namespace matx
 {
+  namespace detail {
+    template <typename T>
+    struct is_initializer_list : std::false_type {};
+
+    template <typename T>
+    struct is_initializer_list<std::initializer_list<T>> : std::true_type {};
+
+    template <typename T>
+    inline constexpr bool is_initializer_list_v = is_initializer_list<T>::value;
+  } // namespace detail
 /**
    * logically reshapes dimensions of a tensor/operator
    * TotalSize for reshape and input operator must match
@@ -239,6 +250,10 @@ MATX_LOOP_UNROLL
           else if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
             return detail::get_operator_capability<Cap>(op_, in);
           }
+          else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+            return combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(op_, in));
+          }
           else {
             auto self_has_cap = capability_attributes<Cap>::default_value;
             return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_, in));
@@ -292,7 +307,8 @@ MATX_LOOP_UNROLL
    * @return reshaped operator
    */
   template <int RANK, typename T, typename ShapeType>
-    requires (!cuda::std::is_array_v<remove_cvref_t<ShapeType>>)
+    requires (!cuda::std::is_array_v<remove_cvref_t<ShapeType>> &&
+              !detail::is_initializer_list_v<remove_cvref_t<ShapeType>>)
   __MATX_INLINE__ auto reshape(const T &op, ShapeType &&s)
   {
     return detail::ReshapeOp<RANK, T, ShapeType>(op, std::forward<ShapeType>(s));
