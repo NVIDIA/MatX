@@ -9,7 +9,6 @@ sys.path.append('examples/python_integration_sample/')
 
 import matxutil
 
-#Do all cupy work using the "with stream" context manager
 a = cp.arange(9, dtype=cp.float32).reshape(3, 3)
 
 # Convert the cupy array to a DLPack capsule
