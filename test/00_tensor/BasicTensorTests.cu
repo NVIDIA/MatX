@@ -85,6 +85,56 @@ DLManagedTensor *MakeManagedTensorForOwningImportTest(int *deleter_calls, int64_
   return mt;
 }
 
+template <typename T>
+struct DLPackVersionedOwningImportContext {
+  int *deleter_calls;
+  T *data;
+  int64_t *shape;
+  int64_t *strides;
+};
+
+template <typename T>
+void DLPackVersionedOwningImportDeleter(DLManagedTensorVersioned *mt) {
+  auto *ctx = static_cast<DLPackVersionedOwningImportContext<T> *>(mt->manager_ctx);
+  if (ctx != nullptr) {
+    (*ctx->deleter_calls)++;
+    delete[] ctx->data;
+    delete[] ctx->shape;
+    delete[] ctx->strides;
+    delete ctx;
+  }
+  delete mt;
+}
+
+template <typename T>
+DLManagedTensorVersioned *MakeVersionedManagedTensorForOwningImportTest(int *deleter_calls, int64_t size) {
+  auto *mt = new DLManagedTensorVersioned{};
+  auto *ctx = new DLPackVersionedOwningImportContext<T>{};
+
+  ctx->deleter_calls = deleter_calls;
+  ctx->data = new T[static_cast<size_t>(size)];
+  ctx->shape = new int64_t[1];
+  ctx->strides = new int64_t[1];
+  ctx->shape[0] = size;
+  ctx->strides[0] = 1;
+
+  mt->version.major = DLPACK_MAJOR_VERSION;
+  mt->version.minor = DLPACK_MINOR_VERSION;
+  mt->dl_tensor.data = static_cast<void *>(ctx->data);
+  mt->dl_tensor.device.device_type = kDLCPU;
+  mt->dl_tensor.device.device_id = 0;
+  mt->dl_tensor.ndim = 1;
+  mt->dl_tensor.dtype = detail::TypeToDLPackType<T>();
+  mt->dl_tensor.shape = ctx->shape;
+  mt->dl_tensor.strides = ctx->strides;
+  mt->dl_tensor.byte_offset = 0;
+  mt->manager_ctx = ctx;
+  mt->flags = 0;
+  mt->deleter = &DLPackVersionedOwningImportDeleter<T>;
+
+  return mt;
+}
+
 template <typename T> struct BasicTensorTestsData {
   using GTestType = cuda::std::tuple_element_t<0, T>;
   using GExecType = cuda::std::tuple_element_t<1, T>;    
@@ -618,6 +668,32 @@ TYPED_TEST(BasicTensorTestsFloatNonComplex, DLPackOwningImportLifetime)
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   int deleter_calls = 0;
   auto *dl = MakeManagedTensorForOwningImportTest<TestType>(&deleter_calls, 8);
+
+  {
+    tensor_t<TestType, 1> t;
+    make_tensor(t, dl);
+    ASSERT_EQ(deleter_calls, 0);
+
+    {
+      auto t_copy = t;
+      ASSERT_EQ(deleter_calls, 0);
+      ASSERT_EQ(t_copy.Data(), t.Data());
+    }
+
+    ASSERT_EQ(deleter_calls, 0);
+  }
+
+  ASSERT_EQ(deleter_calls, 1);
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(BasicTensorTestsFloatNonComplex, DLPackVersionedOwningImportLifetime)
+{
+  MATX_ENTER_HANDLER();
+
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  int deleter_calls = 0;
+  auto *dl = MakeVersionedManagedTensorForOwningImportTest<TestType>(&deleter_calls, 8);
 
   {
     tensor_t<TestType, 1> t;

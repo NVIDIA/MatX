@@ -38,6 +38,17 @@ Custom Allocator Support
 .. doxygenfunction:: make_tensor( TensorType &tensor, const index_t (&shape)[TensorType::Rank()], Allocator&& alloc)
 .. doxygenfunction:: make_tensor( TensorType &tensor, ShapeType &&shape, Allocator&& alloc)
 
+DLPack Support
+~~~~~~~~~~~~~~
+.. versionadded:: 1.1.0
+.. doxygenfunction:: make_tensor( TensorType &tensor, DLManagedTensorVersioned *dlp_tensor)
+.. versionadded:: 1.1.0
+.. doxygenfunction:: make_tensor( TensorType &tensor, DLManagedTensor *dlp_tensor)
+.. versionadded:: 1.1.0
+.. doxygenfunction:: tensor_t::ToDlPackVersioned
+.. versionadded:: 1.1.0
+.. doxygenfunction:: tensor_t::ToDlPack
+
 Return by Pointer
 ~~~~~~~~~~~~~~~~~
 .. doxygenfunction:: make_tensor_p( const index_t (&shape)[RANK],  matxMemorySpace_t space = MATX_MANAGED_MEMORY, cudaStream_t stream = 0)

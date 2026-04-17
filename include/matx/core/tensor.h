@@ -1446,7 +1446,8 @@ MATX_LOOP_UNROLL
   }
 
 
-  static void FreeDLPack(struct DLManagedTensor *mtv) {
+  template <typename ManagedType>
+  static void FreeDLPackCommon_(ManagedType *mtv) {
       delete [] mtv->dl_tensor.shape;
       delete [] mtv->dl_tensor.strides;
       delete static_cast<self_type *>(mtv->manager_ctx);
@@ -1458,21 +1459,13 @@ MATX_LOOP_UNROLL
       mtv                     = nullptr;
     };
 
-  /**
-   * @brief Get a DLPack v0.8 structure representing the tensor
-   *
-   * DLPack is a commonly-used tensor memory layout format for moving tensors between libraries. This function
-   * returns a DLPack structure based on a tensor_t. The caller is responsible for freeing the memory
-   * by calling ->deleter(self).
-   *
-   * **Note**: This function will increment the reference count of the tensor. It is expected that once a tensor
-   * is converted to DLPack someone will eventually call deleter(). If that does not happen a memory leak
-   * will occur.
-   *
-   * @returns Pointer to new DLManagedTensorVersioned pointer. The caller must call the deleter function when finished.
-   */
-  DLManagedTensor *ToDlPack() const {
-    auto mt = new DLManagedTensor;
+  template <typename ManagedType>
+  ManagedType *ToDlPackImpl() const {
+    static_assert(std::is_same_v<ManagedType, DLManagedTensorVersioned> ||
+      std::is_same_v<ManagedType, DLManagedTensor>,
+      "Unsupported DLPack managed tensor type");
+
+    auto *mt = new ManagedType;
     DLTensor *t = &mt->dl_tensor;
     CUpointer_attribute attr[] = {CU_POINTER_ATTRIBUTE_MEMORY_TYPE, CU_POINTER_ATTRIBUTE_DEVICE_ORDINAL};
     CUmemorytype mem_type;
@@ -1532,12 +1525,52 @@ MATX_LOOP_UNROLL
     // setting it as the context
     auto t_copy = new self_type{*this};
     mt->manager_ctx = t_copy;
-    //mt->flags = 0; // Only for v1.0
+    mt->deleter = &self_type::template FreeDLPackCommon_<ManagedType>;
 
-    auto deleter = &self_type::FreeDLPack;
-    mt->deleter = deleter;
+    if constexpr (std::is_same_v<ManagedType, DLManagedTensorVersioned>) {
+      mt->version.major = DLPACK_MAJOR_VERSION;
+      mt->version.minor = DLPACK_MINOR_VERSION;
+      mt->flags = 0;
+    }
 
     return mt;
+  }
+
+  /**
+   * @brief Get a DLPack v0.8 structure representing the tensor
+   *
+   * DLPack is a commonly-used tensor memory layout format for moving tensors between libraries. This function
+   * returns a DLPack structure based on a tensor_t. The caller is responsible for freeing the memory
+   * by calling ->deleter(self).
+   *
+   * **Note**: This function will increment the reference count of the tensor. It is expected that once a tensor
+   * is converted to DLPack someone will eventually call deleter(). If that does not happen a memory leak
+   * will occur.
+   *
+   * This function is provided for compatibility with DLPack v0.8. If the consumer supports DLPack 1.0 or greater,
+   * it is recommended to use ToDlPackVersioned() instead.
+   *
+   * @returns Pointer to new DLManagedTensor pointer. The caller must call the deleter function when finished.
+   */
+  DLManagedTensor *ToDlPack() const {
+    return ToDlPackImpl<DLManagedTensor>();
+  }
+
+  /**
+   * @brief Get a versioned DLPack v1.x structure representing the tensor
+   *
+   * DLPack is a commonly-used tensor memory layout format for moving tensors between libraries. This function
+   * returns a versioned DLPack structure based on a tensor_t. The caller is responsible for freeing the memory
+   * by calling ->deleter(self).
+   *
+   * **Note**: This function will increment the reference count of the tensor. It is expected that once a tensor
+   * is converted to DLPack someone will eventually call deleter(). If that does not happen a memory leak
+   * will occur.
+   *
+   * @returns Pointer to new DLManagedTensorVersioned pointer. The caller must call the deleter function when finished.
+   */
+  DLManagedTensorVersioned *ToDlPackVersioned() const {
+    return ToDlPackImpl<DLManagedTensorVersioned>();
   }
 
 private:

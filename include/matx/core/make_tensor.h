@@ -907,8 +907,20 @@ void dlpack_shape_and_strides(const DLTensor &dt,
 }
 } // namespace detail
 
+/**
+ * Create a tensor from a legacy DLPack managed tensor.
+ *
+ * @deprecated Use `make_tensor(tensor, DLManagedTensor*)` to transfer ownership
+ *   and guarantee source lifetime while MatX views are alive.
+ *
+ * @param tensor
+ *   Tensor object to store newly-created tensor into
+ * @param dlp_tensor
+ *   Legacy DLPack tensor metadata and data pointer (borrowed, non-owning)
+ **/
 template <typename TensorType>
   requires is_tensor<TensorType>
+[[deprecated("Use make_tensor(tensor, DLManagedTensor*) to transfer ownership and ensure lifetime safety")]]
 auto make_tensor( TensorType &tensor,
                   const DLManagedTensor dlp_tensor) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
@@ -927,6 +939,18 @@ auto make_tensor( TensorType &tensor,
   tensor.Shallow(tmp);
 }
 
+/**
+ * Create a tensor from a DLManagedTensor.
+ *
+ * This consumes `dlp_tensor`, the deleter method will be called when the last MatX reference to the imported storage is
+ * released.
+ *
+ * @param tensor
+ *   Tensor object to store newly-created tensor into
+ * @param dlp_tensor
+ *   Pointer to a heap-allocated `DLManagedTensor` whose ownership is
+ *   transferred to MatX
+ **/
 template <typename TensorType>
   requires is_tensor<TensorType>
 auto make_tensor( TensorType &tensor,
@@ -947,6 +971,52 @@ auto make_tensor( TensorType &tensor,
   constexpr int RANK = TensorType::Rank();
   DefaultDescriptor<RANK> desc{detail::to_array(shape), detail::to_array(strides)};
   auto owner = std::shared_ptr<DLManagedTensor>(dlp_tensor, [](DLManagedTensor *managed) {
+    if (managed != nullptr && managed->deleter != nullptr) {
+      managed->deleter(managed);
+    }
+  });
+  auto data = std::shared_ptr<T>(owner, reinterpret_cast<T*>(dt.data));
+  auto storage = make_storage_from_shared_ptr<T>(std::move(data), desc.TotalSize());
+  auto tmp = tensor_t<T, TensorType::Rank(), decltype(desc)>{
+      std::move(storage), std::move(desc), reinterpret_cast<T*>(dt.data)};
+
+  tensor.Shallow(tmp);
+}
+
+/**
+ * Create a tensor from a versioned DLPack managed tensor and transfer ownership.
+ *
+ * This consumes `dlp_tensor`, the deleter method will be called when the last MatX reference to the imported storage is
+ * released.
+ *
+ * @param tensor
+ *   Tensor object to store newly-created tensor into
+ * @param dlp_tensor
+ *   Pointer to a heap-allocated `DLManagedTensorVersioned` whose ownership is
+ *   transferred to MatX
+ **/
+template <typename TensorType>
+  requires is_tensor<TensorType>
+auto make_tensor( TensorType &tensor,
+                  DLManagedTensorVersioned *dlp_tensor) {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  MATX_ASSERT_STR(dlp_tensor != nullptr, matxInvalidParameter, "DLManagedTensorVersioned pointer cannot be null");
+  MATX_ASSERT_STR_EXP(dlp_tensor->version.major, DLPACK_MAJOR_VERSION, matxInvalidParameter,
+                      "Unsupported DLPack major version");
+
+  MATX_LOG_DEBUG("make_tensor(tensor&, DLManagedTensorVersioned*): ptr={}", dlp_tensor->dl_tensor.data);
+
+  using T = typename TensorType::value_type;
+  const DLTensor &dt = dlp_tensor->dl_tensor;
+  detail::validate_dlpack_tensor_type<TensorType>(dt);
+
+  index_t strides[TensorType::Rank()];
+  index_t shape[TensorType::Rank()];
+  detail::dlpack_shape_and_strides<TensorType>(dt, shape, strides);
+
+  constexpr int RANK = TensorType::Rank();
+  DefaultDescriptor<RANK> desc{detail::to_array(shape), detail::to_array(strides)};
+  auto owner = std::shared_ptr<DLManagedTensorVersioned>(dlp_tensor, [](DLManagedTensorVersioned *managed) {
     if (managed != nullptr && managed->deleter != nullptr) {
       managed->deleter(managed);
     }
