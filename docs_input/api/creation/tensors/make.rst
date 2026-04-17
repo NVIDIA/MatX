@@ -44,10 +44,6 @@ DLPack Support
 .. doxygenfunction:: make_tensor( TensorType &tensor, DLManagedTensorVersioned *dlp_tensor)
 .. versionadded:: 1.1.0
 .. doxygenfunction:: make_tensor( TensorType &tensor, DLManagedTensor *dlp_tensor)
-.. versionadded:: 1.1.0
-.. doxygenfunction:: matx::tensor_t::ToDlPackVersioned() const
-.. versionadded:: 1.1.0
-.. doxygenfunction:: matx::tensor_t::ToDlPack() const
 
 Return by Pointer
 ~~~~~~~~~~~~~~~~~
