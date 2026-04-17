@@ -185,48 +185,53 @@ namespace matx
 
     template <typename T> constexpr DLDataType TypeToDLPackType()
     {
-      if constexpr (std::is_same_v<T, cuda::std::complex<float>> || 
-                    std::is_same_v<T, std::complex<float>>)
-        return {kDLComplex, 64, 1};
-      if constexpr (std::is_same_v<T, cuda::std::complex<double>> ||
-                    std::is_same_v<T, std::complex<double>>)
-        return {kDLComplex, 128, 1};
-      if constexpr (std::is_same_v<T, matxFp16>)
-        return {kDLFloat, 16, 1};
-      if constexpr (std::is_same_v<T, matxBf16>)
-        return {kDLBfloat, 16, 1};
-      if constexpr (std::is_same_v<T, matxFp16Complex>)
-        return {kDLComplex, 32, 1};
-      if constexpr (std::is_same_v<T, matxBf16Complex>)
-        return {kDLComplex, 32, 1}; // Wrong, but no other choice
-      if constexpr (std::is_same_v<T, float>)
-        return {kDLFloat, 32, 1};
-      if constexpr (std::is_same_v<T, double>)
-        return {kDLFloat, 64, 1};
-      if constexpr (std::is_same_v<T, int8_t>)
-        return {kDLInt, 8, 1};
-      if constexpr (std::is_same_v<T, int16_t>)
-        return {kDLInt, 16, 1};
-      if constexpr (std::is_same_v<T, int32_t>)
-        return {kDLInt, 32, 1};
-      if constexpr (std::is_same_v<T, int64_t>)
-        return {kDLInt, 64, 1};
-      if constexpr (std::is_same_v<T, uint8_t>)
-        return {kDLUInt, 8, 1};
-      if constexpr (std::is_same_v<T, uint16_t>)
-        return {kDLUInt, 16, 1};
-      if constexpr (std::is_same_v<T, uint32_t>)
-        return {kDLUInt, 32, 1};
-      if constexpr (std::is_same_v<T, uint64_t>)
-        return {kDLUInt, 64, 1};
-      if constexpr (std::is_same_v<T, bool>)
+      using BaseT = std::remove_cv_t<T>;
+      using LaneInfo = DLPackLaneInfo<BaseT>;
+      using ScalarT = typename LaneInfo::scalar_type;
+      constexpr uint16_t lanes = LaneInfo::lanes;
+
+      if constexpr (std::is_same_v<ScalarT, cuda::std::complex<float>> ||
+                    std::is_same_v<ScalarT, std::complex<float>>)
+        return {kDLComplex, 64, lanes};
+      if constexpr (std::is_same_v<ScalarT, cuda::std::complex<double>> ||
+                    std::is_same_v<ScalarT, std::complex<double>>)
+        return {kDLComplex, 128, lanes};
+      if constexpr (std::is_same_v<ScalarT, matxFp16>)
+        return {kDLFloat, 16, lanes};
+      if constexpr (std::is_same_v<ScalarT, matxBf16>)
+        return {kDLBfloat, 16, lanes};
+      if constexpr (std::is_same_v<ScalarT, matxFp16Complex>)
+        return {kDLComplex, 32, lanes};
+      if constexpr (std::is_same_v<ScalarT, matxBf16Complex>)
+        return {kDLComplex, 32, lanes}; // Wrong, but no other choice
+      if constexpr (std::is_same_v<ScalarT, float>)
+        return {kDLFloat, 32, lanes};
+      if constexpr (std::is_same_v<ScalarT, double>)
+        return {kDLFloat, 64, lanes};
+      if constexpr (std::is_same_v<ScalarT, int8_t>)
+        return {kDLInt, 8, lanes};
+      if constexpr (std::is_same_v<ScalarT, int16_t>)
+        return {kDLInt, 16, lanes};
+      if constexpr (std::is_same_v<ScalarT, int32_t>)
+        return {kDLInt, 32, lanes};
+      if constexpr (std::is_same_v<ScalarT, int64_t>)
+        return {kDLInt, 64, lanes};
+      if constexpr (std::is_same_v<ScalarT, uint8_t>)
+        return {kDLUInt, 8, lanes};
+      if constexpr (std::is_same_v<ScalarT, uint16_t>)
+        return {kDLUInt, 16, lanes};
+      if constexpr (std::is_same_v<ScalarT, uint32_t>)
+        return {kDLUInt, 32, lanes};
+      if constexpr (std::is_same_v<ScalarT, uint64_t>)
+        return {kDLUInt, 64, lanes};
+      if constexpr (std::is_same_v<ScalarT, bool>)
   #if DLPACK_VERSION >= 80
-        return {kDLBool, 8, 1};
+        return {kDLBool, 8, lanes};
   #else
-        return {kDLUInt, 8, 1};
+        return {kDLUInt, 8, lanes};
   #endif
 
-      return {kDLOpaqueHandle, 1, 1};
+      return {kDLOpaqueHandle, 1, lanes};
     }
 
 

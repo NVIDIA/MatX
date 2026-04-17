@@ -313,3 +313,88 @@ TYPED_TEST(DLPackTestsFloatNonComplex, VersionedReadOnlyRequiresConstType)
 
   MATX_EXIT_HANDLER();
 }
+
+TEST(DLPackVectorTests, ExportVectorLanesLegacyAndVersioned)
+{
+  MATX_ENTER_HANDLER();
+
+  auto t = make_tensor<float4>({4});
+
+  auto *dl = t.ToDlPack();
+  ASSERT_EQ(dl->dl_tensor.dtype.code, kDLFloat);
+  ASSERT_EQ(dl->dl_tensor.dtype.bits, 32);
+  ASSERT_EQ(dl->dl_tensor.dtype.lanes, 4);
+  dl->deleter(dl);
+
+  auto *dlv = t.ToDlPackVersioned();
+  ASSERT_EQ(dlv->dl_tensor.dtype.code, kDLFloat);
+  ASSERT_EQ(dlv->dl_tensor.dtype.bits, 32);
+  ASSERT_EQ(dlv->dl_tensor.dtype.lanes, 4);
+  dlv->deleter(dlv);
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(DLPackVectorTests, ImportVectorLaneMatchLegacy)
+{
+  MATX_ENTER_HANDLER();
+
+  int deleter_calls = 0;
+  auto *dl = MakeManagedTensorForOwningImportTest<float4>(&deleter_calls, 8);
+  {
+    tensor_t<float4, 1> t;
+    make_tensor(t, dl);
+    ASSERT_EQ(deleter_calls, 0);
+  }
+  ASSERT_EQ(deleter_calls, 1);
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(DLPackVectorTests, ImportVectorLaneMatchVersioned)
+{
+  MATX_ENTER_HANDLER();
+
+  int deleter_calls = 0;
+  auto *dl = MakeVersionedManagedTensorForOwningImportTest<float4>(&deleter_calls, 8);
+  {
+    tensor_t<float4, 1> t;
+    make_tensor(t, dl);
+    ASSERT_EQ(deleter_calls, 0);
+  }
+  ASSERT_EQ(deleter_calls, 1);
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(DLPackVectorTests, ImportVectorLaneMismatchThrows)
+{
+  MATX_ENTER_HANDLER();
+
+  int deleter_calls = 0;
+  auto *dl = MakeManagedTensorForOwningImportTest<float4>(&deleter_calls, 8);
+  dl->dl_tensor.dtype.lanes = 2;
+  {
+    tensor_t<float4, 1> t;
+    ASSERT_THROW({ make_tensor(t, dl); }, matx::detail::matxException);
+  }
+  ASSERT_EQ(deleter_calls, 1);
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(DLPackVectorTests, ImportVectorBaseTypeMismatchThrows)
+{
+  MATX_ENTER_HANDLER();
+
+  int deleter_calls = 0;
+  auto *dl = MakeManagedTensorForOwningImportTest<float4>(&deleter_calls, 8);
+  dl->dl_tensor.dtype.code = kDLInt;
+  {
+    tensor_t<float4, 1> t;
+    ASSERT_THROW({ make_tensor(t, dl); }, matx::detail::matxException);
+  }
+  ASSERT_EQ(deleter_calls, 1);
+
+  MATX_EXIT_HANDLER();
+}
