@@ -779,13 +779,10 @@ auto make_static_tensor() {
 }
 
 namespace detail {
-template <typename TensorType>
-  requires is_tensor<TensorType>
+template <typename T, index_t Rank>
 void validate_dlpack_tensor_type(const DLTensor &dt) {
-  using T = typename TensorType::value_type;
-
   // MatX doesn't track the memory type or device ID, so we don't need to copy it
-  MATX_ASSERT_STR_EXP(dt.ndim, TensorType::Rank(), matxInvalidDim, "DLPack rank doesn't match MatX rank!");
+  MATX_ASSERT_STR_EXP(dt.ndim, Rank, matxInvalidDim, "DLPack rank doesn't match MatX rank!");
 
   // MatX doesn't support vector types at the moment
   MATX_ASSERT_STR_EXP(dt.dtype.lanes, 1, matxInvalidType, "DLPack vector type not supported");
@@ -965,7 +962,7 @@ auto make_tensor( TensorType &tensor,
   MATX_LOG_DEBUG("make_tensor(tensor&, DLManagedTensor): ptr={}", dlp_tensor.dl_tensor.data);
 
   const DLTensor &dt = dlp_tensor.dl_tensor;
-  detail::validate_dlpack_tensor_type<TensorType>(dt);
+  detail::validate_dlpack_tensor_type<std::remove_cv_t<typename TensorType::value_type>, TensorType::Rank()>(dt);
 
   index_t strides[TensorType::Rank()];
   index_t shape[TensorType::Rank()];
@@ -1004,7 +1001,7 @@ auto make_tensor( TensorType &tensor,
 
   using T = typename TensorType::value_type;
   const DLTensor &dt = owner->dl_tensor;
-  detail::validate_dlpack_tensor_type<TensorType>(dt);
+  detail::validate_dlpack_tensor_type<std::remove_cv_t<T>, TensorType::Rank()>(dt);
 
   index_t strides[TensorType::Rank()];
   index_t shape[TensorType::Rank()];
@@ -1052,7 +1049,11 @@ auto make_tensor( TensorType &tensor,
 
   using T = typename TensorType::value_type;
   const DLTensor &dt = owner->dl_tensor;
-  detail::validate_dlpack_tensor_type<TensorType>(dt);
+  detail::validate_dlpack_tensor_type<std::remove_cv_t<T>, TensorType::Rank()>(dt);
+  if ((owner->flags & DLPACK_FLAG_BITMASK_READ_ONLY) != 0U) {
+    MATX_ASSERT_STR(std::is_const_v<T>, matxInvalidType,
+                    "Read-only DLPack tensors must be imported as const MatX tensors");
+  }
 
   index_t strides[TensorType::Rank()];
   index_t shape[TensorType::Rank()];
