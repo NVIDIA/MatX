@@ -787,6 +787,9 @@ void validate_dlpack_tensor_type(const DLTensor &dt) {
   // MatX doesn't track the memory type or device ID, so we don't need to copy it
   MATX_ASSERT_STR_EXP(dt.ndim, TensorType::Rank(), matxInvalidDim, "DLPack rank doesn't match MatX rank!");
 
+  // MatX doesn't support vector types at the moment
+  MATX_ASSERT_STR_EXP(dt.dtype.lanes, 1, matxInvalidType, "DLPack vector type not supported");
+
   switch (dt.dtype.code) {
     case kDLComplex: {
       switch (dt.dtype.bits) {
@@ -908,7 +911,9 @@ void dlpack_shape_and_strides(const DLTensor &dt,
 } // namespace detail
 
 /**
- * Create a tensor from a legacy DLPack managed tensor.
+ * Create a tensor from a legacy DLPack managed tensor. This does not transfer ownership of the DLManagedTensor,
+ * so the caller is responsible for calling the deleter method when the last MatX reference to the imported storage is
+ * released.
  *
  * @deprecated Use `make_tensor(tensor, DLManagedTensor*)` to transfer ownership
  *   and guarantee source lifetime while MatX views are alive.
@@ -972,13 +977,15 @@ auto make_tensor( TensorType &tensor,
   index_t strides[TensorType::Rank()];
   index_t shape[TensorType::Rank()];
   detail::dlpack_shape_and_strides<TensorType>(dt, shape, strides);
+  MATX_ASSERT_STR(dt.byte_offset % sizeof(T) == 0, matxInvalidType, "DLPack byte_offset must align with element type size");
+  auto *data_ptr = reinterpret_cast<T*>(reinterpret_cast<uint8_t*>(dt.data) + dt.byte_offset);
 
   constexpr int RANK = TensorType::Rank();
   DefaultDescriptor<RANK> desc{detail::to_array(shape), detail::to_array(strides)};
-  auto data = std::shared_ptr<T>(owner, reinterpret_cast<T*>(dt.data));
+  auto data = std::shared_ptr<T>(owner, data_ptr);
   auto storage = make_storage_from_shared_ptr<T>(std::move(data), desc.TotalSize());
   auto tmp = tensor_t<T, TensorType::Rank(), decltype(desc)>{
-      std::move(storage), std::move(desc), reinterpret_cast<T*>(dt.data)};
+      std::move(storage), std::move(desc), data_ptr};
 
   tensor.Shallow(tmp);
 }
@@ -1018,13 +1025,15 @@ auto make_tensor( TensorType &tensor,
   index_t strides[TensorType::Rank()];
   index_t shape[TensorType::Rank()];
   detail::dlpack_shape_and_strides<TensorType>(dt, shape, strides);
+  MATX_ASSERT_STR(dt.byte_offset % sizeof(T) == 0, matxInvalidType, "DLPack byte_offset must align with element type size");
+  auto *data_ptr = reinterpret_cast<T*>(reinterpret_cast<uint8_t*>(dt.data) + dt.byte_offset);
 
   constexpr int RANK = TensorType::Rank();
   DefaultDescriptor<RANK> desc{detail::to_array(shape), detail::to_array(strides)};
-  auto data = std::shared_ptr<T>(owner, reinterpret_cast<T*>(dt.data));
+  auto data = std::shared_ptr<T>(owner, data_ptr);
   auto storage = make_storage_from_shared_ptr<T>(std::move(data), desc.TotalSize());
   auto tmp = tensor_t<T, TensorType::Rank(), decltype(desc)>{
-      std::move(storage), std::move(desc), reinterpret_cast<T*>(dt.data)};
+      std::move(storage), std::move(desc), data_ptr};
 
   tensor.Shallow(tmp);
 }
