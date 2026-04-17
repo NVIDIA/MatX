@@ -917,9 +917,27 @@ template <typename TensorType>
 void dlpack_shape_and_strides(const DLTensor &dt,
                               index_t (&shape)[TensorType::Rank()],
                               index_t (&strides)[TensorType::Rank()]) {
+  if constexpr (TensorType::Rank() > 0) {
+    MATX_ASSERT_STR(dt.shape != nullptr, matxInvalidParameter, "DLPack shape cannot be null for non-scalar tensors");
+  }
+
   for (int r = 0; r < TensorType::Rank(); r++) {
-    strides[r] = dt.strides[r];
-    shape[r]   = dt.shape[r];
+    shape[r] = dt.shape[r];
+  }
+
+  if (dt.strides != nullptr) {
+    for (int r = 0; r < TensorType::Rank(); r++) {
+      strides[r] = dt.strides[r];
+    }
+    return;
+  }
+
+  // Older DLPack producers may use null strides to indicate contiguous layout.
+  if constexpr (TensorType::Rank() > 0) {
+    strides[TensorType::Rank() - 1] = 1;
+    for (int r = TensorType::Rank() - 2; r >= 0; r--) {
+      strides[r] = strides[r + 1] * shape[r + 1];
+    }
   }
 }
 } // namespace detail
