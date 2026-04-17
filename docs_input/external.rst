@@ -94,8 +94,8 @@ The producer is responsible for creating a pointer to a
 reference to the tensor and a deleter function. The consumer is responsible for
 calling the `deleter` function when it is done with the tensor.
 
-Exporting MatX tensors
-----------------------
+Exporting MatX tensors via DLPack
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 MatX supports exporting both legacy and versioned DLPack objects:
 
@@ -112,7 +112,7 @@ Both calls increment internal ownership so the underlying storage stays valid
 until the matching DLPack `deleter` is called.
 
 Importing external DLPack tensors into MatX
--------------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 When importing into MatX, use the `make_tensor` overloads to which consume a
 pointer to a `DLManagedTensorVersioned` or `DLManagedTensor` object. For
