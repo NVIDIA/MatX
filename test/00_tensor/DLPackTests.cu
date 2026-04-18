@@ -175,6 +175,28 @@ TYPED_TEST(DLPackTestsAll, ExportLegacyDLPack)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(DLPackTestsFloatNonComplex, ExportVersionedConstTensorSetsReadOnlyFlag)
+{
+  MATX_ENTER_HANDLER();
+
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  auto t_const = make_tensor<const TestType>({5, 10});
+  auto *dlv = t_const.ToDlPackVersioned();
+
+  ASSERT_EQ(dlv->dl_tensor.ndim, 2);
+  ASSERT_EQ(dlv->dl_tensor.data, const_cast<void *>(static_cast<const void *>(t_const.Data())));
+  ASSERT_NE((dlv->flags & DLPACK_FLAG_BITMASK_READ_ONLY), 0U);
+
+  auto dlt = detail::TypeToDLPackType<TestType>();
+  ASSERT_EQ(dlv->dl_tensor.dtype.code, dlt.code);
+  ASSERT_EQ(dlv->dl_tensor.dtype.bits, dlt.bits);
+  ASSERT_EQ(dlv->dl_tensor.dtype.lanes, dlt.lanes);
+
+  dlv->deleter(dlv);
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(DLPackTestsFloatNonComplex, OwningImportLifetimeLegacy)
 {
   MATX_ENTER_HANDLER();

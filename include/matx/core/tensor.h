@@ -1480,7 +1480,9 @@ MATX_LOOP_UNROLL
     int dev_ord;
     void *data[2]       = {&mem_type, &dev_ord};
 
-    t->data             = static_cast<void*>(this->Data());
+    // DLPack carries mutability via flags (versioned API), not via pointer type.
+    // Preserve const-export semantics by marking versioned tensors read-only below.
+    t->data             = const_cast<void *>(static_cast<const void *>(this->Data()));
     t->device.device_id = 0;
 
     // Determine where this memory resides
@@ -1539,6 +1541,9 @@ MATX_LOOP_UNROLL
       mt->version.major = DLPACK_MAJOR_VERSION;
       mt->version.minor = DLPACK_MINOR_VERSION;
       mt->flags = 0;
+      if constexpr (std::is_const_v<T>) {
+        mt->flags |= DLPACK_FLAG_BITMASK_READ_ONLY;
+      }
     }
 
     return mt;
