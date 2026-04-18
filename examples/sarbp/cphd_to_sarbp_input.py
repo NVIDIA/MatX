@@ -649,7 +649,7 @@ def process_cphd(cphd_path: str, output_path: str,
                  pulse_stride: int = 1, max_pulses: int = 0,
                  doppler_filter: bool = False,
                  force_streaming: bool = False,
-                 aperture_angle_deg: float = 1.0,
+                 aperture_angle_deg: float = 0.7,
                  float_samples: bool = False):
     """Full CPHD to sar_bp pipeline.
 
@@ -662,7 +662,7 @@ def process_cphd(cphd_path: str, output_path: str,
     pulse_stride      : decimate pulses by this factor
     max_pulses        : max pulses to use (0 = all)
     doppler_filter    : apply Doppler prefilter to remove out-of-scene energy
-    aperture_angle_deg: max angle from closest approach to include (default: 1.0)
+    aperture_angle_deg: max angle from closest approach to include (default: 0.7)
     """
 
     if pulse_stride > 1:
@@ -948,9 +948,9 @@ def main():
                         help="Force complex64 samples instead of int16 (default: int16)")
     parser.add_argument("--stream", action="store_true",
                         help="Force streamed (low-memory) write path regardless of file size")
-    parser.add_argument("--aperture-angle", type=float, default=1.0,
+    parser.add_argument("--aperture-angle", type=float, default=0.7,
                         help="Max angle (degrees) from closest approach to scene center. "
-                             "Pulses beyond this angle are discarded. (default: 1.0)")
+                             "Pulses beyond this angle are discarded. (default: 0.7)")
     args = parser.parse_args()
 
     if args.output is None:

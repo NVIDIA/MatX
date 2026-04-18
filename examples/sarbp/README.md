@@ -2,7 +2,7 @@
 
 This example forms a SAR (Synthetic Aperture Radar) image from publicly available CPHD (Compensated Phase History Data) using
 the MatX `sar_bp` operator on the GPU. This is meant to provide a working example to demonstrate the `sar_bp` operator
-as well as to provide a useful applications for collecting and sharing benchmark data.
+as well as to provide a useful application for collecting and sharing benchmark data.
 
 This project will download and install additional third-party open source software projects.
 Review the license terms of these open source projects before use.
@@ -17,8 +17,8 @@ The workflow has several steps:
 
 SAR datasets in CPHD format are available from several providers:
 
-- **Umbra** --https://umbra.space/open-data
-- **Capella** --https://www.capellaspace.com/community/
+- **Umbra** https://umbra.space/open-data (https://registry.opendata.aws/umbra-open-data)
+- **Capella** https://www.capellaspace.com/community/ (https://registry.opendata.aws/capella_opendata)
 
 Review the licensing terms of the available data sets prior to use.
 
@@ -28,7 +28,7 @@ One way to download these data sets is to use the AWS CLI available via most Lin
 aws s3 cp s3://umbra-open-data-catalog/sar-data/task-data/0f1231be-26d3-4b98-96ab-f675a5375c14/2026-02-20-03-03-38_UMBRA-07/2026-02-20-03-03-38_UMBRA-07_CPHD.cphd --no-sign-request .
 ```
 
-Note that these files are large and there will be large intermediate and final image files produced during the subsequent steps. The `.cphd` file is ~31 GiB and the intermediate binary data file will be approximately the same size if using all pulses.
+Note that these files are large and there will be large intermediate and final image files produced during the subsequent steps. The `.cphd` file is ~31 GiB and the intermediate binary data file will be approximately the same size if using all pulses. The default processing performed in this examples uses only a subset of the pulses to keet intermediate data sizes and image sizes more manageable.
 
 ## 2. Set Up the Python Environment
 
@@ -50,9 +50,8 @@ Run the conversion script to generate a binary input image from the `.cphd` file
 python cphd_to_sarbp_input.py /path/to/file.cphd -o sarbp_input.sarbp
 ```
 
-This writes a `.sarbp` file (same base name, in the same directory as the
-input) that packages the phase history, platform positions, and image grid
-parameters into a single binary.
+This writes a `.sarbp` file (`sarbp_input.sarbp` in the example) that packages the phase history,
+platform positions, and image grid parameters into a single binary.
 
 ### Common options
 
@@ -60,17 +59,19 @@ parameters into a single binary.
 |------|-------------|
 | `-o OUTPUT` | Output file path (default: input path with `.sarbp` extension) |
 | `--image-size N` | Output image size in pixels, square (default: auto from scene extent) |
-| `--pixel-spacing M` | Pixel spacing in metres (default: auto, 25% oversampled) |
+| `--pixel-spacing M` | Pixel spacing in meters (default: auto, 25% oversampled) |
 | `--pulse-stride N` | Use every Nth pulse for faster processing (default: 1) |
 | `--max-pulses N` | Limit total number of pulses (default: all) |
 | `--doppler-filter` | Enable Doppler prefilter (off by default) |
 | `--aperture-angle DEG` | Max angle from closest approach for pulse selection (default: auto) |
 
-**Example** --form an 8192x8192 image using one degree of data:
+**Example**: Create a data set to form an 8192x8192 image using one degree of data:
 
 ```bash
 python cphd_to_sarbp_input.py /path/to/file.cphd --image-size 8192 --aperture-angle 1.0 -o input_8k.sarbp
 ```
+
+The `--aperture-angle` flag is the easiest way to control data volumes. Increasing the aperture angle will add more pulses and the increased cross-range resolution will reduce pixel pitch, increasing pixel count. We chose a default value to produce reasonably sized images and data sets for this demo, but users can explore different configurations. Also, other CPHD files / collections may require different values.
 
 ## 4. Build the `sarbp` Executable
 
@@ -90,7 +91,7 @@ make -j sarbp
 ```
 
 The output is a raw binary file of single-precision complex floats (interleaved
-real/imag, row-major), written to the same base name with a `.raw` extension.
+real/imag, row-major), written to `output_image.raw` in this example.
 
 ### Common options
 
@@ -103,16 +104,17 @@ real/imag, row-major), written to the same base name with a `.raw` extension.
 | `--precision {double,float,fltflt,mixed}` | Backprojection compute precision (default: mixed) |
 | `--warmup` | Warmup GPU kernels and FFT plans before timed run |
 
-The `--precision` flag controls the arithmetic used by the `sar_bp` operator. For spaceborne SAR, `float` does not provide enough precision to store fractional wavelengths at the range-to-MCP magnitudes (hundreds of km), so pure `float` is not sufficient. The available modes are:
+The `--precision` flag controls the arithmetic used by the `sar_bp` operator. For spaceborne SAR, `float` does not provide enough precision to store fractional wavelengths at the range-to-MCP magnitudes (hundreds of km), so pure `float` is not sufficient to produce focused images. The available modes are:
 
 - `double` -- full double-precision arithmetic. Most accurate.
-- `mixed` -- double-precision for range computation, single-precision elsewhere. Default. Close to `double` in image quality with significantly higher throughput on GPUs with reduced FP64.
-- `fltflt` -- float-float evaluation using two `float` values for the high-precision range math. Significantly higher throughput on GPUs where `double` throughput is reduced (e.g., RTX PROs, Jetsons, gaming GPUs).
+- `mixed` -- double-precision for range computation, single-precision elsewhere. Default. Close to `double` in image quality with slightly higher throughput on GPUs with reduced double-precision throughput. Other than `float`, this is the fastest option on hardware with full-throughput double-precision (e.g., A100, H100/H200, B200).
+- `fltflt` -- float-float evaluation using two `float` values for the high-precision range math. Significantly higher throughput on GPUs where `double` throughput is reduced (e.g., RTX PROs, Jetson Orin/Thor, gaming GPUs).
 - `float` -- single-precision throughout. Fastest but not accurate enough for most spaceborne data.
 
 ## 6. View the Result
 
-The images will be large. Above, we created an 8192 x 8192 pixel image, but you could also create 20000 x 20000 or larger. For such images, you will likely want to use a viewer that explicitly supports such large images or load them into other software for processing. The example provides a simple matplotlib-based script for quick viewing, but most uses will require a more robust viewer. Note that saving to a `.png` in particular downsamples the image and writes an image of ~1500x1500 pixels.
+The images will be large. Above, we by default created an image of approximately 9000 x 9000 pixels, but you could also create 20000 x 20000 image or larger. The example provides a simple matplotlib-based script for quick viewing, but most uses will require a more robust viewer designed for SAR imagery, or at least designed to handle large images. Note that saving to a `.png` in particular downsamples the image and writes an image of ~1500x1500 pixels.
+
 Display the image interactively:
 
 ```bash

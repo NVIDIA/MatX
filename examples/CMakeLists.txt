@@ -60,6 +60,17 @@ endforeach()
 add_executable(sarbp sarbp/sarbp.cu)
 target_link_libraries(sarbp example_lib)
 
+# Copy sarbp helper Python scripts next to the built executable so users can
+# run them from the build/examples directory alongside sarbp.
+add_custom_command(TARGET sarbp POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/sarbp/cphd_to_sarbp_input.py
+        $<TARGET_FILE_DIR:sarbp>/cphd_to_sarbp_input.py
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/sarbp/view_sarbp_image.py
+        $<TARGET_FILE_DIR:sarbp>/view_sarbp_image.py
+    COMMENT "Copying sarbp helper Python scripts to build directory")
+
 # Build proprietary examples
 file (GLOB_RECURSE proprietary_sources CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/proprietary/*/examples/*.cu)
 foreach (pexample ${proprietary_sources})

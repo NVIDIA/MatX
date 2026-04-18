@@ -433,6 +433,7 @@ int main(int argc, char **argv) {
 
   std::cout << "Block size       : " << block_size << " pulses (" << num_blocks
             << " block" << (num_blocks > 1 ? "s" : "") << ")" << std::endl;
+  std::cout << "BP precision     : " << precision_type << std::endl;
 
   cudaStream_t stream;
   CUDA_CHECK(cudaStreamCreate(&stream));
@@ -683,8 +684,18 @@ int main(int argc, char **argv) {
   float elapsed_ms = 0;
   CUDA_CHECK(cudaEventElapsedTime(&elapsed_ms, ev_start, ev_stop));
   if (num_blocks > 1) std::cout << std::endl;
+
+  const double total_backprojections =
+      static_cast<double>(image_width) *
+      static_cast<double>(image_height) *
+      static_cast<double>(num_pulses);
+  const double gbp_per_sec = total_backprojections / (elapsed_ms * 1e6);
+
   std::cout << "Backprojection complete in " << elapsed_ms / 1000.0f << " s"
             << std::endl;
+  std::cout << "  Giga Backprojections: " << total_backprojections / 1e9
+            << " (num_pixels * num_pulses)" << std::endl;
+  std::cout << "  Rate                : " << gbp_per_sec << " Gbp/s" << std::endl;
   CUDA_CHECK(cudaEventDestroy(ev_start));
   CUDA_CHECK(cudaEventDestroy(ev_stop));
 
