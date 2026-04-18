@@ -25,7 +25,7 @@ Review the licensing terms of the available data sets prior to use.
 One way to download these data sets is to use the AWS CLI available via most Linux package managers. For example, if the AWS CLI is installed, the following downloads the `.cphd` file used in this demo to your current working directory:
 
 ```
-aws s3 cp s3://umbra-open-data-catalog/sar-data/task-data/0f1231be-26d3-4b98-96ab-f675a5375c14/2026-02-20-03-03-38_UMBRA-07/2026-02-20-03-03-38_UMBRA-07_CPHD.cphd . --no-sign-request
+aws s3 cp s3://umbra-open-data-catalog/sar-data/task-data/0f1231be-26d3-4b98-96ab-f675a5375c14/2026-02-20-03-03-38_UMBRA-07/2026-02-20-03-03-38_UMBRA-07_CPHD.cphd --no-sign-request .
 ```
 
 Note that these files are large and there will be large intermediate and final image files produced during the subsequent steps. The `.cphd` file is ~31 GiB and the intermediate binary data file will be approximately the same size if using all pulses.
@@ -77,6 +77,7 @@ python cphd_to_sarbp_input.py /path/to/file.cphd --image-size 8192 --aperture-an
 Build MatX with examples enabled:
 
 ```bash
+# From MatX base directory
 mkdir -p build && cd build
 cmake .. -DMATX_BUILD_EXAMPLES=ON -DCMAKE_BUILD_TYPE=Release
 make -j sarbp

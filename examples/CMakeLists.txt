@@ -56,6 +56,10 @@ foreach( example ${examples} )
     target_link_libraries(${example} example_lib)
 endforeach()
 
+# Examples in subdirectories
+add_executable(sarbp sarbp/sarbp.cu)
+target_link_libraries(sarbp example_lib)
+
 # Build proprietary examples
 file (GLOB_RECURSE proprietary_sources CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/proprietary/*/examples/*.cu)
 foreach (pexample ${proprietary_sources})
