@@ -184,6 +184,82 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, Simple)
   MATX_EXIT_HANDLER();
 }
 
+// num_channels == 1 is a degenerate case: no channelization and (with D==M==1)
+// no decimation, so channelize_poly collapses to a plain FIR. The dispatcher
+// used to throw here because the FusedChan switch started at N=2; now it
+// falls through to Smem / SmemTiled / Generic. Verify numeric correctness
+// against a hand-rolled FIR reference.
+TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, NumChannelsOne)
+{
+  MATX_ENTER_HANDLER();
+
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ComplexType = typename test_types::complex_type<TestType>::type;
+
+  const index_t a_len = 128;
+  const index_t f_len = 9;
+  const index_t num_channels = 1;
+  const index_t decimation_factor = 1;
+  const index_t b_len_per_channel = (a_len + num_channels - 1) / num_channels;
+
+  auto a = make_tensor<TestType>({a_len});
+  auto f = make_tensor<TestType>({f_len});
+  auto b = make_tensor<ComplexType>({b_len_per_channel, num_channels});
+
+  // Initialize input and filter with simple deterministic values via direct
+  // host operator() writes. Handles both real and complex TestType uniformly.
+  for (index_t i = 0; i < a_len; i++) {
+    if constexpr (is_complex_v<TestType>) {
+      using scalar_t = typename test_types::inner_type<TestType>::type;
+      a(i) = TestType{static_cast<scalar_t>(i + 1), static_cast<scalar_t>(-(i % 7))};
+    } else {
+      a(i) = static_cast<TestType>(i + 1);
+    }
+  }
+  for (index_t k = 0; k < f_len; k++) {
+    if constexpr (is_complex_v<TestType>) {
+      using scalar_t = typename test_types::inner_type<TestType>::type;
+      f(k) = TestType{static_cast<scalar_t>(k + 1), static_cast<scalar_t>(0)};
+    } else {
+      f(k) = static_cast<TestType>(k + 1);
+    }
+  }
+
+  (b = channelize_poly(a, f, num_channels, decimation_factor)).run(this->exec);
+  this->exec.sync();
+
+  // Reference FIR in double precision: b_ref[t] = sum_{k=0..F-1} f[k] * a[t-k]
+  // with zero padding for t-k < 0.
+  for (index_t t = 0; t < a_len; t++) {
+    cuda::std::complex<double> expect{0.0, 0.0};
+    for (index_t k = 0; k < f_len; k++) {
+      if (t - k >= 0) {
+        if constexpr (is_complex_v<TestType>) {
+          const auto ak = a(t - k);
+          const auto fk = f(k);
+          expect += cuda::std::complex<double>{
+              static_cast<double>(fk.real()) * static_cast<double>(ak.real())
+                - static_cast<double>(fk.imag()) * static_cast<double>(ak.imag()),
+              static_cast<double>(fk.real()) * static_cast<double>(ak.imag())
+                + static_cast<double>(fk.imag()) * static_cast<double>(ak.real())};
+        } else {
+          const double fk = static_cast<double>(f(k));
+          const double ak = static_cast<double>(a(t - k));
+          expect += cuda::std::complex<double>{fk * ak, 0.0};
+        }
+      }
+    }
+    const auto got = b(t, 0);
+    const double mag = std::abs(expect.real()) + std::abs(expect.imag());
+    ASSERT_NEAR(static_cast<double>(got.real()), expect.real(), this->thresh * (1.0 + mag))
+        << "real-part mismatch at t=" << t;
+    ASSERT_NEAR(static_cast<double>(got.imag()), expect.imag(), this->thresh * (1.0 + mag))
+        << "imag-part mismatch at t=" << t;
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
 // Mixed type tests verify that mixing float and double for the input and filter behaves
 // as expected (e.g., that the output is the complex version of the higher precision).
 TYPED_TEST(ChannelizePolyTestDoubleType, MixedPrecision)
