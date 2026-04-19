@@ -188,7 +188,7 @@ int main(int argc, char **argv) {
     std::cerr
         << "Usage: sarbp <input.sarbp> [options]\n"
         << "\n"
-        << "  <input.sarbp>          .sarbp file from cphd_to_sarbp.py\n"
+        << "  <input.sarbp>          .sarbp input file from cphd_to_sarbp_input.py\n"
         << "  -o, --output <file>    Output file (default: input path with .raw extension)\n"
         << "  -u, --upsample <N>     Range upsample factor via zero-padding (default: 1)\n"
         << "  -w, --window <type>    Window for range compression: hamming, none (default: hamming)\n"
@@ -203,12 +203,7 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  if (std::strcmp(argv[1], "-h") == 0 || std::strcmp(argv[1], "--help") == 0) {
-    print_usage();
-    return 0;
-  }
-
-  const std::string input_file = argv[1];
+  std::string input_file;
   std::string output_file;
   int upsample_factor = 1;
   std::string window_type = "hamming";
@@ -216,22 +211,55 @@ int main(int argc, char **argv) {
   bool do_warmup = false;
   std::string precision_type = "mixed";
 
-  for (int i = 2; i < argc; i++) {
-    if ((std::strcmp(argv[i], "-u") == 0 || std::strcmp(argv[i], "--upsample") == 0) && i + 1 < argc) {
+  auto needs_value = [&](int i) -> bool {
+    if (i + 1 >= argc) {
+      std::cerr << "ERROR: option " << argv[i] << " requires a value" << std::endl;
+      print_usage();
+      return false;
+    }
+    return true;
+  };
+
+  for (int i = 1; i < argc; i++) {
+    if (std::strcmp(argv[i], "-h") == 0 || std::strcmp(argv[i], "--help") == 0) {
+      print_usage();
+      return 0;
+    } else if (std::strcmp(argv[i], "-u") == 0 || std::strcmp(argv[i], "--upsample") == 0) {
+      if (!needs_value(i)) return 1;
       upsample_factor = std::atoi(argv[++i]);
-    } else if ((std::strcmp(argv[i], "-w") == 0 || std::strcmp(argv[i], "--window") == 0) && i + 1 < argc) {
+    } else if (std::strcmp(argv[i], "-w") == 0 || std::strcmp(argv[i], "--window") == 0) {
+      if (!needs_value(i)) return 1;
       window_type = argv[++i];
-    } else if ((std::strcmp(argv[i], "-o") == 0 || std::strcmp(argv[i], "--output") == 0) && i + 1 < argc) {
+    } else if (std::strcmp(argv[i], "-o") == 0 || std::strcmp(argv[i], "--output") == 0) {
+      if (!needs_value(i)) return 1;
       output_file = argv[++i];
-    } else if ((std::strcmp(argv[i], "-b") == 0 || std::strcmp(argv[i], "--block-size") == 0) && i + 1 < argc) {
+    } else if (std::strcmp(argv[i], "-b") == 0 || std::strcmp(argv[i], "--block-size") == 0) {
+      if (!needs_value(i)) return 1;
       block_size_arg = std::atoi(argv[++i]);
     } else if (std::strcmp(argv[i], "--warmup") == 0) {
       do_warmup = true;
-    } else if (std::strcmp(argv[i], "--precision") == 0 && i + 1 < argc) {
+    } else if (std::strcmp(argv[i], "--precision") == 0) {
+      if (!needs_value(i)) return 1;
       precision_type = argv[++i];
+    } else if (argv[i][0] == '-') {
+      std::cerr << "ERROR: unknown option '" << argv[i] << "'" << std::endl;
+      print_usage();
+      return 1;
+    } else if (input_file.empty()) {
+      input_file = argv[i];
     } else if (output_file.empty()) {
       output_file = argv[i];
+    } else {
+      std::cerr << "ERROR: unexpected positional argument '" << argv[i] << "'" << std::endl;
+      print_usage();
+      return 1;
     }
+  }
+
+  if (input_file.empty()) {
+    std::cerr << "ERROR: missing required <input.sarbp> argument" << std::endl;
+    print_usage();
+    return 1;
   }
 
   if (output_file.empty()) {
@@ -541,6 +569,13 @@ int main(int argc, char **argv) {
   CUDA_CHECK(cudaEventCreate(&ev_start));
   CUDA_CHECK(cudaEventCreate(&ev_stop));
 
+  std::vector<cudaEvent_t> ev_bp_start(num_blocks);
+  std::vector<cudaEvent_t> ev_bp_stop(num_blocks);
+  for (index_t blk = 0; blk < num_blocks; blk++) {
+    CUDA_CHECK(cudaEventCreate(&ev_bp_start[blk]));
+    CUDA_CHECK(cudaEventCreate(&ev_bp_stop[blk]));
+  }
+
   cudaProfilerStart();
   CUDA_CHECK(cudaEventRecord(ev_start, stream));
 
@@ -663,10 +698,12 @@ int main(int argc, char **argv) {
     }
 
     // Backprojection - accumulates this block's pulses into image
+    CUDA_CHECK(cudaEventRecord(ev_bp_start[blk], stream));
     (image = matx::experimental::sar_bp(image, cur_profiles,
                                          cur_positions, voxel_locations,
                                          cur_rtm, params))
         .run(exec);
+    CUDA_CHECK(cudaEventRecord(ev_bp_stop[blk], stream));
 
     if (num_blocks > 1) {
       std::cout << "\r  Block " << (blk + 1) << " / " << num_blocks << std::flush;
@@ -678,6 +715,7 @@ int main(int argc, char **argv) {
              cudaMemcpyDeviceToHost, stream));
 
   CUDA_CHECK(cudaEventRecord(ev_stop, stream));
+
   exec.sync();
   cudaProfilerStop();
 
@@ -685,19 +723,33 @@ int main(int argc, char **argv) {
   CUDA_CHECK(cudaEventElapsedTime(&elapsed_ms, ev_start, ev_stop));
   if (num_blocks > 1) std::cout << std::endl;
 
+  float bp_elapsed_ms = 0;
+  for (index_t blk = 0; blk < num_blocks; blk++) {
+    float blk_ms = 0;
+    CUDA_CHECK(cudaEventElapsedTime(&blk_ms, ev_bp_start[blk], ev_bp_stop[blk]));
+    bp_elapsed_ms += blk_ms;
+  }
+
   const double total_backprojections =
       static_cast<double>(image_width) *
       static_cast<double>(image_height) *
       static_cast<double>(num_pulses);
-  const double gbp_per_sec = total_backprojections / (elapsed_ms * 1e6);
+  const double bp_gbp_per_sec = total_backprojections / (bp_elapsed_ms * 1e6);
 
-  std::cout << "Backprojection complete in " << elapsed_ms / 1000.0f << " s"
+  std::cout << "Full reconstruction completed in " << elapsed_ms / 1000.0f << " s (incl. data transfers and iffts, if applied)"
             << std::endl;
   std::cout << "  Giga Backprojections: " << total_backprojections / 1e9
             << " (num_pixels * num_pulses)" << std::endl;
-  std::cout << "  Rate                : " << gbp_per_sec << " Gbp/s" << std::endl;
+  std::cout << "BP kernels only      : " << bp_elapsed_ms / 1000.0f << " s (summed over "
+            << num_blocks << " block" << (num_blocks > 1 ? "s" : "") << ")" << std::endl;
+  std::cout << "  Rate                : " << bp_gbp_per_sec << " Gbp/s" << std::endl;
+
   CUDA_CHECK(cudaEventDestroy(ev_start));
   CUDA_CHECK(cudaEventDestroy(ev_stop));
+  for (index_t blk = 0; blk < num_blocks; blk++) {
+    CUDA_CHECK(cudaEventDestroy(ev_bp_start[blk]));
+    CUDA_CHECK(cudaEventDestroy(ev_bp_stop[blk]));
+  }
 
   // -------------------------------------------------------------------
   // 8. Write raw binary file

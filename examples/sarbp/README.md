@@ -9,9 +9,12 @@ Review the license terms of these open source projects before use.
 
 The workflow has several steps:
 
-1. **Data Acquistion**: Download a data set of interest
-1. **Python preprocessing**: Convert a `.cphd` file into a `.sarbp` binary input file
-2. **GPU backprojection**: Run the `sarbp` executable to form the image
+1. **Data Acquisition**: Download a data set of interest
+2. **Python virtual env**: Setup a Python virtual environment (venv)
+3. **Python preprocessing**: Convert a `.cphd` file into a `.sarbp` binary input file
+4. **Build**: Build the `sarbp` executable
+5. **GPU backprojection**: Run the `sarbp` executable to form the image
+6. **Visualization**: View the reconstructed image, or otherwise consume the output image
 
 ## 1. Download SAR Data
 
@@ -28,7 +31,7 @@ One way to download these data sets is to use the AWS CLI available via most Lin
 aws s3 cp s3://umbra-open-data-catalog/sar-data/task-data/0f1231be-26d3-4b98-96ab-f675a5375c14/2026-02-20-03-03-38_UMBRA-07/2026-02-20-03-03-38_UMBRA-07_CPHD.cphd --no-sign-request .
 ```
 
-Note that these files are large and there will be large intermediate and final image files produced during the subsequent steps. The `.cphd` file is ~31 GiB and the intermediate binary data file will be approximately the same size if using all pulses. The default processing performed in this examples uses only a subset of the pulses to keet intermediate data sizes and image sizes more manageable.
+Note that these files are large and there will be large intermediate and final image files produced during the subsequent steps. The `.cphd` file is ~31 GiB and the intermediate binary data file will be approximately the same size if using all pulses. The default processing performed in this examples uses only a subset of the pulses to keep intermediate data sizes and image sizes more manageable.
 
 ## 2. Set Up the Python Environment
 
@@ -63,7 +66,7 @@ platform positions, and image grid parameters into a single binary.
 | `--pulse-stride N` | Use every Nth pulse for faster processing (default: 1) |
 | `--max-pulses N` | Limit total number of pulses (default: all) |
 | `--doppler-filter` | Enable Doppler prefilter (off by default) |
-| `--aperture-angle DEG` | Max angle from closest approach for pulse selection (default: auto) |
+| `--aperture-angle DEG` | Max angle from closest approach for pulse selection (default: 0.7 degrees) |
 
 **Example**: Create a data set to form an 8192x8192 image using one degree of data:
 
@@ -137,7 +140,7 @@ The script determines image dimensions in this order:
 |------|-------------|
 | `--sarbp FILE` | Path to `.sarbp` file for reading dimensions (width/height and pixel size) |
 | `--size HxW` | Image dimensions (overrides `.sarbp` header) |
-| `--dynamic-range DB` | Display range in dB below peak (default: 60) |
+| `--dynamic-range DB` | Display range in dB below peak (default: 70) |
 | `--save FILE` | Save to file instead of displaying |
 | `--cmap NAME` | Matplotlib colormap (default: gray) |
 

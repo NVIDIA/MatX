@@ -924,7 +924,7 @@ def process_cphd(cphd_path: str, output_path: str,
             int16_samples=int16_samples if int16_mode else None)
 
     print(f"\nTo use with MatX sarbp example:")
-    print(f"  sarbp {output_path} [output_image.raw]")
+    print(f"  sarbp {output_path} -o output_image.raw")
 
 
 def main():
