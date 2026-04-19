@@ -344,7 +344,7 @@ int main(int argc, char **argv) {
         cudaHostAllocDefault));
   }
 
-  const size_t pulse_hdr_size = hdr.pulse_header_size > 0 ? hdr.pulse_header_size : 32;
+  const size_t pulse_hdr_size = hdr.pulse_header_size > 0 ? hdr.pulse_header_size : 48;
   const size_t samples_bytes = is_int16_mode
       ? static_cast<size_t>(num_range_bins) * 2 * sizeof(int16_t)
       : static_cast<size_t>(num_range_bins) * sizeof(complex_t);

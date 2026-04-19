@@ -480,9 +480,11 @@ def write_sarbp_file_streamed(output_path: str, reader, pulse_indices: np.ndarra
                 offset=samples_offset,
                 strides=(record_size, 2))
         else:
+            # File format is little-endian; use explicit LE dtype so writes
+            # produce LE bytes on any host.
             dst_arr = np.ndarray(
                 shape=(num_pulses, num_range_bins),
-                dtype=np.complex64,
+                dtype=np.dtype('<c8'),
                 buffer=mm,
                 offset=samples_offset,
                 strides=(record_size, 8))
@@ -619,7 +621,9 @@ def write_sarbp_file(output_path: str, range_profiles: np.ndarray,
         f.write(header)
 
         if not int16_mode:
-            rp = np.ascontiguousarray(range_profiles, dtype=np.complex64)
+            # File format is little-endian; use explicit LE dtype so .tobytes()
+            # below produces LE bytes on any host.
+            rp = np.ascontiguousarray(range_profiles, dtype=np.dtype('<c8'))
 
         for i in range(num_pulses):
             t1 = toa1[i] if toa1 is not None else 0.0
@@ -825,6 +829,16 @@ def process_cphd(cphd_path: str, output_path: str,
         toa1_max = np.max(data['toa1'])  # most restrictive near-range
         toa2_min = np.min(data['toa2'])  # most restrictive far-range
         slant_range_extent = (toa2_min - toa1_max) * c / 2.0
+        if slant_range_extent <= 0.0:
+            # No common TOA support across all pulses (e.g. stripmap collection
+            # where the swath walks along-track). Fall back to the median
+            # per-pulse range depth so image_size reflects a typical pulse's
+            # coverage rather than an undefined intersection.
+            per_pulse_extent = (data['toa2'] - data['toa1']) * c / 2.0
+            slant_range_extent = float(np.median(per_pulse_extent))
+            print("WARNING: TOA intervals have no common intersection across "
+                  "pulses; using median per-pulse slant-range extent "
+                  f"({slant_range_extent:.0f} m) for image_size")
         ground_range_extent = slant_range_extent / np.sin(incidence)
 
         # Cross-range extent: use the same extent as ground-range to produce
