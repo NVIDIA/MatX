@@ -75,12 +75,7 @@ MATX_LOOP_UNROLL
       r_nonr[i] = d_nrec[i];
     }
     else {
-      if constexpr (is_cuda_complex_v<InType>) {
-        r_nonr[i] = make_cuFloatComplex(0.0, 0.0);
-      }
-      else {
-        r_nonr[i] = 0.0;
-      }
+      r_nonr[i] = intype_strip{};
     }
   }
 
@@ -105,12 +100,20 @@ MATX_LOOP_UNROLL
       static_cast<index_t>(chunk_id) * blockDim.x * RECURSIVE_VALS_PER_THREAD +
       threadIdx.x;
 
+MATX_LOOP_UNROLL
+  for (index_t r = 0; r < RECURSIVE_VALS_PER_THREAD; r++) {
+    vals[r] = intype_strip{};
+  }
+
   // Copy signal input. If we're a thread that needs to share data with other
   // blocks for the map step, store that value as well
   if (tid < len) {
 MATX_LOOP_UNROLL
     for (index_t r = 0; r < RECURSIVE_VALS_PER_THREAD; r++) {
-      vals[r] = d_in(static_cast<index_t>(blockIdx.y), static_cast<index_t>(tid + BLOCK_SIZE_RECURSIVE * r));
+      const index_t gidx = tid + BLOCK_SIZE_RECURSIVE * r;
+      if (gidx < len) {
+        vals[r] = d_in(static_cast<index_t>(blockIdx.y), static_cast<index_t>(gidx));
+      }
     }
 
     if (lane > WARP_SIZE - num_non_recursive) {
@@ -125,16 +128,14 @@ MATX_LOOP_UNROLL
 
     if (threadIdx.x < num_non_recursive - 1) {
       if (chunk_id == 0) {
-        if constexpr (is_cuda_complex_v<InType>) {
-          s_exch[threadIdx.x] = make_cuFloatComplex(0.0, 0.0);
-        }
-        else {
-          s_exch[threadIdx.x] = 0;
-        }
+        s_exch[threadIdx.x] = intype_strip{};
       }
       else {
+        const index_t gidx =
+            static_cast<index_t>(chunk_id) * blockDim.x * RECURSIVE_VALS_PER_THREAD -
+            threadIdx.x - 1;
         s_exch[threadIdx.x] =
-            d_in(static_cast<index_t>(blockIdx.y), static_cast<index_t>(chunk_id * blockDim.x - threadIdx.x - 1));
+            d_in(static_cast<index_t>(blockIdx.y), static_cast<index_t>(gidx));
       }
     }
   }
@@ -167,7 +168,7 @@ MATX_LOOP_UNROLL
         }
       }
 
-      if ((blockIdx.x * RECURSIVE_VALS_PER_THREAD + threadIdx.x * r) <
+      if ((tid + BLOCK_SIZE_RECURSIVE * static_cast<index_t>(r)) <
           static_cast<uint32_t>(len)) { // Make sure this value is within bounds of the signal
         if constexpr (is_cuda_complex_v<InType>) {
           vals[r] = cuCmulf(vals[r], r_nonr[0]);
@@ -226,7 +227,7 @@ MATX_LOOP_UNROLL
       tmp[0] = __shfl_sync(~0, vals[r], 0, 2);
     }
 
-    if ((blockIdx.x * RECURSIVE_VALS_PER_THREAD + threadIdx.x * r) <
+    if ((tid + BLOCK_SIZE_RECURSIVE * static_cast<index_t>(r)) <
         len) { // Make sure this value is within bounds of the signal
       if ((threadIdx.x & 1) == 1) {
         if constexpr (is_cuda_complex_v<InType>) {
@@ -247,11 +248,12 @@ MATX_LOOP_UNROLL
 
     // overload register tmp[0] with a predicate instead of branching later
     if constexpr (is_cuda_complex_v<InType>) {
-      tmp[0] = (grptid > (wl - 1)) ? make_cuFloatComplex(1.0, 0.0)
-                                   : make_cuFloatComplex(0.0, 0.0);
+      tmp[0] = (grptid > (wl - 1)) ? intype_strip{1, 0}
+                                   : intype_strip{};
     }
     else {
-      tmp[0] = (grptid > (wl - 1)) ? 1.0 : 0.0;
+      tmp[0] = (grptid > (wl - 1)) ? static_cast<intype_strip>(1)
+                                   : static_cast<intype_strip>(0);
     }
 
 MATX_LOOP_UNROLL
@@ -269,7 +271,7 @@ MATX_LOOP_UNROLL
         }
       }
 
-      if ((blockIdx.x * RECURSIVE_VALS_PER_THREAD + threadIdx.x * r) <
+      if ((tid + BLOCK_SIZE_RECURSIVE * static_cast<index_t>(r)) <
           static_cast<uint32_t>(len)) { // Make sure this value is within bounds of the signal
 // Now apply those values
 MATX_LOOP_UNROLL
@@ -334,7 +336,7 @@ MATX_LOOP_UNROLL
     if (sub_group_idx >= 0) {
 MATX_LOOP_UNROLL
       for (uint32_t vpt = 0; vpt < RECURSIVE_VALS_PER_THREAD; vpt++) {
-        if ((blockIdx.x * RECURSIVE_VALS_PER_THREAD + threadIdx.x * vpt) <
+        if ((tid + BLOCK_SIZE_RECURSIVE * static_cast<index_t>(vpt)) <
             len) { // Make sure this value is within bounds of the signal
 MATX_LOOP_UNROLL
           for (uint32_t r = 0; r < num_recursive; r++) {
@@ -383,7 +385,7 @@ MATX_LOOP_UNROLL
 
       __syncthreads();
 
-      if ((blockIdx.x * RECURSIVE_VALS_PER_THREAD + threadIdx.x * block_idx) <
+      if ((tid + BLOCK_SIZE_RECURSIVE * static_cast<index_t>(block_idx)) <
           len) { // Make sure this value is within bounds of the signal
 MATX_LOOP_UNROLL
         for (uint32_t r = 0; r < num_recursive; r++) {
@@ -556,7 +558,7 @@ MATX_LOOP_UNROLL
     do {
 MATX_LOOP_UNROLL
       for (uint32_t r = 0; r < num_recursive; r++) {
-        if ((blockIdx.x * RECURSIVE_VALS_PER_THREAD + threadIdx.x * r) < len) {
+        if ((tid + BLOCK_SIZE_RECURSIVE * static_cast<index_t>(block_idx)) < len) {
           if constexpr (is_cuda_complex_v<InType>) {
             vals[block_idx] = cuCaddf(
                 vals[block_idx],
@@ -571,7 +573,7 @@ MATX_LOOP_UNROLL
       __syncthreads();
 
       if (threadIdx.x >= BLOCK_SIZE_RECURSIVE - num_recursive) {
-        s_exch[BLOCK_SIZE_RECURSIVE - threadIdx.x - 1] = vals[block_idx - 1];
+        s_exch[BLOCK_SIZE_RECURSIVE - threadIdx.x - 1] = vals[block_idx];
       }
 
       __syncthreads();
