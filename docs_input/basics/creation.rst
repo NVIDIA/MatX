@@ -35,6 +35,36 @@ To convert between a ``tensor_t`` and ``tensor_impl_t`` a type trait called ``ba
 
 where ``in`` is the ``tensor_t`` object and ``in1_`` will be a ``tensor_impl_t``.
 
+Forms Of Creation
+-----------------
+The ``make_tensor`` family of functions are used to create tensors in MatX. It is meant to be used with an ``auto`` return type since it may
+return different types of tensors depending on the input parameters. Broadly speaking there are three different kinds of tensors that can be created 
+with the ``make_`` functions:
+
+- Tensors with a static rank and type, but dynamic sizes
+- Tensors with a static rank, type, and sizes
+- Tensors with a static type and dynamic rank and sizes
+
+In general, the more information MatX has at compile time about the tensor, the better the performance will be. When using fully dynamic tensors the
+``CUDAJITExecutor`` must be used since the dynamic properties are converted to compile-time properties at runtime. The following table summarizes the 
+different tensor types and their properties:
+
+.. list-table::
+   :header-rows: 1
+
+   * - Tensor category
+     - Use with other tensor types
+     - Supported executors
+   * - Static rank/size/type
+     - ❌
+     - Any
+   * - Static rank/size and dynamic type
+     - ✅
+     - Any
+   * - Dynamic rank/size
+     - ✅
+     - CUDAJITExecutor only
+
 Tensor Constructor
 ------------------
 Where possible, tensors should always be created using ``make_tensor``. This abstracts the type away from the user should any template types
@@ -110,11 +140,9 @@ All make functions take the data type as the first template parameter.
 
 Make Variants
 #############
-There are currently 4 different variants of the ``make_`` helper functions:
+There are currently 2 different variants of the ``make_`` helper functions:
 - ``make_`` for creating a tensor with a dynamic descriptor and returning by value
-- ``make_static_`` for creating a tensor with a static descriptor and returning by value
 - ``make_X_p`` for creating a tensor with a dynamic descriptor and returning a pointer
-- ``make_static_X_p`` for creating a tensor with a static descriptor and returning a pointer
 
 The ``_p`` variants return pointers allocated with `new` and are expected to be deleted by the caller when finished. Returning smart pointers would
 have made this easier, but some users have their own smart pointer wrapper and wouldn't want to unpack the standard library versions.
@@ -122,7 +150,7 @@ have made this easier, but some users have their own smart pointer wrapper and w
 Within each of these types, there are usually versions both with and without user-defined pointers. These forms are used when an existing device pointer
 is passed to MatX rather than having the allocation done when the tensor is created.
 
-Each of these 4 variants can be used with all of the construction types when applicable.
+Each of these 2 variants can be used with all of the construction types when applicable.
 
 Tensor Class Members
 ####################
@@ -190,6 +218,32 @@ All cases shown above use the default stride parameters. If the strides are not 
     int shape[3] = {10, 20, 30};
     int strides[3] = {1200, 60, 2};
     auto t = make_tensor<float>(shape, strides);
+
+Dynamic ranks and sizes are useful when that information is only available at runtime.  
+Create them with ``make_tensor<T>()`` (no shape), then initialize shape later with
+``make_tensor(t, shape)``. Dynamic-rank expressions should be executed with
+``CUDAJITExecutor``.
+
+.. code-block:: cpp
+
+    using namespace matx;
+
+    CUDAJITExecutor exec{};
+
+    // Rankless creation
+    auto a = make_tensor<float>();
+    auto b = make_tensor<float>();
+    auto out = make_tensor<float>();
+
+    // Runtime shape assignment
+    make_tensor(a, {4, 5});
+    make_tensor(b, {4, 5});
+    make_tensor(out, {4, 5});
+
+    (a = 1.0f).run(exec);
+    (b = 2.0f).run(exec);
+    (out = a + b).run(exec);
+    exec.sync();    
 
 Creating From A Conforming Shape
 ################################
