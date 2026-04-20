@@ -35,15 +35,16 @@ Note that these files are large and there will be large intermediate and final i
 
 ## 2. Set Up the Python Environment
 
-Create a virtual environment and install the required packages:
+Create a virtual environment and install the required packages (`sarpy` and its dependencies). You can use the included `requirements.txt`, or just `pip install sarpy` if you prefer potentially newer packages.
 
 ```bash
+# From examples/sarbp directory
 python3 -m venv venv
 source venv/bin/activate
-pip install sarpy matplotlib numpy lxml
+pip install -r requirements.txt
 ```
 
-`sarpy` is the CPHD reader. `matplotlib` is optional but useful for visualizing results.
+`sarpy` is the CPHD reader.
 
 ## 3. Convert CPHD to `.sarbp` Format
 

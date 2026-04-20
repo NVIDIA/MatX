@@ -85,6 +85,7 @@
 
 #include "matx.h"
 #include <cuda/std/complex>
+#include <cuda/cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -113,12 +114,6 @@ using namespace matx;
 
 static constexpr size_t SARBP_HEADER_SIZE = 256;
 static constexpr char SARBP_MAGIC[8] = {'S', 'A', 'R', 'B', 'P', '\x02', '\x00', '\x00'};
-
-static index_t next_pow2(index_t n) {
-  index_t p = 1;
-  while (p < n) p <<= 1;
-  return p;
-}
 
 struct SarbpFileHeader {
   uint32_t num_pulses;
@@ -387,7 +382,7 @@ int main(int argc, char **argv) {
       ? static_cast<index_t>(hdr.num_samples_raw) : num_range_bins;
   const index_t fft_size = is_fx_domain
       ? (upsample_factor > 1
-          ? next_pow2(static_cast<index_t>(num_samples_raw) * static_cast<index_t>(upsample_factor))
+          ? cuda::next_power_of_two(static_cast<index_t>(num_samples_raw) * static_cast<index_t>(upsample_factor))
           : num_samples_raw)
       : num_range_bins;
   const index_t output_range_bins = is_fx_domain ? fft_size : num_range_bins;
