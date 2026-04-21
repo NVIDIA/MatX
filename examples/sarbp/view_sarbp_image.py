@@ -190,13 +190,19 @@ def main():
         dy = sarbp_info["voxel_stride_y"]
         x1 = x0 + dx * (width - 1)
         y1 = y0 + dy * (height - 1)
-        # imshow extent: [left, right, bottom, top]
-        # origin="upper" means row 0 is at top, so top=y0, bottom=y1
-        extent = [x0 - dx / 2, x1 + dx / 2, y1 + dy / 2, y0 - dy / 2]
+        # imshow extent: [left, right, bottom, top].
+        # origin="lower" places row 0 at the bottom of the y-axis so the
+        # display follows the map convention with North (increasing y) up.
+        # Row 0 holds voxels at y = voxel_start_y; with voxel_stride_y > 0
+        # this makes the south edge the bottom and the north edge the top.
+        extent = [x0 - dx / 2, x1 + dx / 2, y0 - dy / 2, y1 + dy / 2]
         has_coords = True
 
+    # Row 0 of mag_db corresponds to voxel_start_y (the south edge), so
+    # origin="lower" displays the image with North up regardless of whether
+    # we annotate the axes with meters (coord mode) or pixel indices.
     im = ax.imshow(mag_db, cmap=args.cmap, vmin=vmin, vmax=vmax,
-                   origin="upper", aspect="equal", extent=extent)
+                   origin="lower", aspect="equal", extent=extent)
     fig.colorbar(im, ax=ax, label="dB", shrink=0.8)
     ax.set_title("SAR Backprojection Image")
     if has_coords:
