@@ -340,6 +340,16 @@ int main(int argc, char **argv) {
   }
 
   const size_t pulse_hdr_size = hdr.pulse_header_size > 0 ? hdr.pulse_header_size : 48;
+  // The spec allows only 48 (complex64) or 56 (int16) bytes. Any other value
+  // is a malformed / crafted file. The per-pulse stack buffer below is
+  // sized for the 7-double maximum, so an unchecked larger value would
+  // overflow the buffer on the fin.read() that follows.
+  constexpr size_t MAX_PULSE_HDR_BYTES = sizeof(double) * 7;  // == 56
+  if (pulse_hdr_size != 48 && pulse_hdr_size != MAX_PULSE_HDR_BYTES) {
+    std::cerr << "ERROR: invalid pulse_header_size " << pulse_hdr_size
+              << " (expected 48 or 56)" << std::endl;
+    return 1;
+  }
   const size_t samples_bytes = is_int16_mode
       ? static_cast<size_t>(num_range_bins) * 2 * sizeof(int16_t)
       : static_cast<size_t>(num_range_bins) * sizeof(complex_t);
