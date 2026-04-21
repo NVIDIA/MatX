@@ -804,7 +804,12 @@ def process_cphd(cphd_path: str, output_path: str,
     vel_along_los = np.dot(vel_mid, los) * los
     vel_cross = vel_mid - vel_along_los
     v_cross = np.linalg.norm(vel_cross)
-    T_aperture = num_pulses / data['prf']
+    # num_pulses is the count kept after pulse_stride decimation. The
+    # aperture is the time between the first and last kept pulse, which is
+    # (num_pulses - 1) * pulse_stride / PRF. Omitting the pulse_stride
+    # factor undercounts T_aperture, which overstates cross_range_res and
+    # makes the auto pixel_spacing too coarse by pulse_stride.
+    T_aperture = (num_pulses - 1) * pulse_stride / data['prf']
     cross_range_res = lam * R0 / (2.0 * v_cross * T_aperture)
 
     print(f"Native resolution: slant-range={del_r:.3f} m, "
