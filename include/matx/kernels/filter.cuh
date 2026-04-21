@@ -75,12 +75,7 @@ MATX_LOOP_UNROLL
       r_nonr[i] = d_nrec[i];
     }
     else {
-      if constexpr (is_cuda_complex_v<InType>) {
-        r_nonr[i] = make_cuFloatComplex(0.0, 0.0);
-      }
-      else {
-        r_nonr[i] = 0.0;
-      }
+      r_nonr[i] = intype_strip{};
     }
   }
 
@@ -107,12 +102,7 @@ MATX_LOOP_UNROLL
 
 MATX_LOOP_UNROLL
   for (index_t r = 0; r < RECURSIVE_VALS_PER_THREAD; r++) {
-    if constexpr (is_cuda_complex_v<InType>) {
-      vals[r] = make_cuFloatComplex(0.0, 0.0);
-    }
-    else {
-      vals[r] = 0;
-    }
+    vals[r] = intype_strip{};
   }
 
   // Copy signal input. If we're a thread that needs to share data with other
@@ -138,12 +128,7 @@ MATX_LOOP_UNROLL
 
     if (threadIdx.x < num_non_recursive - 1) {
       if (chunk_id == 0) {
-        if constexpr (is_cuda_complex_v<InType>) {
-          s_exch[threadIdx.x] = make_cuFloatComplex(0.0, 0.0);
-        }
-        else {
-          s_exch[threadIdx.x] = 0;
-        }
+        s_exch[threadIdx.x] = intype_strip{};
       }
       else {
         const index_t gidx =
@@ -263,11 +248,12 @@ MATX_LOOP_UNROLL
 
     // overload register tmp[0] with a predicate instead of branching later
     if constexpr (is_cuda_complex_v<InType>) {
-      tmp[0] = (grptid > (wl - 1)) ? make_cuFloatComplex(1.0, 0.0)
-                                   : make_cuFloatComplex(0.0, 0.0);
+      tmp[0] = (grptid > (wl - 1)) ? intype_strip{1, 0}
+                                   : intype_strip{};
     }
     else {
-      tmp[0] = (grptid > (wl - 1)) ? 1.0 : 0.0;
+      tmp[0] = (grptid > (wl - 1)) ? static_cast<intype_strip>(1)
+                                   : static_cast<intype_strip>(0);
     }
 
 MATX_LOOP_UNROLL
