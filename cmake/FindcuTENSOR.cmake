@@ -79,14 +79,20 @@ else()
 endif()
 
 if(NOT cuTENSOR_FOUND)
-  set(CUTENSOR_FILENAME libcutensor-linux-x86_64-${CUTENSOR_VERSION}-archive)
+  if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
+    set(CUTENSOR_PLATFORM linux-sbsa)
+  else()
+    set(CUTENSOR_PLATFORM linux-x86_64)
+  endif()
+
+  set(CUTENSOR_FILENAME libcutensor-${CUTENSOR_PLATFORM}-${CUTENSOR_VERSION}_cuda${CUDAToolkit_VERSION_MAJOR}-archive)
 
   message(STATUS "cuTENSOR not found. Downloading library. By continuing this download you accept to the license terms of cuTENSOR")
 
   CPMAddPackage(
     NAME cutensor
     VERSION ${CUTENSOR_VERSION}
-    URL https://developer.download.nvidia.com/compute/cutensor/redist/libcutensor/linux-x86_64/libcutensor-linux-x86_64-${CUTENSOR_VERSION}_cuda${CUDAToolkit_VERSION_MAJOR}-archive.tar.xz
+    URL https://developer.download.nvidia.com/compute/cutensor/redist/libcutensor/${CUTENSOR_PLATFORM}/${CUTENSOR_FILENAME}.tar.xz
     # Eigen's CMakelists are not intended for library use
     DOWNLOAD_ONLY YES 
   )
