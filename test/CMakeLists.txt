@@ -17,6 +17,7 @@ set (test_sources
     00_tensor/VizTests.cu
     00_tensor/TensorCreationTests.cu
     00_tensor/EinsumTests.cu
+    00_tensor/DynamicTensorTests.cu
     ${OPERATOR_TEST_FILES}
     00_operators/GeneratorTests.cu
     00_operators/PWelch.cu

@@ -62,6 +62,10 @@ namespace matx
       // Scalar type of operation
       using value_type = typename T::value_type;
 
+      // Propagate dynamic tensor marker through expression tree
+      using dynamic_tensor_expr = cuda::std::bool_constant<
+        is_dynamic_tensor_v<T> || is_dynamic_rank_op_v<T>>;
+
 #ifdef MATX_EN_JIT
       struct JIT_Storage {
         typename detail::inner_storage_or_self_t<detail::base_type_t<T>> op_;
@@ -253,6 +257,15 @@ namespace matx
         } else {
           return op_.Size(dim);
         }
+      }
+
+      __MATX_INLINE__ __MATX_HOST__ int32_t DynRank() const {
+        return detail::get_dyn_rank(op_);
+      }
+
+      __MATX_INLINE__ __MATX_HOST__ int32_t jit_rank() const {
+        if constexpr (is_dynamic_rank_op_v<self_type>) return DynRank();
+        else return Rank();
       }
 
       ~PadOp() = default;

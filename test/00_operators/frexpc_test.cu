@@ -25,13 +25,20 @@ TYPED_TEST(OperatorTestsComplexNonHalfTypesAllExecs, Frexpc)
   auto toint_imag  = make_tensor<int>({10});
 
   // Create operators representing fractional and integer
-  (tiv0 = random<TestType>(tiv0.Shape(), NORMAL)).run(exec);
+  for (index_t i = 0; i < tiv0.Size(0); i++) {
+    using InnerType = typename TestType::value_type;
+    const double xr = (static_cast<double>(i) - 5.0) * 0.25;
+    const double xi = (static_cast<double>(i) - 3.0) * 0.5;
+    tiv0(i) = TestType(static_cast<InnerType>(xr),
+                       static_cast<InnerType>(xi));
+  }
+  exec.sync();
   const auto [ofrac_real, oint_real, ofrac_imag, oint_imag] = frexpc(tiv0);
   
-  ( tofrac_real = ofrac_real, 
-    toint_real = oint_real,
-    tofrac_imag = ofrac_imag, 
-    toint_imag = oint_imag).run(exec);
+  (tofrac_real = ofrac_real).run(exec);
+  (toint_real = oint_real).run(exec);
+  (tofrac_imag = ofrac_imag).run(exec);
+  (toint_imag = oint_imag).run(exec);
   // example-end frexpc-test-1
 
   exec.sync();

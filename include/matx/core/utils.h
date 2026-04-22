@@ -131,6 +131,36 @@ auto __MATX_INLINE__ getPermuteDims( const int (&dims)[D] ) {
   return getPermuteDims<RANK>(detail::to_array(dims));
 }
 
+// Runtime-rank variant for dynamic tensors. Uses MATX_MAX_DYNAMIC_RANK-sized
+// array but only fills entries [0, rt_rank).
+template <int D>
+auto __MATX_INLINE__ getPermuteDims(int rt_rank, const int (&dims)[D]) {
+  constexpr int MAX_RANK = MATX_MAX_DYNAMIC_RANK;
+  cuda::std::array<int, MAX_RANK> perm;
+  cuda::std::array<bool, MAX_RANK> visited;
+
+  perm.fill(0);
+  visited.fill(false);
+
+  int j = rt_rank - 1;
+  for (int i = D - 1; i >= 0; i--) {
+    int a = dims[i];
+    MATX_ASSERT_STR(a >= 0 && a < rt_rank, matxInvalidDim, "Reduction dim out of range\n");
+    MATX_ASSERT_STR(visited[a] == false, matxInvalidDim, "Reduction Dim repeated");
+    visited[a] = true;
+    perm[j--] = a;
+  }
+
+  j = 0;
+  for (int i = 0; i < rt_rank; i++) {
+    if (!visited[i]) {
+      perm[j++] = i;
+    }
+  }
+
+  return perm;
+}
+
 
 template <typename T1, typename T2, typename T3>
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ auto madd( const T1 &x, const T2 &y, const T3 &z) {
@@ -254,6 +284,16 @@ __MATX_INLINE__ std::string array_to_string(const cuda::std::array<T, N>& arr) {
   }
 }
 
+template <typename T, size_t N>
+__MATX_INLINE__ std::string array_to_string(const cuda::std::array<T, N>& arr, int count) {
+  std::string s;
+  for (int i = 0; i < count; ++i) {
+    if (i != 0) s += ", ";
+    s += std::to_string(arr[i]);
+  }
+  return s;
+}
+
 
 template <typename T>
 __MATX_INLINE__ __MATX_HOST__  std::string type_to_string()
@@ -291,6 +331,9 @@ __MATX_INLINE__ __MATX_HOST__  std::string type_to_string()
   }
   else if constexpr (std::is_same_v<T, char>) {
     return "char";
+  }
+  else if constexpr (std::is_same_v<T, signed char>) {
+    return "signed char";
   }
   else if constexpr (std::is_same_v<T, unsigned char>) {
     return "unsigned char";
@@ -362,6 +405,9 @@ __MATX_INLINE__ __MATX_HOST__  std::string type_to_string_c_name()
   }
   else if constexpr (std::is_same_v<T, unsigned char>) {
     return "unsigned_char";
+  }
+  else if constexpr (std::is_same_v<T, signed char>) {
+    return "signed_char";
   }
   else if constexpr (std::is_same_v<T, long long>) {
     return "long_long";
@@ -446,8 +492,212 @@ __MATX_INLINE__ std::string number_to_symbol(const T& val)
 }
 
 
-}
+#ifdef MATX_EN_JIT
+/**
+ * @brief Build a JIT tensor class name from string components.
+ *
+ * Format: JITTensorImpl_<type_c_name>_R<rank>_SI_<s0>_<s1>_...ST_<st0>_<st1>_...
+ * The shape/stride values use '_' as separator.
+ */
+__MATX_INLINE__ std::string make_jit_tensor_class_name_str(
+    const std::string &type_c_name,
+    int rank,
+    const index_t *shape,
+    const index_t *strides)
+{
+  std::string name = "JITTensorImpl_" + type_c_name + "_";
+  name += "R" + std::to_string(rank) + "_";
+  name += "SI_";
+  for (int i = 0; i < rank; ++i) {
+    name += std::to_string(shape[i]);
+    if (i != rank - 1) name += "_";
+  }
+  name += "ST_";
+  for (int i = 0; i < rank; ++i) {
+    name += std::to_string(strides[i]);
+    if (i != rank - 1) name += "_";
+  }
+  return name;
 }
 
+/**
+ * @brief Generate the common JIT tensor struct body string.
+ *
+ * Both tensor_impl_t and dynamic_tensor_t produce identical JIT struct code;
+ * this function is the single source of truth for that struct.
+ */
+__MATX_INLINE__ std::string make_jit_tensor_struct_str(
+    const std::string &class_name,
+    const std::string &type_str,
+    const std::string &stride_type_str,
+    const std::string &rank_str,
+    const std::string &sizes_str,
+    const std::string &strides_str)
+{
+  return
+    std::string("struct " + class_name + "  {\n") +
+        "  static constexpr int RANK = " + rank_str + ";\n" +
+        "  using T = " + type_str + ";\n" +
+        "  using value_type = T;\n" +
+        "  using matxop = bool;\n" +
+        "  using stride_type = " + stride_type_str + ";\n" +
+        "  T *ldata_;\n" +
+        "  constexpr static cuda::std::array<index_t, " + rank_str + "> strides_ = { " + strides_str + " };\n" +
+        "  constexpr static cuda::std::array<index_t, " + rank_str + "> sizes_ = { " + sizes_str + " };\n" +
+        "  template <detail::ElementsPerThread EPT, int I = 0, typename ...Is>\n" +
+        "  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type GetVal([[maybe_unused]] cuda::std::tuple<Is...> tup)  {\n" +
+        "    if constexpr (I < sizeof...(Is)) {\n" +
+        "      if constexpr (EPT != detail::ElementsPerThread::ONE && I == sizeof...(Is) - 1) {\n" +
+        "        return GetVal<EPT, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(strides_[I] * static_cast<index_t>(EPT));\n" +
+        "      }\n" +
+        "      else {\n" +
+        "        return GetVal<EPT, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(strides_[I]);\n" +
+        "      }\n" +
+        "    }\n" +
+        "    else {\n" +
+        "      return 0;\n" +
+        "    }\n" +
+        "  }\n" +
+        "  template <detail::ElementsPerThread EPT, int I = 0, typename ...Is>\n" +
+        "  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type GetValC([[maybe_unused]] const cuda::std::tuple<Is...> tup) const {\n" +
+        "    if constexpr (I < sizeof...(Is)) {\n" +
+        "      if constexpr (EPT != detail::ElementsPerThread::ONE && I == sizeof...(Is) - 1) {\n" +
+        "        return GetValC<EPT, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(strides_[I] * static_cast<index_t>(EPT));\n" +
+        "      }\n" +
+        "      else {\n" +
+        "        return GetValC<EPT, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(strides_[I]);\n" +
+        "      }\n" +
+        "    }\n" +
+        "    else {\n" +
+        "      return 0;\n" +
+        "    }\n" +
+        "  }\n" +
+        "  template <detail::ElementsPerThread EPT, typename... Is>\n" +
+        "  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type GetOffsetOptimized(Is... indices) const {\n" +
+        "     constexpr size_t rank = sizeof...(Is);\n" +
+        "     constexpr int EPT_int = static_cast<int>(EPT);\n" +
+        "     const cuda::std::array<index_t, rank> idx{indices...};\n" +
+        "    \n" +
+        "    if constexpr (rank == 1) {\n" +
+        "        if constexpr (EPT != detail::ElementsPerThread::ONE) {\n" +
+        "          return idx[0] * (strides_[0] * EPT_int);\n" +
+        "      } else {\n" +
+        "        return idx[0] * strides_[0];\n" +
+        "      }\n" +
+        "    }\n" +
+        "    else if constexpr (rank == 2) {\n" +
+        "      if constexpr (EPT != detail::ElementsPerThread::ONE) {\n" +
+        "        return idx[0] * strides_[0] + idx[1] * (strides_[1] * EPT_int);\n" +
+        "      } else {\n" +
+        "        return idx[0] * strides_[0] + idx[1] * strides_[1];\n" +
+        "      }\n" +
+        "    }\n" +
+        "    else if constexpr (rank == 3) {\n" +
+        "      if constexpr (EPT != detail::ElementsPerThread::ONE) {\n" +
+        "        return idx[0] * strides_[0] + idx[1] * strides_[1] + idx[2] * (strides_[2] * EPT_int);\n" +
+        "      } else {\n" +
+        "        return idx[0] * strides_[0] + idx[1] * strides_[1] + idx[2] * strides_[2];\n" +
+        "      }\n" +
+        "    }\n" +
+        "    else if constexpr (rank == 4) {\n" +
+        "      if constexpr (EPT != detail::ElementsPerThread::ONE) {\n" +
+        "        return idx[0] * strides_[0] + idx[1] * strides_[1] + idx[2] * strides_[2] + idx[3] * (strides_[3] * EPT_int);\n" +
+        "      } else {\n" +
+        "        return idx[0] * strides_[0] + idx[1] * strides_[1] + idx[2] * strides_[2] + idx[3] * strides_[3];\n" +
+        "      }\n" +
+        "    }\n" +
+        "    else {\n" +
+        "      return GetValC<EPT, 0, Is...>(cuda::std::make_tuple(indices...));\n" +
+        "    }\n" +
+        "  }\n" +
+        "  template <typename CapType, int I = 0, typename... Is>\n" +
+        "  __MATX_INLINE__ __MATX_DEVICE__ bool CheckBounds(cuda::std::tuple<Is...> tup) const {\n" +
+        "    if constexpr (I < sizeof...(Is)) {\n" +
+        "      constexpr int EPT_int = static_cast<int>(CapType::ept);\n" +
+        "      if constexpr (I == sizeof...(Is) - 1 && EPT_int > 1) {\n" +
+        "        if ((cuda::std::get<I>(tup) + 1) * EPT_int > sizes_[I]) return false;\n" +
+        "      } else {\n" +
+        "        if (cuda::std::get<I>(tup) >= sizes_[I]) return false;\n" +
+        "      }\n" +
+        "      return CheckBounds<CapType, I+1>(tup);\n" +
+        "    }\n" +
+        "    return true;\n" +
+        "  }\n" +
+        "  template <typename CapType, int M = RANK, typename... Is,\n" +
+        "            cuda::std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>\n" +
+        "  __MATX_INLINE__  __MATX_DEVICE__ auto operator()(Is... indices) const noexcept {\n" +
+        "    static_assert(sizeof...(Is) == M, \"Number of indices of operator() must match rank of tensor\");\n" +
+        "    constexpr int EPT_int = static_cast<int>(CapType::ept);\n" +
+        "    using ReturnType = cuda::std::conditional_t<CapType::ept == detail::ElementsPerThread::ONE, T, detail::Vector<T, EPT_int>>;\n" +
+        "    if constexpr (CapType::pass_through_threads) {\n" +
+        "      if (!CheckBounds<CapType, 0>(cuda::std::make_tuple(indices...))) {\n" +
+        "        return ReturnType{};\n" +
+        "      }\n" +
+        "    }\n" +
+        "    const index_t offset = GetOffsetOptimized<CapType::ept>(indices...);\n" +
+        "    if constexpr (CapType::ept == detail::ElementsPerThread::ONE) {\n" +
+        "      return ldata_[offset];\n" +
+        "    } else if constexpr (EPT_int * sizeof(T) <= MAX_VEC_WIDTH_BYTES ) {\n" +
+        "      return *reinterpret_cast<detail::Vector<T, EPT_int>*>(ldata_ + offset);\n" +
+        "    } else {\n" +
+        "      detail::Vector<T, EPT_int> vec;\n" +
+        "      vec.template load<EPT_int>(ldata_ + offset);\n" +
+        "      return vec;\n" +
+        "    }\n" +
+        "  }\n" +
+        "  template <typename CapType, int M = RANK, typename... Is,\n" +
+        "            cuda::std::enable_if_t<cuda::std::conjunction_v<cuda::std::is_integral<Is>...>, bool> = true>\n" +
+        "  __MATX_INLINE__  __MATX_DEVICE__ auto operator()(Is... indices) noexcept\n" +
+        "    -> cuda::std::conditional_t<CapType::ept == detail::ElementsPerThread::ONE, T&, detail::Vector<T, static_cast<int>(CapType::ept)>&>\n" +
+        "  {\n" +
+        "    static_assert(sizeof...(Is) == M, \"Number of indices of operator() must match rank of tensor\");\n" +
+        "    constexpr int EPT_int = static_cast<int>(CapType::ept);\n" +
+        "    if constexpr (CapType::pass_through_threads) {\n" +
+        "      using ReturnType = cuda::std::conditional_t<CapType::ept == detail::ElementsPerThread::ONE, T, detail::Vector<T, EPT_int>>;\n" +
+        "      __align__(alignof(ReturnType)) __shared__ unsigned char dummy_storage[sizeof(ReturnType)];\n" +
+        "      auto &dummy_ = *reinterpret_cast<ReturnType *>(dummy_storage);\n" +
+        "      if (!CheckBounds<CapType, 0>(cuda::std::make_tuple(indices...))) {\n" +
+        "        return dummy_;\n" +
+        "      }\n" +
+        "    }\n" +
+        "    const index_t offset = GetOffsetOptimized<CapType::ept>(indices...);\n" +
+        "    if constexpr (CapType::ept == detail::ElementsPerThread::ONE) {\n" +
+        "      return ldata_[offset];\n" +
+        "    } else {\n" +
+        "      return *reinterpret_cast<detail::Vector<T, EPT_int>*>(ldata_ + offset);\n" +
+        "    }\n" +
+        "  }\n" +
+        "  template <typename CapType>\n" +
+        "  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(const cuda::std::array<index_t, RANK> &idx) const noexcept\n" +
+        "  {\n" +
+        "    return cuda::std::apply([&](auto &&...args) {\n" +
+        "      return this->operator()<CapType>(args...);\n" +
+        "    }, idx);\n" +
+        "  }\n" +
+        "  template <typename CapType>\n" +
+        "  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(const cuda::std::array<index_t, RANK> &idx) noexcept\n" +
+        "  {\n" +
+        "    return cuda::std::apply([&](auto &&...args) -> T& {\n" +
+        "      return this->operator()<CapType>(args...);\n" +
+        "    }, idx);\n" +
+        "  }\n" +
+        "  template <typename CapType, int M = RANK, typename... Is>\n" +
+        "  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T* data_ptr(index_t block_idx, index_t ttl_threads) const noexcept\n" +
+        "  {\n" +
+        "    return ldata_ + block_idx * ttl_threads * static_cast<index_t>(CapType::ept);\n" +
+        "  }\n" +
+        "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank()\n" +
+        "  {\n" +
+        "    return " + rank_str + ";\n" +
+        "  }\n" +
+        "  constexpr __MATX_INLINE__  __MATX_DEVICE__ index_t Size(int dim) const\n" +
+        "  {\n" +
+        "    return sizes_[dim];\n " +
+        "  }\n" +
+        "};\n";
+}
+#endif
 
+}
+}
 

@@ -64,6 +64,10 @@ namespace matx
       // Scalar type of operation
       using value_type = first_value_type;
 
+      // Propagate dynamic tensor marker through expression tree
+      using dynamic_tensor_expr = cuda::std::bool_constant<
+        (is_dynamic_tensor_v<Ts> || ... || false) || (is_dynamic_rank_op_v<Ts> || ... || false)>;
+
       template <int I = -1>
         __MATX_INLINE__ std::string get_str() const {
           if constexpr (I==-1) return "concat(" + get_str<I+1>();
@@ -414,6 +418,19 @@ namespace matx
           return size_;
         else
           return cuda::std::get<0>(ops_).Size(dim);
+      }
+
+      __MATX_INLINE__ __MATX_HOST__ int32_t DynRank() const {
+        int32_t r = -1;
+        cuda::std::apply([&r](const auto&... ops) {
+          ((r = detail::matx_max(r, detail::get_dyn_rank(ops))), ...);
+        }, ops_);
+        return r == -1 ? Rank() : r;
+      }
+
+      __MATX_INLINE__ __MATX_HOST__ int32_t jit_rank() const {
+        if constexpr (is_dynamic_rank_op_v<self_type>) return DynRank();
+        else return Rank();
       }
 
       ~ConcatOp() = default;

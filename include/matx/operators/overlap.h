@@ -60,6 +60,10 @@ namespace matx
         using matxop = bool;
         using matxoplvalue = bool;
 
+        // Propagate dynamic tensor marker through expression tree
+        using dynamic_tensor_expr = cuda::std::bool_constant<
+          is_dynamic_tensor_v<T> || is_dynamic_rank_op_v<T>>;
+
         static_assert(DIM == 1, "overlap() only supports input rank 1 currently");
 
 #ifdef MATX_EN_JIT
@@ -166,6 +170,16 @@ namespace matx
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ shape_type Size(int32_t dim) const
         {
           return n_[dim];
+        }
+
+        __MATX_INLINE__ __MATX_HOST__ int32_t DynRank() const {
+          // OverlapOp always produces rank 2 output regardless of input rank
+          return Rank();
+        }
+
+        __MATX_INLINE__ __MATX_HOST__ int32_t jit_rank() const {
+          if constexpr (is_dynamic_rank_op_v<self_type>) return DynRank();
+          else return Rank();
         }
 
         template <typename ShapeType, typename Executor>

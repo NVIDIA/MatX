@@ -53,6 +53,12 @@ namespace matx
       public:
         using matxop = bool;
         using value_type = typename Op::value_type;
+        using self_type = PolyvalOp<Op, Coeffs>;
+
+        // Propagate dynamic tensor marker through expression tree
+        using dynamic_tensor_expr = cuda::std::bool_constant<
+          is_dynamic_tensor_v<Op> || is_dynamic_rank_op_v<Op> ||
+          is_dynamic_tensor_v<Coeffs> || is_dynamic_rank_op_v<Coeffs>>;
 
 #ifdef MATX_EN_JIT
         struct JIT_Storage {
@@ -137,6 +143,15 @@ namespace matx
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size([[maybe_unused]] int dim) const
         {
           return op_.Size(0);
+        }
+
+        __MATX_INLINE__ __MATX_HOST__ int32_t DynRank() const {
+          return detail::matx_max(detail::get_dyn_rank(op_), detail::get_dyn_rank(coeffs_));
+        }
+
+        __MATX_INLINE__ __MATX_HOST__ int32_t jit_rank() const {
+          if constexpr (is_dynamic_rank_op_v<self_type>) return DynRank();
+          else return Rank();
         }
 
         template <typename ShapeType, typename Executor>

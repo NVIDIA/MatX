@@ -48,6 +48,11 @@ namespace matx
       public:
         using matxop = bool;
         using value_type = typename T1::value_type;
+        using self_type = FFTShift1DOp<T1>;
+
+        // Propagate dynamic tensor marker through expression tree
+        using dynamic_tensor_expr = cuda::std::bool_constant<
+          is_dynamic_tensor_v<T1> || is_dynamic_rank_op_v<T1>>;
 
 #ifdef MATX_EN_JIT
         struct JIT_Storage {
@@ -64,11 +69,12 @@ namespace matx
 
         __MATX_INLINE__ auto get_jit_op_str() const {
           std::string func_name = get_jit_class_name();
+          const int actual_rank = jit_rank();
           cuda::std::array<index_t, Rank()> out_dims_;
-          for (int i = 0; i < Rank(); ++i) {
+          for (int i = 0; i < actual_rank; ++i) {
             out_dims_[i] = Size(i);
           }
-          
+
           return cuda::std::make_tuple(
             func_name,
             std::format("template <typename T> struct {} {{\n"
@@ -91,10 +97,10 @@ namespace matx
                 "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return Rank_; }}\n"
                 "  constexpr __MATX_INLINE__ __MATX_DEVICE__ auto Size(int dim) const {{ return out_dims_[dim]; }}\n"
                 "}};\n",
-                func_name, Rank(), detail::array_to_string(out_dims_))
+                func_name, actual_rank, detail::array_to_string(out_dims_, actual_rank))
           );
         }
-#endif 
+#endif
 
         __MATX_INLINE__ std::string str() const { return "fftshift(" + op_.str() + ")"; }
 
@@ -196,6 +202,15 @@ namespace matx
           return op_.Size(dim);
         }
 
+        __MATX_INLINE__ __MATX_HOST__ int32_t DynRank() const {
+          return detail::get_dyn_rank(op_);
+        }
+
+        __MATX_INLINE__ __MATX_HOST__ int32_t jit_rank() const {
+          if constexpr (is_dynamic_rank_op_v<self_type>) return DynRank();
+          else return Rank();
+        }
+
         template <typename ShapeType, typename Executor>
         __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
         {
@@ -243,6 +258,11 @@ namespace matx
       public:
         using matxop = bool;
         using value_type = typename T1::value_type;
+        using self_type = FFTShift2DOp<T1>;
+
+        // Propagate dynamic tensor marker through expression tree
+        using dynamic_tensor_expr = cuda::std::bool_constant<
+          is_dynamic_tensor_v<T1> || is_dynamic_rank_op_v<T1>>;
 
 #ifdef MATX_EN_JIT
         struct JIT_Storage {
@@ -259,11 +279,12 @@ namespace matx
 
         __MATX_INLINE__ auto get_jit_op_str() const {
           std::string func_name = get_jit_class_name();
+          const int actual_rank = jit_rank();
           cuda::std::array<index_t, Rank()> out_dims_;
-          for (int i = 0; i < Rank(); ++i) {
+          for (int i = 0; i < actual_rank; ++i) {
             out_dims_[i] = Size(i);
           }
-          
+
           return cuda::std::make_tuple(
             func_name,
             std::format("template <typename T> struct {} {{\n"
@@ -287,10 +308,10 @@ namespace matx
                 "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return Rank_; }}\n"
                 "  constexpr __MATX_INLINE__ __MATX_DEVICE__ auto Size(int dim) const {{ return out_dims_[dim]; }}\n"
                 "}};\n",
-                func_name, Rank(), detail::array_to_string(out_dims_))
+                func_name, actual_rank, detail::array_to_string(out_dims_, actual_rank))
           );
         }
-#endif 
+#endif
 
         __MATX_INLINE__ std::string str() const { return "fftshift(" + op_.str() + ")"; }
 
@@ -393,6 +414,15 @@ namespace matx
           return op_.Size(dim);
         }
 
+        __MATX_INLINE__ __MATX_HOST__ int32_t DynRank() const {
+          return detail::get_dyn_rank(op_);
+        }
+
+        __MATX_INLINE__ __MATX_HOST__ int32_t jit_rank() const {
+          if constexpr (is_dynamic_rank_op_v<self_type>) return DynRank();
+          else return Rank();
+        }
+
         template <typename ShapeType, typename Executor>
         __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
         {
@@ -412,12 +442,12 @@ namespace matx
   }
 
   /**
-   * Perform an IFFTShift operation on a 2D tensor swapping the first quadrant
+   * Perform an FFTShift operation on a 2D tensor swapping the first quadrant
    * with the third, and the second with the fourth.
    *
    * Shifts the new indexing of the tensor's last dimension to begin at
    * Size()/2. MatX FFTs leave the sample order starting with DC, positive
-   * frequencies, then negative frequencies last. IFFTShift gives a shifted
+   * frequencies, then negative frequencies last. FFTShift gives a shifted
    * view of a signal where the new order is negative frequencies, DC, then
    * positive frequencies.
    *
@@ -440,6 +470,11 @@ namespace matx
       public:
         using matxop = bool;
         using value_type = typename T1::value_type;
+        using self_type = IFFTShift1DOp<T1>;
+
+        // Propagate dynamic tensor marker through expression tree
+        using dynamic_tensor_expr = cuda::std::bool_constant<
+          is_dynamic_tensor_v<T1> || is_dynamic_rank_op_v<T1>>;
 
 #ifdef MATX_EN_JIT
         struct JIT_Storage {
@@ -456,11 +491,12 @@ namespace matx
 
         __MATX_INLINE__ auto get_jit_op_str() const {
           std::string func_name = get_jit_class_name();
+          const int actual_rank = jit_rank();
           cuda::std::array<index_t, Rank()> out_dims_;
-          for (int i = 0; i < Rank(); ++i) {
+          for (int i = 0; i < actual_rank; ++i) {
             out_dims_[i] = Size(i);
           }
-          
+
           return cuda::std::make_tuple(
             func_name,
             std::format("template <typename T> struct {} {{\n"
@@ -483,10 +519,10 @@ namespace matx
                 "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return Rank_; }}\n"
                 "  constexpr __MATX_INLINE__ __MATX_DEVICE__ auto Size(int dim) const {{ return out_dims_[dim]; }}\n"
                 "}};\n",
-                func_name, Rank(), detail::array_to_string(out_dims_))
+                func_name, actual_rank, detail::array_to_string(out_dims_, actual_rank))
           );
         }
-#endif 
+#endif
 
         __MATX_INLINE__ IFFTShift1DOp(const T1 &op) : op_(op) {
           static_assert(Rank() >= 1, "1D IFFT shift must have a rank 1 operator or higher");
@@ -585,6 +621,15 @@ namespace matx
           return op_.Size(dim);
         }
 
+        __MATX_INLINE__ __MATX_HOST__ int32_t DynRank() const {
+          return detail::get_dyn_rank(op_);
+        }
+
+        __MATX_INLINE__ __MATX_HOST__ int32_t jit_rank() const {
+          if constexpr (is_dynamic_rank_op_v<self_type>) return DynRank();
+          else return Rank();
+        }
+
         template <typename ShapeType, typename Executor>
         __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
         {
@@ -632,6 +677,11 @@ namespace matx
       public:
         using matxop = bool;
         using value_type = typename T1::value_type;
+        using self_type = IFFTShift2DOp<T1>;
+
+        // Propagate dynamic tensor marker through expression tree
+        using dynamic_tensor_expr = cuda::std::bool_constant<
+          is_dynamic_tensor_v<T1> || is_dynamic_rank_op_v<T1>>;
 
 #ifdef MATX_EN_JIT
         struct JIT_Storage {
@@ -648,11 +698,12 @@ namespace matx
 
         __MATX_INLINE__ auto get_jit_op_str() const {
           std::string func_name = get_jit_class_name();
+          const int actual_rank = jit_rank();
           cuda::std::array<index_t, Rank()> out_dims_;
-          for (int i = 0; i < Rank(); ++i) {
+          for (int i = 0; i < actual_rank; ++i) {
             out_dims_[i] = Size(i);
           }
-          
+
           return cuda::std::make_tuple(
             func_name,
             std::format("template <typename T> struct {} {{\n"
@@ -676,10 +727,10 @@ namespace matx
                 "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return Rank_; }}\n"
                 "  constexpr __MATX_INLINE__ __MATX_DEVICE__ auto Size(int dim) const {{ return out_dims_[dim]; }}\n"
                 "}};\n",
-                func_name, Rank(), detail::array_to_string(out_dims_))
+                func_name, actual_rank, detail::array_to_string(out_dims_, actual_rank))
           );
         }
-#endif 
+#endif
 
         __MATX_INLINE__ IFFTShift2DOp(const T1 &op) : op_(op) {
           static_assert(Rank() >= 2, "2D IFFT shift must have a rank 2 operator or higher");
@@ -776,6 +827,15 @@ namespace matx
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
         {
           return op_.Size(dim);
+        }
+
+        __MATX_INLINE__ __MATX_HOST__ int32_t DynRank() const {
+          return detail::get_dyn_rank(op_);
+        }
+
+        __MATX_INLINE__ __MATX_HOST__ int32_t jit_rank() const {
+          if constexpr (is_dynamic_rank_op_v<self_type>) return DynRank();
+          else return Rank();
         }
 
         template <typename ShapeType, typename Executor>

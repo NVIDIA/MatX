@@ -629,10 +629,35 @@ namespace matx {
         }
       }
       else {
-        auto tmpv = make_tensor<typename Op::value_type>(op.Shape());
-        (tmpv = op).run();
-        cudaStreamSynchronize(0);
-        InternalPrint(fp, tmpv, dims...);
+        if constexpr (is_dynamic_rank_op_v<Op>) {
+          // Dynamic rank: dispatch to concrete rank at runtime
+          const int r = detail::get_dyn_rank(op);
+          auto materialize_and_print = [&]<int R>() {
+            cuda::std::array<index_t, R> shape;
+            for (int i = 0; i < R; i++) shape[i] = op.Size(i);
+            auto tmpv = make_tensor<typename Op::value_type>(shape);
+            (tmpv = op).run(CUDAJITExecutor{});
+            cudaStreamSynchronize(0);
+            detail::InternalPrint(fp, tmpv, dims...);
+          };
+          switch (r) {
+            case 0: materialize_and_print.template operator()<0>(); break;
+            case 1: materialize_and_print.template operator()<1>(); break;
+            case 2: materialize_and_print.template operator()<2>(); break;
+            case 3: materialize_and_print.template operator()<3>(); break;
+            case 4: materialize_and_print.template operator()<4>(); break;
+            case 5: materialize_and_print.template operator()<5>(); break;
+            case 6: materialize_and_print.template operator()<6>(); break;
+            case 7: materialize_and_print.template operator()<7>(); break;
+            case 8: materialize_and_print.template operator()<8>(); break;
+            default: MATX_THROW(matxInvalidParameter, "Dynamic tensor rank exceeds MATX_MAX_DYNAMIC_RANK");
+          }
+        } else {
+          auto tmpv = make_tensor<typename Op::value_type>(op.Shape());
+          (tmpv = op).run();
+          cudaStreamSynchronize(0);
+          detail::InternalPrint(fp, tmpv, dims...);
+        }
       }
     #else
       InternalPrint(fp, op, dims...);

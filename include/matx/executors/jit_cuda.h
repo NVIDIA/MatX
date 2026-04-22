@@ -128,37 +128,85 @@ namespace matx
        * @tparam Op Operator type
        * @param op value
        **/
+      /**
+       * Execute an operator, dispatching on runtime rank for dynamic tensors.
+       */
       template <typename Op>
         void Exec(const Op &op) const {
 #ifdef MATX_EN_JIT
-#ifdef __CUDACC__      
-          dim3 threads = 1;
-          dim3 blocks = 1;  
+#ifdef __CUDACC__
+          if constexpr (is_dynamic_rank_op_v<Op>) {
+            // Dynamic rank expression — dispatch to concrete rank instantiation
+            const int r = op.DynRank();
+            switch (r) {
+              case 0: ExecWithRank<0>(op); break;
+              case 1: ExecWithRank<1>(op); break;
+              case 2: ExecWithRank<2>(op); break;
+              case 3: ExecWithRank<3>(op); break;
+              case 4: ExecWithRank<4>(op); break;
+              case 5: ExecWithRank<5>(op); break;
+              case 6: ExecWithRank<6>(op); break;
+              case 7: ExecWithRank<7>(op); break;
+              case 8: ExecWithRank<8>(op); break;
+              default:
+                MATX_THROW(matxInvalidParameter,
+                  "Dynamic rank " + std::to_string(r) + " exceeds MATX_MAX_DYNAMIC_RANK (" +
+                  std::to_string(MATX_MAX_DYNAMIC_RANK) + ")");
+            }
+          } else {
+            // Static rank path — zero overhead
+            ExecWithRank<Op::Rank()>(op);
+          }
+#else
+          MATX_ASSERT_STR(false, matxInvalidParameter, "Cannot call device executor using host compiler");
+#endif
+#else
+          MATX_THROW(matxInvalidParameter, "JIT compilation is not enabled. Define MATX_EN_JIT to use CUDAJit executor.");
+#endif
+        }
 
-          // Parameters passed by value in CUDA are limited to CUDA_MAX_VAL_PARAM. If the user exceeds this, we 
-          // need to error out and have them break up the statement
-          if ((sizeof(op) + sizeof(index_t) * Op::Rank()) > detail::CUDA_MAX_VAL_PARAM) {
-            MATX_THROW(matxInvalidParameter, 
+    private:
+      /**
+       * Rank-parameterized execution. RANK is always a concrete compile-time value.
+       * For static expressions it equals Op::Rank(); for dynamic expressions it is
+       * the runtime rank resolved by the switch in Exec().
+       */
+      template <int RANK, typename Op>
+        void ExecWithRank(const Op &op) const {
+#ifdef MATX_EN_JIT
+#ifdef __CUDACC__
+          dim3 threads = 1;
+          dim3 blocks = 1;
+
+          // Parameters passed by value in CUDA are limited to CUDA_MAX_VAL_PARAM
+          if ((sizeof(op) + sizeof(index_t) * RANK) > detail::CUDA_MAX_VAL_PARAM) {
+            MATX_THROW(matxInvalidParameter,
                 "Parameter buffer to device is limited to " + std::to_string(detail::CUDA_MAX_VAL_PARAM) + "B. "
                 "Please break up your operator statement into multiple executions to limit the size of the parameters");
           }
 
-          cuda::std::array<index_t, Op::Rank()> sizes;
-          for (int i = 0; i < Op::Rank(); i++) {
+          cuda::std::array<index_t, RANK> sizes;
+          for (int i = 0; i < RANK; i++) {
             sizes[i] = op.Size(i);
-          }   
+          }
+
+          // For dynamic tensors, Op::Rank() may differ from RANK.
+          // create_kernel_provider requires an Op::Rank()-sized array.
+          cuda::std::array<index_t, Op::Rank()> op_sizes{};
+          for (int i = 0; i < RANK; i++) {
+            op_sizes[i] = sizes[i];
+          }
 
           // Check if operator supports JIT
-          // Force rank 2 or lower to account for weirdness when we have multiple groups per block
           bool use_jit = detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op);
 
           MATX_LOG_DEBUG("Using JIT: {}", use_jit);
           if (!use_jit) {
             MATX_THROW(matxInvalidParameter, "Operator does not support JIT compilation. Use cudaExecutor instead.");
           }
-          
+
           auto ept_type = detail::EPTQueryInput{true};
-          const auto jit_ept_bounds = detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(op, ept_type); 
+          const auto jit_ept_bounds = detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(op, ept_type);
           if (jit_ept_bounds[0] == detail::ElementsPerThread::INVALID) {
             MATX_THROW(matxInvalidParameter, "Operator does not support JIT compilation. Use cudaExecutor instead.");
           }
@@ -174,10 +222,10 @@ namespace matx
             MATX_LOG_DEBUG("Operator operates on a block level");
           }
 
-          if constexpr (Op::Rank() <= 4) {
+          if constexpr (RANK <= 4) {
             // Get operator type string for cache lookup
             const auto kernel_op_type = detail::get_operator_capability<detail::OperatorCapability::JIT_TYPE_QUERY>(op);
-            
+
             // Check if we have cached launch parameters for this operator type
             detail::JITLaunchParams cached_params;
             bool has_cached_params = false;
@@ -193,7 +241,7 @@ namespace matx
             detail::ElementsPerThread best_ept;
             int shm_size, block_size, groups_per_block;
             bool stride;
-            
+
             if (has_cached_params) {
               // Use cached parameters - skip ALL expensive computations!
               MATX_LOG_DEBUG("Using cached launch parameters for operator type: {}", kernel_op_type);
@@ -204,29 +252,45 @@ namespace matx
               stride = cached_params.stride;
               blocks = cached_params.blocks;
               threads = cached_params.threads;
-              
-              MATX_LOG_DEBUG("Cached EPT {}, Shm size {}, Block size {}, Groups per block {}", 
+
+              MATX_LOG_DEBUG("Cached EPT {}, Shm size {}, Block size {}, Groups per block {}",
                              static_cast<int>(best_ept), shm_size, block_size, groups_per_block);
             } else {
               // No cached parameters - compute them
               MATX_LOG_DEBUG("No cached parameters found, computing launch parameters for JIT");
-              
+
               if (pass_through_threads) {
                 // For pass-through operators (e.g., cuBLASDx), block dimensions are fixed by the operator
                 auto block_dim_range = detail::get_operator_capability<detail::OperatorCapability::BLOCK_DIM>(op);
                 block_size = block_dim_range[1];  // Use the max block size
-                stride = detail::get_grid_dims_block_2d<Op::Rank()>(blocks, threads, sizes, block_size);
-                
+                stride = detail::get_grid_dims_block_2d<RANK>(blocks, threads, sizes, block_size);
+
                 // EPT is 1 for 2D block operators - the operator handles elements internally
                 best_ept = detail::ElementsPerThread::ONE;
                 shm_size = detail::get_operator_capability<detail::OperatorCapability::DYN_SHM_SIZE>(op);
                 groups_per_block = 1;
-                
-                MATX_LOG_DEBUG("Block2D: EPT {}, Shm size {}, Block size {}", 
+
+                MATX_LOG_DEBUG("Block2D: EPT {}, Shm size {}, Block size {}",
                                static_cast<int>(best_ept), shm_size, block_size);
+              } else if constexpr (is_dynamic_rank_op_v<Op>) {
+                // Dynamic tensor expressions: pre-compiled kernels don't exist for this Op type,
+                // so we cannot query register pressure. Use conservative defaults.
+                best_ept = jit_ept_bounds[1];
+                shm_size = detail::get_operator_capability<detail::OperatorCapability::DYN_SHM_SIZE>(op);
+                block_size = 256;
+                groups_per_block = 1;
+
+                MATX_LOG_DEBUG("Dynamic tensor EPT {}, Shm size {}, Block size {}",
+                               static_cast<int>(best_ept), shm_size, block_size);
+
+                if (global_kernel) {
+                  stride = detail::get_grid_dims<RANK>(blocks, threads, sizes, static_cast<int>(best_ept), 256);
+                } else {
+                  stride = detail::get_grid_dims_block<RANK>(blocks, threads, sizes, static_cast<int>(best_ept), groups_per_block, block_size, true);
+                }
               } else {
                 // Create kernel provider for JIT using consolidated function
-                auto kernel_provider = detail::create_kernel_provider<Op>(sizes, true, global_kernel);
+                auto kernel_provider = detail::create_kernel_provider<Op>(op_sizes, true, global_kernel);
 
                 // Find the best launch parameters
                 auto result = detail::find_best_launch_params(op, kernel_provider, 0, true);
@@ -234,17 +298,17 @@ namespace matx
                 shm_size = cuda::std::get<1>(result);
                 block_size = cuda::std::get<2>(result);
                 groups_per_block = cuda::std::get<3>(result);
-                
-                MATX_LOG_DEBUG("Best EPT {}, Shm size {}, Block size {}, Groups per block {}", 
+
+                MATX_LOG_DEBUG("Best EPT {}, Shm size {}, Block size {}, Groups per block {}",
                                static_cast<int>(best_ept), shm_size, block_size, groups_per_block);
-                
+
                 if (global_kernel) {
-                  stride = detail::get_grid_dims<Op::Rank()>(blocks, threads, sizes, static_cast<int>(best_ept), 256);
+                  stride = detail::get_grid_dims<RANK>(blocks, threads, sizes, static_cast<int>(best_ept), 256);
                 } else {
-                  stride = detail::get_grid_dims_block<Op::Rank()>(blocks, threads, sizes, static_cast<int>(best_ept), groups_per_block, block_size, true);
+                  stride = detail::get_grid_dims_block<RANK>(blocks, threads, sizes, static_cast<int>(best_ept), groups_per_block, block_size, true);
                 }
               }
-              
+
               // Cache ALL parameters for future use (sizes are encoded in type string)
               detail::JITLaunchParams params_to_cache;
               params_to_cache.best_ept = best_ept;
@@ -254,26 +318,26 @@ namespace matx
               params_to_cache.stride = stride;
               params_to_cache.blocks = blocks;
               params_to_cache.threads = threads;
-              params_to_cache.osize = op.Rank() == 0 ? 1 : static_cast<int>(op.Size(op.Rank() - 1));
+              params_to_cache.osize = RANK == 0 ? 1 : static_cast<int>(op.Size(RANK - 1));
               params_to_cache.global_kernel = global_kernel;
               params_to_cache.pass_through_threads = pass_through_threads;
-              
+
               {
                 std::lock_guard<std::mutex> lock(detail::jit_launch_params_mutex);
                 detail::jit_launch_params_cache[kernel_op_type] = params_to_cache;
               }
             }
 
-            MATX_LOG_DEBUG("Shm size {}, Stride {}, estimated EPT {}, blocks {}x{}x{} threads {}x{}x{}, pass_through_threads {}", 
+            MATX_LOG_DEBUG("Shm size {}, Stride {}, estimated EPT {}, blocks {}x{}x{} threads {}x{}x{}, pass_through_threads {}",
                 shm_size, stride, static_cast<int>(best_ept), blocks.x, blocks.y, blocks.z, threads.x, threads.y, threads.z, pass_through_threads);
-            const int osize = op.Rank() == 0 ? 1 : static_cast<int>(op.Size(op.Rank() - 1));
+            const int osize = RANK == 0 ? 1 : static_cast<int>(op.Size(RANK - 1));
             detail::nvrtc_compile_and_run("output.cu", op, sizes, blocks, threads, best_ept, stride, shm_size, osize, global_kernel, pass_through_threads);
           }
           else {
             // ND kernel support for ranks > 4 (JIT path)
             // Get operator type string for cache lookup
             const auto kernel_op_type = detail::get_operator_capability<detail::OperatorCapability::JIT_TYPE_QUERY>(op);
-            
+
             // Check if we have cached launch parameters for this operator type
             detail::JITLaunchParams cached_params;
             bool has_cached_params = false;
@@ -285,10 +349,10 @@ namespace matx
                 has_cached_params = true;
               }
             }
-            
+
             detail::ElementsPerThread best_ept;
             bool stride;
-            
+
             if (has_cached_params) {
               // Use cached parameters - skip ALL computations!
               MATX_LOG_DEBUG("Using cached launch parameters for ND kernel: {}", kernel_op_type);
@@ -299,12 +363,12 @@ namespace matx
             } else {
               // No cached parameters - compute them
               MATX_LOG_DEBUG("No cached parameters found, computing launch parameters for ND kernel");
-              
+
               // Reuse the ept_type and jit_ept_bounds from above
               const auto ept_bounds = jit_ept_bounds;
               best_ept = ept_bounds[1];
-              stride = detail::get_grid_dims<Op::Rank()>(blocks, threads, sizes, static_cast<int>(best_ept), 1024);   
-              
+              stride = detail::get_grid_dims<RANK>(blocks, threads, sizes, static_cast<int>(best_ept), 1024);
+
               // Cache ALL parameters for future use (sizes are encoded in type string)
               detail::JITLaunchParams params_to_cache;
               params_to_cache.best_ept = best_ept;
@@ -314,7 +378,7 @@ namespace matx
               params_to_cache.stride = stride;
               params_to_cache.blocks = blocks;
               params_to_cache.threads = threads;
-              params_to_cache.osize = op.Rank() == 0 ? 1 : static_cast<int>(op.Size(op.Rank() - 1));
+              params_to_cache.osize = RANK == 0 ? 1 : static_cast<int>(op.Size(RANK - 1));
               params_to_cache.global_kernel = true;
               params_to_cache.pass_through_threads = pass_through_threads;
               {
@@ -322,21 +386,21 @@ namespace matx
                 detail::jit_launch_params_cache[kernel_op_type] = params_to_cache;
               }
             }
-            
-            MATX_LOG_DEBUG("Using ND kernel for rank > 4 with JIT and EPT {}", static_cast<int>(best_ept));            
+
+            MATX_LOG_DEBUG("Using ND kernel for rank > 4 with JIT and EPT {}", static_cast<int>(best_ept));
             index_t dims = cuda::std::accumulate(cuda::std::begin(sizes) + 1, cuda::std::end(sizes), 1, cuda::std::multiplies<index_t>());
-            const int osize = op.Rank() == 0 ? 1 : static_cast<int>(op.Size(op.Rank() - 1));
-            
-            MATX_LOG_DEBUG("ND kernel: stride {}, blocks {}x{}x{} threads {}x{}x{}, dims {}", 
+            const int osize = RANK == 0 ? 1 : static_cast<int>(op.Size(RANK - 1));
+
+            MATX_LOG_DEBUG("ND kernel: stride {}, blocks {}x{}x{} threads {}x{}x{}, dims {}",
                 stride, blocks.x, blocks.y, blocks.z, threads.x, threads.y, threads.z, dims);
-            
+
             // Use ND kernel through JIT compilation
             detail::nvrtc_compile_and_run("output.cu", op, sizes, blocks, threads, best_ept, stride, 0, osize, true);
           }
-         
+
 #else
           MATX_ASSERT_STR(false, matxInvalidParameter, "Cannot call device executor using host compiler");
-#endif    
+#endif
 #else
           MATX_THROW(matxInvalidParameter, "JIT compilation is not enabled. Define MATX_EN_JIT to use CUDAJit executor.");
 #endif

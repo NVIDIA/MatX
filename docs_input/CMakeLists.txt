@@ -65,9 +65,9 @@ add_custom_command(OUTPUT ${SPHINX_INDEX_FILE}
                    DEPENDS
                     # Other docs files you want to track should go here (or in some variable)
                     ${MATX_RST_DOCS}
-                    ${DOXYGEN_INDEX_FILE}
                    MAIN_DEPENDENCY ${SPHINX_CFG_OUT}
                    COMMENT "Generating documentation with Sphinx")
 
 # Nice named target so we can run the job easily
 add_custom_target(Sphinx ALL DEPENDS ${SPHINX_INDEX_FILE})
+add_dependencies(Sphinx Doxygen)

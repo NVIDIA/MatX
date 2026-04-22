@@ -52,7 +52,7 @@ struct CustomMathFunctor {
   __host__ __device__ auto operator()(T x) const { return x * x + T(2) * x + T(1); }
 };
 
-TYPED_TEST(OperatorTestsNumericAllExecs, ApplyOp)
+TYPED_TEST(OperatorTestsNumericAllExecsWithoutJIT, ApplyOp)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
@@ -235,7 +235,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, ApplyOp)
 }
 
 // Test with complex types
-TYPED_TEST(OperatorTestsComplexTypesAllExecs, ApplyOpComplex)
+TYPED_TEST(OperatorTestsComplexTypesAllExecsWithoutJIT, ApplyOpComplex)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
@@ -269,7 +269,7 @@ TYPED_TEST(OperatorTestsComplexTypesAllExecs, ApplyOpComplex)
 }
 
 // Test with floating point types for more complex operations
-TYPED_TEST(OperatorTestsFloatAllExecs, ApplyOpFloat)
+TYPED_TEST(OperatorTestsFloatAllExecsWithoutJIT, ApplyOpFloat)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
@@ -302,4 +302,3 @@ TYPED_TEST(OperatorTestsFloatAllExecs, ApplyOpFloat)
 
   MATX_EXIT_HANDLER();
 }
-

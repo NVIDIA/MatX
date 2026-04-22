@@ -35,6 +35,7 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/core/type_utils_both.h"
+#include "matx/core/operator_utils.h"
 #include "matx/operators/base_operator.h"
 #include "matx/core/operator_options.h"
 namespace matx
@@ -63,6 +64,10 @@ namespace matx
         using matxop = bool;
         using matxoplvalue = bool;
 
+        // Propagate dynamic tensor marker through expression tree
+        using dynamic_tensor_expr = cuda::std::bool_constant<
+          is_dynamic_tensor_v<T> || is_dynamic_rank_op_v<T>>;
+
         static_assert(T::Rank()>0, "SliceOp: Rank of operator must be greater than 0.");
         static_assert(DIM<=T::Rank(), "SliceOp: DIM must be less than or equal to operator rank.");
 
@@ -85,7 +90,8 @@ namespace matx
 
         __MATX_INLINE__ auto get_jit_op_str() const {
           std::string func_name = get_jit_class_name();
-          
+          const int actual_input_rank = detail::get_dyn_rank(op_);
+
           return cuda::std::make_tuple(
             func_name,
             std::format("template <typename T, typename StrideType> struct {} {{\n"
@@ -125,7 +131,7 @@ namespace matx
                 "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return DIM_; }}\n"
                 "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int32_t dim) const {{ return sizes_[dim]; }}\n"
                 "}};\n",
-                func_name, DIM, T::Rank(), detail::array_to_string(sizes_), detail::array_to_string(dims_), detail::array_to_string(starts_))
+                func_name, DIM, actual_input_rank, detail::array_to_string(sizes_), detail::array_to_string(dims_), detail::array_to_string(starts_, actual_input_rank))
           );
         }
 #endif
@@ -286,6 +292,15 @@ namespace matx
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ shape_type Size(int32_t dim) const
         {
           return sizes_[dim];
+        }
+
+        __MATX_INLINE__ __MATX_HOST__ int32_t DynRank() const {
+          return DIM;
+        }
+
+        __MATX_INLINE__ __MATX_HOST__ int32_t jit_rank() const {
+          if constexpr (is_dynamic_rank_op_v<self_type>) return DynRank();
+          else return Rank();
         }
 
         ~SliceOp() = default;

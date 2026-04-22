@@ -54,8 +54,10 @@
 namespace matx {
 
 enum {
-  matxNoRank = -1
+  matxNoRank = -1,
 };
+
+constexpr int MATX_MAX_DYNAMIC_RANK = 8;
 
 enum class MemoryLayout {
   MEMORY_LAYOUT_ROW_MAJOR,
@@ -92,6 +94,21 @@ using remove_cvref_t = typename remove_cvref<T>::type;
 
 template <typename T, int RANK, typename Desc, typename Data> class tensor_impl_t;
 template <typename T, int RANK, typename Desc> class tensor_t;
+
+/**
+ * @brief Determine if a type is a dynamic tensor
+ */
+template <typename T>
+inline constexpr bool is_dynamic_tensor_v =
+  requires { typename remove_cvref_t<T>::dynamic_tensor; };
+
+/**
+ * @brief Determine if an expression tree contains dynamic tensors
+ */
+template <typename T>
+inline constexpr bool is_dynamic_rank_op_v =
+  is_dynamic_tensor_v<T> ||
+  requires { requires remove_cvref_t<T>::dynamic_tensor_expr::value; };
 
 /**
  * @brief Determine if a type is a MatX tie type

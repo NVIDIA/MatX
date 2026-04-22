@@ -33,6 +33,7 @@
 #pragma once
 
 #include "matx/core/type_utils.h"
+#include "matx/core/operator_utils.h"
 #include "matx/operators/base_operator.h"
 
 namespace matx
@@ -51,6 +52,10 @@ namespace matx
         using matxoplvalue = bool;
         using self_type = LCollapseOp<DIM, T1>;
 
+        // Propagate dynamic tensor marker through expression tree
+        using dynamic_tensor_expr = cuda::std::bool_constant<
+          is_dynamic_tensor_v<T1> || is_dynamic_rank_op_v<T1>>;
+
 #ifdef MATX_EN_JIT
         struct JIT_Storage {
           typename detail::inner_storage_or_self_t<detail::base_type_t<T1>> op_;
@@ -65,17 +70,19 @@ namespace matx
         }
 
         __MATX_INLINE__ auto get_jit_op_str() const {
+          const int actual_rank = jit_rank();
           std::string func_name = get_jit_class_name();
           cuda::std::array<index_t, Rank()> out_dims_;
-          for (int i = 0; i < Rank(); ++i) {
+          for (int i = 0; i < actual_rank; ++i) {
             out_dims_[i] = Size(i);
           }
 
+          const int actual_input_rank = is_dynamic_rank_op_v<T1> ? detail::get_dyn_rank(op_) : T1::Rank();
           cuda::std::array<index_t, T1::Rank()> op_sizes_;
-          for (int i = 0; i < T1::Rank(); ++i) {
+          for (int i = 0; i < actual_input_rank; ++i) {
             op_sizes_[i] = op_.Size(i);
           }
-          
+
           return cuda::std::make_tuple(
             func_name,
             std::format("template <typename T> struct {} {{\n"
@@ -109,7 +116,7 @@ namespace matx
                 "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return Rank_; }}\n"
                 "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const {{ return out_dims_[dim]; }}\n"
                 "}};\n",
-                func_name, DIM, Rank(), T1::Rank(), size_, detail::array_to_string(out_dims_), detail::array_to_string(op_sizes_))
+                func_name, DIM, actual_rank, actual_input_rank, size_, detail::array_to_string(out_dims_, actual_rank), detail::array_to_string(op_sizes_, actual_input_rank))
           );
         }
 #endif
@@ -121,6 +128,15 @@ namespace matx
           static_assert(DIM > 1, "Must collapse multiple dims");
           MATX_LOG_TRACE("{} constructor: input_rank={}, output_rank={}", str(), T1::Rank(), T1::Rank() - DIM + 1);
           static_assert(T1::Rank() >= 2, "Collapse must be called on operators with rank >= 2");
+
+          int input_rank;
+          if constexpr (is_dynamic_rank_op_v<self_type>) {
+            input_rank = op_.DynRank();
+            MATX_ASSERT_STR(input_rank >= static_cast<int>(DIM), matxInvalidParameter,
+                            "LCollapseOp: dynamic input rank must be >= DIM");
+          } else {
+            input_rank = T1::Rank();
+          }
 
           // compute size of collapsed dimension
           size_ = 1;
@@ -203,6 +219,15 @@ namespace matx
             return size_;
           else // otherwise return the un-collapsed size from operator
             return op_.Size(DIM + dim - 1);
+        }
+
+        __MATX_INLINE__ __MATX_HOST__ int32_t DynRank() const {
+          return detail::get_dyn_rank(op_) - DIM + 1;
+        }
+
+        __MATX_INLINE__ __MATX_HOST__ int32_t jit_rank() const {
+          if constexpr (is_dynamic_rank_op_v<self_type>) return DynRank();
+          else return Rank();
         }
 
         ~LCollapseOp() = default;
@@ -309,12 +334,17 @@ namespace matx
       private:
         mutable typename detail::base_type_t<T1> op_;
         index_t size_;  // size of collapsed dim
+        int32_t dyn_rank_;  // actual output rank (== Rank() for static tensors)
 
       public:
         using matxop = bool;
         using value_type = typename T1::value_type;
         using matxoplvalue = bool;
         using self_type = RCollapseOp<DIM, T1>;
+
+        // Propagate dynamic tensor marker through expression tree
+        using dynamic_tensor_expr = cuda::std::bool_constant<
+          is_dynamic_tensor_v<T1> || is_dynamic_rank_op_v<T1>>;
 
 #ifdef MATX_EN_JIT
         struct JIT_Storage {
@@ -330,17 +360,19 @@ namespace matx
         }
 
         __MATX_INLINE__ auto get_jit_op_str() const {
+          const int actual_rank = jit_rank();
+          const int actual_input_rank = is_dynamic_rank_op_v<T1> ? detail::get_dyn_rank(op_) : T1::Rank();
           std::string func_name = get_jit_class_name();
           cuda::std::array<index_t, Rank()> out_dims_;
-          for (int i = 0; i < Rank(); ++i) {
+          for (int i = 0; i < actual_rank; ++i) {
             out_dims_[i] = Size(i);
           }
 
           cuda::std::array<index_t, T1::Rank()> op_sizes_;
-          for (int i = 0; i < T1::Rank(); ++i) {
+          for (int i = 0; i < actual_input_rank; ++i) {
             op_sizes_[i] = op_.Size(i);
           }
-          
+
           return cuda::std::make_tuple(
             func_name,
             std::format("template <typename T> struct {} {{\n"
@@ -374,7 +406,7 @@ namespace matx
                 "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return Rank_; }}\n"
                 "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const {{ return out_dims_[dim]; }}\n"
                 "}};\n",
-                func_name, DIM, Rank(), T1::Rank(), size_, detail::array_to_string(out_dims_), detail::array_to_string(op_sizes_))
+                func_name, DIM, actual_rank, actual_input_rank, size_, detail::array_to_string(out_dims_, actual_rank), detail::array_to_string(op_sizes_, actual_input_rank))
           );
         }
 #endif
@@ -387,13 +419,24 @@ namespace matx
           static_assert(DIM > 1, "Collapse DIM must have be greater than 1");
           static_assert(T1::Rank() >= 2, "Collapse must be called on operators with rank >= 2");
 
-          // comptue size of collapsed dimension
+          // Compute the actual input rank (runtime for dynamic, compile-time for static)
+          int input_rank;
+          if constexpr (is_dynamic_rank_op_v<self_type>) {
+            input_rank = op_.DynRank();
+            MATX_ASSERT_STR(input_rank >= static_cast<int>(DIM), matxInvalidParameter,
+                            "RCollapseOp: dynamic input rank must be >= DIM");
+          } else {
+            input_rank = T1::Rank();
+          }
+          dyn_rank_ = input_rank - DIM + 1;
+
+          // compute size of collapsed dimension
           size_ = 1;
 
-          // Collapse right-most dims
+          // Collapse right-most dims using the actual input rank
   MATX_LOOP_UNROLL
           for(int i = 0 ; i < DIM; i++) {
-            size_ *= op_.Size(T1::Rank() - 1 - i);
+            size_ *= op_.Size(input_rank - 1 - i);
           }
         }
 
@@ -462,12 +505,21 @@ MATX_LOOP_UNROLL
           return T1::Rank() - DIM + 1;
         }
 
-        constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
+        __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
         {
-          if(dim == Rank()-1)  // if asking for the last dim, return collapsed size
+          if(dim == dyn_rank_ - 1)  // if asking for the last dim, return collapsed size
             return size_;
           else // otherwise return the un-collapsed size from operator
             return op_.Size(dim);
+        }
+
+        __MATX_INLINE__ __MATX_HOST__ int32_t DynRank() const {
+          return dyn_rank_;
+        }
+
+        __MATX_INLINE__ __MATX_HOST__ int32_t jit_rank() const {
+          if constexpr (is_dynamic_rank_op_v<self_type>) return DynRank();
+          else return Rank();
         }
 
         ~RCollapseOp() = default;

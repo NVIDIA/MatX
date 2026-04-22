@@ -76,13 +76,18 @@ namespace matx
 
       public:
         using matxop = bool;
-        using input_type = typename OpA::value_type;        
+        using input_type = typename OpA::value_type;
         using value_type = std::conditional_t<is_complex_v<input_type>,
           input_type,
           typename scalar_to_complex<input_type>::ctype>;
         using matx_transform_op = bool;
         using fft_xform_op = bool;
         using can_alias = bool; // FFTs can use same input/output memory
+        using self_type = FFTOp<OpA, PermDims, Direction, Type>;
+
+        // Propagate dynamic tensor marker through expression tree
+        using dynamic_tensor_expr = cuda::std::bool_constant<
+          is_dynamic_tensor_v<OpA> || is_dynamic_rank_op_v<OpA>>;
 
 #ifdef MATX_EN_JIT
         struct JIT_Storage {
@@ -103,41 +108,44 @@ namespace matx
           }
         }
 
-        __MATX_INLINE__ FFTOp(const OpA &a, index_t size, PermDims perm, FFTNorm norm) : 
+        __MATX_INLINE__ FFTOp(const OpA &a, index_t size, PermDims perm, FFTNorm norm) :
             a_(a), fft_size_(size),  perm_(perm), norm_(norm) {
           MATX_LOG_TRACE("{} constructor: fft_size={}, norm={}", str(), size, static_cast<int>(norm));
-          for (int r = 0; r < Rank(); r++) {
+
+          // Use runtime rank for dynamic tensors, compile-time rank otherwise
+          const int rt_rank = detail::get_dyn_rank(a_);
+          for (int r = 0; r < rt_rank; r++) {
             out_dims_[r] = a_.Size(r);
           }
 
           if (fft_size_ != 0) {
             if constexpr (Type == detail::FFTType::C2C) {
               if constexpr (std::is_same_v<PermDims, no_permute_t>) {
-                out_dims_[Rank() - 1] = fft_size_;
+                out_dims_[rt_rank - 1] = fft_size_;
               }
               else {
-                out_dims_[perm_[Rank()-1]] = fft_size_;
+                out_dims_[perm_[rt_rank-1]] = fft_size_;
               }
-            } 
+            }
             else if constexpr (Type == detail::FFTType::R2C) {
               // R2C transforms pack the results in fft_size_/2 + 1 complex elements
               if constexpr (std::is_same_v<PermDims, no_permute_t>) {
-                out_dims_[Rank() - 1] = fft_size_ / 2 + 1;
+                out_dims_[rt_rank - 1] = fft_size_ / 2 + 1;
               }
               else {
-                out_dims_[perm_[Rank()-1]] = fft_size_ / 2 + 1;
+                out_dims_[perm_[rt_rank-1]] = fft_size_ / 2 + 1;
               }
             }
             else {
               if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
-                out_dims_[perm_[Rank()-1]] = 2 * (fft_size_ - 1);
+                out_dims_[perm_[rt_rank-1]] = 2 * (fft_size_ - 1);
               }
               else {
-                out_dims_[Rank() - 1] = 2 * (fft_size_ - 1);
-              }                
+                out_dims_[rt_rank - 1] = 2 * (fft_size_ - 1);
+              }
             }
           }
-          else { 
+          else {
             // For R2C transforms, the output length could correspond to an input length of
             // either (out_dim-1)*2 or (out_dim-1)*2+1. The FFT transform will be unable to
             // deduce which is correct, so explicitly set the transform size here. For C2C
@@ -147,30 +155,30 @@ namespace matx
             // (N-1)*2 or (N-1)*2+1. If the operator is used such that the output is a
             // real tensor, then the size will be set to the output tensor length. If we
             // create a temporary, then this will be a C2C transform and the output length
-            // will match the input length.            
-            if constexpr (Type == detail::FFTType::C2C) { 
+            // will match the input length.
+            if constexpr (Type == detail::FFTType::C2C) {
               if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
-                fft_size_ = a.Size(perm_[Rank()-1]);
+                fft_size_ = a.Size(perm_[rt_rank-1]);
               } else {
-                fft_size_ = a.Size(a.Rank()-1);
-              }              
+                fft_size_ = a.Size(rt_rank - 1);
+              }
             }
             else if constexpr (Type == detail::FFTType::R2C) { // R2C is N/2+1
               if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
-                out_dims_[perm_[Rank()-1]] = out_dims_[perm_[Rank()-1]] / 2 + 1;
+                out_dims_[perm_[rt_rank-1]] = out_dims_[perm_[rt_rank-1]] / 2 + 1;
               }
               else {
-                out_dims_[Rank() - 1] = out_dims_[Rank() - 1] / 2 + 1;
+                out_dims_[rt_rank - 1] = out_dims_[rt_rank - 1] / 2 + 1;
               }
             }
             else {
-              // R2C is 2*(N-1) unless overridden
+              // C2R is 2*(N-1) unless overridden
               if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
-                out_dims_[perm_[Rank()-1]] = 2 * (out_dims_[perm_[Rank()-1]] - 1);
+                out_dims_[perm_[rt_rank-1]] = 2 * (out_dims_[perm_[rt_rank-1]] - 1);
               }
               else {
-                out_dims_[Rank() - 1] = 2 * (out_dims_[Rank() - 1] - 1);
-              }              
+                out_dims_[rt_rank - 1] = 2 * (out_dims_[rt_rank - 1] - 1);
+              }
             }
           }
 
@@ -209,12 +217,13 @@ namespace matx
         }
 
         __MATX_INLINE__ auto get_jit_op_str() const {
+          const int actual_rank = jit_rank();
           const std::string class_name = get_jit_class_name();
 
           const std::string fft_func_name = std::string(FFT_DX_FUNC_PREFIX) + "_" + dx_fft_helper_.GetSymbolName();
-         
+
           return cuda::std::make_tuple(
-             class_name, 
+             class_name,
              std::string(
                  " extern \"C\" __device__ void " + fft_func_name + "(" + detail::type_to_string<input_type>() + "*);\n" +
                  " template <typename OpA> struct " + class_name + "  {\n" +
@@ -222,8 +231,8 @@ namespace matx
                  "  using matxop = bool;\n" +
                  "  using value_type = cuda::std::conditional_t<is_complex_v<input_type>, input_type, typename scalar_to_complex<input_type>::ctype>;\n" +
                  "  typename detail::inner_storage_or_self_t<detail::base_type_t<OpA>> a_;\n" +
-                 "  constexpr static cuda::std::array<index_t, " + std::to_string(Rank()) + "> out_dims_ = { " + 
-                 detail::array_to_string(out_dims_) + " };\n" +             
+                 "  constexpr static cuda::std::array<index_t, " + std::to_string(actual_rank) + "> out_dims_ = { " +
+                 detail::array_to_string(out_dims_, actual_rank) + " };\n" +             
                  "  template <typename CapType, typename... Is>\n" +
                  "  __MATX_INLINE__ __MATX_DEVICE__  decltype(auto) operator()(Is... indices) const\n" +
                  "  {\n" +
@@ -231,7 +240,7 @@ namespace matx
                  "  }\n" +
                  "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank()\n" +
                  "  {\n" +
-                 "    return OpA::Rank();\n" +
+                 "    return " + std::to_string(actual_rank) + ";\n" +
                  "  }\n" +
                  "  constexpr __MATX_INLINE__  __MATX_DEVICE__ index_t Size(int dim) const\n" +
                  "  {\n" +
@@ -263,6 +272,14 @@ namespace matx
           return out_dims_[dim];
         }
 
+        __MATX_INLINE__ __MATX_HOST__ int32_t DynRank() const {
+          return detail::get_dyn_rank(a_);
+        }
+
+        __MATX_INLINE__ __MATX_HOST__ int32_t jit_rank() const {
+          if constexpr (is_dynamic_rank_op_v<self_type>) return DynRank();
+          else return Rank();
+        }
 
         template <OperatorCapability Cap, typename InType>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
@@ -330,10 +347,11 @@ namespace matx
           }
           else if constexpr (Cap == OperatorCapability::GROUPS_PER_BLOCK) {
             int ffts_per_block_candidate;
+            const int rt_rank = detail::get_dyn_rank(a_);
 
-            if constexpr (Rank() > 1) {
+            if (rt_rank > 1) {
               const int ffts_per_block = dx_fft_helper_.GetFFTsPerBlock();
-              const auto last_dim = a_.Size(a_.Rank() - 2);
+              const auto last_dim = a_.Size(rt_rank - 2);
               ffts_per_block_candidate = ffts_per_block;
               // Try to find an ffts_per_block that evenly divides into last dimension size
               // Decrease ffts_per_block until it divides evenly or until 1
@@ -553,9 +571,15 @@ namespace matx
   template<typename OpA>
   __MATX_INLINE__ auto fft(const OpA &a, const int32_t (&axis)[1], uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD) {
     constexpr auto fft_type = detail::ComplexInType<OpA>();
-    auto perm = detail::getPermuteDims<remove_cvref_t<OpA>::Rank()>(axis);
-    const index_t fft_size_ = static_cast<index_t>(fft_size);
-    return detail::FFTOp<OpA, decltype(perm), detail::FFTDirection::FORWARD, fft_type>(a, fft_size_, perm, norm);
+    if constexpr (is_dynamic_rank_op_v<remove_cvref_t<OpA>>) {
+      auto perm = detail::getPermuteDims(detail::get_dyn_rank(a), axis);
+      const index_t fft_size_ = static_cast<index_t>(fft_size);
+      return detail::FFTOp<OpA, decltype(perm), detail::FFTDirection::FORWARD, fft_type>(a, fft_size_, perm, norm);
+    } else {
+      auto perm = detail::getPermuteDims<remove_cvref_t<OpA>::Rank()>(axis);
+      const index_t fft_size_ = static_cast<index_t>(fft_size);
+      return detail::FFTOp<OpA, decltype(perm), detail::FFTDirection::FORWARD, fft_type>(a, fft_size_, perm, norm);
+    }
   }
 
   /**
@@ -598,9 +622,15 @@ namespace matx
    template<typename OpA>
    __MATX_INLINE__ auto rfft(const OpA &a, const int32_t (&axis)[1], uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD) {
      static_assert(!is_complex_v<typename remove_cvref_t<OpA>::value_type>, "RFFT only supports real input");
-     auto perm = detail::getPermuteDims<remove_cvref_t<OpA>::Rank()>(axis);
-     const index_t fft_size_ = static_cast<index_t>(fft_size);
-     return detail::FFTOp<OpA, decltype(perm), detail::FFTDirection::FORWARD, detail::FFTType::R2C>(a, fft_size_, perm, norm);
+     if constexpr (is_dynamic_rank_op_v<remove_cvref_t<OpA>>) {
+       auto perm = detail::getPermuteDims(detail::get_dyn_rank(a), axis);
+       const index_t fft_size_ = static_cast<index_t>(fft_size);
+       return detail::FFTOp<OpA, decltype(perm), detail::FFTDirection::FORWARD, detail::FFTType::R2C>(a, fft_size_, perm, norm);
+     } else {
+       auto perm = detail::getPermuteDims<remove_cvref_t<OpA>::Rank()>(axis);
+       const index_t fft_size_ = static_cast<index_t>(fft_size);
+       return detail::FFTOp<OpA, decltype(perm), detail::FFTDirection::FORWARD, detail::FFTType::R2C>(a, fft_size_, perm, norm);
+     }
    }  
 
   /**
@@ -650,9 +680,15 @@ namespace matx
    */
   template<typename OpA>
   __MATX_INLINE__ auto ifft(const OpA &a, const int32_t (&axis)[1], uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD) {
-    auto perm = detail::getPermuteDims<remove_cvref_t<OpA>::Rank()>(axis);
-    const index_t fft_size_ = static_cast<index_t>(fft_size);
-    return detail::FFTOp<OpA, decltype(perm), detail::FFTDirection::BACKWARD, detail::FFTType::C2C>(a, fft_size_, perm, norm);
+    if constexpr (is_dynamic_rank_op_v<remove_cvref_t<OpA>>) {
+      auto perm = detail::getPermuteDims(detail::get_dyn_rank(a), axis);
+      const index_t fft_size_ = static_cast<index_t>(fft_size);
+      return detail::FFTOp<OpA, decltype(perm), detail::FFTDirection::BACKWARD, detail::FFTType::C2C>(a, fft_size_, perm, norm);
+    } else {
+      auto perm = detail::getPermuteDims<remove_cvref_t<OpA>::Rank()>(axis);
+      const index_t fft_size_ = static_cast<index_t>(fft_size);
+      return detail::FFTOp<OpA, decltype(perm), detail::FFTDirection::BACKWARD, detail::FFTType::C2C>(a, fft_size_, perm, norm);
+    }
   }
 
   /**
@@ -696,9 +732,15 @@ namespace matx
     */
    template<typename OpA>
    __MATX_INLINE__ auto irfft(const OpA &a, const int32_t (&axis)[1], uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD) {
-     auto perm = detail::getPermuteDims<remove_cvref_t<OpA>::Rank()>(axis);
-     const index_t fft_size_ = static_cast<index_t>(fft_size);
-     return detail::FFTOp<OpA, decltype(perm), detail::FFTDirection::BACKWARD, detail::FFTType::C2R>(a, fft_size_, perm, norm);
+     if constexpr (is_dynamic_rank_op_v<remove_cvref_t<OpA>>) {
+       auto perm = detail::getPermuteDims(detail::get_dyn_rank(a), axis);
+       const index_t fft_size_ = static_cast<index_t>(fft_size);
+       return detail::FFTOp<OpA, decltype(perm), detail::FFTDirection::BACKWARD, detail::FFTType::C2R>(a, fft_size_, perm, norm);
+     } else {
+       auto perm = detail::getPermuteDims<remove_cvref_t<OpA>::Rank()>(axis);
+       const index_t fft_size_ = static_cast<index_t>(fft_size);
+       return detail::FFTOp<OpA, decltype(perm), detail::FFTDirection::BACKWARD, detail::FFTType::C2R>(a, fft_size_, perm, norm);
+     }
    }    
 
 

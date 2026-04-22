@@ -51,6 +51,11 @@ namespace matx
         using matxop = bool;
 
         using value_type = typename T::value_type;
+        using self_type = CloneOp<CRank, T>;
+
+        // Propagate dynamic tensor marker through expression tree
+        using dynamic_tensor_expr = cuda::std::bool_constant<
+          is_dynamic_tensor_v<T> || is_dynamic_rank_op_v<T>>;
 
 #ifdef MATX_EN_JIT
         struct JIT_Storage {
@@ -203,6 +208,15 @@ MATX_IGNORE_WARNING_POP_GCC
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
         {
           return sizes_[dim];
+        }
+
+        __MATX_INLINE__ __MATX_HOST__ int32_t DynRank() const {
+          return Rank(); // CloneOp output rank is CRank (template param)
+        }
+
+        __MATX_INLINE__ __MATX_HOST__ int32_t jit_rank() const {
+          if constexpr (is_dynamic_rank_op_v<self_type>) return DynRank();
+          else return Rank();
         }
 
         template <typename ShapeType, typename Executor>

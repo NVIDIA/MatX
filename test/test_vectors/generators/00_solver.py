@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import os
 import numpy as np
 import cupy as cp
 from cupyx.scipy import linalg as cplinalg
@@ -7,6 +8,8 @@ from numpy import random
 import math
 import matx_common
 from typing import Dict, List
+
+os.environ.setdefault('CUPY_CACHE_DIR', '/tmp')
 
 
 class inv:

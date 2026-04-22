@@ -1486,7 +1486,7 @@ MATX_LOOP_UNROLL
     t->device.device_id = 0;
 
     // Determine where this memory resides
-    void *data_ptr = const_cast<tensor_t*>(this)->GetStorage().data();
+    void *data_ptr = const_cast<void *>(static_cast<const void *>(this->Data()));
     auto kind = GetPointerKind(data_ptr);
     [[maybe_unused]] auto mem_res = cuPointerGetAttributes(sizeof(attr)/sizeof(attr[0]), attr, data, reinterpret_cast<CUdeviceptr>(data_ptr));
     MATX_ASSERT_STR_EXP(mem_res, CUDA_SUCCESS, matxCudaError, "Error returned from cuPointerGetAttributes");
