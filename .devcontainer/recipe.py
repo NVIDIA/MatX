@@ -104,11 +104,5 @@ Stage0 += shell(commands=[
     'pip3 --no-cache-dir install --break-system-packages --upgrade ' + ' '.join(pip_packages)
 ])
 
-# Install Cursor CLI from the official script and expose `agent` globally.
-Stage0 += shell(commands=[
-    'curl https://cursor.com/install -fsS | HOME=/usr/local bash',
-    'ln -sf /usr/local/.local/bin/agent /usr/local/bin/agent',
-    'ln -sf /usr/local/.local/bin/cursor-agent /usr/local/bin/cursor-agent'
-])
 
 print(Stage0)
