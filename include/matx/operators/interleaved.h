@@ -49,6 +49,11 @@ namespace matx
       public:
         using matxop = bool;
         using value_type = typename T1::value_type;
+        using self_type = ComplexInterleavedOp<T1>;
+
+        // Propagate dynamic tensor marker through expression tree
+        using dynamic_tensor_expr = cuda::std::bool_constant<
+          is_dynamic_tensor_v<T1> || is_dynamic_rank_op_v<T1>>;
 
         using complex_type = std::conditional_t<is_matx_half_v<value_type>,
               matxHalfComplex<value_type>,
@@ -68,9 +73,11 @@ namespace matx
         }
 
         __MATX_INLINE__ auto get_jit_op_str() const {
+          const int actual_rank = jit_rank();
           std::string func_name = get_jit_class_name();
+          const std::string complex_type_str = type_to_string<complex_type>();
           cuda::std::array<index_t, Rank()> out_dims_;
-          for (int i = 0; i < Rank(); ++i) {
+          for (int i = 0; i < actual_rank; ++i) {
             out_dims_[i] = Size(i);
           }
           
@@ -78,7 +85,7 @@ namespace matx
             func_name,
             std::format("template <typename T> struct {} {{\n"
                 "  using value_type = typename T::value_type;\n"
-                "  using complex_type = cuda::std::complex<value_type>;\n"
+                "  using complex_type = {};\n"
                 "  using matxop = bool;\n"
                 "  constexpr static int Rank_ = {};\n"
                 "  constexpr static cuda::std::array<index_t, Rank_> out_dims_ = {{ {} }};\n"
@@ -87,14 +94,14 @@ namespace matx
                 "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(Is... indices) const\n"
                 "  {{\n"
                 "    if constexpr (CapType::ept == ElementsPerThread::ONE) {{\n"
-                "      auto real = get_value<DefaultCapabilities>(op_, indices...);\n"
+                "      auto real = get_value<CapType>(op_, indices...);\n"
                 "      constexpr size_t rank_idx = (Rank_ == 1) ? 0 : (Rank_ - 2);\n"
                 "      cuda::std::array idx{{indices...}};\n"
-                "      idx[rank_idx] += out_dims_[rank_idx] / 2;\n"
-                "      auto imag = get_value<DefaultCapabilities>(op_, idx);\n"
+                "      idx[rank_idx] += out_dims_[rank_idx];\n"
+                "      auto imag = get_value<CapType>(op_, idx);\n"
                 "      return complex_type{{real, imag}};\n"
                 "    }} else {{\n"
-                "      return Vector<value_type, static_cast<index_t>(CapType::ept)>{{}};\n"
+                "      return Vector<complex_type, static_cast<index_t>(CapType::ept)>{{}};\n"
                 "    }}\n"
                 "  }}\n"
                 "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return Rank_; }}\n"
@@ -104,7 +111,7 @@ namespace matx
                 "    return (dim == Rank_ - 2) ? out_dims_[dim] : out_dims_[dim];\n"
                 "  }}\n"
                 "}};\n",
-                func_name, Rank(), detail::array_to_string(out_dims_))
+                func_name, complex_type_str, actual_rank, detail::array_to_string(out_dims_, actual_rank))
           );
         }
 #endif
@@ -162,7 +169,7 @@ namespace matx
           if constexpr (is_matx_op<T1>()) {
             op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           }
-        }          
+        }
 
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
         {
@@ -173,6 +180,15 @@ namespace matx
 
           return (dim == static_cast<int>(Rank()) - 2) ? op_.Size(dim) / 2
             : op_.Size(dim);
+        }
+
+        __MATX_INLINE__ __MATX_HOST__ int32_t DynRank() const {
+          return detail::get_dyn_rank(op_);
+        }
+
+        __MATX_INLINE__ __MATX_HOST__ int32_t jit_rank() const {
+          if constexpr (is_dynamic_rank_op_v<self_type>) return DynRank();
+          else return Rank();
         }
 
         template <OperatorCapability Cap, typename InType>

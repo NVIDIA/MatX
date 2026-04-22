@@ -101,6 +101,11 @@ namespace matx
         using value_type = typename Op::value_type;
         using self_type = matxBinaryOp<I1, I2, Op>;
 
+        // Propagate dynamic tensor marker through expression tree
+        using dynamic_tensor_expr = cuda::std::bool_constant<
+          is_dynamic_tensor_v<I1> || is_dynamic_tensor_v<I2> ||
+          is_dynamic_rank_op_v<I1> || is_dynamic_rank_op_v<I2>>;
+
 #ifdef MATX_EN_JIT
         struct JIT_Storage {
           typename detail::inner_storage_or_self_t<detail::base_type_t<I1>> in1_;
@@ -163,37 +168,39 @@ namespace matx
       }
 
       __MATX_INLINE__ auto get_jit_op_str() const {
-        cuda::std::array<index_t, static_cast<size_t>(Rank())> out_dims_;
-        for (int i = 0; i < Rank(); ++i) {
-          out_dims_[i] = Size(i);
+        const int actual_rank = jit_rank();
+        std::string dims_str;
+        for (int i = 0; i < actual_rank; ++i) {
+          if (i > 0) dims_str += ", ";
+          dims_str += std::to_string(Size(i));
         }
         const std::string func_name = get_jit_class_name();
         return cuda::std::make_tuple(
-           func_name, 
-           std::string("template <typename I1, typename I2, typename Op> struct " + func_name + "  {\n") + 
+           func_name,
+           std::string("template <typename I1, typename I2, typename Op> struct " + func_name + "  {\n") +
                "  using value_type = typename Op::value_type;\n" +
                "  using matxop = bool;\n" +
-               "  constexpr static cuda::std::array<index_t, " + std::to_string(Rank()) + "> out_dims_ = { " + 
-               detail::array_to_string(out_dims_) + " };\n" +
+               "  constexpr static cuda::std::array<index_t, " + std::to_string(actual_rank) + "> out_dims_ = { " +
+               dims_str + " };\n" +
                "  typename detail::inner_storage_or_self_t<detail::base_type_t<I1>> in1_;\n" +
                "  typename detail::inner_storage_or_self_t<detail::base_type_t<I2>> in2_;\n" +
                "  typename detail::inner_storage_or_self_t<detail::base_type_t<Op>> op_;\n" +
                "  template <typename CapType, typename... Is>\n" +
                "  __MATX_INLINE__ __MATX_DEVICE__  decltype(auto) operator()(Is... indices) const\n" +
-               "  {\n" +     
-               "    auto i1 = get_value<CapType>(in1_, indices...);\n" + 
+               "  {\n" +
+               "    auto i1 = get_value<CapType>(in1_, indices...);\n" +
                "    auto i2 = get_value<CapType>(in2_, indices...);\n" +
                "    auto result = op_.template operator()<CapType>(i1, i2);\n" +
-               "    return result;\n" + 
+               "    return result;\n" +
                "  }\n" +
                "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank()\n" +
                "  {\n" +
-               "    return detail::matx_max(detail::get_rank<I1>(), detail::get_rank<I2>());\n" +
+               "    return " + std::to_string(actual_rank) + ";\n" +
                "  }\n" +
                "  constexpr __MATX_INLINE__  __MATX_DEVICE__ index_t Size(int dim) const\n" +
                "  {\n" +
                "    return out_dims_[dim];\n " +
-               "  }\n" +          
+               "  }\n" +
                "};\n"
         );
       }      
@@ -267,6 +274,15 @@ namespace matx
         index_t size1 = detail::get_expanded_size<Rank()>(in1_, dim);
         index_t size2 = detail::get_expanded_size<Rank()>(in2_, dim);
         return detail::matx_max(size1,size2);
+      }
+
+      __MATX_INLINE__ __MATX_HOST__ int32_t DynRank() const {
+        return detail::matx_max(detail::get_dyn_rank(in1_), detail::get_dyn_rank(in2_));
+      }
+
+      __MATX_INLINE__ __MATX_HOST__ int32_t jit_rank() const {
+        if constexpr (is_dynamic_rank_op_v<self_type>) return DynRank();
+        else return Rank();
       }
 
       template <typename ShapeType, typename Executor>

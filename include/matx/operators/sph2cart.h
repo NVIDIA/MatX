@@ -53,6 +53,13 @@ namespace matx
       public:
         using matxop = bool;
         using value_type = typename T1::value_type;
+        using self_type = Sph2CartOp<T1, T2, T3, WHICH>;
+
+        // Propagate dynamic tensor marker through expression tree
+        using dynamic_tensor_expr = cuda::std::bool_constant<
+          is_dynamic_tensor_v<T1> || is_dynamic_rank_op_v<T1> ||
+          is_dynamic_tensor_v<T2> || is_dynamic_rank_op_v<T2> ||
+          is_dynamic_tensor_v<T3> || is_dynamic_rank_op_v<T3>>;
 
 #ifdef MATX_EN_JIT
         struct JIT_Storage {
@@ -70,9 +77,10 @@ namespace matx
         }
 
         __MATX_INLINE__ auto get_jit_op_str() const {
+          const int actual_rank = jit_rank();
           std::string func_name = get_jit_class_name();
           cuda::std::array<index_t, Rank()> out_dims_;
-          for (int i = 0; i < Rank(); ++i) {
+          for (int i = 0; i < actual_rank; ++i) {
             out_dims_[i] = Size(i);
           }
           
@@ -107,7 +115,7 @@ namespace matx
                 "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return Rank_; }}\n"
                 "  constexpr __MATX_INLINE__ __MATX_DEVICE__ auto Size(int dim) const {{ return out_dims_[dim]; }}\n"
                 "}};\n",
-                func_name, WHICH, Rank(), detail::array_to_string(out_dims_))
+                func_name, WHICH, actual_rank, detail::array_to_string(out_dims_, actual_rank))
           );
         }
 #endif
@@ -192,6 +200,15 @@ namespace matx
 					index_t size2 = get_expanded_size<Rank()>(phi_, dim);
 					index_t size3 = get_expanded_size<Rank()>(r_, dim);
 					return detail::matx_max(size1, size2, size3);
+        }
+
+        __MATX_INLINE__ __MATX_HOST__ int32_t DynRank() const {
+          return detail::matx_max(detail::get_dyn_rank(theta_), detail::matx_max(detail::get_dyn_rank(phi_), detail::get_dyn_rank(r_)));
+        }
+
+        __MATX_INLINE__ __MATX_HOST__ int32_t jit_rank() const {
+          if constexpr (is_dynamic_rank_op_v<self_type>) return DynRank();
+          else return Rank();
         }
 
         template <OperatorCapability Cap, typename InType>

@@ -84,141 +84,148 @@ namespace matx
       template <typename Op>
         void Exec(const Op &op) const {
 #ifdef __CUDACC__      
-          dim3 threads = 1;
-          dim3 blocks = 1;  
-
-          // Parameters passed by value in CUDA are limited to CUDA_MAX_VAL_PARAM. If the user exceeds this, we 
-          // need to error out and have them break up the statement
-          if ((sizeof(op) + sizeof(index_t) * Op::Rank()) > detail::CUDA_MAX_VAL_PARAM) {
-            MATX_THROW(matxInvalidParameter, 
-                "Parameter buffer to device is limited to " + std::to_string(detail::CUDA_MAX_VAL_PARAM) + "B. "
-                "Please break up your operator statement into multiple executions to limit the size of the parameters");
-          }
-          cuda::std::array<index_t, Op::Rank()> sizes;
-          for (int i = 0; i < Op::Rank(); i++) {
-            sizes[i] = op.Size(i);
-          }   
-
-          if constexpr (Op::Rank() <= 4) {
-            // Create kernel provider for non-JIT using consolidated function
-            auto kernel_provider = detail::create_kernel_provider<Op>(sizes, false, false);
-
-            // Find the best launch parameters
-            auto [best_ept, shm_size, block_size, groups_per_block] = detail::find_best_launch_params(op, kernel_provider, 256, false);
-
-            // Check if all leaf tensors have unit stride in the last dimension.
-            // This allows eliding one ULDC + IMAD per tensor access.
-            const bool unit_stride_last = detail::get_operator_capability<detail::OperatorCapability::UNIT_STRIDE_LAST>(op);
-
-            // Helper lambda to handle kernel dispatch. This is templated on the EPT
-            // and unit-stride-last flag since those are what the kernels are templated on.
-            auto dispatch_kernel = [&]<detail::ElementsPerThread EPT, bool USL>(auto&& kernel_handler) {
-              int max_tpb = 256;
-
-              bool stride = detail::get_grid_dims<Op::Rank()>(blocks, threads, sizes, static_cast<int>(EPT), max_tpb);
-
-              constexpr bool JIT = false;
-              using CapType = detail::CapabilityParams<EPT, JIT, USL>;
-              
-              if constexpr (Op::Rank() == 0) {
-                kernel_handler([&]() {
-                  detail::matxOpT0Kernel<CapType><<<blocks, threads, 0, stream_>>>(op);
-                });
-              }
-              else if constexpr (Op::Rank() == 1) {
-                kernel_handler([&]() {
-                  detail::matxOpT1Kernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0]);
-                });
-              }
-              else if constexpr (Op::Rank() == 2) {
-                if (stride) {
-                  kernel_handler([&]() {
-                    detail::matxOpT2StrideKernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
-                  });
-                } else {
-                  kernel_handler([&]() {
-                    detail::matxOpT2Kernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
-                  });
-                }
-              }
-              else if constexpr (Op::Rank() == 3) {
-                if (stride) {
-                  kernel_handler([&]() {
-                    detail::matxOpT3StrideKernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
-                  });
-                } else {
-                  kernel_handler([&]() {
-                    detail::matxOpT3Kernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
-                  });
-                }
-              }
-              else if constexpr (Op::Rank() == 4) {
-                if (stride) {
-                  kernel_handler([&]() {
-                    detail::matxOpT4StrideKernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
-                  });
-                } else {
-                  kernel_handler([&]() {
-                    detail::matxOpT4Kernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
-                  });
-                }
-              }
-            };
-
-            // Helper lambda to launch kernel, branching on unit_stride_last
-            auto launch_kernel = [&]<detail::ElementsPerThread EPT>() {
-              auto handler = [&](auto launch_func) {
-                MATX_LOG_DEBUG("Launching CUDA kernel: rank={}, blocks=({},{},{}), threads=({},{},{}), EPT={}, USL={}, stream={}",
-                               Op::Rank(), blocks.x, blocks.y, blocks.z, threads.x, threads.y, threads.z,
-                               static_cast<int>(EPT), unit_stride_last, reinterpret_cast<void*>(stream_));
-                launch_func();
-              };
-              if (unit_stride_last) {
-                dispatch_kernel.template operator()<EPT, true>(handler);
-              } else {
-                dispatch_kernel.template operator()<EPT, false>(handler);
-              }
-            };
-
-            // Launch the correct kernel based on the best EPT found
-            switch (best_ept) {
-              case detail::ElementsPerThread::THIRTY_TWO:
-                launch_kernel.template operator()<detail::ElementsPerThread::THIRTY_TWO>();
-                break;
-              case detail::ElementsPerThread::SIXTEEN:
-                launch_kernel.template operator()<detail::ElementsPerThread::SIXTEEN>();
-                break;
-              case detail::ElementsPerThread::EIGHT:
-                launch_kernel.template operator()<detail::ElementsPerThread::EIGHT>();
-                break;
-              case detail::ElementsPerThread::FOUR:
-                launch_kernel.template operator()<detail::ElementsPerThread::FOUR>();
-                break;
-              case detail::ElementsPerThread::TWO:
-                launch_kernel.template operator()<detail::ElementsPerThread::TWO>();
-                break;
-              case detail::ElementsPerThread::ONE:
-                launch_kernel.template operator()<detail::ElementsPerThread::ONE>();
-                break;
-              default:
-                MATX_THROW(matxInvalidParameter, "No kernel found for this operator");
-            }
+          if constexpr (is_dynamic_rank_op_v<Op>) {
+            MATX_THROW(matxInvalidExecutor,
+                "Dynamic-rank expressions (including mixed static/dynamic tensors) require CUDAJITExecutor. "
+                "cudaExecutor only supports static-rank expressions.");
           }
           else {
-            auto ept_type = detail::EPTQueryInput{false};
-            const auto ept_bounds = detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(op, ept_type);
-            bool stride = detail::get_grid_dims<Op::Rank()>(blocks, threads, sizes, static_cast<int>(ept_bounds[1]), 1024);
-            index_t dims = cuda::std::accumulate(cuda::std::begin(sizes) + 1, cuda::std::end(sizes), 1, cuda::std::multiplies<index_t>());
-            constexpr bool JIT = false;
-            const bool usl = detail::get_operator_capability<detail::OperatorCapability::UNIT_STRIDE_LAST>(op);
-            if (usl) {
-              constexpr bool USL = true;
-              using CapType = detail::CapabilityParams<detail::ElementsPerThread::ONE, JIT, USL>;
-              detail::matxOpTDKernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes, dims);
-            } else {
-              constexpr bool USL = false;
-              using CapType = detail::CapabilityParams<detail::ElementsPerThread::ONE, JIT, USL>;
-              detail::matxOpTDKernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes, dims);
+            dim3 threads = 1;
+            dim3 blocks = 1;  
+
+            // Parameters passed by value in CUDA are limited to CUDA_MAX_VAL_PARAM. If the user exceeds this, we 
+            // need to error out and have them break up the statement
+            if ((sizeof(op) + sizeof(index_t) * Op::Rank()) > detail::CUDA_MAX_VAL_PARAM) {
+              MATX_THROW(matxInvalidParameter, 
+                  "Parameter buffer to device is limited to " + std::to_string(detail::CUDA_MAX_VAL_PARAM) + "B. "
+                  "Please break up your operator statement into multiple executions to limit the size of the parameters");
+            }
+            cuda::std::array<index_t, Op::Rank()> sizes;
+            for (int i = 0; i < Op::Rank(); i++) {
+              sizes[i] = op.Size(i);
+            }   
+
+            if constexpr (Op::Rank() <= 4) {
+              // Create kernel provider for non-JIT using consolidated function
+              auto kernel_provider = detail::create_kernel_provider<Op>(sizes, false, false);
+
+              // Find the best launch parameters
+              auto [best_ept, shm_size, block_size, groups_per_block] = detail::find_best_launch_params(op, kernel_provider, 256, false);
+
+              // Check if all leaf tensors have unit stride in the last dimension.
+              // This allows eliding one ULDC + IMAD per tensor access.
+              const bool unit_stride_last = detail::get_operator_capability<detail::OperatorCapability::UNIT_STRIDE_LAST>(op);
+
+              // Helper lambda to handle kernel dispatch. This is templated on the EPT
+              // and unit-stride-last flag since those are what the kernels are templated on.
+              auto dispatch_kernel = [&]<detail::ElementsPerThread EPT, bool USL>(auto&& kernel_handler) {
+                int max_tpb = 256;
+
+                bool stride = detail::get_grid_dims<Op::Rank()>(blocks, threads, sizes, static_cast<int>(EPT), max_tpb);
+
+                constexpr bool JIT = false;
+                using CapType = detail::CapabilityParams<EPT, JIT, USL>;
+                
+                if constexpr (Op::Rank() == 0) {
+                  kernel_handler([&]() {
+                    detail::matxOpT0Kernel<CapType><<<blocks, threads, 0, stream_>>>(op);
+                  });
+                }
+                else if constexpr (Op::Rank() == 1) {
+                  kernel_handler([&]() {
+                    detail::matxOpT1Kernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0]);
+                  });
+                }
+                else if constexpr (Op::Rank() == 2) {
+                  if (stride) {
+                    kernel_handler([&]() {
+                      detail::matxOpT2StrideKernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
+                    });
+                  } else {
+                    kernel_handler([&]() {
+                      detail::matxOpT2Kernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1]);
+                    });
+                  }
+                }
+                else if constexpr (Op::Rank() == 3) {
+                  if (stride) {
+                    kernel_handler([&]() {
+                      detail::matxOpT3StrideKernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
+                    });
+                  } else {
+                    kernel_handler([&]() {
+                      detail::matxOpT3Kernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2]);
+                    });
+                  }
+                }
+                else if constexpr (Op::Rank() == 4) {
+                  if (stride) {
+                    kernel_handler([&]() {
+                      detail::matxOpT4StrideKernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
+                    });
+                  } else {
+                    kernel_handler([&]() {
+                      detail::matxOpT4Kernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes[0], sizes[1], sizes[2], sizes[3]);
+                    });
+                  }
+                }
+              };
+
+              // Helper lambda to launch kernel, branching on unit_stride_last
+              auto launch_kernel = [&]<detail::ElementsPerThread EPT>() {
+                auto handler = [&](auto launch_func) {
+                  MATX_LOG_DEBUG("Launching CUDA kernel: rank={}, blocks=({},{},{}), threads=({},{},{}), EPT={}, USL={}, stream={}",
+                                 Op::Rank(), blocks.x, blocks.y, blocks.z, threads.x, threads.y, threads.z,
+                                 static_cast<int>(EPT), unit_stride_last, reinterpret_cast<void*>(stream_));
+                  launch_func();
+                };
+                if (unit_stride_last) {
+                  dispatch_kernel.template operator()<EPT, true>(handler);
+                } else {
+                  dispatch_kernel.template operator()<EPT, false>(handler);
+                }
+              };
+
+              // Launch the correct kernel based on the best EPT found
+              switch (best_ept) {
+                case detail::ElementsPerThread::THIRTY_TWO:
+                  launch_kernel.template operator()<detail::ElementsPerThread::THIRTY_TWO>();
+                  break;
+                case detail::ElementsPerThread::SIXTEEN:
+                  launch_kernel.template operator()<detail::ElementsPerThread::SIXTEEN>();
+                  break;
+                case detail::ElementsPerThread::EIGHT:
+                  launch_kernel.template operator()<detail::ElementsPerThread::EIGHT>();
+                  break;
+                case detail::ElementsPerThread::FOUR:
+                  launch_kernel.template operator()<detail::ElementsPerThread::FOUR>();
+                  break;
+                case detail::ElementsPerThread::TWO:
+                  launch_kernel.template operator()<detail::ElementsPerThread::TWO>();
+                  break;
+                case detail::ElementsPerThread::ONE:
+                  launch_kernel.template operator()<detail::ElementsPerThread::ONE>();
+                  break;
+                default:
+                  MATX_THROW(matxInvalidParameter, "No kernel found for this operator");
+              }
+            }
+            else {
+              auto ept_type = detail::EPTQueryInput{false};
+              const auto ept_bounds = detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(op, ept_type);
+              bool stride = detail::get_grid_dims<Op::Rank()>(blocks, threads, sizes, static_cast<int>(ept_bounds[1]), 1024);
+              index_t dims = cuda::std::accumulate(cuda::std::begin(sizes) + 1, cuda::std::end(sizes), 1, cuda::std::multiplies<index_t>());
+              constexpr bool JIT = false;
+              const bool usl = detail::get_operator_capability<detail::OperatorCapability::UNIT_STRIDE_LAST>(op);
+              if (usl) {
+                constexpr bool USL = true;
+                using CapType = detail::CapabilityParams<detail::ElementsPerThread::ONE, JIT, USL>;
+                detail::matxOpTDKernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes, dims);
+              } else {
+                constexpr bool USL = false;
+                using CapType = detail::CapabilityParams<detail::ElementsPerThread::ONE, JIT, USL>;
+                detail::matxOpTDKernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes, dims);
+              }
             }
           }            
 #else

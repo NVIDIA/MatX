@@ -48,6 +48,12 @@ namespace matx
     template<class Op1, class Op2>
       class CommaOp : public BaseOp<CommaOp<Op1, Op2>>{
         public:
+          using self_type = CommaOp<Op1, Op2>;
+
+          // Propagate dynamic tensor marker through expression tree
+          using dynamic_tensor_expr = cuda::std::bool_constant<
+            is_dynamic_tensor_v<Op1> || is_dynamic_tensor_v<Op2> ||
+            is_dynamic_rank_op_v<Op1> || is_dynamic_rank_op_v<Op2>>;
 
 #ifdef MATX_EN_JIT
           struct JIT_Storage {
@@ -64,12 +70,13 @@ namespace matx
           }
 
           __MATX_INLINE__ auto get_jit_op_str() const {
+            const int actual_rank = jit_rank();
             std::string func_name = get_jit_class_name();
             cuda::std::array<index_t, Rank()> out_dims_;
-            for (int i = 0; i < Rank(); ++i) {
+            for (int i = 0; i < actual_rank; ++i) {
               out_dims_[i] = Size(i);
             }
-            
+
             return cuda::std::make_tuple(
               func_name,
               std::format("template <typename Op1, typename Op2> struct {} {{\n"
@@ -86,7 +93,7 @@ namespace matx
                   "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return Rank_; }}\n"
                   "  constexpr __MATX_INLINE__ __MATX_DEVICE__ auto Size(int dim) const {{ return out_dims_[dim]; }}\n"
                   "}};\n",
-                  func_name, Rank(), detail::array_to_string(out_dims_))
+                  func_name, actual_rank, detail::array_to_string(out_dims_, actual_rank))
             );
           }
 #endif
@@ -123,7 +130,16 @@ namespace matx
           constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
           {
             return op2_.Size(dim);
-          }      
+          }
+
+          __MATX_INLINE__ __MATX_HOST__ int32_t DynRank() const {
+            return detail::matx_max(detail::get_dyn_rank(op1_), detail::get_dyn_rank(op2_));
+          }
+
+          __MATX_INLINE__ __MATX_HOST__ int32_t jit_rank() const {
+            if constexpr (is_dynamic_rank_op_v<self_type>) return DynRank();
+            else return Rank();
+          }
 
           template <typename ShapeType, typename Executor>
           __MATX_INLINE__ void PreRun(ShapeType &&shape, Executor &&ex) const noexcept

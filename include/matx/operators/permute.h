@@ -57,6 +57,10 @@ namespace matx
         using matxop = bool;
         using matxoplvalue = bool;
 
+        // Propagate dynamic tensor marker through expression tree
+        using dynamic_tensor_expr = cuda::std::bool_constant<
+          is_dynamic_tensor_v<T> || is_dynamic_rank_op_v<T>>;
+
 #ifdef MATX_EN_JIT
         struct JIT_Storage {
           typename detail::inner_storage_or_self_t<detail::base_type_t<T>> op_;
@@ -76,27 +80,28 @@ namespace matx
         }
 
         __MATX_INLINE__ auto get_jit_op_str() const {
+          const int actual_rank = jit_rank();
           std::string func_name = get_jit_class_name();
           cuda::std::array<index_t, Rank()> out_dims_;
-          for (int i = 0; i < Rank(); ++i) {
+          for (int i = 0; i < actual_rank; ++i) {
             out_dims_[i] = Size(i);
           }
 
           std::string dims_array = "{ ";
-          for (int i = 0; i < Rank(); i++) {
+          for (int i = 0; i < actual_rank; i++) {
             dims_array += std::to_string(dims_[i]);
-            if (i < Rank() - 1) dims_array += ", ";
+            if (i < actual_rank - 1) dims_array += ", ";
           }
           dims_array += " }";
-          
+
           return cuda::std::make_tuple(
             func_name,
             std::string("template <typename T> struct " + func_name + " {\n") +
                 "  using value_type = typename T::value_type;\n" +
                 "  using matxop = bool;\n" +
-                "  constexpr static int Rank_ = " + std::to_string(Rank()) + ";\n" +
+                "  constexpr static int Rank_ = " + std::to_string(actual_rank) + ";\n" +
                 "  constexpr static cuda::std::array<index_t, Rank_> out_dims_ = { " +
-                detail::array_to_string(out_dims_) + " };\n" +
+                detail::array_to_string(out_dims_, actual_rank) + " };\n" +
                 "  constexpr static cuda::std::array<int32_t, Rank_> dims_ = " + dims_array + ";\n" +
                 "  typename detail::inner_storage_or_self_t<detail::base_type_t<T>> op_;\n" +
                 "  template <typename CapType, typename... Is>\n" +
@@ -206,6 +211,15 @@ MATX_LOOP_UNROLL
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int32_t dim) const
         {
           return op_.Size(dims_[dim]);
+        }
+
+        __MATX_INLINE__ __MATX_HOST__ int32_t DynRank() const {
+          return detail::get_dyn_rank(op_);
+        }
+
+        __MATX_INLINE__ __MATX_HOST__ int32_t jit_rank() const {
+          if constexpr (is_dynamic_rank_op_v<self_type>) return DynRank();
+          else return Rank();
         }
 
         template <typename ShapeType, typename Executor>

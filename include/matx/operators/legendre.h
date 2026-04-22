@@ -71,9 +71,10 @@ namespace matx
         }
 
         __MATX_INLINE__ auto get_jit_op_str() const {
+          const int actual_rank = jit_rank();
           std::string func_name = get_jit_class_name();
           cuda::std::array<index_t, Rank()> out_dims_;
-          for (int i = 0; i < Rank(); ++i) {
+          for (int i = 0; i < actual_rank; ++i) {
             out_dims_[i] = Size(i);
           }
           
@@ -109,7 +110,7 @@ namespace matx
                 "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(Is... indices) const {{\n"
                 "    if constexpr (CapType::ept == ElementsPerThread::ONE) {{\n"
                 "      cuda::std::array<index_t, Rank_> inds{{indices...}};\n"
-                "      cuda::std::array<index_t, {}> xinds;\n"
+                "      cuda::std::array<index_t, {}> xinds{{}};\n"
                 "      int axis1 = axis_[0];\n"
                 "      int axis2 = axis_[1];\n"
                 "      index_t nind = inds[axis1];\n"
@@ -122,7 +123,7 @@ namespace matx
                 "      int idx = 0;\n"
                 "      for(int i = 0; i < Rank_; i++) {{\n"
                 "        index_t ind = inds[i];\n"
-                "        if(i != axis_[0] && i != axis_[1]) {{\n"
+                "        if(i != axis1 && i != axis2) {{\n"
                 "          xinds[idx++] = ind;\n"
                 "        }}\n"
                 "      }}\n"
@@ -141,7 +142,7 @@ namespace matx
                 "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return Rank_; }}\n"
                 "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const {{ return out_dims_[dim]; }}\n"
                 "}};\n",
-                func_name, Rank(), axis_[0], axis_[1], detail::array_to_string(out_dims_), T3::Rank())
+                func_name, actual_rank, axis_[0], axis_[1], detail::array_to_string(out_dims_, actual_rank), T3::Rank())
           );
         }
 #endif
@@ -182,6 +183,13 @@ namespace matx
       public:
         using matxop = bool;
         using value_type = typename T3::value_type;
+        using self_type = LegendreOp<T1, T2, T3>;
+
+        // Propagate dynamic tensor marker through expression tree
+        using dynamic_tensor_expr = cuda::std::bool_constant<
+          is_dynamic_tensor_v<T1> || is_dynamic_rank_op_v<T1> ||
+          is_dynamic_tensor_v<T2> || is_dynamic_rank_op_v<T2> ||
+          is_dynamic_tensor_v<T3> || is_dynamic_rank_op_v<T3>>;
 
         __MATX_INLINE__ std::string str() const { return "legendre(" + get_type_str(n_) + "," + get_type_str(m_) + "," + get_type_str(in_) + ")"; }
 
@@ -368,6 +376,15 @@ namespace matx
               d--;
             return get_size(in_, d);
           }
+        }
+
+        __MATX_INLINE__ __MATX_HOST__ int32_t DynRank() const {
+          return detail::matx_max(detail::get_dyn_rank(n_), detail::matx_max(detail::get_dyn_rank(m_), detail::get_dyn_rank(in_)));
+        }
+
+        __MATX_INLINE__ __MATX_HOST__ int32_t jit_rank() const {
+          if constexpr (is_dynamic_rank_op_v<self_type>) return DynRank();
+          else return Rank();
         }
     };
   }

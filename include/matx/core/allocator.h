@@ -133,7 +133,6 @@ struct MemTracker {
     // be destroyed, making cudaFree/cudaFreeAsync calls fail with
     // CUDA_ERROR_CONTEXT_IS_DESTROYED.
     auto is_cuda_free = [&]() {
-      if (iter->second.kind == MATX_HOST_MALLOC_MEMORY) return true; // not CUDA
       int dev;
       return cudaGetDevice(&dev) == cudaSuccess;
     };

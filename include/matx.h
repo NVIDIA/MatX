@@ -50,6 +50,7 @@
 #include "matx/core/print.h"
 #include "matx/core/pybind.h"
 #include "matx/core/tensor.h"
+#include "matx/core/dynamic_tensor.h"
 #include "matx/core/sparse_tensor.h"  // sparse support is experimental
 #include "matx/core/make_sparse_tensor.h"
 #include "matx/core/tie.h"

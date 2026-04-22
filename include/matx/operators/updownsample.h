@@ -56,6 +56,10 @@ namespace matx
         using value_type = typename T::value_type;
         using self_type = UpsampleOp<T>;
 
+        // Propagate dynamic tensor marker through expression tree
+        using dynamic_tensor_expr = cuda::std::bool_constant<
+          is_dynamic_tensor_v<T> || is_dynamic_rank_op_v<T>>;
+
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {
           return T::Rank();
@@ -78,11 +82,12 @@ namespace matx
 
         __MATX_INLINE__ auto get_jit_op_str() const {
           std::string func_name = get_jit_class_name();
+          const int actual_rank = jit_rank();
           cuda::std::array<index_t, Rank()> out_dims_;
-          for (int i = 0; i < Rank(); ++i) {
+          for (int i = 0; i < actual_rank; ++i) {
             out_dims_[i] = Size(i);
           }
-          
+
           return cuda::std::make_tuple(
             func_name,
             std::format("template <typename T> struct {} {{\n"
@@ -110,7 +115,7 @@ namespace matx
                 "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return Rank_; }}\n"
                 "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int32_t dim) const {{ return out_dims_[dim]; }}\n"
                 "}};\n",
-                func_name, dim_, n_, Rank(), detail::array_to_string(out_dims_))
+                func_name, dim_, n_, actual_rank, detail::array_to_string(out_dims_, actual_rank))
           );
         }
 #endif 
@@ -196,6 +201,15 @@ namespace matx
           else {
             return op_.Size(dim);
           }
+        }
+
+        __MATX_INLINE__ __MATX_HOST__ int32_t DynRank() const {
+          return detail::get_dyn_rank(op_);
+        }
+
+        __MATX_INLINE__ __MATX_HOST__ int32_t jit_rank() const {
+          if constexpr (is_dynamic_rank_op_v<self_type>) return DynRank();
+          else return Rank();
         }
 
         template <typename ShapeType, typename Executor>

@@ -38,7 +38,7 @@ tensor:
 
 .. code-block:: cpp
 
-    auto t = make_static_tensor<float, 10, 20>();
+    auto t = make_tensor<float, 10, 20>();
 
 Note that for a static tensor the shape is moved to the template parameters instead of function arguments.
 
@@ -437,5 +437,3 @@ That's it!
 This quick start guide was intended to give a very brief introduction to the concepts behind MatX, and how these concepts apply to the code. There's a lot
 more to explore in MatX and far more functions than could be listed here. For more examples we recommend browsing through the examples to see how to perform 
 real tasks using MatX, and the API guide to see an exhaustive list of functions and operators.
-
-

@@ -96,7 +96,7 @@ auto make_tensor(Storage<T> storage, ShapeType &&shape) {
  * @param stream cuda stream to allocate in (only applicable to async allocations)
  **/
 template <typename TensorType>
-  requires is_tensor<TensorType>
+  requires (is_tensor<TensorType> && !is_dynamic_tensor_v<TensorType>)
 void make_tensor( TensorType &tensor,
                   const index_t (&shape)[TensorType::Rank()],
                   matxMemorySpace_t space = MATX_MANAGED_MEMORY,
@@ -193,7 +193,7 @@ auto make_tensor( ShapeType &&shape,
  *
  **/
 template <typename TensorType, typename ShapeType>
-  requires (is_tensor<TensorType> && !std::is_array_v<remove_cvref_t<ShapeType>>)
+  requires (is_tensor<TensorType> && !is_dynamic_tensor_v<TensorType> && !std::is_array_v<remove_cvref_t<ShapeType>>)
 auto make_tensor( TensorType &tensor,
                   ShapeType &&shape,
                   matxMemorySpace_t space = MATX_MANAGED_MEMORY,
@@ -268,7 +268,7 @@ auto make_tensor( [[maybe_unused]] const std::initializer_list<detail::no_size_t
  *
  **/
 template <typename TensorType>
-  requires is_tensor<TensorType>
+  requires (is_tensor<TensorType> && !is_dynamic_tensor_v<TensorType>)
 auto make_tensor( TensorType &tensor,
                   matxMemorySpace_t space = MATX_MANAGED_MEMORY,
                   cudaStream_t stream = 0) {
@@ -341,7 +341,7 @@ auto make_tensor( T *data,
  * @returns New tensor
  **/
 template <typename TensorType>
-  requires is_tensor<TensorType>
+  requires (is_tensor<TensorType> && !is_dynamic_tensor_v<TensorType>)
 auto make_tensor( TensorType &tensor,
                   typename TensorType::value_type *data,
                   const index_t (&shape)[TensorType::Rank()]) {
@@ -402,7 +402,7 @@ auto make_tensor( T *data,
  * @returns New tensor
  **/
 template <typename TensorType>
-  requires is_tensor<TensorType>
+  requires (is_tensor<TensorType> && !is_dynamic_tensor_v<TensorType>)
 auto make_tensor( TensorType &tensor,
                   typename TensorType::value_type *data,
                   typename TensorType::shape_container &&shape) {
@@ -444,7 +444,7 @@ auto make_tensor( T *ptr,
  * @returns New tensor
  **/
 template <typename TensorType>
-  requires is_tensor<TensorType>
+  requires (is_tensor<TensorType> && !is_dynamic_tensor_v<TensorType>)
 auto make_tensor( TensorType &tensor,
                   typename TensorType::value_type *ptr) {
   MATX_LOG_DEBUG("make_tensor(tensor&, ptr, 0D): ptr={}", reinterpret_cast<void*>(ptr));
@@ -546,7 +546,7 @@ auto make_tensor( ShapeType &&shape,
  *   Custom allocator (PMR allocator, custom allocator pointer, etc.)
  **/
 template <typename TensorType, typename Allocator>
-  requires is_tensor<TensorType>
+  requires (is_tensor<TensorType> && !is_dynamic_tensor_v<TensorType>)
 void make_tensor( TensorType &tensor,
                   const index_t (&shape)[TensorType::Rank()],
                   Allocator&& alloc) {
@@ -575,7 +575,7 @@ void make_tensor( TensorType &tensor,
  *   Custom allocator (PMR allocator, custom allocator pointer, etc.)
  **/
 template <typename TensorType, typename ShapeType, typename Allocator>
-  requires (is_tensor<TensorType> &&
+  requires (is_tensor<TensorType> && !is_dynamic_tensor_v<TensorType> &&
             !std::is_array_v<remove_cvref_t<ShapeType>>)
 void make_tensor( TensorType &tensor,
                   ShapeType &&shape,
@@ -627,7 +627,7 @@ auto make_tensor( T* const data,
  * @returns New tensor
  **/
 template <typename TensorType>
-  requires is_tensor<TensorType>
+  requires (is_tensor<TensorType> && !is_dynamic_tensor_v<TensorType>)
 auto make_tensor( TensorType &tensor,
                   typename TensorType::value_type* const data,
                   typename TensorType::desc_type &&desc) {
@@ -674,7 +674,7 @@ auto make_tensor( D &&desc,
  * @returns New tensor
  **/
 template <typename TensorType>
-  requires (is_tensor<TensorType> && is_matx_descriptor<typename TensorType::desc_type>)
+  requires (is_tensor<TensorType> && !is_dynamic_tensor_v<TensorType> && is_matx_descriptor<typename TensorType::desc_type>)
 auto make_tensor( TensorType &&tensor,
                   typename TensorType::desc_type &&desc,
                   matxMemorySpace_t space = MATX_MANAGED_MEMORY,
@@ -739,7 +739,7 @@ auto make_tensor( T *const data,
  * @returns New tensor
  **/
 template <typename TensorType>
-  requires is_tensor<TensorType>
+  requires (is_tensor<TensorType> && !is_dynamic_tensor_v<TensorType>)
 auto make_tensor( TensorType &tensor,
                   typename TensorType::value_type *const data,
                   const index_t (&shape)[TensorType::Rank()],
@@ -764,22 +764,39 @@ auto make_tensor( TensorType &tensor,
 
 
 /**
- * Create a static-sized tensor with implicit memory
+ * Create a static-sized tensor with implicit memory using compile-time shape
+ * template parameters.
+ *
+ * Example: make_tensor<float, 10, 20>()
+ *
  * @returns New tensor
  **/
 template <typename T, index_t I, index_t ...Is>
-auto make_static_tensor() {
+auto make_tensor() {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   
-  MATX_LOG_DEBUG("make_static_tensor<T,I,Is...>()");
+  MATX_LOG_DEBUG("make_tensor<T,I,Is...>()");
 
   static_tensor_desc_t<I, Is...> desc{};
   auto storage = make_owning_storage<T>(desc.TotalSize());
   return tensor_t<T, desc.Rank(), decltype(desc)>{std::move(storage), std::move(desc)};
 }
 
+/**
+ * Backward-compatible wrapper for static-sized tensors.
+ *
+ * Prefer make_tensor<T, I, Is...>() for new code.
+ */
+template <typename T, index_t I, index_t ...Is>
+[[deprecated("make_static_tensor is deprecated; use make_tensor<T, I, Is...>() instead.")]]
+auto make_static_tensor() {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  MATX_LOG_DEBUG("make_static_tensor<T,I,Is...>() -> make_tensor<T,I,Is...>()");
+  return make_tensor<T, I, Is...>();
+}
+
 template <typename TensorType>
-  requires is_tensor<TensorType>
+  requires (is_tensor<TensorType> && !is_dynamic_tensor_v<TensorType>)
 auto make_tensor( TensorType &tensor,
                   const DLManagedTensor dlp_tensor) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)

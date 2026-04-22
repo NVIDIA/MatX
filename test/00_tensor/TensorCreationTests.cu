@@ -121,19 +121,37 @@ TYPED_TEST(TensorCreationTestsAll, MakeStaticShape)
 {
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
-  auto mt1 = make_static_tensor<TestType, 10>();
+  auto mt0 = make_tensor<TestType, 7>();
+  ASSERT_EQ(mt0.Size(0), 7);
+
+  auto mt1 = make_tensor<TestType, 10>();
   ASSERT_EQ(mt1.Size(0), 10);
 
-  auto mt2 = make_static_tensor<float, 10, 40>();
+  auto mt2_new = make_tensor<float, 10, 40>();
+  ASSERT_EQ(mt2_new.Size(0), 10);
+  ASSERT_EQ(mt2_new.Size(1), 40);
+
+  auto mt2 = make_tensor<float, 10, 40>();
   ASSERT_EQ(mt2.Size(0), 10);
   ASSERT_EQ(mt2.Size(1), 40);
 
-  auto mt3 = make_static_tensor<TestType, 10, 40, 30>();
+  auto mt3_new = make_tensor<TestType, 10, 40, 30>();
+  ASSERT_EQ(mt3_new.Size(0), 10);
+  ASSERT_EQ(mt3_new.Size(1), 40);
+  ASSERT_EQ(mt3_new.Size(2), 30);
+
+  auto mt3 = make_tensor<TestType, 10, 40, 30>();
   ASSERT_EQ(mt3.Size(0), 10);
   ASSERT_EQ(mt3.Size(1), 40);
   ASSERT_EQ(mt3.Size(2), 30);
 
-  auto mt4 = make_static_tensor<TestType, 10, 40, 30, 6>();
+  auto mt4_new = make_tensor<TestType, 10, 40, 30, 6>();
+  ASSERT_EQ(mt4_new.Size(0), 10);
+  ASSERT_EQ(mt4_new.Size(1), 40);
+  ASSERT_EQ(mt4_new.Size(2), 30);
+  ASSERT_EQ(mt4_new.Size(3), 6);
+
+  auto mt4 = make_tensor<TestType, 10, 40, 30, 6>();
   ASSERT_EQ(mt4.Size(0), 10);
   ASSERT_EQ(mt4.Size(1), 40);
   ASSERT_EQ(mt4.Size(2), 30);
@@ -144,25 +162,25 @@ TYPED_TEST(TensorCreationTestsAll, StaticTensorRankAndStrides)
 {
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
-  auto mt1 = make_static_tensor<TestType, 8>();
+  auto mt1 = make_tensor<TestType, 8>();
   ASSERT_EQ(mt1.Rank(), 1);
   ASSERT_EQ(mt1.Stride(0), 1);
   ASSERT_TRUE(mt1.IsContiguous());
 
-  auto mt2 = make_static_tensor<TestType, 4, 5>();
+  auto mt2 = make_tensor<TestType, 4, 5>();
   ASSERT_EQ(mt2.Rank(), 2);
   ASSERT_EQ(mt2.Stride(0), 5);
   ASSERT_EQ(mt2.Stride(1), 1);
   ASSERT_TRUE(mt2.IsContiguous());
 
-  auto mt3 = make_static_tensor<TestType, 3, 4, 5>();
+  auto mt3 = make_tensor<TestType, 3, 4, 5>();
   ASSERT_EQ(mt3.Rank(), 3);
   ASSERT_EQ(mt3.Stride(0), 20);
   ASSERT_EQ(mt3.Stride(1), 5);
   ASSERT_EQ(mt3.Stride(2), 1);
   ASSERT_TRUE(mt3.IsContiguous());
 
-  auto mt4 = make_static_tensor<TestType, 2, 3, 4, 5>();
+  auto mt4 = make_tensor<TestType, 2, 3, 4, 5>();
   ASSERT_EQ(mt4.Rank(), 4);
   ASSERT_EQ(mt4.Stride(0), 60);
   ASSERT_EQ(mt4.Stride(1), 20);
@@ -175,16 +193,16 @@ TYPED_TEST(TensorCreationTestsAll, StaticTensorTotalSize)
 {
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
-  auto mt1 = make_static_tensor<TestType, 10>();
+  auto mt1 = make_tensor<TestType, 10>();
   ASSERT_EQ(mt1.TotalSize(), 10);
 
-  auto mt2 = make_static_tensor<TestType, 4, 5>();
+  auto mt2 = make_tensor<TestType, 4, 5>();
   ASSERT_EQ(mt2.TotalSize(), 20);
 
-  auto mt3 = make_static_tensor<TestType, 3, 4, 5>();
+  auto mt3 = make_tensor<TestType, 3, 4, 5>();
   ASSERT_EQ(mt3.TotalSize(), 60);
 
-  auto mt4 = make_static_tensor<TestType, 2, 3, 4, 5>();
+  auto mt4 = make_tensor<TestType, 2, 3, 4, 5>();
   ASSERT_EQ(mt4.TotalSize(), 120);
 }
 
@@ -192,10 +210,10 @@ TYPED_TEST(TensorCreationTestsAll, StaticTensorDataPointer)
 {
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
-  auto mt1 = make_static_tensor<TestType, 10>();
+  auto mt1 = make_tensor<TestType, 10>();
   ASSERT_NE(mt1.Data(), nullptr);
 
-  auto mt2 = make_static_tensor<TestType, 4, 5>();
+  auto mt2 = make_tensor<TestType, 4, 5>();
   ASSERT_NE(mt2.Data(), nullptr);
 }
 
@@ -205,14 +223,14 @@ TYPED_TEST(TensorCreationTestsAll, StaticTensorAssignOnes)
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
   ExecType exec{};
 
-  auto mt1 = make_static_tensor<TestType, 4>();
+  auto mt1 = make_tensor<TestType, 4>();
   (mt1 = ones<TestType>()).run(exec);
   exec.sync();
   for (index_t i = 0; i < 4; i++) {
     ASSERT_EQ(mt1(i), TestType(1));
   }
 
-  auto mt2 = make_static_tensor<TestType, 3, 4>();
+  auto mt2 = make_tensor<TestType, 3, 4>();
   (mt2 = ones<TestType>()).run(exec);
   exec.sync();
   for (index_t i = 0; i < 3; i++) {
@@ -228,14 +246,14 @@ TYPED_TEST(TensorCreationTestsAll, StaticTensorAssignZeros)
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
   ExecType exec{};
 
-  auto mt1 = make_static_tensor<TestType, 5>();
+  auto mt1 = make_tensor<TestType, 5>();
   (mt1 = zeros<TestType>()).run(exec);
   exec.sync();
   for (index_t i = 0; i < 5; i++) {
     ASSERT_EQ(mt1(i), TestType(0));
   }
 
-  auto mt2 = make_static_tensor<TestType, 2, 3>();
+  auto mt2 = make_tensor<TestType, 2, 3>();
   (mt2 = zeros<TestType>()).run(exec);
   exec.sync();
   for (index_t i = 0; i < 2; i++) {
@@ -251,7 +269,7 @@ TYPED_TEST(TensorCreationTestsAll, StaticTensorCopy)
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
   ExecType exec{};
 
-  auto src = make_static_tensor<TestType, 4, 3>();
+  auto src = make_tensor<TestType, 4, 3>();
   (src = ones<TestType>()).run(exec);
   exec.sync();
 
@@ -262,7 +280,7 @@ TYPED_TEST(TensorCreationTestsAll, StaticTensorCopy)
   ASSERT_EQ(dst.Data(), src.Data()); // shallow copy
 
   // Assign into another static tensor
-  auto dst2 = make_static_tensor<TestType, 4, 3>();
+  auto dst2 = make_tensor<TestType, 4, 3>();
   (dst2 = src).run(exec);
   exec.sync();
   for (index_t i = 0; i < 4; i++) {
@@ -278,9 +296,9 @@ TYPED_TEST(TensorCreationTestsAll, StaticTensorArithmetic)
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
   ExecType exec{};
 
-  auto a = make_static_tensor<TestType, 4>();
-  auto b = make_static_tensor<TestType, 4>();
-  auto c = make_static_tensor<TestType, 4>();
+  auto a = make_tensor<TestType, 4>();
+  auto b = make_tensor<TestType, 4>();
+  auto c = make_tensor<TestType, 4>();
 
   (a = ones<TestType>()).run(exec);
   (b = ones<TestType>()).run(exec);
@@ -298,9 +316,9 @@ TYPED_TEST(TensorCreationTestsAll, StaticTensorArithmetic2D)
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
   ExecType exec{};
 
-  auto a = make_static_tensor<TestType, 3, 4>();
-  auto b = make_static_tensor<TestType, 3, 4>();
-  auto c = make_static_tensor<TestType, 3, 4>();
+  auto a = make_tensor<TestType, 3, 4>();
+  auto b = make_tensor<TestType, 3, 4>();
+  auto c = make_tensor<TestType, 3, 4>();
 
   (a = ones<TestType>()).run(exec);
   (b = ones<TestType>()).run(exec);
@@ -320,9 +338,9 @@ TYPED_TEST(TensorCreationTestsAll, StaticTensorArithmetic3D)
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
   ExecType exec{};
 
-  auto a = make_static_tensor<TestType, 2, 3, 4>();
-  auto b = make_static_tensor<TestType, 2, 3, 4>();
-  auto c = make_static_tensor<TestType, 2, 3, 4>();
+  auto a = make_tensor<TestType, 2, 3, 4>();
+  auto b = make_tensor<TestType, 2, 3, 4>();
+  auto c = make_tensor<TestType, 2, 3, 4>();
 
   (a = ones<TestType>()).run(exec);
   (b = ones<TestType>()).run(exec);
@@ -344,9 +362,9 @@ TYPED_TEST(TensorCreationTestsAll, StaticTensorArithmetic4D)
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
   ExecType exec{};
 
-  auto a = make_static_tensor<TestType, 2, 3, 4, 5>();
-  auto b = make_static_tensor<TestType, 2, 3, 4, 5>();
-  auto c = make_static_tensor<TestType, 2, 3, 4, 5>();
+  auto a = make_tensor<TestType, 2, 3, 4, 5>();
+  auto b = make_tensor<TestType, 2, 3, 4, 5>();
+  auto c = make_tensor<TestType, 2, 3, 4, 5>();
 
   (a = ones<TestType>()).run(exec);
   (b = ones<TestType>()).run(exec);
@@ -368,7 +386,7 @@ TYPED_TEST(TensorCreationTestsAll, StaticTensorShape)
 {
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
-  auto mt = make_static_tensor<TestType, 3, 4, 5>();
+  auto mt = make_tensor<TestType, 3, 4, 5>();
   auto shape = mt.Shape();
   ASSERT_EQ(shape[0], 3);
   ASSERT_EQ(shape[1], 4);
@@ -379,7 +397,7 @@ TYPED_TEST(TensorCreationTestsAll, StaticTensorDescriptor)
 {
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
-  auto mt = make_static_tensor<TestType, 3, 4, 5>();
+  auto mt = make_tensor<TestType, 3, 4, 5>();
   auto desc = mt.Descriptor();
   ASSERT_EQ(desc.Rank(), 3);
   ASSERT_EQ(desc.Size(0), 3);
@@ -397,7 +415,7 @@ TYPED_TEST(TensorCreationTestsComplex, StaticTensorRealView)
   ExecType exec{};
 
   constexpr index_t N = 8;
-  auto t = make_static_tensor<TestType, N>();
+  auto t = make_tensor<TestType, N>();
   (t = ones<TestType>()).run(exec);
   exec.sync();
 
@@ -417,7 +435,7 @@ TYPED_TEST(TensorCreationTestsComplex, StaticTensorImagView)
   ExecType exec{};
 
   constexpr index_t N = 8;
-  auto t = make_static_tensor<TestType, N>();
+  auto t = make_tensor<TestType, N>();
   (t = ones<TestType>()).run(exec);
   exec.sync();
 
@@ -436,7 +454,7 @@ TYPED_TEST(TensorCreationTestsComplex, StaticTensorRealView2D)
   using InnerType = typename TestType::value_type;
   ExecType exec{};
 
-  auto t = make_static_tensor<TestType, 4, 3>();
+  auto t = make_tensor<TestType, 4, 3>();
   (t = ones<TestType>()).run(exec);
   exec.sync();
 

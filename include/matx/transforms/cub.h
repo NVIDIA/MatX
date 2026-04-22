@@ -81,6 +81,7 @@ struct CubParams_t {
   index_t batches{0};
   MatXDataType_t dtype;
   cudaStream_t stream;
+  size_t plan_type_hash{0};
 };
 
 template <typename T> struct HistEvenParams_t {
@@ -220,8 +221,9 @@ public:
     }
 
     params.dtype = TypeToInt<T1>();
-
     params.stream = stream;
+    params.plan_type_hash =
+      typeid(matxCubPlan_t<OutputTensor, InputOperator, op, CParams>).hash_code();
 
     return params;
   }
@@ -1248,6 +1250,8 @@ public:
     }
     params.dtype = TypeToInt<T1>();
     params.stream = stream;
+    params.plan_type_hash =
+      typeid(matxCubSingleArgPlan_t<OutputTensor, TensorIndexType, InputOperator, CParams>).hash_code();
 
     return params;
   }
@@ -1400,6 +1404,8 @@ public:
     }
     params.dtype = TypeToInt<T1>();
     params.stream = stream;
+    params.plan_type_hash =
+      typeid(matxCubDualArgPlan_t<OutputTensor, TensorIndexType, InputOperator, CParams>).hash_code();
 
     return params;
   }
@@ -1523,6 +1529,7 @@ struct CubParamsKeyHash {
     return (std::hash<uint64_t>()(k.batches)) +
            (std::hash<uint64_t>()((uint64_t)k.stream)) +
            (std::hash<uint64_t>()((uint64_t)k.op)) +
+           (std::hash<size_t>()(k.plan_type_hash)) +
            shash;
   }
 };
@@ -1546,7 +1553,8 @@ struct CubParamsKeyEq {
 
 
     return l.batches == t.batches && l.dtype == t.dtype &&
-           l.stream == t.stream && l.op == t.op;
+           l.stream == t.stream && l.op == t.op &&
+           l.plan_type_hash == t.plan_type_hash;
   }
 };
 
@@ -1765,6 +1773,7 @@ void cub_reduce(OutputTensor &a_out, const InputOperator &a, typename InputOpera
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  const cudaExecutor exec{stream};
   // Get parameters required by these tensors
   using param_type = typename detail::ReduceParams_t<ReduceOp, typename InputOperator::value_type>;
   auto reduce_params = param_type{ReduceOp{}, init};
@@ -1787,7 +1796,8 @@ void cub_reduce(OutputTensor &a_out, const InputOperator &a, typename InputOpera
     },
     [&](std::shared_ptr<cache_val_type> ctype) {
       ctype->ExecReduce(a_out, a, stream);
-    }
+    },
+    exec
   );
 
 #else
@@ -1821,6 +1831,7 @@ void cub_sum(OutputTensor &a_out, const InputOperator &a,
 
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  const cudaExecutor exec{stream};
 
 #ifndef MATX_DISABLE_CUB_CACHE
   auto params =
@@ -1839,7 +1850,8 @@ void cub_sum(OutputTensor &a_out, const InputOperator &a,
       },
       [&](std::shared_ptr<cache_val_type> ctype) {
         ctype->ExecSum(a_out, a, stream);
-      }
+      },
+      exec
     );
 #else
   auto tmp = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE_SUM>{a_out, a, {}, stream};
@@ -1868,6 +1880,7 @@ void cub_min(OutputTensor &a_out, const InputOperator &a,
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  const cudaExecutor exec{stream};
 
 #ifndef MATX_DISABLE_CUB_CACHE
   auto params =
@@ -1886,7 +1899,8 @@ void cub_min(OutputTensor &a_out, const InputOperator &a,
       },
       [&](std::shared_ptr<cache_val_type> ctype) {
         ctype->ExecMin(a_out, a, stream);
-      }
+      },
+      exec
     );
 #else
   auto tmp = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE_MIN>{
@@ -1917,6 +1931,7 @@ void cub_max(OutputTensor &a_out, const InputOperator &a,
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  const cudaExecutor exec{stream};
 #ifndef MATX_DISABLE_CUB_CACHE
   auto params =
       detail::matxCubPlan_t<OutputTensor,
@@ -1934,7 +1949,8 @@ void cub_max(OutputTensor &a_out, const InputOperator &a,
       },
       [&](std::shared_ptr<cache_val_type> ctype) {
         ctype->ExecMax(a_out, a, stream);
-      }
+      },
+      exec
     );
 #else
   auto tmp = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_REDUCE_MAX>{
@@ -1972,6 +1988,7 @@ void cub_argreduce(OutputTensor &a_out, TensorIndexType &aidx_out, const InputOp
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  const cudaExecutor exec{stream};
 
   // converts operators to tensors (if necessary)
   auto a_out_supported = getCubArgReduceSupportedTensor(a_out, stream);
@@ -1997,11 +2014,17 @@ void cub_argreduce(OutputTensor &a_out, TensorIndexType &aidx_out, const InputOp
         cache_id,
         params,
         [&]() {
-          return std::make_shared<cache_val_type>(a_out_supported, aidx_out_supported, a_supported, reduce_params, stream);
+          return std::make_shared<cache_val_type>(a_out_supported,
+                                                  aidx_out_supported,
+                                                  a_supported,
+                                                  detail::CUB_OP_SINGLE_ARG_REDUCE,
+                                                  reduce_params,
+                                                  stream);
         },
         [&](std::shared_ptr<cache_val_type> ctype) {
           ctype->ExecArgReduce(a_out_supported, aidx_out_supported, a_supported, stream);
-        }
+        },
+        exec
       );
   #else
     auto tmp = cache_val_type{a_out_supported, aidx_out_supported, a_supported, detail::CUB_OP_SINGLE_ARG_REDUCE, reduce_params, stream};
@@ -2056,6 +2079,7 @@ void cub_dualargreduce(OutputTensor &a1_out,
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  const cudaExecutor exec{stream};
 
   using cache_val_type = detail::matxCubDualArgPlan_t<OutputTensor, TensorIndexType, InputOperator, CParams>;
 
@@ -2068,11 +2092,19 @@ void cub_dualargreduce(OutputTensor &a1_out,
         cache_id,
         params,
         [&]() {
-          return std::make_shared<cache_val_type>(a1_out, aidx1_out, a2_out, aidx2_out, a, reduce_params, stream);
+          return std::make_shared<cache_val_type>(a1_out,
+                                                  aidx1_out,
+                                                  a2_out,
+                                                  aidx2_out,
+                                                  a,
+                                                  detail::CUB_OP_DUAL_ARG_REDUCE,
+                                                  reduce_params,
+                                                  stream);
         },
         [&](std::shared_ptr<cache_val_type> ctype) {
           ctype->ExecDualArgReduce(a1_out, aidx1_out, a2_out, aidx2_out, a, stream);
-        }
+        },
+        exec
       );
   #else
     auto tmp = cache_val_type{a1_out, aidx1_out, a2_out, aidx2_out, a, detail::CUB_OP_DUAL_ARG_REDUCE, reduce_params, stream};
@@ -2433,6 +2465,7 @@ void hist_impl(OutputTensor &a_out, const InputOperator &a,
   static_assert(std::is_same_v<typename OutputTensor::value_type, int>, "Output histogram operator must use int type");
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  const cudaExecutor exec{stream};
 
   detail::HistEvenParams_t<typename InputOperator::value_type> hp{lower, upper, num_levels};
 #ifndef MATX_DISABLE_CUB_CACHE
@@ -2453,7 +2486,8 @@ void hist_impl(OutputTensor &a_out, const InputOperator &a,
       },
       [&](std::shared_ptr<cache_val_type> ctype) {
         ctype->ExecHistEven(a_out, a, lower, upper, num_levels, stream);
-      }
+      },
+      exec
     );
 
 #else
@@ -2577,36 +2611,11 @@ void find_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperator 
   auto cparams = detail::SelectParams_t<SelectType, CountTensor>{sel, num_found};
   cudaStream_t stream = exec.getStream();
 
-#ifndef MATX_DISABLE_CUB_CACHE
-  using param_type = typename detail::SelectParams_t<SelectType, CountTensor>;
-  // Get cache or new Sort plan if it doesn't exist
-  auto params =
-      detail::matxCubPlan_t<OutputTensor,
-                            InputOperator,
-                            detail::CUB_OP_SELECT_VALS,
-                            param_type>::GetCubParams(a_out, a, stream);
-  using cache_val_type = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_SELECT_VALS, param_type>;
-  auto cache_id = detail::GetCacheIdFromType<detail::cub_cache_t>();
-  MATX_LOG_DEBUG("CUB find values transform: cache_id={}", cache_id);
-  detail::GetCache().LookupAndExec<detail::cub_cache_t>(
-      cache_id,
-      params,
-      [&]() {
-        return std::make_shared<cache_val_type>(a_out, a, cparams, stream);
-      },
-      [&](std::shared_ptr<cache_val_type> ctype) {
-        ctype->ExecSelect(a_out, a, stream);
-      },
-      exec
-    );
-
-#else
   auto tmp = detail::matxCubPlan_t< OutputTensor,
                                         InputOperator,
                                         detail::CUB_OP_SELECT_VALS,
                                         decltype(cparams)>{a_out, a, cparams, stream};
   tmp.ExecSelect(a_out, a, stream);
-#endif
 #endif
 }
 
@@ -2698,36 +2707,11 @@ void find_idx_impl(OutputTensor &a_out, CountTensor &num_found, const InputOpera
   cudaStream_t stream = exec.getStream();
   auto cparams = detail::SelectParams_t<SelectType, CountTensor>{sel, num_found};
 
-#ifndef MATX_DISABLE_CUB_CACHE
-  using param_type = typename detail::SelectParams_t<SelectType, CountTensor>;
-  // Get cache or new Sort plan if it doesn't exist
-  auto params =
-      detail::matxCubPlan_t<OutputTensor,
-                            InputOperator,
-                            detail::CUB_OP_SELECT_IDX,
-                            param_type>::GetCubParams(a_out, a, stream);
-  using cache_val_type = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_SELECT_IDX, param_type>;
-  auto cache_id = detail::GetCacheIdFromType<detail::cub_cache_t>();
-  MATX_LOG_DEBUG("CUB find indices transform: cache_id={}", cache_id);
-  detail::GetCache().LookupAndExec<detail::cub_cache_t>(
-      cache_id,
-      params,
-      [&]() {
-        return std::make_shared<cache_val_type>(a_out, a, cparams, stream);
-      },
-      [&](std::shared_ptr<cache_val_type> ctype) {
-        ctype->ExecSelectIndex(a_out, a, stream);
-      },
-      exec
-    );
-
-#else
   auto tmp = detail::matxCubPlan_t< OutputTensor,
                                         InputOperator,
                                         detail::CUB_OP_SELECT_IDX,
                                         decltype(cparams)>{a_out, a, cparams, stream};
   tmp.ExecSelectIndex(a_out, a, stream);
-#endif
 #endif
 }
 
@@ -2819,35 +2803,11 @@ void unique_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperato
 
   auto cparams = detail::UniqueParams_t<CountTensor>{num_found};
 
-#ifndef MATX_DISABLE_CUB_CACHE
-  using param_type = typename detail::UniqueParams_t<CountTensor>;
-  // Get cache or new Sort plan if it doesn't exist
-  auto params =
-      detail::matxCubPlan_t<OutputTensor,
-                            InputOperator,
-                            detail::CUB_OP_UNIQUE,
-                            param_type>::GetCubParams(a_out, a, stream);
-  using cache_val_type = detail::matxCubPlan_t<OutputTensor, InputOperator, detail::CUB_OP_UNIQUE, param_type>;
-  auto cache_id = detail::GetCacheIdFromType<detail::cub_cache_t>();
-  MATX_LOG_DEBUG("CUB unique transform: cache_id={}", cache_id);
-  detail::GetCache().LookupAndExec<detail::cub_cache_t>(
-      cache_id,
-      params,
-      [&]() {
-        return std::make_shared<cache_val_type>(a_out, a, cparams, stream);
-      },
-      [&](std::shared_ptr<cache_val_type> ctype) {
-        ctype->ExecUnique(a_out, sort_tensor, stream);
-      },
-      exec
-    );
-#else
   auto tmp = detail::matxCubPlan_t< OutputTensor,
                                         InputOperator,
                                         detail::CUB_OP_UNIQUE,
                                         decltype(cparams)>{a_out, sort_tensor, cparams, stream};
   tmp.ExecUnique(a_out, sort_tensor, stream);
-#endif
 #endif
 }
 

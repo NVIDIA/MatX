@@ -62,6 +62,12 @@ namespace matx
 
     public:
       using value_type = void; ///< Scalar type for type extraction
+      using self_type = IFELSEOp<C1, T1, T2>;
+
+      // Propagate dynamic tensor marker through expression tree
+      using dynamic_tensor_expr = cuda::std::bool_constant<
+        is_dynamic_tensor_v<C1> || is_dynamic_tensor_v<T1> || is_dynamic_tensor_v<T2> ||
+        is_dynamic_rank_op_v<C1> || is_dynamic_rank_op_v<T1> || is_dynamic_rank_op_v<T2>>;
 
 #ifdef MATX_EN_JIT
       struct JIT_Storage {
@@ -79,12 +85,13 @@ namespace matx
       }
 
       __MATX_INLINE__ auto get_jit_op_str() const {
+        const int actual_rank = jit_rank();
         std::string func_name = get_jit_class_name();
         cuda::std::array<index_t, Rank()> out_dims_;
-        for (int i = 0; i < Rank(); ++i) {
+        for (int i = 0; i < actual_rank; ++i) {
           out_dims_[i] = Size(i);
         }
-        
+
         return cuda::std::make_tuple(
           func_name,
           std::format("template <typename C1, typename T1, typename T2> struct {} {{\n"
@@ -110,7 +117,7 @@ namespace matx
               "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return Rank_; }}\n"
               "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const {{ return size_[dim]; }}\n"
               "}};\n",
-              func_name, Rank(), detail::array_to_string(out_dims_))
+              func_name, actual_rank, detail::array_to_string(out_dims_, actual_rank))
         );
       }
 #endif
@@ -198,6 +205,20 @@ namespace matx
         return detail::matx_max(detail::get_rank<C1>(), detail::get_rank<T1>(), detail::get_rank<T2>());
       }
 
+      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
+      {
+        return size_[dim];
+      }
+
+      __MATX_INLINE__ __MATX_HOST__ int32_t DynRank() const {
+        return detail::matx_max(detail::get_dyn_rank(cond_), detail::get_dyn_rank(op1_), detail::get_dyn_rank(op2_));
+      }
+
+      __MATX_INLINE__ __MATX_HOST__ int32_t jit_rank() const {
+        if constexpr (is_dynamic_rank_op_v<self_type>) return DynRank();
+        else return Rank();
+      }
+
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PreRun(ShapeType &&shape, Executor &&ex) const noexcept
       {
@@ -228,17 +249,6 @@ namespace matx
         if constexpr (is_matx_op<C1>()) {
           cond_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
-      }
-
-      /**
-       * @brief Size of dimension of operator
-       *
-       * @param dim Dimension to get size of
-       * @return Size of dimension
-       */
-      constexpr index_t __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const
-      {
-        return size_[dim];
       }
 
       template <OperatorCapability Cap, typename InType>

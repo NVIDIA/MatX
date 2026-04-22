@@ -35,6 +35,7 @@
 #include <initializer_list>
 
 #include "matx/core/type_utils.h"
+#include "matx/core/operator_utils.h"
 #include "matx/operators/base_operator.h"
 
 namespace matx
@@ -69,6 +70,10 @@ namespace matx
         using matxoplvalue = bool;
         using self_type = ReshapeOp<RANK, T, ShapeType>;
 
+        // Propagate dynamic tensor marker through expression tree
+        using dynamic_tensor_expr = cuda::std::bool_constant<
+          is_dynamic_tensor_v<T> || is_dynamic_rank_op_v<T>>;
+
 #ifdef MATX_EN_JIT
         struct JIT_Storage {
           typename detail::inner_storage_or_self_t<detail::base_type_t<T>> op_;
@@ -88,29 +93,31 @@ namespace matx
         }
 
         __MATX_INLINE__ auto get_jit_op_str() const {
+          const int actual_rank = jit_rank();
           std::string func_name = get_jit_class_name();
-          
+
           std::string sizes_array = "{ ";
-          for (int i = 0; i < Rank(); i++) {
+          for (int i = 0; i < actual_rank; i++) {
             sizes_array += std::to_string(sizes_[i]);
-            if (i < Rank() - 1) sizes_array += ", ";
+            if (i < actual_rank - 1) sizes_array += ", ";
           }
           sizes_array += " }";
 
+          const int actual_input_rank = detail::get_dyn_rank(op_);
           std::string op_sizes_array = "{ ";
-          for (int i = 0; i < T::Rank(); i++) {
+          for (int i = 0; i < actual_input_rank; i++) {
             op_sizes_array += std::to_string(op_.Size(i));
-            if (i < T::Rank() - 1) op_sizes_array += ", ";
+            if (i < actual_input_rank - 1) op_sizes_array += ", ";
           }
           op_sizes_array += " }";
-          
+
           return cuda::std::make_tuple(
             func_name,
             std::string("template <typename T> struct " + func_name + " {\n") +
                 "  using value_type = typename T::value_type;\n" +
                 "  using matxop = bool;\n" +
-                "  constexpr static int Rank_ = " + std::to_string(Rank()) + ";\n" +
-                "  constexpr static int OpRank_ = " + std::to_string(T::Rank()) + ";\n" +
+                "  constexpr static int Rank_ = " + std::to_string(actual_rank) + ";\n" +
+                "  constexpr static int OpRank_ = " + std::to_string(actual_input_rank) + ";\n" +
                 "  constexpr static cuda::std::array<index_t, Rank_> sizes_ = " + sizes_array + ";\n" +
                 "  constexpr static cuda::std::array<index_t, OpRank_> op_sizes_ = " + op_sizes_array + ";\n" +
                 "  typename detail::inner_storage_or_self_t<detail::base_type_t<T>> op_;\n" +
@@ -263,6 +270,15 @@ MATX_LOOP_UNROLL
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int32_t dim) const
         {
           return sizes_[dim];
+        }
+
+        __MATX_INLINE__ __MATX_HOST__ int32_t DynRank() const {
+          return Rank(); // ReshapeOp output rank is RANK (template param)
+        }
+
+        __MATX_INLINE__ __MATX_HOST__ int32_t jit_rank() const {
+          if constexpr (is_dynamic_rank_op_v<self_type>) return DynRank();
+          else return Rank();
         }
 
         template <typename S2, typename Executor>

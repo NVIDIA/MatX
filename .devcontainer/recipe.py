@@ -19,7 +19,7 @@ else:
     raise RuntimeError("Unsupported platform")
 
 Stage0 = hpccm.Stage()
-Stage0 += baseimage(image='nvidia/cuda:13.0.1-devel-ubuntu24.04', _as='devel', _distro="ubuntu24")
+Stage0 += baseimage(image='nvidia/cuda:13.2.0-devel-ubuntu24.04', _as='devel', _distro="ubuntu24")
 
 Stage0 += packages(ospackages=[
     'bison',
@@ -34,10 +34,8 @@ Stage0 += packages(ospackages=[
     'lcov',
     'ninja-build',
     'numactl',
-    'python3-numpy',
-    'python3-pip',
     'python3-dev',
-    'python3-venv',
+    'python3-pip',
     'sudo',
     'texlive-font-utils',
     'valgrind',
@@ -88,17 +86,6 @@ Stage0 += shell(commands=[
     '/bin/echo "matx ALL = (root) NOPASSWD: ALL" >> /etc/sudoers',
    ])
 
-Stage0 += shell(commands=[
-    'python3 -m venv /opt/nvidia/venv'
-])
-
-Stage0 += copy(src='run_from_venv.sh',dest='/opt/nvidia/run_from_venv.sh')
-Stage0 += shell(commands=[
-    "echo '[[ -z \"$VIRTUAL_ENV\" ]] && source /opt/nvidia/run_from_venv.sh /bin/bash' >> /etc/skel/.bashrc",
-    "echo '[[ -z \"$VIRTUAL_ENV\" ]] && source /opt/nvidia/run_from_venv.sh /bin/bash' >> /root/.bashrc",
-    "echo '[[ -z \"$VIRTUAL_ENV\" ]] && source /opt/nvidia/run_from_venv.sh /bin/bash' >> /home/matx/.bashrc"
-])
-
 pip_packages=[
     'breathe',
     'cupy-cuda13x',
@@ -113,12 +100,9 @@ pip_packages=[
     'sphinx-rtd-theme'
 ]
 
-pip_commands =[
-    '/opt/nvidia/run_from_venv.sh',
-    'pip3 --no-cache-dir install --upgrade',
-    " ".join(pip_packages)
-]
+Stage0 += shell(commands=[
+    'pip3 --no-cache-dir install --break-system-packages --upgrade ' + ' '.join(pip_packages)
+])
 
-Stage0 += shell(commands=[" ".join(pip_commands)])
 
 print(Stage0)

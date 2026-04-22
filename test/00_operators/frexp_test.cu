@@ -22,7 +22,11 @@ TYPED_TEST(OperatorTestsFloatNonComplexNonHalfAllExecs, Frexp)
   auto tofrac = make_tensor<TestType>({10});
   auto toint  = make_tensor<int>({10});
 
-  (tiv0 = random<TestType>(tiv0.Shape(), NORMAL)).run(exec);
+  for (index_t i = 0; i < tiv0.Size(0); i++) {
+    const double x = (static_cast<double>(i) - 5.0) * 0.25;
+    tiv0(i) = static_cast<TestType>(x);
+  }
+  exec.sync();
   // Create operators representing fractional and integer
   const auto [ofrac, oint] = frexp(tiv0);
   (tofrac = ofrac, toint = oint).run(exec);

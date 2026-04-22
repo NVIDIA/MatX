@@ -75,6 +75,11 @@ public:
   using op_type = Op;
   using matx_setop = bool;
 
+  // Propagate dynamic tensor marker through expression tree
+  using dynamic_tensor_expr = cuda::std::bool_constant<
+    is_dynamic_tensor_v<T> || is_dynamic_tensor_v<Op> ||
+    is_dynamic_rank_op_v<T> || is_dynamic_rank_op_v<Op>>;
+
   __MATX_INLINE__ const std::string str() const {
     return get_type_str(out_) + "=" + get_type_str(op_);
   }
@@ -179,9 +184,10 @@ public:
 
   __MATX_INLINE__ auto get_jit_op_str() const {
     const std::string func_name = get_jit_class_name();
+    const int actual_rank = jit_rank();
     return cuda::std::make_tuple(
-       func_name, 
-       std::string("template <typename T, typename Op> struct " + func_name + "  {\n") + 
+       func_name,
+       std::string("template <typename T, typename Op> struct " + func_name + "  {\n") +
            "  using value_type = typename T::value_type;\n" +
            "  using matxop = bool;\n" +
           "   mutable typename detail::inner_storage_or_self_t<detail::base_type_t<T>> out_;\n" +
@@ -204,16 +210,16 @@ public:
           "  }\n" +
            "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank()\n" +
            "  {\n" +
-           "    return T::Rank();\n" +
+           "    return " + std::to_string(actual_rank) + ";\n" +
            "  }\n" +
            "  constexpr __MATX_INLINE__  __MATX_DEVICE__ index_t Size(int dim) const\n" +
            "  {\n" +
-           "     if constexpr (T::Rank() == 0) {\n" +
+           "     if constexpr (" + std::to_string(actual_rank) + " == 0) {\n" +
            "       return 1;\n" +
            "     }\n" +
            "     else {\n" +
            "       return out_.Size(dim);\n" +
-           "     }\n" + 
+           "     }\n" +
            "   }\n" +
            "};\n"
     );
@@ -352,6 +358,15 @@ public:
     else {
       return out_.Size(dim);
     }
+  }
+
+  __MATX_INLINE__ __MATX_HOST__ int32_t DynRank() const {
+    return detail::get_dyn_rank(out_);
+  }
+
+  __MATX_INLINE__ __MATX_HOST__ int32_t jit_rank() const {
+    if constexpr (is_dynamic_rank_op_v<set<T, Op>>) return DynRank();
+    else return Rank();
   }
 };
 
