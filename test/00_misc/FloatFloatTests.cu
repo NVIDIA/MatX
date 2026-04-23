@@ -294,6 +294,20 @@ struct FltFltCmpGe {
   }
 };
 
+struct DoubleToFltFlt {
+  __MATX_HOST__ __MATX_DEVICE__ fltflt operator()(double x) const {
+    return static_cast<fltflt>(x);
+  }
+};
+
+struct FltFltGetHi {
+  __MATX_HOST__ __MATX_DEVICE__ float operator()(fltflt x) const { return x.hi; }
+};
+
+struct FltFltGetLo {
+  __MATX_HOST__ __MATX_DEVICE__ float operator()(fltflt x) const { return x.lo; }
+};
+
 template <typename Exec>
 class FltFltExecutorTests : public ::testing::Test {
 protected:
@@ -2226,5 +2240,109 @@ TYPED_TEST(FltFltExecutorTests, Fmod) {
     const double ref = std::fmod(a_dbl, b_dbl);
     // Expect at least 30 bits - limited by fltflt precision at 1e5 magnitude
     EXPECT_GE(numMatchingMantissaBits(static_cast<double>(result()), ref), 30);
+  }
+}
+
+TYPED_TEST(FltFltExecutorTests, ConvertFromDouble) {
+  auto dbl_in = make_tensor<double>({});
+  auto ff_result = make_tensor<fltflt>({});
+  auto hi_out = make_tensor<float>({});
+  auto lo_out = make_tensor<float>({});
+
+  auto run_and_extract = [&](double x) {
+    (dbl_in = x).run(this->exec);
+    (ff_result = matx::apply(DoubleToFltFlt{}, dbl_in)).run(this->exec);
+    (hi_out = matx::apply(FltFltGetHi{}, ff_result)).run(this->exec);
+    (lo_out = matx::apply(FltFltGetLo{}, ff_result)).run(this->exec);
+    this->exec.sync();
+  };
+
+  // Normal round-trip: pi should recover >=44 mantissa bits
+  {
+    run_and_extract(std::numbers::pi);
+    const double reconstructed = static_cast<double>(hi_out()) + static_cast<double>(lo_out());
+    EXPECT_GE(numMatchingMantissaBits(reconstructed, std::numbers::pi), 44);
+  }
+
+  // Zero
+  {
+    run_and_extract(0.0);
+    EXPECT_EQ(hi_out(), 0.0f);
+    EXPECT_EQ(lo_out(), 0.0f);
+  }
+
+  // Verify hi+lo == x exactly for a normal-range value
+  {
+    // x = 1.5 + 2^-25: hi = 1.5, lo = 2^-25 (normal float)
+    const double x = 1.5 + std::ldexp(1.0, -25);
+    run_and_extract(x);
+    const double reconstructed = static_cast<double>(hi_out()) + static_cast<double>(lo_out());
+    EXPECT_EQ(reconstructed, x);
+  }
+
+  // Small doubles (hi_exp < 53, |x| < 2^-74): on device the fast path drops lo because
+  // the scale 2^(hi_exp-179) underflows to 0.0f.  On host the reference double-subtraction
+  // path computes the correct subnormal lo.
+  constexpr bool is_cuda = std::is_same_v<TypeParam, matx::cudaExecutor>;
+
+  // x = 2^-103 + 2^-127: hi_exp = 920-896 = 24 < 53
+  {
+    const double x = std::bit_cast<double>(0x3980000010000000ULL);
+    run_and_extract(x);
+    EXPECT_EQ(std::bit_cast<uint32_t>(hi_out()), 0x0C000000u); // hi = 2^-103
+    if constexpr (is_cuda) { EXPECT_EQ(lo_out(), 0.0f); }
+    else { EXPECT_EQ(std::bit_cast<uint32_t>(lo_out()), 0x00400000u); } // 2^-127 (subnormal)
+  }
+
+  // x = 2^-114 + 2^-138: hi_exp = 909-896 = 13 < 53
+  {
+    const double x = std::bit_cast<double>(0x38D0000010000000ULL);
+    run_and_extract(x);
+    EXPECT_EQ(std::bit_cast<uint32_t>(hi_out()), 0x06800000u); // hi = 2^-114
+    if constexpr (is_cuda) { EXPECT_EQ(lo_out(), 0.0f); }
+    else { EXPECT_EQ(std::bit_cast<uint32_t>(lo_out()), 0x00000800u); } // 2^-138 (subnormal)
+  }
+
+  // x = 2^-125 + 2^-149: hi_exp = 898-896 = 2 < 53
+  {
+    const double x = std::bit_cast<double>(0x3820000010000000ULL);
+    run_and_extract(x);
+    EXPECT_EQ(std::bit_cast<uint32_t>(hi_out()), 0x01000000u); // hi = 2^-125
+    if constexpr (is_cuda) { EXPECT_EQ(lo_out(), 0.0f); }
+    else { EXPECT_EQ(std::bit_cast<uint32_t>(lo_out()), 0x00000001u); } // 2^-149 (min subnormal)
+  }
+
+  // x near FLT_MIN (hi_exp = 1 < 53): lo = 0 on both paths (residual too small for any float)
+  {
+    const double x = std::bit_cast<double>(0x3810000010000000ULL);
+    run_and_extract(x);
+    EXPECT_EQ(std::bit_cast<uint32_t>(hi_out()), 0x00800000u); // FLT_MIN
+    EXPECT_EQ(lo_out(), 0.0f);
+  }
+
+  // FLT_MIN exactly representable as float, lo = 0
+  {
+    run_and_extract(std::numeric_limits<float>::min());
+    EXPECT_EQ(hi_out(), std::numeric_limits<float>::min());
+    EXPECT_EQ(lo_out(), 0.0f);
+  }
+
+  // Negative value round-trip
+  {
+    run_and_extract(-std::numbers::pi);
+    const double reconstructed = static_cast<double>(hi_out()) + static_cast<double>(lo_out());
+    EXPECT_GE(numMatchingMantissaBits(reconstructed, -std::numbers::pi), 44);
+  }
+
+  // Large double near FLT_MAX: hi_exp = 254, triggers overflow path (hi_exp >= 226).
+  // x = FLT_MAX + 2^76 (adds a nonzero residual so lo != 0).
+  {
+    // FLT_MAX = (2 - 2^-23) * 2^127; e_x = 1150, hi_exp = 254.
+    // Add 2^76 to ensure r != 0 and lo is representable.
+    const double x = static_cast<double>(std::numeric_limits<float>::max()) + std::ldexp(1.0, 76);
+    run_and_extract(x);
+    const double reconstructed = static_cast<double>(hi_out()) + static_cast<double>(lo_out());
+    EXPECT_GE(numMatchingMantissaBits(reconstructed, x), 44);
+    EXPECT_NE(lo_out(), std::numeric_limits<float>::infinity());
   }
 }

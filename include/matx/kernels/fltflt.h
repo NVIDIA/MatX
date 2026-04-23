@@ -58,49 +58,49 @@ struct alignas(8) fltflt {
     // nvcc will warn about __host__ and __device__ annotations on default constructors because default
     // constructors will not run in all conditions (e.g., in static shared memory CUDA kernel allocations).
     __MATX_INLINE__ fltflt() = default;
-    // On device, we avoid double-precision subtraction by extracting the residual mantissa
-    // bits directly from the IEEE 754 representation using integer operations. hi is the
-    // truncated (round-toward-zero) float, so hi + lo == x exactly in real arithmetic.
-    // Ties-to-even and NaN/Inf are not handled precisely (edge cases fall back to
-    // hi=(float)x, lo=0). The constexpr branch is taken during compile-time evaluation.
+    // On device, extract hi/lo from IEEE-754 double bits with no FP64 instructions.
+    //
+    // Accuracy guarantees (device fast path, for normal doubles in float range):
+    //   - fl(hi + lo) == hi  (fast2sum ensures no rounding error when adding lo back).
+    //   - |x - (hi+lo)| <= 16 ulp(x)  for |x| >= 2^-74  (hi_exp >= 53): the 29-bit
+    //     residual r is rounded to 24-bit float, losing at most 16 ULPs.
+    //   - lo == 0  for |x| < 2^-74  (hi_exp < 53): the scale 2^(hi_exp-179) underflows
+    //     as a float, so the residual is dropped rather than emitting a subnormal lo.
+    //   - NaN, Inf, subnormal doubles, and doubles outside float range fall back to
+    //     hi = (float)x, lo = 0.
     __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ constexpr explicit fltflt(double x) {
 #if defined(__CUDA_ARCH__)
-        // During compile-time (constexpr) evaluation on device, fall through to the
-        // standard double-subtraction path which is constexpr-compatible.
+        // Constexpr evaluation on device uses the standard double-subtraction path.
         if (__builtin_is_constant_evaluated()) {
             hi = static_cast<float>(x);
             lo = static_cast<float>(x - static_cast<double>(hi));
         } else {
-            // Fast runtime path: extract residual mantissa bits via integer operations,
-            // avoiding double-precision subtraction. hi uses truncation (round-toward-zero),
-            // so hi + lo == x exactly in real arithmetic. NaN/Inf/subnormal doubles and
-            // doubles outside float range are not handled precisely (per design).
             unsigned long long xbits = __double_as_longlong(x);
             unsigned int sign = (unsigned int)(xbits >> 63);
             unsigned int e_x = (unsigned int)((xbits >> 52) & 0x7FFU);
             unsigned long long mant = xbits & 0x000FFFFFFFFFFFFFULL;
-            // float biased exponent: (e_x - 1023) + 127 = e_x - 896
+            // hi_exp: float biased exponent = (e_x - 1023) + 127 = e_x - 896.
             int hi_exp = (int)e_x - 896;
             if (e_x == 0 || hi_exp <= 0 || hi_exp >= 255) {
                 hi = (float)x;
                 lo = 0.0f;
             } else {
-                // hi: top 23 explicit mantissa bits, same exponent as x.
+                // hi: top 23 explicit mantissa bits, round-toward-zero.
                 hi = __int_as_float((sign << 31) | ((unsigned int)hi_exp << 23) | (unsigned int)(mant >> 29));
-                // lo: lower 29 bits of significand, scaled to the correct power of 2.
+                // r: the remaining 29 mantissa bits (bits [28:0]).
                 unsigned int r = (unsigned int)(mant & 0x1FFFFFFFU);
-                if (r == 0) {
-                    lo = 0.0f;
-                } else {
-                    int n = 31 - __clz(r);           // highest set bit of r (0..28)
-                    int lo_exp = n + (int)e_x - 948; // n + (e_x - 1023 - 52) + 127
-                    if (lo_exp <= 0) {
-                        lo = 0.0f;
-                    } else {
-                        unsigned int lo_mant = (n >= 23) ? (r >> (n - 23)) : (r << (23 - n));
-                        lo = __int_as_float((sign << 31) | ((unsigned int)lo_exp << 23) | (lo_mant & 0x7FFFFFU));
-                    }
-                }
+                float r_float = __uint2float_rn(r); // round r to nearest 24-bit float
+                // lo = r × 2^(hi_exp-179): single multiply, no overflow and no FP64.
+                //   Max product: (2^29 - 1) × 2^75 < 2^104 < FLT_MAX  (hi_exp <= 254).
+                //   For hi_exp < 53, lo_exp = 0 → scale = 0.0f → lo_raw = 0.
+                unsigned int lo_exp = hi_exp >= 53u ? (unsigned int)hi_exp - 52u : 0u;
+                float lo_raw = r_float * __int_as_float(lo_exp << 23);
+                lo_raw = __int_as_float(__float_as_int(lo_raw) | (sign << 31));
+                // fast2sum: adjust hi to round-to-nearest and absorb the correction into lo,
+                // guaranteeing fl(hi + lo) == hi.
+                float s = hi + lo_raw;
+                lo = lo_raw - (s - hi);
+                hi = s;
             }
         }
 #else
