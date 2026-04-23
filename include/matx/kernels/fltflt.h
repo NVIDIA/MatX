@@ -58,8 +58,56 @@ struct alignas(8) fltflt {
     // nvcc will warn about __host__ and __device__ annotations on default constructors because default
     // constructors will not run in all conditions (e.g., in static shared memory CUDA kernel allocations).
     __MATX_INLINE__ fltflt() = default;
-    __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ constexpr explicit fltflt(double x)
-        : hi(static_cast<float>(x)), lo(static_cast<float>(x - static_cast<double>(hi))) {}
+    // On device, we avoid double-precision subtraction by extracting the residual mantissa
+    // bits directly from the IEEE 754 representation using integer operations. hi is the
+    // truncated (round-toward-zero) float, so hi + lo == x exactly in real arithmetic.
+    // Ties-to-even and NaN/Inf are not handled precisely (edge cases fall back to
+    // hi=(float)x, lo=0). The constexpr branch is taken during compile-time evaluation.
+    __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ constexpr explicit fltflt(double x) {
+#if defined(__CUDA_ARCH__)
+        // During compile-time (constexpr) evaluation on device, fall through to the
+        // standard double-subtraction path which is constexpr-compatible.
+        if (__builtin_is_constant_evaluated()) {
+            hi = static_cast<float>(x);
+            lo = static_cast<float>(x - static_cast<double>(hi));
+        } else {
+            // Fast runtime path: extract residual mantissa bits via integer operations,
+            // avoiding double-precision subtraction. hi uses truncation (round-toward-zero),
+            // so hi + lo == x exactly in real arithmetic. NaN/Inf/subnormal doubles and
+            // doubles outside float range are not handled precisely (per design).
+            unsigned long long xbits = __double_as_longlong(x);
+            unsigned int sign = (unsigned int)(xbits >> 63);
+            unsigned int e_x = (unsigned int)((xbits >> 52) & 0x7FFU);
+            unsigned long long mant = xbits & 0x000FFFFFFFFFFFFFULL;
+            // float biased exponent: (e_x - 1023) + 127 = e_x - 896
+            int hi_exp = (int)e_x - 896;
+            if (e_x == 0 || hi_exp <= 0 || hi_exp >= 255) {
+                hi = (float)x;
+                lo = 0.0f;
+            } else {
+                // hi: top 23 explicit mantissa bits, same exponent as x.
+                hi = __int_as_float((sign << 31) | ((unsigned int)hi_exp << 23) | (unsigned int)(mant >> 29));
+                // lo: lower 29 bits of significand, scaled to the correct power of 2.
+                unsigned int r = (unsigned int)(mant & 0x1FFFFFFFU);
+                if (r == 0) {
+                    lo = 0.0f;
+                } else {
+                    int n = 31 - __clz(r);           // highest set bit of r (0..28)
+                    int lo_exp = n + (int)e_x - 948; // n + (e_x - 1023 - 52) + 127
+                    if (lo_exp <= 0) {
+                        lo = 0.0f;
+                    } else {
+                        unsigned int lo_mant = (n >= 23) ? (r >> (n - 23)) : (r << (23 - n));
+                        lo = __int_as_float((sign << 31) | ((unsigned int)lo_exp << 23) | (lo_mant & 0x7FFFFFU));
+                    }
+                }
+            }
+        }
+#else
+        hi = static_cast<float>(x);
+        lo = static_cast<float>(x - static_cast<double>(hi));
+#endif
+    }
     __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ constexpr explicit fltflt(float x) : hi(x), lo(0.0f) {}
     __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ constexpr explicit fltflt(float hi_, float lo_) : hi(hi_), lo(lo_) {}
     __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ constexpr explicit operator double() const {
