@@ -50,26 +50,21 @@ function(create_bench_executable bench_file)
         RUN_SERIAL TRUE
         LABELS bench
     )
-endfunction()
 
-foreach(bench_file ${bench_sources})
-    create_bench_executable(${bench_file})
-endforeach()
+    set(target_name "${target_name}" PARENT_SCOPE)
+endfunction()
 
 set(bench_targets "")
 foreach(bench_file ${bench_sources})
-    get_filename_component(_bn ${bench_file} NAME_WE)
-    get_filename_component(_bd ${bench_file} DIRECTORY)
-    string(REPLACE "/" "_" _bdc ${_bd})
-    list(APPEND bench_targets "bench_${_bdc}_${_bn}")
+    create_bench_executable(${bench_file})
+    list(APPEND bench_targets ${target_name})
 endforeach()
-
-set(BENCH_CTEST_PARALLEL_JOBS 4)
 
 add_custom_target(bench
     DEPENDS ${bench_targets}
-    COMMAND ${CMAKE_CTEST_COMMAND} -j${BENCH_CTEST_PARALLEL_JOBS} -R "^bench_" --output-on-failure
+    # No -j: each benchmark test uses RUN_SERIAL so CTest runs them one at a time (GPU-safe).
+    COMMAND ${CMAKE_CTEST_COMMAND} -R "^bench_" --output-on-failure
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-    COMMENT "Running all MatX benchmarks via CTest (${BENCH_CTEST_PARALLEL_JOBS} parallel jobs; each bench test is RUN_SERIAL)"
+    COMMENT "Running all MatX benchmarks via CTest (serial; RUN_SERIAL per test)"
     VERBATIM
 )
