@@ -99,8 +99,10 @@ inline void sar_bp_impl(OutImageType &out, const InitialImageType &initial_image
   // kernel reads/writes them via direct operator() calls regardless of
   // IsUnitStride. This maximizes the set of input types that benefit from
   // the fast path.
+  // range_to_mcp is always a MatX operator (scalar wrapping is the caller's
+  // responsibility). Rank-0 ops have no stride; rank-1 ops need a tensor-view
+  // with unit stride for the fast path.
   constexpr bool rtm_fast_path_ok =
-      !is_matx_op<RangeToMcpType>() ||
       RangeToMcpType::Rank() == 0 ||
       is_tensor_view_v<RangeToMcpType>;
   constexpr bool fast_path_eligible =
@@ -113,10 +115,8 @@ inline void sar_bp_impl(OutImageType &out, const InitialImageType &initial_image
     is_unit_stride =
         range_profiles.Stride(RangeProfilesType::Rank() - 1) == 1 &&
         platform_positions.Stride(PlatPosType::Rank() - 1) == 1;
-    if constexpr (is_matx_op<RangeToMcpType>()) {
-      if constexpr (RangeToMcpType::Rank() == 1) {
-        is_unit_stride = is_unit_stride && range_to_mcp.Stride(0) == 1;
-      }
+    if constexpr (RangeToMcpType::Rank() == 1) {
+      is_unit_stride = is_unit_stride && range_to_mcp.Stride(0) == 1;
     }
   }
 

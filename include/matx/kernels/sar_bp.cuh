@@ -191,11 +191,14 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
     static_assert(is_complex_v<typename InitialImageType::value_type>, "Initial image must be complex");
     static_assert(is_complex_v<typename RangeProfilesType::value_type>, "Range profiles must be complex");
 
-    static_assert(
-        (is_matx_op<RangeToMcpType>() && (RangeToMcpType::Rank() == 0 || RangeToMcpType::Rank() == 1) &&
-        (cuda::std::is_same_v<typename RangeToMcpType::value_type, float> || cuda::std::is_same_v<typename RangeToMcpType::value_type, double> || cuda::std::is_same_v<typename RangeToMcpType::value_type, fltflt>)) ||
-        (cuda::std::is_same_v<RangeToMcpType, float> || cuda::std::is_same_v<RangeToMcpType, double> || cuda::std::is_same_v<RangeToMcpType, fltflt>),
-        "RangeToMcpType must currently be a 0D tensor or scalar of type float, double, or fltflt");
+    static_assert(is_matx_op<RangeToMcpType>(),
+        "RangeToMcpType must be a MatX operator");
+    static_assert(RangeToMcpType::Rank() == 0 || RangeToMcpType::Rank() == 1,
+        "RangeToMcpType must be a rank-0 or rank-1 operator");
+    static_assert(cuda::std::is_same_v<typename RangeToMcpType::value_type, float> ||
+                  cuda::std::is_same_v<typename RangeToMcpType::value_type, double> ||
+                  cuda::std::is_same_v<typename RangeToMcpType::value_type, fltflt>,
+        "RangeToMcpType::value_type must be float, double, or fltflt");
 
     using initial_image_t = typename InitialImageType::value_type;
     using image_t = typename OutImageType::value_type;
@@ -266,26 +269,16 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
     detail::TensorAccessor<RangeProfilesType, IsUnitStride> rp(range_profiles);
     detail::TensorAccessor<PlatPosType, IsUnitStride> pp(platform_positions);
 
-    // range_to_mcp can be a rank-0 or rank-1 matx op, or a plain scalar.
-    // The TensorAccessor's operator() overloads cover the matx-op cases;
-    // the scalar case is returned directly by the lambda.
-    [[maybe_unused]] const auto rtm_acc = [&]() {
-        if constexpr (is_matx_op<RangeToMcpType>()) {
-            return detail::TensorAccessor<RangeToMcpType, IsUnitStride>(range_to_mcp);
-        } else {
-            return int{0};  // placeholder; never dereferenced for scalars
-        }
-    }();
+    // range_to_mcp is required to be a rank-0 or rank-1 MatX operator; the
+    // TensorAccessor picks the fast pointer path on IsUnitStride for tensor
+    // views or forwards to operator() for computed ops (e.g. ConstVal).
+    const detail::TensorAccessor<RangeToMcpType, IsUnitStride> rtm_acc(range_to_mcp);
 
-    const auto r_to_mcp = [&range_to_mcp, rtm_acc](index_t p) -> auto {
-        if constexpr (is_matx_op<RangeToMcpType>()) {
-            if constexpr (RangeToMcpType::Rank() == 0) {
-                return rtm_acc();
-            } else {
-                return rtm_acc(p);
-            }
+    const auto r_to_mcp = [rtm_acc](index_t p) -> auto {
+        if constexpr (RangeToMcpType::Rank() == 0) {
+            return rtm_acc();
         } else {
-            return range_to_mcp;
+            return rtm_acc(p);
         }
     };
 
