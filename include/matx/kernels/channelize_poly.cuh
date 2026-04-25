@@ -436,8 +436,8 @@ __global__ void ChannelizePoly1D_SmemTiled(
             }
         } else {
             // The dispatch must not select FilterInSmem when K exceeds the
-            // rotations[] array size. Assert this invariant at runtime.
-            assert(K <= detail::cpoly::SmemTiledMaxRotations);
+            // rotations[] array size. We rely on the transform dispatch to
+            // ensure this invariant due to the cost of run-time kernel checks.
             int32_t rotations[detail::cpoly::SmemTiledMaxRotations];
             for (int32_t k = 0; k < K; k++) {
                 rotations[k] = static_cast<int32_t>((static_cast<int64_t>(k) * decimation_factor) % M);
