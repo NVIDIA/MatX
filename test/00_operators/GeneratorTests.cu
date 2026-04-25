@@ -409,6 +409,100 @@ TYPED_TEST(BasicGeneratorTestsAll, Ones)
   MATX_EXIT_HANDLER();
 }
 
+// fill(shape, value) for a rank-1 tensor; verify every element matches the
+// supplied value. Mirrors the Ones/Zeros tests but with a non-trivial value.
+TYPED_TEST(BasicGeneratorTestsAll, Fill)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  ExecType exec{};
+  // example-begin fill-gen-test-1
+  const index_t count = 100;
+  auto t1 = make_tensor<TestType>({count});
+
+  const TestType value = static_cast<TestType>(7);
+  (t1 = fill<TestType>({count}, value)).run(exec);
+  // example-end fill-gen-test-1
+  exec.sync();
+
+  for (index_t i = 0; i < count; i++) {
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1(i), value));
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+// fill with the no-shape (NoShape) overload, used as a broadcastable scalar
+// inside an operator expression. The shape is deduced from the surrounding
+// expression, so no shape argument is required.
+TYPED_TEST(BasicGeneratorTestsAll, FillNoShape)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  ExecType exec{};
+  const index_t count = 100;
+  auto t1 = make_tensor<TestType>({count});
+  auto src = make_tensor<TestType>({count});
+  (src = zeros<TestType>({count})).run(exec);
+
+  // example-begin fill-gen-test-2
+  const TestType value = static_cast<TestType>(11);
+  // Shapeless fill() broadcasts as a scalar across `src`. The result's
+  // shape comes from `src`, so fill needs no shape of its own.
+  (t1 = src + fill<TestType>(value)).run(exec);
+  // example-end fill-gen-test-2
+  exec.sync();
+
+  for (index_t i = 0; i < count; i++) {
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1(i), value));
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+// fill on a rank-0 tensor (empty shape array); fills the single element.
+TYPED_TEST(BasicGeneratorTestsAll, FillRank0)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  ExecType exec{};
+
+  cuda::std::array<index_t, 0> s{};
+  auto t = make_tensor<TestType>(s);
+
+  const TestType value = static_cast<TestType>(13);
+  (t = fill<TestType>(s, value)).run(exec);
+  exec.sync();
+
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(t(), value));
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(BasicGeneratorTestsAll, FillRank0EmptyBrace)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  ExecType exec{};
+
+  // example-begin fill-gen-test-3
+  // Rank-0 fill: an empty {} shape produces a 0D operator with a single
+  // element. Equivalent to passing an explicit cuda::std::array<index_t, 0>.
+  auto t = make_tensor<TestType>({});
+  const TestType value = static_cast<TestType>(17);
+  (t = fill<TestType>({}, value)).run(exec);
+  // example-end fill-gen-test-3
+  exec.sync();
+
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(t(), value));
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(BasicGeneratorTestsNumericNonComplex, Range)
 {
   MATX_ENTER_HANDLER();
