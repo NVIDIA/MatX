@@ -91,6 +91,9 @@ namespace matx
    * @tparam T
    *   Data type
    *
+   * @param s
+   *   Empty initializer list `{}`; unused, present to enable braced-init
+   *   overload resolution for the rank-0 case.
    * @param value
    *   Value to fill
    */
