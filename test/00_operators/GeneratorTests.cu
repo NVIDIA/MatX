@@ -418,6 +418,10 @@ TYPED_TEST(BasicGeneratorTestsAll, Fill)
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
   ExecType exec{};
   // example-begin fill-gen-test-1
+  // Note: for trivial "set every element to value", a bare scalar works too:
+  //   (t1 = value).run(exec);
+  // fill() is shown here for the shape-taking API surface; its real value is
+  // in slots that require an actual MatX operator (see fill-gen-test-2).
   const index_t count = 100;
   auto t1 = make_tensor<TestType>({count});
 
@@ -447,12 +451,10 @@ TYPED_TEST(BasicGeneratorTestsAll, FillNoShape)
   auto src = make_tensor<TestType>({count});
   (src = zeros<TestType>({count})).run(exec);
 
-  // example-begin fill-gen-test-2
   const TestType value = static_cast<TestType>(11);
   // Shapeless fill() broadcasts as a scalar across `src`. The result's
   // shape comes from `src`, so fill needs no shape of its own.
   (t1 = src + fill<TestType>(value)).run(exec);
-  // example-end fill-gen-test-2
   exec.sync();
 
   for (index_t i = 0; i < count; i++) {
@@ -490,8 +492,10 @@ TYPED_TEST(BasicGeneratorTestsAll, FillRank0EmptyBrace)
   ExecType exec{};
 
   // example-begin fill-gen-test-3
-  // Rank-0 fill: an empty {} shape produces a 0D operator with a single
-  // element. Equivalent to passing an explicit cuda::std::array<index_t, 0>.
+  // Rank-0 fill via the empty-brace shape. Note: for plain assignment a
+  // scalar `(t = value).run(exec)` works too; the rank-0 fill form is for
+  // APIs that specifically expect a 0D MatX operator (e.g. sar_bp's
+  // range_to_mcp parameter).
   auto t = make_tensor<TestType>({});
   const TestType value = static_cast<TestType>(17);
   (t = fill<TestType>({}, value)).run(exec);
@@ -499,6 +503,38 @@ TYPED_TEST(BasicGeneratorTestsAll, FillRank0EmptyBrace)
   exec.sync();
 
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(t(), value));
+
+  MATX_EXIT_HANDLER();
+}
+
+// fill() in a slot that requires an actual MatX operator (not a scalar).
+// zipvec is templated on operator types; passing a bare scalar here fails
+// to compile because float has no Rank() / value_type / operator(). fill()
+// is the zero-storage adapter that lets a constant slot into a typed-op
+// position without allocating a tensor of constants.
+TEST(OperatorTests, FillInZipvec)
+{
+  MATX_ENTER_HANDLER();
+  cudaExecutor exec{};
+
+  // example-begin fill-gen-test-2
+  const index_t H = 8, W = 8;
+  auto x = clone<2>(linspace<float>(-1.0f, 1.0f, W), {H, matxKeepDim});
+  auto y = clone<2>(linspace<float>(-1.0f, 1.0f, H), {matxKeepDim, W});
+
+  // matx::zipvec(x, y, 5.0f) does not compile: zipvec expects MatX ops on
+  // every slot, and 5.0f has no Rank() / value_type. fill<float>({H, W}, 5.0f)
+  // is a zero-storage rank-2 op that satisfies the slot without allocating
+  // an H*W tensor of constants.
+  auto voxels = zipvec(x, y, fill<float>({H, W}, 5.0f));
+
+  auto out = make_tensor<float3>({H, W});
+  (out = voxels).run(exec);
+  // example-end fill-gen-test-2
+
+  exec.sync();
+  EXPECT_FLOAT_EQ(out(0, 0).z, 5.0f);
+  EXPECT_FLOAT_EQ(out(H/2, W/2).z, 5.0f);
 
   MATX_EXIT_HANDLER();
 }
