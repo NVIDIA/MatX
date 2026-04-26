@@ -19,6 +19,7 @@ floating-point fill to an integer operator.
 
 .. doxygenfunction:: matx::fill(ShapeType &&s, T value)
 .. doxygenfunction:: matx::fill(const index_t (&s)[RANK], T value)
+.. doxygenfunction:: matx::fill(const std::initializer_list<detail::no_size_t> s, T value)
 .. doxygenfunction:: matx::fill(T value)
 
 Examples
