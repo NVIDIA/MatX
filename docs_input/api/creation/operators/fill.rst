@@ -33,7 +33,10 @@ Shape-taking form, fills a 1D tensor:
    :end-before: example-end fill-gen-test-1
    :dedent:
 
-Shapeless form, broadcast as a scalar inside an operator expression:
+``fill()`` used in a slot that requires a MatX operator. ``zipvec`` is
+templated on operator types, so a bare scalar in the third slot fails to
+compile; ``fill<float>(5.0f)`` is the zero-storage adapter that satisfies
+the slot:
 
 .. literalinclude:: ../../../../test/00_operators/GeneratorTests.cu
    :language: cpp
@@ -41,7 +44,8 @@ Shapeless form, broadcast as a scalar inside an operator expression:
    :end-before: example-end fill-gen-test-2
    :dedent:
 
-Rank-0 fill via the ``{}`` shape:
+Rank-0 fill via the ``{}`` shape, for APIs that specifically expect a 0D
+operator:
 
 .. literalinclude:: ../../../../test/00_operators/GeneratorTests.cu
    :language: cpp
