@@ -49,15 +49,39 @@ def strip_ansi(text):
     return ANSI_ESCAPE.sub('', text)
 
 
-def find_benchmark_executable(build_dir):
-    """Find the matx_bench executable."""
-    benchmark_path = build_dir / "bench" / "matx_bench"
+def _resolve_bench_executable(build_dir, stem):
+    """Return path to bench/<stem> or bench/<stem>.exe if present."""
+    bench_dir = build_dir / "bench"
+    for name in (stem, f"{stem}.exe"):
+        path = bench_dir / name
+        if path.is_file():
+            return path
+    return None
 
-    if benchmark_path.exists():
+
+def find_benchmark_executable(build_dir):
+    """Find the SAR BP benchmark executable (per-source CMake target)."""
+    stem = "bench_00_transform_sarbp"
+    benchmark_path = _resolve_bench_executable(build_dir, stem)
+
+    if benchmark_path is not None:
         return benchmark_path
 
-    print(f"Error: Could not find matx_bench at {benchmark_path}")
+    print(
+        "Error: Could not find benchmark executable "
+        f"bench/{stem} under {build_dir}"
+    )
     return None
+
+
+def build_dir_contains_benchmark_exes(build_dir):
+    """True if build_dir/bench contains at least one bench_* executable."""
+    bench_dir = build_dir / "bench"
+    if not bench_dir.is_dir():
+        return False
+    return any(
+        p.is_file() and p.name.startswith("bench_") for p in bench_dir.iterdir()
+    )
 
 
 def run_benchmark(executable_path, benchmark_name, verbose=False):
@@ -320,7 +344,7 @@ def main():
         "--build-dir",
         type=Path,
         default=None,
-        help="Path to the MatX build directory containing bench/matx_bench. "
+        help="Path to the MatX build directory containing bench/bench_00_transform_sarbp. "
              "If not specified, the current working directory is checked first, "
              "then common locations relative to the script are searched.",
     )
@@ -347,10 +371,10 @@ def main():
             sys.exit(1)
     else:
         # Check if the current working directory looks like a valid build directory
-        # (i.e. it already contains bench/matx_bench). This lets users run the script
+        # (i.e. it already contains bench/bench_* executables). This lets users run the script
         # from any build directory without needing --build-dir.
         cwd = Path.cwd()
-        if (cwd / "bench" / "matx_bench").exists():
+        if build_dir_contains_benchmark_exes(cwd):
             build_dir = cwd
         else:
             # Fall back to searching common locations relative to the script
@@ -365,7 +389,7 @@ def main():
             build_dir = None
             for bd in possible_build_dirs:
                 bd_resolved = bd.resolve()
-                if bd_resolved.exists() and (bd_resolved / "bench" / "matx_bench").exists():
+                if bd_resolved.exists() and build_dir_contains_benchmark_exes(bd_resolved):
                     build_dir = bd_resolved
                     break
 

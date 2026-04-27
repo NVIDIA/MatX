@@ -124,8 +124,11 @@ Benchmarks
 MatX uses the NVBench software for the benchmarking framework. Like other packages, NVBench will be download using CPM according to
 the methods mentioned above.
 
-NVBench has a small library that will be compiled on the first `make` run. Benchmarks can be run using the ``bench/matx_bench`` executable,
-and all options to filter or modify benchmark runs can be found in the nvbench_ project documentation.
+NVBench has a small library that will be compiled on the first ``make`` run. With ``-DMATX_BUILD_BENCHMARKS=ON``, CMake emits one executable per
+benchmark source file under ``build/bench``, named ``bench_<subdir>_<basename>`` (for example ``bench_00_transform_matmul``). You can build a
+single benchmark with ``cmake --build <build-dir> --target bench_00_transform_matmul``. All benchmarks are registered with CTest under names
+matching those targets; run ``ctest -R '^bench_'`` from ``build/bench``, or ``ctest -L bench``, or build the ``bench`` target from the top-level build
+to execute the suite via CTest. NVBench CLI options to filter or modify benchmark runs apply to each executable and are documented in the nvbench_ project.
 
 .. _nvbench: https://github.com/NVIDIA/nvbench
 
