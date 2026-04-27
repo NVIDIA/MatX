@@ -37,6 +37,7 @@
 #include "matx/generators/blackman.h"
 #include "matx/generators/chirp.h"
 #include "matx/generators/diag.h"
+#include "matx/generators/fill.h"
 #include "matx/generators/flattop.h"
 #include "matx/generators/hamming.h"
 #include "matx/generators/hanning.h"
