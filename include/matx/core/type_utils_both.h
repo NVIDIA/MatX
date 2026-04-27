@@ -1156,6 +1156,58 @@ namespace detail {
   
   template <typename... Ts>
   using AggregateToVecType = typename AggregateToVec<Ts...>::type;  
+
+  template <typename T>
+  struct DLPackLaneInfo {
+    using scalar_type = remove_cvref_t<T>;
+    static constexpr uint16_t lanes = 1;
+  };
+
+#define MATX_DEFINE_DLPACK_LANE_INFO(scalar_t, width)                                   \
+  template <>                                                                            \
+  struct DLPackLaneInfo<typename VecTypeSelector<scalar_t, width>::type> {              \
+    using scalar_type = scalar_t;                                                        \
+    static constexpr uint16_t lanes = width;                                             \
+  };
+
+  MATX_DEFINE_DLPACK_LANE_INFO(float, 2)
+  MATX_DEFINE_DLPACK_LANE_INFO(float, 3)
+  MATX_DEFINE_DLPACK_LANE_INFO(float, 4)
+  MATX_DEFINE_DLPACK_LANE_INFO(double, 2)
+  MATX_DEFINE_DLPACK_LANE_INFO(double, 3)
+  MATX_DEFINE_DLPACK_LANE_INFO(double, 4)
+  MATX_DEFINE_DLPACK_LANE_INFO(char, 2)
+  MATX_DEFINE_DLPACK_LANE_INFO(char, 3)
+  MATX_DEFINE_DLPACK_LANE_INFO(char, 4)
+  MATX_DEFINE_DLPACK_LANE_INFO(unsigned char, 2)
+  MATX_DEFINE_DLPACK_LANE_INFO(unsigned char, 3)
+  MATX_DEFINE_DLPACK_LANE_INFO(unsigned char, 4)
+  MATX_DEFINE_DLPACK_LANE_INFO(short, 2)
+  MATX_DEFINE_DLPACK_LANE_INFO(short, 3)
+  MATX_DEFINE_DLPACK_LANE_INFO(short, 4)
+  MATX_DEFINE_DLPACK_LANE_INFO(unsigned short, 2)
+  MATX_DEFINE_DLPACK_LANE_INFO(unsigned short, 3)
+  MATX_DEFINE_DLPACK_LANE_INFO(unsigned short, 4)
+  MATX_DEFINE_DLPACK_LANE_INFO(int, 2)
+  MATX_DEFINE_DLPACK_LANE_INFO(int, 3)
+  MATX_DEFINE_DLPACK_LANE_INFO(int, 4)
+  MATX_DEFINE_DLPACK_LANE_INFO(unsigned int, 2)
+  MATX_DEFINE_DLPACK_LANE_INFO(unsigned int, 3)
+  MATX_DEFINE_DLPACK_LANE_INFO(unsigned int, 4)
+  MATX_DEFINE_DLPACK_LANE_INFO(long, 2)
+  MATX_DEFINE_DLPACK_LANE_INFO(long, 3)
+  MATX_DEFINE_DLPACK_LANE_INFO(long, 4)
+  MATX_DEFINE_DLPACK_LANE_INFO(unsigned long, 2)
+  MATX_DEFINE_DLPACK_LANE_INFO(unsigned long, 3)
+  MATX_DEFINE_DLPACK_LANE_INFO(unsigned long, 4)
+  MATX_DEFINE_DLPACK_LANE_INFO(long long, 2)
+  MATX_DEFINE_DLPACK_LANE_INFO(long long, 3)
+  MATX_DEFINE_DLPACK_LANE_INFO(long long, 4)
+  MATX_DEFINE_DLPACK_LANE_INFO(unsigned long long, 2)
+  MATX_DEFINE_DLPACK_LANE_INFO(unsigned long long, 3)
+  MATX_DEFINE_DLPACK_LANE_INFO(unsigned long long, 4)
+
+#undef MATX_DEFINE_DLPACK_LANE_INFO
 }
 
 

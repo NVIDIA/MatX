@@ -795,36 +795,43 @@ auto make_static_tensor() {
   return make_tensor<T, I, Is...>();
 }
 
-template <typename TensorType>
-  requires (is_tensor<TensorType> && !is_dynamic_tensor_v<TensorType>)
-auto make_tensor( TensorType &tensor,
-                  const DLManagedTensor dlp_tensor) {
-  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  
-  MATX_LOG_DEBUG("make_tensor(tensor&, DLManagedTensor): ptr={}", dlp_tensor.dl_tensor.data);
-
-  using T = typename TensorType::value_type;
-  const DLTensor &dt = dlp_tensor.dl_tensor;
+namespace detail {
+template <typename T, index_t Rank>
+void validate_dlpack_tensor_type(const DLTensor &dt) {
+  using BaseT = std::remove_cv_t<T>;
+  using LaneInfo = detail::DLPackLaneInfo<BaseT>;
+  using ScalarT = typename LaneInfo::scalar_type;
+  [[maybe_unused]] constexpr uint16_t lanes = LaneInfo::lanes;
 
   // MatX doesn't track the memory type or device ID, so we don't need to copy it
-  MATX_ASSERT_STR_EXP(dt.ndim, TensorType::Rank(), matxInvalidDim, "DLPack rank doesn't match MatX rank!");
+  MATX_ASSERT_STR_EXP(dt.ndim, Rank, matxInvalidDim, "DLPack rank doesn't match MatX rank!");
+
+  MATX_ASSERT_STR_EXP(
+      dt.dtype.lanes, lanes, matxInvalidType,
+      "DLPack vector lane mismatch: dtype.lanes must match MatX value_type lane width");
 
   switch (dt.dtype.code) {
     case kDLComplex: {
       switch (dt.dtype.bits) {
         case 128: {
-          [[maybe_unused]] constexpr bool same = std::is_same_v<T, cuda::std::complex<double>>;
-          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch");
+          [[maybe_unused]] constexpr bool same = std::is_same_v<ScalarT, cuda::std::complex<double>>;
+          MATX_ASSERT_STR(
+              same, matxInvalidType,
+              "DLPack dtype mismatch: code=kDLComplex bits=128 requires MatX base scalar type cuda::std::complex<double>");
           break;
         }
         case 64: {
-          [[maybe_unused]] constexpr bool same = std::is_same_v<T, cuda::std::complex<float>>;
-          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch");
+          [[maybe_unused]] constexpr bool same = std::is_same_v<ScalarT, cuda::std::complex<float>>;
+          MATX_ASSERT_STR(
+              same, matxInvalidType,
+              "DLPack dtype mismatch: code=kDLComplex bits=64 requires MatX base scalar type cuda::std::complex<float>");
           break;
         }
         case 32: {
-          [[maybe_unused]] constexpr bool same = std::is_same_v<T, matxFp16Complex> || std::is_same_v<T, matxBf16Complex>;
-          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch");
+          [[maybe_unused]] constexpr bool same = std::is_same_v<ScalarT, matxFp16Complex>;
+          MATX_ASSERT_STR(
+              same, matxInvalidType,
+              "DLPack dtype mismatch: code=kDLComplex bits=32 requires MatX base scalar type matxFp16Complex");
           break;
         }
         default:
@@ -836,18 +843,24 @@ auto make_tensor( TensorType &tensor,
     case kDLFloat: {
       switch (dt.dtype.bits) {
         case 64: {
-          [[maybe_unused]] constexpr bool same = std::is_same_v<T, double>;
-          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch");
+          [[maybe_unused]] constexpr bool same = std::is_same_v<ScalarT, double>;
+          MATX_ASSERT_STR(
+              same, matxInvalidType,
+              "DLPack dtype mismatch: code=kDLFloat bits=64 requires MatX base scalar type double");
           break;
         }
         case 32: {
-          [[maybe_unused]] constexpr bool same = std::is_same_v<T, float>;
-          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch");
+          [[maybe_unused]] constexpr bool same = std::is_same_v<ScalarT, float>;
+          MATX_ASSERT_STR(
+              same, matxInvalidType,
+              "DLPack dtype mismatch: code=kDLFloat bits=32 requires MatX base scalar type float");
           break;
         }
         case 16: {
-          [[maybe_unused]] constexpr bool same = std::is_same_v<T, matxFp16> || std::is_same_v<T, matxBf16>;
-          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch");
+          [[maybe_unused]] constexpr bool same = std::is_same_v<ScalarT, matxFp16>;
+          MATX_ASSERT_STR(
+              same, matxInvalidType,
+              "DLPack dtype mismatch: code=kDLFloat bits=16 requires MatX base scalar type matxFp16");
           break;
         }
         default:
@@ -855,26 +868,48 @@ auto make_tensor( TensorType &tensor,
       }
       break;
     }
+    case kDLBfloat: {
+      switch (dt.dtype.bits) {
+        case 16: {
+          [[maybe_unused]] constexpr bool same = std::is_same_v<ScalarT, matxBf16>;
+          MATX_ASSERT_STR(
+              same, matxInvalidType,
+              "DLPack dtype mismatch: code=kDLBfloat bits=16 requires MatX base scalar type matxBf16");
+          break;
+        }
+        default:
+          MATX_THROW(matxInvalidSize, "Invalid bfloat size from DLPack");
+      }
+      break;
+    }
     case kDLInt: {
       switch (dt.dtype.bits) {
         case 64: {
-          [[maybe_unused]] constexpr bool same = std::is_same_v<T, int64_t>;
-          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch");
+          [[maybe_unused]] constexpr bool same = std::is_same_v<ScalarT, int64_t>;
+          MATX_ASSERT_STR(
+              same, matxInvalidType,
+              "DLPack dtype mismatch: code=kDLInt bits=64 requires MatX base scalar type int64_t");
           break;
         }
         case 32: {
-          [[maybe_unused]] constexpr bool same = std::is_same_v<T, int32_t>;
-          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch");
+          [[maybe_unused]] constexpr bool same = std::is_same_v<ScalarT, int32_t>;
+          MATX_ASSERT_STR(
+              same, matxInvalidType,
+              "DLPack dtype mismatch: code=kDLInt bits=32 requires MatX base scalar type int32_t");
           break;
         }
         case 16: {
-          [[maybe_unused]] constexpr bool same = std::is_same_v<T, int16_t>;
-          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch");
+          [[maybe_unused]] constexpr bool same = std::is_same_v<ScalarT, int16_t>;
+          MATX_ASSERT_STR(
+              same, matxInvalidType,
+              "DLPack dtype mismatch: code=kDLInt bits=16 requires MatX base scalar type int16_t");
           break;
         }
         case 8: {
-          [[maybe_unused]] constexpr bool same = std::is_same_v<T, int8_t>;
-          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch");
+          [[maybe_unused]] constexpr bool same = std::is_same_v<ScalarT, int8_t>;
+          MATX_ASSERT_STR(
+              same, matxInvalidType,
+              "DLPack dtype mismatch: code=kDLInt bits=8 requires MatX base scalar type int8_t");
           break;
         }
         default:
@@ -885,23 +920,31 @@ auto make_tensor( TensorType &tensor,
     case kDLUInt: {
       switch (dt.dtype.bits) {
         case 64: {
-          [[maybe_unused]] constexpr bool same = std::is_same_v<T, uint64_t>;
-          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch");
+          [[maybe_unused]] constexpr bool same = std::is_same_v<ScalarT, uint64_t>;
+          MATX_ASSERT_STR(
+              same, matxInvalidType,
+              "DLPack dtype mismatch: code=kDLUInt bits=64 requires MatX base scalar type uint64_t");
           break;
         }
         case 32: {
-          [[maybe_unused]] constexpr bool same = std::is_same_v<T, uint32_t>;
-          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch");
+          [[maybe_unused]] constexpr bool same = std::is_same_v<ScalarT, uint32_t>;
+          MATX_ASSERT_STR(
+              same, matxInvalidType,
+              "DLPack dtype mismatch: code=kDLUInt bits=32 requires MatX base scalar type uint32_t");
           break;
         }
         case 16: {
-          [[maybe_unused]] constexpr bool same = std::is_same_v<T, uint16_t>;
-          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch");
+          [[maybe_unused]] constexpr bool same = std::is_same_v<ScalarT, uint16_t>;
+          MATX_ASSERT_STR(
+              same, matxInvalidType,
+              "DLPack dtype mismatch: code=kDLUInt bits=16 requires MatX base scalar type uint16_t");
           break;
         }
         case 8: {
-          [[maybe_unused]] constexpr bool same = std::is_same_v<T, uint8_t>;
-          MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch");
+          [[maybe_unused]] constexpr bool same = std::is_same_v<ScalarT, uint8_t>;
+          MATX_ASSERT_STR(
+              same, matxInvalidType,
+              "DLPack dtype mismatch: code=kDLUInt bits=8 requires MatX base scalar type uint8_t");
           break;
         }
         default:
@@ -910,22 +953,176 @@ auto make_tensor( TensorType &tensor,
       break;
     }
     case kDLBool: {
-      [[maybe_unused]] constexpr bool same = std::is_same_v<T, bool>;
-      MATX_ASSERT_STR(same, matxInvalidType, "DLPack/MatX type mismatch");
+      [[maybe_unused]] constexpr bool same = std::is_same_v<ScalarT, bool>;
+      MATX_ASSERT_STR(
+          same, matxInvalidType,
+          "DLPack dtype mismatch: code=kDLBool requires MatX base scalar type bool");
       break;
     }
+    default:
+      MATX_THROW(matxInvalidType, "Unsupported DLPack data type code");
+  }
+}
+
+template <typename TensorType>
+  requires is_tensor<TensorType>
+void dlpack_shape_and_strides(const DLTensor &dt,
+                              index_t (&shape)[TensorType::Rank()],
+                              index_t (&strides)[TensorType::Rank()]) {
+  if constexpr (TensorType::Rank() > 0) {
+    MATX_ASSERT_STR(dt.shape != nullptr, matxInvalidParameter, "DLPack shape cannot be null for non-scalar tensors");
+  }
+
+  for (int r = 0; r < TensorType::Rank(); r++) {
+    shape[r] = dt.shape[r];
+  }
+
+  if (dt.strides != nullptr) {
+    for (int r = 0; r < TensorType::Rank(); r++) {
+      strides[r] = dt.strides[r];
+    }
+    return;
+  }
+
+  // Older DLPack producers may use null strides to indicate contiguous layout.
+  if constexpr (TensorType::Rank() > 0) {
+    strides[TensorType::Rank() - 1] = 1;
+    for (int r = TensorType::Rank() - 2; r >= 0; r--) {
+      strides[r] = strides[r + 1] * shape[r + 1];
+    }
+  }
+}
+} // namespace detail
+
+/**
+ * Create a tensor from a legacy DLPack managed tensor. This does not transfer ownership of the DLManagedTensor,
+ * so the caller is responsible for calling the deleter method when the last MatX reference to the imported storage is
+ * released.
+ *
+ * @deprecated Use `make_tensor(tensor, DLManagedTensor*)` to transfer ownership
+ *   and guarantee source lifetime while MatX views are alive.
+ *
+ * @param tensor
+ *   Tensor object to store newly-created tensor into
+ * @param dlp_tensor
+ *   Legacy DLPack tensor metadata and data pointer (borrowed, non-owning)
+ **/
+template <typename TensorType>
+    requires (is_tensor<TensorType> && !is_dynamic_tensor_v<TensorType>)
+[[deprecated("Use make_tensor(tensor, DLManagedTensor*) to transfer ownership and ensure lifetime safety")]]
+auto make_tensor( TensorType &tensor,
+                  const DLManagedTensor dlp_tensor) {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  
+  MATX_LOG_DEBUG("make_tensor(tensor&, DLManagedTensor): ptr={}", dlp_tensor.dl_tensor.data);
+
+  const DLTensor &dt = dlp_tensor.dl_tensor;
+  detail::validate_dlpack_tensor_type<typename TensorType::value_type, TensorType::Rank()>(dt);
+
+  index_t strides[TensorType::Rank()];
+  index_t shape[TensorType::Rank()];
+  detail::dlpack_shape_and_strides<TensorType>(dt, shape, strides);
+
+  auto tmp = make_tensor<typename TensorType::value_type, TensorType::Rank()>(
+          reinterpret_cast<typename TensorType::value_type*>(dt.data), shape, strides, false);
+  tensor.Shallow(tmp);
+}
+
+/**
+ * Create a tensor from a DLManagedTensor.
+ *
+ * This consumes `dlp_tensor`, the deleter method will be called when the last MatX reference to the imported storage is
+ * released.
+ *
+ * @param tensor
+ *   Tensor object to store newly-created tensor into
+ * @param dlp_tensor
+ *   Pointer to a heap-allocated `DLManagedTensor` whose ownership is
+ *   transferred to MatX
+ **/
+template <typename TensorType>
+  requires (is_tensor<TensorType> && !is_dynamic_tensor_v<TensorType>)
+auto make_tensor( TensorType &tensor,
+                  DLManagedTensor *dlp_tensor) {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  MATX_ASSERT_STR(dlp_tensor != nullptr, matxInvalidParameter, "DLManagedTensor pointer cannot be null");
+
+  auto owner = std::shared_ptr<DLManagedTensor>(dlp_tensor, [](DLManagedTensor *managed) {
+    if (managed != nullptr && managed->deleter != nullptr) {
+      managed->deleter(managed);
+    }
+  });
+  MATX_LOG_DEBUG("make_tensor(tensor&, DLManagedTensor*): ptr={}", owner->dl_tensor.data);
+
+  using T = typename TensorType::value_type;
+  const DLTensor &dt = owner->dl_tensor;
+  detail::validate_dlpack_tensor_type<T, TensorType::Rank()>(dt);
+
+  index_t strides[TensorType::Rank()];
+  index_t shape[TensorType::Rank()];
+  detail::dlpack_shape_and_strides<TensorType>(dt, shape, strides);
+  MATX_ASSERT_STR(dt.byte_offset % sizeof(T) == 0, matxInvalidType, "DLPack byte_offset must align with element type size");
+  auto *data_ptr = reinterpret_cast<T*>(reinterpret_cast<uint8_t*>(dt.data) + dt.byte_offset);
+
+  constexpr int RANK = TensorType::Rank();
+  DefaultDescriptor<RANK> desc{detail::to_array(shape), detail::to_array(strides)};
+  auto data = std::shared_ptr<T>(owner, data_ptr);
+  auto storage = make_storage_from_shared_ptr<T>(std::move(data), desc.TotalSize());
+  auto tmp = tensor_t<T, TensorType::Rank(), decltype(desc)>{
+      std::move(storage), std::move(desc), data_ptr};
+
+  tensor.Shallow(tmp);
+}
+
+/**
+ * Create a tensor from a versioned DLPack managed tensor and transfer ownership.
+ *
+ * This consumes `dlp_tensor`, the deleter method will be called when the last MatX reference to the imported storage is
+ * released.
+ *
+ * @param tensor
+ *   Tensor object to store newly-created tensor into
+ * @param dlp_tensor
+ *   Pointer to a heap-allocated `DLManagedTensorVersioned` whose ownership is
+ *   transferred to MatX
+ **/
+template <typename TensorType>
+  requires (is_tensor<TensorType> && !is_dynamic_tensor_v<TensorType>)
+auto make_tensor( TensorType &tensor,
+                  DLManagedTensorVersioned *dlp_tensor) {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  MATX_ASSERT_STR(dlp_tensor != nullptr, matxInvalidParameter, "DLManagedTensorVersioned pointer cannot be null");
+
+  auto owner = std::shared_ptr<DLManagedTensorVersioned>(dlp_tensor, [](DLManagedTensorVersioned *managed) {
+    if (managed != nullptr && managed->deleter != nullptr) {
+      managed->deleter(managed);
+    }
+  });
+  MATX_ASSERT_STR_EXP(owner->version.major, DLPACK_MAJOR_VERSION, matxInvalidParameter,
+                      "Unsupported DLPack major version");
+  MATX_LOG_DEBUG("make_tensor(tensor&, DLManagedTensorVersioned*): ptr={}", owner->dl_tensor.data);
+
+  using T = typename TensorType::value_type;
+  const DLTensor &dt = owner->dl_tensor;
+  detail::validate_dlpack_tensor_type<T, TensorType::Rank()>(dt);
+  if ((owner->flags & DLPACK_FLAG_BITMASK_READ_ONLY) != 0U) {
+    MATX_ASSERT_STR(std::is_const_v<T>, matxInvalidType,
+                    "Read-only DLPack tensors must be imported as const MatX tensors");
   }
 
   index_t strides[TensorType::Rank()];
   index_t shape[TensorType::Rank()];
+  detail::dlpack_shape_and_strides<TensorType>(dt, shape, strides);
+  MATX_ASSERT_STR(dt.byte_offset % sizeof(T) == 0, matxInvalidType, "DLPack byte_offset must align with element type size");
+  auto *data_ptr = reinterpret_cast<T*>(reinterpret_cast<uint8_t*>(dt.data) + dt.byte_offset);
 
-  for (int r = 0; r < TensorType::Rank(); r++) {
-    strides[r] = dt.strides[r];
-    shape[r]   = dt.shape[r];
-  }
+  constexpr int RANK = TensorType::Rank();
+  DefaultDescriptor<RANK> desc{detail::to_array(shape), detail::to_array(strides)};
+  auto data = std::shared_ptr<T>(owner, data_ptr);
+  auto storage = make_storage_from_shared_ptr<T>(std::move(data), desc.TotalSize());
+  auto tmp = tensor_t<T, TensorType::Rank(), decltype(desc)>{
+      std::move(storage), std::move(desc), data_ptr};
 
-  auto tmp = make_tensor<typename TensorType::value_type, TensorType::Rank()>(
-          reinterpret_cast<typename TensorType::value_type*>(dt.data), shape, strides, false);
   tensor.Shallow(tmp);
 }
 

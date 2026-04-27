@@ -141,7 +141,7 @@ namespace matx
         void* ptr;
         matxAlloc(&ptr, size * sizeof(T), space, stream);
         data_ = std::shared_ptr<T>(static_cast<T*>(ptr), [stream](T* p) {
-          matxFree(p, stream);
+          matxFree(const_cast<void *>(static_cast<const void *>(p)), stream);
         });
       }
     }

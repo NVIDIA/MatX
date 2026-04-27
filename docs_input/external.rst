@@ -81,8 +81,62 @@ Care must be taken when passing either operators or pointers to existing code to
 * The *kind* of the pointer must be known to the external code. For example, if the tensor was created in device memory, the external 
   code must access it only where device memory is accessible.
 
-If the external code supports the *dlpack* standard, the tensor's `ToDLPack()` method can be used instead to get a `DLManagedTensor` object.
-This method is much safer since all shape and ownership can be transferred.
+DLPack Interoperability
+=======================
+
+If the external code supports the `DLPack exchange API <https://dmlc.github.io/dlpack/latest/>`_, MatX can exchange tensors
+with full metadata (dtype, shape, strides, device) and explicit ownership.
+
+DLPack operates on a producer-consumer model where the producer is the library
+that creates the tensor and the consumer is the library that uses the tensor.
+The producer is responsible for creating a pointer to a
+`DLManagedTensorVersioned` or  `DLManagedTensor` object, which contains a
+reference to the tensor and a deleter function. The consumer is responsible for
+calling the `deleter` function when it is done with the tensor.
+
+Exporting MatX tensors via DLPack
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+MatX supports exporting both legacy and versioned DLPack objects:
+
+.. code-block:: cpp
+
+  auto t = matx::make_tensor<float>({10, 10});
+
+  // Versioned DLPack (v1.x style)
+  DLManagedTensorVersioned *versioned = t.ToDlPackVersioned();
+  // Legacy DLPack (v0.x style)
+  DLManagedTensor *legacy = t.ToDlPack();
+
+Both calls increment internal ownership so the underlying storage stays valid
+until the matching DLPack `deleter` is called.
+
+Importing external DLPack tensors into MatX
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+When importing into MatX, use the `make_tensor` overloads that consume a
+pointer to a `DLManagedTensorVersioned` or `DLManagedTensor` object. For
+example, to convert a libtorch tensor to a MatX tensor:
+
+.. code-block:: cpp
+
+  #include <torch/torch.h>
+  #include <ATen/DLConvertor.h>
+  #include <matx.h>
+
+  // Create a libtorch tensor
+  auto torch_tensor = torch::randn({10, 10});
+
+  // Convert the libtorch tensor to a MatX tensor
+  matx::tensor_t<float, 2> t;
+  matx::make_tensor(t, at::toDLPackVersioned(torch_tensor));
+
+MatX will invoke the producer-provided DLPack deleter when the last MatX
+reference to the imported storage is released.
+
+.. important::
+
+  A `DLManagedTensorVersioned` or `DLManagedTensor` should only be consumed once.
 
 
 Passing By Object

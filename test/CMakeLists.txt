@@ -10,6 +10,7 @@ set (test_sources
     00_misc/ProfilingTests.cu
     00_misc/PropertyTests.cu
     00_tensor/BasicTensorTests.cu
+    00_tensor/DLPackTests.cu
     00_tensor/CUBTests.cu
     00_tensor/Storage.cu
     00_tensor/ViewTests.cu

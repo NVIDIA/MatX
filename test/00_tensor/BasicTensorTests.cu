@@ -534,33 +534,3 @@ TYPED_TEST(BasicTensorTestsAll, DevicePrint)
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(BasicTensorTestsAll, DLPack)
-{
-  MATX_ENTER_HANDLER();
-
-  using TestType = cuda::std::tuple_element_t<0, TypeParam>;  
-
-  auto t = make_tensor<TestType>({5,10,20});
-  auto dl = t.ToDlPack();
-
-  ASSERT_EQ(dl->dl_tensor.ndim, 3);
-  ASSERT_EQ(dl->dl_tensor.data, t.Data());
-  ASSERT_EQ(dl->dl_tensor.device.device_id, 0);
-  ASSERT_EQ(dl->dl_tensor.device.device_type, kDLCUDA);
-  auto dlt = detail::TypeToDLPackType<TestType>();
-  ASSERT_EQ(dl->dl_tensor.dtype.code, dlt.code);
-  ASSERT_EQ(dl->dl_tensor.dtype.bits, dlt.bits);
-  ASSERT_EQ(dl->dl_tensor.dtype.lanes, dlt.lanes);
-  ASSERT_EQ(dl->dl_tensor.shape[0], t.Size(0));
-  ASSERT_EQ(dl->dl_tensor.shape[1], t.Size(1));
-  ASSERT_EQ(dl->dl_tensor.shape[2], t.Size(2));
-  ASSERT_EQ(dl->dl_tensor.strides[0], t.Stride(0));
-  ASSERT_EQ(dl->dl_tensor.strides[1], t.Stride(1));
-  ASSERT_EQ(dl->dl_tensor.strides[2], t.Stride(2));
-  ASSERT_EQ(t.GetRefCount(), 2);
-  dl->deleter(dl);
-  ASSERT_EQ(t.GetRefCount(), 1);
-
-  MATX_EXIT_HANDLER();
-}
-
