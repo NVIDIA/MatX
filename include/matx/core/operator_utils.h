@@ -164,7 +164,13 @@ namespace matx {
         Vector<T, static_cast<index_t>(CapType::ept)> result;
         MATX_LOOP_UNROLL
         for (int i = 0; i < static_cast<index_t>(CapType::ept); i++) {
-          result.data[i] = func(index * static_cast<index_t>(CapType::ept) + i);
+          using ret_type = remove_cvref_t<decltype(func(index * static_cast<index_t>(CapType::ept) + i))>;
+          if constexpr ((cuda::std::is_arithmetic_v<T> || cuda::std::is_enum_v<T>) &&
+                        (cuda::std::is_arithmetic_v<ret_type> || cuda::std::is_enum_v<ret_type>)) {
+            result.data[i] = static_cast<T>(func(index * static_cast<index_t>(CapType::ept) + i));
+          } else {
+            result.data[i] = func(index * static_cast<index_t>(CapType::ept) + i);
+          }
         }
         return result;
       }
@@ -178,7 +184,13 @@ namespace matx {
         Vector<OutType, static_cast<index_t>(CapType::ept)> result;
         MATX_LOOP_UNROLL
         for (int i = 0; i < static_cast<index_t>(CapType::ept); i++) {
-          result.data[i] = func(vals.data[i]...);
+          using ret_type = remove_cvref_t<decltype(func(vals.data[i]...))>;
+          if constexpr ((cuda::std::is_arithmetic_v<OutType> || cuda::std::is_enum_v<OutType>) &&
+                        (cuda::std::is_arithmetic_v<ret_type> || cuda::std::is_enum_v<ret_type>)) {
+            result.data[i] = static_cast<OutType>(func(vals.data[i]...));
+          } else {
+            result.data[i] = func(vals.data[i]...);
+          }
         }
         return result;
       }
@@ -432,4 +444,3 @@ namespace matx {
     }    
   }
 }
-

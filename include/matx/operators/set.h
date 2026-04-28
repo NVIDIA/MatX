@@ -154,11 +154,17 @@ public:
     }
     else {
       const auto in_val = detail::get_value<CapType>(static_cast<const decltype(op_)&>(op_), indices...);
+      using in_val_type = remove_cvref_t<decltype(in_val)>;
       using out_type = decltype(out_.template operator()<CapType>(indices...));
       
-      if constexpr (!is_vector_v<decltype(in_val)> && is_vector_v<out_type>) {
+      if constexpr (!is_vector_v<in_val_type> && is_vector_v<out_type>) {
         Vector<remove_cvref_t<decltype(in_val)>, static_cast<size_t>(CapType::ept)> vec{in_val};
         out_.template operator()<CapType>(indices...) = vec;
+      }
+      else if constexpr (!is_vector_v<in_val_type> && !is_vector_v<out_type> &&
+                         (cuda::std::is_arithmetic_v<in_val_type> || cuda::std::is_enum_v<in_val_type>) &&
+                         (cuda::std::is_arithmetic_v<remove_cvref_t<out_type>> || cuda::std::is_enum_v<remove_cvref_t<out_type>>)) {
+        out_.template operator()<CapType>(indices...) = static_cast<remove_cvref_t<out_type>>(in_val);
       }
       else {
         out_.template operator()<CapType>(indices...) = in_val;
@@ -202,6 +208,11 @@ public:
           "    if constexpr (!is_vector_v<in_val_type> && is_vector_v<out_type>) {\n" +
           "      Vector<remove_cvref_t<in_val_type>, static_cast<size_t>(CapType::ept)> vec{in_val};\n" +
           "      out_.template operator()<CapType>(indices...) = vec;\n" +
+          "    }\n" +
+          "    else if constexpr (!is_vector_v<in_val_type> && !is_vector_v<out_type> &&\n" +
+          "                         (cuda::std::is_arithmetic_v<in_val_type> || cuda::std::is_enum_v<in_val_type>) &&\n" +
+          "                         (cuda::std::is_arithmetic_v<remove_cvref_t<out_type>> || cuda::std::is_enum_v<remove_cvref_t<out_type>>)) {\n" +
+          "      out_.template operator()<CapType>(indices...) = static_cast<remove_cvref_t<out_type>>(in_val);\n" +
           "    }\n" +
           "    else {\n" +
           "      out_.template operator()<CapType>(indices...) = in_val;\n" +

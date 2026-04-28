@@ -80,7 +80,7 @@ __global__ void ResamplePoly1D_PhaseBlock(OutType output, InType input, FilterTy
 
     constexpr int Rank = OutType::Rank();
     const index_t output_len = output.Size(Rank-1);
-    index_t filter_len = filter.Size(0);
+    index_t filter_len = static_cast<index_t>(filter.Size(0));
     const index_t input_len = input.Size(Rank-1);
 
     // We assume odd-length filters below. In the case of an even-length filter,
@@ -236,7 +236,7 @@ __global__ void ResamplePoly1D_PhaseBlock(OutType output, InType input, FilterTy
 template <int THREADS, typename FilterType>
 __device__ inline void ResamplePoly1D_LoadFilter(typename FilterType::value_type *s_filter, const FilterType &filter)
 {
-    const index_t filter_len = filter.Size(0);
+    const index_t filter_len = static_cast<index_t>(filter.Size(0));
     const int tid = threadIdx.x;
     if (filter_len % 2 == 0) {
         for (int t = tid; t < filter_len; t += THREADS) {
@@ -267,7 +267,7 @@ __global__ void ResamplePoly1D_ElemBlock(OutType output, InType input, FilterTyp
 
     constexpr int Rank = OutType::Rank();
     const index_t output_len = output.Size(Rank-1);
-    index_t filter_len = filter.Size(0);
+    index_t filter_len = static_cast<index_t>(filter.Size(0));
     const index_t input_len = input.Size(Rank-1);
 
     const size_t filter_sz_bytes = (filter_len % 2 == 0) ? sizeof(filter_t)*(filter_len+1) : sizeof(filter_t)*filter_len;
@@ -385,7 +385,7 @@ __global__ void ResamplePoly1D_WarpCentric(OutType output, InType input, FilterT
 
     constexpr int Rank = OutType::Rank();
     const index_t output_len = output.Size(Rank-1);
-    index_t filter_len = filter.Size(0);
+    index_t filter_len = static_cast<index_t>(filter.Size(0));
     const index_t input_len = input.Size(Rank-1);
 
     const size_t filter_sz_bytes = (filter_len % 2 == 0) ? sizeof(filter_t)*(filter_len+1) : sizeof(filter_t)*filter_len;

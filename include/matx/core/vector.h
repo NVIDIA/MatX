@@ -90,9 +90,15 @@ struct alignas(alignment_by_type<T>() * N) Vector {
   template <typename T2>
     requires (cuda::std::is_same_v<typename T2::matx_vec, bool> && T2::width == N)
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Vector& operator=(const T2& v) {
+    using src_type = remove_cvref_t<decltype(v.data[0])>;
     MATX_LOOP_UNROLL
     for (int i = 0; i < N; i++) {
-      data[i] = v.data[i];
+      if constexpr ((cuda::std::is_arithmetic_v<T> || cuda::std::is_enum_v<T>) &&
+                    (cuda::std::is_arithmetic_v<src_type> || cuda::std::is_enum_v<src_type>)) {
+        data[i] = static_cast<T>(v.data[i]);
+      } else {
+        data[i] = v.data[i];
+      }
     }
     return *this;
   }
