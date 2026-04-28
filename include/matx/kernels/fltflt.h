@@ -62,12 +62,10 @@ struct alignas(8) fltflt {
     //
     // Accuracy guarantees (device fast path, for normal doubles in float range):
     //   - fl(hi + lo) == hi  (fast2sum ensures no rounding error when adding lo back).
-    //   - |x - (hi+lo)| <= 16 ulp(x)  for |x| >= 2^-74  (hi_exp >= 53): the 29-bit
-    //     residual r is rounded to 24-bit float, losing at most 16 ULPs.
-    //   - lo == 0  for |x| < 2^-74  (hi_exp < 53): the scale 2^(hi_exp-179) underflows
-    //     as a float, so the residual is dropped rather than emitting a subnormal lo.
+    //   - |x - (hi+lo)| <= 8 ulp(x) if hi and lo in normal range.
     //   - NaN, Inf, subnormal doubles, and doubles outside float range fall back to
-    //     hi = (float)x, lo = 0.
+    //     hi = (float)x.
+    //   - If hi is NaN or Inf, lo can be arbitrary.
     __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ constexpr explicit fltflt(double x) {
 #if defined(__CUDA_ARCH__)
         // Constexpr evaluation on device uses the standard double-subtraction path.
@@ -76,30 +74,25 @@ struct alignas(8) fltflt {
             lo = static_cast<float>(x - static_cast<double>(hi));
         } else {
             unsigned long long xbits = __double_as_longlong(x);
-            unsigned int sign = (unsigned int)(xbits >> 63);
-            unsigned int e_x = (unsigned int)((xbits >> 52) & 0x7FFU);
+            unsigned int sign = static_cast<unsigned int>(xbits >> 63);
+            unsigned int e_x = static_cast<unsigned int>((xbits >> 52) & 0x7FFU);
             unsigned long long mant = xbits & 0x000FFFFFFFFFFFFFULL;
             // hi_exp: float biased exponent = (e_x - 1023) + 127 = e_x - 896.
-            int hi_exp = (int)e_x - 896;
+            int hi_exp = static_cast<int>(e_x) - 896;
             if (e_x == 0 || hi_exp <= 0 || hi_exp >= 255) {
                 hi = (float)x;
                 lo = 0.0f;
             } else {
-                // hi: top 23 explicit mantissa bits, round-toward-zero.
-                hi = __int_as_float((sign << 31) | ((unsigned int)hi_exp << 23) | (unsigned int)(mant >> 29));
-                // r: the remaining 29 mantissa bits (bits [28:0]).
-                unsigned int r = (unsigned int)(mant & 0x1FFFFFFFU);
-                float r_float = __uint2float_rn(r); // round r to nearest 24-bit float
-                // lo = r × 2^(hi_exp-179): single multiply, no overflow and no FP64.
-                //   Max product: (2^29 - 1) × 2^75 < 2^104 < FLT_MAX  (hi_exp <= 254).
-                //   For hi_exp < 53, lo_exp = 0 → scale = 0.0f → lo_raw = 0.
-                unsigned int lo_exp = hi_exp >= 53u ? (unsigned int)hi_exp - 52u : 0u;
-                float lo_raw = r_float * __int_as_float(lo_exp << 23);
-                lo_raw = __int_as_float(__float_as_int(lo_raw) | (sign << 31));
+                // hi: top 23 explicit mantissa bits, round-nearest, ties away from zero.
+                // use + to mux in the mantissa, as we may need to carry into the exponent.
+                hi = __int_as_float((sign << 31) | ((unsigned int)hi_exp << 23) + (((unsigned int)(mant >> 28) + 1) >> 1));
+                // r: remainder as signed integer (we shift by 3 to get the 29 mantissa bits, with top-most bit the sign bit)
+                int r = static_cast<int>(static_cast<unsigned int>(mant) << 3);
+                lo = (__int2float_rn(r) * 0x1p-55f) * __int_as_float((sign << 31) | (hi_exp << 23));
                 // fast2sum: adjust hi to round-to-nearest and absorb the correction into lo,
                 // guaranteeing fl(hi + lo) == hi.
-                float s = hi + lo_raw;
-                lo = lo_raw - (s - hi);
+                float s = hi + lo;
+                lo = lo - (s - hi);
                 hi = s;
             }
         }

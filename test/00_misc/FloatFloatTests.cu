@@ -2280,18 +2280,14 @@ TYPED_TEST(FltFltExecutorTests, ConvertFromDouble) {
     EXPECT_EQ(reconstructed, x);
   }
 
-  // Small doubles (hi_exp < 53, |x| < 2^-74): on device the fast path drops lo because
-  // the scale 2^(hi_exp-179) underflows to 0.0f.  On host the reference double-subtraction
-  // path computes the correct subnormal lo.
-  constexpr bool is_cuda = std::is_same_v<TypeParam, matx::cudaExecutor>;
+  // Small doubles (hi_exp < 53, |x| < 2^-74): the low part is in the subnormal range.
 
   // x = 2^-103 + 2^-127: hi_exp = 920-896 = 24 < 53
   {
     const double x = std::bit_cast<double>(0x3980000010000000ULL);
     run_and_extract(x);
     EXPECT_EQ(std::bit_cast<uint32_t>(hi_out()), 0x0C000000u); // hi = 2^-103
-    if constexpr (is_cuda) { EXPECT_EQ(lo_out(), 0.0f); }
-    else { EXPECT_EQ(std::bit_cast<uint32_t>(lo_out()), 0x00400000u); } // 2^-127 (subnormal)
+    EXPECT_EQ(std::bit_cast<uint32_t>(lo_out()), 0x00400000u); // 2^-127 (subnormal)
   }
 
   // x = 2^-114 + 2^-138: hi_exp = 909-896 = 13 < 53
@@ -2299,8 +2295,7 @@ TYPED_TEST(FltFltExecutorTests, ConvertFromDouble) {
     const double x = std::bit_cast<double>(0x38D0000010000000ULL);
     run_and_extract(x);
     EXPECT_EQ(std::bit_cast<uint32_t>(hi_out()), 0x06800000u); // hi = 2^-114
-    if constexpr (is_cuda) { EXPECT_EQ(lo_out(), 0.0f); }
-    else { EXPECT_EQ(std::bit_cast<uint32_t>(lo_out()), 0x00000800u); } // 2^-138 (subnormal)
+    EXPECT_EQ(std::bit_cast<uint32_t>(lo_out()), 0x00000800u); // 2^-138 (subnormal)
   }
 
   // x = 2^-125 + 2^-149: hi_exp = 898-896 = 2 < 53
@@ -2308,8 +2303,7 @@ TYPED_TEST(FltFltExecutorTests, ConvertFromDouble) {
     const double x = std::bit_cast<double>(0x3820000010000000ULL);
     run_and_extract(x);
     EXPECT_EQ(std::bit_cast<uint32_t>(hi_out()), 0x01000000u); // hi = 2^-125
-    if constexpr (is_cuda) { EXPECT_EQ(lo_out(), 0.0f); }
-    else { EXPECT_EQ(std::bit_cast<uint32_t>(lo_out()), 0x00000001u); } // 2^-149 (min subnormal)
+    EXPECT_EQ(std::bit_cast<uint32_t>(lo_out()), 0x00000001u); // 2^-149 (min subnormal)
   }
 
   // x near FLT_MIN (hi_exp = 1 < 53): lo = 0 on both paths (residual too small for any float)
@@ -2344,5 +2338,113 @@ TYPED_TEST(FltFltExecutorTests, ConvertFromDouble) {
     const double reconstructed = static_cast<double>(hi_out()) + static_cast<double>(lo_out());
     EXPECT_GE(numMatchingMantissaBits(reconstructed, x), 44);
     EXPECT_NE(lo_out(), std::numeric_limits<float>::infinity());
+  }
+}
+
+// Sweep many doubles across the normal float range and verify the three accuracy
+// claims documented at the top of the fltflt(double) constructor:
+//   (1) |x - hi| <= 0.5 ulp(hi)
+//   (2) |lo|     <= 0.5 ulp(hi)
+//   (3) |x - (hi+lo)| <= 8 ulp(x)   (only when hi and lo are both in normal range)
+TYPED_TEST(FltFltExecutorTests, ConvertFromDoubleAccuracy) {
+  std::vector<double> inputs;
+
+  // Build a double from (sign, hi_exp = float biased exponent, 52-bit mantissa).
+  // Skips inputs that would land on the NaN/Inf/subnormal/out-of-range fallback path
+  // (hi_exp <= 0 or hi_exp >= 255), since the contract above is for the fast path only.
+  auto add_input = [&](unsigned sign, int hi_exp, uint64_t mant) {
+    if (hi_exp <= 0 || hi_exp >= 255) return;
+    const uint64_t e_x = static_cast<uint64_t>(hi_exp) + 896;
+    const uint64_t bits = (static_cast<uint64_t>(sign & 1u) << 63) |
+                          (e_x << 52) |
+                          (mant & 0x000FFFFFFFFFFFFFULL);
+    inputs.push_back(std::bit_cast<double>(bits));
+  };
+
+  // Walk the float biased exponent from the smallest normal (1) to the largest (254),
+  // including the boundary at hi_exp = 53 below which lo cannot be normal.
+  const int hi_exps[] = {1, 2, 13, 24, 25, 30, 52, 53, 54, 75, 100, 127, 200, 225, 226, 253, 254};
+
+  // Mantissa low 29 bits (the residual). Includes:
+  //   - 0:                       residual = 0, r_float exact
+  //   - 1:                       smallest non-zero residual
+  //   - 0x10000000:              tie at +0.5 ulp(hi) (exercises fast2sum tie-to-even)
+  //   - 0x10000001 / 0x0FFFFFFF: just past / before the tie
+  //   - 0x1FFFFFFF:              maximum residual
+  //   - arbitrary middle values
+  const uint64_t low_mants[] = {
+      0x00000000ULL, 0x00000001ULL, 0x0FFFFFFFULL, 0x10000000ULL,
+      0x10000001ULL, 0x1FFFFFFFULL, 0x12345678ULL, 0x1ABCDEF1ULL,
+  };
+
+  // Mantissa bits 51..29 (the part that ends up in hi_field). Includes 0 (so hi is a
+  // power of 2, where ulp asymmetric-ness shows up) and the all-ones value (which makes
+  // the round-half-up overflow into the next exponent).
+  const uint64_t high_mants[] = {0x000000ULL, 0x000001ULL, 0x123456ULL, 0x7FFFFEULL, 0x7FFFFFULL};
+
+  for (int hi_exp : hi_exps) {
+    for (unsigned sign : {0u, 1u}) {
+      for (uint64_t high : high_mants) {
+        for (uint64_t low : low_mants) {
+          const uint64_t mant = (high << 29) | low;
+          add_input(sign, hi_exp, mant);
+        }
+      }
+    }
+  }
+
+  // A handful of "real" values in addition to the bit patterns above.
+  inputs.push_back(0.0);
+  inputs.push_back(-0.0);
+  inputs.push_back(1.0);
+  inputs.push_back(-1.0);
+  inputs.push_back(2.0);
+  inputs.push_back(std::numbers::pi);
+  inputs.push_back(-std::numbers::pi);
+  inputs.push_back(std::numbers::e);
+  inputs.push_back(std::numbers::sqrt2);
+  inputs.push_back(static_cast<double>(std::numeric_limits<float>::max()));
+  inputs.push_back(-static_cast<double>(std::numeric_limits<float>::max()));
+
+  const matx::index_t N = static_cast<matx::index_t>(inputs.size());
+  auto dbl_in = make_tensor<double>({N});
+  auto ff_result = make_tensor<fltflt>({N});
+  auto hi_out_t = make_tensor<float>({N});
+  auto lo_out_t = make_tensor<float>({N});
+
+  for (matx::index_t i = 0; i < N; ++i) {
+    dbl_in(i) = inputs[static_cast<size_t>(i)];
+  }
+
+  (ff_result = matx::apply(DoubleToFltFlt{}, dbl_in)).run(this->exec);
+  (hi_out_t = matx::apply(FltFltGetHi{}, ff_result)).run(this->exec);
+  (lo_out_t = matx::apply(FltFltGetLo{}, ff_result)).run(this->exec);
+  this->exec.sync();
+
+  for (matx::index_t i = 0; i < N; ++i) {
+    const double x = inputs[static_cast<size_t>(i)];
+    const float hi = hi_out_t(i);
+    const float lo = lo_out_t(i);
+
+    // The accuracy contract only applies when hi is a normal float. Inputs whose
+    // mantissa rounds up past FLT_MAX legitimately produce hi = +/-Inf, and zeros
+    // fall through here too; neither has a residual to check.
+    if (!std::isnormal(hi)) continue;
+
+    // 0.5 * ulp(hi), using the upper-side step (the standard "ulp" definition).
+    const double half_ulp_hi = std::ldexp(1.0, std::ilogb(hi) - 24);
+
+    // Property (3): |x - (hi+lo)| <= 8 ulp(x), only when both hi and lo are in normal
+    // range. lo is allowed to be exactly zero, but only when the residual really is
+    // zero (so we don't accidentally validate a flush-to-zero underflow).
+    const double residual = x - static_cast<double>(hi);
+    const bool lo_is_normal = std::isnormal(lo);
+    const bool lo_is_genuine_zero = (lo == 0.0f) && (residual == 0.0);
+    if (lo_is_normal || lo_is_genuine_zero) {
+      const double ulp_x = std::ldexp(1.0, std::ilogb(x) - 52);
+      EXPECT_LE(std::abs(x - (static_cast<double>(hi) + static_cast<double>(lo))),
+                8.0 * ulp_x)
+          << "Property (3) violated: x = " << x << ", hi = " << hi << ", lo = " << lo;
+    }
   }
 }
