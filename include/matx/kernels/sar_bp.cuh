@@ -311,14 +311,15 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
     loose_complex_compute_t accum{};
     const loose_compute_t bin_offset = static_cast<loose_compute_t>(0.5) * static_cast<loose_compute_t>(num_range_bins-1);
 
-    const int num_pulse_blocks = (num_pulses + PULSE_BLOCK_SIZE - 1) / PULSE_BLOCK_SIZE;
-    for (int block = 0; block < num_pulse_blocks; ++block) {
-        const int num_pulses_in_block = num_pulses - block * PULSE_BLOCK_SIZE < PULSE_BLOCK_SIZE ?
-            num_pulses - block * PULSE_BLOCK_SIZE : PULSE_BLOCK_SIZE;
+    constexpr index_t pulse_block_size = static_cast<index_t>(PULSE_BLOCK_SIZE);
+    const index_t num_pulse_blocks = (num_pulses + pulse_block_size - 1) / pulse_block_size;
+    for (index_t block = 0; block < num_pulse_blocks; ++block) {
+        const index_t num_pulses_in_block = num_pulses - block * pulse_block_size < pulse_block_size ?
+            num_pulses - block * pulse_block_size : pulse_block_size;
         if constexpr (UseSharedPreamble) {
             __syncthreads();
             for (index_t ip = tid; ip < num_pulses_in_block; ip += blockDim.x * blockDim.y) {
-                const int p = block * PULSE_BLOCK_SIZE + ip;
+                const index_t p = block * pulse_block_size + ip;
                 // Accessor does the IsUnitStride / rank dispatch internally,
                 // so we just ask for (apx, apy, apz) uniformly.
                 auto load_xyz = [&]() {
@@ -359,7 +360,7 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
         }
         #pragma unroll 4
         for (index_t ip = 0; ip < num_pulses_in_block; ++ip) {
-            const int p = block * PULSE_BLOCK_SIZE + ip;
+            const index_t p = block * pulse_block_size + ip;
             strict_or_ff_compute_t diffR;
             loose_compute_t w;
             index_t bin_floor_int;

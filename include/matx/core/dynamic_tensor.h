@@ -295,7 +295,8 @@ public:
       if constexpr (sizeof(T) != detail::alignment_by_type<T>()) {
         return cuda::std::array<detail::ElementsPerThread, 2>{detail::ElementsPerThread::ONE, detail::ElementsPerThread::ONE};
       } else {
-        int width = in.jit ? 32 : MAX_VEC_WIDTH_BYTES / sizeof(T);
+        const int vec_width = MAX_VEC_WIDTH_BYTES / static_cast<int>(sizeof(T));
+        int width = in.jit ? 32 : vec_width;
         index_t lsize = shape_[rank_ - 1];
         while (width > 1) {
           if (((lsize % width) == 0) &&
@@ -308,7 +309,7 @@ public:
       }
     }
     else if constexpr (Cap == detail::OperatorCapability::MAX_EPT_VEC_LOAD) {
-      int vec = MAX_VEC_WIDTH_BYTES / sizeof(T);
+      int vec = MAX_VEC_WIDTH_BYTES / static_cast<int>(sizeof(T));
       int power = 1;
       while (power * 2 <= vec) { power *= 2; }
       return power;

@@ -18,7 +18,7 @@
 namespace matx {
 
 namespace matx_conv1d_detail {
-  constexpr size_t CONV1D_ELEMENTS_PER_BLOCK = 512;
+  constexpr int CONV1D_ELEMENTS_PER_BLOCK = 512;
 };
 using namespace matx_conv1d_detail;
 
@@ -47,8 +47,8 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
   using ftype_strip = typename FilterType::value_type;
   using intype_strip = typename InType::value_type;
   using outtype_strip = typename OutType::value_type;
-  uint32_t filter_len = d_filter.Size(Rank-1);
-  uint32_t full_len = signal_len + filter_len - 1;
+  const index_t filter_len = d_filter.Size(Rank-1);
+  const index_t full_len = signal_len + filter_len - 1;
 
   int batch_idx = blockIdx.x;
 
@@ -65,7 +65,7 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
   intype_strip *s_data = reinterpret_cast<intype_strip*>(&s_exch1d[filter_bytes]);
 
   // load filter
-  for (uint32_t idx = threadIdx.x;  idx < filter_len; idx += THREADS) {
+  for (index_t idx = static_cast<index_t>(threadIdx.x); idx < filter_len; idx += THREADS) {
     bdims[Rank - 1] = idx;
     cuda::std::apply([&, d_filter](auto &&...args) {
         s_filter[idx] = d_filter.operator()(args...);
@@ -73,24 +73,25 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
   }
 
   // number of chunks in the signal, number of output elements / chunk size rounded up
-  uint32_t num_chunks = (signal_len + filter_len -1 + CONV1D_ELEMENTS_PER_BLOCK - 1) / CONV1D_ELEMENTS_PER_BLOCK;
+  index_t num_chunks = (signal_len + filter_len - 1 + CONV1D_ELEMENTS_PER_BLOCK - 1) / CONV1D_ELEMENTS_PER_BLOCK;
 
   // number of chunks per Y block, rounded up
   num_chunks = (num_chunks + gridDim.y - 1) / gridDim.y;
 
   MATX_LOOP_DO_NOT_UNROLL
-  for(uint32_t n = 0; n < num_chunks; n++) {
+  for (index_t n = 0; n < num_chunks; n++) {
     // compute current chunk idx
-    uint32_t chunk_idx = blockIdx.y + n * gridDim.y;
+    index_t chunk_idx = static_cast<index_t>(blockIdx.y) + n * static_cast<index_t>(gridDim.y);
 
     // ensure s_data is consumed from last iteration of chunk loop
     if( n > 0 )
       __syncthreads();
 
     // load signal,  pad extra elements with zeros
-    for (int32_t lidx = threadIdx.x, gidx  = chunk_idx * CONV1D_ELEMENTS_PER_BLOCK - filter_len + 1 + threadIdx.x;
-        gidx < static_cast<int32_t>((chunk_idx+1) * CONV1D_ELEMENTS_PER_BLOCK) ;
-        gidx += THREADS, lidx += THREADS) {
+    for (index_t lidx = static_cast<index_t>(threadIdx.x),
+                 gidx = chunk_idx * CONV1D_ELEMENTS_PER_BLOCK - filter_len + 1 + static_cast<index_t>(threadIdx.x);
+         gidx < (chunk_idx + 1) * CONV1D_ELEMENTS_PER_BLOCK;
+         gidx += THREADS, lidx += THREADS) {
 
       // some elements may be out of range.  We set their values to 0.
       intype_strip val(0);
@@ -147,8 +148,8 @@ MATX_LOOP_UNROLL
 
     // We have computed the full convolution here.  we now need to output the correct range.
     // compute output range
-    uint32_t start;
-    uint32_t stop;
+    index_t start;
+    index_t stop;
 
     if (mode == MATX_C_MODE_FULL) {
       start = 0;
@@ -168,9 +169,9 @@ MATX_LOOP_UNROLL
 MATX_LOOP_UNROLL
     for (uint32_t i = 0; i < EPT; i++) {
       // index for the computation
-      uint32_t idx = chunk_idx * CONV1D_ELEMENTS_PER_BLOCK + i * THREADS + threadIdx.x;
+      const index_t idx = chunk_idx * CONV1D_ELEMENTS_PER_BLOCK + static_cast<index_t>(i) * THREADS + static_cast<index_t>(threadIdx.x);
       // output index is shifted by start
-      int32_t gidx = idx - start;
+      const index_t gidx = idx - start;
 
       if(idx >= start && idx <= stop) {
         bdims[Rank - 1] = gidx;
@@ -248,7 +249,7 @@ __global__ void Conv2D(OutType d_out, InType1 d_in1, InType2 d_in2,
   index_t i2N = d_in2.Size(Rank-2);
   index_t i2M = d_in2.Size(Rank-1);
 
-  int dy = 0, dx = 0;
+  index_t dy = 0, dx = 0;
 
   if( mode == MATX_C_MODE_SAME) {
     dy = i2N / 2;
