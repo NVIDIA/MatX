@@ -116,15 +116,15 @@ struct TensorAccessor {
     }
 
     // Rank-0 access.
-    template <int R = Rank, cuda::std::enable_if_t<R == 0, int> = 0>
     __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__
-    decltype(auto) operator()() const { return op_(); }
+    decltype(auto) operator()() const requires (Rank == 0) { return op_(); }
 
-    // Rank >= 1 access; SFINAE enforces arity == Rank.
-    template <typename... Is,
-              cuda::std::enable_if_t<(Rank >= 1) && sizeof...(Is) == Rank, int> = 0>
+    // Rank >= 1 access; arity must match Rank.
+    template <typename... Is>
     __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__
-    decltype(auto) operator()(Is... is) const {
+    decltype(auto) operator()(Is... is) const
+        requires (Rank >= 1 && sizeof...(Is) == Rank)
+    {
         if constexpr (FastPath) {
             const index_t idx_arr[] = { static_cast<index_t>(is)... };
             // Last-dim stride is 1 under IsUnitStride.
@@ -143,11 +143,11 @@ struct TensorAccessor {
 
     // Bind the first sizeof...(Leading) dimensions. Returns a BoundAccessor
     // with (Rank - sizeof...(Leading)) remaining dims.
-    template <typename... Leading,
-              cuda::std::enable_if_t<(sizeof...(Leading) > 0) &&
-                               (sizeof...(Leading) <= Rank), int> = 0>
+    template <typename... Leading>
     __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__
-    auto bind(Leading... leading) const {
+    auto bind(Leading... leading) const
+        requires (sizeof...(Leading) > 0 && sizeof...(Leading) <= Rank)
+    {
         return BoundAccessor<Op, IsUnitStride, sizeof...(Leading)>(
             *this, static_cast<index_t>(leading)...);
     }
@@ -224,9 +224,8 @@ struct BoundAccessor {
     }
 
     // Rank-0 remainder: nullary.
-    template <int R = Rank, cuda::std::enable_if_t<R == 0, int> = 0>
     __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__
-    decltype(auto) operator()() const {
+    decltype(auto) operator()() const requires (Rank == 0) {
         if constexpr (FastPath) {
             return base_[0];
         } else {
@@ -235,10 +234,11 @@ struct BoundAccessor {
     }
 
     // Rank >= 1 remainder: variadic, arity == Rank.
-    template <typename... Is,
-              cuda::std::enable_if_t<(Rank >= 1) && sizeof...(Is) == Rank, int> = 0>
+    template <typename... Is>
     __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__
-    decltype(auto) operator()(Is... is) const {
+    decltype(auto) operator()(Is... is) const
+        requires (Rank >= 1 && sizeof...(Is) == Rank)
+    {
         if constexpr (FastPath) {
             const index_t idx_arr[] = { static_cast<index_t>(is)... };
             index_t offset = idx_arr[Rank - 1];

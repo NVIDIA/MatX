@@ -39,6 +39,22 @@ using namespace matx;
 
 const std::vector<ssize_t> PROBLEM_SIZES = {2000};
 
+// Gigabackprojections per second derived metric. Operations per launch =
+// num_pulses * image_width * image_height = problem_size^3. Reading this
+// straight off the nvbench table/CSV beats parsing the table in Python.
+static void add_gproj_per_sec_summary(nvbench::state &state)
+{
+  const double seconds = state.get_summary("Batch GPU").get_float64("value");
+  const int64_t ps = state.get_int64("Problem Size");
+  const double ops = static_cast<double>(ps) * static_cast<double>(ps) * static_cast<double>(ps);
+
+  auto &s = state.add_summary("matx/sarbp/gproj_per_sec");
+  s.set_string("name", "Gproj/s");
+  s.set_string("hint", "item_rate");
+  s.set_string("description", "Gigabackprojections per second (problem_size^3 / time)");
+  s.set_float64("value", ops / seconds / 1e9);
+}
+
 /* Float precision benchmark */
 void sarbp_float(nvbench::state &state)
 {
@@ -103,6 +119,7 @@ void sarbp_float(nvbench::state &state)
         .run(cudaExecutor(launch.get_stream()));
   });
 
+  add_gproj_per_sec_summary(state);
   matx::ClearCachesAndAllocations();
 }
 
@@ -173,6 +190,7 @@ void sarbp_double(nvbench::state &state)
         .run(cudaExecutor(launch.get_stream()));
   });
 
+  add_gproj_per_sec_summary(state);
   matx::ClearCachesAndAllocations();
 }
 
@@ -244,6 +262,7 @@ void sarbp_mixed(nvbench::state &state)
         .run(cudaExecutor(launch.get_stream()));
   });
 
+  add_gproj_per_sec_summary(state);
   matx::ClearCachesAndAllocations();
 }
 
@@ -316,6 +335,7 @@ void sarbp_fltflt(nvbench::state &state)
         .run(cudaExecutor(launch.get_stream()));
   });
 
+  add_gproj_per_sec_summary(state);
   matx::ClearCachesAndAllocations();
 }
 
