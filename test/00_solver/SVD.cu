@@ -510,9 +510,9 @@ void svdpi_test( const index_t (&AshapeA)[RANK], Executor exec) {
   (A = random<AType>(AshapeA, NORMAL)).run(exec);
   auto x0 = random<SType>(std::move(Sshape), NORMAL);
 
-  (U = 0).run(exec);
-  (S = 0).run(exec);
-  (VT = 0).run(exec);
+  (U = AType{0}).run(exec);
+  (S = SType{0}).run(exec);
+  (VT = AType{0}).run(exec);
 
   (mtie(U, S, VT) = svdpi(A, x0, iterations, r)).run(exec);
   // example-end svdpi-test-1
@@ -642,9 +642,9 @@ void svdbpi_test( const index_t (&AshapeA)[RANK], Executor exec) {
   (A = random<AType>(std::move(Ashape), NORMAL)).run(exec);
 
 
-  (U = 0).run(exec);
-  (S = 0).run(exec);
-  (VT = 0).run(exec);
+  (U = AType{0}).run(exec);
+  (S = SType{0}).run(exec);
+  (VT = AType{0}).run(exec);
 
   (mtie(U, S, VT) = svdbpi(A, iterations)).run(exec);
   // example-end svdbpi-test-1

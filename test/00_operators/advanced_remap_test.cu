@@ -48,7 +48,7 @@ TEST(OperatorTestsAdvanced, AdvancedRemapOp)
     }
   }
 
-  (B = 0).run(exec);
+  (B = static_cast<complex>(0)).run(exec);
 
   auto rop = remap<1>(A, idx);
   auto lop = lcollapse<3>(rop);
@@ -121,10 +121,10 @@ TEST(OperatorTestsAdvanced, AdvancedRemapOp)
   auto cop = C.Clone<4>({matxKeepDim, M, matxKeepDim, matxKeepDim});
   auto rcop = lcollapse<3>(remap<1>(cop, idx));
 
-  (O1 = 1).run(exec);
-  (O2 = 2).run(exec);
-  (O3 = 3).run(exec);
-  (O4 = 4).run(exec);
+  (O1 = complex{1.0f, 0.0f}).run(exec);
+  (O2 = complex{2.0f, 0.0f}).run(exec);
+  (O3 = complex{3.0f, 0.0f}).run(exec);
+  (O4 = complex{4.0f, 0.0f}).run(exec);
   
   (B = lop).run(exec);
   (D = rcop).run(exec);

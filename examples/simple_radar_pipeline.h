@@ -90,7 +90,8 @@ public:
       typename I1::type xpow = xpow_(idz, idy, idx);
       typename I2::type ba = ba_(idz, idy, idx);
       typename I2::type norm = norm_(idz, idy, idx);
-      typename I2::type alpha = norm * (cuda::std::powf(pfa_, -1.0f / norm) - 1.f);
+      using calc_type = typename I2::type;
+      calc_type alpha = norm * (cuda::std::pow(static_cast<calc_type>(pfa_), calc_type(-1) / norm) - calc_type(1));
       out_(idz, idy, idx) = (xpow > alpha * ba) ? 1 : 0;
 
     }

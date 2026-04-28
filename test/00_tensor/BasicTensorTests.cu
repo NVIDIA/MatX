@@ -466,7 +466,7 @@ TYPED_TEST(BasicTensorTestsIntegral, StridedKernels)
     auto tb = make_tensor<TestType>({70000 * 1024, 1});
     auto tc = make_tensor<TestType>({70000 * 1024, 1});
 
-    (ta = 1, tb = 2).run();
+    (ta = TestType{1}, tb = TestType{2}).run();
     (tc = ta + tb).run();
 
     cudaStreamSynchronize(0);
@@ -481,7 +481,7 @@ TYPED_TEST(BasicTensorTestsIntegral, StridedKernels)
     auto tb = make_tensor<TestType>({70000 * 1024, 1, 1});
     auto tc = make_tensor<TestType>({70000 * 1024, 1, 1});
 
-    (ta = 1, tb = 2).run();
+    (ta = TestType{1}, tb = TestType{2}).run();
     (tc = ta + tb).run();
 
     cudaStreamSynchronize(0);
@@ -496,7 +496,7 @@ TYPED_TEST(BasicTensorTestsIntegral, StridedKernels)
     auto tb = make_tensor<TestType>({70000 * 1024, 1, 1, 1});
     auto tc = make_tensor<TestType>({70000 * 1024, 1, 1, 1});
 
-    (ta = 1, tb = 2).run();
+    (ta = TestType{1}, tb = TestType{2}).run();
     (tc = ta + tb).run();
 
     cudaStreamSynchronize(0);
@@ -516,7 +516,7 @@ TYPED_TEST(BasicTensorTestsAll, Print)
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
   auto t = make_tensor<TestType>({3});
-  (t = ones()).run(this->exec);
+  (t = ones<TestType>()).run(this->exec);
   print(t);
 
   MATX_EXIT_HANDLER();
@@ -528,9 +528,8 @@ TYPED_TEST(BasicTensorTestsAll, DevicePrint)
   using TestType = cuda::std::tuple_element_t<0, TypeParam>; 
 
   auto t = make_tensor<TestType>({3}, MATX_DEVICE_MEMORY);
-  (t = ones()).run(this->exec);
+  (t = ones<TestType>()).run(this->exec);
   print(t);
 
   MATX_EXIT_HANDLER();
 }
-

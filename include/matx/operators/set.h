@@ -41,6 +41,10 @@
 #include "matx/core/capabilities.h"
 #include "matx/core/operator_utils.h"
 
+#ifndef MATX_CHECK_NARROWING_CONVERSIONS
+#define MATX_CHECK_NARROWING_CONVERSIONS 1
+#endif
+
 namespace matx {
 template <typename T, int RANK, typename Desc> class tensor_t; ///< Tensor detail type
 template <typename T> class BaseOp; ///< Base operator type
@@ -48,6 +52,57 @@ template <typename T> class BaseOp; ///< Base operator type
 namespace detail {
 
 template <typename T, int RANK, typename Desc, typename Data> class tensor_impl_t; ///< Tensor implementation type
+
+#if MATX_CHECK_NARROWING_CONVERSIONS
+// Brace initialization rejects arithmetic narrowing, giving set() a shorter
+// diagnostic than a kernel instantiation.
+template <typename From, typename To>
+struct set_assignment_conversion_may_narrow {
+private:
+  using from_type = remove_cvref_t<From>;
+  using to_type = remove_cvref_t<To>;
+
+  template <typename F, typename U>
+  static constexpr bool compute()
+  {
+    if constexpr (std::is_void_v<F> || std::is_void_v<U> || std::is_same_v<F, U>) {
+      return false;
+    }
+    else if constexpr (is_vector_v<F>) {
+      return set_assignment_conversion_may_narrow<typename F::value_type, U>::value;
+    }
+    else if constexpr (is_vector_v<U>) {
+      return set_assignment_conversion_may_narrow<F, typename U::value_type>::value;
+    }
+    else if constexpr (is_complex_v<F> && is_complex_v<U>) {
+      return set_assignment_conversion_may_narrow<typename F::value_type, typename U::value_type>::value;
+    }
+    else if constexpr (!is_complex_v<F> && is_complex_v<U>) {
+      return set_assignment_conversion_may_narrow<F, typename U::value_type>::value;
+    }
+    else if constexpr (is_complex_v<F> && !is_complex_v<U>) {
+      return false;
+    }
+    else if constexpr (!std::is_assignable_v<U &, F>) {
+      return false;
+    }
+    else {
+      // List initialization will reject narrowing conversions, so we can check if the conversion is narrowing by 
+      // testing if F can be list-initialized into U. We also check that the types are not the same, as some 
+      // types (e.g. half) have non-narrowing implicit conversions to the same type that are not accepted by list initialization.
+      return !requires(F from) { U{from}; };
+    }
+  }
+
+public:
+  static constexpr bool value = compute<from_type, to_type>();
+};
+
+template <typename From, typename To>
+inline constexpr bool set_assignment_conversion_may_narrow_v =
+  set_assignment_conversion_may_narrow<From, To>::value;
+
+#endif
 
 
 /**
@@ -67,6 +122,19 @@ class set : public BaseOp<set<T, Op>> {
 private:
   mutable typename detail::base_type_t<T> out_;
   mutable typename detail::base_type_t<Op> op_;
+
+#if MATX_CHECK_NARROWING_CONVERSIONS
+  template <typename RhsValueType>
+  static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ void CheckNarrowingAssignment()
+  {
+    using lhs_value_type = remove_cvref_t<typename T::value_type>;
+    using rhs_value_type = remove_cvref_t<RhsValueType>;
+    static_assert(
+      !set_assignment_conversion_may_narrow_v<rhs_value_type, lhs_value_type>,
+      "MatX assignment may require a narrowing implicit conversion. Cast the RHS or use a typed generator, "
+      "for example tensor = T{value}, ones<T>(), zeros<T>(), or as_type<T>(op).");
+  }
+#endif
 
 public:
   // Type specifier for reflection on class
@@ -122,11 +190,17 @@ public:
     if constexpr (is_planar_complex_v<typename T::value_type>) {
       const auto r = detail::get_value<detail::DefaultCapabilities>(
           static_cast<const decltype(op_)&>(op_), args...);
+#if MATX_CHECK_NARROWING_CONVERSIONS
+      CheckNarrowingAssignment<decltype(r)>();
+#endif
       out_.template operator()<detail::DefaultCapabilities>(args...) = r;
       return r;
     }
     else {
       const auto r = detail::get_value<CapType>(static_cast<const decltype(op_)&>(op_), args...);
+#if MATX_CHECK_NARROWING_CONVERSIONS
+      CheckNarrowingAssignment<decltype(r)>();
+#endif
       out_.template operator()<CapType>(args...) = r;
       return r;
     }
@@ -149,12 +223,19 @@ public:
     if constexpr (is_planar_complex_v<typename T::value_type>) {
       const auto in_val = detail::get_value<detail::DefaultCapabilities>(
           static_cast<const decltype(op_)&>(op_), indices...);
+#if MATX_CHECK_NARROWING_CONVERSIONS
+      CheckNarrowingAssignment<decltype(in_val)>();
+#endif
       out_.template operator()<detail::DefaultCapabilities>(indices...) = in_val;
       return in_val;
     }
     else {
       const auto in_val = detail::get_value<CapType>(static_cast<const decltype(op_)&>(op_), indices...);
       using out_type = decltype(out_.template operator()<CapType>(indices...));
+
+#if MATX_CHECK_NARROWING_CONVERSIONS
+      CheckNarrowingAssignment<decltype(in_val)>();
+#endif
       
       if constexpr (!is_vector_v<decltype(in_val)> && is_vector_v<out_type>) {
         Vector<remove_cvref_t<decltype(in_val)>, static_cast<size_t>(CapType::ept)> vec{in_val};

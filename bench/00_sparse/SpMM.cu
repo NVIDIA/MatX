@@ -22,10 +22,19 @@ void pow2_SpMM_bench(nvbench::state &state, nvbench::type_list<ValueType>)
   auto B = make_tensor<ValueType, 2>({K, N}, MATX_DEVICE_MEMORY);
   auto C = make_tensor<ValueType, 2>({M, N}, MATX_DEVICE_MEMORY);
 
-  (A = diag(1.0)).run(exec);  // very simple sparse matrix
-                              // with density = min(m,k) / m*k
-  (B = ones()).run(exec);
-  (C = zeros()).run(exec);
+  if constexpr (is_complex_v<ValueType>) {
+    using DiagType = typename ValueType::value_type;
+    (A = diag<DiagType>(DiagType{1})).run(exec);  // very simple sparse matrix
+  }
+  else if constexpr (cuda::std::is_same_v<ValueType, double>) {
+    (A = diag<double>(1.0)).run(exec);  // very simple sparse matrix
+  }
+  else {
+    (A = diag<float>(1.0f)).run(exec);  // very simple sparse matrix
+  }
+  // with density = min(m,k) / m*k
+  (B = ones<ValueType>()).run(exec);
+  (C = zeros<ValueType>()).run(exec);
 
   auto Acoo = experimental::make_zero_tensor_coo<ValueType, index_t>({M, K}, MATX_DEVICE_MEMORY);
   (Acoo = dense2sparse(A)).run(exec);

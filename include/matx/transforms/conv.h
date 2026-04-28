@@ -214,7 +214,7 @@ inline void matxDirectConv1DInternal(OutputType &o, const InType &i,
 
   dim3 gsize(grid_size, num_blocks);
   constexpr int EPT = 4;
-  constexpr int THREADS = CONV1D_ELEMENTS_PER_BLOCK / EPT;
+  constexpr int THREADS = static_cast<int>(CONV1D_ELEMENTS_PER_BLOCK / EPT);
   static_assert(CONV1D_ELEMENTS_PER_BLOCK % EPT == 0);
 
   Conv1D<THREADS, EPT><<<gsize, THREADS, shmsize, stream>>>(

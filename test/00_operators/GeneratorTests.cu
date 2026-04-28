@@ -212,7 +212,7 @@ TYPED_TEST(BasicGeneratorTestsAll, Diag)
       delta(0) = static_cast<TestType>(1.0);
       exec.sync();
 
-      (td = 0).run(exec);
+      (td = TestType{0}).run(exec);
       (td = diag(conv1d(tc, delta, MATX_C_MODE_SAME))).run(exec);
       exec.sync();
 
@@ -366,7 +366,7 @@ TYPED_TEST(BasicGeneratorTestsAll, Zeros)
   cuda::std::array<index_t, 1> s({count});
   auto t1 = make_tensor<TestType>(s);
 
-  (t1 = zeros()).run(exec);
+  (t1 = zeros<TestType>()).run(exec);
   // example-end zeros-gen-test-1
 
   exec.sync();
@@ -393,7 +393,7 @@ TYPED_TEST(BasicGeneratorTestsAll, Ones)
   cuda::std::array<index_t, 1> s({count});
   auto t1 = make_tensor<TestType>(s);
 
-  (t1 = ones()).run(exec);
+  (t1 = ones<TestType>()).run(exec);
   // example-end ones-gen-test-1    
   exec.sync();
 
@@ -454,7 +454,12 @@ TYPED_TEST(BasicGeneratorTestsAll, FillNoShape)
   const TestType value = static_cast<TestType>(11);
   // Shapeless fill() broadcasts as a scalar across `src`. The result's
   // shape comes from `src`, so fill needs no shape of its own.
-  (t1 = src + fill<TestType>(value)).run(exec);
+  if constexpr (std::is_same_v<TestType, bool>) {
+    (t1 = src || fill<TestType>(value)).run(exec);
+  }
+  else {
+    (t1 = src + fill<TestType>(value)).run(exec);
+  }
   exec.sync();
 
   for (index_t i = 0; i < count; i++) {
@@ -551,7 +556,7 @@ TYPED_TEST(BasicGeneratorTestsNumericNonComplex, Range)
   tensor_t<TestType, 1> t1{{count}};
 
   // Generate a sequence of 100 numbers starting at 1 and spaced by 1
-  (t1 = range<0>(t1.Shape(), 1, 1)).run(exec);
+  (t1 = range<0>(t1.Shape(), static_cast<TestType>(1), static_cast<TestType>(1))).run(exec);
   // example-end range-gen-test-1  
   exec.sync();
 
@@ -634,8 +639,10 @@ TYPED_TEST(BasicGeneratorTestsNumericNonComplex, Linspace)
 
     for (int row = 0; row < ls.Size(0); row++) {
       for (int col = 0; col < ls.Size(1); col++) {
-        TestType step = (stops[col] - starts[col]) / (count - 1);
-        EXPECT_TRUE(MatXUtils::MatXTypeCompare(ls(row, col), starts[col] + step * row));
+        const TestType step =
+            static_cast<TestType>((stops[col] - starts[col]) / static_cast<TestType>(count - 1));
+        const TestType expected = static_cast<TestType>(starts[col] + step * static_cast<TestType>(row));
+        EXPECT_TRUE(MatXUtils::MatXTypeCompare(ls(row, col), expected));
       }
     }
   }
@@ -652,8 +659,10 @@ TYPED_TEST(BasicGeneratorTestsNumericNonComplex, Linspace)
 
     for (int row = 0; row < ls.Size(0); row++) {
       for (int col = 0; col < ls.Size(1); col++) {
-        TestType step = (stops[row] - starts[row]) / (count - 1);
-        EXPECT_TRUE(MatXUtils::MatXTypeCompare(ls(row, col), starts[row] + step * col));
+        const TestType step =
+            static_cast<TestType>((stops[row] - starts[row]) / static_cast<TestType>(count - 1));
+        const TestType expected = static_cast<TestType>(starts[row] + step * static_cast<TestType>(col));
+        EXPECT_TRUE(MatXUtils::MatXTypeCompare(ls(row, col), expected));
       }
     }
   }    
@@ -711,8 +720,10 @@ TYPED_TEST(BasicGeneratorTestsNumericNonComplex, Linspace)
 
     for (int row = 0; row < ls.Size(0); row++) {
       for (int col = 0; col < ls.Size(1); col++) {
-        TestType step = (stops[col] - starts[col]) / (count - 1);
-        EXPECT_TRUE(MatXUtils::MatXTypeCompare(ls(row, col), starts[col] + step * row));
+        const TestType step =
+            static_cast<TestType>((stops[col] - starts[col]) / static_cast<TestType>(count - 1));
+        const TestType expected = static_cast<TestType>(starts[col] + step * static_cast<TestType>(row));
+        EXPECT_TRUE(MatXUtils::MatXTypeCompare(ls(row, col), expected));
       }
     }
   }
@@ -730,8 +741,10 @@ TYPED_TEST(BasicGeneratorTestsNumericNonComplex, Linspace)
 
     for (int row = 0; row < ls.Size(0); row++) {
       for (int col = 0; col < ls.Size(1); col++) {
-        TestType step = (stops[row] - starts[row]) / (count - 1);
-        EXPECT_TRUE(MatXUtils::MatXTypeCompare(ls(row, col), starts[row] + step * col));
+        const TestType step =
+            static_cast<TestType>((stops[row] - starts[row]) / static_cast<TestType>(count - 1));
+        const TestType expected = static_cast<TestType>(starts[row] + step * static_cast<TestType>(col));
+        EXPECT_TRUE(MatXUtils::MatXTypeCompare(ls(row, col), expected));
       }
     }
   }
@@ -749,8 +762,10 @@ TYPED_TEST(BasicGeneratorTestsNumericNonComplex, Linspace)
 
     for (int row = 0; row < ls.Size(0); row++) {
       for (int col = 0; col < ls.Size(1); col++) {
-        TestType step = (stops[col] - starts[col]) / (count - 1);
-        EXPECT_TRUE(MatXUtils::MatXTypeCompare(ls(row, col), starts[col] + step * row));
+        const TestType step =
+            static_cast<TestType>((stops[col] - starts[col]) / static_cast<TestType>(count - 1));
+        const TestType expected = static_cast<TestType>(starts[col] + step * static_cast<TestType>(row));
+        EXPECT_TRUE(MatXUtils::MatXTypeCompare(ls(row, col), expected));
       }
     }
   }
@@ -784,21 +799,14 @@ TYPED_TEST(BasicGeneratorTestsFloatNonComplex, Logspace)
                 static_cast<double>(s[s.size() - 1] - 1);
 
   for (index_t i = 0; i < count; i++) {
+    const double expected = cuda::std::pow(
+        10.0, static_cast<double>(start) + step * static_cast<double>(i));
+
     if constexpr (IsHalfType<TestType>()) {
-      EXPECT_TRUE(MatXUtils::MatXTypeCompare(
-          t1(i),
-          cuda::std::powf(10, static_cast<double>(start) +
-                                  static_cast<double>(step) *
-                                      static_cast<double>(i)),
-          2));
+      EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1(i), expected, 2));
     }
     else {
-      EXPECT_TRUE(MatXUtils::MatXTypeCompare(
-          t1(i),
-          cuda::std::powf(10, static_cast<double>(start) +
-                                  static_cast<double>(step) *
-                                      static_cast<double>(i)),
-          0.01));
+      EXPECT_TRUE(MatXUtils::MatXTypeCompare(t1(i), expected, 0.01));
     }
   }
 
@@ -988,5 +996,3 @@ TYPED_TEST(BasicGeneratorTestsFloatNonComplexNonHalf, CChirp)
   pb.reset();
   MATX_EXIT_HANDLER();
 }
-
-

@@ -95,9 +95,11 @@ namespace matx
                 "  {{\n"
                 "    return detail::ApplyGeneratorVecFunc<CapType, FreqType>([this](index_t idx) {{\n"
                 "      if (method_ == ChirpMethod::CHIRP_METHOD_LINEAR) {{\n"
-                "        return cuda::std::cos(2.0f * M_PI * (f0_ * sop_(idx) + 0.5f * ((f1_ - f0_) / t1_) * sop_(idx) * sop_(idx)));\n"
+                "        const FreqType tval = static_cast<FreqType>(sop_(idx));\n"
+                "        const FreqType phase = FreqType(2) * static_cast<FreqType>(M_PI) * (f0_ * tval + FreqType(0.5) * ((f1_ - f0_) / static_cast<FreqType>(t1_)) * tval * tval);\n"
+                "        return static_cast<FreqType>(cuda::std::cos(phase));\n"
                 "      }}\n"
-                "      return 0.0;\n"
+                "      return FreqType(0);\n"
                 "    }}, i);\n"
                 "  }}\n"
                 "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return 1; }}\n"
@@ -168,10 +170,13 @@ namespace matx
         {
           return detail::ApplyGeneratorVecFunc<CapType, FreqType>([this](index_t idx) { 
             if (method_ == ChirpMethod::CHIRP_METHOD_LINEAR) {
-              return cuda::std::cos(2.0f * M_PI * (f0_ * sop_(idx) + 0.5f * ((f1_ - f0_) / t1_) * sop_(idx) * sop_(idx)));
+              const FreqType tval = static_cast<FreqType>(sop_(idx));
+              const FreqType phase = FreqType(2) * static_cast<FreqType>(M_PI) *
+                  (f0_ * tval + FreqType(0.5) * ((f1_ - f0_) / static_cast<FreqType>(t1_)) * tval * tval);
+              return static_cast<FreqType>(cuda::std::cos(phase));
             }
 
-            return 0.0; 
+            return FreqType(0); 
           }, i);
         }
 
@@ -235,8 +240,10 @@ namespace matx
                 "  {{\n"
                 "    return detail::ApplyGeneratorVecFunc<CapType, value_type>([this](index_t idx) {{\n"
                 "      if (method_ == ChirpMethod::CHIRP_METHOD_LINEAR) {{\n"
-                "        FreqType real = cuda::std::cos(2.0f * M_PI * (f0_ * sop_(idx) + 0.5f * ((f1_ - f0_) / t1_) * sop_(idx) * sop_(idx)));\n"
-                "        FreqType imag = -cuda::std::cos(2.0f * M_PI * (f0_ * sop_(idx) + 0.5f * ((f1_ - f0_) / t1_) * sop_(idx) * sop_(idx) + 90.0/360.0));\n"
+                "        const FreqType tval = static_cast<FreqType>(sop_(idx));\n"
+                "        const FreqType phase = FreqType(2) * static_cast<FreqType>(M_PI) * (f0_ * tval + FreqType(0.5) * ((f1_ - f0_) / static_cast<FreqType>(t1_)) * tval * tval);\n"
+                "        FreqType real = static_cast<FreqType>(cuda::std::cos(phase));\n"
+                "        FreqType imag = static_cast<FreqType>(-cuda::std::cos(phase + FreqType(90.0 / 360.0)));\n"
                 "        return cuda::std::complex<FreqType>{{real, imag}};\n"
                 "      }}\n"
                 "      return cuda::std::complex<FreqType>{{0, 0}};\n"
@@ -310,8 +317,11 @@ namespace matx
         {
           return detail::ApplyGeneratorVecFunc<CapType, value_type>([this](index_t idx) { 
             if (method_ == ChirpMethod::CHIRP_METHOD_LINEAR) {
-              FreqType real = cuda::std::cos(2.0f * M_PI * (f0_ * sop_(idx) + 0.5f * ((f1_ - f0_) / t1_) * sop_(idx) * sop_(idx)));
-              FreqType imag = -cuda::std::cos(2.0f * M_PI * (f0_ * sop_(idx) + 0.5f * ((f1_ - f0_) / t1_) * sop_(idx) * sop_(idx) + 90.0/360.0));
+              const FreqType tval = static_cast<FreqType>(sop_(idx));
+              const FreqType phase = FreqType(2) * static_cast<FreqType>(M_PI) *
+                  (f0_ * tval + FreqType(0.5) * ((f1_ - f0_) / static_cast<FreqType>(t1_)) * tval * tval);
+              FreqType real = static_cast<FreqType>(cuda::std::cos(phase));
+              FreqType imag = static_cast<FreqType>(-cuda::std::cos(phase + FreqType(90.0 / 360.0)));
               return cuda::std::complex<FreqType>{real, imag};
             }
 

@@ -47,8 +47,8 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
   using ftype_strip = typename FilterType::value_type;
   using intype_strip = typename InType::value_type;
   using outtype_strip = typename OutType::value_type;
-  uint32_t filter_len = d_filter.Size(Rank-1);
-  uint32_t full_len = signal_len + filter_len - 1;
+  uint32_t filter_len = static_cast<uint32_t>(d_filter.Size(Rank - 1));
+  uint32_t full_len = static_cast<uint32_t>(signal_len + filter_len - 1);
 
   int batch_idx = blockIdx.x;
 
@@ -73,7 +73,8 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
   }
 
   // number of chunks in the signal, number of output elements / chunk size rounded up
-  uint32_t num_chunks = (signal_len + filter_len -1 + CONV1D_ELEMENTS_PER_BLOCK - 1) / CONV1D_ELEMENTS_PER_BLOCK;
+  uint32_t num_chunks = static_cast<uint32_t>(
+      (signal_len + filter_len - 1 + CONV1D_ELEMENTS_PER_BLOCK - 1) / CONV1D_ELEMENTS_PER_BLOCK);
 
   // number of chunks per Y block, rounded up
   num_chunks = (num_chunks + gridDim.y - 1) / gridDim.y;
@@ -88,7 +89,8 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
       __syncthreads();
 
     // load signal,  pad extra elements with zeros
-    for (int32_t lidx = threadIdx.x, gidx  = chunk_idx * CONV1D_ELEMENTS_PER_BLOCK - filter_len + 1 + threadIdx.x;
+    for (int32_t lidx = threadIdx.x,
+                 gidx = static_cast<int32_t>(chunk_idx * CONV1D_ELEMENTS_PER_BLOCK - filter_len + 1 + threadIdx.x);
         gidx < static_cast<int32_t>((chunk_idx+1) * CONV1D_ELEMENTS_PER_BLOCK) ;
         gidx += THREADS, lidx += THREADS) {
 
@@ -168,7 +170,7 @@ MATX_LOOP_UNROLL
 MATX_LOOP_UNROLL
     for (uint32_t i = 0; i < EPT; i++) {
       // index for the computation
-      uint32_t idx = chunk_idx * CONV1D_ELEMENTS_PER_BLOCK + i * THREADS + threadIdx.x;
+      uint32_t idx = static_cast<uint32_t>(chunk_idx * CONV1D_ELEMENTS_PER_BLOCK + i * THREADS + threadIdx.x);
       // output index is shifted by start
       int32_t gidx = idx - start;
 
@@ -251,8 +253,8 @@ __global__ void Conv2D(OutType d_out, InType1 d_in1, InType2 d_in2,
   int dy = 0, dx = 0;
 
   if( mode == MATX_C_MODE_SAME) {
-    dy = i2N / 2;
-    dx = i2M / 2;
+    dy = static_cast<int>(i2N / 2);
+    dx = static_cast<int>(i2M / 2);
 #if 0
     // uncomment this to match matlab
     if(i2N % 2 == 0) dy--;
@@ -260,8 +262,8 @@ __global__ void Conv2D(OutType d_out, InType1 d_in1, InType2 d_in2,
 #endif
 
   } else if ( mode == MATX_C_MODE_FULL) {
-    dy = i2N - 1;
-    dx = i2M - 1;
+    dy = static_cast<int>(i2N - 1);
+    dx = static_cast<int>(i2M - 1);
   }
 
   // grid stride loop over batches

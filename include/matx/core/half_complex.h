@@ -1057,7 +1057,7 @@ using matxBf16Complex = matxHalfComplex<matxBf16>; ///< Alias for a MatXbf16 com
 
 struct matxFp16ComplexPlanar : public matxFp16Complex {
   using matxFp16Complex::matxFp16Complex;
-  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxFp16ComplexPlanar() = default;
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxFp16ComplexPlanar() : matxFp16Complex(0.0f, 0.0f) {}
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxFp16ComplexPlanar(const matxFp16Complex &rhs) : matxFp16Complex(rhs) {}
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxFp16ComplexPlanar &operator=(const matxFp16Complex &rhs)
   {
@@ -1069,7 +1069,7 @@ struct matxFp16ComplexPlanar : public matxFp16Complex {
 
 struct matxBf16ComplexPlanar : public matxBf16Complex {
   using matxBf16Complex::matxBf16Complex;
-  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxBf16ComplexPlanar() = default;
+  __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxBf16ComplexPlanar() : matxBf16Complex(0.0f, 0.0f) {}
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxBf16ComplexPlanar(const matxBf16Complex &rhs) : matxBf16Complex(rhs) {}
   __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ matxBf16ComplexPlanar &operator=(const matxBf16Complex &rhs)
   {

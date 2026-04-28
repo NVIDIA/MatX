@@ -66,16 +66,20 @@ __global__ void curand_setup_kernel(Gen *states, uint64_t seed, index_t size)
  * @param min min of the range to generate
  * @param max max of the range to generate
  */
-template <typename T, typename Gen>
-__MATX_INLINE__ __MATX_DEVICE__ void get_randomi(T &val, Gen *state, double min, double max)
+template <typename T, typename Gen, typename FloatT>
+__MATX_INLINE__ __MATX_DEVICE__ void get_randomi(T &val, Gen *state, FloatT min, FloatT max)
 {
+  FloatT norm;
 
-  double normFloat = curand_uniform(state);
+  if constexpr (cuda::std::is_same_v<FloatT, double>) {
+    norm = curand_uniform_double(state);
+  }
+  else {
+    norm = curand_uniform(state);
+  }
 
-  // Scale to the provided min and max range
-  val = static_cast<T>(normFloat * (max - min)+ min);
-
-};
+  val = static_cast<T>(norm * (max - min) + min);
+}
 
 /**
  * @brief Get a random number
@@ -417,11 +421,18 @@ namespace detail {
                     std::is_same_v<T,  int64_t>
           )
           {
+            using rand_scale_t =
+              cuda::std::conditional_t<(sizeof(T) > sizeof(uint32_t)), double, float>;
             if constexpr (sizeof...(indices) == 0) {
-              get_randomi(val.data[i], &states_[0], iParams_.min_, iParams_.max_);
+              get_randomi(val.data[i], 
+                &states_[0], 
+                static_cast<rand_scale_t>(iParams_.min_), 
+                static_cast<rand_scale_t>(iParams_.max_));
             }
             else {
-              get_randomi(val.data[i], &states_[static_cast<int>(CapType::ept) * GetValC<0, Is...>(cuda::std::make_tuple(indices...)) + i], iParams_.min_, iParams_.max_);
+              get_randomi(val.data[i], 
+                &states_[static_cast<int>(CapType::ept) * GetValC<0, Is...>(cuda::std::make_tuple(indices...)) + i], 
+                static_cast<rand_scale_t>(iParams_.min_), static_cast<rand_scale_t>(iParams_.max_));
             }          
           }
         }

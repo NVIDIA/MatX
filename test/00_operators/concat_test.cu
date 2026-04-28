@@ -42,9 +42,9 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Concatenate)
   // Test contcat with nested transforms
   if constexpr (is_cuda_non_jit_executor<ExecType> && (std::is_same_v<TestType, float> || std::is_same_v<TestType, double>)) {
     auto delta = make_tensor<TestType>({1});
-    delta.SetVals({1.0});
+    delta.SetVals({static_cast<TestType>(1)});
 
-    (t1o = 0).run(exec);
+    (t1o = static_cast<TestType>(0)).run(exec);
     (t1o = concat(0, conv1d(t11, delta, MATX_C_MODE_SAME), conv1d(t12, delta, MATX_C_MODE_SAME))).run(exec);
 
     exec.sync();
