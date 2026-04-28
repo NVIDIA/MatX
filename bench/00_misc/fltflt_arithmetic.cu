@@ -1079,7 +1079,7 @@ __global__ void iterative_cast2fltflt_kernel(fltflt* __restrict__ result, int64_
       }
       // For double, increment the bit pattern to get the next representable value
       // so the loop anti-aliasing doesn't introduce a double-precision add.
-      if constexpr (std::is_same_v<T, double>) {
+      if constexpr (cuda::std::is_same_v<T, double>) {
         src_val = __longlong_as_double(__double_as_longlong(src_val) + 1LL);
       } else {
         src_val = src_val + static_cast<T>(0.0001);
