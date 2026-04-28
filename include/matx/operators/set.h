@@ -166,6 +166,9 @@ public:
                          (cuda::std::is_arithmetic_v<remove_cvref_t<out_type>> || cuda::std::is_enum_v<remove_cvref_t<out_type>>)) {
         out_.template operator()<CapType>(indices...) = static_cast<remove_cvref_t<out_type>>(in_val);
       }
+      else if constexpr (is_vector_v<out_type>) {
+        out_.template operator()<CapType>(indices...) = in_val;
+      }
       else {
         out_.template operator()<CapType>(indices...) = in_val;
       }
@@ -213,6 +216,9 @@ public:
           "                         (cuda::std::is_arithmetic_v<in_val_type> || cuda::std::is_enum_v<in_val_type>) &&\n" +
           "                         (cuda::std::is_arithmetic_v<remove_cvref_t<out_type>> || cuda::std::is_enum_v<remove_cvref_t<out_type>>)) {\n" +
           "      out_.template operator()<CapType>(indices...) = static_cast<remove_cvref_t<out_type>>(in_val);\n" +
+          "    }\n" +
+          "    else if constexpr (is_vector_v<out_type>) {\n" +
+          "      out_.template operator()<CapType>(indices...) = in_val;\n" +
           "    }\n" +
           "    else {\n" +
           "      out_.template operator()<CapType>(indices...) = in_val;\n" +

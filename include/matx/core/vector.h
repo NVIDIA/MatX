@@ -96,6 +96,10 @@ struct alignas(alignment_by_type<T>() * N) Vector {
       if constexpr ((cuda::std::is_arithmetic_v<T> || cuda::std::is_enum_v<T>) &&
                     (cuda::std::is_arithmetic_v<src_type> || cuda::std::is_enum_v<src_type>)) {
         data[i] = static_cast<T>(v.data[i]);
+      } else if constexpr (is_complex_half_v<T> || is_complex_half_v<src_type>) {
+        data[i] = v.data[i];
+      } else if constexpr (cuda::std::is_convertible_v<src_type, T>) {
+        data[i] = static_cast<T>(v.data[i]);
       } else {
         data[i] = v.data[i];
       }

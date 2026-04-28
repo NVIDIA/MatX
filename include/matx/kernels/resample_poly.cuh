@@ -79,9 +79,9 @@ __global__ void ResamplePoly1D_PhaseBlock(OutType output, InType input, FilterTy
     filter_t *s_filter = reinterpret_cast<filter_t *>(smem_filter);
 
     constexpr int Rank = OutType::Rank();
-    const index_t output_len = output.Size(Rank-1);
-    index_t filter_len = static_cast<index_t>(filter.Size(0));
-    const index_t input_len = input.Size(Rank-1);
+    const auto output_len = output.Size(Rank-1);
+    auto filter_len = filter.Size(0);
+    const auto input_len = input.Size(Rank-1);
 
     // We assume odd-length filters below. In the case of an even-length filter,
     // logically prepend the filter with a single zero to make its length odd.
@@ -191,7 +191,9 @@ __global__ void ResamplePoly1D_PhaseBlock(OutType output, InType input, FilterTy
     const index_t max_input_ind = input_len - 1;
 
     const index_t start_ind = phase_ind + up * (tid  + elem_block * elems_per_thread * THREADS);
-    const index_t last_ind = cuda::std::min(output_len - 1, start_ind + elems_per_thread * THREADS * up);
+    const auto last_ind = cuda::std::min(
+        output_len - 1,
+        static_cast<decltype(output_len)>(start_ind + elems_per_thread * THREADS * up));
     for (index_t out_ind = start_ind; out_ind <= last_ind; out_ind += THREADS * up) {
         // out_ind is the index in the output array and up_ind = out_ind * down is the
         // corresponding index in the upsampled array
@@ -236,7 +238,7 @@ __global__ void ResamplePoly1D_PhaseBlock(OutType output, InType input, FilterTy
 template <int THREADS, typename FilterType>
 __device__ inline void ResamplePoly1D_LoadFilter(typename FilterType::value_type *s_filter, const FilterType &filter)
 {
-    const index_t filter_len = static_cast<index_t>(filter.Size(0));
+    const auto filter_len = filter.Size(0);
     const int tid = threadIdx.x;
     if (filter_len % 2 == 0) {
         for (int t = tid; t < filter_len; t += THREADS) {
@@ -266,9 +268,9 @@ __global__ void ResamplePoly1D_ElemBlock(OutType output, InType input, FilterTyp
     filter_t *s_filter = reinterpret_cast<filter_t *>(smem_filter);
 
     constexpr int Rank = OutType::Rank();
-    const index_t output_len = output.Size(Rank-1);
-    index_t filter_len = static_cast<index_t>(filter.Size(0));
-    const index_t input_len = input.Size(Rank-1);
+    const auto output_len = output.Size(Rank-1);
+    auto filter_len = filter.Size(0);
+    const auto input_len = input.Size(Rank-1);
 
     const size_t filter_sz_bytes = (filter_len % 2 == 0) ? sizeof(filter_t)*(filter_len+1) : sizeof(filter_t)*filter_len;
     const bool load_filter_to_smem = (filter_sz_bytes <= MATX_RESAMPLE_POLY_MAX_SMEM_BYTES);
@@ -304,7 +306,9 @@ __global__ void ResamplePoly1D_ElemBlock(OutType output, InType input, FilterTyp
     // whether or not the filter has been loaded to shared memory.
     const index_t filter_central_tap = (filter_len-1)/2;
     const index_t start_ind = elem_block * elems_per_thread * THREADS + tid;
-    const index_t last_ind = cuda::std::min(output_len - 1, start_ind + (elems_per_thread-1) * THREADS);
+    const auto last_ind = cuda::std::min(
+        output_len - 1,
+        static_cast<decltype(output_len)>(start_ind + (elems_per_thread - 1) * THREADS));
     if (load_filter_to_smem) {
         for (index_t out_ind = start_ind; out_ind <= last_ind; out_ind += THREADS) {
             const index_t up_ind = out_ind * down;
@@ -384,9 +388,9 @@ __global__ void ResamplePoly1D_WarpCentric(OutType output, InType input, FilterT
     filter_t *s_filter = reinterpret_cast<filter_t *>(smem_filter);
 
     constexpr int Rank = OutType::Rank();
-    const index_t output_len = output.Size(Rank-1);
-    index_t filter_len = static_cast<index_t>(filter.Size(0));
-    const index_t input_len = input.Size(Rank-1);
+    const auto output_len = output.Size(Rank-1);
+    auto filter_len = filter.Size(0);
+    const auto input_len = input.Size(Rank-1);
 
     const size_t filter_sz_bytes = (filter_len % 2 == 0) ? sizeof(filter_t)*(filter_len+1) : sizeof(filter_t)*filter_len;
     const bool load_filter_to_smem = (filter_sz_bytes <= MATX_RESAMPLE_POLY_MAX_SMEM_BYTES);
@@ -411,7 +415,9 @@ __global__ void ResamplePoly1D_WarpCentric(OutType output, InType input, FilterT
     const index_t filter_len_half = filter_len/2;
     const index_t filter_central_tap = (filter_len-1)/2;
     const index_t start_ind = elem_block * elems_per_warp * NUM_WARPS;
-    const index_t last_ind = cuda::std::min(output_len - 1, start_ind + elems_per_warp * NUM_WARPS - 1);
+    const auto last_ind = cuda::std::min(
+        output_len - 1,
+        static_cast<decltype(output_len)>(start_ind + elems_per_warp * NUM_WARPS - 1));
     if (load_filter_to_smem) {
         for (index_t out_ind = start_ind+warp_id; out_ind <= last_ind; out_ind += NUM_WARPS) {
             const index_t up_ind = out_ind * down;
