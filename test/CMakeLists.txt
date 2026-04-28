@@ -9,6 +9,7 @@ set (test_sources
     00_misc/FloatFloatTests.cu
     00_misc/ProfilingTests.cu
     00_misc/PropertyTests.cu
+    00_misc/TensorAccessorTests.cu
     00_tensor/BasicTensorTests.cu
     00_tensor/DLPackTests.cu
     00_tensor/CUBTests.cu

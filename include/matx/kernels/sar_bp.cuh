@@ -44,6 +44,7 @@
 #include "matx/core/type_utils.h"
 #include "matx/core/tensor_utils.h"
 #include "matx/kernels/fltflt.h"
+#include "matx/kernels/tensor_accessor.h"
 
 #define PULSE_BLOCK_SIZE 512
 
@@ -80,24 +81,25 @@ __device__ inline fltflt ComputeRangeToPixelFloatFloat(fltflt apx, fltflt apy, f
     return fltflt_norm3d(dx, dy, dz);
 }
 
-template <typename PlatPosType, SarBpComputeType ComputeType, typename strict_compute_t, typename loose_compute_t>
-__device__ inline strict_compute_t ComputeRangeToPixel(const PlatPosType &ant_pos, const index_t pulse_idx, const loose_compute_t px, const loose_compute_t py, const loose_compute_t z0) {
-    using plat_pos_t = typename PlatPosType::value_type;
+template <typename PlatPosAccessor, SarBpComputeType ComputeType, typename strict_compute_t, typename loose_compute_t>
+__device__ inline strict_compute_t ComputeRangeToPixel(const PlatPosAccessor &ant_pos, const index_t pulse_idx, const loose_compute_t px, const loose_compute_t py, const loose_compute_t z0) {
+    using plat_pos_t = typename PlatPosAccessor::value_type;
+    constexpr int Rank = PlatPosAccessor::Rank;
 
     strict_compute_t dx, dy, dz;
-    static_assert((PlatPosType::Rank() == 1 && (std::is_same_v<plat_pos_t, double3> || std::is_same_v<plat_pos_t, double4> ||
-        std::is_same_v<plat_pos_t, float3> || std::is_same_v<plat_pos_t, float4>)) || PlatPosType::Rank() == 2,
+    static_assert((Rank == 1 && (cuda::std::is_same_v<plat_pos_t, double3> || cuda::std::is_same_v<plat_pos_t, double4> ||
+        cuda::std::is_same_v<plat_pos_t, float3> || cuda::std::is_same_v<plat_pos_t, float4>)) || Rank == 2,
         "ComputeRangeToPixel: plat_pos_t must be a 1D tensor of 3D or 4D vectorized type or a 2D tensor with size 3 (x,y,z) in the second dimension");
 
-    if constexpr (PlatPosType::Rank() == 1) {
-        const plat_pos_t ant_pos_p = ant_pos.operator()(pulse_idx);
+    if constexpr (Rank == 1) {
+        const plat_pos_t ant_pos_p = ant_pos(pulse_idx);
         dx = static_cast<strict_compute_t>(px) - static_cast<strict_compute_t>(ant_pos_p.x);
         dy = static_cast<strict_compute_t>(py) - static_cast<strict_compute_t>(ant_pos_p.y);
         dz = static_cast<strict_compute_t>(z0) - static_cast<strict_compute_t>(ant_pos_p.z);
     } else {
-        dx = static_cast<strict_compute_t>(px) - static_cast<strict_compute_t>(ant_pos.operator()(pulse_idx, 0));
-        dy = static_cast<strict_compute_t>(py) - static_cast<strict_compute_t>(ant_pos.operator()(pulse_idx, 1));
-        dz = static_cast<strict_compute_t>(z0) - static_cast<strict_compute_t>(ant_pos.operator()(pulse_idx, 2));
+        dx = static_cast<strict_compute_t>(px) - static_cast<strict_compute_t>(ant_pos(pulse_idx, 0));
+        dy = static_cast<strict_compute_t>(py) - static_cast<strict_compute_t>(ant_pos(pulse_idx, 1));
+        dz = static_cast<strict_compute_t>(z0) - static_cast<strict_compute_t>(ant_pos(pulse_idx, 2));
     }
 
     if constexpr (ComputeType == SarBpComputeType::Float) {
@@ -124,7 +126,7 @@ __global__ void SarBpFillPhaseLUT(cuda::std::complex<StorageType> *phase_lut, Co
     constexpr ComputeType four_pi_over_c = static_cast<ComputeType>(4.0 * M_PI / SPEED_OF_LIGHT);
     const ComputeType range_bin_start = static_cast<ComputeType>(tid - 0.5 * (num_range_bins-1)) * dr;
     const ComputeType phase = four_pi_over_c * ref_freq * range_bin_start;
-    if constexpr (std::is_same_v<ComputeType, float>) {
+    if constexpr (cuda::std::is_same_v<ComputeType, float>) {
         ComputeType sinx, cosx;
         ::sincosf(phase, &sinx, &cosx);
         phase_lut[tid] = cuda::std::complex<StorageType>(
@@ -147,15 +149,33 @@ using strict_or_ff_compute_param_t = typename std::conditional<ComputeType == Sa
 template <SarBpComputeType ComputeType>
 using loose_compute_param_t = typename std::conditional<ComputeType == SarBpComputeType::Double, double, float>::type;
 
-template <SarBpComputeType ComputeType>
+// Shared-memory layout is parameterized on whether the kernel runs the
+// cooperative preamble (see UseSharedPreamble in SarBp). The preamble loads
+// per-pulse antenna positions and pre-computes mcp_partial = bin_offset
+// - rtm*dr_inv once per pulse block, amortizing the global FP64 loads and
+// FP64->compute-type casts across all threads.
+template <SarBpComputeType ComputeType, bool PreambleEnabled>
 struct SarBpSharedMemory {};
 
-template <>
-struct SarBpSharedMemory<SarBpComputeType::FloatFloat> {
+template <bool PreambleEnabled>
+struct SarBpSharedMemory<SarBpComputeType::FloatFloat, PreambleEnabled> {
     fltflt ant_pos[PULSE_BLOCK_SIZE][4];
 };
 
-template <SarBpComputeType ComputeType, typename OutImageType, typename InitialImageType, typename RangeProfilesType, typename PlatPosType, typename VoxLocType, typename RangeToMcpType, bool PhaseLUT>
+template <>
+struct SarBpSharedMemory<SarBpComputeType::Float, true> {
+    // Slots: [0..2] = ant_pos.x/y/z as float, [3] = bin_offset - rtm*dr_inv
+    float ant_pos[PULSE_BLOCK_SIZE][4];
+};
+
+template <>
+struct SarBpSharedMemory<SarBpComputeType::Mixed, true> {
+    // Same layout as Float, but with double elements so strict_compute_t (double)
+    // arithmetic in the inner loop reads directly without up-casting.
+    double ant_pos[PULSE_BLOCK_SIZE][4];
+};
+
+template <SarBpComputeType ComputeType, typename OutImageType, typename InitialImageType, typename RangeProfilesType, typename PlatPosType, typename VoxLocType, typename RangeToMcpType, bool PhaseLUT, bool IsUnitStride>
 __launch_bounds__(16*16)
 __global__ void SarBp(OutImageType output, const InitialImageType initial_image, const __grid_constant__ RangeProfilesType range_profiles, const __grid_constant__ PlatPosType platform_positions, const __grid_constant__ VoxLocType voxel_locations, const __grid_constant__ RangeToMcpType range_to_mcp,
                       strict_or_ff_compute_param_t<ComputeType> dr_inv,
@@ -171,11 +191,14 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
     static_assert(is_complex_v<typename InitialImageType::value_type>, "Initial image must be complex");
     static_assert(is_complex_v<typename RangeProfilesType::value_type>, "Range profiles must be complex");
 
-    static_assert(
-        (is_matx_op<RangeToMcpType>() && (RangeToMcpType::Rank() == 0 || RangeToMcpType::Rank() == 1) &&
-        (std::is_same_v<typename RangeToMcpType::value_type, float> || std::is_same_v<typename RangeToMcpType::value_type, double> || std::is_same_v<typename RangeToMcpType::value_type, fltflt>)) ||
-        (std::is_same_v<RangeToMcpType, float> || std::is_same_v<RangeToMcpType, double> || std::is_same_v<RangeToMcpType, fltflt>),
-        "RangeToMcpType must currently be a 0D tensor or scalar of type float, double, or fltflt");
+    static_assert(is_matx_op<RangeToMcpType>(),
+        "RangeToMcpType must be a MatX operator");
+    static_assert(RangeToMcpType::Rank() == 0 || RangeToMcpType::Rank() == 1,
+        "RangeToMcpType must be a rank-0 or rank-1 operator");
+    static_assert(cuda::std::is_same_v<typename RangeToMcpType::value_type, float> ||
+                  cuda::std::is_same_v<typename RangeToMcpType::value_type, double> ||
+                  cuda::std::is_same_v<typename RangeToMcpType::value_type, fltflt>,
+        "RangeToMcpType::value_type must be float, double, or fltflt");
 
     using initial_image_t = typename InitialImageType::value_type;
     using image_t = typename OutImageType::value_type;
@@ -194,34 +217,68 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
     const index_t ix = static_cast<index_t>(blockIdx.x * blockDim.x + threadIdx.x);
     const index_t iy = static_cast<index_t>(blockIdx.y * blockDim.y + threadIdx.y);
 
-    __shared__ SarBpSharedMemory<ComputeType> sh_mem;
+    // IsUnitStride=true implies the hot inputs must be tensor views (they
+    // use .Data()). The transform-level dispatch enforces this; the
+    // static_asserts below make the contract explicit so a misuse fails at
+    // compile time rather than via a missing-method error deep in the kernel.
+    if constexpr (IsUnitStride) {
+        static_assert(is_tensor_view_v<RangeProfilesType>,
+                      "SarBp IsUnitStride path requires range_profiles to be a tensor view");
+        static_assert(is_tensor_view_v<PlatPosType>,
+                      "SarBp IsUnitStride path requires platform_positions to be a tensor view");
+    }
+
+    // The cooperative shared-memory preamble is required for FloatFloat (its
+    // inner loop reads directly from shared memory) and enabled for Float and
+    // Mixed when PhaseLUT is on.  With PhaseLUT=false the inner loop still
+    // needs diffR = dist - rtm for sincos, which the preamble does not
+    // preserve, so fall back to direct global reads in that case.
+    constexpr bool UseSharedPreamble =
+        (ComputeType == SarBpComputeType::FloatFloat) ||
+        ((ComputeType == SarBpComputeType::Float ||
+          ComputeType == SarBpComputeType::Mixed) && PhaseLUT);
+
+    __shared__ SarBpSharedMemory<ComputeType, UseSharedPreamble> sh_mem;
 
     const bool is_valid = ix < image_width && iy < image_height;
-    if constexpr (ComputeType != SarBpComputeType::FloatFloat) {
-        // For the FloatFloat ComputeType, keep all threads active to participate in CTA-wide
-        // antenna position loads
+    if constexpr (!UseSharedPreamble) {
+        // When the preamble is enabled, keep all threads active so they can
+        // participate in the CTA-wide cooperative loads of antenna positions.
         if (! is_valid) return;
     }
 
     const index_t num_pulses = range_profiles.Size(0);
     const index_t num_range_bins = range_profiles.Size(1);
 
-    static_assert(std::is_same_v<voxel_loc_t, double3> || std::is_same_v<voxel_loc_t, double4> ||
-        std::is_same_v<voxel_loc_t, float3> || std::is_same_v<voxel_loc_t, float4>, "SarBp: VoxLocType must represent a 2D operator of type double3, double4, float3, or float4");
+    static_assert(cuda::std::is_same_v<voxel_loc_t, double3> || cuda::std::is_same_v<voxel_loc_t, double4> ||
+        cuda::std::is_same_v<voxel_loc_t, float3> || cuda::std::is_same_v<voxel_loc_t, float4>, "SarBp: VoxLocType must represent a 2D operator of type double3, double4, float3, or float4");
+    // voxel_locations is read once per thread (outside the pulse loop), so it
+    // is deliberately not covered by the IsUnitStride fast-path logic. The
+    // one-shot cost of its operator() is negligible and its layout is free to
+    // be anything the caller wants without blocking fast-path eligibility.
     const voxel_loc_t voxel_loc = is_valid ? voxel_locations(iy, ix) : voxel_loc_t{};
     const loose_compute_t py = voxel_loc.y;
     const loose_compute_t px = voxel_loc.x;
     const loose_compute_t pz = voxel_loc.z;
 
-    const auto r_to_mcp = [&range_to_mcp](index_t p) -> auto {
-        if constexpr (is_matx_op<RangeToMcpType>()) {
-            if constexpr (RangeToMcpType::Rank() == 0) {
-                return range_to_mcp();
-            } else {
-                return range_to_mcp(p);
-            }
+    // TensorAccessor wraps each hot tensor and picks the fast pointer path
+    // when IsUnitStride && is_tensor_view_v<Op>, otherwise forwards to
+    // operator(). Binding the tensor's Data() and Stride(0) into the
+    // accessor's members forces the compiler to materialize the grid-constant
+    // LDCs once at kernel entry rather than reloading inside the pulse loop.
+    detail::TensorAccessor<RangeProfilesType, IsUnitStride> rp(range_profiles);
+    detail::TensorAccessor<PlatPosType, IsUnitStride> pp(platform_positions);
+
+    // range_to_mcp is required to be a rank-0 or rank-1 MatX operator; the
+    // TensorAccessor picks the fast pointer path on IsUnitStride for tensor
+    // views or forwards to operator() for computed ops (e.g. ConstVal).
+    const detail::TensorAccessor<RangeToMcpType, IsUnitStride> rtm_acc(range_to_mcp);
+
+    const auto r_to_mcp = [rtm_acc](index_t p) -> auto {
+        if constexpr (RangeToMcpType::Rank() == 0) {
+            return rtm_acc();
         } else {
-            return range_to_mcp;
+            return rtm_acc(p);
         }
     };
 
@@ -238,7 +295,7 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
         } else {
             // With PhaseLUT == false, strict_or_ff_compute_t is either float or double, so we can use sincos[f] directly.
             strict_or_ff_compute_t sinx, cosx;
-            if constexpr (std::is_same_v<strict_compute_t, double>) {
+            if constexpr (cuda::std::is_same_v<strict_compute_t, double>) {
                 ::sincos(phase_correction_partial * diffR, &sinx, &cosx);
             } else {
                 ::sincosf(phase_correction_partial * diffR, &sinx, &cosx);
@@ -258,23 +315,42 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
     for (int block = 0; block < num_pulse_blocks; ++block) {
         const int num_pulses_in_block = num_pulses - block * PULSE_BLOCK_SIZE < PULSE_BLOCK_SIZE ?
             num_pulses - block * PULSE_BLOCK_SIZE : PULSE_BLOCK_SIZE;
-        if constexpr (ComputeType == SarBpComputeType::FloatFloat) {
+        if constexpr (UseSharedPreamble) {
             __syncthreads();
             for (index_t ip = tid; ip < num_pulses_in_block; ip += blockDim.x * blockDim.y) {
                 const int p = block * PULSE_BLOCK_SIZE + ip;
-                if constexpr (PlatPosType::Rank() == 1) {
-                    const plat_pos_t ant_pos_p = platform_positions.operator()(p);
-                    sh_mem.ant_pos[ip][0] = static_cast<fltflt>(ant_pos_p.x);
-                    sh_mem.ant_pos[ip][1] = static_cast<fltflt>(ant_pos_p.y);
-                    sh_mem.ant_pos[ip][2] = static_cast<fltflt>(ant_pos_p.z);
+                // Accessor does the IsUnitStride / rank dispatch internally,
+                // so we just ask for (apx, apy, apz) uniformly.
+                auto load_xyz = [&]() {
+                    if constexpr (PlatPosType::Rank() == 1) {
+                        const plat_pos_t ap = pp(p);
+                        return cuda::std::make_tuple(ap.x, ap.y, ap.z);
+                    } else {
+                        return cuda::std::make_tuple(pp(p, 0), pp(p, 1), pp(p, 2));
+                    }
+                };
+                const auto xyz = load_xyz();
+
+                if constexpr (ComputeType == SarBpComputeType::FloatFloat) {
+                    sh_mem.ant_pos[ip][0] = static_cast<fltflt>(cuda::std::get<0>(xyz));
+                    sh_mem.ant_pos[ip][1] = static_cast<fltflt>(cuda::std::get<1>(xyz));
+                    sh_mem.ant_pos[ip][2] = static_cast<fltflt>(cuda::std::get<2>(xyz));
+                    const fltflt rtm = static_cast<fltflt>(r_to_mcp(p));
+                    const fltflt neg_rtm = fltflt{-rtm.hi, -rtm.lo};
+                    sh_mem.ant_pos[ip][3] = fltflt_fma(neg_rtm, dr_inv, bin_offset);
                 } else {
-                    sh_mem.ant_pos[ip][0] = static_cast<fltflt>(platform_positions.operator()(p, 0));
-                    sh_mem.ant_pos[ip][1] = static_cast<fltflt>(platform_positions.operator()(p, 1));
-                    sh_mem.ant_pos[ip][2] = static_cast<fltflt>(platform_positions.operator()(p, 2));
+                    // Float / Mixed: cast inputs to strict_compute_t (float / double)
+                    // once per pulse here, instead of once per pulse per pixel.
+                    sh_mem.ant_pos[ip][0] = static_cast<strict_compute_t>(cuda::std::get<0>(xyz));
+                    sh_mem.ant_pos[ip][1] = static_cast<strict_compute_t>(cuda::std::get<1>(xyz));
+                    sh_mem.ant_pos[ip][2] = static_cast<strict_compute_t>(cuda::std::get<2>(xyz));
+                    const strict_compute_t rtm = static_cast<strict_compute_t>(r_to_mcp(p));
+                    if constexpr (cuda::std::is_same_v<strict_compute_t, double>) {
+                        sh_mem.ant_pos[ip][3] = ::fma(-rtm, dr_inv, static_cast<double>(bin_offset));
+                    } else {
+                        sh_mem.ant_pos[ip][3] = ::fmaf(-rtm, dr_inv, bin_offset);
+                    }
                 }
-                const fltflt rtm = static_cast<fltflt>(r_to_mcp(p));
-                const fltflt neg_rtm = fltflt{-rtm.hi, -rtm.lo};
-                sh_mem.ant_pos[ip][3] = fltflt_fma(neg_rtm, dr_inv, bin_offset);
             }
             __syncthreads();
             if (! is_valid) {
@@ -303,12 +379,46 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
                 const float adjust = ::floorf(frac);  // -1, 0, or 1
                 bin_floor_int = static_cast<index_t>(floor_hi + adjust);
                 w = frac - adjust;
+            } else if constexpr (UseSharedPreamble) {
+                // Float / Mixed with shared-mem preamble: antenna position and
+                // mcp_partial have been pre-loaded / pre-computed in shared
+                // memory, so the inner loop is pure strict_compute_t arithmetic.
+                const strict_compute_t apx = sh_mem.ant_pos[ip][0];
+                const strict_compute_t apy = sh_mem.ant_pos[ip][1];
+                const strict_compute_t apz = sh_mem.ant_pos[ip][2];
+                const strict_compute_t mcp_partial = sh_mem.ant_pos[ip][3];
+                const strict_compute_t dx = static_cast<strict_compute_t>(px) - apx;
+                const strict_compute_t dy = static_cast<strict_compute_t>(py) - apy;
+                const strict_compute_t dz = static_cast<strict_compute_t>(pz) - apz;
+                strict_compute_t dist;
+                if constexpr (ComputeType == SarBpComputeType::Float) {
+                    dist = ::sqrtf(dx*dx + dy*dy + dz*dz);
+                } else {
+#if __CUDA_ARCH__ == 700 || __CUDA_ARCH__ == 800 || __CUDA_ARCH__ == 900 || __CUDA_ARCH__ == 1000
+                    dist = ::sqrt(dx*dx + dy*dy + dz*dz);
+#else
+                    dist = NewtonRaphsonSqrt(dx*dx + dy*dy + dz*dz);
+#endif
+                }
+                // bin = (dist - rtm)*dr_inv + bin_offset = dist*dr_inv + mcp_partial
+                const strict_compute_t bin = dist * dr_inv + mcp_partial;
+                strict_compute_t bin_floor;
+                if constexpr (cuda::std::is_same_v<strict_compute_t, double>) {
+                    bin_floor = ::floor(bin);
+                } else {
+                    bin_floor = ::floorf(bin);
+                }
+                w = static_cast<loose_compute_t>(bin - bin_floor);
+                bin_floor_int = static_cast<index_t>(bin_floor);
+                // diffR is unused when PhaseLUT=true (required for this branch);
+                // assign to avoid any maybe-uninitialized warning downstream.
+                diffR = dist;
             } else {
-                diffR = ComputeRangeToPixel<PlatPosType, ComputeType, strict_compute_t, loose_compute_t>(
-                    platform_positions, p, px, py, pz) - static_cast<strict_compute_t>(r_to_mcp(p));
+                diffR = ComputeRangeToPixel<decltype(pp), ComputeType, strict_compute_t, loose_compute_t>(
+                    pp, p, px, py, pz) - static_cast<strict_compute_t>(r_to_mcp(p));
                 const strict_compute_t bin = diffR * dr_inv + bin_offset;
                 strict_compute_t bin_floor;
-                if constexpr (std::is_same_v<strict_compute_t, double>) {
+                if constexpr (cuda::std::is_same_v<strict_compute_t, double>) {
                     bin_floor = ::floor(bin);
                 } else {
                     bin_floor = ::floorf(bin);
@@ -317,21 +427,15 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
                 bin_floor_int = static_cast<index_t>(bin_floor);
             }
             if (bin_floor_int >= 0 && bin_floor_int < static_cast<index_t>(num_range_bins-1)) {
-
-                range_profiles_t sample_lo, sample_hi;
-
-                cuda::std::apply([&sample_lo, &range_profiles](auto &&...args) {
-                    sample_lo = range_profiles.operator()(args...);
-                }, cuda::std::make_tuple(p, bin_floor_int));
-
-                cuda::std::apply([&sample_hi, &range_profiles](auto &&...args) {
-                    sample_hi = range_profiles.operator()(args...);
-                }, cuda::std::make_tuple(p, bin_floor_int + 1));
+                // rp accessor picks the fast pointer path on IsUnitStride or
+                // falls through to operator().
+                const range_profiles_t sample_lo = rp(p, bin_floor_int);
+                const range_profiles_t sample_hi = rp(p, bin_floor_int + 1);
 
                 const loose_complex_compute_t sample = [&sample_lo, &sample_hi, &w]() -> loose_complex_compute_t {
                     const loose_complex_compute_t loose_sample_lo = static_cast<loose_complex_compute_t>(sample_lo);
                     const loose_complex_compute_t loose_sample_hi = static_cast<loose_complex_compute_t>(sample_hi);
-                    if constexpr (std::is_same_v<loose_compute_t, float>) {
+                    if constexpr (cuda::std::is_same_v<loose_compute_t, float>) {
                         return loose_complex_compute_t{
                             __fmaf_rn(w, loose_sample_hi.real(), __fmaf_rn(-w, loose_sample_lo.real(), loose_sample_lo.real())),
                             __fmaf_rn(w, loose_sample_hi.imag(), __fmaf_rn(-w, loose_sample_lo.imag(), loose_sample_lo.imag()))
@@ -356,12 +460,17 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
     } // pulse block
 
     if (is_valid) {
-        initial_image_t initial_image_voxel = initial_image.operator()(iy, ix);
+        // initial_image and output are each touched exactly once per thread,
+        // so they are intentionally not included in the IsUnitStride fast-path
+        // check in the transform layer. Direct operator() calls keep the
+        // transform's fast-path eligibility as permissive as possible:
+        // non-unit-stride or computed-op initial_image (e.g. ConstVal zeros)
+        // and non-unit-stride output layouts do not disqualify the fast path
+        // for the hot tensors (range_profiles, platform_positions, rtm).
+        const initial_image_t initial_image_voxel = initial_image.operator()(iy, ix);
         const image_t voxel_contribution {
             initial_image_voxel.real() + accum.real(), initial_image_voxel.imag() + accum.imag() };
-        cuda::std::apply([voxel_contribution, &output](auto &&...args) {
-            output.operator()(args...) = voxel_contribution;
-        }, cuda::std::make_tuple(iy, ix));
+        output.operator()(iy, ix) = voxel_contribution;
     }
 }
 
