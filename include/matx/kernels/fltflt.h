@@ -60,9 +60,9 @@ struct alignas(8) fltflt {
     __MATX_INLINE__ fltflt() = default;
     // On device, extract hi/lo from IEEE-754 double bits with no FP64 instructions.
     //
-    // Accuracy guarantees (device fast path, for normal doubles in float range):
-    //   - fl(hi + lo) == hi  (fast2sum ensures no rounding error when adding lo back).
-    //   - |x - (hi+lo)| <= 8 ulp(x) if hi and lo in normal range.
+    // Accuracy guarantees:
+    //   - fl(hi + lo) == hi  (fast2sum ensures no rounding error when adding lo back) for |x| <= FLT_MAX
+    //   - |x - (hi+lo)| <= 8 ulp(x) for |x| <= FLT_MAX
     //   - NaN, Inf, subnormal doubles, and doubles outside float range fall back to
     //     hi = (float)x.
     //   - If hi is NaN or Inf, lo can be arbitrary.
@@ -71,7 +71,14 @@ struct alignas(8) fltflt {
         // Constexpr evaluation on device uses the standard double-subtraction path.
         if (__builtin_is_constant_evaluated()) {
             hi = static_cast<float>(x);
-            lo = static_cast<float>(x - static_cast<double>(hi));
+            if (cuda::std::isfinite(hi)) {
+                lo = static_cast<float>(x - static_cast<double>(hi));
+                float s = hi + lo;
+                lo = lo - (s - hi);
+                hi = s;
+            } else {
+                lo = 0.0f;
+            }
         } else {
             unsigned long long xbits = __double_as_longlong(x);
             unsigned int sign = static_cast<unsigned int>(xbits >> 63);
@@ -91,6 +98,13 @@ struct alignas(8) fltflt {
                 lo = (__int2float_rn(r) * 0x1p-55f) * __int_as_float((sign << 31) | (hi_exp << 23));
                 // fast2sum: adjust hi to round-to-nearest and absorb the correction into lo,
                 // guaranteeing fl(hi + lo) == hi.
+                // two special cases can result in overflow here:
+                // 1. |x| >= FLT_MAX + ulp(FLT_MAX)/2, 
+                //   input: hi == +/-Inf, lo normal. 
+                //   output: hi == +/-Inf, lo == NaN.
+                // 2. |x| > FLT_MAX + ulp(FLT_MAX)/2 - ulp(ulp(FLT_MAX)/2)/2: 
+                //   input: hi == +/-FLT_MAX, lo == +/-ulp(FLT_MAX)/2
+                //   output: hi == +/-Inf, lo == -/+Inf.
                 float s = hi + lo;
                 lo = lo - (s - hi);
                 hi = s;
@@ -98,7 +112,14 @@ struct alignas(8) fltflt {
         }
 #else
         hi = static_cast<float>(x);
-        lo = static_cast<float>(x - static_cast<double>(hi));
+        if (cuda::std::isfinite(hi)) {
+            lo = static_cast<float>(x - static_cast<double>(hi));
+            float s = hi + lo;
+            lo = lo - (s - hi);
+            hi = s;
+        } else {
+            lo = 0.0f;
+        }
 #endif
     }
     __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ constexpr explicit fltflt(float x) : hi(x), lo(0.0f) {}
