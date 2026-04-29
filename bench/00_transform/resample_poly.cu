@@ -40,19 +40,11 @@ using namespace matx;
 using resample_poly_types =
     nvbench::type_list<cuda::std::complex<float>, cuda::std::complex<double>, float, double>;
 
-// 1D polyphase resampler.
-//
-// Axes (defaults can be overriden on the command line, e.g.
-//   --axis "Up=[2,3,4,5]" --axis "Down=[1,2,3]" --axis "Signal Size=[131072,524288]"
-// ):
-//   - Up           : upsample factor (default 4)
-//   - Down         : downsample factor (default 5)
-//   - Signal Size  : input length in samples (default 512000)
-//   - Filter Size  : filter length, or 0 to auto-compute as
-//                    2 * 10 * max(up, down) + 1 (default: 0)
-template <typename ValueType>
-void resample_poly_1d(nvbench::state &state,
-                     nvbench::type_list<ValueType>)
+// Shared body for the 1D polyphase resampler benchmarks. Templated on signal
+// and filter types separately so we can cover real-filter / complex-signal
+// pipelines (common in radar/SDR) in addition to the matched-type case.
+template <typename SignalType, typename FilterType>
+static void resample_poly_1d_run(nvbench::state &state)
 {
   cudaExecutor exec{0};
 
@@ -69,14 +61,14 @@ void resample_poly_1d(nvbench::state &state,
   //   out_len = ceil(signal_len * up / down)
   const index_t out_len = (signal_len * up + down - 1) / down;
 
-  auto in     = make_tensor<ValueType>({signal_len});
-  auto filter = make_tensor<ValueType>({filter_len});
-  auto out    = make_tensor<ValueType>({out_len});
+  auto in     = make_tensor<SignalType>({signal_len});
+  auto filter = make_tensor<FilterType>({filter_len});
+  auto out    = make_tensor<SignalType>({out_len});
 
   // Populate inputs with deterministic random data so first-run timing
   // doesn't get charged for page faults on the unified-memory fast path.
-  (in     = random<ValueType>({signal_len}, NORMAL)).run(exec);
-  (filter = random<ValueType>({filter_len}, NORMAL)).run(exec);
+  (in     = random<SignalType>({signal_len}, NORMAL)).run(exec);
+  (filter = random<FilterType>({filter_len}, NORMAL)).run(exec);
 
   in.PrefetchDevice(0);
   filter.PrefetchDevice(0);
@@ -110,6 +102,23 @@ void resample_poly_1d(nvbench::state &state,
   thr.set_string("description", "Million input samples per second");
   thr.set_float64("value", static_cast<double>(signal_len) / seconds / 1e6);
 }
+
+// 1D polyphase resampler with matched signal/filter element types.
+//
+// Axes (defaults can be overriden on the command line, e.g.
+//   --axis "Up=[2,3,4,5]" --axis "Down=[1,2,3]" --axis "Signal Size=[131072,524288]"
+// ):
+//   - Up           : upsample factor (default 4)
+//   - Down         : downsample factor (default 5)
+//   - Signal Size  : input length in samples (default 512000)
+//   - Filter Size  : filter length, or 0 to auto-compute as
+//                    2 * 10 * max(up, down) + 1 (default: 0)
+template <typename ValueType>
+void resample_poly_1d(nvbench::state &state,
+                     nvbench::type_list<ValueType>)
+{
+  resample_poly_1d_run<ValueType, ValueType>(state);
+}
 NVBENCH_BENCH_TYPES(resample_poly_1d, NVBENCH_TYPE_AXES(resample_poly_types))
     .add_int64_axis("Up",          {4})
     .add_int64_axis("Down",        {5})
@@ -117,4 +126,24 @@ NVBENCH_BENCH_TYPES(resample_poly_1d, NVBENCH_TYPE_AXES(resample_poly_types))
     // Filter Size = 0 (or any value <= 0) is a sentinel meaning "auto-compute
     // from up/down via 2*10*max(up,down)+1". The actual filter length used
     // shows up in the "Eff. Filter" summary column on every row.
+    .add_int64_axis("Filter Size", {0});
+
+using resample_poly_complex_types =
+    nvbench::type_list<cuda::std::complex<float>, cuda::std::complex<double>>;
+
+// 1D polyphase resampler, complex signal with real-valued filter. Real
+// filters on complex I/Q data are the common case in radar/SDR pipelines,
+// and exercise a different mixed-type code path than the matched variant.
+template <typename ValueType>
+void resample_poly_1d_real_filter(nvbench::state &state,
+                                  nvbench::type_list<ValueType>)
+{
+  using filter_t = typename ValueType::value_type;
+  resample_poly_1d_run<ValueType, filter_t>(state);
+}
+NVBENCH_BENCH_TYPES(resample_poly_1d_real_filter,
+                    NVBENCH_TYPE_AXES(resample_poly_complex_types))
+    .add_int64_axis("Up",          {4})
+    .add_int64_axis("Down",        {5})
+    .add_int64_axis("Signal Size", {512000})
     .add_int64_axis("Filter Size", {0});
