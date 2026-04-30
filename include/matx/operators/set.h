@@ -42,7 +42,7 @@
 #include "matx/core/operator_utils.h"
 
 #ifndef MATX_CHECK_NARROWING_CONVERSIONS
-#define MATX_CHECK_NARROWING_CONVERSIONS 1
+#define MATX_CHECK_NARROWING_CONVERSIONS 0
 #endif
 
 namespace matx {
