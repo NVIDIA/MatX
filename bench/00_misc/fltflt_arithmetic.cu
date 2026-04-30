@@ -1077,7 +1077,13 @@ __global__ void iterative_cast2fltflt_kernel(fltflt* __restrict__ result, int64_
         acc[ilp] = static_cast<fltflt>(src_val);
         asm volatile("" : "+f"(acc[ilp].hi), "+f"(acc[ilp].lo));
       }
-      src_val = src_val + static_cast<T>(0.0001);
+      // For double, increment the bit pattern to get the next representable value
+      // so the loop anti-aliasing doesn't introduce a double-precision add.
+      if constexpr (cuda::std::is_same_v<T, double>) {
+        src_val = __longlong_as_double(__double_as_longlong(src_val) + 1LL);
+      } else {
+        src_val = src_val + static_cast<T>(0.0001);
+      }
     }
 
     fltflt result_val = acc[0];

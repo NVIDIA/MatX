@@ -58,8 +58,70 @@ struct alignas(8) fltflt {
     // nvcc will warn about __host__ and __device__ annotations on default constructors because default
     // constructors will not run in all conditions (e.g., in static shared memory CUDA kernel allocations).
     __MATX_INLINE__ fltflt() = default;
-    __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ constexpr explicit fltflt(double x)
-        : hi(static_cast<float>(x)), lo(static_cast<float>(x - static_cast<double>(hi))) {}
+    // On device, extract hi/lo from IEEE-754 double bits with no FP64 instructions.
+    //
+    // Accuracy guarantees:
+    //   - fl(hi + lo) == hi  (fast2sum ensures no rounding error when adding lo back) for |x| <= FLT_MAX
+    //   - |x - (hi+lo)| <= 8 ulp(x) for |x| <= FLT_MAX
+    //   - NaN, Inf, subnormal doubles, and doubles outside float range fall back to
+    //     hi = (float)x.
+    //   - If hi is NaN or Inf, lo can be arbitrary.
+    __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ constexpr explicit fltflt(double x) {
+#if defined(__CUDA_ARCH__)
+        // Constexpr evaluation on device uses the standard double-subtraction path.
+        if (__builtin_is_constant_evaluated()) {
+            hi = static_cast<float>(x);
+            if (cuda::std::isfinite(hi)) {
+                lo = static_cast<float>(x - static_cast<double>(hi));
+                float s = hi + lo;
+                lo = lo - (s - hi);
+                hi = s;
+            } else {
+                lo = 0.0f;
+            }
+        } else {
+            unsigned long long xbits = __double_as_longlong(x);
+            unsigned int sign = static_cast<unsigned int>(xbits >> 63);
+            unsigned int e_x = static_cast<unsigned int>((xbits >> 52) & 0x7FFU);
+            unsigned long long mant = xbits & 0x000FFFFFFFFFFFFFULL;
+            // hi_exp: float biased exponent = (e_x - 1023) + 127 = e_x - 896.
+            int hi_exp = static_cast<int>(e_x) - 896;
+            if (e_x == 0 || hi_exp <= 0 || hi_exp >= 255) {
+                hi = (float)x;
+                lo = 0.0f;
+            } else {
+                // hi: top 23 explicit mantissa bits, round-nearest, ties away from zero.
+                // use + to mux in the mantissa, as we may need to carry into the exponent.
+                hi = __int_as_float((sign << 31) | ((unsigned int)hi_exp << 23) + (((unsigned int)(mant >> 28) + 1) >> 1));
+                // r: remainder as signed integer (we shift by 3 to get the 29 mantissa bits, with top-most bit the sign bit)
+                int r = static_cast<int>(static_cast<unsigned int>(mant) << 3);
+                lo = (__int2float_rn(r) * 0x1p-55f) * __int_as_float((sign << 31) | (hi_exp << 23));
+                // fast2sum: adjust hi to round-to-nearest and absorb the correction into lo,
+                // guaranteeing fl(hi + lo) == hi.
+                // two special cases can result in overflow here:
+                // 1. |x| >= FLT_MAX + ulp(FLT_MAX)/2, 
+                //   input: hi == +/-Inf, lo normal. 
+                //   output: hi == +/-Inf, lo == NaN.
+                // 2. |x| > FLT_MAX + ulp(FLT_MAX)/2 - ulp(ulp(FLT_MAX)/2)/2: 
+                //   input: hi == +/-FLT_MAX, lo == +/-ulp(FLT_MAX)/2
+                //   output: hi == +/-Inf, lo == -/+Inf.
+                float s = hi + lo;
+                lo = lo - (s - hi);
+                hi = s;
+            }
+        }
+#else
+        hi = static_cast<float>(x);
+        if (cuda::std::isfinite(hi)) {
+            lo = static_cast<float>(x - static_cast<double>(hi));
+            float s = hi + lo;
+            lo = lo - (s - hi);
+            hi = s;
+        } else {
+            lo = 0.0f;
+        }
+#endif
+    }
     __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ constexpr explicit fltflt(float x) : hi(x), lo(0.0f) {}
     __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ constexpr explicit fltflt(float hi_, float lo_) : hi(hi_), lo(lo_) {}
     __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ constexpr explicit operator double() const {
