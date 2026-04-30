@@ -138,13 +138,53 @@ namespace matx
 
 	      __MATX_INLINE__ PermuteOp(const T &op, const cuda::std::array<int32_t, T::Rank()> &dims) : op_(op) {
 
+          [[maybe_unused]] cuda::std::array<bool, Rank()> seen{};
           for(int32_t i = 0; i < Rank(); i++) {
             [[maybe_unused]] int32_t dim = dims[i];
             MATX_ASSERT_STR(dim < Rank() && dim >= 0, matxInvalidDim, "PermuteOp:  Invalid permute index.");
+            MATX_ASSERT_STR(!seen[dim], matxInvalidDim, "PermuteOp:  Duplicate permute index.");
+            seen[dim] = true;
 
             dims_[i] = dims[i];
           }
           MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
+        }
+
+        // For permuted-output axis K, find the input axis j with dims[j]==K
+        // and return inds[j]. The accumulator form with a conditional store
+        // (rather than an early return) is intentional: ptxas keeps `result`
+        // in a register and the unrolled loop becomes a predicated chain. An
+        // early-return inside the unrolled loop spills the inds array to
+        // local memory because each iteration becomes a real exit edge that
+        // inhibits the optimization. With the constructor's range +
+        // uniqueness checks, exactly one j matches per K.
+        template <size_t K, typename Dims, typename Inds>
+        static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ index_t
+        lookup_for_axis_(const Dims &dims, const Inds &inds)
+        {
+          index_t result = 0;
+          MATX_LOOP_UNROLL
+          for (int32_t j = 0; j < Rank(); j++) {
+            if (dims[j] == static_cast<int32_t>(K)) {
+              result = inds[j];
+            }
+          }
+          return result;
+        }
+
+        // Aggregate-initialize the permuted-index array via the parameter pack
+        // expansion of lookup_for_axis_<K>(...) and forward it to op. Avoids a
+        // mutable local array, which was the source of register spills (when
+        // built via direct indexed store) and warnings (when conditionally
+        // written in a double loop).
+        template <typename CapType, typename Op, typename Dims, typename Inds, size_t... K>
+        static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto)
+        apply_permuted_(Op &&op, const Dims &dims, const Inds &inds,
+                        cuda::std::index_sequence<K...>)
+        {
+          return get_value<CapType>(cuda::std::forward<Op>(op),
+                                    cuda::std::array<index_t, Rank()>{
+                                        lookup_for_axis_<K>(dims, inds)...});
         }
 
         template <typename CapType, typename Op, typename Dims, typename... Is>
@@ -154,31 +194,10 @@ namespace matx
             static_assert(sizeof...(Is)==Rank());
             static_assert((std::is_convertible_v<Is, index_t> && ... ));
 
-            // convert variadic type to tuple so we can read/update
-            cuda::std::array<index_t, Rank()> inds{indices...};
-MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
-            cuda::std::array<index_t, Rank()> ind;
-MATX_IGNORE_WARNING_POP_GCC
-
-#if 0
-    //This causes register spills but might be faster if Rank is large
-MATX_LOOP_UNROLL
-            for(int32_t i = 0; i < Rank(); i++) {
-              ind[dims_[i]] = inds[i];
-            }
-#else
-MATX_LOOP_UNROLL
-      // use double loop to avoid register spills
-            for(int32_t i = 0; i < Rank(); i++) {
-MATX_LOOP_UNROLL
-              for(int32_t j = 0; j < Rank(); j++) {
-                if(dims[j] == i) {
-                  ind[i] = inds[j];
-                }
-              }
-            }
-#endif
-            return get_value<CapType>(cuda::std::forward<Op>(op), ind);
+            const cuda::std::array<index_t, Rank()> inds{indices...};
+            return apply_permuted_<CapType>(cuda::std::forward<Op>(op),
+                                            dims, inds,
+                                            cuda::std::make_index_sequence<Rank()>{});
           } else {
             return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
           }
