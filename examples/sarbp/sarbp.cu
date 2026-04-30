@@ -98,16 +98,6 @@
 
 using namespace matx;
 
-#define CUDA_CHECK(call)                                                       \
-  do {                                                                         \
-    cudaError_t err = (call);                                                  \
-    if (err != cudaSuccess) {                                                  \
-      std::cerr << "CUDA error at " << __FILE__ << ":" << __LINE__ << " - "   \
-                << cudaGetErrorString(err) << std::endl;                       \
-      std::exit(1);                                                            \
-    }                                                                          \
-  } while (0)
-
 // ---------------------------------------------------------------------------
 // .sarbp file header (matches Python writer)
 // ---------------------------------------------------------------------------
@@ -321,20 +311,20 @@ int main(int argc, char **argv) {
   complex_t *h_range_profiles = nullptr;
   int16_t *h_range_profiles_i16 = nullptr;
 
-  CUDA_CHECK(cudaHostAlloc(&h_positions,
+  MATX_CUDA_CHECK(cudaHostAlloc(&h_positions,
       static_cast<size_t>(num_pulses) * sizeof(double3), cudaHostAllocDefault));
-  CUDA_CHECK(cudaHostAlloc(&h_range_to_mcp,
+  MATX_CUDA_CHECK(cudaHostAlloc(&h_range_to_mcp,
       static_cast<size_t>(num_pulses) * sizeof(double), cudaHostAllocDefault));
 
   if (is_int16_mode) {
-    CUDA_CHECK(cudaHostAlloc(&h_ampsf,
+    MATX_CUDA_CHECK(cudaHostAlloc(&h_ampsf,
         static_cast<size_t>(num_pulses) * sizeof(float), cudaHostAllocDefault));
     // int16 pairs: num_range_bins * 2 int16 per pulse
-    CUDA_CHECK(cudaHostAlloc(&h_range_profiles_i16,
+    MATX_CUDA_CHECK(cudaHostAlloc(&h_range_profiles_i16,
         static_cast<size_t>(num_pulses) * static_cast<size_t>(num_range_bins) * 2 * sizeof(int16_t),
         cudaHostAllocDefault));
   } else {
-    CUDA_CHECK(cudaHostAlloc(&h_range_profiles,
+    MATX_CUDA_CHECK(cudaHostAlloc(&h_range_profiles,
         static_cast<size_t>(num_pulses) * static_cast<size_t>(num_range_bins) * sizeof(complex_t),
         cudaHostAllocDefault));
   }
@@ -469,7 +459,7 @@ int main(int argc, char **argv) {
   std::cout << "BP precision     : " << precision_type << std::endl;
 
   cudaStream_t stream;
-  CUDA_CHECK(cudaStreamCreate(&stream));
+  MATX_CUDA_CHECK(cudaStreamCreate(&stream));
   cudaExecutor exec{stream};
 
   // Pre-allocate GPU block buffers (sized for largest block)
@@ -565,24 +555,24 @@ int main(int argc, char **argv) {
   const size_t num_pixels =
       static_cast<size_t>(image_height) * static_cast<size_t>(image_width);
   complex_t *h_image = nullptr;
-  CUDA_CHECK(cudaHostAlloc(&h_image, num_pixels * sizeof(complex_t), cudaHostAllocDefault));
+  MATX_CUDA_CHECK(cudaHostAlloc(&h_image, num_pixels * sizeof(complex_t), cudaHostAllocDefault));
 
   std::cout << "Running backprojection (" << output_range_bins << " range bins, del_r="
             << del_r << " m)..." << std::endl;
 
   cudaEvent_t ev_start, ev_stop;
-  CUDA_CHECK(cudaEventCreate(&ev_start));
-  CUDA_CHECK(cudaEventCreate(&ev_stop));
+  MATX_CUDA_CHECK(cudaEventCreate(&ev_start));
+  MATX_CUDA_CHECK(cudaEventCreate(&ev_stop));
 
   std::vector<cudaEvent_t> ev_bp_start(num_blocks);
   std::vector<cudaEvent_t> ev_bp_stop(num_blocks);
   for (index_t blk = 0; blk < num_blocks; blk++) {
-    CUDA_CHECK(cudaEventCreate(&ev_bp_start[blk]));
-    CUDA_CHECK(cudaEventCreate(&ev_bp_stop[blk]));
+    MATX_CUDA_CHECK(cudaEventCreate(&ev_bp_start[blk]));
+    MATX_CUDA_CHECK(cudaEventCreate(&ev_bp_stop[blk]));
   }
 
   cudaProfilerStart();
-  CUDA_CHECK(cudaEventRecord(ev_start, stream));
+  MATX_CUDA_CHECK(cudaEventRecord(ev_start, stream));
 
   for (index_t blk = 0; blk < num_blocks; blk++) {
     const index_t p0 = blk * block_size;
@@ -595,11 +585,11 @@ int main(int argc, char **argv) {
     auto cur_rtm       = matx::slice(blk_rtm,       {0},    {npulses});
 
     // Upload platform positions and range_to_mcp for this block
-    CUDA_CHECK(cudaMemcpyAsync(cur_positions.Data(),
+    MATX_CUDA_CHECK(cudaMemcpyAsync(cur_positions.Data(),
                     h_positions + p0,
                     static_cast<size_t>(npulses) * sizeof(double3),
                     cudaMemcpyHostToDevice, stream));
-    CUDA_CHECK(cudaMemcpyAsync(cur_rtm.Data(),
+    MATX_CUDA_CHECK(cudaMemcpyAsync(cur_rtm.Data(),
                     h_range_to_mcp + p0,
                     static_cast<size_t>(npulses) * sizeof(double),
                     cudaMemcpyHostToDevice, stream));
@@ -611,11 +601,11 @@ int main(int argc, char **argv) {
         // Upload int16 I/Q pairs and per-pulse scale
         auto cur_fx_i16 = matx::slice(blk_fx_i16, {0, 0}, {npulses, num_samples_raw * 2});
         auto cur_ampsf = matx::slice(blk_ampsf, {0}, {npulses});
-        CUDA_CHECK(cudaMemcpyAsync(cur_fx_i16.Data(),
+        MATX_CUDA_CHECK(cudaMemcpyAsync(cur_fx_i16.Data(),
                         h_range_profiles_i16 + p0 * num_samples_raw * 2,
                         static_cast<size_t>(npulses) * static_cast<size_t>(num_samples_raw) * 2 * sizeof(int16_t),
                         cudaMemcpyHostToDevice, stream));
-        CUDA_CHECK(cudaMemcpyAsync(cur_ampsf.Data(),
+        MATX_CUDA_CHECK(cudaMemcpyAsync(cur_ampsf.Data(),
                         h_ampsf + p0,
                         static_cast<size_t>(npulses) * sizeof(float),
                         cudaMemcpyHostToDevice, stream));
@@ -641,21 +631,21 @@ int main(int argc, char **argv) {
         }
       } else {
         // Upload complex64 samples directly
-        CUDA_CHECK(cudaMemcpyAsync(cur_fx.Data(),
+        MATX_CUDA_CHECK(cudaMemcpyAsync(cur_fx.Data(),
                         h_range_profiles + p0 * num_samples_raw,
                         static_cast<size_t>(npulses) * static_cast<size_t>(num_samples_raw) * sizeof(complex_t),
                         cudaMemcpyHostToDevice, stream));
 
         if (apply_window) {
           (cur_fx = cur_fx * matx::hamming<1>({npulses, num_samples_raw})).run(exec);
-          CUDA_CHECK(cudaGetLastError());
+          MATX_CUDA_CHECK(cudaGetLastError());
         }
       }
 
       // Zero only the padding region (middle of each row after ifftshift)
       const index_t pad_size = fft_size - num_samples_raw;
       if (pad_size > 0) {
-        CUDA_CHECK(cudaMemset2DAsync(
+        MATX_CUDA_CHECK(cudaMemset2DAsync(
             cur_profiles.Data() + (num_samples_raw - ifft_shift),
             static_cast<size_t>(fft_size) * sizeof(complex_t),
             0,
@@ -665,7 +655,7 @@ int main(int argc, char **argv) {
       }
 
       // Second half of spectrum (indices shift..N-1) -> start of padded row
-      CUDA_CHECK(cudaMemcpy2DAsync(
+      MATX_CUDA_CHECK(cudaMemcpy2DAsync(
           cur_profiles.Data(),
           static_cast<size_t>(fft_size) * sizeof(complex_t),
           cur_fx.Data() + ifft_shift,
@@ -675,7 +665,7 @@ int main(int argc, char **argv) {
           cudaMemcpyDeviceToDevice, stream));
 
       // First half of spectrum (indices 0..shift-1) -> end of padded row
-      CUDA_CHECK(cudaMemcpy2DAsync(
+      MATX_CUDA_CHECK(cudaMemcpy2DAsync(
           cur_profiles.Data() + (fft_size - ifft_shift),
           static_cast<size_t>(fft_size) * sizeof(complex_t),
           cur_fx.Data(),
@@ -696,19 +686,19 @@ int main(int argc, char **argv) {
       (cur_profiles = matx::fftshift1D(cur_compressed)).run(exec);
     } else {
       // Pre-compressed: simple copy
-      CUDA_CHECK(cudaMemcpyAsync(cur_profiles.Data(),
+      MATX_CUDA_CHECK(cudaMemcpyAsync(cur_profiles.Data(),
                       h_range_profiles + p0 * num_range_bins,
                       static_cast<size_t>(npulses) * static_cast<size_t>(num_range_bins) * sizeof(complex_t),
                       cudaMemcpyHostToDevice, stream));
     }
 
     // Backprojection - accumulates this block's pulses into image
-    CUDA_CHECK(cudaEventRecord(ev_bp_start[blk], stream));
+    MATX_CUDA_CHECK(cudaEventRecord(ev_bp_start[blk], stream));
     (image = matx::experimental::sar_bp(image, cur_profiles,
                                          cur_positions, voxel_locations,
                                          cur_rtm, params))
         .run(exec);
-    CUDA_CHECK(cudaEventRecord(ev_bp_stop[blk], stream));
+    MATX_CUDA_CHECK(cudaEventRecord(ev_bp_stop[blk], stream));
 
     if (num_blocks > 1) {
       std::cout << "\r  Block " << (blk + 1) << " / " << num_blocks << std::flush;
@@ -716,22 +706,22 @@ int main(int argc, char **argv) {
   }
 
   // Copy result to pinned host buffer (included in timed region)
-  CUDA_CHECK(cudaMemcpyAsync(h_image, image.Data(), num_pixels * sizeof(complex_t),
+  MATX_CUDA_CHECK(cudaMemcpyAsync(h_image, image.Data(), num_pixels * sizeof(complex_t),
              cudaMemcpyDeviceToHost, stream));
 
-  CUDA_CHECK(cudaEventRecord(ev_stop, stream));
+  MATX_CUDA_CHECK(cudaEventRecord(ev_stop, stream));
 
   exec.sync();
   cudaProfilerStop();
 
   float elapsed_ms = 0;
-  CUDA_CHECK(cudaEventElapsedTime(&elapsed_ms, ev_start, ev_stop));
+  MATX_CUDA_CHECK(cudaEventElapsedTime(&elapsed_ms, ev_start, ev_stop));
   if (num_blocks > 1) std::cout << std::endl;
 
   float bp_elapsed_ms = 0;
   for (index_t blk = 0; blk < num_blocks; blk++) {
     float blk_ms = 0;
-    CUDA_CHECK(cudaEventElapsedTime(&blk_ms, ev_bp_start[blk], ev_bp_stop[blk]));
+    MATX_CUDA_CHECK(cudaEventElapsedTime(&blk_ms, ev_bp_start[blk], ev_bp_stop[blk]));
     bp_elapsed_ms += blk_ms;
   }
 
@@ -749,11 +739,11 @@ int main(int argc, char **argv) {
             << num_blocks << " block" << (num_blocks > 1 ? "s" : "") << ")" << std::endl;
   std::cout << "  Rate                : " << bp_gbp_per_sec << " Gbp/s" << std::endl;
 
-  CUDA_CHECK(cudaEventDestroy(ev_start));
-  CUDA_CHECK(cudaEventDestroy(ev_stop));
+  MATX_CUDA_CHECK(cudaEventDestroy(ev_start));
+  MATX_CUDA_CHECK(cudaEventDestroy(ev_stop));
   for (index_t blk = 0; blk < num_blocks; blk++) {
-    CUDA_CHECK(cudaEventDestroy(ev_bp_start[blk]));
-    CUDA_CHECK(cudaEventDestroy(ev_bp_stop[blk]));
+    MATX_CUDA_CHECK(cudaEventDestroy(ev_bp_start[blk]));
+    MATX_CUDA_CHECK(cudaEventDestroy(ev_bp_stop[blk]));
   }
 
   // -------------------------------------------------------------------
@@ -773,14 +763,14 @@ int main(int argc, char **argv) {
   std::cout << "Wrote " << image_height << " x " << image_width
             << " complex<float> image to " << output_file << std::endl;
 
-  CUDA_CHECK(cudaFreeHost(h_positions));
-  CUDA_CHECK(cudaFreeHost(h_range_to_mcp));
-  if (h_range_profiles) CUDA_CHECK(cudaFreeHost(h_range_profiles));
-  if (h_range_profiles_i16) CUDA_CHECK(cudaFreeHost(h_range_profiles_i16));
-  if (h_ampsf) CUDA_CHECK(cudaFreeHost(h_ampsf));
-  CUDA_CHECK(cudaFreeHost(h_image));
+  MATX_CUDA_CHECK(cudaFreeHost(h_positions));
+  MATX_CUDA_CHECK(cudaFreeHost(h_range_to_mcp));
+  if (h_range_profiles) MATX_CUDA_CHECK(cudaFreeHost(h_range_profiles));
+  if (h_range_profiles_i16) MATX_CUDA_CHECK(cudaFreeHost(h_range_profiles_i16));
+  if (h_ampsf) MATX_CUDA_CHECK(cudaFreeHost(h_ampsf));
+  MATX_CUDA_CHECK(cudaFreeHost(h_image));
   matx::ClearCachesAndAllocations();
-  CUDA_CHECK(cudaStreamDestroy(stream));
+  MATX_CUDA_CHECK(cudaStreamDestroy(stream));
   MATX_EXIT_HANDLER();
 
   return 0;
