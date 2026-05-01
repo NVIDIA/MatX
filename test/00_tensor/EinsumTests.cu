@@ -166,8 +166,8 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Dot)
   auto a1 = make_tensor<TestType>({60});
   auto b1 = make_tensor<TestType>({60});
   auto c0 = make_tensor<TestType>({});
-  (a1 = ones<TestType>(a1.Shape()) * 2).run(exec);
-  (b1 = ones<TestType>(b1.Shape()) * 2).run(exec);
+  (a1 = ones<TestType>(a1.Shape()) * TestType{2}).run(exec);
+  (b1 = ones<TestType>(b1.Shape()) * TestType{2}).run(exec);
 
   // Perform a dot product of b1 with itself and store in a1
   (c0 = cutensor::einsum("i,i->", a1, b1)).run(exec);
