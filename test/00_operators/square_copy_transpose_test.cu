@@ -19,6 +19,9 @@ TYPED_TEST(OperatorTestsNumericNoHalfAllExecs, SquareCopyTranspose)
   index_t count = 512;
   tensor_t<TestType, 2> t2({count, count});
   tensor_t<TestType, 2> t2t({count, count});
+  auto expected_value = [](index_t value) {
+    return TestType{static_cast<detail::value_promote_t<TestType>>(value)};
+  };
 
   for (index_t i = 0; i < count; i++) {
     for (index_t j = 0; j < count; j++) {
@@ -32,7 +35,7 @@ TYPED_TEST(OperatorTestsNumericNoHalfAllExecs, SquareCopyTranspose)
 
   for (index_t i = 0; i < count; i++) {
     for (index_t j = 0; j < count; j++) {
-      ASSERT_EQ(t2t(i, j), TestType(i * count + (double)j));
+      ASSERT_EQ(t2t(i, j), expected_value(i * count + j));
     }
   }
 
@@ -43,9 +46,9 @@ TYPED_TEST(OperatorTestsNumericNoHalfAllExecs, SquareCopyTranspose)
   for (index_t i = 0; i < count; i++) {
     for (index_t j = 0; j < count; j++) {
       EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2(i, j),
-                                             TestType(i * count + (double)j)));
+                                             expected_value(i * count + j)));
       EXPECT_TRUE(
-          MatXUtils::MatXTypeCompare(t2t(j, i), TestType(i * count + j)));
+          MatXUtils::MatXTypeCompare(t2t(j, i), expected_value(i * count + j)));
     }
   }
   MATX_EXIT_HANDLER();
@@ -62,6 +65,9 @@ TYPED_TEST(OperatorTestsNumericNoHalfAllExecs, NonSquareTranspose)
   index_t count1 = 200, count2 = 100;
   tensor_t<TestType, 2> t2({count1, count2});
   tensor_t<TestType, 2> t2t({count2, count1});
+  auto expected_value = [](index_t value) {
+    return TestType{static_cast<detail::value_promote_t<TestType>>(value)};
+  };
 
   for (index_t i = 0; i < count1; i++) {
     for (index_t j = 0; j < count2; j++) {
@@ -75,9 +81,9 @@ TYPED_TEST(OperatorTestsNumericNoHalfAllExecs, NonSquareTranspose)
   for (index_t i = 0; i < count1; i++) {
     for (index_t j = 0; j < count2; j++) {
       EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2(i, j),
-                                             TestType(i * count + (double)j)));
+                                             expected_value(i * count + j)));
       EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2t(j, i),
-                                             TestType(i * count + (double)j)));
+                                             expected_value(i * count + j)));
     }
   }
   MATX_EXIT_HANDLER();

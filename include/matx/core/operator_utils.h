@@ -158,13 +158,13 @@ namespace matx {
     template <typename CapType, typename T, typename Func>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto ApplyGeneratorVecFunc(const Func &func, index_t index) {
       if constexpr (CapType::ept == ElementsPerThread::ONE) {
-        return func(index);
+        return static_cast<T>(func(index));
       } else {
 
         Vector<T, static_cast<index_t>(CapType::ept)> result;
         MATX_LOOP_UNROLL
         for (int i = 0; i < static_cast<index_t>(CapType::ept); i++) {
-          result.data[i] = func(index * static_cast<index_t>(CapType::ept) + i);
+          result.data[i] = static_cast<T>(func(index * static_cast<index_t>(CapType::ept) + i));
         }
         return result;
       }
@@ -173,12 +173,12 @@ namespace matx {
     template <typename CapType, typename OutType, typename Func, typename... Vals>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto ApplyVecFunc(const Func &func, const Vals &...vals) {
       if constexpr (CapType::ept == ElementsPerThread::ONE) {
-        return func(vals...);
+        return static_cast<OutType>(func(vals...));
       } else {
         Vector<OutType, static_cast<index_t>(CapType::ept)> result;
         MATX_LOOP_UNROLL
         for (int i = 0; i < static_cast<index_t>(CapType::ept); i++) {
-          result.data[i] = func(vals.data[i]...);
+          result.data[i] = static_cast<OutType>(func(vals.data[i]...));
         }
         return result;
       }
@@ -432,4 +432,3 @@ namespace matx {
     }    
   }
 }
-

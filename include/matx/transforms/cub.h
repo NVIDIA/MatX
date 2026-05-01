@@ -993,7 +993,7 @@ inline void ExecSort(OutputTensor &a_out,
 #ifdef __CUDACC__
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
-    if (!has_index_cmp_op_v<decltype(cparams_.op)>) {
+    if constexpr (!has_index_cmp_op_v<decltype(cparams_.op)>) {
       if constexpr (is_tensor_view_v<InputOperator>) {
         if (a.IsContiguous()) {
           cub::DeviceSelect::If(d_temp,

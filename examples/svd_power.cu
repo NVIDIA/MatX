@@ -104,9 +104,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
     printf("iterations: %d\n", iterations);
 
-    (U = 0).run(exec);
-    (S = 0).run(exec);
-    (VT = 0).run(exec);
+    (U = static_cast<AType>(0)).run(exec);
+    (S = static_cast<SType>(0)).run(exec);
+    (VT = static_cast<AType>(0)).run(exec);
 
     (mtie(U, S, VT) = svdpi(A, x0, iterations, k)).run(exec);
 
@@ -161,9 +161,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   // Same as above but with svdbpi
   {
 
-    (U = 0).run(exec);
-    (S = 0).run(exec);
-    (VT = 0).run(exec);
+    (U = static_cast<AType>(0)).run(exec);
+    (S = static_cast<SType>(0)).run(exec);
+    (VT = static_cast<AType>(0)).run(exec);
     // TODO add k
     (mtie(U, S, VT) = svdbpi(A, iterations, tol)).run(exec);
 

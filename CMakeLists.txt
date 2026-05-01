@@ -81,6 +81,7 @@ option(MATX_EN_EXTENDED_LAMBDA "Enable extended lambda support for device/host l
 option(MATX_EN_JIT "Enable CUDA JIT compilation support via NVRTC" OFF)
 option(MATX_EN_MATHDX "Enable MathDx support for kernel fusion" OFF)
 option(MATX_EN_UNSAFE_ALIAS_DETECTION "Enable aliased memory detection" OFF)
+option(MATX_CHECK_NARROWING_CONVERSIONS "Enable compile-time checks for narrowing assignment conversions" OFF)
 option(MATX_DISABLE_EXCEPTIONS "Disable C++ exceptions and log errors instead" OFF)
 
 set(MATX_EN_PYBIND11 OFF CACHE BOOL "Enable pybind11 support")
@@ -228,6 +229,9 @@ endif()
 if (MATX_EN_UNSAFE_ALIAS_DETECTION)
     target_compile_definitions(matx INTERFACE MATX_EN_UNSAFE_ALIAS_DETECTION)
 endif()
+
+target_compile_definitions(matx INTERFACE
+    MATX_CHECK_NARROWING_CONVERSIONS=$<BOOL:${MATX_CHECK_NARROWING_CONVERSIONS}>)
 
 # Host support
 if (MATX_EN_NVPL OR MATX_EN_X86_FFTW OR MATX_EN_BLIS OR MATX_EN_OPENBLAS)

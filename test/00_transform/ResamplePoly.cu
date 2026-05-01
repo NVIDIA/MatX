@@ -359,7 +359,7 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Batched)
     // Now use a full 4D tensor rather than just a cloned tensor as input
     auto full = make_tensor<TestType>({nA, nB, nC, a_len});
     (full = ac).run(this->exec);
-    (b = 0).run(this->exec);
+    (b = TestType{0}).run(this->exec);
 
     this->exec.sync();
 
@@ -398,7 +398,7 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Identity)
   };
 
   auto zero = make_tensor<TestType>({1});
-  (zero = 0).run(this->exec);
+  (zero = TestType{0}).run(this->exec);
   this->exec.sync();
 
   for (size_t i = 0; i < sizeof(test_cases)/sizeof(test_cases[0]); i++) {
@@ -441,7 +441,7 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Downsample)
   };
 
   auto seven = make_tensor<TestType>({1});
-  (seven = 7).run(this->exec);
+  (seven = TestType{static_cast<typename inner_op_type_t<TestType>::type>(7)}).run(this->exec);
   this->exec.sync();
 
   for (size_t i = 0; i < sizeof(test_cases)/sizeof(test_cases[0]); i++) {
@@ -479,6 +479,7 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Upsample)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using InnerType = typename inner_op_type_t<TestType>::type;
 
   struct {
     index_t a_len;
@@ -500,7 +501,8 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Upsample)
 
     // The resample kernel scales the filter by up, so we use 1/up to get an
     // effective filter of 1.
-    (f = 1.0/static_cast<double>(up)).run(this->exec);
+    const auto filter_scale = static_cast<InnerType>(1) / static_cast<InnerType>(up);
+    (f = TestType{filter_scale}).run(this->exec);
     this->exec.sync();
 
     auto a = make_tensor<TestType>({a_len});

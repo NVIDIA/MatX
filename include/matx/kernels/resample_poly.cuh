@@ -79,9 +79,9 @@ __global__ void ResamplePoly1D_PhaseBlock(OutType output, InType input, FilterTy
     filter_t *s_filter = reinterpret_cast<filter_t *>(smem_filter);
 
     constexpr int Rank = OutType::Rank();
-    const index_t output_len = output.Size(Rank-1);
-    index_t filter_len = filter.Size(0);
-    const index_t input_len = input.Size(Rank-1);
+    const index_t output_len = static_cast<index_t>(output.Size(Rank-1));
+    index_t filter_len = static_cast<index_t>(filter.Size(0));
+    const index_t input_len = static_cast<index_t>(input.Size(Rank-1));
 
     // We assume odd-length filters below. In the case of an even-length filter,
     // logically prepend the filter with a single zero to make its length odd.
@@ -266,9 +266,9 @@ __global__ void ResamplePoly1D_ElemBlock(OutType output, InType input, FilterTyp
     filter_t *s_filter = reinterpret_cast<filter_t *>(smem_filter);
 
     constexpr int Rank = OutType::Rank();
-    const index_t output_len = output.Size(Rank-1);
-    index_t filter_len = filter.Size(0);
-    const index_t input_len = input.Size(Rank-1);
+    const index_t output_len = static_cast<index_t>(output.Size(Rank-1));
+    index_t filter_len = static_cast<index_t>(filter.Size(0));
+    const index_t input_len = static_cast<index_t>(input.Size(Rank-1));
 
     const size_t filter_sz_bytes = (filter_len % 2 == 0) ? sizeof(filter_t)*(filter_len+1) : sizeof(filter_t)*filter_len;
     const bool load_filter_to_smem = (filter_sz_bytes <= MATX_RESAMPLE_POLY_MAX_SMEM_BYTES);
@@ -384,9 +384,9 @@ __global__ void ResamplePoly1D_WarpCentric(OutType output, InType input, FilterT
     filter_t *s_filter = reinterpret_cast<filter_t *>(smem_filter);
 
     constexpr int Rank = OutType::Rank();
-    const index_t output_len = output.Size(Rank-1);
-    index_t filter_len = filter.Size(0);
-    const index_t input_len = input.Size(Rank-1);
+    const index_t output_len = static_cast<index_t>(output.Size(Rank-1));
+    index_t filter_len = static_cast<index_t>(filter.Size(0));
+    const index_t input_len = static_cast<index_t>(input.Size(Rank-1));    
 
     const size_t filter_sz_bytes = (filter_len % 2 == 0) ? sizeof(filter_t)*(filter_len+1) : sizeof(filter_t)*filter_len;
     const bool load_filter_to_smem = (filter_sz_bytes <= MATX_RESAMPLE_POLY_MAX_SMEM_BYTES);
@@ -420,7 +420,7 @@ __global__ void ResamplePoly1D_WarpCentric(OutType output, InType input, FilterT
             const index_t x_start = (up_start + up - 1) / up;
             index_t x_end = up_end / up;
             // Since the filter is in shared memory, we can narrow the index type to 32 bits
-            int h_ind = static_cast<int>(filter_central_tap + (up_ind - up*x_start)) - lane_id*up;
+            int h_ind = static_cast<int>(filter_central_tap + (up_ind - up*x_start)) - static_cast<int>(lane_id*up);
 
             output_t accum {};
             input_t in_val;

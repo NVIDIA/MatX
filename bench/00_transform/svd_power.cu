@@ -33,9 +33,9 @@ void svdpi_batch(nvbench::state &state,
 
   (A = random<float>({batch, m, n}, NORMAL)).run(exec);
 
-  (U = 0).run(exec);
-  (S = 0).run(exec);
-  (VT = 0).run(exec);
+  (U = AType{0}).run(exec);
+  (S = SType{0}).run(exec);
+  (VT = AType{0}).run(exec);
   auto x0 = random<float>({batch, r}, NORMAL);
 
   // warm up
@@ -81,9 +81,9 @@ void svdbpi_batch(nvbench::state &state,
 
   (A = random<float>({batch, m, n}, NORMAL)).run(exec);
 
-  (U = 0).run(exec);
-  (S = 0).run(exec);
-  (VT = 0).run(exec);
+  (U = AType{0}).run(exec);
+  (S = SType{0}).run(exec);
+  (VT = AType{0}).run(exec);
 
   // warm up
   nvtxRangePushA("Warmup");
@@ -102,4 +102,3 @@ NVBENCH_BENCH_TYPES(svdbpi_batch, NVBENCH_TYPE_AXES(svd_types))
   .add_int64_axis("cols", {4, 16, 64})
   .add_int64_axis("rows", {4})
   .add_int64_axis("batch", {3000});
-

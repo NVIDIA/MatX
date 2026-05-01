@@ -182,6 +182,8 @@ By default, all of these options are OFF.
     - ``-DMATX_EN_COVERAGE=ON``
   * - Complex Operations NaN/Inf Handling
     - ``-DMATX_EN_COMPLEX_OP_NAN_CHECKS=ON``
+  * - Narrowing Assignment Conversion Checks
+    - ``-DMATX_CHECK_NARROWING_CONVERSIONS=ON``
   * - CUDA Line Info
     - ``-DMATX_EN_CUDA_LINEINFO=ON``
   * - cuTENSOR Support
@@ -262,6 +264,14 @@ the ``cuda::std::complex`` implementation supports this extra handling for multi
 yields the semantics of the direct implementation above.
 Using the ``-DMATX_EN_COMPLEX_OP_NAN_CHECKS=ON`` CMake option or otherwise defining the ``MATX_EN_COMPLEX_OP_NAN_CHECKS``
 macro will enable these additional checks. Enabling this option introduces extra cost in complex multiplication and division.
+
+Narrowing Assignment Conversion Checks
+--------------------------------------
+
+Using the ``-DMATX_CHECK_NARROWING_CONVERSIONS=ON`` CMake option or otherwise defining the ``MATX_CHECK_NARROWING_CONVERSIONS``
+macro to ``1`` enables additional compile-time diagnostics for assignments that may require narrowing implicit conversions.
+This can help find cases where an expression, literal, or generator produces a wider or different type than the destination
+tensor. The checks are disabled by default.
 
 CUDA Line Info
 --------------
@@ -368,6 +378,5 @@ and building on the offline system.
 
     
 - Build your MatX project per your standard process, CPM will automatically use the cache
-
 
 

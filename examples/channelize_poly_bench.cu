@@ -171,7 +171,9 @@ struct ScalarType<cuda::std::complex<T>> { using type = T; };
 template <typename InType, typename FilterType>
 void DispatchBench(const BenchConfig &cfg) {
   using in_scalar = typename ScalarType<InType>::type;
-  using OutType = cuda::std::complex<in_scalar>;
+  using filter_scalar = typename ScalarType<FilterType>::type;
+  using out_scalar = cuda::std::common_type_t<in_scalar, filter_scalar>;
+  using OutType = cuda::std::complex<out_scalar>;
 
   printf("Input: %-16s  Filter: %-16s  Output: %-16s\n",
       TypeName<InType>(), TypeName<FilterType>(), TypeName<OutType>());

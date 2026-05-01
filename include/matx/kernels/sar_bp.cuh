@@ -257,9 +257,9 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
     // one-shot cost of its operator() is negligible and its layout is free to
     // be anything the caller wants without blocking fast-path eligibility.
     const voxel_loc_t voxel_loc = is_valid ? voxel_locations(iy, ix) : voxel_loc_t{};
-    const loose_compute_t py = voxel_loc.y;
-    const loose_compute_t px = voxel_loc.x;
-    const loose_compute_t pz = voxel_loc.z;
+    const loose_compute_t py = static_cast<loose_compute_t>(voxel_loc.y);
+    const loose_compute_t px = static_cast<loose_compute_t>(voxel_loc.x);
+    const loose_compute_t pz = static_cast<loose_compute_t>(voxel_loc.z);
 
     // TensorAccessor wraps each hot tensor and picks the fast pointer path
     // when IsUnitStride && is_tensor_view_v<Op>, otherwise forwards to
@@ -286,8 +286,13 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
     const auto get_reference_phase = [&phase_lut, &phase_correction_partial, &phase_correction_partial_loose](strict_or_ff_compute_t diffR, index_t bin_floor_int, loose_compute_t w) -> loose_complex_compute_t {
         if constexpr (PhaseLUT) {
             const loose_complex_compute_t base_phase = phase_lut[bin_floor_int];
-            float incr_sinx, incr_cosx;
-            __sincosf(phase_correction_partial_loose * w, &incr_sinx, &incr_cosx);
+            loose_compute_t incr_sinx, incr_cosx;
+            if constexpr (cuda::std::is_same_v<loose_compute_t, double>) {
+                ::sincos(phase_correction_partial_loose * w, &incr_sinx, &incr_cosx);
+            } else {
+                __sincosf(phase_correction_partial_loose * w, &incr_sinx, &incr_cosx);
+            }
+
             return loose_complex_compute_t{
                 base_phase.real() * incr_cosx - base_phase.imag() * incr_sinx,
                 base_phase.real() * incr_sinx + base_phase.imag() * incr_cosx
@@ -311,14 +316,17 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
     loose_complex_compute_t accum{};
     const loose_compute_t bin_offset = static_cast<loose_compute_t>(0.5) * static_cast<loose_compute_t>(num_range_bins-1);
 
-    const int num_pulse_blocks = (num_pulses + PULSE_BLOCK_SIZE - 1) / PULSE_BLOCK_SIZE;
+    const int num_pulse_blocks = static_cast<int>(
+        (num_pulses + static_cast<index_t>(PULSE_BLOCK_SIZE) - 1) / static_cast<index_t>(PULSE_BLOCK_SIZE));
     for (int block = 0; block < num_pulse_blocks; ++block) {
-        const int num_pulses_in_block = num_pulses - block * PULSE_BLOCK_SIZE < PULSE_BLOCK_SIZE ?
-            num_pulses - block * PULSE_BLOCK_SIZE : PULSE_BLOCK_SIZE;
+        const index_t pulse_base = static_cast<index_t>(block) * static_cast<index_t>(PULSE_BLOCK_SIZE);
+        const index_t pulses_remaining = num_pulses - pulse_base;
+        const index_t num_pulses_in_block =
+            (pulses_remaining < static_cast<index_t>(PULSE_BLOCK_SIZE)) ? pulses_remaining : static_cast<index_t>(PULSE_BLOCK_SIZE);
         if constexpr (UseSharedPreamble) {
             __syncthreads();
             for (index_t ip = tid; ip < num_pulses_in_block; ip += blockDim.x * blockDim.y) {
-                const int p = block * PULSE_BLOCK_SIZE + ip;
+                const index_t p = pulse_base + ip;
                 // Accessor does the IsUnitStride / rank dispatch internally,
                 // so we just ask for (apx, apy, apz) uniformly.
                 auto load_xyz = [&]() {
@@ -359,7 +367,7 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
         }
         #pragma unroll 4
         for (index_t ip = 0; ip < num_pulses_in_block; ++ip) {
-            const int p = block * PULSE_BLOCK_SIZE + ip;
+            const index_t p = pulse_base + ip;
             strict_or_ff_compute_t diffR;
             loose_compute_t w;
             index_t bin_floor_int;
@@ -468,9 +476,13 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
         // and non-unit-stride output layouts do not disqualify the fast path
         // for the hot tensors (range_profiles, platform_positions, rtm).
         const initial_image_t initial_image_voxel = initial_image.operator()(iy, ix);
-        const image_t voxel_contribution {
-            initial_image_voxel.real() + accum.real(), initial_image_voxel.imag() + accum.imag() };
-        output.operator()(iy, ix) = voxel_contribution;
+        using out_value_t = typename OutImageType::value_type;
+        using out_scalar_t = typename out_value_t::value_type;
+
+        output(iy, ix) = out_value_t{
+            static_cast<out_scalar_t>(initial_image_voxel.real() + accum.real()),
+            static_cast<out_scalar_t>(initial_image_voxel.imag() + accum.imag())
+        };
     }
 }
 

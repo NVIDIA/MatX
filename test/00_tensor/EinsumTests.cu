@@ -166,8 +166,8 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Dot)
   auto a1 = make_tensor<TestType>({60});
   auto b1 = make_tensor<TestType>({60});
   auto c0 = make_tensor<TestType>({});
-  (a1 = ones(a1.Shape()) * 2).run(exec);
-  (b1 = ones(b1.Shape()) * 2).run(exec); 
+  (a1 = ones<TestType>(a1.Shape()) * TestType{2}).run(exec);
+  (b1 = ones<TestType>(b1.Shape()) * TestType{2}).run(exec);
 
   // Perform a dot product of b1 with itself and store in a1
   (c0 = cutensor::einsum("i,i->", a1, b1)).run(exec);
@@ -192,8 +192,8 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, GEMM)
   auto b2 = make_tensor<TestType>({20,10});
   auto c2 = make_tensor<TestType>({10,10});    
   auto c22 = make_tensor<TestType>({10,10});   
-  (a2 = ones()).run(exec);
-  (b2 = ones()).run(exec); 
+  (a2 = ones<TestType>()).run(exec);
+  (b2 = ones<TestType>()).run(exec);
 
   // Perform a GEMM of a2 * b2. Compare results to traditional matmul call
   (c2 = cutensor::einsum("mk,kn->mn", a2, b2)).run(exec);
@@ -222,8 +222,8 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, GEMMTranspose)
   auto b2 = make_tensor<TestType>({20,10});
   auto c2 = make_tensor<TestType>({10,5});    
   auto c22 = make_tensor<TestType>({5,10});   
-  (a2 = ones()).run(exec);
-  (b2 = ones()).run(exec); 
+  (a2 = ones<TestType>()).run(exec);
+  (b2 = ones<TestType>()).run(exec);
 
   // Perform a GEMM of a2 * b2 and store the results transposed
   (c2 = cutensor::einsum("mk,kn->nm", a2, b2)).run(exec);
@@ -251,8 +251,8 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Permute)
   auto a = make_tensor<TestType>({5,20,4,3});
   auto b = make_tensor<TestType>({20,3,4,5});
   auto b2 = make_tensor<TestType>({20,3,4,5});
-  (a = ones()).run(exec);
-  (b = ones()).run(exec);
+  (a = ones<TestType>()).run(exec);
+  (b = ones<TestType>()).run(exec);
 
   // Permute a 4D tensor. This gives the same output as Permute, but is much faster
   (b = cutensor::einsum("ijkl->jlki", a)).run(exec);
@@ -313,7 +313,7 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Trace)
   auto a2 = make_tensor<TestType>({10,10});
   auto c0_0 = make_tensor<TestType>({});
   auto c0_1 = make_tensor<TestType>({});
-  (a2 = ones()).run(exec);
+  (a2 = ones<TestType>()).run(exec);
 
   // Perform a GEMM of a2 * b2. Compare results to traditional matmul call
   (c0_0 = cutensor::einsum("ii->", a2)).run(exec);

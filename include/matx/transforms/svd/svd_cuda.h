@@ -439,7 +439,8 @@ inline void svdbpi_impl(UType &U, SType &S, VTType &VT, const AType &A, int max_
     matmul_impl(AT, A, conj(transpose_matrix(A)), exec);
   }
 
-  auto e2 = eye({d,d});
+  using q_value_t = typename decltype(Q)::value_type;
+  auto e2 = eye<q_value_t>({d, d});
   auto cShape = A.Shape();
   cShape[RANK-1] = matxKeepDim;
   cShape[RANK-2] = matxKeepDim;

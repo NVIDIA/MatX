@@ -35,10 +35,16 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Abs2)
     exec.sync();
     ASSERT_NEAR(y(), 8.0, 1.0e-6);
   } else {
-    x() = 2.0;
+    x() = static_cast<TestType>(2);
     (y = abs2(x)).run(exec);
     exec.sync();
-    ASSERT_NEAR(y(), 4.0, 1.0e-6);
+    if constexpr (std::is_integral_v<inner_type>) {
+      ASSERT_EQ(y(), static_cast<inner_type>(4));
+    }
+    else {
+      ASSERT_NEAR(y(), static_cast<inner_type>(4), 1.0e-6);
+    }
+
 
     // Test with higher rank tensor
     auto x3 = make_tensor<TestType>({3,3,3});
@@ -58,7 +64,12 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Abs2)
       for (int j = 0; j < 3; j++) {
         for (int k = 0; k < 3; k++) {
           TestType v = static_cast<TestType>(i*9 + j*3 + k);
-          ASSERT_NEAR(y3(i,j,k), v*v, 1.0e-6);
+          if constexpr (std::is_integral_v<inner_type>) {
+            ASSERT_EQ(y3(i,j,k), static_cast<inner_type>(v*v));
+          }
+          else {
+            ASSERT_NEAR(y3(i,j,k), static_cast<inner_type>(v*v), 1.0e-6);
+          }          
         }
       }
     }

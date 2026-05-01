@@ -166,7 +166,8 @@ namespace matx
             Is... indices)
         {
           if constexpr (CapType::ept == ElementsPerThread::ONE) {
-            cuda::std::array idx{indices...};
+            cuda::std::array<index_t, sizeof...(Is)> idx{
+                static_cast<index_t>(indices)...};
 
             index_t shift;
             if constexpr (shift_rank_ == 1) {

@@ -302,11 +302,17 @@ TYPED_TEST(TensorCreationTestsAll, StaticTensorArithmetic)
 
   (a = ones<TestType>()).run(exec);
   (b = ones<TestType>()).run(exec);
-  (c = a + b).run(exec);
+  if constexpr (std::is_same_v<TestType, bool>) {
+    (c = a || b).run(exec);
+  }
+  else {
+    (c = a + b).run(exec);
+  }
   exec.sync();
 
+  const TestType expected = std::is_same_v<TestType, bool> ? TestType(true) : TestType(2);
   for (index_t i = 0; i < 4; i++) {
-    ASSERT_EQ(c(i), TestType(2));
+    ASSERT_EQ(c(i), expected);
   }
 }
 
@@ -322,12 +328,18 @@ TYPED_TEST(TensorCreationTestsAll, StaticTensorArithmetic2D)
 
   (a = ones<TestType>()).run(exec);
   (b = ones<TestType>()).run(exec);
-  (c = a + b).run(exec);
+  if constexpr (std::is_same_v<TestType, bool>) {
+    (c = a || b).run(exec);
+  }
+  else {
+    (c = a + b).run(exec);
+  }
   exec.sync();
 
+  const TestType expected = std::is_same_v<TestType, bool> ? TestType(true) : TestType(2);
   for (index_t i = 0; i < 3; i++) {
     for (index_t j = 0; j < 4; j++) {
-      ASSERT_EQ(c(i, j), TestType(2));
+      ASSERT_EQ(c(i, j), expected);
     }
   }
 }
@@ -344,13 +356,19 @@ TYPED_TEST(TensorCreationTestsAll, StaticTensorArithmetic3D)
 
   (a = ones<TestType>()).run(exec);
   (b = ones<TestType>()).run(exec);
-  (c = a + b).run(exec);
+  if constexpr (std::is_same_v<TestType, bool>) {
+    (c = a || b).run(exec);
+  }
+  else {
+    (c = a + b).run(exec);
+  }
   exec.sync();
 
+  const TestType expected = std::is_same_v<TestType, bool> ? TestType(true) : TestType(2);
   for (index_t i = 0; i < 2; i++) {
     for (index_t j = 0; j < 3; j++) {
       for (index_t k = 0; k < 4; k++) {
-        ASSERT_EQ(c(i, j, k), TestType(2));
+        ASSERT_EQ(c(i, j, k), expected);
       }
     }
   }
@@ -368,14 +386,20 @@ TYPED_TEST(TensorCreationTestsAll, StaticTensorArithmetic4D)
 
   (a = ones<TestType>()).run(exec);
   (b = ones<TestType>()).run(exec);
-  (c = a + b).run(exec);
+  if constexpr (std::is_same_v<TestType, bool>) {
+    (c = a || b).run(exec);
+  }
+  else {
+    (c = a + b).run(exec);
+  }
   exec.sync();
 
+  const TestType expected = std::is_same_v<TestType, bool> ? TestType(true) : TestType(2);
   for (index_t i = 0; i < 2; i++) {
     for (index_t j = 0; j < 3; j++) {
       for (index_t k = 0; k < 4; k++) {
         for (index_t l = 0; l < 5; l++) {
-          ASSERT_EQ(c(i, j, k, l), TestType(2));
+          ASSERT_EQ(c(i, j, k, l), expected);
         }
       }
     }

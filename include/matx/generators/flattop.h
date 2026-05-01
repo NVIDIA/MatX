@@ -85,7 +85,8 @@ namespace matx
                 "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(index_t i) const\n" +
                 "  {\n" +
                 "    return detail::ApplyGeneratorVecFunc<CapType, T>([](index_t idx) {\n" +
-                "      return a0 - a1 * cuda::std::cos(2*cuda::std::numbers::pi*idx / (size_ - 1)) + a2 * cuda::std::cos(4*cuda::std::numbers::pi*idx / (size_ - 1)) - a3 * cuda::std::cos(6*cuda::std::numbers::pi*idx / (size_ - 1)) + a4 * cuda::std::cos(8*cuda::std::numbers::pi*idx / (size_ - 1));\n" +
+                "      static constexpr T tmp_pi = cuda::std::numbers::pi;\n" +
+                "      return a0 - a1 * cuda::std::cos(static_cast<T>(2) * tmp_pi * idx / (size_ - 1)) + a2 * cuda::std::cos(static_cast<T>(4) * tmp_pi * idx / (size_ - 1)) - a3 * cuda::std::cos(static_cast<T>(6) * tmp_pi * idx / (size_ - 1)) + a4 * cuda::std::cos(static_cast<T>(8) * tmp_pi * idx / (size_ - 1));\n" +
                 "    }, i);\n" +
                 "  }\n" +
                 "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() { return 1; }\n" +
@@ -107,11 +108,12 @@ namespace matx
         inline __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
         {
           return detail::ApplyGeneratorVecFunc<CapType, T>([this](index_t idx) {
+            static constexpr T tmp_pi = cuda::std::numbers::pi;
             return  a0  
-              - a1 * cuda::std::cos(2*M_PI*idx / (size_ - 1))
-              + a2 * cuda::std::cos(4*M_PI*idx / (size_ - 1))
-              - a3 * cuda::std::cos(6*M_PI*idx / (size_ - 1))
-              + a4 * cuda::std::cos(8*M_PI*idx / (size_ - 1));
+              - a1 * cuda::std::cos(static_cast<T>(2)*tmp_pi*idx / (size_ - 1))
+              + a2 * cuda::std::cos(static_cast<T>(4)*tmp_pi*idx / (size_ - 1))
+              - a3 * cuda::std::cos(static_cast<T>(6)*tmp_pi*idx / (size_ - 1))
+              + a4 * cuda::std::cos(static_cast<T>(8)*tmp_pi*idx / (size_ - 1));
           }, i);
         }
 

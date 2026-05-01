@@ -517,7 +517,7 @@ int main(int argc, char **argv) {
           // Warmup int16 -> complex<float> conversion kernel
           auto cur_fx_i16 = matx::slice(blk_fx_i16, {0, 0}, {npulses, num_samples_raw * 2});
           auto cur_ampsf = matx::slice(blk_ampsf, {0}, {npulses});
-          (cur_fx_i16 = 0).run(exec);
+          (cur_fx_i16 = static_cast<int16_t>(0)).run(exec);
           (cur_ampsf = 1.0f).run(exec);
           auto i_vals = matx::slice(cur_fx_i16, {0, 0},
                                     {npulses, num_samples_raw * 2}, {1, 2});

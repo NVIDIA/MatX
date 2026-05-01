@@ -952,17 +952,17 @@ __global__ void ChannelizePoly1D_FusedChan(OutType output, InType input, FilterT
     for (int t = tid; t < NUM_CHAN*NUM_CHAN; t += THREADS) {
         const int i = t / NUM_CHAN;
         const int j = t % NUM_CHAN;
-        if constexpr (std::is_same_v<output_t, std::complex<double>> || std::is_same_v<output_t, cuda::std::complex<double>>) {
+        if constexpr (std::is_same_v<AccumType, double>) {
             const double arg = 2.0 * M_PI * j * i / NUM_CHAN;
             double sinx, cosx;
             sincos(arg, &sinx, &cosx);
-            complex_accum_t eij { cosx, sinx };
+            complex_accum_t eij { static_cast<AccumType>(cosx), static_cast<AccumType>(sinx) };
             smem_eij[i][j] = eij;
         } else {
             const float arg = 2.0f * static_cast<float>(M_PI) * j * i / NUM_CHAN;
             float sinx, cosx;
             sincosf(arg, &sinx, &cosx);
-            complex_accum_t eij { cosx, sinx };
+            complex_accum_t eij { static_cast<AccumType>(cosx), static_cast<AccumType>(sinx) };
             smem_eij[i][j] = eij;
         }
     }

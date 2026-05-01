@@ -113,7 +113,7 @@ public:
     make_tensor(devsT, tmp, MATX_ASYNC_DEVICE_MEMORY, stream);
 
     // Populate our ones matrix
-    (onesM = ones()).run(stream);
+    (onesM = ones<T1>()).run(stream);
   }
 
   static CovParams_t GetCovParams([[maybe_unused]] TensorTypeC &c, const TensorTypeA &a, cudaStream_t stream = 0)
