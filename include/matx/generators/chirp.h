@@ -242,8 +242,9 @@ namespace matx
                 "      if (method_ == ChirpMethod::CHIRP_METHOD_LINEAR) {{\n"
                 "        const FreqType tval = static_cast<FreqType>(sop_(idx));\n"
                 "        const FreqType phase = FreqType(2) * static_cast<FreqType>(M_PI) * (f0_ * tval + FreqType(0.5) * ((f1_ - f0_) / static_cast<FreqType>(t1_)) * tval * tval);\n"
+                "        const FreqType quadrature_offset = FreqType(2) * static_cast<FreqType>(M_PI) * FreqType(90.0 / 360.0);\n"
                 "        FreqType real = static_cast<FreqType>(cuda::std::cos(phase));\n"
-                "        FreqType imag = static_cast<FreqType>(-cuda::std::cos(phase + FreqType(90.0 / 360.0)));\n"
+                "        FreqType imag = static_cast<FreqType>(-cuda::std::cos(phase + quadrature_offset));\n"
                 "        return cuda::std::complex<FreqType>{{real, imag}};\n"
                 "      }}\n"
                 "      return cuda::std::complex<FreqType>{{0, 0}};\n"
@@ -320,8 +321,9 @@ namespace matx
               const FreqType tval = static_cast<FreqType>(sop_(idx));
               const FreqType phase = FreqType(2) * static_cast<FreqType>(M_PI) *
                   (f0_ * tval + FreqType(0.5) * ((f1_ - f0_) / static_cast<FreqType>(t1_)) * tval * tval);
+              const FreqType quadrature_offset = FreqType(2) * static_cast<FreqType>(M_PI) * FreqType(90.0 / 360.0);
               FreqType real = static_cast<FreqType>(cuda::std::cos(phase));
-              FreqType imag = static_cast<FreqType>(-cuda::std::cos(phase + FreqType(90.0 / 360.0)));
+              FreqType imag = static_cast<FreqType>(-cuda::std::cos(phase + quadrature_offset));
               return cuda::std::complex<FreqType>{real, imag};
             }
 

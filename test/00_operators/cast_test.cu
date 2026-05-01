@@ -12,7 +12,7 @@ TEST(OperatorTests, Cast)
   index_t count0 = 4;
   auto t = make_tensor<int8_t>({count0});
   auto t2 = make_tensor<int8_t>({count0});
-  auto to = make_tensor<int8_t>({count0});
+  auto to = make_tensor<float>({count0});
 
   cudaExecutor exec{};
 
@@ -20,21 +20,21 @@ TEST(OperatorTests, Cast)
   t2.SetVals({126, 126, 126, 126});
   
   // example-begin as_type-test-1
-  (to = as_type<int8_t>(t + t2)).run(exec);
+  (to = as_float(as_type<int8_t>(t + t2))).run(exec);
   // example-end as_type-test-1
   exec.sync();
 
   for (int i = 0; i < t.Size(0); i++) {
-    ASSERT_EQ(to(i), static_cast<int8_t>(-4)); // -4 from 126 + 126 wrap-around
+    ASSERT_EQ(to(i), -4.0f); // -4 from 126 + 126 wrap-around
   }
 
   // example-begin as_int8-test-1
-  (to = as_int8(t + t2)).run(exec);
+  (to = as_float(as_int8(t + t2))).run(exec);
   // example-end as_int8-test-1
   exec.sync();
   
   for (int i = 0; i < t.Size(0); i++) {
-    ASSERT_EQ(to(i), static_cast<int8_t>(-4)); // -4 from 126 + 126 wrap-around
+    ASSERT_EQ(to(i), -4.0f); // -4 from 126 + 126 wrap-around
   }  
 
   // example-begin as_complex_float-test-1
