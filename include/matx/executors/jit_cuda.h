@@ -185,15 +185,27 @@ namespace matx
                 "Please break up your operator statement into multiple executions to limit the size of the parameters");
           }
 
-          cuda::std::array<index_t, RANK> sizes;
-          for (int i = 0; i < RANK; i++) {
+          // The dynamic-rank dispatch in Exec() instantiates ExecWithRank for
+          // every switch arm, so this template is compiled for RANK values
+          // that exceed Op::Rank() (dead arms — never reached at runtime,
+          // since the dynamic source's runtime rank must match Op::Rank()).
+          // Cap both copies at min(RANK, Op::Rank()) so the dead instantiations
+          // don't read past op.Size() bounds or write past op_sizes, which
+          // trips -Werror=aggressive-loop-optimizations on older GCC. The
+          // unfilled slots stay zero from `{}`-init; in the live arm this is
+          // a no-op (RANK == Op::Rank()), and in the genuine dynamic case
+          // (Op::Rank() > RANK) the trailing zeros were already the intent.
+          constexpr int kSizeCount =
+              (RANK < static_cast<int>(Op::Rank())) ? RANK : static_cast<int>(Op::Rank());
+
+          cuda::std::array<index_t, RANK> sizes{};
+          for (int i = 0; i < kSizeCount; i++) {
             sizes[i] = op.Size(i);
           }
 
-          // For dynamic tensors, Op::Rank() may differ from RANK.
           // create_kernel_provider requires an Op::Rank()-sized array.
           cuda::std::array<index_t, Op::Rank()> op_sizes{};
-          for (int i = 0; i < RANK; i++) {
+          for (int i = 0; i < kSizeCount; i++) {
             op_sizes[i] = sizes[i];
           }
 
