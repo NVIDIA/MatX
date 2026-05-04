@@ -85,6 +85,36 @@ class SVDPISolverTestNonHalfTypes : public SVDTest<TensorType> {
 TYPED_TEST_SUITE(SVDSolverTestNonHalfTypes, MatXFloatNonHalfTypesAllExecs);
 TYPED_TEST_SUITE(SVDPISolverTestNonHalfTypes, MatXFloatNonHalfTypesCUDAExec);
 
+template <typename T>
+T MakeSVDTestValue(double value)
+{
+  using SType = typename inner_op_type_t<T>::type;
+  if constexpr (is_complex_v<T>) {
+    return T{static_cast<SType>(value), static_cast<SType>(0)};
+  }
+  else {
+    return static_cast<T>(value);
+  }
+}
+
+TEST(SVDInternalTests, CUDASelectsExpectedSVDMethods)
+{
+  float *ptr = nullptr;
+  auto matrix = make_tensor<float>(ptr, {8, 4}, false);
+  auto small_batched = make_tensor<float>(ptr, {2, 4, 4}, false);
+  auto large_batched = make_tensor<float>(ptr, {2, 64, 64}, false);
+  auto generated_batched = ones<float>({2, 4, 4});
+
+  EXPECT_EQ(static_cast<int>(detail::GetCUDASVDMethod(matrix)),
+            static_cast<int>(detail::SVDMethod::GESVD));
+  EXPECT_EQ(static_cast<int>(detail::GetCUDASVDMethod(small_batched)),
+            static_cast<int>(detail::SVDMethod::GESVDJ_BATCHED));
+  EXPECT_EQ(static_cast<int>(detail::GetCUDASVDMethod(large_batched)),
+            static_cast<int>(detail::SVDMethod::GESVD));
+  EXPECT_EQ(static_cast<int>(detail::GetCUDASVDMethod(generated_batched)),
+            static_cast<int>(detail::SVDMethod::GESVDJ_BATCHED));
+}
+
 TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasic)
 {
   MATX_ENTER_HANDLER();
@@ -737,6 +767,41 @@ TYPED_TEST(SVDPISolverTestNonHalfTypes, SVDBPI)
   svdbpi_test<TestType>({5,5,4,4}, this->exec);
   svdbpi_test<TestType>({5,5,4,16}, this->exec);
   svdbpi_test<TestType>({5,5,16,4}, this->exec);
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(SVDPISolverTestNonHalfTypes, SVDBPIToleranceCheck)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using SType = typename inner_op_type_t<TestType>::type;
+
+  tensor_t<TestType, 2> A2{{2, 2}};
+  tensor_t<TestType, 2> U2{{2, 2}};
+  tensor_t<SType, 1> S2{{2}};
+  tensor_t<TestType, 2> VT2{{2, 2}};
+
+  const auto zero = MakeSVDTestValue<TestType>(0);
+  const auto one = MakeSVDTestValue<TestType>(1);
+  const auto two = MakeSVDTestValue<TestType>(2);
+  A2(0, 0) = one;
+  A2(0, 1) = zero;
+  A2(1, 0) = zero;
+  A2(1, 1) = two;
+  (mtie(U2, S2, VT2) = svdbpi(A2, 2, 1.0e9f)).run(this->exec);
+
+  tensor_t<TestType, 3> A3{{1, 2, 2}};
+  tensor_t<TestType, 3> U3{{1, 2, 2}};
+  tensor_t<SType, 2> S3{{1, 2}};
+  tensor_t<TestType, 3> VT3{{1, 2, 2}};
+
+  A3(0, 0, 0) = one;
+  A3(0, 0, 1) = zero;
+  A3(0, 1, 0) = zero;
+  A3(0, 1, 1) = two;
+  (mtie(U3, S3, VT3) = svdbpi(A3, 2, 1.0e9f)).run(this->exec);
+  this->exec.sync();
 
   MATX_EXIT_HANDLER();
 }

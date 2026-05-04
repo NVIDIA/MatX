@@ -385,7 +385,7 @@ public:
    * @param dim Dimension to retrieve
    * @return Size of dimension
    */
-  static constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) { return shape_[dim]; }
+  static constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) { return make_shape()[dim]; }
 
   /**
    * @brief Get stride of dimension
@@ -393,7 +393,7 @@ public:
    * @param dim Dimension to retrieve
    * @return Stride of dimension
    */
-  static constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Stride(int dim) { return stride_[dim]; }
+  static constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Stride(int dim) { return make_strides()[dim]; }
 
   /**
    * @brief Return strides contaienr of descriptor
@@ -401,7 +401,7 @@ public:
    * @return Strides container
    */
   static constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Strides() {
-    return stride_;
+    return make_strides();
   }
 
   /**
@@ -409,14 +409,14 @@ public:
    *
    * @return Descriptor rank
    */
-  static constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ int Rank() { return shape_.size(); }
+  static constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ int Rank() { return sizeof...(Is) + 1; }
 
   /**
    * @brief Get underlying shape object
    *
    * @return Shape object
    */
-  static constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Shape() { return shape_; }
+  static constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Shape() { return make_shape(); }
 
   /**
    * @brief Get total size of descriptor
@@ -424,27 +424,25 @@ public:
    * @return Product of all sizes
    */
   static constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto TotalSize() {
-      return cuda::std::accumulate(shape_.begin(), shape_.end(), static_cast<index_t>(1), cuda::std::multiplies<index_t>());
+      return (I * ... * Is);
   }
 
 private:
-  static constexpr auto make_shape(){
+  static constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto make_shape(){
       return cuda::std::array{I, Is...};
   }
 
-  static constexpr auto make_strides(){
+  static constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto make_strides(){
       cuda::std::array<index_t, 1 + sizeof...(Is)> m{};
+      const auto shape = make_shape();
       m[m.size()-1] = 1;
       if constexpr (m.size() > 1) {
         for (int i = m.size()-2; i >= 0; i--) {
-            m[i] = m[i+1] * Size(i + 1);
+            m[i] = m[i+1] * shape[i + 1];
         }
       }
       return m;
   }
-
-  static constexpr shape_container shape_ = make_shape();
-  static constexpr stride_container stride_ = make_strides();
 };
 
 /**

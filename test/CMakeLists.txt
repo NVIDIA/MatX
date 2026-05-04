@@ -5,13 +5,18 @@ list(TRANSFORM OPERATOR_TEST_FILES PREPEND "00_operators/")
 
 set (test_sources
     00_misc/AllocatorTests.cu
+    00_misc/CapabilitiesTests.cu
     00_misc/ClearCacheTests.cu
+    00_misc/CudaExecutorCommonTests.cu
+    00_misc/ErrorTests.cu
     00_misc/FloatFloatTests.cu
+    00_misc/GridDimTests.cu
     00_misc/ProfilingTests.cu
     00_misc/PropertyTests.cu
     00_misc/TensorAccessorTests.cu
     00_tensor/BasicTensorTests.cu
     00_tensor/DLPackTests.cu
+    00_tensor/MakeTensorTests.cu
     00_tensor/CUBTests.cu
     00_tensor/Storage.cu
     00_tensor/ViewTests.cu

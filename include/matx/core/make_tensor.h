@@ -448,7 +448,7 @@ template <typename TensorType>
 auto make_tensor( TensorType &tensor,
                   typename TensorType::value_type *ptr) {
   MATX_LOG_DEBUG("make_tensor(tensor&, ptr, 0D): ptr={}", reinterpret_cast<void*>(ptr));
-  auto tmp = make_tensor<typename TensorType::value_type>(ptr, false);
+  auto tmp = make_tensor<typename TensorType::value_type>(ptr, {}, false);
   tensor.Shallow(tmp);
 }
 

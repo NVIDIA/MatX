@@ -22,20 +22,26 @@ Stage0 = hpccm.Stage()
 Stage0 += baseimage(image='nvidia/cuda:12.6.2-devel-ubuntu22.04', _as='devel', _distro="ubuntu22")
 
 Stage0 += packages(ospackages=[
+    'apt-transport-https',
     'bison',
+    'ca-certificates',
     'clang-tidy',
     'curl',
     'flex',
     'ghostscript',
     'git',
+    'gnupg',
     'libjs-mathjax',
     'liblapacke-dev',    
     'libopenblas64-openmp-dev',
     'lcov',
     'ninja-build',
     'numactl',
-    'python3-pip',
     'python3-dev',
+    'python3-pip',
+    'python3-setuptools',
+    'python3-venv',
+    'python3-wheel',
     'sudo',
     'texlive-font-utils',
     'valgrind',
@@ -57,10 +63,27 @@ Stage0 += pip(pip="pip3", upgrade=True, packages=[
     'sphinx-rtd-theme',
 ])
 
+Stage0 += shell(commands=["python3 -c \"import cupy, numpy, scipy, pybind11\""])
+
 Stage0 += gnu()
 Stage0 += cmake(eula=True, version="3.26.4")
-Stage0 += nsight_compute(eula=True)
-Stage0 += nsight_systems()
+Stage0 += packages(
+    apt_keys=[f"https://developer.download.nvidia.com/devtools/repos/ubuntu2204/{TARGETARCH}/nvidia.pub"],
+    apt_repositories=[f"deb [signed-by=/usr/share/keyrings/nvidia.gpg] https://developer.download.nvidia.com/devtools/repos/ubuntu2204/{TARGETARCH}/ /"],
+    force_add_repo=True,
+    ospackages=[
+        'nsight-compute',
+        'nsight-systems',
+        'nsight-systems-cli',
+    ],
+    _apt_key=False)
+Stage0 += shell(commands=[
+    'ln -sfn "$(find /opt/nvidia/nsight-compute -mindepth 1 -maxdepth 1 -type d -name \'[0-9]*\' | sort -V | tail -n 1)" /opt/nvidia/nsight-compute/latest'
+])
+Stage0 += environment(variables={
+    'NV_COMPUTE_PROFILER_DISABLE_STOCK_FILE_DEPLOYMENT': '1',
+    'PATH': '/opt/nvidia/nsight-compute/latest:$PATH',
+})
 
 Stage0 += shell(commands=["wget https://doxygen.nl/files/doxygen-{}.src.tar.gz".format(DOXYGEN_VER),
                           "tar -zxf doxygen-{}.src.tar.gz".format(DOXYGEN_VER),

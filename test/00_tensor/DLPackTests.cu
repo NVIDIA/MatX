@@ -312,6 +312,9 @@ TYPED_TEST(DLPackTestsFloatNonComplex, VersionedReadOnlyRequiresConstType)
 {
   MATX_ENTER_HANDLER();
 
+#ifdef NDEBUG
+  GTEST_SKIP() << "Read-only DLPack validation uses MATX_ASSERT and is disabled in release builds";
+#else
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   int mutable_deleter_calls = 0;
   int const_deleter_calls = 0;
@@ -332,6 +335,7 @@ TYPED_TEST(DLPackTestsFloatNonComplex, VersionedReadOnlyRequiresConstType)
     ASSERT_EQ(const_deleter_calls, 0);
   }
   ASSERT_EQ(const_deleter_calls, 1);
+#endif
 
   MATX_EXIT_HANDLER();
 }
@@ -393,6 +397,9 @@ TEST(DLPackVectorTests, ImportVectorLaneMismatchThrows)
 {
   MATX_ENTER_HANDLER();
 
+#ifdef NDEBUG
+  GTEST_SKIP() << "DLPack dtype validation uses MATX_ASSERT and is disabled in release builds";
+#else
   int deleter_calls = 0;
   auto *dl = MakeManagedTensorForOwningImportTest<float4>(&deleter_calls, 8);
   dl->dl_tensor.dtype.lanes = 2;
@@ -401,6 +408,7 @@ TEST(DLPackVectorTests, ImportVectorLaneMismatchThrows)
     ASSERT_THROW({ make_tensor(t, dl); }, matx::detail::matxException);
   }
   ASSERT_EQ(deleter_calls, 1);
+#endif
 
   MATX_EXIT_HANDLER();
 }
@@ -409,6 +417,9 @@ TEST(DLPackVectorTests, ImportVectorBaseTypeMismatchThrows)
 {
   MATX_ENTER_HANDLER();
 
+#ifdef NDEBUG
+  GTEST_SKIP() << "DLPack dtype validation uses MATX_ASSERT and is disabled in release builds";
+#else
   int deleter_calls = 0;
   auto *dl = MakeManagedTensorForOwningImportTest<float4>(&deleter_calls, 8);
   dl->dl_tensor.dtype.code = kDLInt;
@@ -417,6 +428,7 @@ TEST(DLPackVectorTests, ImportVectorBaseTypeMismatchThrows)
     ASSERT_THROW({ make_tensor(t, dl); }, matx::detail::matxException);
   }
   ASSERT_EQ(deleter_calls, 1);
+#endif
 
   MATX_EXIT_HANDLER();
 }
