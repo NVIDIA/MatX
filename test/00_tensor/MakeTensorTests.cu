@@ -239,7 +239,7 @@ TEST(MakeTensorTests, CreatesDescriptorBackedTensors)
   EXPECT_EQ(data[4], 53);
 
   tensor_t<int, 2> placed_allocated;
-  make_tensor(std::move(placed_allocated),
+  make_tensor(placed_allocated,
               DefaultDescriptor<2>{cuda::std::array<index_t, 2>{2, 3}},
               MATX_HOST_MALLOC_MEMORY);
   ExpectShape2(placed_allocated, 2, 3);
