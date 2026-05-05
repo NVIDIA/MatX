@@ -42,12 +42,15 @@ class RadarAmbiguityFunction : public ::testing::Test {
 protected:
   void SetUp() override
   {
-
+#ifdef CUPY_INSTALLED
     pb = std::make_unique<detail::MatXPybind>();
     pb->InitAndRunTVGenerator<complex>("01_radar", "ambgfun", "run",
                                        {sig_size});
 
     pb->NumpyToTensorView(xv, "x");
+#else
+    GTEST_SKIP() << "CuPy is required to generate ambgfun reference data";
+#endif
   }
 
   void TearDown() override { pb.reset(); }
@@ -57,11 +60,7 @@ protected:
   std::unique_ptr<detail::MatXPybind> pb;
 };
 
-//#ifdef CUPY_INSTALLED
-//TEST_F(RadarAmbiguityFunction, Cut2D)
-//#else
-TEST_F(RadarAmbiguityFunction, DISABLED_Cut2D)
-//#endif
+TEST_F(RadarAmbiguityFunction, Cut2D)
 {
   MATX_ENTER_HANDLER();
 
@@ -75,11 +74,7 @@ TEST_F(RadarAmbiguityFunction, DISABLED_Cut2D)
   MATX_EXIT_HANDLER();
 }
 
-//#ifdef CUPY_INSTALLED
-//TEST_F(RadarAmbiguityFunction, CutDelay)
-//#else
-TEST_F(RadarAmbiguityFunction, DISABLED_CutDelay)
-//#endif
+TEST_F(RadarAmbiguityFunction, CutDelay)
 {
   MATX_ENTER_HANDLER();
 
@@ -96,11 +91,7 @@ TEST_F(RadarAmbiguityFunction, DISABLED_CutDelay)
   MATX_EXIT_HANDLER();
 }
 
-//#ifdef CUPY_INSTALLED
-//TEST_F(RadarAmbiguityFunction, CutDoppler)
-//#else
-TEST_F(RadarAmbiguityFunction, DISABLED_CutDoppler)
-//#endif
+TEST_F(RadarAmbiguityFunction, CutDoppler)
 {
   MATX_ENTER_HANDLER();
 

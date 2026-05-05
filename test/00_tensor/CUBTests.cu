@@ -132,6 +132,225 @@ TEST(TensorStats, Hist)
   MATX_EXIT_HANDLER();
 }
 
+TEST(TensorStats, HistNonContiguousInput)
+{
+  MATX_ENTER_HANDLER();
+
+  constexpr int levels = 4;
+  tensor_t<float, 1> inv_storage({12});
+  tensor_t<int, 1> outv({levels - 1});
+
+  inv_storage.SetVals({0, 99, 1, 99, 2, 99, 0, 99, 1, 99, 2, 99});
+
+  cudaExecutor exec{};
+  const index_t hist_shape[1] = {6};
+  const index_t hist_strides[1] = {2};
+  auto inv_strided = make_tensor(inv_storage.Data(), hist_shape, hist_strides);
+  (outv = hist(inv_strided, 0.0f, 3.0f, levels)).run(exec);
+  exec.sync();
+
+  for (index_t i = 0; i < outv.Size(0); i++) {
+    ASSERT_EQ(outv(i), 2);
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(TensorStats, CumsumNonContiguousInput)
+{
+  MATX_ENTER_HANDLER();
+
+  tensor_t<int, 2> inv({3, 4});
+  tensor_t<int, 2> outv({4, 3});
+
+  inv.SetVals({{1, 2, 3, 4},
+               {10, 20, 30, 40},
+               {100, 200, 300, 400}});
+
+  cudaExecutor exec{};
+  auto invp = inv.Permute({1, 0});
+  (outv = cumsum(invp)).run(exec);
+  exec.sync();
+
+  for (index_t i = 0; i < outv.Size(0); i++) {
+    int running = 0;
+    for (index_t j = 0; j < outv.Size(1); j++) {
+      running += invp(i, j);
+      ASSERT_EQ(outv(i, j), running);
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(TensorStats, SortLegacyRank2AndOversizedGuards)
+{
+  MATX_ENTER_HANDLER();
+
+  cudaExecutor exec{};
+  tensor_t<int, 2> inv({2, cubSegmentCuttoff});
+  auto outv = make_tensor<int>(inv.Shape());
+
+  for (index_t i = 0; i < inv.Size(0); i++) {
+    for (index_t j = 0; j < inv.Size(1); j++) {
+      inv(i, j) = static_cast<int>(inv.Size(1) - j + i);
+    }
+  }
+
+  (outv = matx::sort(inv, SORT_DIR_ASC)).run(exec);
+  exec.sync();
+  for (index_t i = 0; i < outv.Size(0); i++) {
+    ASSERT_EQ(outv(i, 0), static_cast<int>(i + 1));
+    ASSERT_EQ(outv(i, outv.Size(1) - 1), static_cast<int>(outv.Size(1) + i));
+  }
+
+  (outv = matx::sort(inv, SORT_DIR_DESC)).run(exec);
+  exec.sync();
+  for (index_t i = 0; i < outv.Size(0); i++) {
+    ASSERT_EQ(outv(i, 0), static_cast<int>(outv.Size(1) + i));
+    ASSERT_EQ(outv(i, outv.Size(1) - 1), static_cast<int>(i + 1));
+  }
+
+  int *ptr = nullptr;
+  index_t *idx_ptr = nullptr;
+  auto huge_in = make_tensor<int>(ptr, {2048, 2048, 1024}, false);
+  auto huge_out = make_tensor<int>(ptr, {2048, 2048, 1024}, false);
+  auto huge_idx_in = make_tensor<index_t>(idx_ptr, {2048, 2048, 1024}, false);
+  auto huge_idx_out = make_tensor<index_t>(idx_ptr, {2048, 2048, 1024}, false);
+
+  EXPECT_THROW({ detail::sort_impl_inner(huge_out, huge_in, SORT_DIR_ASC, exec); },
+               detail::matxException);
+  EXPECT_THROW({ detail::sort_pairs_impl_inner(huge_idx_out, huge_idx_in, huge_out, huge_in, SORT_DIR_ASC, exec); },
+               detail::matxException);
+
+  tensor_t<int, 2> noncontig_base({2, 3});
+  tensor_t<int, 2> noncontig_out({3, 2});
+  auto noncontig_view = noncontig_base.Permute({1, 0});
+  detail::SortParams_t sort_params{SORT_DIR_ASC};
+  using NonContigSortPlan = detail::matxCubPlan_t<decltype(noncontig_out),
+                                                  decltype(noncontig_view),
+                                                  detail::CUB_OP_RADIX_SORT,
+                                                  detail::SortParams_t>;
+  auto create_noncontig_sort_plan = [&]() {
+    NonContigSortPlan plan(noncontig_out, noncontig_view, sort_params, exec.getStream());
+    (void)plan;
+  };
+  EXPECT_THROW(create_noncontig_sort_plan(), detail::matxException);
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(TensorStats, NonContiguousFindUniqueAndArgReduceOutputs)
+{
+  MATX_ENTER_HANDLER();
+
+  cudaExecutor exec{};
+  tensor_t<float, 2> inv({2, 4});
+  inv.SetVals({{1, 1, 2, 2},
+               {1, 1, 2, 2}});
+  auto invp = inv.Permute({1, 0});
+
+  tensor_t<float, 1> found({8});
+  tensor_t<int, 1> found_idx({8});
+  tensor_t<int, 0> num_found{{}};
+
+  (mtie(found, num_found) = find(invp, GT{1.5f})).run(exec);
+  exec.sync();
+  ASSERT_EQ(num_found(), 4);
+  for (index_t i = 0; i < num_found(); i++) {
+    ASSERT_EQ(found(i), 2.0f);
+  }
+
+  (mtie(found_idx, num_found) = find_idx(invp, GT{1.5f})).run(exec);
+  exec.sync();
+  ASSERT_EQ(num_found(), 4);
+  for (index_t i = 0; i < num_found(); i++) {
+    ASSERT_EQ(found_idx(i), i + 4);
+  }
+
+  tensor_t<float, 1> unique_out({8});
+  auto unique_params = detail::UniqueParams_t<decltype(num_found)>{num_found};
+  auto unique_plan = detail::matxCubPlan_t<decltype(unique_out),
+                                           decltype(invp),
+                                           detail::CUB_OP_UNIQUE,
+                                           decltype(unique_params)>{unique_out, invp, unique_params, exec.getStream()};
+  unique_plan.ExecUnique(unique_out, invp, exec.getStream());
+  exec.sync();
+  ASSERT_EQ(num_found(), 2);
+  ASSERT_EQ(unique_out(0), 1.0f);
+  ASSERT_EQ(unique_out(1), 2.0f);
+
+  tensor_t<float, 2> arg_in({2, 3});
+  tensor_t<float, 1> arg_out({2});
+  tensor_t<index_t, 1> arg_idx({2});
+  arg_in.SetVals({{1, 5, 2},
+                  {4, 3, 6}});
+
+  (mtie(arg_out, arg_idx) = argmax(arg_in, {1})).run(exec);
+  exec.sync();
+  ASSERT_EQ(arg_out(0), 5.0f);
+  ASSERT_EQ(arg_idx(0), 1);
+  ASSERT_EQ(arg_out(1), 6.0f);
+  ASSERT_EQ(arg_idx(1), 5);
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(TensorStats, InternalCubPlansRejectInvalidOperations)
+{
+  int *ptr = nullptr;
+  index_t *idx_ptr = nullptr;
+  auto in = make_tensor<int>(ptr, {4}, false);
+  auto out = make_tensor<int>(ptr, {}, false);
+  auto idx = make_tensor<index_t>(idx_ptr, {}, false);
+  using SingleParams = detail::ReduceParams_t<detail::CustomArgMaxCmp, cuda::std::tuple<index_t, int>>;
+  using DualParams = detail::ReduceParams_t<detail::CustomArgMinMaxCmp, cuda::std::tuple<index_t, int, index_t, int>>;
+  SingleParams single_params{detail::CustomArgMaxCmp{}, cuda::std::make_tuple(index_t{0}, int{})};
+  DualParams dual_params{detail::CustomArgMinMaxCmp{}, cuda::std::make_tuple(index_t{0}, int{}, index_t{0}, int{})};
+
+  using SinglePlan = detail::matxCubSingleArgPlan_t<decltype(out), decltype(idx), decltype(in), SingleParams>;
+  using DualPlan = detail::matxCubDualArgPlan_t<decltype(out), decltype(idx), decltype(in), DualParams>;
+  auto create_single_plan = [&]() {
+    SinglePlan plan(out, idx, in, detail::CUB_OP_REDUCE, single_params, 0);
+    (void)plan;
+  };
+  auto create_dual_plan = [&]() {
+    DualPlan plan(out, idx, out, idx, in, detail::CUB_OP_REDUCE, dual_params, 0);
+    (void)plan;
+  };
+
+  EXPECT_THROW(create_single_plan(), detail::matxException);
+  EXPECT_THROW(create_dual_plan(), detail::matxException);
+}
+
+TEST(TensorStats, NoMatchesFindAndUniqueHost)
+{
+  MATX_ENTER_HANDLER();
+
+  HostExecutor exec{};
+  tensor_t<float, 1> in({3});
+  tensor_t<float, 1> out({3});
+  tensor_t<int, 1> idx({3});
+  tensor_t<int, 0> num_found{{}};
+
+  in.SetVals({1, 2, 3});
+
+  (mtie(out, num_found) = find(in, GT{10.0f})).run(exec);
+  ASSERT_EQ(num_found(), 0);
+
+  (mtie(idx, num_found) = find_idx(in, GT{10.0f})).run(exec);
+  ASSERT_EQ(num_found(), 0);
+
+  in.SetVals({1, 1, 2});
+
+  (mtie(out, num_found) = unique(in)).run(exec);
+  ASSERT_EQ(num_found(), 2);
+  ASSERT_EQ(out(0), 1.0f);
+  ASSERT_EQ(out(1), 2.0f);
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(CUBTestsNumericNonComplexAllExecs, CumSum)
 {
   MATX_ENTER_HANDLER();

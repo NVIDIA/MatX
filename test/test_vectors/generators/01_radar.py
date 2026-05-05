@@ -155,7 +155,7 @@ class ambgfun:
             }
             """,
             "_new_ynorm_kernel",
-            options=("-std=c++11",),
+            options=("-std=c++17",),
         )
 
         cut = 'delay'

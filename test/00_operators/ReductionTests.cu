@@ -810,6 +810,43 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Percentile)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, PercentileMethodsAndBounds)
+{
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+
+  ExecType exec{};
+
+  MATX_ENTER_HANDLER();
+  {
+    auto t1 = make_tensor<TestType>({5});
+    auto t0 = make_tensor<TestType>({});
+    t1.SetVals({0, 10, 20, 30, 40});
+
+    auto expect_percentile = [&](uint8_t q, PercentileMethod method, double expected) {
+      (t0 = percentile(t1, q, method)).run(exec);
+      exec.sync();
+      EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), static_cast<TestType>(expected), 0.01));
+    };
+
+    expect_percentile(0, PercentileMethod::LINEAR, 0.0);
+    expect_percentile(100, PercentileMethod::LINEAR, 40.0);
+    expect_percentile(25, PercentileMethod::HAZEN, 7.5);
+    expect_percentile(25, PercentileMethod::WEIBULL, 5.0);
+    expect_percentile(25, PercentileMethod::MEDIAN_UNBIASED, 6.6666666667);
+    expect_percentile(25, PercentileMethod::NORMAL_UNBIASED, 6.875);
+    expect_percentile(25, PercentileMethod::MIDPOINT, 15.0);
+    expect_percentile(25, PercentileMethod::NEAREST, 10.0);
+
+#ifndef NDEBUG
+    EXPECT_THROW({ detail::percentile_impl(t0, t1, 50, static_cast<PercentileMethod>(99), exec); },
+                 detail::matxException);
+#endif
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Median)
 {
   MATX_ENTER_HANDLER();
@@ -1758,5 +1795,3 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, Trace)
   ASSERT_EQ(t0(), count);
   MATX_EXIT_HANDLER();
 }
-
-

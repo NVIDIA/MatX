@@ -81,7 +81,7 @@ public:
 
   __MATX_DEVICE__ __MATX_INLINE__ __MATX_HOST__ void operator()(index_t idy, index_t idx)
   {
-    return out_.template operator()<ElementsPerThread::ONE>(idy, idx);
+    return this->template operator()<DefaultCapabilities>(idy, idx);
   }
 
   constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
@@ -97,12 +97,20 @@ public:
 
   template <OperatorCapability Cap, typename InType>
   __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
-    // No specific capabilities enforced
     auto self_has_cap = capability_attributes<Cap>::default_value;
-    return combine_capabilities<Cap>(self_has_cap, 
-          detail::get_operator_capability<Cap>(xnorm_, in), 
-          detail::get_operator_capability<Cap>(ynorm_, in),
-          detail::get_operator_capability<Cap>(out_, in));
+    if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+      const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+      return combine_capabilities<Cap>(my_cap,
+            detail::get_operator_capability<Cap>(xnorm_, in),
+            detail::get_operator_capability<Cap>(ynorm_, in),
+            detail::get_operator_capability<Cap>(out_, in));
+    }
+    else {
+      return combine_capabilities<Cap>(self_has_cap,
+            detail::get_operator_capability<Cap>(xnorm_, in),
+            detail::get_operator_capability<Cap>(ynorm_, in),
+            detail::get_operator_capability<Cap>(out_, in));
+    }
   }     
 };
 
@@ -135,16 +143,23 @@ public:
 
   __MATX_DEVICE__ inline void operator()(index_t idx)
   {
-    return out_.template operator()<ElementsPerThread::ONE>(idx);
+    return this->template operator()<DefaultCapabilities>(idx);
   } 
 
   template <OperatorCapability Cap, typename InType>
   __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
-    // No specific capabilities enforced
     auto self_has_cap = capability_attributes<Cap>::default_value;
-    return combine_capabilities<Cap>(self_has_cap, 
-          detail::get_operator_capability<Cap>(out_, in), 
-          detail::get_operator_capability<Cap>(x_, in));
+    if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+      const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+      return combine_capabilities<Cap>(my_cap,
+            detail::get_operator_capability<Cap>(out_, in),
+            detail::get_operator_capability<Cap>(x_, in));
+    }
+    else {
+      return combine_capabilities<Cap>(self_has_cap,
+            detail::get_operator_capability<Cap>(out_, in),
+            detail::get_operator_capability<Cap>(x_, in));
+    }
   }       
 
   constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
@@ -182,16 +197,23 @@ public:
 
   __MATX_DEVICE__ inline void operator()(index_t idx)
   {
-    return out_.template operator()<ElementsPerThread::ONE>(idx);
+    return this->template operator()<DefaultCapabilities>(idx);
   }
 
   template <OperatorCapability Cap, typename InType>
   __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
-    // No specific capabilities enforced
     auto self_has_cap = capability_attributes<Cap>::default_value;
-    return combine_capabilities<Cap>(self_has_cap, 
-          detail::get_operator_capability<Cap>(out_, in), 
-          detail::get_operator_capability<Cap>(x_, in));
+    if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+      const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+      return combine_capabilities<Cap>(my_cap,
+            detail::get_operator_capability<Cap>(out_, in),
+            detail::get_operator_capability<Cap>(x_, in));
+    }
+    else {
+      return combine_capabilities<Cap>(self_has_cap,
+            detail::get_operator_capability<Cap>(out_, in),
+            detail::get_operator_capability<Cap>(x_, in));
+    }
   }           
 
   constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
