@@ -50,6 +50,26 @@ static constexpr int ILP_FACTOR = 8;
 // Unroll factor for the inner loop
 static constexpr int ITER_UNROLL_FACTOR = 16;
 
+// Per-row GOPS/s summary so downstream tooling reads throughput straight off
+// the nvbench table/CSV. Each kernel does ILP_FACTOR ops per inner iteration
+// per element, with `iterations` outer iterations, on `size` elements:
+//   total_ops_per_call = size * iterations * ILP_FACTOR * ops_per_op
+// `ops_per_op` lets compound ops (FMA = 2, norm3d = 5, etc.) self-report.
+static void add_gops_per_sec_summary(nvbench::state &state, double ops_per_op = 1.0)
+{
+  const double seconds = state.get_summary("Batch GPU").get_float64("value");
+  const int64_t size = state.get_int64("Array Size");
+  const int64_t iterations = state.get_int64("Iterations");
+  const double total_ops = static_cast<double>(size) * static_cast<double>(iterations)
+                         * static_cast<double>(ILP_FACTOR) * ops_per_op;
+
+  auto &s = state.add_summary("matx/fltflt/gops_per_sec");
+  s.set_string("name", "Gops/s");
+  s.set_string("hint", "item_rate");
+  s.set_string("description", "Giga-operations per second (per-row throughput)");
+  s.set_float64("value", total_ops / seconds / 1e9);
+}
+
 template <typename T>
 __global__ void iterative_add_kernel(T* __restrict__ result, int64_t size, int32_t iterations)
 {
@@ -283,6 +303,7 @@ void fltflt_bench_add(nvbench::state &state, nvbench::type_list<PrecisionType>)
     iterative_add_kernel<<<grid_size, block_size, 0, (cudaStream_t)launch.get_stream()>>>(
       result.Data(), size, iterations);
   });
+  add_gops_per_sec_summary(state);
 }
 
 NVBENCH_BENCH_TYPES(fltflt_bench_add, NVBENCH_TYPE_AXES(precision_types))
@@ -313,6 +334,7 @@ void fltflt_bench_sub(nvbench::state &state, nvbench::type_list<PrecisionType>)
     iterative_sub_kernel<<<grid_size, block_size, 0, (cudaStream_t)launch.get_stream()>>>(
       result.Data(), size, iterations);
   });
+  add_gops_per_sec_summary(state);
 }
 
 NVBENCH_BENCH_TYPES(fltflt_bench_sub, NVBENCH_TYPE_AXES(precision_types))
@@ -343,6 +365,7 @@ void fltflt_bench_mul(nvbench::state &state, nvbench::type_list<PrecisionType>)
     iterative_mul_kernel<<<grid_size, block_size, 0, (cudaStream_t)launch.get_stream()>>>(
       result.Data(), size, iterations);
   });
+  add_gops_per_sec_summary(state);
 }
 
 NVBENCH_BENCH_TYPES(fltflt_bench_mul, NVBENCH_TYPE_AXES(precision_types))
@@ -373,6 +396,7 @@ void fltflt_bench_div(nvbench::state &state, nvbench::type_list<PrecisionType>)
     iterative_div_kernel<<<grid_size, block_size, 0, (cudaStream_t)launch.get_stream()>>>(
       result.Data(), size, iterations);
   });
+  add_gops_per_sec_summary(state);
 }
 
 NVBENCH_BENCH_TYPES(fltflt_bench_div, NVBENCH_TYPE_AXES(precision_types))
@@ -403,6 +427,7 @@ void fltflt_bench_sqrt(nvbench::state &state, nvbench::type_list<PrecisionType>)
     iterative_sqrt_kernel<<<grid_size, block_size, 0, (cudaStream_t)launch.get_stream()>>>(
       result.Data(), size, iterations);
   });
+  add_gops_per_sec_summary(state);
 }
 
 NVBENCH_BENCH_TYPES(fltflt_bench_sqrt, NVBENCH_TYPE_AXES(precision_types))
@@ -473,6 +498,7 @@ void fltflt_bench_sqrt_fast(nvbench::state &state, nvbench::type_list<PrecisionT
     iterative_sqrt_fast_kernel<<<grid_size, block_size, 0, (cudaStream_t)launch.get_stream()>>>(
       result.Data(), size, iterations);
   });
+  add_gops_per_sec_summary(state);
 }
 
 NVBENCH_BENCH_TYPES(fltflt_bench_sqrt_fast, NVBENCH_TYPE_AXES(precision_types))
@@ -554,6 +580,8 @@ void fltflt_bench_norm3d(nvbench::state &state, nvbench::type_list<PrecisionType
     iterative_norm3d_kernel<<<grid_size, block_size, 0, (cudaStream_t)launch.get_stream()>>>(
       result.Data(), size, iterations);
   });
+  // 3 muls + 2 adds + 1 sqrt + 1 sub + 1 add = 8 ops per inner iteration.
+  add_gops_per_sec_summary(state, /*ops_per_op=*/8.0);
 }
 
 NVBENCH_BENCH_TYPES(fltflt_bench_norm3d, NVBENCH_TYPE_AXES(precision_types))
@@ -584,6 +612,7 @@ void fltflt_bench_abs(nvbench::state &state, nvbench::type_list<PrecisionType>)
     iterative_abs_kernel<<<grid_size, block_size, 0, (cudaStream_t)launch.get_stream()>>>(
       result.Data(), size, iterations);
   });
+  add_gops_per_sec_summary(state);
 }
 
 NVBENCH_BENCH_TYPES(fltflt_bench_abs, NVBENCH_TYPE_AXES(precision_types))
@@ -614,6 +643,7 @@ void fltflt_bench_fma(nvbench::state &state, nvbench::type_list<PrecisionType>)
     iterative_fma_kernel<<<grid_size, block_size, 0, (cudaStream_t)launch.get_stream()>>>(
       result.Data(), size, iterations);
   });
+  add_gops_per_sec_summary(state, /*ops_per_op=*/2.0);  // FMA = 1 mul + 1 add
 }
 
 NVBENCH_BENCH_TYPES(fltflt_bench_fma, NVBENCH_TYPE_AXES(precision_types))
@@ -680,6 +710,7 @@ void fltflt_bench_madd(nvbench::state &state, nvbench::type_list<PrecisionType>)
     iterative_madd_kernel<<<grid_size, block_size, 0, (cudaStream_t)launch.get_stream()>>>(
       result.Data(), size, iterations);
   });
+  add_gops_per_sec_summary(state, /*ops_per_op=*/2.0);  // separate mul + add
 }
 
 NVBENCH_BENCH_TYPES(fltflt_bench_madd, NVBENCH_TYPE_AXES(precision_types))
@@ -753,6 +784,7 @@ void fltflt_bench_round(nvbench::state &state, nvbench::type_list<PrecisionType>
     iterative_round_kernel<<<grid_size, block_size, 0, (cudaStream_t)launch.get_stream()>>>(
       result.Data(), size, iterations);
   });
+  add_gops_per_sec_summary(state);
 }
 
 NVBENCH_BENCH_TYPES(fltflt_bench_round, NVBENCH_TYPE_AXES(precision_types))
@@ -834,6 +866,7 @@ void fltflt_bench_fmod(nvbench::state &state, nvbench::type_list<PrecisionType>)
     iterative_fmod_kernel<<<grid_size, block_size, 0, (cudaStream_t)launch.get_stream()>>>(
       result.Data(), size, iterations);
   });
+  add_gops_per_sec_summary(state);
 }
 
 NVBENCH_BENCH_TYPES(fltflt_bench_fmod, NVBENCH_TYPE_AXES(precision_types))
@@ -910,6 +943,7 @@ void fltflt_bench_trunc(nvbench::state &state, nvbench::type_list<PrecisionType>
     iterative_trunc_kernel<<<grid_size, block_size, 0, (cudaStream_t)launch.get_stream()>>>(
       result.Data(), size, iterations);
   });
+  add_gops_per_sec_summary(state);
 }
 
 NVBENCH_BENCH_TYPES(fltflt_bench_trunc, NVBENCH_TYPE_AXES(precision_types))
@@ -986,6 +1020,7 @@ void fltflt_bench_floor(nvbench::state &state, nvbench::type_list<PrecisionType>
     iterative_floor_kernel<<<grid_size, block_size, 0, (cudaStream_t)launch.get_stream()>>>(
       result.Data(), size, iterations);
   });
+  add_gops_per_sec_summary(state);
 }
 
 NVBENCH_BENCH_TYPES(fltflt_bench_floor, NVBENCH_TYPE_AXES(precision_types))
@@ -1048,6 +1083,7 @@ void fltflt_bench_cast2dbl(nvbench::state &state, nvbench::type_list<PrecisionTy
     iterative_cast2dbl_kernel<PrecisionType><<<grid_size, block_size, 0, (cudaStream_t)launch.get_stream()>>>(
       result.Data(), size, iterations);
   });
+  add_gops_per_sec_summary(state);
 }
 
 NVBENCH_BENCH_TYPES(fltflt_bench_cast2dbl, NVBENCH_TYPE_AXES(precision_types))
@@ -1116,6 +1152,7 @@ void fltflt_bench_cast2fltflt(nvbench::state &state, nvbench::type_list<Precisio
     iterative_cast2fltflt_kernel<PrecisionType><<<grid_size, block_size, 0, (cudaStream_t)launch.get_stream()>>>(
       result.Data(), size, iterations);
   });
+  add_gops_per_sec_summary(state);
 }
 
 NVBENCH_BENCH_TYPES(fltflt_bench_cast2fltflt, NVBENCH_TYPE_AXES(precision_types))

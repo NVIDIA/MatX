@@ -53,6 +53,7 @@ namespace cg = cooperative_groups;
 #include "matx/core/utils.h"
 #include "matx/core/type_utils.h"
 #include "matx/core/tensor_utils.h"
+#include "matx/kernels/tensor_accessor.h"
 
 namespace matx {
 
@@ -66,7 +67,7 @@ static constexpr int MATX_RESAMPLE_POLY_MAX_NUM_THREADS = 256;
 static constexpr size_t MATX_RESAMPLE_POLY_MAX_SMEM_BYTES = 11*1024;
 
 #ifdef __CUDACC__ 
-template <int THREADS, typename OutType, typename InType, typename FilterType, typename index_t>
+template <int THREADS, bool IsUnitStride, typename OutType, typename InType, typename FilterType, typename index_t>
 __launch_bounds__(MATX_RESAMPLE_POLY_MAX_NUM_THREADS)
 __global__ void ResamplePoly1D_PhaseBlock(OutType output, InType input, FilterType filter,
                     index_t up, index_t down, index_t elems_per_thread)
@@ -95,9 +96,20 @@ __global__ void ResamplePoly1D_PhaseBlock(OutType output, InType input, FilterTy
     const int tid = threadIdx.x;
     const index_t filter_len_half = filter_len/2;
 
-    // All but the last dim are batch indices
+    // Wrap input/output/filter in TensorAccessor and bind the leading Rank-1
+    // batch dims once. After binding, per-access calls supply only the inner
+    // element index. On the fast path this collapses to base_ptr[idx]
+    // arithmetic; on the slow path it forwards to operator(). Output and
+    // input share the same batch shape (asserted by resample_poly_impl), so
+    // a single BlockToIdx call feeds both bind_first_n calls.
     const int batch_idx = blockIdx.x;
-    auto bdims = BlockToIdx(output, batch_idx, 1);
+    detail::TensorAccessor<InType,     IsUnitStride> input_acc(input);
+    detail::TensorAccessor<OutType,    IsUnitStride> output_acc(output);
+    detail::TensorAccessor<FilterType, IsUnitStride> filter_acc(filter);
+
+    const auto batch_idx_arr = BlockToIdx(output, batch_idx, 1);
+    auto input_b  = detail::bind_first_n<Rank - 1>(input_acc,  batch_idx_arr);
+    auto output_b = detail::bind_first_n<Rank - 1>(output_acc, batch_idx_arr);
 
     // We assume odd-length filters in the below index calculations. If the filter
     // is even-length, then it has had a single zero logically prepended to it to
@@ -148,10 +160,7 @@ __global__ void ResamplePoly1D_PhaseBlock(OutType output, InType input, FilterTy
     // overlaps with zero-filled samples from the upsampling operation.
     if (last_filter_ind < 0) {
         for (index_t out_ind = phase_ind + tid * up; out_ind < output_len; out_ind += THREADS * up) {
-            bdims[Rank - 1] = out_ind;
-            cuda::std::apply([&output](auto &&...args) {
-                output.operator()(args...) = 0;
-            }, bdims);
+            output_b(out_ind) = 0;
         }
         return;
     }
@@ -167,13 +176,13 @@ __global__ void ResamplePoly1D_PhaseBlock(OutType output, InType input, FilterTy
         for (index_t t = tid; t < this_phase_len; t += THREADS) {
             const index_t ind = t * up + first_filter_ind;
             const index_t smem_ind = this_phase_len - 1 - t;
-            s_filter[smem_ind] = (ind > 0) ? scale * filter.operator()(ind-1) : static_cast<filter_t>(0);
+            s_filter[smem_ind] = (ind > 0) ? scale * filter_acc(ind-1) : static_cast<filter_t>(0);
         }
     } else {
         for (index_t t = tid; t < this_phase_len; t += THREADS) {
             const index_t ind = t * up + first_filter_ind;
             const index_t smem_ind = this_phase_len - 1 - t;
-            s_filter[smem_ind] = scale * filter.operator()(ind);
+            s_filter[smem_ind] = scale * filter_acc(ind);
         }
     }
 
@@ -217,43 +226,47 @@ __global__ void ResamplePoly1D_PhaseBlock(OutType output, InType input, FilterTy
         index_t x_ind = input_ind - prologue;
         index_t h_ind = left_h_ind - prologue;
         output_t accum {};
-        input_t in_val;
         for (index_t j = 0; j < n; j++) {
-            bdims[Rank - 1] = x_ind++;
-            cuda::std::apply([&in_val, &input](auto &&...args) {
-                in_val = input.operator()(args...);
-            }, bdims);
+            const input_t in_val = input_b(x_ind++);
             accum += s_filter[h_ind++] * in_val;
         }
 
-        bdims[Rank - 1] = out_ind;
-        cuda::std::apply([&accum, &output](auto &&...args) {
-            output.operator()(args...) = accum;
-        }, bdims);
+        output_b(out_ind) = accum;
     }
 }
 
-template <int THREADS, typename FilterType>
-__device__ inline void ResamplePoly1D_LoadFilter(typename FilterType::value_type *s_filter, const FilterType &filter)
+template <int THREADS, typename FilterAcc>
+__device__ inline void ResamplePoly1D_LoadFilter(typename FilterAcc::value_type *s_filter,
+                                                  const FilterAcc &filter_acc, index_t filter_len)
 {
-    const index_t filter_len = filter.Size(0);
+    // FilterAcc is a TensorAccessor / BoundAccessor wrapping the filter
+    // operator; both expose `value_type` aliased from the underlying op's
+    // value_type. The static_assert documents that contract so a refactor
+    // that drops `value_type` from those wrappers fails here at the helper
+    // site rather than silently breaking smem-filter loads.
+    using filter_value_t = typename FilterAcc::value_type;
+    static_assert(cuda::std::is_arithmetic_v<filter_value_t> ||
+                  is_complex_v<filter_value_t> ||
+                  is_matx_type_v<filter_value_t>,
+                  "ResamplePoly1D_LoadFilter requires FilterAcc::value_type "
+                  "to be a MatX-supported numeric scalar/complex type");
     const int tid = threadIdx.x;
     if (filter_len % 2 == 0) {
         for (int t = tid; t < filter_len; t += THREADS) {
-            s_filter[t+1] = filter.operator()(t);
+            s_filter[t+1] = filter_acc(t);
         }
         if (tid == 0) {
-            s_filter[0] = static_cast<typename FilterType::value_type>(0);
+            s_filter[0] = static_cast<filter_value_t>(0);
         }
     } else {
         for (int t = tid; t < filter_len; t += THREADS) {
-            s_filter[t] = filter.operator()(t);
+            s_filter[t] = filter_acc(t);
         }
     }
     __syncthreads();    
 }
 
-template <int THREADS, typename OutType, typename InType, typename FilterType, typename index_t>
+template <int THREADS, bool IsUnitStride, typename OutType, typename InType, typename FilterType, typename index_t>
 __launch_bounds__(MATX_RESAMPLE_POLY_MAX_NUM_THREADS)
 __global__ void ResamplePoly1D_ElemBlock(OutType output, InType input, FilterType filter,
                     index_t up, index_t down, index_t elems_per_thread)
@@ -277,16 +290,24 @@ __global__ void ResamplePoly1D_ElemBlock(OutType output, InType input, FilterTyp
     const int tid = threadIdx.x;
     // const int THREADS = blockDim.x;
 
+    // TensorAccessors with per-block batch binding (see ResamplePoly1D_PhaseBlock).
+    detail::TensorAccessor<InType,     IsUnitStride> input_acc(input);
+    detail::TensorAccessor<OutType,    IsUnitStride> output_acc(output);
+    detail::TensorAccessor<FilterType, IsUnitStride> filter_acc(filter);
+
     if (load_filter_to_smem) {
-        ResamplePoly1D_LoadFilter<THREADS, FilterType>(s_filter, filter);
+        ResamplePoly1D_LoadFilter<THREADS>(s_filter, filter_acc, filter_len);
         if (filter_len % 2 == 0) {
             filter_len++;
         }
     }
 
-    // All but the last dim are batch indices
+    // Bind the leading Rank-1 batch dims into both accessors. Input and
+    // output share their batch shape, so a single BlockToIdx call feeds both.
     const int batch_idx = blockIdx.x;
-    auto bdims = BlockToIdx(output, batch_idx, 1);
+    const auto batch_idx_arr = BlockToIdx(output, batch_idx, 1);
+    auto input_b  = detail::bind_first_n<Rank - 1>(input_acc,  batch_idx_arr);
+    auto output_b = detail::bind_first_n<Rank - 1>(output_acc, batch_idx_arr);
 
     // Scale the filter coefficients by up to match scipy's convention
     const filter_t scale = static_cast<filter_t>(up);
@@ -316,21 +337,17 @@ __global__ void ResamplePoly1D_ElemBlock(OutType output, InType input, FilterTyp
             int h_ind = static_cast<int>(filter_central_tap + (up_ind - up*x_start));
 
             output_t accum {};
-            input_t in_val;
+            // Cap the inner-loop unroll at 8; unroll=16 can saturate the MIO
+            // pipeline and reduce performance.
+            #pragma unroll 8
             for (index_t i = x_start; i <= x_end; i++) {
-                bdims[Rank - 1] = i;
-                cuda::std::apply([&in_val, &input](auto &&...args) {
-                    in_val = input.operator()(args...);
-                }, bdims);
+                const input_t in_val = input_b(i);
                 accum += in_val * s_filter[h_ind];
                 h_ind -= up;
             }
 
             accum *= scale;
-            bdims[Rank - 1] = out_ind;
-            cuda::std::apply([&accum, &output](auto &&...args) {
-                output.operator()(args...) = accum;
-            }, bdims);
+            output_b(out_ind) = accum;
         }
     } else {
         for (index_t out_ind = start_ind; out_ind <= last_ind; out_ind += THREADS) {
@@ -345,27 +362,20 @@ __global__ void ResamplePoly1D_ElemBlock(OutType output, InType input, FilterTyp
             }
 
             output_t accum {};
-            input_t in_val;
             for (index_t i = x_start; i <= x_end; i++) {
-                bdims[Rank - 1] = i;
-                cuda::std::apply([&in_val, &input](auto &&...args) {
-                    in_val = input.operator()(args...);
-                }, bdims);
-                accum += in_val * filter.operator()(h_ind);
+                const input_t in_val = input_b(i);
+                accum += in_val * filter_acc(h_ind);
                 h_ind -= up;
             }
 
             accum *= scale;
-            bdims[Rank - 1] = out_ind;
-            cuda::std::apply([&accum, &output](auto &&...args) {
-                output.operator()(args...) = accum;
-            }, bdims);
+            output_b(out_ind) = accum;
         }
     }
 
 }
 
-template <int THREADS, typename OutType, typename InType, typename FilterType, typename index_t>
+template <int THREADS, bool IsUnitStride, typename OutType, typename InType, typename FilterType, typename index_t>
 __launch_bounds__(MATX_RESAMPLE_POLY_MAX_NUM_THREADS)
 __global__ void ResamplePoly1D_WarpCentric(OutType output, InType input, FilterType filter,
                     index_t up, index_t down, index_t elems_per_warp)
@@ -393,16 +403,24 @@ __global__ void ResamplePoly1D_WarpCentric(OutType output, InType input, FilterT
 
     const int elem_block = blockIdx.z;
 
+    // TensorAccessors with per-block batch binding (see ResamplePoly1D_PhaseBlock).
+    detail::TensorAccessor<InType,     IsUnitStride> input_acc(input);
+    detail::TensorAccessor<OutType,    IsUnitStride> output_acc(output);
+    detail::TensorAccessor<FilterType, IsUnitStride> filter_acc(filter);
+
     if (load_filter_to_smem) {
-        ResamplePoly1D_LoadFilter<THREADS, FilterType>(s_filter, filter);
+        ResamplePoly1D_LoadFilter<THREADS>(s_filter, filter_acc, filter_len);
         if (filter_len % 2 == 0) {
             filter_len++;
         }        
     }
 
-    // All but the last dim are batch indices
+    // Bind the leading Rank-1 batch dims into both accessors. Input and
+    // output share their batch shape, so a single BlockToIdx call feeds both.
     const int batch_idx = blockIdx.x;
-    auto bdims = BlockToIdx(output, batch_idx, 1);
+    const auto batch_idx_arr = BlockToIdx(output, batch_idx, 1);
+    auto input_b  = detail::bind_first_n<Rank - 1>(input_acc,  batch_idx_arr);
+    auto output_b = detail::bind_first_n<Rank - 1>(output_acc, batch_idx_arr);
 
     // Scale the filter coefficients by up to match scipy's convention
     const filter_t scale = static_cast<filter_t>(up);
@@ -423,12 +441,8 @@ __global__ void ResamplePoly1D_WarpCentric(OutType output, InType input, FilterT
             int h_ind = static_cast<int>(filter_central_tap + (up_ind - up*x_start)) - static_cast<int>(lane_id*up);
 
             output_t accum {};
-            input_t in_val;
             for (index_t i = x_start+lane_id; i <= x_end; i += WARP_SIZE) {
-                bdims[Rank - 1] = i;
-                cuda::std::apply([&in_val, &input](auto &&...args) {
-                    in_val = input.operator()(args...);
-                }, bdims);
+                const input_t in_val = input_b(i);
                 accum += in_val * s_filter[h_ind];
                 h_ind -= up * WARP_SIZE;
             }
@@ -442,10 +456,7 @@ __global__ void ResamplePoly1D_WarpCentric(OutType output, InType input, FilterT
                 accum = cg::reduce(tile, accum, cg::plus<output_t>());
             }
             if (lane_id == 0) {
-                bdims[Rank - 1] = out_ind;
-                cuda::std::apply([&accum, &output](auto &&...args) {
-                    output.operator()(args...) = accum;
-                }, bdims);
+                output_b(out_ind) = accum;
             }
         }
     } else {
@@ -462,13 +473,9 @@ __global__ void ResamplePoly1D_WarpCentric(OutType output, InType input, FilterT
             h_ind -= lane_id*up;
 
             output_t accum {};
-            input_t in_val;
             for (index_t i = x_start+lane_id; i <= x_end; i += WARP_SIZE) {
-                bdims[Rank - 1] = i;
-                cuda::std::apply([&in_val, &input](auto &&...args) {
-                    in_val = input.operator()(args...);
-                }, bdims);
-                accum += in_val * filter.operator()(h_ind);
+                const input_t in_val = input_b(i);
+                accum += in_val * filter_acc(h_ind);
                 h_ind -= up * WARP_SIZE;
             }
 
@@ -481,10 +488,7 @@ __global__ void ResamplePoly1D_WarpCentric(OutType output, InType input, FilterT
                 accum = cg::reduce(tile, accum, cg::plus<output_t>());
             }
             if (lane_id == 0) {
-                bdims[Rank - 1] = out_ind;
-                cuda::std::apply([&accum, &output](auto &&...args) {
-                    output.operator()(args...) = accum;
-                }, bdims);
+                output_b(out_ind) = accum;
             }
         }
     }

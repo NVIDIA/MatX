@@ -118,50 +118,77 @@ inline void matxResamplePoly1DInternal(OutType &o, const InType &i,
     return (max_outlen_per_cta + cta_comp_unit_count * grid.z - 1) / (cta_comp_unit_count * grid.z);
   };
 
+  // Unit-stride fast path: only viable when every hot tensor is a tensor view
+  // (Data()/Stride() callable) AND each one's last-dim stride is 1. The
+  // TensorAccessor in the kernel takes the fast pointer-arithmetic path when
+  // IsUnitStride is true; otherwise it forwards to operator() and works for
+  // any MatX op (computed ops included).
+  constexpr bool fast_path_eligible =
+      is_tensor_view_v<OutType> &&
+      is_tensor_view_v<InType> &&
+      is_tensor_view_v<FilterType>;
+
+  bool is_unit_stride = false;
+  if constexpr (fast_path_eligible) {
+    is_unit_stride =
+        o.Stride(OutType::Rank() - 1) == 1 &&
+        i.Stride(InType::Rank() - 1) == 1 &&
+        filter.Stride(FilterType::Rank() - 1) == 1;
+  }
+
   constexpr int THREADS = MATX_RESAMPLE_POLY_MAX_NUM_THREADS;
-  if (kernel == ResampleKernel::PhaseBlock) {
-    const size_t smemBytes = (sizeof(filter_t) * max_phase_len <= MATX_RESAMPLE_POLY_MAX_SMEM_BYTES) ?
-      sizeof(filter_t) * max_phase_len : 0;
-    const index_t max_output_len_per_phase = (output_len + up - 1) / up;
-    grid.y = static_cast<int>(up);
-    const index_t elems_per_thread = compute_elems_per_comp_unit(max_output_len_per_phase, THREADS);
-    if (downcast_to_32b_index()) {
-      ResamplePoly1D_PhaseBlock<THREADS, OutType, InType, FilterType, int32_t><<<grid, THREADS, smemBytes, stream>>>(
-        o, i, filter, static_cast<int32_t>(up), static_cast<int32_t>(down),
-        static_cast<int32_t>(elems_per_thread));
-    } else {
-      ResamplePoly1D_PhaseBlock<THREADS, OutType, InType, FilterType, index_t><<<grid, THREADS, smemBytes, stream>>>(
-        o, i, filter, up, down, elems_per_thread);
-    }
-  } else if (kernel == ResampleKernel::ElemBlock) {
-    const size_t filter_sz_bytes = (filter_len % 2 == 0) ? sizeof(filter_t)*(filter_len+1) : sizeof(filter_t)*filter_len;
-    const size_t smemBytes = (filter_sz_bytes <= MATX_RESAMPLE_POLY_MAX_SMEM_BYTES) ? filter_sz_bytes : 0;
-    const index_t elems_per_thread = compute_elems_per_comp_unit(output_len, THREADS);
-    if (downcast_to_32b_index()) {
-      ResamplePoly1D_ElemBlock<THREADS, OutType, InType, FilterType, int32_t><<<grid, THREADS, smemBytes, stream>>>(
-        o, i, filter, static_cast<int32_t>(up), static_cast<int32_t>(down),
-        static_cast<int32_t>(elems_per_thread));
-    } else {
-      ResamplePoly1D_ElemBlock<THREADS, OutType, InType, FilterType, index_t><<<grid, THREADS, smemBytes, stream>>>(
-        o, i, filter, up, down, elems_per_thread);
-    }
-  } else {
-    // We only select the WarpCentric kernel for trivially copyable types, but we need this
-    // constexpr if to avoid instantiating the kernel with inappropriate types.
-    if constexpr (std::is_trivially_copyable_v<output_t>) {
+  auto dispatch_kernel = [&](auto is_unit_c) {
+    constexpr bool IsUnitStride = decltype(is_unit_c)::value;
+    if (kernel == ResampleKernel::PhaseBlock) {
+      const size_t smemBytes = (sizeof(filter_t) * max_phase_len <= MATX_RESAMPLE_POLY_MAX_SMEM_BYTES) ?
+        sizeof(filter_t) * max_phase_len : 0;
+      const index_t max_output_len_per_phase = (output_len + up - 1) / up;
+      grid.y = static_cast<int>(up);
+      const index_t elems_per_thread = compute_elems_per_comp_unit(max_output_len_per_phase, THREADS);
+      if (downcast_to_32b_index()) {
+        ResamplePoly1D_PhaseBlock<THREADS, IsUnitStride, OutType, InType, FilterType, int32_t><<<grid, THREADS, smemBytes, stream>>>(
+          o, i, filter, static_cast<int32_t>(up), static_cast<int32_t>(down),
+          static_cast<int32_t>(elems_per_thread));
+      } else {
+        ResamplePoly1D_PhaseBlock<THREADS, IsUnitStride, OutType, InType, FilterType, index_t><<<grid, THREADS, smemBytes, stream>>>(
+          o, i, filter, up, down, elems_per_thread);
+      }
+    } else if (kernel == ResampleKernel::ElemBlock) {
       const size_t filter_sz_bytes = (filter_len % 2 == 0) ? sizeof(filter_t)*(filter_len+1) : sizeof(filter_t)*filter_len;
       const size_t smemBytes = (filter_sz_bytes <= MATX_RESAMPLE_POLY_MAX_SMEM_BYTES) ? filter_sz_bytes : 0;
-      static_assert(THREADS % WARP_SIZE == 0);
-      const index_t elems_per_warp = compute_elems_per_comp_unit(output_len, THREADS/WARP_SIZE);
+      const index_t elems_per_thread = compute_elems_per_comp_unit(output_len, THREADS);
       if (downcast_to_32b_index()) {
-        ResamplePoly1D_WarpCentric<THREADS, OutType, InType, FilterType, int32_t><<<grid, THREADS, smemBytes, stream>>>(
+        ResamplePoly1D_ElemBlock<THREADS, IsUnitStride, OutType, InType, FilterType, int32_t><<<grid, THREADS, smemBytes, stream>>>(
           o, i, filter, static_cast<int32_t>(up), static_cast<int32_t>(down),
-          static_cast<int32_t>(elems_per_warp));
+          static_cast<int32_t>(elems_per_thread));
       } else {
-        ResamplePoly1D_WarpCentric<THREADS, OutType, InType, FilterType, index_t><<<grid, THREADS, smemBytes, stream>>>(
-          o, i, filter, up, down, elems_per_warp);
+        ResamplePoly1D_ElemBlock<THREADS, IsUnitStride, OutType, InType, FilterType, index_t><<<grid, THREADS, smemBytes, stream>>>(
+          o, i, filter, up, down, elems_per_thread);
+      }
+    } else {
+      // We only select the WarpCentric kernel for trivially copyable types, but we need this
+      // constexpr if to avoid instantiating the kernel with inappropriate types.
+      if constexpr (std::is_trivially_copyable_v<output_t>) {
+        const size_t filter_sz_bytes = (filter_len % 2 == 0) ? sizeof(filter_t)*(filter_len+1) : sizeof(filter_t)*filter_len;
+        const size_t smemBytes = (filter_sz_bytes <= MATX_RESAMPLE_POLY_MAX_SMEM_BYTES) ? filter_sz_bytes : 0;
+        static_assert(THREADS % WARP_SIZE == 0);
+        const index_t elems_per_warp = compute_elems_per_comp_unit(output_len, THREADS/WARP_SIZE);
+        if (downcast_to_32b_index()) {
+          ResamplePoly1D_WarpCentric<THREADS, IsUnitStride, OutType, InType, FilterType, int32_t><<<grid, THREADS, smemBytes, stream>>>(
+            o, i, filter, static_cast<int32_t>(up), static_cast<int32_t>(down),
+            static_cast<int32_t>(elems_per_warp));
+        } else {
+          ResamplePoly1D_WarpCentric<THREADS, IsUnitStride, OutType, InType, FilterType, index_t><<<grid, THREADS, smemBytes, stream>>>(
+            o, i, filter, up, down, elems_per_warp);
+        }
       }
     }
+  };
+
+  if (is_unit_stride) {
+    dispatch_kernel(cuda::std::bool_constant<true>{});
+  } else {
+    dispatch_kernel(cuda::std::bool_constant<false>{});
   }
 #endif
 }
