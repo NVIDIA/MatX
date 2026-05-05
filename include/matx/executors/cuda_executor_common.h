@@ -157,6 +157,10 @@ namespace detail
   template <typename Op>
   auto create_kernel_provider(const cuda::std::array<index_t, Op::Rank()>& sizes, bool is_jit = false, bool global_kernel = false) {
     return [&, is_jit, global_kernel](ElementsPerThread ept) -> const void* {
+      if (ept == ElementsPerThread::INVALID) {
+        return nullptr;
+      }
+
       dim3 local_blocks = 1;
       dim3 local_threads = 1;
       [[maybe_unused]] bool stride;
@@ -428,4 +432,3 @@ namespace detail
 
 } // namespace detail
 } // namespace matx
-

@@ -323,24 +323,30 @@ TEST(TensorStats, InternalCubPlansRejectInvalidOperations)
   EXPECT_THROW(create_dual_plan(), detail::matxException);
 }
 
-TEST(TensorStats, EmptyFindAndUniqueHost)
+TEST(TensorStats, NoMatchesFindAndUniqueHost)
 {
   MATX_ENTER_HANDLER();
 
   HostExecutor exec{};
-  tensor_t<float, 1> empty({0});
-  tensor_t<float, 1> out({1});
-  tensor_t<int, 1> idx({1});
+  tensor_t<float, 1> in({3});
+  tensor_t<float, 1> out({3});
+  tensor_t<int, 1> idx({3});
   tensor_t<int, 0> num_found{{}};
 
-  (mtie(out, num_found) = find(empty, GT{0.0f})).run(exec);
+  in.SetVals({1, 2, 3});
+
+  (mtie(out, num_found) = find(in, GT{10.0f})).run(exec);
   ASSERT_EQ(num_found(), 0);
 
-  (mtie(idx, num_found) = find_idx(empty, GT{0.0f})).run(exec);
+  (mtie(idx, num_found) = find_idx(in, GT{10.0f})).run(exec);
   ASSERT_EQ(num_found(), 0);
 
-  (mtie(out, num_found) = unique(empty)).run(exec);
-  ASSERT_EQ(num_found(), 0);
+  in.SetVals({1, 1, 2});
+
+  (mtie(out, num_found) = unique(in)).run(exec);
+  ASSERT_EQ(num_found(), 2);
+  ASSERT_EQ(out(0), 1.0f);
+  ASSERT_EQ(out(1), 2.0f);
 
   MATX_EXIT_HANDLER();
 }

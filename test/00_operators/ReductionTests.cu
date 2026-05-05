@@ -839,7 +839,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, PercentileMethodsAndBou
     expect_percentile(25, PercentileMethod::NEAREST, 10.0);
 
 #ifndef NDEBUG
-    EXPECT_THROW({ (t0 = percentile(t1, 50, static_cast<PercentileMethod>(99))).run(exec); },
+    EXPECT_THROW({ detail::percentile_impl(t0, t1, 50, static_cast<PercentileMethod>(99), exec); },
                  detail::matxException);
 #endif
   }
