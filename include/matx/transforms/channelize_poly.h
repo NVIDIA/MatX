@@ -256,8 +256,8 @@ inline void SmemTiledImpl(
   // IndexType x IsUnitStride. Filter-smem layout selection: Full (smallest
   // footprint, phase compute at access), Rotated (direct indexing, redundant
   // storage), or Global (filter stays in GMEM).
-  constexpr bool kMaxDec  = true;
-  constexpr bool kOversampled = false;
+  [[maybe_unused]] constexpr bool kMaxDec  = true;
+  [[maybe_unused]] constexpr bool kOversampled = false;
 
   // Unit-stride fast path eligibility + runtime check: same pattern as
   // sar_bp / ChannelizePoly1D. Computed ops without .Data() / .Stride() fall
