@@ -66,7 +66,7 @@ __MATX_INLINE__ int GetComputeCapabilityMinor() {
 }
 
 __MATX_INLINE__ int GetComputeCapability() {
-    return GetComputeCapabilityMajor() * 100 + GetComputeCapabilityMinor();
+    return GetComputeCapabilityMajor() * 100 + GetComputeCapabilityMinor() * 10;
 }
 
 __MATX_INLINE__ bool IsHopperOrAbove() {
@@ -700,4 +700,3 @@ __MATX_INLINE__ std::string make_jit_tensor_struct_str(
 
 }
 }
-

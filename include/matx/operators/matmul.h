@@ -189,7 +189,7 @@ namespace matx
           cudaGetDevice(&device);
           cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device);
           cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device);
-          int cc = major * 100 + minor;  // Compute capability as three digits (e.g., 890 for SM 8.9)
+          int cc = major * 100 + minor * 10;  // Compute capability as __CUDA_ARCH__ digits (e.g., 890 for SM 8.9)
           
           dx_gemm_helper_.set_m(a_.Size(OpA::Rank() - 2));
           dx_gemm_helper_.set_n(b_.Size(OpB::Rank() - 1));
