@@ -47,6 +47,10 @@ namespace matx {
 //   "Extended-Precision Floating-Point Numbers for GPU Computation", Andrew Thall,
 //   https://andrewthall.org/papers/df64_qf128.pdf
 // That paper cites key work from D. E. Knuth, T. J. Dekker, A. H. Karp and others.
+// The reference for the FPAN-based implementation of fltflt_add() is:
+//   "High-Performance Branch-Free Algorithms for Extended-Precision Floating-Point Arithmetic",
+//   David K. Zhang and Alex Aiken, Proceedings of the International Conference for High Performance
+//   Computing, Networking, Storage and Analysis, 2025.
 
 // fltflt represents an unevaluated floating point sum of two non-overlapping fp32 components.
 // The hi component is the most significant part of the sum, and the lo component is the least significant part.
@@ -250,21 +254,40 @@ static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_two_prod_fma(
     return fltflt{ x, y };
 }
 
-// fltflt_add is the df64_add() function given by Thall. This function uses two_sum()
-// for the hi and lo components followed by addition of the cross terms and
-// re-normalization to a non-overlapping expansion.
+// FPAN-based two-term addition from Zhang & Aiken (SC'25), Figure 2.
+//
+// The Thall df64_add() form chains two FastTwoSums in series on the
+// critical path (the lo-side path traverses both), giving depth 13 fp32
+// ops. The FPAN form below runs the FastTwoSum on the hi parts (q)
+// concurrently with the lo-side add (st_lo), so q's 3 ops sit entirely
+// off the critical path and the lo-side path traverses only one
+// FastTwoSum. Critical-path depth: 10 fp32 ops vs 13 for Thall.
+//
+// Both forms use the same 20 fp32 ops total, so steady-state throughput
+// is identical. The latency win shows up when the SM cannot fully hide
+// the per-call dependency chain (low occupancy, serial accumulators,
+// reduction tails). For reference, Thall's df64_add reads:
+//   fltflt s = fltflt_two_sum(a.hi, b.hi);
+//   const fltflt t = fltflt_two_sum(a.lo, b.lo);
+//   s.lo = detail::fadd_rn(s.lo, t.hi);
+//   s = fltflt_fast_two_sum(s.hi, s.lo);
+//   s.lo = detail::fadd_rn(s.lo, t.lo);
+//   s = fltflt_fast_two_sum(s.hi, s.lo);
+//   return s;
 static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_add(fltflt a, fltflt b) {
     fltflt s = fltflt_two_sum(a.hi, b.hi);
     const fltflt t = fltflt_two_sum(a.lo, b.lo);
-    s.lo = detail::fadd_rn(s.lo, t.hi);
-    s = fltflt_fast_two_sum(s.hi, s.lo);
-    s.lo = detail::fadd_rn(s.lo, t.lo);
-    s = fltflt_fast_two_sum(s.hi, s.lo);
-    return s;
+    const fltflt q = fltflt_fast_two_sum(s.hi, t.hi);
+    const float st_lo = detail::fadd_rn(s.lo, t.lo);
+    const float stq_lo = detail::fadd_rn(st_lo, q.lo);
+    return fltflt_fast_two_sum(q.hi, stq_lo);
 }
 
 // This overload is an optimization of fltflt_add() for the case where b is
-// a float, and thus b.lo is zero.
+// a float, and thus b.lo is zero. The FPAN restructuring above does not
+// apply here because there is no second TwoSum to lift; this form
+// remains the Thall-style chain (TwoSum -> add -> FastTwoSum, ~9 fp32
+// ops on the critical path).
 static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_add(fltflt a, float b) {
     fltflt s = fltflt_two_sum(a.hi, b);
     s.lo = detail::fadd_rn(s.lo, a.lo);
