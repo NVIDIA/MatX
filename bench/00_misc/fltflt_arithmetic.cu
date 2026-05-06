@@ -1312,12 +1312,14 @@ void fltflt_bench_add_latency(nvbench::state &state, nvbench::type_list<Precisio
   const int blocks    = static_cast<int>(state.get_int64("Blocks"));
   constexpr int threads = 32;  // exactly one warp per block
 
+  cudaExecutor exec{0};
   const size_t total_threads = static_cast<size_t>(blocks) * threads;
   auto result = make_tensor<PrecisionType>({static_cast<index_t>(total_threads)});
 
   state.add_element_count(static_cast<int64_t>(chain_len) * total_threads, "ops");
 
-  warmup_gpu_once();  // warmup_gpu_once() syncs internally; no further sync needed.
+  warmup_gpu_once();
+  exec.sync();
 
   state.exec([&](nvbench::launch &launch) {
     chain_add_kernel<PrecisionType>

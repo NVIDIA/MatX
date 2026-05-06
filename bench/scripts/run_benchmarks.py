@@ -323,13 +323,21 @@ PROFILES = {
             "fltflt_bench_cast2fltflt",
         ],
         "summary": summarize_fltflt,
+        # Inherited from the deleted run_fltflt_benchmarks.py.
+        "timeout_seconds": 300,
     },
     "sarbp": {
         "exe_stems": ["bench_00_transform_sarbp", "matx_bench"],
         "benchmarks": ["sarbp_float", "sarbp_double", "sarbp_mixed", "sarbp_fltflt"],
         "summary": summarize_sarbp,
+        # Inherited from the deleted run_sarbp_benchmarks.py; sarbp at the
+        # default Problem Size runs longer than the fltflt sweep.
+        "timeout_seconds": 600,
     },
 }
+
+# Default timeout for any future profile that doesn't set its own.
+DEFAULT_TIMEOUT_SECONDS = 600
 
 
 # ---------------------------------------------------------------------------
@@ -383,8 +391,13 @@ def run_profile(name, profile, build_dir, out_dir, extra_args):
         "--csv",  str(csv_path),
     ]
     cmd += extra_args
-    print(f"[{name}] {' '.join(cmd)}")
-    res = subprocess.run(cmd)
+    timeout = profile.get("timeout_seconds", DEFAULT_TIMEOUT_SECONDS)
+    print(f"[{name}] {' '.join(cmd)}  (timeout {timeout}s)")
+    try:
+        res = subprocess.run(cmd, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        print(f"[{name}] nvbench exceeded timeout of {timeout}s", file=sys.stderr)
+        return False
     if res.returncode != 0:
         print(f"[{name}] nvbench exited with status {res.returncode}", file=sys.stderr)
         return False
