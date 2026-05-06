@@ -430,7 +430,7 @@ auto make_tensor( T *ptr,
                   bool owning = false) {
   MATX_LOG_DEBUG("make_tensor<T>(ptr, 0D, owning): ptr={}, owning={}", 
                  reinterpret_cast<void*>(ptr), owning);
-  cuda::std::array<index_t, 0> shape;
+  cuda::std::array<index_t, 0> shape{};
   return make_tensor<T, decltype(shape)>(ptr, std::move(shape), owning);
 }
 
