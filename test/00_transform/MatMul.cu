@@ -256,6 +256,7 @@ TYPED_TEST(MatMulTestComplexNonHalfCUDA, SmallRectAHermitian)
     tensor_t<TestType, 2> b{{m, n}};
     tensor_t<TestType, 2> c_hermitian{{k, n}};
     tensor_t<TestType, 2> c_conj_transpose{{k, n}};
+    tensor_t<TestType, 2> c_conj_hermitian{{k, n}};
 
     for (index_t i = 0; i < m; i++) {
       for (index_t j = 0; j < k; j++) {
@@ -271,16 +272,22 @@ TYPED_TEST(MatMulTestComplexNonHalfCUDA, SmallRectAHermitian)
 
     (c_hermitian = matmul(hermitianT(a), b)).run(this->exec);
     (c_conj_transpose = matmul(conj(transpose_matrix(a)), b)).run(this->exec);
+    (c_conj_hermitian = matmul(conj(hermitianT(a)), b)).run(this->exec);
     this->exec.sync();
 
     for (index_t i = 0; i < k; i++) {
       for (index_t j = 0; j < n; j++) {
         TestType expected{};
+        TestType expected_conj_hermitian{};
         for (index_t p = 0; p < m; p++) {
           expected += detail::scalar_internal_conj(a(p, i)) * b(p, j);
+          expected_conj_hermitian += a(p, i) * b(p, j);
         }
         EXPECT_TRUE(MatXUtils::MatXTypeCompare(c_hermitian(i, j), expected, this->thresh));
         EXPECT_TRUE(MatXUtils::MatXTypeCompare(c_conj_transpose(i, j), expected, this->thresh));
+        EXPECT_TRUE(MatXUtils::MatXTypeCompare(c_conj_hermitian(i, j),
+                                               expected_conj_hermitian,
+                                               this->thresh));
       }
     }
   }

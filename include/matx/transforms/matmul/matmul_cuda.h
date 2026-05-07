@@ -176,16 +176,20 @@ inline constexpr bool is_hermitian_trans_op_v =
     is_hermitian_trans_op<remove_cvref_t<Op>>::value;
 
 template <typename Op>
-struct is_conj_unary_op : std::false_type {
+struct is_conj_tensor_view_unary_op : std::false_type {
 };
 
+// cuBLASLt can express conjugation of a tensor view by passing the transposed
+// view with CUBLAS_OP_C. Keep this narrow so nested expressions such as
+// conj(hermitianT(A)) are evaluated as written by the generic copy path.
 template <typename I1, typename T>
-struct is_conj_unary_op<matxUnaryOp<I1, ConjOp<T>>> : std::true_type {
+struct is_conj_tensor_view_unary_op<matxUnaryOp<I1, ConjOp<T>>>
+    : std::bool_constant<is_tensor_view_v<remove_cvref_t<I1>>> {
 };
 
 template <typename Op>
-inline constexpr bool is_conj_unary_op_v =
-    is_conj_unary_op<remove_cvref_t<Op>>::value;
+inline constexpr bool is_conj_tensor_view_unary_op_v =
+    is_conj_tensor_view_unary_op<remove_cvref_t<Op>>::value;
 
 template <typename T>
 static constexpr cublasOperation_t MatMulConjTransposeOp()
@@ -352,6 +356,12 @@ public:
     params.a_planar = is_planar_complex_v<typename TensorTypeA::value_type>;
     params.b_planar = is_planar_complex_v<typename TensorTypeB::value_type>;
     params.c_planar = is_planar_complex_v<typename TensorTypeC::value_type>;
+    params.a_rows = a.Size(TensorTypeA::Rank() - 2);
+    params.a_cols = a.Size(TensorTypeA::Rank() - 1);
+    params.b_rows = b.Size(TensorTypeB::Rank() - 2);
+    params.b_cols = b.Size(TensorTypeB::Rank() - 1);
+    params.c_rows = c.Size(RANK - 2);
+    params.c_cols = c.Size(RANK - 1);
 
     // Batches
     params.batch = 1;
@@ -431,12 +441,11 @@ public:
       else if constexpr (PROV == PROVIDER_TYPE_CUTLASS) {
         params.opA = CUBLAS_OP_N;
         params.opB = CUBLAS_OP_N;
-        params.m = static_cast<int>(b.Size(TensorTypeB::Rank() - 1));
-        params.n = static_cast<int>(a.Size(TensorTypeA::Rank() - 2));
-        params.k =
-            static_cast<int>(a.Size(TensorTypeA::Rank() - 2)); // Gemm Problem dimensions
-        params.lda = static_cast<int>(b.Stride(TensorTypeB::Rank() - 1));
-        params.ldb = static_cast<int>(a.Stride(TensorTypeA::Rank() - 1));
+        params.m = params.a_rows;
+        params.n = params.b_cols;
+        params.k = params.a_cols; // Gemm Problem dimensions
+        params.lda = static_cast<int>(a.Stride(TensorTypeA::Rank() - 2));
+        params.ldb = static_cast<int>(b.Stride(TensorTypeB::Rank() - 2));
         params.ldc = static_cast<int>(c.Stride(RANK - 1));
       }
     }
@@ -516,10 +525,15 @@ public:
       else if constexpr (PROV == PROVIDER_TYPE_CUTLASS) {
         params.opA = CUBLAS_OP_N;
         params.opB = CUBLAS_OP_N;
-        params.m = static_cast<int>(a.Size(TensorTypeA::Rank() - 2));
-        params.n = static_cast<int>(b.Size(TensorTypeB::Rank() - 1));
-        params.k =
-            static_cast<int>(a.Size(TensorTypeA::Rank() - 1)); // Gemm Problem dimensions
+        params.a_rows = a.Size(TensorTypeA::Rank() - 2);
+        params.a_cols = a.Size(TensorTypeA::Rank() - 1);
+        params.b_rows = b.Size(TensorTypeB::Rank() - 2);
+        params.b_cols = b.Size(TensorTypeB::Rank() - 1);
+        params.c_rows = c.Size(RANK - 2);
+        params.c_cols = c.Size(RANK - 1);
+        params.m = params.a_rows;
+        params.n = params.b_cols;
+        params.k = params.a_cols; // Gemm Problem dimensions
         params.lda = static_cast<int>(a.Stride(TensorTypeA::Rank() - 2));
         params.ldb = static_cast<int>(b.Stride(TensorTypeB::Rank() - 2));
         params.ldc = static_cast<int>(c.Stride(RANK - 2));
@@ -1299,7 +1313,7 @@ __MATX_INLINE__ void WithMatmulOperand(const Op &op, cudaStream_t stream,
     CopyCublasInputIfNeeded(tensor, input, stream);
     func(tensor, MatMulConjTransposeOp<ValueType>());
   }
-  else if constexpr (can_use_metadata_op && is_conj_unary_op_v<OpType>) {
+  else if constexpr (can_use_metadata_op && is_conj_tensor_view_unary_op_v<OpType>) {
     const auto &input = op.Input();
     auto transposed = transpose_matrix(input);
     auto tensor = getCublasSupportedTensor(transposed, stream);
