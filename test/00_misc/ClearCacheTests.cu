@@ -74,13 +74,13 @@ TEST(ClearCacheTests, TestCase) {
     err = cudaMemGetInfo(&post_clear_free_mem, &total_mem);
     ASSERT_EQ(err, cudaSuccess);
 
-    const ssize_t allocated = static_cast<ssize_t>(initial_free_mem) - static_cast<ssize_t>(post_alloc_free_mem);
-    const ssize_t freed = static_cast<ssize_t>(post_clear_free_mem) - static_cast<ssize_t>(post_alloc_free_mem);
+    const ptrdiff_t allocated = static_cast<ptrdiff_t>(initial_free_mem) - static_cast<ptrdiff_t>(post_alloc_free_mem);
+    const ptrdiff_t freed = static_cast<ptrdiff_t>(post_clear_free_mem) - static_cast<ptrdiff_t>(post_alloc_free_mem);
 
     // The cuBLAS cache and allocator data structure should have allocated at least 8 MiB
     // in total and thus at least 8 MiB should be freed when clearing the caches/allocations.
-    ASSERT_GE(allocated, 2 * four_MiB);
-    ASSERT_GE(freed, 2 * four_MiB);
+    ASSERT_GE(allocated, static_cast<ptrdiff_t>(2 * four_MiB));
+    ASSERT_GE(freed, static_cast<ptrdiff_t>(2 * four_MiB));
 
     MATX_EXIT_HANDLER();
 }
