@@ -67,7 +67,7 @@ namespace detail
         }
       }
 
-      CudaExecutorBase(int stream, bool profiling = false) : stream_(reinterpret_cast<cudaStream_t>(stream)), profiling_(profiling), start_(nullptr), stop_(nullptr) {
+      CudaExecutorBase(int stream, bool profiling = false) : stream_(reinterpret_cast<cudaStream_t>(static_cast<intptr_t>(stream))), profiling_(profiling), start_(nullptr), stop_(nullptr) {
         if (profiling_) {
           MATX_CUDA_CHECK(cudaEventCreate(&start_));
           MATX_CUDA_CHECK(cudaEventCreate(&stop_));
@@ -327,7 +327,7 @@ namespace detail
       MATX_CUDA_CHECK(cudaFuncGetAttributes(&attr, (const void*)kernel_func));
 
       const auto set_ept_query = detail::SetEPTQueryInput{current_ept};
-      const auto set_ept = detail::get_operator_capability<detail::OperatorCapability::SET_ELEMENTS_PER_THREAD>(op, set_ept_query);
+      [[maybe_unused]] const auto set_ept = detail::get_operator_capability<detail::OperatorCapability::SET_ELEMENTS_PER_THREAD>(op, set_ept_query);
       
       // Determine block size for register calculation
       if (use_jit) {
@@ -354,7 +354,7 @@ namespace detail
           
           groups_per_block = current_groups_per_block;
           const auto set_groups_per_block_query = detail::SetGroupsPerBlockQueryInput{groups_per_block};
-          const auto set_groups_per_block = detail::get_operator_capability<detail::OperatorCapability::SET_GROUPS_PER_BLOCK>(op, set_groups_per_block_query);            
+          [[maybe_unused]] const auto set_groups_per_block = detail::get_operator_capability<detail::OperatorCapability::SET_GROUPS_PER_BLOCK>(op, set_groups_per_block_query);            
           // Use the max block size for now
           block_size = detail::get_operator_capability<detail::OperatorCapability::BLOCK_DIM>(op)[1];
           shm_size = detail::get_operator_capability<detail::OperatorCapability::DYN_SHM_SIZE>(op);
@@ -424,7 +424,7 @@ namespace detail
     
     // Fallback to minimum EPT
     const auto set_ept_query = detail::SetEPTQueryInput{min_ept};
-    const auto set_ept = detail::get_operator_capability<detail::OperatorCapability::SET_ELEMENTS_PER_THREAD>(op, set_ept_query);
+    [[maybe_unused]] const auto set_ept = detail::get_operator_capability<detail::OperatorCapability::SET_ELEMENTS_PER_THREAD>(op, set_ept_query);
     int shm_size = detail::get_operator_capability<detail::OperatorCapability::DYN_SHM_SIZE>(op);
     //printf("Fallback to minimum EPT %d with shm_size %d\n", static_cast<int>(min_ept), shm_size);
     return cuda::std::make_tuple(min_ept, shm_size, block_size, groups_per_block);

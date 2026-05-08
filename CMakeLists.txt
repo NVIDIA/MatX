@@ -192,6 +192,11 @@ if(WIN32)
         # Hardcoding /std:c++17 here would override /std:c++20 for targets like MatX examples
         # and tests that require C++20 features (e.g. std::source_location, concepts, etc.).
         set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler=/Zc:__cplusplus -Xcompiler=/utf-8 -DFMT_UNICODE=0")
+        # /wd4996: suppress "deprecated" warnings from NVIDIA's own headers (cusparse.h,
+        # cusolverDn.h, etc.) that annotate types scheduled for removal. These warnings
+        # originate in external SDK headers and cannot be fixed in MatX; without /wd4996
+        # they become errors under /WX.
+        set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler=/wd4996")
         add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/utf-8>")
     endif()
 endif()
