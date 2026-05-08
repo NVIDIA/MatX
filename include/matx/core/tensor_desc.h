@@ -157,6 +157,13 @@ public:
     InitFromShape(cuda::std::move(tshape));
   }
 
+#ifndef _MSC_VER
+  // MSVC/nvcc on Windows eagerly validates C-array (&arr)[N] parameter signatures in every
+  // member function during class template instantiation, even when RANK==0 makes N==0 (which
+  // is invalid in standard C++). GCC/Clang permit zero-sized arrays as an extension so these
+  // overloads compile there. On Windows, the equivalent cuda::std::array overloads below are
+  // available on all platforms and provide the same functionality.
+
   /**
    * @brief Constructor with perfect-forwarded shape and C array of strides
    *
@@ -211,6 +218,7 @@ public:
       *(shape_.begin() + i) = shape[i];
     }
   }
+#endif // !_MSC_VER
 
   /**
    * Check if a descriptor is contiguous in memory for all elements in the view

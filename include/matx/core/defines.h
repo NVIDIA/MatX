@@ -107,6 +107,16 @@ namespace matx {
 // std::ceil is not constexpr until C++23
 #define MATX_ROUND_UP(N, S) ((((N) + (S) - 1) / (S)) * (S))
 
+// MATX_VISIBILITY_DEFAULT: marks a symbol for export in shared library builds.
+// On GCC/Clang this expands to __attribute__((visibility("default"))).
+// On MSVC, __attribute__ is not supported and visibility is controlled by
+// __declspec(dllexport/dllimport), so the attribute is silenced here.
+#if defined(_MSC_VER)
+  #define MATX_VISIBILITY_DEFAULT
+#else
+  #define MATX_VISIBILITY_DEFAULT __attribute__ ((visibility ("default")))
+#endif
+
 enum {
   matxKeepDim     = cuda::std::numeric_limits<index_t>::max(),
   matxDropDim     = cuda::std::numeric_limits<index_t>::max() - 1,

@@ -1,0 +1,117 @@
+# Windows build-only CI workflow for MatX.
+#
+# Goals:
+#   - Validate that MatX compiles on Windows with MSVC (VS 17 / VS 18) and nvcc.
+#   - Run on every push to main and on every pull request targeting main.
+#   - No GPU is available on GitHub-hosted runners, so only compilation is
+#     validated (no test execution). Use a self-hosted runner with a GPU to
+#     add ctest execution.
+#
+# CUDA note:
+#   GitHub-hosted Windows runners do not have the CUDA Toolkit pre-installed.
+#   The Jimver/cuda-toolkit action downloads and installs it (~3-4 GB, adds
+#   roughly 10-15 minutes to the job). Only the compiler and headers are
+#   needed for a compile-only run so 'sub-packages: nvcc' keeps the download
+#   smaller on supported toolkit versions.
+#
+# VS 18 (Visual Studio 2026) note:
+#   'windows-latest' will point to the newest available Windows runner image.
+#   Once GitHub ships a VS 18 image it will be picked up automatically.
+#   Until then both matrix legs may resolve to VS 17; the generator string
+#   controls which VS version CMake targets, not just the runner image.
+
+name: Build (Windows)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    name: "CUDA ${{ matrix.cuda }} / VS ${{ matrix.vs_gen }}"
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Visual Studio 17 2022 on Windows Server 2022 (always available)
+          - os: windows-2022
+            cuda: "12.2.0"
+            vs_gen: "Visual Studio 17 2022"
+            vs_label: "VS17"
+
+          # Visual Studio 18 2026 – uses windows-latest; update 'os' to a
+          # dedicated windows-2025 or windows-2026 label once GitHub ships it.
+          - os: windows-latest
+            cuda: "12.2.0"
+            vs_gen: "Visual Studio 18 2026"
+            vs_label: "VS18"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      # ------------------------------------------------------------------
+      # Install CUDA Toolkit (nvcc + headers only to keep download small)
+      # Docs: https://github.com/Jimver/cuda-toolkit
+      # ------------------------------------------------------------------
+      - name: Install CUDA Toolkit ${{ matrix.cuda }}
+        uses: Jimver/cuda-toolkit@v0.2.18
+        id: cuda-toolkit
+        with:
+          cuda: ${{ matrix.cuda }}
+          method: network
+          # 'nvcc' sub-package includes the compiler and device headers;
+          # add 'cudart' if runtime linking is needed for test executables.
+          sub-packages: '["nvcc", "cudart", "visual_studio_integration"]'
+          use-github-cache: true
+
+      - name: Show CUDA version
+        run: nvcc --version
+
+      # ------------------------------------------------------------------
+      # CMake configure – compile tests + examples, skip benchmarks here
+      # because building benchmarks requires downloading additional deps
+      # (nvbench + fmt) which significantly extends CI time. Enable them
+      # in a nightly or manual workflow if desired.
+      # ------------------------------------------------------------------
+      - name: Configure CMake
+        run: |
+          cmake -B build `
+            -G "${{ matrix.vs_gen }}" `
+            -A x64 `
+            -DMATX_BUILD_TESTS=ON `
+            -DMATX_BUILD_EXAMPLES=ON `
+            -DMATX_BUILD_BENCHMARKS=OFF `
+            -DMATX_BUILD_DOCS=OFF `
+            -DCMAKE_CUDA_ARCHITECTURES="80;90"
+        # CMAKE_CUDA_ARCHITECTURES: build for Ampere (80) and Hopper (90).
+        # Add 89 (Ada) or 100 (Blackwell) as needed.
+        # Using PTX-only suffixes (e.g. "90-real;90-virtual") reduces binary
+        # size but is unnecessary for a compile-only validation run.
+
+      # ------------------------------------------------------------------
+      # Build – /m uses all available logical processors on Windows.
+      # Release config avoids debug iterator overhead and is faster to link.
+      # ------------------------------------------------------------------
+      - name: Build
+        run: cmake --build build --config Release -- /m
+
+      # ------------------------------------------------------------------
+      # Optional: upload build logs on failure for diagnosis.
+      # ------------------------------------------------------------------
+      - name: Upload build logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs-${{ matrix.vs_label }}-cuda${{ matrix.cuda }}
+          path: |
+            build/**/*.log
+            build/CMakeFiles/CMakeError.log
+            build/CMakeFiles/CMakeOutput.log
+          retention-days: 7

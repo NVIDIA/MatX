@@ -290,7 +290,7 @@ struct MemTracker {
 
 
 
-__attribute__ ((visibility ("default")))
+MATX_VISIBILITY_DEFAULT
 __MATX_INLINE__ MemTracker &GetAllocMap() {
   static MemTracker tracker;
   return tracker;
@@ -304,7 +304,7 @@ __MATX_INLINE__ MemTracker &GetAllocMap() {
 // call matxFree() on user-managed pointers after calling this function. This function should
 // be called after the user application has called matxFree() on any pointers for which it
 // will call matxFree().
-__attribute__ ((visibility ("default")))
+MATX_VISIBILITY_DEFAULT
 __MATX_INLINE__ void FreeAllocations() {
   GetAllocMap().free_all();
 }
