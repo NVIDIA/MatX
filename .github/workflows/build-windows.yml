@@ -125,8 +125,19 @@ jobs:
           Write-Host "Files installed:"
           Get-ChildItem $dst -Filter "CUDA*" | Select-Object -ExpandProperty Name
 
+      # ------------------------------------------------------------------
+      # Pin Python so that both pip and CMake's find_package(Python) use
+      # the exact same interpreter. Without this, CMake may pick up a
+      # different Python from the hosted tool cache than the one pip wrote
+      # packages into, causing "No module named 'numpy'" at configure time.
+      # ------------------------------------------------------------------
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
       - name: Install Python dependencies
-        run: pip3 install numpy
+        run: pip install numpy
 
       - name: Show tool versions
         shell: bash
