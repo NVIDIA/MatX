@@ -800,8 +800,12 @@ __global__ void iterative_fmod_kernel(T* __restrict__ result, int64_t size, int3
   int64_t idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < size) {
     T val[ILP_FACTOR];
-    T init_val = static_cast<T>(100000.0 * std::numbers::pi);
-    const T divisor = static_cast<T>(std::numbers::e);
+    // std::numbers::pi / std::numbers::e are not available in nvcc device code
+    // (<numbers> is a host-only C++20 facility). Use the M_PI / M_E constants
+    // defined in matx/core/defines.h, which fall back to literals when the
+    // POSIX <cmath> extensions are absent (e.g. strict ISO mode, nvcc).
+    T init_val = static_cast<T>(100000.0 * M_PI);
+    const T divisor = static_cast<T>(M_E);
 
     #pragma unroll
     for (int ilp = 0; ilp < ILP_FACTOR; ilp++) {
