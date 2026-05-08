@@ -60,6 +60,20 @@ class solve:
             'X': X,
         }
 
+    def run_vector_expression(self):
+        n = self.size[-1]
+        A = self._make_a((n, n))
+        B = matx_common.randn_ndarray((n,), self.dtype)
+        C = matx_common.randn_ndarray((n,), self.dtype)
+        X = np.linalg.solve(A, B) * C
+
+        return {
+            'A': A,
+            'B': B,
+            'C': C,
+            'X': X,
+        }
+
     def run_matrix(self):
         n, nrhs = self.size[-2:]
         A = self._make_a((n, n))

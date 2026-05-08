@@ -118,6 +118,30 @@ TYPED_TEST(DenseSolveTestFloatTypes, SolveMatrixRHS)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(DenseSolveTestFloatTypes, SolveInExpression)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+
+  constexpr index_t n = 8;
+  auto A = make_tensor<TestType>({n, n});
+  auto B = make_tensor<TestType>({n});
+  auto C = make_tensor<TestType>({n});
+  auto X = make_tensor<TestType>({n});
+
+  this->pb->template InitAndRunTVGenerator<TestType>(
+      "00_solver", "solve", "run_vector_expression", {n});
+  this->pb->NumpyToTensorView(A, "A");
+  this->pb->NumpyToTensorView(B, "B");
+  this->pb->NumpyToTensorView(C, "C");
+
+  (X = solve(A, B) * C).run(this->exec);
+  this->exec.sync();
+
+  MATX_TEST_ASSERT_COMPARE(this->pb, X, "X", this->thresh);
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(DenseSolveTestFloatTypes, SolveBatchedVectorRHS)
 {
   MATX_ENTER_HANDLER();
