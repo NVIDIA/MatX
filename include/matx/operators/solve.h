@@ -132,7 +132,7 @@ public:
   template <typename ShapeType, typename Executor>
   __MATX_INLINE__ void
   InnerPreRun([[maybe_unused]] ShapeType &&shape,
-              [[maybe_unused]] Executor &&ex) const noexcept {
+              [[maybe_unused]] Executor &&ex) const {
     if constexpr (is_matx_op<OpA>()) {
       a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
     }
@@ -143,7 +143,7 @@ public:
 
   template <typename ShapeType, typename Executor>
   __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape,
-                              [[maybe_unused]] Executor &&ex) const noexcept {
+                              [[maybe_unused]] Executor &&ex) const {
     if (prerun_done_) {
       return;
     }
@@ -157,7 +157,7 @@ public:
 
   template <typename ShapeType, typename Executor>
   __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape,
-                               [[maybe_unused]] Executor &&ex) const noexcept {
+                               [[maybe_unused]] Executor &&ex) const {
     if constexpr (is_matx_op<OpA>()) {
       a_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
     }

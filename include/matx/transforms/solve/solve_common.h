@@ -37,11 +37,44 @@
 #include "matx/core/type_utils.h"
 #include "matx/transforms/solver_common.h"
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
 namespace matx {
 namespace detail {
+
+template <typename T>
+class DenseSolveAllocGuard {
+public:
+  DenseSolveAllocGuard() = default;
+  DenseSolveAllocGuard(const DenseSolveAllocGuard &) = delete;
+  DenseSolveAllocGuard &operator=(const DenseSolveAllocGuard &) = delete;
+
+  ~DenseSolveAllocGuard() noexcept
+  {
+    try {
+      matxFree(ptr_);
+    }
+    catch (...) {
+    }
+  }
+
+  void Alloc(size_t bytes,
+             matxMemorySpace_t space,
+             cudaStream_t stream = cudaStreamDefault)
+  {
+    matxAlloc(reinterpret_cast<void **>(&ptr_), bytes, space, stream);
+  }
+
+  __MATX_INLINE__ T *get() const noexcept
+  {
+    return ptr_;
+  }
+
+private:
+  T *ptr_ = nullptr;
+};
 
 template <typename T>
 inline constexpr bool is_dense_solve_supported_type_v =

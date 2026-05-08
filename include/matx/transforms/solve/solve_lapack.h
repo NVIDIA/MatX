@@ -134,36 +134,29 @@ void dense_solve_impl([[maybe_unused]] OutputTensor &&out,
     }
   }
 
-  T *a_ptr = nullptr;
-  matxAlloc(reinterpret_cast<void **>(&a_ptr), a_new.Bytes(),
-            MATX_HOST_MALLOC_MEMORY);
-  auto a_work_t = detail::TransposeCopy(a_ptr, a_new, exec);
+  detail::DenseSolveAllocGuard<T> a_ptr;
+  a_ptr.Alloc(a_new.Bytes(), MATX_HOST_MALLOC_MEMORY);
+  auto a_work_t = detail::TransposeCopy(a_ptr.get(), a_new, exec);
   auto a_col = a_work_t.PermuteMatrix();
 
   if constexpr (detail::IsDenseSolveVectorRHS<decltype(a_new), decltype(b_new)>()) {
-    T *b_ptr = nullptr;
-    matxAlloc(reinterpret_cast<void **>(&b_ptr), b_new.Bytes(),
-              MATX_HOST_MALLOC_MEMORY);
-    auto b_work = make_tensor<T>(b_ptr, b_new.Shape());
+    detail::DenseSolveAllocGuard<T> b_ptr;
+    b_ptr.Alloc(b_new.Bytes(), MATX_HOST_MALLOC_MEMORY);
+    auto b_work = make_tensor<T>(b_ptr.get(), b_new.Shape());
     (b_work = b_new).run(exec);
 
     detail::DenseSolveLapackLoop(a_col, b_work, exec);
     matx::copy(out, b_work, exec);
-    matxFree(b_ptr);
   }
   else {
-    T *b_ptr = nullptr;
-    matxAlloc(reinterpret_cast<void **>(&b_ptr), b_new.Bytes(),
-              MATX_HOST_MALLOC_MEMORY);
-    auto b_work_t = detail::TransposeCopy(b_ptr, b_new, exec);
+    detail::DenseSolveAllocGuard<T> b_ptr;
+    b_ptr.Alloc(b_new.Bytes(), MATX_HOST_MALLOC_MEMORY);
+    auto b_work_t = detail::TransposeCopy(b_ptr.get(), b_new, exec);
     auto b_col = b_work_t.PermuteMatrix();
 
     detail::DenseSolveLapackLoop(a_col, b_col, exec);
     matx::copy(out, b_work_t.PermuteMatrix(), exec);
-    matxFree(b_ptr);
   }
-
-  matxFree(a_ptr);
 #endif
 }
 
