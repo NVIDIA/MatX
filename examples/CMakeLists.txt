@@ -49,6 +49,9 @@ if (MSVC)
         $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/W4>
         $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/WX>
     )
+    # cudart_static.lib pulls in LIBCMT (static CRT); suppress the LNK4098 warning
+    # that results from mixing it with the /MD (dynamic CRT) runtime used elsewhere.
+    target_link_options(example_lib INTERFACE /NODEFAULTLIB:LIBCMT)
 else()
     target_compile_options(example_lib INTERFACE ${WARN_FLAGS})
     target_compile_options(example_lib INTERFACE ${MATX_CUDA_FLAGS})
