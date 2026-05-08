@@ -100,8 +100,7 @@ jobs:
       - name: Configure CMake
         run: |
           cmake -B build `
-            -G "${{ matrix.generator }}" `
-            ${{ matrix.cmake_config_args || '' }} `
+            -G "${{ matrix.generator }}" ${{ matrix.cmake_config_args || '' }} `
             -DMATX_BUILD_TESTS=OFF `
             -DMATX_BUILD_EXAMPLES=ON `
             -DMATX_BUILD_BENCHMARKS=OFF `
