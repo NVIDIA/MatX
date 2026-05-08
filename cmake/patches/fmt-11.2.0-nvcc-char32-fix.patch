@@ -11,6 +11,7 @@ Subject: [PATCH] Workaround a CUDA issue in handing UTF-32 literals (#4719)
    // in constexpr functions and non-static ones are poorly optimized.
 -  return U"\x9999999a\x828f5c29\x80418938\x80068db9\x8000a7c6\x800010c7"
 -         U"\x800001ae\x8000002b"[index];
++
 +  // while in C++23 we can use static constexpr, and in c++17 we can use out of
 +  // function definition of inline constexpr, in C++11 we have to rely on string
 +  // literals in order to avoid duplicating constant definitions across
