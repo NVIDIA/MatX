@@ -126,7 +126,7 @@ jobs:
           Get-ChildItem $dst -Filter "CUDA*" | Select-Object -ExpandProperty Name
 
       - name: Install Python dependencies
-        run: pip install numpy
+        run: pip3 install numpy
 
       - name: Show tool versions
         shell: bash
