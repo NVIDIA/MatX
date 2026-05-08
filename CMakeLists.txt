@@ -205,6 +205,17 @@ if(WIN32)
         # templates. Correct code, not a real ambiguity; suppress to unblock /WX builds.
         set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler=/wd4864")
         add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/wd4864>")
+        # /wd4702: unreachable code in constexpr-if chains — MSVC false positive when every
+        # if-constexpr branch returns but a fallback return is still needed for non-MSVC.
+        set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler=/wd4702")
+        add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/wd4702>")
+        # /wd4324: structure padded due to alignas — intentional in CUDA operator types.
+        set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler=/wd4324")
+        add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/wd4324>")
+        # /wd4714: __forceinline function not inlined — expected for large templated
+        # functions such as get_type_str() instantiated over complex operator types.
+        set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler=/wd4714")
+        add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/wd4714>")
         add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/utf-8>")
     endif()
 endif()
@@ -529,21 +540,18 @@ if (MATX_BUILD_BENCHMARKS)
     # CUDA frontend rejects these with "character value is out of range"; gcc/clang accept
     # arbitrary char32_t bit patterns and are unaffected. Affected: fmt 11.1.4–12.1.0.
     # nvbench (at the git_tag in cmake/versions.json) pins fmt 11.2.0, which falls in the
-    # affected range.
+    # affected range. See: https://github.com/fmtlib/fmt/pull/4719 for more detail
     #
     # Fix strategy: pre-register fmt 11.2.0 (same version nvbench pins, so nvbench stays
-    # compatible) with a PATCH_COMMAND that runs cmake/patches/fmt-nvcc-char32-fix.cmake.
-    # That script replaces the char32_t return with a constexpr uint32_t array that is
-    # semantically identical, valid from C++14 onwards, and accepted by nvcc.
+    # compatible) with a PATCH_COMMAND that applies the upstream fix from fmtlib/fmt commit
+    # 03cfb8645e2646fce738fe9d8e13fe7d7d947ad4. That commit replaces the char32_t U"..."
+    # literals with semantically identical char16_t u"..." literals split across two arrays
+    # and recombined via bitshift, which nvcc accepts. --ignore-whitespace handles CRLF
+    # line endings on Windows.
     #
-    # Why not use commit 9cb8c0f (post-12.1.0, which uses char16_t literals)? That commit
-    # belongs to fmt 12.x, which requires C++20. nvbench compiles its own .cu sources with
-    # -std=c++17, so fmt 12.x headers produce a secondary "constexpr function cannot have
-    # a parameter of nonliteral type" error under C++17. Staying on 11.2.0 avoids this.
-    #
-    # cmake/patches/fmt-11.1.4-nvcc-char32-fix.patch is kept for historical reference.
-    # -DFMT_UNICODE=0 in CMAKE_CUDA_FLAGS (see above) is still required separately to
-    # suppress the fmt static_assert that fires when nvcc cannot see /utf-8.
+    # Why not upgrade to fmt 12.x (which includes this fix natively)? fmt 12.x requires
+    # C++20. nvbench compiles its own .cu sources with -std=c++17, so fmt 12.x headers
+    # produce a secondary error under C++17. Staying on 11.2.0 + patch avoids this.
     #
     # TODO: This override can be removed once:
     # (a) nvbench updates to a fmt version that pre-dates 11.1.4 (no char32_t literals), or
@@ -557,9 +565,31 @@ if (MATX_BUILD_BENCHMARKS)
             NAME fmt
             GIT_REPOSITORY "https://github.com/fmtlib/fmt.git"
             GIT_TAG "11.2.0"
-            PATCH_COMMAND ${CMAKE_COMMAND}
-                -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/patches/fmt-nvcc-char32-fix.cmake"
         )
+        set(_fmt_patch "${CMAKE_CURRENT_SOURCE_DIR}/cmake/patches/fmt-11.2.0-nvcc-char32-fix.patch")
+        execute_process(
+            COMMAND git apply --ignore-whitespace --check --reverse "${_fmt_patch}"
+            WORKING_DIRECTORY "${fmt_SOURCE_DIR}"
+            RESULT_VARIABLE _fmt_patch_already_applied
+            OUTPUT_QUIET
+            ERROR_QUIET
+        )
+        if(NOT _fmt_patch_already_applied EQUAL 0)
+            message(STATUS "MatX: applying fmt char32_t patch")
+            execute_process(
+                COMMAND git apply --ignore-whitespace "${_fmt_patch}"
+                WORKING_DIRECTORY "${fmt_SOURCE_DIR}"
+                RESULT_VARIABLE _fmt_patch_result
+            )
+            if(NOT _fmt_patch_result EQUAL 0)
+                message(FATAL_ERROR "MatX: failed to apply fmt char32_t patch (exit ${_fmt_patch_result})")
+            endif()
+        else()
+            message(STATUS "MatX: fmt char32_t patch already applied, skipping")
+        endif()
+        unset(_fmt_patch)
+        unset(_fmt_patch_already_applied)
+        unset(_fmt_patch_result)
     endif()
 
     rapids_cpm_nvbench( CPM_ARGS 
