@@ -197,6 +197,14 @@ if(WIN32)
         # originate in external SDK headers and cannot be fixed in MatX; without /wd4996
         # they become errors under /WX.
         set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler=/wd4996")
+        # /wd4100: suppress unreferenced formal parameter warnings from third-party headers
+        # (Python 3.14 cpython/unicodeobject.h has intentional _unused_op parameters).
+        set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler=/wd4100")
+        add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/wd4100>")
+        # /wd4864: VS18 new warning for dependent-name template calls on free function
+        # templates. Correct code, not a real ambiguity; suppress to unblock /WX builds.
+        set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler=/wd4864")
+        add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/wd4864>")
         add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/utf-8>")
     endif()
 endif()

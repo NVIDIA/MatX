@@ -236,7 +236,7 @@ namespace detail {
   class RandomOp : public BaseOp<RandomOp<T, ShapeType>> {
     private:
       using inner_t = typename inner_op_type_t<T>::type;
-      static constexpr int RANK = cuda::std::tuple_size<ShapeType>{};
+      static constexpr int RANK = static_cast<int>(cuda::std::tuple_size<ShapeType>{});
       cuda::std::array<index_t, RANK> shape_;
       cuda::std::array<index_t, RANK> strides_;
       index_t total_size_;
