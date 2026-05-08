@@ -323,7 +323,7 @@ void sparse_matvec_impl(TensorTypeC &C, const TensorTypeA &a,
     uint64_t numD = a.crdSize(0);
     uint64_t m = a.Size(0);
     uint64_t n = a.Size(1);
-    uint32_t THREADS = static_cast<uint32_t>(std::min(m, 1024LU));
+    uint32_t THREADS = static_cast<uint32_t>(std::min(m, uint64_t{1024}));
     uint32_t BATCHES = static_cast<uint32_t>(
         cuda::std::ceil(static_cast<double>(m) / THREADS));
     if constexpr (atype::Format::isDIAI())

@@ -265,6 +265,9 @@ template <typename T> constexpr MatXDataType_t TypeToInt()
   if constexpr (std::is_same_v<T, uint64_t>)
     return MATX_TYPE_UINT64;
 
+#ifdef _MSC_VER
+#pragma warning(suppress: 4702)
+#endif
   return MATX_TYPE_INVALID;
 }
 
@@ -359,6 +362,9 @@ template <typename T> constexpr cudaDataType_t MatXTypeToCudaType()
     return CUDA_C_16BF;
   }
 
+#ifdef _MSC_VER
+#pragma warning(suppress: 4702)
+#endif
   return CUDA_C_32F;
 }
 
@@ -377,6 +383,9 @@ template <typename T> constexpr cublasComputeType_t MatXTypeToCudaComputeType()
     return CUBLAS_COMPUTE_64F;
   }
 
+#ifdef _MSC_VER
+#pragma warning(suppress: 4702)
+#endif
   return CUBLAS_COMPUTE_32F;
 }
 

@@ -78,7 +78,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   auto Y = make_tensor<ValueType>(Ym.Shape());
   auto Z = make_tensor<ValueType>(Zm.Shape());
 
-  (X = Xm, Y = Ym, Z=Zm).run(exec);
+  (void)(X = Xm, Y = Ym, Z=Zm).run(exec);
 
   exec.sync();
 

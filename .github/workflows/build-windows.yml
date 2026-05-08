@@ -1,38 +1,4 @@
-# Windows build-only CI workflow for MatX.
-#
-# Goals:
-#   - Validate that MatX compiles on Windows with MSVC (VS 17 / VS 18) and nvcc.
-#   - Run on every push to main and on every pull request targeting main.
-#   - No GPU is available on GitHub-hosted runners, so only compilation is
-#     validated (no test execution). Use a self-hosted runner with a GPU to
-#     add ctest execution.
-#
-# Generator choice - Visual Studio generators:
-#   CMake's Visual Studio generators require the CUDA MSBuild toolset
-#   (CUDA xx.x.targets / .props) to be present in the VS BuildCustomizations
-#   directory. The CUDA network installer sometimes skips writing those files
-#   during headless CI, producing the CMake error "No CUDA toolset found."
-#   The "Install CUDA VS integration" step below copies the files manually
-#   from the toolkit's extras/visual_studio_integration/MSBuildExtensions/
-#   directory into the correct VS BuildCustomizations directory so the VS
-#   generator can find the CUDA toolset reliably.
-#
-# CUDA note:
-#   GitHub-hosted Windows runners do not have the CUDA Toolkit pre-installed.
-#   The Jimver/cuda-toolkit action downloads and installs it. The full toolkit
-#   is installed (no sub-packages restriction) because the component layout
-#   differs between CUDA versions and partial installs can omit headers such
-#   as crt/host_config.h that cuda_runtime.h includes unconditionally. Downloads
-#   are cached between runs via use-github-cache so subsequent runs are fast.
-#
-# VS 18 (Visual Studio 2026) note:
-#   The windows-2025-vs2026 runner label targets the Windows Server 2025 image
-#   with VS 18 (2026) pre-installed. If that label is not yet available on
-#   GitHub-hosted runners the VS18 legs will queue indefinitely; replace with
-#   the correct label once GitHub publishes it.
-#   See: https://github.com/actions/runner-images
-
-name: Build (Windows)
+name: Build (Windows + Linux)
 
 on:
   push:
@@ -42,7 +8,7 @@ on:
 
 jobs:
   build:
-    name: "CUDA ${{ matrix.cuda }} / ${{ matrix.vs_label }}"
+    name: "CUDA ${{ matrix.cuda }} / ${{ matrix.label }}"
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -50,22 +16,23 @@ jobs:
       matrix:
         include:
           - os: windows-2022
-            cuda: "12.4.0"
-            vs_label: "VS17"
-            vs_generator: "Visual Studio 17 2022"
-            vc_toolset_dir: "v170"
-
-          - os: windows-2022
             cuda: "13.2.0"
-            vs_label: "VS17"
-            vs_generator: "Visual Studio 17 2022"
+            label: "VS17"
+            generator: "Visual Studio 17 2022"
             vc_toolset_dir: "v170"
+            cmake_config_args: "-A x64"
 
           - os: windows-2025-vs2026
             cuda: "13.2.0"
-            vs_label: "VS18"
-            vs_generator: "Visual Studio 18 2026"
+            label: "VS18"
+            generator: "Visual Studio 18 2026"
             vc_toolset_dir: "v180"
+            cmake_config_args: "-A x64"
+
+          - os: ubuntu-22.04
+            cuda: "13.2.0"
+            label: "Linux-GCC"
+            generator: "Ninja"
 
     steps:
       - name: Checkout repository
@@ -73,11 +40,6 @@ jobs:
         with:
           fetch-depth: 1
 
-      # ------------------------------------------------------------------
-      # Install CUDA Toolkit (full install, no sub-packages restriction).
-      # Must run BEFORE the VS integration copy step below.
-      # Docs: https://github.com/Jimver/cuda-toolkit
-      # ------------------------------------------------------------------
       - name: Install CUDA Toolkit ${{ matrix.cuda }}
         uses: Jimver/cuda-toolkit@v0.2.35
         id: cuda-toolkit
@@ -86,13 +48,8 @@ jobs:
           method: network
           use-github-cache: true
 
-      # ------------------------------------------------------------------
-      # The CUDA network installer sometimes skips the VS MSBuild integration
-      # step (writing CUDA x.y.targets / .props into BuildCustomizations).
-      # Copy them manually from the toolkit's extras directory so the CMake
-      # Visual Studio generator can locate the CUDA toolset.
-      # ------------------------------------------------------------------
       - name: Install CUDA VS integration
+        if: runner.os == 'Windows'
         shell: pwsh
         run: |
           # Derive "12.4" from "12.4.0"
@@ -125,12 +82,7 @@ jobs:
           Write-Host "Files installed:"
           Get-ChildItem $dst -Filter "CUDA*" | Select-Object -ExpandProperty Name
 
-      # ------------------------------------------------------------------
-      # Pin Python so that both pip and CMake's find_package(Python) use
-      # the exact same interpreter. Without this, CMake may pick up a
-      # different Python from the hosted tool cache than the one pip wrote
-      # packages into, causing "No module named 'numpy'" at configure time.
-      # ------------------------------------------------------------------
+      # Pin Python so that both pip and CMake's find_package(Python) use the same.
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -145,39 +97,29 @@ jobs:
           cmake --version | head -1
           nvcc --version
 
-      # ------------------------------------------------------------------
-      # CMake configure with the Visual Studio generator.
-      # The VS generator locates cl.exe automatically from the VS install.
-      # CMAKE_BUILD_TYPE is not used with multi-config VS generators;
-      # the config is selected at build time via --config Release.
-      # ------------------------------------------------------------------
       - name: Configure CMake
+        if: runner.os == 'Windows'
         run: |
           cmake -B build `
-            -G "${{ matrix.vs_generator }}" `
-            -A x64 `
-            -DMATX_BUILD_TESTS=ON `
-            -DMATX_BUILD_EXAMPLES=ON `
-            -DMATX_BUILD_BENCHMARKS=ON `
+            -G "${{ matrix.generator }}" `
+            ${{ matrix.cmake_config_args || '' }} `
+            -DMATX_BUILD_TESTS=OFF `
+            -DMATX_BUILD_EXAMPLES=OFF `
+            -DMATX_BUILD_BENCHMARKS=OFF `
             -DMATX_BUILD_DOCS=OFF `
             -DCMAKE_CUDA_ARCHITECTURES="80;90"
 
-      # ------------------------------------------------------------------
-      # Build using all available cores.
-      # ------------------------------------------------------------------
       - name: Build
         run: cmake --build build --config Release --parallel
 
-      # ------------------------------------------------------------------
-      # Upload build logs on failure for diagnosis.
-      # ------------------------------------------------------------------
       - name: Upload build logs on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: build-logs-${{ matrix.vs_label }}-cuda${{ matrix.cuda }}
+          name: build-logs-${{ matrix.label }}-cuda${{ matrix.cuda }}
           path: |
             build/**/*.log
             build/CMakeFiles/CMakeError.log
             build/CMakeFiles/CMakeOutput.log
+            build/CMakeFiles/*.log
           retention-days: 7

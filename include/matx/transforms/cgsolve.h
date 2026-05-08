@@ -70,8 +70,8 @@ namespace matx
       MATX_ASSERT_STR(A.Rank() -1 == X.Rank(), matxInvalidDim, "cgsolve:  A rank must be one larger than X rank");
       MATX_ASSERT_STR(X.Rank() == B.Rank(), matxInvalidDim, "cgsole: X rank and B rank must match");
 
-      cudaStream_t d2h;
-      cudaEvent_t event;
+      cudaStream_t d2h = nullptr;
+      cudaEvent_t event = nullptr;
       
 
       if(tol>0.0f) {
@@ -148,8 +148,18 @@ namespace matx
         // Fuse these into 1 kernel with comma op
         // r1 = r0 - a * Ap 
         // x = x + a * p
+        // MSVC C4834: MatX overloads operator, to combine two [[nodiscard]] set-ops into
+        // a single compound op; the lhs result is NOT discarded (it is captured by the
+        // overloaded comma), but MSVC's [[nodiscard]] checker doesn't see through it.
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable: 4834)
+#endif
         auto updateOp = ( r1 = r0 - (r0r0c/pApc) * Ap,
              X = X + (r0r0c/pApc) * p);
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
         (void)(IF( pApc != value_type(0), updateOp)).run(stream);
         
