@@ -37,6 +37,13 @@
 #include "gtest/gtest.h"
 
 #include <bit>
+#include <numbers>  // std::numbers::pi, ::e, ::sqrt2 — C++20, host-only.
+                    // This file is test/reference code that runs on the host;
+                    // std::numbers is intentionally used here for its type-safe
+                    // API (std::numbers::pi_v<float>, etc.).
+                    // In device code or shared headers, use M_PI / M_E from
+                    // matx/core/defines.h instead — nvcc's device front-end
+                    // does not parse <numbers>.
 
 using namespace matx;
 

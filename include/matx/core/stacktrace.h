@@ -58,6 +58,7 @@ static constexpr int MAX_FRAMES = 63;
 static inline void printStackTrace(std::ostream &eout = std::cerr)
 {
 #ifdef _WIN32
+  (void)eout; // Stack trace not yet implemented on Windows; suppress C4100 (unreferenced parameter) under /WX
   // TODO add code for windows stack trace
 #else
   std::stringstream out;
