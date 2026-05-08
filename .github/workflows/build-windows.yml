@@ -98,7 +98,6 @@ jobs:
           nvcc --version
 
       - name: Configure CMake
-        if: runner.os == 'Windows'
         run: |
           cmake -B build `
             -G "${{ matrix.generator }}" `
