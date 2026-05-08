@@ -258,8 +258,8 @@ public:
       params.onembed[1] = o.Size(RANK-1);
       params.istride = i.Stride(RANK-1);
       params.ostride = o.Stride(RANK-1);
-      params.idist = (RANK<=2) ? 1 : (int) i.Stride(RANK-3);
-      params.odist = (RANK<=2) ? 1 : (int) o.Stride(RANK-3);
+      params.idist = (RANK<=2) ? 1u : static_cast<uint32_t>(i.Stride(RANK-3));
+      params.odist = (RANK<=2) ? 1u : static_cast<uint32_t>(o.Stride(RANK-3));
 
       if constexpr (is_complex_half_v<T1> || is_half_v<T1>) {
         if ((params.n[0] & (params.n[0] - 1)) != 0 ||
