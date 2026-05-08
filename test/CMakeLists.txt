@@ -119,7 +119,16 @@ function(create_test_executable test_file)
     endif()
 
     if (MSVC)
-        target_compile_options(${target_name} PRIVATE /W4 /WX)
+        # /W4 and /WX must be wrapped in -Xcompiler for CUDA source files.
+        # nvcc does not recognize MSVC-style /flags as its own options; passing them
+        # directly without -Xcompiler causes nvcc to treat them as extra input files,
+        # triggering "A single input file is required for a non-link phase".
+        target_compile_options(${target_name} PRIVATE
+            $<$<COMPILE_LANGUAGE:CXX>:/W4>
+            $<$<COMPILE_LANGUAGE:CXX>:/WX>
+            $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/W4>
+            $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/WX>
+        )
     else()
         target_compile_options(${target_name} PRIVATE ${WARN_FLAGS})
         target_compile_options(${target_name} PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:${MATX_CUDA_FLAGS}>)

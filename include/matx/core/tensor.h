@@ -1403,6 +1403,11 @@ MATX_LOOP_UNROLL
     return tensor_t<T, N, decltype(new_desc)>{storage_, std::move(new_desc), data};
   }
 
+#ifndef _MSC_VER
+  // MSVC/nvcc on Windows validates C-array (&arr)[N] parameter signatures in every member
+  // during class template instantiation; RANK==0 makes N==0 which is invalid in standard C++.
+  // GCC/Clang allow zero-sized arrays as an extension. On Windows, the cuda::std::array
+  // overloads above provide the same functionality.
   template <typename StrideType, int N = RANK>
   __MATX_INLINE__ auto Slice(const typename Desc::shape_type (&firsts)[RANK],
                             const typename Desc::shape_type (&ends)[RANK],
@@ -1410,6 +1415,7 @@ MATX_LOOP_UNROLL
   {
     return Slice<N>(detail::to_array(firsts), detail::to_array(ends), detail::to_array(strides));
   }
+#endif // !_MSC_VER
 
   /**
    * Slice a tensor either within the same dimension or to a lower dimension
@@ -1446,12 +1452,15 @@ MATX_LOOP_UNROLL
     return Slice<N, detail::NoStride>(firsts, ends, detail::NoStride{});
   }
 
+#ifndef _MSC_VER
+  // See above: C-array overloads excluded on MSVC/nvcc due to zero-size array rejection.
   template <int N = RANK>
   __MATX_INLINE__ auto Slice(const typename Desc::shape_type (&firsts)[RANK],
                               const typename Desc::shape_type (&ends)[RANK]) const
   {
     return Slice<N>(detail::to_array(firsts), detail::to_array(ends));
   }
+#endif // !_MSC_VER
 
 
   template <typename ManagedType>

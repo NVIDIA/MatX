@@ -152,6 +152,50 @@ rapids_cpm_cccl(
 
 target_link_libraries(matx INTERFACE CCCL::CCCL)
 
+if(WIN32)
+    # Prevent wingdi.h from defining ERROR=0, which breaks MATX_LOG_ERROR
+    target_compile_definitions(matx INTERFACE NOMINMAX WIN32_LEAN_AND_MEAN NOGDI _USE_MATH_DEFINES)
+
+    if(MSVC)
+        # /Zc:preprocessor: MSVC conformance preprocessor required by libcudacxx / MatX.
+        # Passed as -Xcompiler so it reaches cl.exe through nvcc.
+        add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/Zc:preprocessor>")
+        add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/Zc:preprocessor>")
+
+        # /Zc:__cplusplus: Without this MSVC always reports __cplusplus=199711L regardless
+        # of /std:c++NN, which breaks any library (e.g. nvbench) that checks __cplusplus
+        # directly in .cxx files compiled by cl.exe (not through nvcc). The equivalent
+        # -Xcompiler=/Zc:__cplusplus in CMAKE_CUDA_FLAGS only reaches cl.exe for .cu files.
+        add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/Zc:__cplusplus>")
+
+        # /Zc:__cplusplus makes MSVC report the true value of __cplusplus.
+        # /utf-8: Required by fmt 11+ on MSVC (including 11.2.0) to satisfy the static_assert in
+        # include/fmt/base.h:
+        #   enum { is_utf8_enabled = "\u00A7"[1] == '\xA7' };
+        #   enum { use_utf8 = !FMT_WIN32 || is_utf8_enabled };
+        #   static_assert(!FMT_UNICODE || use_utf8, "Unicode support requires compiling with /utf-8");
+        # Without /utf-8, MSVC encodes "\u00A7" (§) as the single byte 0xA7 in the current
+        # Windows code page, so [1] == '\0' != '\xA7' and is_utf8_enabled = 0. The assertion fires.
+        # With /utf-8, MSVC encodes it as the two UTF-8 bytes 0xC2 0xA7, so [1] == 0xA7 and
+        # the assertion passes. This assertion is evaluated by cl.exe (the host compiler), so
+        # -Xcompiler=/utf-8 is sufficient to reach cl.exe for both .cu and .cxx files.
+        # This was NOT changed in fmt 11.2.0 — the only fix in 11.2.0 was the char32_t
+        # lookup-table literals (see the note on nvbench bump in cmake/versions.json).
+        # NOTE: -DFMT_UNICODE=0 was previously also injected here as a belt-and-suspenders guard.
+        # -DFMT_UNICODE=0: required for .cu files on Windows/MSVC. nvcc's CUDA frontend does
+        # not inherit /utf-8 from -Xcompiler=/utf-8, so the fmt static_assert
+        #   static_assert(!FMT_UNICODE || use_utf8, "Unicode support requires compiling with /utf-8")
+        # fires when FMT_UNICODE=1 (the default). -Xcompiler=/utf-8 alone is insufficient.
+        #
+        # NOTE: /std:c++NN is NOT set here. Per-target CUDA_STANDARD/CXX_STANDARD is sufficient:
+        # nvcc translates its -std=c++NN flag to /std:c++NN for cl.exe in each .cu compilation.
+        # Hardcoding /std:c++17 here would override /std:c++20 for targets like MatX examples
+        # and tests that require C++20 features (e.g. std::source_location, concepts, etc.).
+        set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler=/Zc:__cplusplus -Xcompiler=/utf-8 -DFMT_UNICODE=0")
+        add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/utf-8>")
+    endif()
+endif()
+
 # Set flags for compiling tests faster (only for nvcc)
 if (NOT CMAKE_CUDA_COMPILER_ID STREQUAL "Clang")
     set(MATX_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} --threads 0 -ftemplate-backtrace-limit=0 --extended-lambda)
@@ -460,6 +504,42 @@ if (MATX_BUILD_EXAMPLES)
 endif()
 
 if (MATX_BUILD_BENCHMARKS)
+    # Pre-register fmt at a commit that fixes the nvcc char32_t parse error.
+    #
+    # NOTE: fmt (fmtlib) is NOT a dependency of the MatX library itself. The MatX headers
+    # use printf-style format strings and std::format (C++20) exclusively. fmt enters the
+    # build only here, as a transitive dependency of nvbench (the benchmarking framework
+    # used by the targets in bench/). Non-benchmark builds are entirely unaffected.
+    #
+    # Background: fractional_part_rounding_thresholds() in fmt/format.h historically used
+    # char32_t U"..." string literals with values (e.g. 0x9999999a) exceeding U+10FFFF.
+    # nvcc's CUDA frontend rejects these with "character value is out of range"; gcc/clang
+    # accept arbitrary char32_t bit patterns and are unaffected.
+    #
+    # Fix: commit 9cb8c0f (fmtlib/fmt main branch, post-12.1.0) re-encodes the table as
+    # two char16_t u"..." literals for the high and low 16-bit halves. All char16_t code
+    # units are <= 0xFFFF so nvcc accepts them. This CPMAddPackage call pre-registers fmt
+    # at that commit so that rapids_cpm_nvbench (below) picks up this version instead of
+    # fetching an older one via its own dependency.
+    #
+    # cmake/patches/fmt-11.1.4-nvcc-char32-fix.patch is kept for historical reference.
+    # -DFMT_UNICODE=0 in CMAKE_CUDA_FLAGS (see above) is still required separately to
+    # suppress the fmt static_assert that fires when nvcc cannot see /utf-8.
+    #
+    # TODO: Once nvbench's own dependency pulls in fmt 12.2.0 or later (which will be the
+    # first release to contain commit 9cb8c0f), this CPMAddPackage override and the MSVC
+    # guard block below can be removed. Check cmake/versions.json nvbench git_tag against
+    # https://github.com/NVIDIA/nvbench to see which fmt version it vendors.
+    if (MSVC)
+        message(STATUS "MatX: pre-registering fmt at commit 9cb8c0f (post-12.1.0 main) to fix "
+                       "nvcc char32_t parse error in fractional_part_rounding_thresholds()")
+        CPMAddPackage(
+            NAME fmt
+            GIT_REPOSITORY "https://github.com/fmtlib/fmt.git"
+            GIT_TAG "9cb8c0f92b4c345fb974a75d71370c23047528aa"
+        )
+    endif()
+
     rapids_cpm_nvbench( CPM_ARGS 
                         OPTIONS
                         "CMAKE_CXX_STANDARD 20"

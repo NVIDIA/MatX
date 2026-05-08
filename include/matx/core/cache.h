@@ -116,7 +116,7 @@ struct CacheCommonParamsKeyHash {
 };
 
 #ifndef DOXYGEN_ONLY
-__attribute__ ((visibility ("default")))
+MATX_VISIBILITY_DEFAULT
 #endif
 inline cuda::std::atomic<CacheId> CacheIdCounter{0};
 inline std::recursive_mutex cache_mtx; ///< Mutex protecting updates from map
@@ -130,7 +130,7 @@ inline auto& CacheRegistry() {
 }
 
 template<typename CacheType>
-__attribute__ ((visibility ("default")))
+MATX_VISIBILITY_DEFAULT
 CacheId GetCacheIdFromType()
 {
   static CacheId id = CacheIdCounter.fetch_add(1);
@@ -732,13 +732,13 @@ inline size_t PodArrayToHash(cuda::std::array<T, len> c)
   return hash;
 }
 
-__attribute__ ((visibility ("default")))
+MATX_VISIBILITY_DEFAULT
 __MATX_INLINE__ matxCache_t &InitCache() {
   static matxCache_t cache;
   return cache;
 }
 
-__attribute__ ((visibility ("default")))
+MATX_VISIBILITY_DEFAULT
 __MATX_INLINE__ matxCache_t &GetCache() {
   [[maybe_unused]] const auto &tracker = GetAllocMap();
   return InitCache();
@@ -751,7 +751,7 @@ __MATX_INLINE__ matxCache_t &GetCache() {
 // function does not clear the allocator cache (i.e., allocations made with matxAlloc
 // other than those created to support transforms).
 // To free the allocator cache, use matx::FreeAllocations().
-__attribute__ ((visibility ("default")))
+MATX_VISIBILITY_DEFAULT
 __MATX_INLINE__ void ClearCaches() {
   detail::GetCache().ClearAll();
 }
@@ -759,7 +759,7 @@ __MATX_INLINE__ void ClearCaches() {
 // Helper function to clear both MatX caches and allocations. This provides a single
 // function that can be called prior to program exit to support clean shutdown
 // (i.e., to avoid issues with the order of destruction of static objects and CUDA contexts).
-__attribute__ ((visibility ("default")))
+MATX_VISIBILITY_DEFAULT
 __MATX_INLINE__ void ClearCachesAndAllocations() {
   ClearCaches();
   FreeAllocations();
