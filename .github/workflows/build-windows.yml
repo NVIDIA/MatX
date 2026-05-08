@@ -50,6 +50,19 @@ jobs:
             vs_gen: "Visual Studio 18 2026"
             vs_label: "VS18"
 
+          # Visual Studio 17 2022 on Windows Server 2022 (always available)
+          - os: windows-2022
+            cuda: "13.2.0"
+            vs_gen: "Visual Studio 17 2022"
+            vs_label: "VS17"
+
+          # Visual Studio 18 2026 – uses windows-latest; update 'os' to a
+          # dedicated windows-2025 or windows-2026 label once GitHub ships it.
+          - os: windows-latest
+            cuda: "13.2.0"
+            vs_gen: "Visual Studio 18 2026"
+            vs_label: "VS18"
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -75,10 +88,7 @@ jobs:
         run: nvcc --version
 
       # ------------------------------------------------------------------
-      # CMake configure – compile tests + examples, skip benchmarks here
-      # because building benchmarks requires downloading additional deps
-      # (nvbench + fmt) which significantly extends CI time. Enable them
-      # in a nightly or manual workflow if desired.
+      # CMake configure – compile tests + examples
       # ------------------------------------------------------------------
       - name: Configure CMake
         run: |
@@ -87,7 +97,7 @@ jobs:
             -A x64 `
             -DMATX_BUILD_TESTS=ON `
             -DMATX_BUILD_EXAMPLES=ON `
-            -DMATX_BUILD_BENCHMARKS=OFF `
+            -DMATX_BUILD_BENCHMARKS=ON `
             -DMATX_BUILD_DOCS=OFF `
             -DCMAKE_CUDA_ARCHITECTURES="80;90"
         # CMAKE_CUDA_ARCHITECTURES: build for Ampere (80) and Hopper (90).
