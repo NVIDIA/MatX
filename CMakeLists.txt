@@ -592,6 +592,14 @@ if (MATX_BUILD_BENCHMARKS)
         unset(_fmt_patch_result)
     endif()
 
+    if (MSVC)
+        # Force nvbench (and its tools) to use the DLL CRT (/MD or /MDd) to match the
+        # rest of the MatX build.  Without this nvbench-ctl defaults to /MT (LIBCMT),
+        # which produces LNK4098 and LNK2019 errors when linking against nvbench.lib
+        # built with /MD.
+        set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL$<$<CONFIG:Debug>:Debug>")
+    endif()
+
     rapids_cpm_nvbench( CPM_ARGS 
                         OPTIONS
                         "CMAKE_CXX_STANDARD 20"

@@ -132,7 +132,14 @@ void sphericalharmonics(nvbench::state &state, nvbench::type_list<ValueType>)
 
   state.exec( 
     [&](nvbench::launch &launch) {
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable: 4834)
+#endif
       (X=XXm, Y=YYm, Z=ZZm).run((cudaStream_t)launch.get_stream());
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
     });
 }
 

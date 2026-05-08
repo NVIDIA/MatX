@@ -161,7 +161,7 @@ inline bool get_grid_dims(dim3 &blocks, dim3 &threads, const cuda::std::array<in
     }
   }  
   else {
-    size_t dims = cuda::std::accumulate(cuda::std::begin(sizes), cuda::std::end(sizes), 1, cuda::std::multiplies<index_t>());
+    size_t dims = static_cast<size_t>(cuda::std::accumulate(cuda::std::begin(sizes), cuda::std::end(sizes), index_t{1}, cuda::std::multiplies<index_t>()));
     threads.x = std::min(((int)dims + 31)/32 * 32, max_cta_size);
 
     // launch as many blocks as necessary

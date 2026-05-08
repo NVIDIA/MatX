@@ -743,7 +743,7 @@ TYPED_TEST(FltFltExecutorTests, Floor) {
     this->exec.sync();
 
     const double pi_floor_ref_f64 = std::floor(std::numbers::pi);
-    const float pi_floor_ref_f32 = std::floor(std::numbers::pi_v<float>);
+    [[maybe_unused]] const float pi_floor_ref_f32 = std::floor(std::numbers::pi_v<float>);
 
     // For floor of pi, the result should be exactly 3.0 (which is representable exactly)
     EXPECT_EQ(floor_result(), 3.0);
@@ -2439,7 +2439,7 @@ TYPED_TEST(FltFltExecutorTests, ConvertFromDoubleAccuracy) {
     if (!std::isnormal(hi)) continue;
 
     // 0.5 * ulp(hi), using the upper-side step (the standard "ulp" definition).
-    const double half_ulp_hi = std::ldexp(1.0, std::ilogb(hi) - 24);
+    [[maybe_unused]] const double half_ulp_hi = std::ldexp(1.0, std::ilogb(hi) - 24);
 
     // Property (3): |x - (hi+lo)| <= 8 ulp(x), only when both hi and lo are in normal
     // range. lo is allowed to be exactly zero, but only when the residual really is
