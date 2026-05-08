@@ -68,7 +68,7 @@ jobs:
       # Docs: https://github.com/Jimver/cuda-toolkit
       # ------------------------------------------------------------------
       - name: Install CUDA Toolkit ${{ matrix.cuda }}
-        uses: Jimver/cuda-toolkit@v0.2.18
+        uses: Jimver/cuda-toolkit@v0.2.35
         id: cuda-toolkit
         with:
           cuda: ${{ matrix.cuda }}
