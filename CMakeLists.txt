@@ -592,13 +592,18 @@ if (MATX_BUILD_BENCHMARKS)
         unset(_fmt_patch_result)
     endif()
 
-    if (MSVC)
-        # Force nvbench (and its tools) to use the DLL CRT (/MD or /MDd) to match the
-        # rest of the MatX build.  Without this nvbench-ctl defaults to /MT (LIBCMT),
-        # which produces LNK4098 and LNK2019 errors when linking against nvbench.lib
-        # built with /MD.
-        set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL$<$<CONFIG:Debug>:Debug>")
-    endif()
+    # if (MSVC)
+    #     # Force nvbench (and its tools) to use the DLL CRT (/MD or /MDd) to match the
+    #     # rest of the MatX build.  Without this nvbench-ctl defaults to /MT (LIBCMT),
+    #     # which produces LNK4098 and LNK2019 errors when linking against nvbench.lib
+    #     # built with /MD.
+    #     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL$<$<CONFIG:Debug>:Debug>")
+    #     # CMake 4.x propagates CMAKE_MSVC_RUNTIME_LIBRARY into try_compile sub-projects
+    #     # (e.g. nvbench's check_cxx_compiler_flag calls).  The scratch project may not
+    #     # recognise the value, causing a configure error.  Remove it from the propagation
+    #     # list so try_compile stays unaffected while the main build still uses /MD.
+    #     list(REMOVE_ITEM CMAKE_TRY_COMPILE_PLATFORM_VARIABLES CMAKE_MSVC_RUNTIME_LIBRARY)
+    # endif()
 
     rapids_cpm_nvbench( CPM_ARGS 
                         OPTIONS
