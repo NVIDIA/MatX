@@ -504,39 +504,48 @@ if (MATX_BUILD_EXAMPLES)
 endif()
 
 if (MATX_BUILD_BENCHMARKS)
-    # Pre-register fmt at a commit that fixes the nvcc char32_t parse error.
+    # Pre-register fmt to fix the nvcc char32_t parse error in benchmarks.
     #
     # NOTE: fmt (fmtlib) is NOT a dependency of the MatX library itself. The MatX headers
     # use printf-style format strings and std::format (C++20) exclusively. fmt enters the
     # build only here, as a transitive dependency of nvbench (the benchmarking framework
     # used by the targets in bench/). Non-benchmark builds are entirely unaffected.
     #
-    # Background: fractional_part_rounding_thresholds() in fmt/format.h historically used
-    # char32_t U"..." string literals with values (e.g. 0x9999999a) exceeding U+10FFFF.
-    # nvcc's CUDA frontend rejects these with "character value is out of range"; gcc/clang
-    # accept arbitrary char32_t bit patterns and are unaffected.
+    # Background: fractional_part_rounding_thresholds() in fmt/format.h used char32_t
+    # U"..." string literals with values (e.g. 0x9999999a) exceeding U+10FFFF. nvcc's
+    # CUDA frontend rejects these with "character value is out of range"; gcc/clang accept
+    # arbitrary char32_t bit patterns and are unaffected. Affected: fmt 11.1.4–12.1.0.
+    # nvbench (at the git_tag in cmake/versions.json) pins fmt 11.2.0, which falls in the
+    # affected range.
     #
-    # Fix: commit 9cb8c0f (fmtlib/fmt main branch, post-12.1.0) re-encodes the table as
-    # two char16_t u"..." literals for the high and low 16-bit halves. All char16_t code
-    # units are <= 0xFFFF so nvcc accepts them. This CPMAddPackage call pre-registers fmt
-    # at that commit so that rapids_cpm_nvbench (below) picks up this version instead of
-    # fetching an older one via its own dependency.
+    # Fix strategy: pre-register fmt 11.2.0 (same version nvbench pins, so nvbench stays
+    # compatible) with a PATCH_COMMAND that runs cmake/patches/fmt-nvcc-char32-fix.cmake.
+    # That script replaces the char32_t return with a constexpr uint32_t array that is
+    # semantically identical, valid from C++14 onwards, and accepted by nvcc.
+    #
+    # Why not use commit 9cb8c0f (post-12.1.0, which uses char16_t literals)? That commit
+    # belongs to fmt 12.x, which requires C++20. nvbench compiles its own .cu sources with
+    # -std=c++17, so fmt 12.x headers produce a secondary "constexpr function cannot have
+    # a parameter of nonliteral type" error under C++17. Staying on 11.2.0 avoids this.
     #
     # cmake/patches/fmt-11.1.4-nvcc-char32-fix.patch is kept for historical reference.
     # -DFMT_UNICODE=0 in CMAKE_CUDA_FLAGS (see above) is still required separately to
     # suppress the fmt static_assert that fires when nvcc cannot see /utf-8.
     #
-    # TODO: Once nvbench's own dependency pulls in fmt 12.2.0 or later (which will be the
-    # first release to contain commit 9cb8c0f), this CPMAddPackage override and the MSVC
-    # guard block below can be removed. Check cmake/versions.json nvbench git_tag against
-    # https://github.com/NVIDIA/nvbench to see which fmt version it vendors.
+    # TODO: This override can be removed once:
+    # (a) nvbench updates to a fmt version that pre-dates 11.1.4 (no char32_t literals), or
+    # (b) nvbench updates to a fmt version with the char16_t fix AND targets C++20 so that
+    #     fmt 12.x headers compile cleanly, or
+    # (c) nvcc's parser is fixed to accept char32_t values > U+10FFFF.
+    # Check cmake/versions.json nvbench git_tag vs https://github.com/NVIDIA/nvbench.
     if (MSVC)
-        message(STATUS "MatX: pre-registering fmt at commit 9cb8c0f (post-12.1.0 main) to fix "
-                       "nvcc char32_t parse error in fractional_part_rounding_thresholds()")
+        message(STATUS "MatX: pre-registering fmt 11.2.0 with char32_t patch for nvcc compatibility")
         CPMAddPackage(
             NAME fmt
             GIT_REPOSITORY "https://github.com/fmtlib/fmt.git"
-            GIT_TAG "9cb8c0f92b4c345fb974a75d71370c23047528aa"
+            GIT_TAG "11.2.0"
+            PATCH_COMMAND ${CMAKE_COMMAND}
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/patches/fmt-nvcc-char32-fix.cmake"
         )
     endif()
 
