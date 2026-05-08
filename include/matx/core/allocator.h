@@ -389,7 +389,7 @@ __MATX_INLINE__ void matxPrintMemoryStatistics()
   matxGetMemoryStats(&current, &total, &max);
 
   printf("Memory Statistics(GB):  current: %.2f, total: %.2f, max: %.2f. Total "
-         "allocations: %lu\n",
+         "allocations: %zu\n",
          static_cast<double>(current) / 1e9, static_cast<double>(total) / 1e9,
          static_cast<double>(max) / 1e9, GetAllocMap().size());
 }

@@ -55,12 +55,6 @@ jobs:
             vs_generator: "Visual Studio 17 2022"
             vc_toolset_dir: "v170"
 
-          - os: windows-2025-vs2026
-            cuda: "12.4.0"
-            vs_label: "VS18"
-            vs_generator: "Visual Studio 18 2026"
-            vc_toolset_dir: "v180"
-
           - os: windows-2022
             cuda: "13.2.0"
             vs_label: "VS17"
@@ -130,6 +124,9 @@ jobs:
 
           Write-Host "Files installed:"
           Get-ChildItem $dst -Filter "CUDA*" | Select-Object -ExpandProperty Name
+
+      - name: Install Python dependencies
+        run: pip install numpy
 
       - name: Show tool versions
         shell: bash
