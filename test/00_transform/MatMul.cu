@@ -1198,29 +1198,87 @@ TYPED_TEST(MatMulTestFloatTypes, OuterProduct)
 }
 
 #if defined(MATX_EN_JIT) && defined(MATX_EN_MATHDX)
+namespace {
+
+constexpr index_t kCuBLASDxPassThroughDim = 4;
+
+template <typename TensorType>
+void FillOnes2D(TensorType &t)
+{
+  for (index_t row = 0; row < kCuBLASDxPassThroughDim; ++row) {
+    for (index_t col = 0; col < kCuBLASDxPassThroughDim; ++col) {
+      t(row, col) = 1.0f;
+    }
+  }
+}
+
+} // namespace
+
 TEST(MatMulJIT, CuBLASDxUnaryFusion)
 {
   MATX_ENTER_HANDLER();
-  constexpr index_t dim = 4;
-  auto a = make_tensor<float>({dim, dim});
-  auto b = make_tensor<float>({dim, dim});
-  auto c = make_tensor<float>({dim, dim});
-
-  for (index_t row = 0; row < dim; ++row) {
-    for (index_t col = 0; col < dim; ++col) {
-      a(row, col) = 1.0f;
-      b(row, col) = 1.0f;
-    }
-  }
+  auto a = make_tensor<float>({kCuBLASDxPassThroughDim, kCuBLASDxPassThroughDim});
+  auto b = make_tensor<float>({kCuBLASDxPassThroughDim, kCuBLASDxPassThroughDim});
+  auto c = make_tensor<float>({kCuBLASDxPassThroughDim, kCuBLASDxPassThroughDim});
+  FillOnes2D(a);
+  FillOnes2D(b);
 
   CUDAJITExecutor exec{};
   (c = sqrt(matmul(a, b))).run(exec);
   exec.sync();
   ASSERT_EQ(cudaGetLastError(), cudaSuccess);
 
-  for (index_t row = 0; row < dim; ++row) {
-    for (index_t col = 0; col < dim; ++col) {
+  for (index_t row = 0; row < kCuBLASDxPassThroughDim; ++row) {
+    for (index_t col = 0; col < kCuBLASDxPassThroughDim; ++col) {
       ASSERT_NEAR(c(row, col), 2.0f, 1e-4f);
+    }
+  }
+  MATX_EXIT_HANDLER();
+}
+
+TEST(MatMulJIT, CuBLASDxBinaryFusion)
+{
+  MATX_ENTER_HANDLER();
+  auto a = make_tensor<float>({kCuBLASDxPassThroughDim, kCuBLASDxPassThroughDim});
+  auto b = make_tensor<float>({kCuBLASDxPassThroughDim, kCuBLASDxPassThroughDim});
+  auto c = make_tensor<float>({kCuBLASDxPassThroughDim, kCuBLASDxPassThroughDim});
+  FillOnes2D(a);
+  FillOnes2D(b);
+
+  CUDAJITExecutor exec{};
+  (c = matmul(a, b) + 1.0f).run(exec);
+  exec.sync();
+  ASSERT_EQ(cudaGetLastError(), cudaSuccess);
+
+  for (index_t row = 0; row < kCuBLASDxPassThroughDim; ++row) {
+    for (index_t col = 0; col < kCuBLASDxPassThroughDim; ++col) {
+      ASSERT_NEAR(c(row, col), 5.0f, 1e-4f);
+    }
+  }
+  MATX_EXIT_HANDLER();
+}
+
+TEST(MatMulJIT, CuBLASDxCastFusion)
+{
+  MATX_ENTER_HANDLER();
+  auto a = make_tensor<float>({kCuBLASDxPassThroughDim, kCuBLASDxPassThroughDim});
+  auto b = make_tensor<float>({kCuBLASDxPassThroughDim, kCuBLASDxPassThroughDim});
+  auto c = make_tensor<double>({kCuBLASDxPassThroughDim, kCuBLASDxPassThroughDim});
+  auto z = make_tensor<cuda::std::complex<float>>({kCuBLASDxPassThroughDim, kCuBLASDxPassThroughDim});
+  FillOnes2D(a);
+  FillOnes2D(b);
+
+  CUDAJITExecutor exec{};
+  (c = as_type<double>(matmul(a, b))).run(exec);
+  (z = as_complex_float(matmul(a, b), matmul(a, b))).run(exec);
+  exec.sync();
+  ASSERT_EQ(cudaGetLastError(), cudaSuccess);
+
+  for (index_t row = 0; row < kCuBLASDxPassThroughDim; ++row) {
+    for (index_t col = 0; col < kCuBLASDxPassThroughDim; ++col) {
+      ASSERT_NEAR(c(row, col), 4.0, 1e-6);
+      ASSERT_NEAR(z(row, col).real(), 4.0f, 1e-4f);
+      ASSERT_NEAR(z(row, col).imag(), 4.0f, 1e-4f);
     }
   }
   MATX_EXIT_HANDLER();
