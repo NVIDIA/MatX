@@ -28,10 +28,11 @@
 #   are cached between runs via use-github-cache so subsequent runs are fast.
 #
 # VS 18 (Visual Studio 2026) note:
-#   windows-2025 runners ship with VS 18 pre-installed. ilammy/msvc-dev-cmd
-#   with vsversion '2026' selects it. If the image is not yet available the
-#   VS18 leg will fail at the runner selection step - update the os field once
-#   GitHub makes a stable windows-2025 image available.
+#   The windows-2025-vs2026 runner label targets the Windows Server 2025 image
+#   with VS 18 (2026) pre-installed. If that label is not yet available on
+#   GitHub-hosted runners the VS18 legs will queue indefinitely; replace with
+#   the correct label once GitHub publishes it.
+#   See: https://github.com/actions/runner-images
 
 name: Build (Windows)
 
@@ -55,7 +56,7 @@ jobs:
             vs_version: "2022"
             vs_label: "VS17"
 
-          - os: windows-2025
+          - os: windows-2025-vs2026
             cuda: "12.4.0"
             vs_version: "2026"
             vs_label: "VS18"
@@ -65,7 +66,7 @@ jobs:
             vs_version: "2022"
             vs_label: "VS17"
 
-          - os: windows-2025
+          - os: windows-2025-vs2026
             cuda: "13.2.0"
             vs_version: "2026"
             vs_label: "VS18"
