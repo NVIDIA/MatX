@@ -126,7 +126,16 @@ namespace matx
   {
     matxError_t e;
     char str[400];
-    std::stringstream stack;
+    // Stack trace captured as std::string rather than std::stringstream.
+    //
+    // std::stringstream deletes its copy constructor, making any class that
+    // holds one non-copyable. MSVC introduced warning C5272 (promoted to an
+    // error by /WX) in VS 18 (MSVC 14.4x / 2026) that fires when a
+    // non-copyable type is thrown: the C++ standard requires a thrown object
+    // to be copyable because the runtime may need to copy it during stack
+    // unwinding. std::string is copyable, avoids the warning entirely, and is
+    // semantically equivalent here since stack is only ever read as a string.
+    std::string stack;
 
     /**
      * @brief Throw an exception and print a stack trace
@@ -141,7 +150,9 @@ namespace matx
     {
       snprintf(str, sizeof(str), "matxException (%s: %s) - %s:%d\n",
                matxErrorString(error), s, file, line);
-      detail::printStackTrace(stack);
+      std::ostringstream oss;
+      detail::printStackTrace(oss);
+      stack = oss.str();
     }
 
     matxException(matxError_t error, const std::string &s, const char *file, int line)
@@ -149,7 +160,9 @@ namespace matx
     {
       snprintf(str, sizeof(str), "matxException (%s: %s) - %s:%d\n",
                matxErrorString(error), s.c_str(), file, line);
-      detail::printStackTrace(stack);
+      std::ostringstream oss;
+      detail::printStackTrace(oss);
+      stack = oss.str();
     }
 
     const char* what() const noexcept override { return str; }
@@ -182,7 +195,7 @@ namespace matx
   catch (matx::detail::matxException & e)                       \
   {                                                             \
     MATX_LOG_FATAL("{}", e.what());                             \
-    MATX_LOG_FATAL("Stack Trace:\n{}", e.stack.str());          \
+    MATX_LOG_FATAL("Stack Trace:\n{}", e.stack);               \
     exit(1);                                                    \
   }
 

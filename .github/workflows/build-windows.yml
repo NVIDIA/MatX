@@ -7,19 +7,31 @@
 #     validated (no test execution). Use a self-hosted runner with a GPU to
 #     add ctest execution.
 #
+# Generator choice - Ninja instead of "Visual Studio XX":
+#   CMake's Visual Studio generators require the CUDA MSBuild toolset
+#   (CUDA xx.x.targets / .props) to be installed in the VS BuildCustomizations
+#   directory. The CUDA network installer often fails to write those files
+#   during a headless CI install, producing the CMake error:
+#     "No CUDA toolset found."
+#   Using the Ninja generator avoids this requirement entirely. nvcc still uses
+#   cl.exe as the host compiler (set via CMAKE_CUDA_HOST_COMPILER / the MSVC
+#   dev-cmd environment), which is identical to the local VS build.
+#   ilammy/msvc-dev-cmd selects the correct VS version (17 or 18) and puts
+#   the matching cl.exe / link.exe on PATH before CMake runs.
+#
 # CUDA note:
 #   GitHub-hosted Windows runners do not have the CUDA Toolkit pre-installed.
 #   The Jimver/cuda-toolkit action downloads and installs it. The full toolkit
 #   is installed (no sub-packages restriction) because the component layout
 #   differs between CUDA versions and partial installs can omit headers such
-#   as crt/host_config.h that cuda_runtime.h requires. Downloads are cached
-#   between runs via use-github-cache so subsequent runs are fast.
+#   as crt/host_config.h that cuda_runtime.h includes unconditionally. Downloads
+#   are cached between runs via use-github-cache so subsequent runs are fast.
 #
 # VS 18 (Visual Studio 2026) note:
-#   'windows-latest' will point to the newest available Windows runner image.
-#   Once GitHub ships a VS 18 image it will be picked up automatically.
-#   Until then both matrix legs may resolve to VS 17; the generator string
-#   controls which VS version CMake targets, not just the runner image.
+#   windows-2025 runners ship with VS 18 pre-installed. ilammy/msvc-dev-cmd
+#   with vsversion '2026' selects it. If the image is not yet available the
+#   VS18 leg will fail at the runner selection step - update the os field once
+#   GitHub makes a stable windows-2025 image available.
 
 name: Build (Windows)
 
@@ -31,7 +43,7 @@ on:
 
 jobs:
   build:
-    name: "CUDA ${{ matrix.cuda }} / VS ${{ matrix.vs_gen }}"
+    name: "CUDA ${{ matrix.cuda }} / ${{ matrix.vs_label }}"
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -40,22 +52,22 @@ jobs:
         include:
           - os: windows-2022
             cuda: "12.4.0"
-            vs_gen: "Visual Studio 17 2022"
+            vs_version: "2022"
             vs_label: "VS17"
 
-          - os: windows-2025-vs2026
+          - os: windows-2025
             cuda: "12.4.0"
-            vs_gen: "Visual Studio 18 2026"
+            vs_version: "2026"
             vs_label: "VS18"
 
           - os: windows-2022
             cuda: "13.2.0"
-            vs_gen: "Visual Studio 17 2022"
+            vs_version: "2022"
             vs_label: "VS17"
 
-          - os: windows-2025-vs2026
+          - os: windows-2025
             cuda: "13.2.0"
-            vs_gen: "Visual Studio 18 2026"
+            vs_version: "2026"
             vs_label: "VS18"
 
     steps:
@@ -65,15 +77,20 @@ jobs:
           fetch-depth: 1
 
       # ------------------------------------------------------------------
-      # Install CUDA Toolkit
+      # Set up the MSVC developer environment for the selected VS version.
+      # This puts the correct cl.exe / link.exe / lib.exe on PATH and sets
+      # INCLUDE / LIB so that nvcc and CMake find the right toolchain without
+      # needing the Visual Studio CMake generator or the CUDA VS toolset.
+      # ------------------------------------------------------------------
+      - name: Set up MSVC ${{ matrix.vs_version }} environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+          vsversion: ${{ matrix.vs_version }}
+
+      # ------------------------------------------------------------------
+      # Install CUDA Toolkit (full install, no sub-packages restriction).
       # Docs: https://github.com/Jimver/cuda-toolkit
-      #
-      # No sub-packages restriction: the header sub-package layout changed
-      # between CUDA toolkit versions, so partial installs (e.g. just "nvcc"
-      # + "cudart") may omit crt/host_config.h and other compiler-support
-      # headers that cuda_runtime.h includes unconditionally. Installing the
-      # full toolkit is the most reliable option; subsequent runs are fast
-      # because use-github-cache caches the download.
       # ------------------------------------------------------------------
       - name: Install CUDA Toolkit ${{ matrix.cuda }}
         uses: Jimver/cuda-toolkit@v0.2.35
@@ -83,36 +100,40 @@ jobs:
           method: network
           use-github-cache: true
 
-      - name: Show CUDA version
-        run: nvcc --version
+      - name: Show tool versions
+        shell: bash
+        run: |
+          nvcc --version
+          cl.exe 2>&1 | head -2 || true
 
       # ------------------------------------------------------------------
-      # CMake configure – compile tests + examples
+      # CMake configure with Ninja.
+      # CMAKE_CUDA_HOST_COMPILER is set explicitly to cl.exe so nvcc uses
+      # the MSVC version selected by ilammy/msvc-dev-cmd regardless of any
+      # other cl.exe that may be on PATH.
       # ------------------------------------------------------------------
       - name: Configure CMake
         run: |
           cmake -B build `
-            -G "${{ matrix.vs_gen }}" `
-            -A x64 `
+            -G Ninja `
+            -DCMAKE_C_COMPILER=cl `
+            -DCMAKE_CXX_COMPILER=cl `
+            -DCMAKE_CUDA_HOST_COMPILER=cl `
             -DMATX_BUILD_TESTS=ON `
             -DMATX_BUILD_EXAMPLES=ON `
             -DMATX_BUILD_BENCHMARKS=ON `
             -DMATX_BUILD_DOCS=OFF `
-            -DCMAKE_CUDA_ARCHITECTURES="80;90"
-        # CMAKE_CUDA_ARCHITECTURES: build for Ampere (80) and Hopper (90).
-        # Add 89 (Ada) or 100 (Blackwell) as needed.
-        # Using PTX-only suffixes (e.g. "90-real;90-virtual") reduces binary
-        # size but is unnecessary for a compile-only validation run.
+            -DCMAKE_CUDA_ARCHITECTURES="80;90" `
+            -DCMAKE_BUILD_TYPE=Release
 
       # ------------------------------------------------------------------
-      # Build – /m uses all available logical processors on Windows.
-      # Release config avoids debug iterator overhead and is faster to link.
+      # Build using all available cores.
       # ------------------------------------------------------------------
       - name: Build
-        run: cmake --build build --config Release -- /m
+        run: cmake --build build --parallel
 
       # ------------------------------------------------------------------
-      # Optional: upload build logs on failure for diagnosis.
+      # Upload build logs on failure for diagnosis.
       # ------------------------------------------------------------------
       - name: Upload build logs on failure
         if: failure()
