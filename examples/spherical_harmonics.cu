@@ -78,14 +78,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   auto Y = make_tensor<ValueType>(Ym.Shape());
   auto Z = make_tensor<ValueType>(Zm.Shape());
 
-#ifdef _MSC_VER
-#pragma warning(push)
-#pragma warning(disable: 4834)
-#endif
+MATX_IGNORE_WARNING_PUSH_MSVC(4834)
   (X = Xm, Y = Ym, Z=Zm).run(exec);
-#ifdef _MSC_VER
-#pragma warning(pop)
-#endif
+MATX_IGNORE_WARNING_POP_MSVC()
 
   exec.sync();
 
