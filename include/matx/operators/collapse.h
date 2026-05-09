@@ -129,7 +129,7 @@ namespace matx
           MATX_LOG_TRACE("{} constructor: input_rank={}, output_rank={}", str(), T1::Rank(), T1::Rank() - DIM + 1);
           static_assert(T1::Rank() >= 2, "Collapse must be called on operators with rank >= 2");
 
-          int input_rank = T1::Rank();
+          [[maybe_unused]] int input_rank = T1::Rank();
           if constexpr (is_dynamic_rank_op_v<self_type>) {
             input_rank = op_.DynRank();
             MATX_ASSERT_STR(input_rank >= static_cast<int>(DIM), matxInvalidParameter,
