@@ -114,9 +114,9 @@ namespace matx
       return "matxcuTensorError";
     case matxInvalidExecutor:
       return "matxInvalidExecutor";
+    default:
+      return "Unknown";
     };
-
-    return "Unknown";
   }
 
   namespace detail {
