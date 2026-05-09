@@ -38,6 +38,18 @@
 #include <regex>
 #include <thread>
 #include <chrono>
+#include <filesystem>
+
+#ifdef _MSC_VER
+inline int setenv(const char* name, const char* value, int /*overwrite*/) {
+  return _putenv_s(name, value);
+}
+inline int unsetenv(const char* name) {
+  // _putenv with "NAME=" (no value after '=') removes the variable
+  std::string var = std::string(name) + "=";
+  return _putenv(var.c_str());
+}
+#endif
 
 using namespace matx;
 
@@ -53,9 +65,10 @@ protected:
     original_dest_ = std::getenv("MATX_LOG_DEST");
     
     // Generate a unique test file name
-    test_log_file_ = std::string("/tmp/matx_test_log_") + 
-                     std::to_string(std::chrono::system_clock::now().time_since_epoch().count()) + 
-                     ".log";
+    test_log_file_ = (std::filesystem::temp_directory_path() /
+                      ("matx_test_log_" +
+                       std::to_string(std::chrono::system_clock::now().time_since_epoch().count()) +
+                       ".log")).string();
   }
 
   void TearDown() override {

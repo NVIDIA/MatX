@@ -137,6 +137,7 @@ TYPED_TEST(ViewTestsAll, Stride)
 TYPED_TEST(ViewTestsIntegral, SliceStride)
 {
   MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   this->t1.SetVals({10, 20, 30, 40, 50, 60, 70, 80, 90, 100});
   auto t1t = slice(this->t1, {0}, {matxEnd}, {2});
 
@@ -147,7 +148,7 @@ TYPED_TEST(ViewTestsIntegral, SliceStride)
   auto t1t2 = slice(this->t1, {2}, {matxEnd}, {2});
 
   for (index_t i = 0; i < t1t2.Size(0); i++) {
-    ASSERT_EQ(30 + 20 * i, t1t2(i));
+    ASSERT_EQ(static_cast<TestType>(30 + 20 * i), t1t2(i));
   }
 
   MATX_EXIT_HANDLER();
@@ -507,8 +508,8 @@ TYPED_TEST(ViewTestsIntegral, Randomi)
       for (index_t j = 0; j < count; j++) {
         for (index_t k = 0; k < count; k++) {
           TestType val = t3f(i, j, k);
-          ASSERT_LE(val, 100);
-          ASSERT_LE(0, val);
+          ASSERT_LE(val, static_cast<TestType>(100));
+          ASSERT_LE(static_cast<TestType>(0), val);
         }
       }
     }

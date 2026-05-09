@@ -129,7 +129,6 @@ TYPED_TEST(DiaSparseTestsAll, MatvecDIAI) {
   auto C = makeC<TestType>();
 
   const auto m = A.Size(0);
-  const auto n = A.Size(1);
 
   // Matvec.
   auto O = make_tensor<TestType>({m});
@@ -161,7 +160,6 @@ TYPED_TEST(DiaSparseTestsAll, MatvecDIAJ) {
   auto C = makeC<TestType>();
 
   const auto m = A.Size(0);
-  const auto n = A.Size(1);
 
   // Matvec.
   auto O = make_tensor<TestType>({m});

@@ -29,7 +29,9 @@ TYPED_TEST(OperatorTestsFloatNonComplexNonHalfAllExecs, Frexp)
   exec.sync();
   // Create operators representing fractional and integer
   const auto [ofrac, oint] = frexp(tiv0);
+  MATX_IGNORE_WARNING_PUSH_MSVC(4834) // discarding return value of [[nodiscard]] function (comma operator)
   (tofrac = ofrac, toint = oint).run(exec);
+  MATX_IGNORE_WARNING_POP_MSVC
   // example-end frexp-test-1
 
   exec.sync();

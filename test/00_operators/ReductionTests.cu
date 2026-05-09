@@ -212,7 +212,7 @@ TYPED_TEST(ReductionTestsNumericNoHalfAllExecs, Sum)
     exec.sync();
     for(int i = 0 ; i < x ; i++) {
       for(int j = 0; j < y ; j++) {
-        ASSERT_TRUE( MatXUtils::MatXTypeCompare(b(i,j), (TestType)z));
+        ASSERT_TRUE( MatXUtils::MatXTypeCompare(b(i,j), static_cast<TestType>(z)));
       }
     }
   }
@@ -296,7 +296,7 @@ TYPED_TEST(ReductionTestsNumericNoHalfAllExecs, Sum)
     for (index_t i = 0; i < t2.Size(0); i++) {
       for (index_t j = 0; j < t2.Size(1); j++) {
         ASSERT_TRUE(MatXUtils::MatXTypeCompare(
-            t2(i, j), (TestType)(t4.Size(2) * t4.Size(3))));
+            t2(i, j), static_cast<TestType>(t4.Size(2) * t4.Size(3))));
       }
     }
 
@@ -305,7 +305,7 @@ TYPED_TEST(ReductionTestsNumericNoHalfAllExecs, Sum)
     for (index_t i = 0; i < t2.Size(0); i++) {
       for (index_t j = 0; j < t2.Size(1); j++) {
         ASSERT_TRUE(
-            MatXUtils::MatXTypeCompare(t2(i, j), (TestType)(t3.Size(2))));
+            MatXUtils::MatXTypeCompare(t2(i, j), static_cast<TestType>(t3.Size(2))));
       }
     }
   }

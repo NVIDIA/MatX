@@ -130,14 +130,22 @@ public:
     // Duck-typed interface
     void* allocate(size_t bytes) {
         size_t aligned_bytes = (bytes + alignment_ - 1) & ~(alignment_ - 1);
+#ifdef _MSC_VER
+        void* ptr = _aligned_malloc(aligned_bytes, alignment_);
+#else
         void* ptr = std::aligned_alloc(alignment_, aligned_bytes);
+#endif
         if (!ptr) throw std::bad_alloc();
         return ptr;
     }
     
     void deallocate(void* ptr, size_t bytes) {
-        (void)bytes;  // Unused - size not needed for std::free
+        (void)bytes;  // Unused - size not needed for free
+#ifdef _MSC_VER
+        _aligned_free(ptr);
+#else
         std::free(ptr);
+#endif
     }
     
     size_t getAlignment() const { return alignment_; }

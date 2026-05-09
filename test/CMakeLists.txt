@@ -123,11 +123,23 @@ function(create_test_executable test_file)
         # nvcc does not recognize MSVC-style /flags as its own options; passing them
         # directly without -Xcompiler causes nvcc to treat them as extra input files,
         # triggering "A single input file is required for a non-link phase".
+        # Add /bigobj for heavily-templated tests.
         target_compile_options(${target_name} PRIVATE
             $<$<COMPILE_LANGUAGE:CXX>:/W4>
             $<$<COMPILE_LANGUAGE:CXX>:/WX>
             $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/W4>
             $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/WX>
+            $<$<COMPILE_LANGUAGE:CXX>:/bigobj>
+            $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/bigobj>
+            # /wd4459: local declaration hides global — triggered inside Google Test's
+            # gtest-matchers.h header; cannot be fixed in MatX.
+            $<$<COMPILE_LANGUAGE:CXX>:/wd4459>
+            $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/wd4459>
+            # /wd4244: conversion from int64/int to float/double — triggered by
+            # intentional (TestType)(Size() * ...) casts in typed tests and by
+            # GTest macro internals when comparing mixed integer/float types.
+            $<$<COMPILE_LANGUAGE:CXX>:/wd4244>
+            $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/wd4244>
         )
     else()
         target_compile_options(${target_name} PRIVATE ${WARN_FLAGS})

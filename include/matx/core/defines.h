@@ -104,6 +104,18 @@ namespace matx {
     #define MATX_IGNORE_WARNING_POP_CLANG
 #endif
 
+#if defined(_MSC_VER)
+    #define MATX_IGNORE_WARNING_PUSH_MSVC(WARN_ID) \
+        __pragma(warning(push)) \
+        __pragma(warning(disable : WARN_ID))
+
+    #define MATX_IGNORE_WARNING_POP_MSVC \
+        __pragma(warning(pop))
+#else
+    #define MATX_IGNORE_WARNING_PUSH_MSVC(WARN_ID)
+    #define MATX_IGNORE_WARNING_POP_MSVC
+#endif
+
 // std::ceil is not constexpr until C++23
 #define MATX_ROUND_UP(N, S) ((((N) + (S) - 1) / (S)) * (S))
 

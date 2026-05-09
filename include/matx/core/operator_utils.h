@@ -86,7 +86,7 @@ namespace matx {
 
   template <typename Op>
   cuda::std::array<index_t, Op::Rank()> Shape(const Op &op) {
-    cuda::std::array<index_t, Op::Rank()> shape;
+    cuda::std::array<index_t, Op::Rank()> shape{};
     for (int r = 0; r < Op::Rank(); r++) {
       shape[r] = op.Size(r);
     }
