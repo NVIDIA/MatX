@@ -270,9 +270,12 @@ namespace detail
                           : (const void*)matxOpT4Kernel<CapabilityParams<ElementsPerThread::ONE, false>, Op>;
           }
           break;
+        default:
+          return (const void*)nullptr;
       }
-#endif      
+#else
       return (const void*)nullptr;
+#endif      
     };
   }
 
