@@ -80,7 +80,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
 MATX_IGNORE_WARNING_PUSH_MSVC(4834)
   (X = Xm, Y = Ym, Z=Zm).run(exec);
-MATX_IGNORE_WARNING_POP_MSVC()
+MATX_IGNORE_WARNING_POP_MSVC
 
   exec.sync();
 
