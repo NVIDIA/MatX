@@ -314,14 +314,14 @@ TYPED_TEST(OperatorTestsNumericAllExecs, OperatorFuncs)
   exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c));
 
-  TestType p = 2.0f;
+  TestType p = static_cast<TestType>(2.0f);
   // example-begin pow-test-1
   (tov0 = as_type<TestType>(pow(tiv0, p))).run(exec);
   // example-end pow-test-1
   exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::scalar_internal_pow(c, p)));
 
-  TestType three = 3.0f;
+  TestType three = static_cast<TestType>(3.0f);
 
   (tov0 = tiv0 * tiv0 * (tiv0 + tiv0) / tiv0 + three).run(exec);
   exec.sync();

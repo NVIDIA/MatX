@@ -227,7 +227,9 @@ static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto scalar_internal_angle(
 
 template <typename T>
 static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto scalar_internal_subneg(T v1) {
+  MATX_IGNORE_WARNING_PUSH_MSVC(4146) // unary minus on unsigned type, result still unsigned
   return -v1;
+  MATX_IGNORE_WARNING_POP_MSVC
 }
 
 template <typename T>

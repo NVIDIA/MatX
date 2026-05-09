@@ -44,10 +44,12 @@ TYPED_TEST(OperatorTestsNumericAllExecs, OperatorFuncs)
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c / c));
 
   // example-begin neg-test-1
+  MATX_IGNORE_WARNING_PUSH_MSVC(4146)
   (tov0 = -tiv0).run(exec);
   // example-end neg-test-1
   exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), -c));
+  MATX_IGNORE_WARNING_POP_MSVC
 
   // example-begin IF-test-1
   IF(tiv0 == tiv0, tov0 = c).run(exec);
@@ -55,14 +57,14 @@ TYPED_TEST(OperatorTestsNumericAllExecs, OperatorFuncs)
   exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c));
 
-  TestType p = 2.0f;
+  TestType p = static_cast<TestType>(2.0f);
   // example-begin pow-test-1
   (tov0 = as_type<TestType>(pow(tiv0, p))).run(exec);
   // example-end pow-test-1
   exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), detail::scalar_internal_pow(c, p)));
 
-  TestType three = 3.0f;
+  TestType three = static_cast<TestType>(3.0f);
 
   (tov0 = tiv0 * tiv0 * (tiv0 + tiv0) / tiv0 + three).run(exec);
   exec.sync();

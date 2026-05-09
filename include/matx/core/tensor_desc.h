@@ -305,11 +305,10 @@ public:
 
 // gcc 14.1 incorrectly reports shape_ as uninitialized in some contexts
 MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
-#ifdef _MSC_VER
-#pragma warning(suppress: 4702)
-#endif
+MATX_IGNORE_WARNING_PUSH_MSVC(4702)
     return *(shape_.begin() + dim);
 MATX_IGNORE_WARNING_POP_GCC
+MATX_IGNORE_WARNING_POP_MSVC
   }
 
   /**
@@ -339,12 +338,11 @@ MATX_IGNORE_WARNING_POP_GCC
         so it can never count up to 3. */
 MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
 MATX_IGNORE_WARNING_PUSH_GCC("-Warray-bounds")
-#ifdef _MSC_VER
-#pragma warning(suppress: 4702)
-#endif
+MATX_IGNORE_WARNING_PUSH_MSVC(4702)
     return *(stride_.begin() + dim);
 MATX_IGNORE_WARNING_POP_GCC
 MATX_IGNORE_WARNING_POP_GCC
+MATX_IGNORE_WARNING_POP_MSVC
   }
 
   /**
@@ -451,7 +449,7 @@ private:
       const auto shape = make_shape();
       m[m.size()-1] = 1;
       if constexpr (m.size() > 1) {
-        for (int i = m.size()-2; i >= 0; i--) {
+        for (int i = static_cast<int>(m.size())-2; i >= 0; i--) {
             m[i] = m[i+1] * shape[i + 1];
         }
       }

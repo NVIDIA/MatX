@@ -36,6 +36,17 @@
 #include <fstream>
 #include <sstream>
 
+#ifdef _MSC_VER
+inline int setenv(const char* name, const char* value, int /*overwrite*/) {
+  return _putenv_s(name, value);
+}
+inline int unsetenv(const char* name) {
+  // _putenv with "NAME=" (no value after '=') removes the variable
+  std::string var = std::string(name) + "=";
+  return _putenv(var.c_str());
+}
+#endif
+
 using namespace matx;
 
 // We only include the logging tests if the <format> header is available

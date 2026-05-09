@@ -672,6 +672,7 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, Batched)
   using ComplexType = typename test_types::complex_type<TestType>::type;
 
   constexpr int BATCH_DIMS = 2;
+  (void)BATCH_DIMS;
   struct {
     index_t a_len;
     index_t f_len;
@@ -1353,6 +1354,7 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, OversampledBatched)
   using ComplexType = typename test_types::complex_type<TestType>::type;
 
   constexpr int BATCH_DIMS = 2;
+  (void)BATCH_DIMS;
   struct {
     index_t a_len;
     index_t f_len;
