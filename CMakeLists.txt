@@ -216,6 +216,13 @@ if(WIN32)
         # functions such as get_type_str() instantiated over complex operator types.
         set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler=/wd4714")
         add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/wd4714>")
+        # /wd4127: conditional expression is constant — common in template/constexpr code.
+        # VS18 2025+ (MSVC 1950+) resolves most of these automatically; suppress only on
+        # VS17 2022 and earlier.
+        if(MSVC_VERSION LESS 1950)
+            set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler=/wd4127")
+            add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/wd4127>")
+        endif()
         add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/utf-8>")
     endif()
 endif()

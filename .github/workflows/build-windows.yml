@@ -104,9 +104,9 @@ jobs:
             -G "${{ matrix.generator }}" ${{ matrix.cmake_config_args || '' }} `
             -DMATX_BUILD_TESTS=OFF `
             -DMATX_BUILD_EXAMPLES=ON `
-            -DMATX_BUILD_BENCHMARKS=OFF `
+            -DMATX_BUILD_BENCHMARKS=ON `
             -DMATX_BUILD_DOCS=OFF `
-            -DCMAKE_CUDA_ARCHITECTURES="80;90"
+            -DCMAKE_CUDA_ARCHITECTURES="80"
 
       - name: Build
         run: cmake --build build --config Release --parallel
