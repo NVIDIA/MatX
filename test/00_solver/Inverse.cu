@@ -61,6 +61,60 @@ class InvSolverTestFloatTypes : public InvSolverTest<TensorType> {
 TYPED_TEST_SUITE(InvSolverTestFloatTypes,
   MatXFloatNonHalfTypesCUDAExec);
 
+#if defined(MATX_EN_MATHDX) && defined(MATX_EN_JIT)
+TEST(InvSolverJIT, CuSolverDxRuntimeQueries)
+{
+  auto A = make_tensor<float>({2, 2});
+  auto op = inv(A);
+
+  EXPECT_TRUE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op));
+  EXPECT_GT(detail::get_operator_capability<detail::OperatorCapability::DYN_SHM_SIZE>(op), 0);
+
+  const auto block_dim = detail::get_operator_capability<detail::OperatorCapability::BLOCK_DIM>(op);
+  EXPECT_GT(block_dim[0], 0);
+  EXPECT_EQ(block_dim[0], block_dim[1]);
+}
+
+TEST(InvSolverJIT, CuSolverDxMatchesCudaPath)
+{
+  auto A_jit = make_tensor<float>({2, 2});
+  auto A_cuda = make_tensor<float>({2, 2});
+  auto O_jit = make_tensor<float>({2, 2});
+  auto O_cuda = make_tensor<float>({2, 2});
+
+  A_jit(0, 0) = 4.0f;
+  A_jit(0, 1) = 7.0f;
+  A_jit(1, 0) = 2.0f;
+  A_jit(1, 1) = 6.0f;
+  (A_cuda = A_jit).run(cudaExecutor{});
+
+  CUDAJITExecutor jit_exec{};
+  cudaExecutor cuda_exec{};
+  (O_jit = inv(A_jit)).run(jit_exec);
+  (O_cuda = inv(A_cuda)).run(cuda_exec);
+  jit_exec.sync();
+  cuda_exec.sync();
+
+  for (index_t i = 0; i < 2; i++) {
+    for (index_t j = 0; j < 2; j++) {
+      ASSERT_NEAR(O_jit(i, j), O_cuda(i, j), 1e-4f);
+    }
+  }
+}
+
+TEST(InvSolverJIT, CuSolverDxRejectsUnsupportedShape)
+{
+  auto A = make_tensor<float>({2, 3});
+  auto O = make_tensor<float>({2, 3});
+  auto op = inv(A);
+
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op));
+
+  CUDAJITExecutor exec{};
+  EXPECT_THROW({ (O = op).run(exec); }, matx::detail::matxException);
+}
+#endif
+
 TYPED_TEST(InvSolverTestFloatTypes, Inv4x4)
 {
   MATX_ENTER_HANDLER();

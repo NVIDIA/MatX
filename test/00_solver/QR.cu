@@ -156,3 +156,29 @@ TYPED_TEST(QRSolverTestFloatTypes, QRBasicBatched)
 
   MATX_EXIT_HANDLER();
 }
+
+TYPED_TEST(QRSolverTestFloatTypes, ProjectionAPI)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+
+  constexpr index_t rows = 8;
+  constexpr index_t cols = 5;
+  using value_type = typename inner_op_type_t<TestType>::type;
+  auto A = make_tensor<TestType>({rows, cols});
+  auto RefOut = make_tensor<TestType>({rows, cols});
+  auto RefTau = make_tensor<TestType>({std::min(rows, cols)});
+  auto mdiff = make_tensor<value_type>({});
+
+  this->pb->template InitAndRunTVGenerator<TestType>("00_solver", "qr", "run", {rows, cols});
+  this->pb->NumpyToTensorView(A, "A");
+
+  (mtie(RefOut, RefTau) = qr_solver(A)).run(this->exec);
+  auto op = qr_solver(A);
+  (mdiff = max(abs(op.Out - RefOut)) + max(abs(op.Tau - RefTau))).run(this->exec);
+  this->exec.sync();
+
+  ASSERT_NEAR(mdiff(), value_type(0), value_type(this->thresh));
+
+  MATX_EXIT_HANDLER();
+}

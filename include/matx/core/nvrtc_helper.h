@@ -54,6 +54,8 @@
 #include <cctype>
 #include <regex>
 #include <limits>
+#include <set>
+#include <optional>
 
 
 namespace matx {
@@ -285,8 +287,21 @@ std::vector<std::string> __MATX_HOST__ __MATX_INLINE__ get_preprocessor_options(
     }
     //options.push_back("-I" + (build_dir / "_deps/pybind11-src/include").string());
 #ifdef MATX_EN_MATHDX
-    options.push_back("-I" + (build_dir / "_deps/mathdx-src/nvidia/mathdx/25.06/include").string());
-    options.push_back("-I" + (build_dir / "_deps/mathdx-src/nvidia/mathdx/25.06/external/cutlass/include").string());
+#ifdef MATX_MATHDX_INCLUDE_DIR
+    options.push_back("-I" + std::string(MATX_MATHDX_INCLUDE_DIR));
+#else
+    options.push_back("-I" + (build_dir / "_deps/mathdx-src/nvidia/mathdx/26.03/include").string());
+#endif
+#ifdef MATX_MATHDX_CUTLASS_INCLUDE_DIR
+    options.push_back("-I" + std::string(MATX_MATHDX_CUTLASS_INCLUDE_DIR));
+#else
+    options.push_back("-I" + (build_dir / "_deps/mathdx-src/nvidia/mathdx/26.03/external/cutlass/include").string());
+#endif
+#ifdef MATX_LIBMATHDX_INCLUDE_DIR
+    options.push_back("-I" + std::string(MATX_LIBMATHDX_INCLUDE_DIR));
+#else
+    options.push_back("-I" + (build_dir / "_deps/libmathdx-src/include").string());
+#endif
 #endif
 
     // System paths
@@ -366,6 +381,47 @@ std::vector<std::string> __MATX_HOST__ __MATX_INLINE__ get_preprocessor_options(
       } while (0)
   #endif // NVJITLINK_CHECK
   
+inline bool needs_cusolverdx_link(const std::set<std::string> &ltoir_symbols)
+{
+    for (const auto &symbol : ltoir_symbols) {
+      if (symbol.starts_with("solver_cusolverdx_func")) {
+        return true;
+      }
+    }
+
+    return false;
+}
+
+inline void add_cusolverdx_link_file(nvJitLinkHandle handle)
+{
+    const char *fatbin_env = std::getenv("MATX_CUSOLVERDX_FATBIN");
+    const char *library_env = std::getenv("MATX_CUSOLVERDX_LIBRARY");
+
+    if (fatbin_env != nullptr) {
+      MATX_LOG_DEBUG("Adding cuSolverDx fatbin from MATX_CUSOLVERDX_FATBIN: {}", fatbin_env);
+      NVJITLINK_CHECK(handle, nvJitLinkAddFile(handle, NVJITLINK_INPUT_FATBIN, fatbin_env));
+      return;
+    }
+
+    if (library_env != nullptr) {
+      MATX_LOG_DEBUG("Adding cuSolverDx library from MATX_CUSOLVERDX_LIBRARY: {}", library_env);
+      NVJITLINK_CHECK(handle, nvJitLinkAddFile(handle, NVJITLINK_INPUT_LIBRARY, library_env));
+      return;
+    }
+
+#ifdef MATX_CUSOLVERDX_FATBIN
+    MATX_LOG_DEBUG("Adding cuSolverDx fatbin: {}", MATX_CUSOLVERDX_FATBIN);
+    NVJITLINK_CHECK(handle, nvJitLinkAddFile(handle, NVJITLINK_INPUT_FATBIN, MATX_CUSOLVERDX_FATBIN));
+    return;
+#elif defined(MATX_CUSOLVERDX_LIBRARY)
+    MATX_LOG_DEBUG("Adding cuSolverDx library: {}", MATX_CUSOLVERDX_LIBRARY);
+    NVJITLINK_CHECK(handle, nvJitLinkAddFile(handle, NVJITLINK_INPUT_LIBRARY, MATX_CUSOLVERDX_LIBRARY));
+    return;
+#else
+    MATX_THROW(matxInvalidParameter, "cuSolverDx JIT requires MATX_CUSOLVERDX_FATBIN or MATX_CUSOLVERDX_LIBRARY");
+#endif
+}
+
 
 // Read file contents into a string
 inline std::string read_file_contents(const std::string& filepath) {
@@ -868,6 +924,10 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name,
         lto_opts.emplace_back(o.c_str());
     }
     NVJITLINK_CHECK(handle, nvJitLinkCreate(&handle, static_cast<int>(lto_opts.size()), lto_opts.data()));
+
+    if (needs_cusolverdx_link(ltoir_query_input.ltoir_symbols)) {
+      add_cusolverdx_link_file(handle);
+    }
 
     // First add all our LTO-IR from the operator
     for (const auto& lto : ltoir_query_input.ltoir_symbols) {

@@ -69,8 +69,54 @@ template <typename TensorType>
 class EigenSolverTestFloatTypes : public EigenSolverTest<TensorType> {
 };
 
+template <typename TensorType>
+class EigenProjectionSolverTestFloatTypes : public ::testing::Test {
+};
+
 TYPED_TEST_SUITE(EigenSolverTestFloatTypes,
                  MatXFloatNonHalfTypesAllExecs);
+TYPED_TEST_SUITE(EigenProjectionSolverTestFloatTypes,
+                 MatXFloatNonHalfTypesCUDAExec);
+
+template <typename T>
+T MakeEigenTestValue(double value)
+{
+  using SType = typename inner_op_type_t<T>::type;
+  if constexpr (is_complex_v<T>) {
+    return T{static_cast<SType>(value), static_cast<SType>(0)};
+  }
+  else {
+    return static_cast<T>(value);
+  }
+}
+
+TYPED_TEST(EigenProjectionSolverTestFloatTypes, ProjectionAPI)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using value_type = typename inner_op_type_t<TestType>::type;
+
+  constexpr index_t n = 4;
+  cudaExecutor exec{};
+  auto Bv = make_tensor<TestType>({n, n});
+  auto residual = make_tensor<TestType>({n, n});
+  auto mdiff = make_tensor<value_type>({});
+
+  for (index_t i = 0; i < n; i++) {
+    for (index_t j = 0; j < n; j++) {
+      Bv(i, j) = i == j ? MakeEigenTestValue<TestType>(static_cast<double>(i + 1)) : TestType{};
+    }
+  }
+
+  auto op = eig(Bv);
+  (residual = matmul(Bv, op.Vectors) - matmul(op.Vectors, diag(as_type<TestType>(op.Values)))).run(exec);
+  (mdiff = max(abs(residual))).run(exec);
+  exec.sync();
+
+  ASSERT_NEAR(mdiff(), value_type(0), value_type(0.001));
+
+  MATX_EXIT_HANDLER();
+}
 
 TYPED_TEST(EigenSolverTestFloatTypes, EigenBasic)
 {

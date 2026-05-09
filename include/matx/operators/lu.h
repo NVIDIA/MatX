@@ -35,6 +35,7 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
+#include "matx/operators/solver_projection.h"
 #include "matx/transforms/lu/lu_cuda.h"
 #ifdef MATX_EN_CPU_SOLVER
   #include "matx/transforms/lu/lu_lapack.h"
@@ -42,20 +43,148 @@
 
 namespace matx {
 namespace detail {
+  enum LUComponents : int {
+    LU_FACTORS = 0,
+    LU_PIV = 1
+  };
+
+  template<typename OpA>
+  class LUState
+  {
+    private:
+      static_assert(OpA::Rank() >= 2, "lu() requires input rank 2 or higher");
+      using a_value_type = typename OpA::value_type;
+      using piv_value_type = int64_t;
+      static constexpr int RANK = OpA::Rank();
+
+      typename detail::base_type_t<OpA> a_;
+      cuda::std::array<index_t, RANK> factors_shape_;
+      cuda::std::array<index_t, RANK - 1> piv_shape_;
+      mutable detail::tensor_impl_t<a_value_type, RANK> factors_;
+      mutable detail::tensor_impl_t<piv_value_type, RANK - 1> piv_;
+      mutable a_value_type *factors_ptr_ = nullptr;
+      mutable piv_value_type *piv_ptr_ = nullptr;
+      mutable bool materialized_ = false;
+
+    public:
+      LUState(const OpA &a) : a_(a)
+      {
+        factors_shape_ = SolverShapeFromInput<RANK>(a_);
+        piv_shape_ = SolverVectorShapeFromMatrixShape<RANK>(factors_shape_);
+      }
+
+      const auto &FactorsShape() const { return factors_shape_; }
+      const auto &PivShape() const { return piv_shape_; }
+      const auto &Input() const { return a_; }
+
+      template <typename Executor>
+      void Materialize(Executor &&ex) const
+      {
+        if (materialized_) {
+          return;
+        }
+
+        if constexpr (is_matx_op<OpA>()) {
+          a_.PreRun(detail::NoShape{}, std::forward<Executor>(ex));
+        }
+
+        detail::AllocateTempTensor(factors_, std::forward<Executor>(ex), factors_shape_, &factors_ptr_);
+        detail::AllocateTempTensor(piv_, std::forward<Executor>(ex), piv_shape_, &piv_ptr_);
+        if constexpr (is_cuda_executor_v<Executor>) {
+          lu_impl(factors_, piv_, a_, std::forward<Executor>(ex));
+        }
+        else {
+#if MATX_EN_CPU_SOLVER
+          if constexpr (std::is_same_v<piv_value_type, lapack_int_t>) {
+            lu_impl(factors_, piv_, a_, std::forward<Executor>(ex));
+          }
+          else {
+            detail::tensor_impl_t<lapack_int_t, RANK - 1> lapack_piv;
+            lapack_int_t *lapack_piv_ptr = nullptr;
+            detail::AllocateTempTensor(lapack_piv, std::forward<Executor>(ex), piv_shape_, &lapack_piv_ptr);
+            lu_impl(factors_, lapack_piv, a_, std::forward<Executor>(ex));
+            for (index_t i = 0; i < lapack_piv.TotalSize(); i++) {
+              piv_.Data()[i] = static_cast<piv_value_type>(lapack_piv.Data()[i]);
+            }
+            matxFree(lapack_piv_ptr);
+          }
+#else
+          lu_impl(factors_, piv_, a_, std::forward<Executor>(ex));
+#endif
+        }
+        materialized_ = true;
+      }
+
+      template <typename Executor>
+      void Release(Executor &&ex) const
+      {
+        if (!materialized_) {
+          return;
+        }
+
+        if constexpr (is_matx_op<OpA>()) {
+          a_.PostRun(detail::NoShape{}, std::forward<Executor>(ex));
+        }
+
+        if (factors_ptr_ != nullptr) {
+          if constexpr (is_cuda_executor_v<Executor>) {
+            matxFree(factors_ptr_, ex.getStream());
+          }
+          else {
+            matxFree(factors_ptr_);
+          }
+          factors_ptr_ = nullptr;
+        }
+
+        if (piv_ptr_ != nullptr) {
+          if constexpr (is_cuda_executor_v<Executor>) {
+            matxFree(piv_ptr_, ex.getStream());
+          }
+          else {
+            matxFree(piv_ptr_);
+          }
+          piv_ptr_ = nullptr;
+        }
+
+        materialized_ = false;
+      }
+
+      template <int Component>
+      auto Tensor() const
+      {
+        if constexpr (Component == LU_FACTORS) {
+          return factors_;
+        }
+        else {
+          return piv_;
+        }
+      }
+  };
+
   template<typename OpA>
   class LUOp : public BaseOp<LUOp<OpA>>
   {
     private:
-      typename detail::base_type_t<OpA> a_;
+      using state_type = LUState<OpA>;
+      std::shared_ptr<state_type> state_;
 
     public:
       using matxop = bool;
       using value_type = typename OpA::value_type;
       using matx_transform_op = bool;
       using lu_xform_op = bool;
+      using factors_type = detail::tensor_impl_t<value_type, OpA::Rank()>;
+      using piv_type = detail::tensor_impl_t<int64_t, OpA::Rank() - 1>;
+
+      SolverProjectionOp<state_type, LU_FACTORS, factors_type> LU;
+      SolverProjectionOp<state_type, LU_PIV, piv_type> Piv;
 
       __MATX_INLINE__ std::string str() const { return "lu()"; }
-      __MATX_INLINE__ LUOp(const OpA &a) : a_(a) {
+      __MATX_INLINE__ LUOp(const OpA &a) :
+        state_(std::make_shared<state_type>(a)),
+        LU(state_.get(), state_->FactorsShape(), "lu().LU"),
+        Piv(state_.get(), state_->PivShape(), "lu().Piv")
+      {
         MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
       };
 
@@ -66,14 +195,14 @@ namespace detail {
       template <OperatorCapability Cap, typename InType>
       __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
         auto self_has_cap = capability_attributes<Cap>::default_value;
-        return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
+        return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(state_->Input(), in));
       }
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
         static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 2 outputs on lu(). ie: (mtie(O, piv) = lu(A))");     
 
-        lu_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), a_, ex);        
+        lu_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), state_->Input(), ex);
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -85,14 +214,14 @@ namespace detail {
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
       {
         if constexpr (is_matx_op<OpA>()) {
-          a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          state_->Input().PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
       }
       // Size is not relevant in eig() since there are multiple return values and it
       // is not allowed to be called in larger expressions
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
       {
-        return a_.Size(dim);
+        return state_->FactorsShape()[dim];
       }
 
   };

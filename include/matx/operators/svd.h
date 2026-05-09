@@ -35,6 +35,7 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
+#include "matx/operators/solver_projection.h"
 #include "matx/transforms/svd/svd_cuda.h"
 #ifdef MATX_EN_CPU_SOLVER
   #include "matx/transforms/svd/svd_lapack.h"
@@ -43,22 +44,167 @@ namespace matx {
 
 
 namespace detail {
+  enum SVDComponents : int {
+    SVD_U = 0,
+    SVD_S = 1,
+    SVD_VT = 2
+  };
+
+  template<typename OpA>
+  class SVDState
+  {
+    private:
+      static_assert(OpA::Rank() >= 2, "svd() requires input rank 2 or higher");
+      using a_value_type = typename OpA::value_type;
+      using s_value_type = typename inner_op_type_t<a_value_type>::type;
+      static constexpr int RANK = OpA::Rank();
+
+      typename detail::base_type_t<OpA> a_;
+      SVDMode jobz_;
+      SVDHostAlgo algo_;
+      cuda::std::array<index_t, RANK> u_shape_;
+      cuda::std::array<index_t, RANK - 1> s_shape_;
+      cuda::std::array<index_t, RANK> vt_shape_;
+      mutable detail::tensor_impl_t<a_value_type, RANK> u_;
+      mutable detail::tensor_impl_t<s_value_type, RANK - 1> s_;
+      mutable detail::tensor_impl_t<a_value_type, RANK> vt_;
+      mutable a_value_type *u_ptr_ = nullptr;
+      mutable s_value_type *s_ptr_ = nullptr;
+      mutable a_value_type *vt_ptr_ = nullptr;
+      mutable bool materialized_ = false;
+
+    public:
+      SVDState(const OpA &a, const SVDMode jobz, const SVDHostAlgo algo) : a_(a), jobz_(jobz), algo_(algo)
+      {
+        auto a_shape = SolverShapeFromInput<RANK>(a_);
+        u_shape_ = a_shape;
+        s_shape_ = SolverVectorShapeFromMatrixShape<RANK>(a_shape);
+        vt_shape_ = a_shape;
+
+        const index_t m = a_shape[RANK - 2];
+        const index_t n = a_shape[RANK - 1];
+        const index_t k = m < n ? m : n;
+        u_shape_[RANK - 1] = jobz_ == SVDMode::REDUCED ? k : m;
+        vt_shape_[RANK - 2] = jobz_ == SVDMode::REDUCED ? k : n;
+      }
+
+      const auto &Input() const { return a_; }
+      const auto &UShape() const { return u_shape_; }
+      const auto &SShape() const { return s_shape_; }
+      const auto &VTShape() const { return vt_shape_; }
+      SVDMode Jobz() const { return jobz_; }
+      SVDHostAlgo Algo() const { return algo_; }
+
+      template <typename Executor>
+      void Materialize(Executor &&ex) const
+      {
+        if (materialized_) {
+          return;
+        }
+
+        if constexpr (is_matx_op<OpA>()) {
+          a_.PreRun(detail::NoShape{}, std::forward<Executor>(ex));
+        }
+
+        detail::AllocateTempTensor(u_, std::forward<Executor>(ex), u_shape_, &u_ptr_);
+        detail::AllocateTempTensor(s_, std::forward<Executor>(ex), s_shape_, &s_ptr_);
+        detail::AllocateTempTensor(vt_, std::forward<Executor>(ex), vt_shape_, &vt_ptr_);
+        if constexpr (is_cuda_executor_v<Executor>) {
+          svd_impl(u_, s_, vt_, a_, std::forward<Executor>(ex), jobz_);
+        }
+        else {
+          svd_impl(u_, s_, vt_, a_, std::forward<Executor>(ex), jobz_, algo_);
+        }
+        materialized_ = true;
+      }
+
+      template <typename Executor>
+      void Release(Executor &&ex) const
+      {
+        if (!materialized_) {
+          return;
+        }
+
+        if constexpr (is_matx_op<OpA>()) {
+          a_.PostRun(detail::NoShape{}, std::forward<Executor>(ex));
+        }
+
+        if (u_ptr_ != nullptr) {
+          if constexpr (is_cuda_executor_v<Executor>) {
+            matxFree(u_ptr_, ex.getStream());
+          }
+          else {
+            matxFree(u_ptr_);
+          }
+          u_ptr_ = nullptr;
+        }
+
+        if (s_ptr_ != nullptr) {
+          if constexpr (is_cuda_executor_v<Executor>) {
+            matxFree(s_ptr_, ex.getStream());
+          }
+          else {
+            matxFree(s_ptr_);
+          }
+          s_ptr_ = nullptr;
+        }
+
+        if (vt_ptr_ != nullptr) {
+          if constexpr (is_cuda_executor_v<Executor>) {
+            matxFree(vt_ptr_, ex.getStream());
+          }
+          else {
+            matxFree(vt_ptr_);
+          }
+          vt_ptr_ = nullptr;
+        }
+
+        materialized_ = false;
+      }
+
+      template <int Component>
+      auto Tensor() const
+      {
+        if constexpr (Component == SVD_U) {
+          return u_;
+        }
+        else if constexpr (Component == SVD_S) {
+          return s_;
+        }
+        else {
+          return vt_;
+        }
+      }
+  };
+
   template<typename OpA>
   class SVDOp : public BaseOp<SVDOp<OpA>>
   {
     private:
-      typename detail::base_type_t<OpA> a_;
-      SVDMode jobz_;
-      SVDHostAlgo algo_;
+      using state_type = SVDState<OpA>;
+      std::shared_ptr<state_type> state_;
 
     public:
       using matxop = bool;
       using value_type = typename OpA::value_type;
       using matx_transform_op = bool;
       using svd_xform_op = bool;
+      using u_type = detail::tensor_impl_t<value_type, OpA::Rank()>;
+      using s_value_type = typename inner_op_type_t<value_type>::type;
+      using s_type = detail::tensor_impl_t<s_value_type, OpA::Rank() - 1>;
+      using vt_type = detail::tensor_impl_t<value_type, OpA::Rank()>;
 
-      __MATX_INLINE__ std::string str() const { return "svd(" + get_type_str(a_) + ")"; }
-      __MATX_INLINE__ SVDOp(const OpA &a, const SVDMode jobz, const SVDHostAlgo algo) : a_(a), jobz_(jobz), algo_(algo) {
+      SolverProjectionOp<state_type, SVD_U, u_type> U;
+      SolverProjectionOp<state_type, SVD_S, s_type> S;
+      SolverProjectionOp<state_type, SVD_VT, vt_type> VT;
+
+      __MATX_INLINE__ std::string str() const { return "svd(" + get_type_str(state_->Input()) + ")"; }
+      __MATX_INLINE__ SVDOp(const OpA &a, const SVDMode jobz, const SVDHostAlgo algo) :
+        state_(std::make_shared<state_type>(a, jobz, algo)),
+        U(state_.get(), state_->UShape(), "svd().U"),
+        S(state_.get(), state_->SShape(), "svd().S"),
+        VT(state_.get(), state_->VTShape(), "svd().VT")
+      {
         MATX_LOG_TRACE("{} constructor: jobz={}, algo={}", str(), static_cast<int>(jobz), static_cast<int>(algo));
       };
 
@@ -70,11 +216,11 @@ namespace detail {
       __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
         if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
           const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
-          return combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(a_, in));
+          return combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(state_->Input(), in));
         }
         else {
           auto self_has_cap = capability_attributes<Cap>::default_value;
-          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
+          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(state_->Input(), in));
         }
       }
 
@@ -83,9 +229,9 @@ namespace detail {
       void Exec(Out &&out, Executor &&ex) const {
         static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 4, "Must use mtie with 3 outputs on svd(). ie: (mtie(U, S, VT) = svd(A))");
         if constexpr (is_cuda_executor_v<Executor>) {
-          svd_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), cuda::std::get<2>(out), a_, ex, jobz_);
+          svd_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), cuda::std::get<2>(out), state_->Input(), ex, state_->Jobz());
         } else {
-          svd_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), cuda::std::get<2>(out), a_, ex, jobz_, algo_);
+          svd_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), cuda::std::get<2>(out), state_->Input(), ex, state_->Jobz(), state_->Algo());
         }
       }
 
@@ -93,7 +239,7 @@ namespace detail {
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
       {
         if constexpr (is_matx_op<OpA>()) {
-          a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          state_->Input().PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
       }
 
@@ -105,7 +251,7 @@ namespace detail {
       // is not allowed to be called in larger expressions
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
       {
-        return a_.Size(dim);
+        return state_->Input().Size(dim);
       }
 
   };

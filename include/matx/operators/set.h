@@ -316,9 +316,20 @@ public:
           "    if constexpr (requires { typename Op::matx_jit_block_reduction; }) {\n" +
           "      return op_.template Store<CapType>(out_, indices...);\n" +
           "    }\n" +
+          "    bool valid = true;\n" +
+          "    if constexpr (Rank() > 0) {\n" +
+          "      index_t idx_arr[] = { static_cast<index_t>(indices)... };\n" +
+          "      MATX_LOOP_UNROLL\n" +
+          "      for (int dim = 0; dim < Rank(); dim++) {\n" +
+          "        valid = valid && idx_arr[dim] < out_.Size(dim);\n" +
+          "      }\n" +
+          "    }\n" +
           "    auto in_val = detail::get_value<CapType>(op_, indices...);\n" +
           "    using out_type = decltype(out_.template operator()<CapType>(indices...));\n" +
-          "    if constexpr (ContainsBlockReduction<Op>()) {\n" +
+          "    if (!valid) {\n" +
+          "      return in_val;\n" +
+          "    }\n" +
+          "    else if constexpr (ContainsBlockReduction<Op>()) {\n" +
           "      using ScalarCap = CapabilityParams<ElementsPerThread::ONE, CapType::jit>;\n" +
           "      if (threadIdx.x == 0) {\n" +
           "        out_.template operator()<ScalarCap>(indices...) = in_val;\n" +

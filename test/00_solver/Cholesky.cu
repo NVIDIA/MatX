@@ -71,6 +71,94 @@ class CholSolverTestNonHalfFloatTypes : public CholSolverTest<TensorType> {
 TYPED_TEST_SUITE(CholSolverTestNonHalfFloatTypes,
   MatXFloatNonHalfTypesAllExecs);
 
+#if defined(MATX_EN_MATHDX) && defined(MATX_EN_JIT)
+TEST(CholSolverJIT, CuSolverDxRuntimeQueries)
+{
+  auto A = make_tensor<float>({2, 2});
+  auto op = chol(A, SolverFillMode::LOWER);
+
+  EXPECT_TRUE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op));
+  EXPECT_GE(detail::get_operator_capability<detail::OperatorCapability::DYN_SHM_SIZE>(op),
+            static_cast<int>(4 * sizeof(float) + sizeof(int)));
+
+  const auto block_dim = detail::get_operator_capability<detail::OperatorCapability::BLOCK_DIM>(op);
+  EXPECT_GT(block_dim[0], 0);
+  EXPECT_EQ(block_dim[0], block_dim[1]);
+}
+
+TEST(CholSolverJIT, CuSolverDxMatchesCudaPath)
+{
+  auto A_jit = make_tensor<float>({2, 2});
+  auto A_cuda = make_tensor<float>({2, 2});
+  auto O_jit = make_tensor<float>({2, 2});
+  auto O_cuda = make_tensor<float>({2, 2});
+
+  A_jit(0, 0) = 4.0f;
+  A_jit(0, 1) = 2.0f;
+  A_jit(1, 0) = 2.0f;
+  A_jit(1, 1) = 3.0f;
+  (A_cuda = A_jit).run(cudaExecutor{});
+
+  CUDAJITExecutor jit_exec{};
+  cudaExecutor cuda_exec{};
+  (O_jit = chol(A_jit, SolverFillMode::LOWER)).run(jit_exec);
+  (O_cuda = chol(A_cuda, SolverFillMode::LOWER)).run(cuda_exec);
+  jit_exec.sync();
+  cuda_exec.sync();
+
+  for (index_t i = 0; i < 2; i++) {
+    for (index_t j = 0; j <= i; j++) {
+      ASSERT_NEAR(O_jit(i, j), O_cuda(i, j), 1e-4f);
+    }
+  }
+}
+
+TEST(CholSolverJIT, CuSolverDxBatchedMatchesCudaPath)
+{
+  auto A_jit = make_tensor<float>({2, 2, 2});
+  auto A_cuda = make_tensor<float>({2, 2, 2});
+  auto O_jit = make_tensor<float>({2, 2, 2});
+  auto O_cuda = make_tensor<float>({2, 2, 2});
+
+  A_jit(0, 0, 0) = 4.0f;
+  A_jit(0, 0, 1) = 2.0f;
+  A_jit(0, 1, 0) = 2.0f;
+  A_jit(0, 1, 1) = 3.0f;
+  A_jit(1, 0, 0) = 9.0f;
+  A_jit(1, 0, 1) = 3.0f;
+  A_jit(1, 1, 0) = 3.0f;
+  A_jit(1, 1, 1) = 5.0f;
+  (A_cuda = A_jit).run(cudaExecutor{});
+
+  CUDAJITExecutor jit_exec{};
+  cudaExecutor cuda_exec{};
+  (O_jit = chol(A_jit, SolverFillMode::LOWER)).run(jit_exec);
+  (O_cuda = chol(A_cuda, SolverFillMode::LOWER)).run(cuda_exec);
+  jit_exec.sync();
+  cuda_exec.sync();
+
+  for (index_t b = 0; b < 2; b++) {
+    for (index_t i = 0; i < 2; i++) {
+      for (index_t j = 0; j <= i; j++) {
+        ASSERT_NEAR(O_jit(b, i, j), O_cuda(b, i, j), 1e-4f);
+      }
+    }
+  }
+}
+
+TEST(CholSolverJIT, CuSolverDxRejectsUnsupportedShape)
+{
+  auto A = make_tensor<float>({2, 3});
+  auto O = make_tensor<float>({2, 3});
+  auto op = chol(A, SolverFillMode::LOWER);
+
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op));
+
+  CUDAJITExecutor exec{};
+  EXPECT_THROW({ (O = op).run(exec); }, matx::detail::matxException);
+}
+#endif
+
 TYPED_TEST(CholSolverTestNonHalfFloatTypes, CholeskyBasic)
 {
   MATX_ENTER_HANDLER();

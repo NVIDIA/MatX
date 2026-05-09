@@ -154,3 +154,32 @@ TYPED_TEST(LUSolverTestFloatTypes, LUBasicBatched)
 
   MATX_EXIT_HANDLER();
 }
+
+TYPED_TEST(LUSolverTestFloatTypes, ProjectionAPI)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  using value_type = typename inner_op_type_t<TestType>::type;
+  using piv_value_type = std::conditional_t<is_cuda_executor_v<ExecType>, int64_t, lapack_int_t>;
+
+  constexpr index_t rows = 8;
+  constexpr index_t cols = 5;
+  auto A = make_tensor<TestType>({rows, cols});
+  auto RefLU = make_tensor<TestType>({rows, cols});
+  auto RefPiv = make_tensor<piv_value_type>({std::min(rows, cols)});
+  auto all_ok = make_tensor<int>({});
+
+  this->pb->template InitAndRunTVGenerator<TestType>("00_solver", "lu", "run", {rows, cols});
+  this->pb->NumpyToTensorView(A, "A");
+
+  (mtie(RefLU, RefPiv) = lu(A)).run(this->exec);
+  auto op = lu(A);
+  (all_ok = all(as_int((abs(op.LU - RefLU) < value_type(this->thresh)) &&
+                       clone<2>(op.Piv == as_type<int64_t>(RefPiv), {rows, matxKeepDim})))).run(this->exec);
+  this->exec.sync();
+
+  ASSERT_EQ(all_ok(), 1);
+
+  MATX_EXIT_HANDLER();
+}
