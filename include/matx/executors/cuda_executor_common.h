@@ -306,9 +306,8 @@ namespace detail
         default:
           return (const void*)nullptr;
       }
-#else
+#endif
       return (const void*)nullptr;
-#endif      
     };
   }
 

@@ -134,7 +134,7 @@ void sphericalharmonics(nvbench::state &state, nvbench::type_list<ValueType>)
     [&](nvbench::launch &launch) {
 MATX_IGNORE_WARNING_PUSH_MSVC(4834) // expression result unused
       (X=XXm, Y=YYm, Z=ZZm).run((cudaStream_t)launch.get_stream());
-MATX_IGNORE_WARNING_POP_MSVC()
+MATX_IGNORE_WARNING_POP_MSVC
     });
 }
 
