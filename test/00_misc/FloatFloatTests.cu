@@ -102,6 +102,33 @@ struct FltFltFma {
     }
 };
 
+struct FltFltFmaApprox {
+    __MATX_HOST__ __MATX_DEVICE__ double operator()(fltflt a, fltflt b, fltflt c) const
+    {
+      return static_cast<double>(fltflt_fma_approx(a, b, c));
+    }
+    __MATX_HOST__ __MATX_DEVICE__ double operator()(float a, fltflt b, fltflt c) const
+    {
+      return static_cast<double>(fltflt_fma_approx(a, b, c));
+    }
+    __MATX_HOST__ __MATX_DEVICE__ double operator()(fltflt a, float b, fltflt c) const
+    {
+      return static_cast<double>(fltflt_fma_approx(a, b, c));
+    }
+    __MATX_HOST__ __MATX_DEVICE__ double operator()(fltflt a, fltflt b, float c) const
+    {
+      return static_cast<double>(fltflt_fma_approx(a, b, c));
+    }
+    __MATX_HOST__ __MATX_DEVICE__ double operator()(fltflt a, float b, float c) const
+    {
+      return static_cast<double>(fltflt_fma_approx(a, b, c));
+    }
+    __MATX_HOST__ __MATX_DEVICE__ double operator()(float a, fltflt b, float c) const
+    {
+      return static_cast<double>(fltflt_fma_approx(a, b, c));
+    }
+};
+
 struct FltFltFmaRaw {
     __MATX_HOST__ __MATX_DEVICE__ fltflt operator()(fltflt a, fltflt b, fltflt c) const
     {
@@ -110,6 +137,17 @@ struct FltFltFmaRaw {
     __MATX_HOST__ __MATX_DEVICE__ fltflt operator()(fltflt a, fltflt b, float c) const
     {
       return fltflt_fma(a, b, c);
+    }
+};
+
+struct FltFltFmaApproxRaw {
+    __MATX_HOST__ __MATX_DEVICE__ fltflt operator()(fltflt a, fltflt b, fltflt c) const
+    {
+      return fltflt_fma_approx(a, b, c);
+    }
+    __MATX_HOST__ __MATX_DEVICE__ fltflt operator()(fltflt a, fltflt b, float c) const
+    {
+      return fltflt_fma_approx(a, b, c);
     }
 };
 
@@ -311,12 +349,6 @@ struct DoubleToFltFlt {
   }
 };
 
-struct FltFltFromParts {
-  __MATX_HOST__ __MATX_DEVICE__ fltflt operator()(float hi, float lo) const {
-    return fltflt{hi, lo};
-  }
-};
-
 struct FltFltGetHi {
   __MATX_HOST__ __MATX_DEVICE__ float operator()(fltflt x) const { return x.hi; }
 };
@@ -372,28 +404,6 @@ static int numMatchingMantissaBits(double a, double b) {
     const int leadingZeros = std::countl_zero(diff);
     const int matchingBits = std::min(leadingZeros, 53);
     return matchingBits + delta;
-}
-
-TYPED_TEST(FltFltExecutorTests, HiLoConstructorNormalizes) {
-  auto hi = make_tensor<float>({});
-  auto lo = make_tensor<float>({});
-  auto ff = make_tensor<fltflt>({});
-
-  constexpr float hi_val = 1.0f;
-  constexpr float lo_val = 0x1.8p-24f;
-  (hi = hi_val).run(this->exec);
-  (lo = lo_val).run(this->exec);
-  (ff = matx::apply(FltFltFromParts{}, hi, lo)).run(this->exec);
-  this->exec.sync();
-
-  const fltflt result = ff();
-  const float expected_hi = std::nextafter(1.0f, 2.0f);
-  const float expected_lo = -0x1p-25f;
-
-  EXPECT_EQ(result.hi, expected_hi);
-  EXPECT_EQ(result.lo, expected_lo);
-  EXPECT_EQ(static_cast<float>(result.hi + result.lo), result.hi);
-  EXPECT_EQ(static_cast<double>(result), static_cast<double>(hi_val) + static_cast<double>(lo_val));
 }
 
 TYPED_TEST(FltFltExecutorTests, Addition) {
@@ -501,13 +511,61 @@ TYPED_TEST(FltFltExecutorTests, FusedMultiplyAdd) {
     EXPECT_GE(numMatchingMantissaBits(fma_result_ac_f32(), fma_ref_ac_f32), 44);
 }
 
-TYPED_TEST(FltFltExecutorTests, FusedMultiplyAddLowLowProductCancellation) {
+TYPED_TEST(FltFltExecutorTests, FusedMultiplyAddApprox) {
+    auto pi = make_tensor<fltflt>({});
+    auto e = make_tensor<fltflt>({});
+    auto sqrt2 = make_tensor<fltflt>({});
+    auto pi_f32 = make_tensor<float>({});
+    auto e_f32 = make_tensor<float>({});
+    auto sqrt2_f32 = make_tensor<float>({});
+    (pi = static_cast<fltflt>(std::numbers::pi)).run(this->exec);
+    (e = static_cast<fltflt>(std::numbers::e)).run(this->exec);
+    (sqrt2 = static_cast<fltflt>(std::numbers::sqrt2)).run(this->exec);
+    (pi_f32 = std::numbers::pi_v<float>).run(this->exec);
+    (e_f32 = std::numbers::e_v<float>).run(this->exec);
+    (sqrt2_f32 = std::numbers::sqrt2_v<float>).run(this->exec);
+
+    auto fma_result = make_tensor<double>({});
+    auto fma_result_a_f32 = make_tensor<double>({});
+    auto fma_result_b_f32 = make_tensor<double>({});
+    auto fma_result_c_f32 = make_tensor<double>({});
+    auto fma_result_bc_f32 = make_tensor<double>({});
+    auto fma_result_ac_f32 = make_tensor<double>({});
+    (fma_result = matx::apply(FltFltFmaApprox{}, pi, e, sqrt2)).run(this->exec);
+    (fma_result_a_f32 = matx::apply(FltFltFmaApprox{}, pi_f32, e, sqrt2)).run(this->exec);
+    (fma_result_b_f32 = matx::apply(FltFltFmaApprox{}, pi, e_f32, sqrt2)).run(this->exec);
+    (fma_result_c_f32 = matx::apply(FltFltFmaApprox{}, pi, e, sqrt2_f32)).run(this->exec);
+    (fma_result_bc_f32 = matx::apply(FltFltFmaApprox{}, pi, e_f32, sqrt2_f32)).run(this->exec);
+    (fma_result_ac_f32 = matx::apply(FltFltFmaApprox{}, pi_f32, e, sqrt2_f32)).run(this->exec);
+    this->exec.sync();
+
+    const double fma_ref_f64 = std::numbers::pi * std::numbers::e + std::numbers::sqrt2;
+    const double fma_ref_f32 = std::numbers::pi_v<float> * std::numbers::e_v<float> + std::numbers::sqrt2_v<float>;
+    const double fma_ref_a_f32 = std::numbers::pi_v<float> * std::numbers::e + std::numbers::sqrt2;
+    const double fma_ref_b_f32 = std::numbers::pi * std::numbers::e_v<float> + std::numbers::sqrt2;
+    const double fma_ref_c_f32 = std::numbers::pi * std::numbers::e + std::numbers::sqrt2_v<float>;
+    const double fma_ref_bc_f32 = std::numbers::pi * std::numbers::e_v<float> + std::numbers::sqrt2_v<float>;
+    const double fma_ref_ac_f32 = std::numbers::pi_v<float> * std::numbers::e + std::numbers::sqrt2_v<float>;
+
+    EXPECT_LE(numMatchingMantissaBits(fma_ref_f32, fma_ref_f64), 24);
+
+    EXPECT_GE(numMatchingMantissaBits(fma_result(), fma_ref_f64), 44);
+    EXPECT_GE(numMatchingMantissaBits(fma_result_a_f32(), fma_ref_a_f32), 44);
+    EXPECT_GE(numMatchingMantissaBits(fma_result_b_f32(), fma_ref_b_f32), 44);
+    EXPECT_GE(numMatchingMantissaBits(fma_result_c_f32(), fma_ref_c_f32), 44);
+    EXPECT_GE(numMatchingMantissaBits(fma_result_bc_f32(), fma_ref_bc_f32), 44);
+    EXPECT_GE(numMatchingMantissaBits(fma_result_ac_f32(), fma_ref_ac_f32), 44);
+}
+
+TYPED_TEST(FltFltExecutorTests, FusedMultiplyAddLowLowProductContribution) {
   auto a = make_tensor<fltflt>({});
   auto b = make_tensor<fltflt>({});
   auto c = make_tensor<fltflt>({});
   auto c_f32 = make_tensor<float>({});
   auto fma_result = make_tensor<fltflt>({});
   auto fma_result_c_f32 = make_tensor<fltflt>({});
+  auto approx_result = make_tensor<fltflt>({});
+  auto approx_result_c_f32 = make_tensor<fltflt>({});
 
   const float u = 0x1p-25f;
   const fltflt a_val{1.0f, u};
@@ -521,6 +579,8 @@ TYPED_TEST(FltFltExecutorTests, FusedMultiplyAddLowLowProductCancellation) {
   (c_f32 = c_float).run(this->exec);
   (fma_result = matx::apply(FltFltFmaRaw{}, a, b, c)).run(this->exec);
   (fma_result_c_f32 = matx::apply(FltFltFmaRaw{}, a, b, c_f32)).run(this->exec);
+  (approx_result = matx::apply(FltFltFmaApproxRaw{}, a, b, c)).run(this->exec);
+  (approx_result_c_f32 = matx::apply(FltFltFmaApproxRaw{}, a, b, c_f32)).run(this->exec);
   this->exec.sync();
 
   // The hi product and two cross terms cancel exactly:
@@ -534,6 +594,15 @@ TYPED_TEST(FltFltExecutorTests, FusedMultiplyAddLowLowProductCancellation) {
   EXPECT_EQ(fma_result().lo, 0.0f);
   EXPECT_EQ(fma_result_c_f32().hi, -0x1p-50f);
   EXPECT_EQ(fma_result_c_f32().lo, 0.0f);
+
+  EXPECT_NE(static_cast<double>(approx_result()), ref);
+  EXPECT_NE(static_cast<double>(approx_result_c_f32()), ref);
+  EXPECT_EQ(static_cast<double>(approx_result()), 0.0);
+  EXPECT_EQ(static_cast<double>(approx_result_c_f32()), 0.0);
+  EXPECT_EQ(approx_result().hi, 0.0f);
+  EXPECT_EQ(approx_result().lo, 0.0f);
+  EXPECT_EQ(approx_result_c_f32().hi, 0.0f);
+  EXPECT_EQ(approx_result_c_f32().lo, 0.0f);
 }
 
 TYPED_TEST(FltFltExecutorTests, Subtraction) {

@@ -345,7 +345,7 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
                     sh_mem.ant_pos[ip][2] = static_cast<fltflt>(cuda::std::get<2>(xyz));
                     const fltflt rtm = static_cast<fltflt>(r_to_mcp(p));
                     const fltflt neg_rtm = fltflt{-rtm.hi, -rtm.lo};
-                    sh_mem.ant_pos[ip][3] = fltflt_fma(neg_rtm, dr_inv, bin_offset);
+                    sh_mem.ant_pos[ip][3] = fltflt_fma_approx(neg_rtm, dr_inv, bin_offset);
                 } else {
                     // Float / Mixed: cast inputs to strict_compute_t (float / double)
                     // once per pulse here, instead of once per pulse per pixel.
@@ -379,7 +379,7 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
                     sh_mem.ant_pos[ip][0], sh_mem.ant_pos[ip][1], sh_mem.ant_pos[ip][2], px, py, pz);
                 // sh_mem.ant_pos[ip][3] is -mcp * dr_inv + bin_offset, so here we compute
                 // dist * dr_inv + (-mcp * dr_inv + bin_offset) = (dist - mcp) * dr_inv + bin_offset
-                const fltflt bin = fltflt_fma(diffR, dr_inv, sh_mem.ant_pos[ip][3]);
+                const fltflt bin = fltflt_fma_approx(diffR, dr_inv, sh_mem.ant_pos[ip][3]);
                 float floor_hi = ::floorf(bin.hi);
                 float frac = (bin.hi - floor_hi) + bin.lo;
                 // bin.lo may push bin over a boundary, in which case floor and frac are incorrect.
