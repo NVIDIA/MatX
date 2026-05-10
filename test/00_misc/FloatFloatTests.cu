@@ -102,6 +102,17 @@ struct FltFltFma {
     }
 };
 
+struct FltFltFmaRaw {
+    __MATX_HOST__ __MATX_DEVICE__ fltflt operator()(fltflt a, fltflt b, fltflt c) const
+    {
+      return fltflt_fma(a, b, c);
+    }
+    __MATX_HOST__ __MATX_DEVICE__ fltflt operator()(fltflt a, fltflt b, float c) const
+    {
+      return fltflt_fma(a, b, c);
+    }
+};
+
 struct FltFltSub {
   __MATX_HOST__ __MATX_DEVICE__ double operator()(fltflt a, fltflt b) const
   {
@@ -300,6 +311,12 @@ struct DoubleToFltFlt {
   }
 };
 
+struct FltFltFromParts {
+  __MATX_HOST__ __MATX_DEVICE__ fltflt operator()(float hi, float lo) const {
+    return fltflt{hi, lo};
+  }
+};
+
 struct FltFltGetHi {
   __MATX_HOST__ __MATX_DEVICE__ float operator()(fltflt x) const { return x.hi; }
 };
@@ -355,6 +372,28 @@ static int numMatchingMantissaBits(double a, double b) {
     const int leadingZeros = std::countl_zero(diff);
     const int matchingBits = std::min(leadingZeros, 53);
     return matchingBits + delta;
+}
+
+TYPED_TEST(FltFltExecutorTests, HiLoConstructorNormalizes) {
+  auto hi = make_tensor<float>({});
+  auto lo = make_tensor<float>({});
+  auto ff = make_tensor<fltflt>({});
+
+  constexpr float hi_val = 1.0f;
+  constexpr float lo_val = 0x1.8p-24f;
+  (hi = hi_val).run(this->exec);
+  (lo = lo_val).run(this->exec);
+  (ff = matx::apply(FltFltFromParts{}, hi, lo)).run(this->exec);
+  this->exec.sync();
+
+  const fltflt result = ff();
+  const float expected_hi = std::nextafter(1.0f, 2.0f);
+  const float expected_lo = -0x1p-25f;
+
+  EXPECT_EQ(result.hi, expected_hi);
+  EXPECT_EQ(result.lo, expected_lo);
+  EXPECT_EQ(static_cast<float>(result.hi + result.lo), result.hi);
+  EXPECT_EQ(static_cast<double>(result), static_cast<double>(hi_val) + static_cast<double>(lo_val));
 }
 
 TYPED_TEST(FltFltExecutorTests, Addition) {
@@ -460,6 +499,41 @@ TYPED_TEST(FltFltExecutorTests, FusedMultiplyAdd) {
     EXPECT_GE(numMatchingMantissaBits(fma_result_c_f32(), fma_ref_c_f32), 44);
     EXPECT_GE(numMatchingMantissaBits(fma_result_bc_f32(), fma_ref_bc_f32), 44);
     EXPECT_GE(numMatchingMantissaBits(fma_result_ac_f32(), fma_ref_ac_f32), 44);
+}
+
+TYPED_TEST(FltFltExecutorTests, FusedMultiplyAddLowLowProductCancellation) {
+  auto a = make_tensor<fltflt>({});
+  auto b = make_tensor<fltflt>({});
+  auto c = make_tensor<fltflt>({});
+  auto c_f32 = make_tensor<float>({});
+  auto fma_result = make_tensor<fltflt>({});
+  auto fma_result_c_f32 = make_tensor<fltflt>({});
+
+  const float u = 0x1p-25f;
+  const fltflt a_val{1.0f, u};
+  const fltflt b_val{1.0f, -u};
+  const fltflt c_val{-1.0f, 0.0f};
+  const float c_float = -1.0f;
+
+  (a = a_val).run(this->exec);
+  (b = b_val).run(this->exec);
+  (c = c_val).run(this->exec);
+  (c_f32 = c_float).run(this->exec);
+  (fma_result = matx::apply(FltFltFmaRaw{}, a, b, c)).run(this->exec);
+  (fma_result_c_f32 = matx::apply(FltFltFmaRaw{}, a, b, c_f32)).run(this->exec);
+  this->exec.sync();
+
+  // The hi product and two cross terms cancel exactly:
+  //   (1 + u) * (1 - u) - 1 = -u*u.
+  // Dropping a.lo*b.lo therefore changes the result from -2^-50 to zero.
+  const double ref = -static_cast<double>(u) * static_cast<double>(u);
+
+  EXPECT_EQ(static_cast<double>(fma_result()), ref);
+  EXPECT_EQ(static_cast<double>(fma_result_c_f32()), ref);
+  EXPECT_EQ(fma_result().hi, -0x1p-50f);
+  EXPECT_EQ(fma_result().lo, 0.0f);
+  EXPECT_EQ(fma_result_c_f32().hi, -0x1p-50f);
+  EXPECT_EQ(fma_result_c_f32().lo, 0.0f);
 }
 
 TYPED_TEST(FltFltExecutorTests, Subtraction) {
@@ -2144,7 +2218,7 @@ TYPED_TEST(FltFltExecutorTests, Fmod) {
 
     // Test: fmod(pi * 1e8, e)
     // Note: The quotient is ~1.156e8. Due to fltflt precision limits at magnitude 1e8
-    // (absolute precision ~1e8 * 2^(-44) ≈ 5.7e-6), the intermediate quotient cannot be
+    // (absolute precision ~1e8 * 2^(-44) ~= 5.7e-6), the intermediate quotient cannot be
     // represented precisely enough, leading to reduced precision in the result.
     (a = static_cast<fltflt>(a_dbl)).run(this->exec);
     (b = static_cast<fltflt>(b_dbl)).run(this->exec);
