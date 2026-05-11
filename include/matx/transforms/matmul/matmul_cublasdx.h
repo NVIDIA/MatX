@@ -439,7 +439,13 @@ namespace matx {
           static_assert(CapType::ept == ElementsPerThread::ONE, "cuBLASDx only supports ONE elements per thread");
           if constexpr (CapType::ept == ElementsPerThread::ONE) {
             const int output_idx = threadIdx.x;
-            return smem_c[output_idx];
+            if (output_idx < )";
+        result += std::to_string(static_cast<int>(m_ * n_));
+        result += ") {\n";
+        result += R"(
+              return static_cast<value_type>(smem_c[output_idx]);
+            }
+            return value_type{};
           }
         )";
 

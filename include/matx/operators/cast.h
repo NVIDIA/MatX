@@ -109,8 +109,10 @@ namespace matx
                 "  __MATX_INLINE__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) const\n" +
                 "  {\n" +
                 (actual_rank > 0 ?
-                "    if ((threadIdx.x * static_cast<int>(CapType::ept)) > Size(Rank_ - 1)) {\n"
-                "      return detail::GetJitSentinelValue<CapType, value_type>();\n"
+                "    if constexpr (!CapType::pass_through_threads) {\n"
+                "      if ((threadIdx.x * static_cast<int>(CapType::ept)) > Size(Rank_ - 1)) {\n"
+                "        return detail::GetJitSentinelValue<CapType, value_type>();\n"
+                "      }\n"
                 "    }\n" : "") +
                 "    auto cast_func = [](const auto &val) { return static_cast<NewType>(val); };\n" +
                 "    return ApplyVecFunc<CapType, NewType>(cast_func, get_value<CapType>(op_, indices...));\n" +
@@ -272,8 +274,10 @@ namespace matx
                 "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(Is... indices) const\n" +
                 "  {\n" +
                 (actual_rank > 0 ?
-                "    if ((threadIdx.x * static_cast<int>(CapType::ept)) > Size(Rank() - 1)) {\n"
-                "      return detail::GetJitSentinelValue<CapType, value_type>();\n"
+                "    if constexpr (!CapType::pass_through_threads) {\n"
+                "      if ((threadIdx.x * static_cast<int>(CapType::ept)) > Size(Rank() - 1)) {\n"
+                "        return detail::GetJitSentinelValue<CapType, value_type>();\n"
+                "      }\n"
                 "    }\n" : "") +
                 "    auto cast_func = [](const auto &real, const auto &imag) {\n" +
                 "      using inner_type = typename inner_op_type_t<NewType>::type;\n" +

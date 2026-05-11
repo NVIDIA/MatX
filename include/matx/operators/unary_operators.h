@@ -146,8 +146,10 @@ namespace matx
             "  __MATX_INLINE__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) const\n" +
             "  {\n" +
             (actual_rank > 0 ?
-            "    if ((threadIdx.x * static_cast<int>(CapType::ept)) > Size(Rank() - 1)) {\n"
-            "      return detail::GetJitSentinelValue<CapType, value_type>();\n"
+            "    if constexpr (!CapType::pass_through_threads) {\n"
+            "      if ((threadIdx.x * static_cast<int>(CapType::ept)) > Size(Rank() - 1)) {\n"
+            "        return detail::GetJitSentinelValue<CapType, value_type>();\n"
+            "      }\n"
             "    }\n" : "") +
             "    auto i1 = get_value<CapType>(in1_, indices...);\n" +
             "    return op_.template operator()<CapType>(i1);\n" +
