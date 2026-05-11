@@ -400,7 +400,7 @@ public:
   // InnerPreRun on it to call any nested PreRun calls, then output directly into the LHS
   // tensor.
   template <typename ShapeType, typename Executor>
-  void TransformExec(ShapeType &&shape, Executor &&ex) const noexcept {
+  void TransformExec(ShapeType &&shape, Executor &&ex) const {
     op_.InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
     op_.Exec(cuda::std::make_tuple(out_), std::forward<Executor>(ex));
     op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));

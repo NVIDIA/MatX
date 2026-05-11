@@ -35,7 +35,11 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
+#include "matx/transforms/solve/solve_cuda.h"
 #include "matx/transforms/solve/solve_cusparse.h"
+#ifdef MATX_EN_CPU_SOLVER
+#include "matx/transforms/solve/solve_lapack.h"
+#endif
 #ifdef MATX_EN_CUDSS
 #include "matx/transforms/solve/solve_cudss.h"
 #endif
@@ -121,17 +125,17 @@ public:
 #endif
       }
     } else {
-      MATX_THROW(matxNotSupported,
-                 "Direct solver currently only supports sparse system");
+      dense_solve_impl(cuda::std::get<0>(out), a_, b_, ex);
     }
   }
 
   template <typename ShapeType, typename Executor>
   __MATX_INLINE__ void
   InnerPreRun([[maybe_unused]] ShapeType &&shape,
-              [[maybe_unused]] Executor &&ex) const noexcept {
-    static_assert(is_sparse_tensor_v<OpA>,
-                  "Direct solver currently only supports sparse system");
+              [[maybe_unused]] Executor &&ex) const {
+    if constexpr (is_matx_op<OpA>()) {
+      a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+    }
     if constexpr (is_matx_op<OpB>()) {
       b_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
     }
@@ -139,7 +143,7 @@ public:
 
   template <typename ShapeType, typename Executor>
   __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape,
-                              [[maybe_unused]] Executor &&ex) const noexcept {
+                              [[maybe_unused]] Executor &&ex) const {
     if (prerun_done_) {
       return;
     }
@@ -153,9 +157,10 @@ public:
 
   template <typename ShapeType, typename Executor>
   __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape,
-                               [[maybe_unused]] Executor &&ex) const noexcept {
-    static_assert(is_sparse_tensor_v<OpA>,
-                  "Direct solver currently only supports sparse system");
+                               [[maybe_unused]] Executor &&ex) const {
+    if constexpr (is_matx_op<OpA>()) {
+      a_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+    }
     if constexpr (is_matx_op<OpB>()) {
       b_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
     }
@@ -166,21 +171,21 @@ public:
 } // end namespace detail
 
 /**
- * Running X = solve(A, B) solves the system A X^T = B^T for
- * an unknown X given the rhs B. The transposition is used so
- * that the different rhs vectors and solutions are stacked by
- * row (another way to think about this is that X and B are
- * presented using column-major storage). Currently, this
- * operation is only implemented for solving a linear system
- * with a very **sparse** matrix A in CSR or DIA format.
+ * Running X = solve(A, B) solves the system A X = B for dense A, where A has
+ * shape `... x n x n` and B has shape `... x n` for a vector right-hand side
+ * or `... x n x nrhs` for one or more matrix right-hand sides. Dense batch
+ * dimensions must match exactly and are not broadcast.
+ *
+ * For sparse A, solve preserves the legacy sparse API: B and X stack different
+ * right-hand sides by row and the operation solves A X^T = B^T.
  *
  * @tparam OpA
- *    Data type of A tensor (sparse)
+ *    Data type of A tensor
  * @tparam OpB
  *    Data type of B tensor
  *
  * @param A
- *   A Sparse tensor with system coefficients
+ *   A tensor with system coefficients
  * @param B
  *   B Dense tensor of known values
  *
