@@ -9,7 +9,7 @@ else()
   set(NOT_SUBPROJECT OFF)
 endif()
 
-# CMake 3.24 can auto-detect GPUs, but it's not standard on any distrobution. For now, rapids-cmake has a utility
+# CMake 3.24 can auto-detect GPUs, but it's not standard on any distribution. For now, rapids-cmake has a utility
 # function to do it, so we grab that as a dependency. The user can optionally override GPU_ARCH to specify
 # their own. We check if rapids-cmake exists for projects that already include it so we don't have conflicting
 # directories
