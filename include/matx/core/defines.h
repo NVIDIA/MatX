@@ -158,32 +158,4 @@ static constexpr int MAX_VEC_WIDTH_BYTES = 16;
   #define MATX_LOOP_DO_NOT_UNROLL
 #endif
 
-// Mathematical constants.
-//
-// Use the right constant for the right context:
-//
-//   Host-only code (.cpp, host functions in .cu):
-//     Prefer std::numbers::pi / std::numbers::pi_v<T> (C++20 <numbers>).
-//     These are typed, template-friendly, and carry no macro hygiene risk.
-//
-//   Device code or headers compiled by the nvcc device pass:
-//     Use M_PI / M_E (defined below). nvcc's CUDA front-end does not parse
-//     <numbers>, so std::numbers::* is unavailable in __device__ context.
-//
-//   Headers that must compile in both host and device passes:
-//     Use M_PI / M_E so that a single definition works everywhere.
-//
-// Background: M_PI / M_E are POSIX extensions to <cmath>. On Windows they
-// require _USE_MATH_DEFINES (which MatX sets in CMakeLists.txt), and they
-// are absent in strict ISO C++ mode. The #ifndef guards below provide a
-// portable fallback with values that match std::numbers::pi_v<double> and
-// std::numbers::e_v<double> exactly.
-#ifndef M_PI
-#define M_PI 3.141592653589793238462643383279502884
-#endif
-#ifndef M_E
-#define M_E  2.718281828459045235360287471352662497
-#endif
-
-
 }
