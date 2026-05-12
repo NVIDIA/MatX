@@ -20,3 +20,54 @@ For sparse ``A``, ``solve`` preserves the legacy sparse solve layout where
 right-hand sides are stacked by row and the operation solves ``A X^T = B^T``.
 Sparse direct solve support depends on the sparse format and may require cuDSS;
 please see :ref:`sparse_tensor_api`.
+
+Examples
+~~~~~~~~
+
+Dense vector right-hand side
+
+.. literalinclude:: ../../../../test/00_solver/SolveDense.cu
+   :language: cpp
+   :start-after: example-begin solve-test-1
+   :end-before: example-end solve-test-1
+   :dedent:
+
+Dense matrix right-hand side
+
+.. literalinclude:: ../../../../test/00_solver/SolveDense.cu
+   :language: cpp
+   :start-after: example-begin solve-test-2
+   :end-before: example-end solve-test-2
+   :dedent:
+
+In an expression
+
+.. literalinclude:: ../../../../test/00_solver/SolveDense.cu
+   :language: cpp
+   :start-after: example-begin solve-test-3
+   :end-before: example-end solve-test-3
+   :dedent:
+
+Batched vector right-hand side
+
+.. literalinclude:: ../../../../test/00_solver/SolveDense.cu
+   :language: cpp
+   :start-after: example-begin solve-test-4
+   :end-before: example-end solve-test-4
+   :dedent:
+
+Batched matrix right-hand side
+
+.. literalinclude:: ../../../../test/00_solver/SolveDense.cu
+   :language: cpp
+   :start-after: example-begin solve-test-5
+   :end-before: example-end solve-test-5
+   :dedent:
+
+In-place right-hand side
+
+.. literalinclude:: ../../../../test/00_solver/SolveDense.cu
+   :language: cpp
+   :start-after: example-begin solve-test-6
+   :end-before: example-end solve-test-6
+   :dedent:
