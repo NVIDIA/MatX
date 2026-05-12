@@ -7,6 +7,10 @@ Perform an LU factorization.
 
 .. versionadded:: 0.6.0
 
+.. note::
+   ``lu`` is a multi-output solver API and is not currently supported by CUDA JIT fusion or cuSolverDx in MatX.
+   Use a normal non-JIT executor path for LU factorization; ``CUDAJITExecutor`` rejects this operator.
+
 .. doxygenfunction:: lu
 
 Examples

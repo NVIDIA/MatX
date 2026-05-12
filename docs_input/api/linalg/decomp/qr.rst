@@ -7,6 +7,11 @@ Perform a QR decomposition.
 
 .. versionadded:: 0.6.0
 
+.. note::
+   ``qr``, ``qr_econ``, and ``qr_solver`` are multi-output solver APIs and are not currently supported by CUDA JIT
+   fusion or cuSolverDx in MatX. Use a normal non-JIT executor path supported by the QR variant; ``CUDAJITExecutor``
+   rejects these operators.
+
 .. doxygenfunction:: qr
 
 .. note::
@@ -53,4 +58,3 @@ Examples
    :start-after: example-begin qr_solver-test-1
    :end-before: example-end qr_solver-test-1
    :dedent:
-

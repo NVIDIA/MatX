@@ -59,14 +59,22 @@ CUDA JIT Kernel Fusion
 
     CUDA JIT kernel fusion is considered an experimental feature. There may be bugs that don't occur with JIT disabled, and new features are being added over time.
 
-MatX supports CUDA JIT kernel fusion that compiles the entire expression into a single kernel. Currently this is enabled 
-for all standard MatX element-wise operators and FFT and GEMM operations via MathDx. To enable fusion with MathDx, 
-the following options must be enabled: ``-DMATX_EN_MATHDX=ON``. Once enabled, the ``CUDAJITExecutor`` can be used perform JIT compilation
-in supported situations. If the expression cannot be JIT compiled, the JITExecutor may throw an error.
+MatX supports CUDA JIT kernel fusion that compiles the entire expression into a single kernel. Currently this is enabled
+for all standard MatX element-wise operators, FFT operations via cuFFTDx, GEMM operations via cuBLASDx, and selected
+solver operations via cuSolverDx. To enable fusion with MathDx, the following option must be enabled:
+``-DMATX_EN_MATHDX=ON``. MathDx support also enables the NVRTC-based JIT support used by ``CUDAJITExecutor``.
+Once enabled, the ``CUDAJITExecutor`` can be used to perform JIT compilation in supported situations. If the expression
+cannot be JIT compiled, the ``CUDAJITExecutor`` may throw an error.
 
 While JIT compilation can provide a large performance boost, there are two overheads that occur when using JIT compilation:
+
 * The first pass to JIT the code takes time. The first time a ``run()`` statement is executed on a new operator, MatX identifies this and performs JIT compilation. Depending on the complexity of the operator, this could be anywhere from milliseconds to seconds to complete. Once finished, MatX will cache the compiled kernel so that subsequent runs of the same operator will not require JIT compilation.
 * A lookup is done to find kernels that have already been compiled. This is a small overhead and may not be noticeable.
+
+For MathDx-backed operations, MatX uses the ``libmathdx`` runtime interface to query launch resources such as shared
+memory usage, block dimensions, workspace size, generated symbol names, and LTOIR. This is required because MatX
+operator sizes may be known only at runtime. MatX caches the generated code and launch metadata for a matching operator
+signature so repeated runs can avoid repeating the runtime descriptor queries.
 
 As mentioned above, there is no difference in syntax between MatX statements that perform JIT compilation and those that do not. The executor 
 is the only change, just as it would be with a host executor. For example, in the following code:
@@ -100,8 +108,9 @@ example:
     auto my_op = (fftshift1D(fft(b)));
 
 In this case the MathDx library requires at least 2 elements per thread for the FFT, but the ``fftshift1D`` operator requires 
-only 1 element per thread. Therefore, the entire expression cannot be JIT-compiled and will fall back to the non-JIT path. Some of 
-these restrictions may be relaxed in newer versions of MatX or the MathDx library.
+only 1 element per thread. Therefore, the entire expression cannot be JIT-compiled with ``CUDAJITExecutor``. Use a normal
+``CUDAExecutor`` to run the same expression through the non-JIT path. Some of these restrictions may be relaxed in newer
+versions of MatX or the MathDx library.
 
 MathDx Compatibility
 ====================
@@ -115,15 +124,31 @@ MathDx Compatibility
      - Notes
    * - cuBLASDx
      - Yes
-     - Enabled via ``-DMATX_EN_MATHDX=ON`` for GEMM fusion paths.
+     - Enabled via ``-DMATX_EN_MATHDX=ON`` for compatible ``matmul``/GEMM fusion paths. Fusion with other MathDx
+       operators requires a compatible runtime block dimension. For example, a ``matmul`` expression can fuse with a
+       cuSolverDx ``inv`` when their block-dimension ranges intersect.
    * - cuFFTDx
      - Yes
-     - Enabled via ``-DMATX_EN_MATHDX=ON`` for FFT fusion paths.
+     - Enabled via ``-DMATX_EN_MATHDX=ON`` for compatible FFT fusion paths. cuFFTDx has stricter launch-shape
+       requirements than the generic element-wise JIT path, and does not generally compose with cuBLASDx/cuSolverDx
+       operations that require a different block/grid model.
    * - cuSolverDx
-     - No
-     - Not supported yet by MatX CUDA JIT fusion.
-   * - cuRandDx
+     - Partial
+     - Enabled via ``-DMATX_EN_MATHDX=ON`` for ``chol`` and ``inv``. The current cuSolverDx JIT path supports rank
+       2 through 4 square matrices with ``float``, ``double``, ``complex<float>``, and ``complex<double>`` values.
+       Multi-output solver APIs such as ``lu``, ``qr``, ``qr_solver``, ``qr_econ``, ``svd``, and ``eig`` are not
+       currently JIT-fused and should be run with a normal non-JIT executor path supported by that operator.
+   * - cuRANDDx
      - No
      - Not supported yet by MatX CUDA JIT fusion.
 
+Current Limitations
+===================
 
+``CUDAJITExecutor`` only runs expressions that MatX can lower completely into one JIT kernel. All operators in the
+expression must support CUDA JIT, and MathDx-backed operators must have compatible runtime launch requirements such as
+block dimensions and shared-memory usage. Unsupported shapes, types, ranks, or incompatible MathDx launch requirements
+are reported before launch instead of silently falling back inside ``CUDAJITExecutor``.
+
+The normal non-JIT CUDA, host, and library-backed execution paths remain available for operations that are not currently
+supported by CUDA JIT fusion.

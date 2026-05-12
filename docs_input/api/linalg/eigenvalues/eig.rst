@@ -7,6 +7,10 @@ Perform an eigenvalue decomposition for Hermitian or real symmetric matrices.
 
 .. versionadded:: 0.6.0
 
+.. note::
+   ``eig`` is a multi-output solver API and is not currently supported by CUDA JIT fusion or cuSolverDx in MatX.
+   Use a normal non-JIT executor path for eigenvalue decomposition; ``CUDAJITExecutor`` rejects this operator.
+
 .. doxygenfunction:: eig
 
 Enums

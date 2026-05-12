@@ -323,7 +323,9 @@ Enabling this option will disable the caching of CUB allocations. This is useful
 MathDx Support
 --------------
 
-Enabling MathDx support will enable the use of MathDx for CUDA kernel fusion. See :ref:`fusion` for more information.
+Enabling MathDx support will enable MathDx-backed CUDA kernel fusion for supported FFT, GEMM, and solver operations.
+MatX uses the separate ``libmathdx`` runtime interface to query launch resources and generate LTOIR for runtime-sized
+operators before JIT compilation. See :ref:`fusion` for the current support matrix and limitations.
 
 
 MatX Library Linking
