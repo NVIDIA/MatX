@@ -176,6 +176,9 @@ namespace detail {
         else if constexpr (Cap == OperatorCapability::PASS_THROUGH_THREADS) {
           return true;
         }
+        else if constexpr (Cap == OperatorCapability::PASS_THROUGH_INNER_RANK) {
+          return 2;
+        }
         else if constexpr (Cap == OperatorCapability::BLOCK_DIM) {
           return combine_capabilities<Cap>(dx_gesv_helper_.GetBlockDimRange(), detail::get_operator_capability<Cap>(a_, in));
         }

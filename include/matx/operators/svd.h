@@ -75,6 +75,8 @@ namespace detail {
       mutable int materialize_count_ = 0;
 
     public:
+      using input_type = OpA;
+
       SVDState(const OpA &a, const SVDMode jobz, const SVDHostAlgo algo) : a_(a), jobz_(jobz), algo_(algo)
       {
         auto a_shape = SolverShapeFromInput<RANK>(a_);

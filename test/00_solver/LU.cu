@@ -73,6 +73,18 @@ class LUSolverTestFloatTypes : public LUSolverTest<TensorType> {
 TYPED_TEST_SUITE(LUSolverTestFloatTypes,
                  MatXFloatNonHalfTypesAllExecs);
 
+template <typename T>
+T MakeLUJITTestValue(double value)
+{
+  using SType = typename inner_op_type_t<T>::type;
+  if constexpr (is_complex_v<T>) {
+    return T{static_cast<SType>(value), static_cast<SType>(0)};
+  }
+  else {
+    return static_cast<T>(value);
+  }
+}
+
 #if defined(MATX_EN_MATHDX) && defined(MATX_EN_JIT)
 template <typename TensorType>
 class LUSolverJITTestFloatTypes : public ::testing::Test {
@@ -81,49 +93,133 @@ class LUSolverJITTestFloatTypes : public ::testing::Test {
 TYPED_TEST_SUITE(LUSolverJITTestFloatTypes,
                  MatXFloatNonHalfTypesCUDAExec);
 
-TYPED_TEST(LUSolverJITTestFloatTypes, CuSolverDxSingleMatrixRejectsProjectionJIT)
+TYPED_TEST(LUSolverJITTestFloatTypes, CuSolverDxSingleMatrixProjectionJIT)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using value_type = typename inner_op_type_t<TestType>::type;
 
   constexpr index_t rows = 4;
   constexpr index_t cols = 3;
   auto A = make_tensor<TestType>({rows, cols});
-  auto Factors = make_tensor<TestType>({rows, cols});
-  auto Piv = make_tensor<int64_t>({std::min(rows, cols)});
+  auto RefLU = make_tensor<TestType>({rows, cols});
+  auto RefPiv = make_tensor<int64_t>({std::min(rows, cols)});
+  auto RefCombined = make_tensor<TestType>({rows, cols});
+  auto Combined = make_tensor<TestType>({rows, cols});
+  auto mdiff = make_tensor<value_type>({});
+
+  for (index_t i = 0; i < rows; i++) {
+    for (index_t j = 0; j < cols; j++) {
+      A(i, j) = i == j ? MakeLUJITTestValue<TestType>(static_cast<double>(i + 2)) : TestType{};
+    }
+  }
+
   auto op = lu(A);
-
   EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op));
-  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.LU));
-  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.Piv));
+  EXPECT_TRUE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.LU));
+  EXPECT_TRUE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.Piv));
 
+  cudaExecutor cuda_exec{};
   CUDAJITExecutor exec{};
-  EXPECT_THROW({ (Factors = op.LU).run(exec); }, matx::detail::matxException);
-  EXPECT_THROW({ (Piv = op.Piv).run(exec); }, matx::detail::matxException);
+  (mtie(RefLU, RefPiv) = lu(A)).run(cuda_exec);
+  (RefCombined = RefLU).run(cuda_exec);
+
+  (Combined = op.LU + TestType{} * clone<2>(as_type<TestType>(op.Piv), {rows, matxKeepDim})).run(exec);
+  (mdiff = max(abs(Combined - RefCombined))).run(cuda_exec);
+  cuda_exec.sync();
+
+  ASSERT_NEAR(mdiff(), value_type(0), value_type(0.001));
 
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(LUSolverJITTestFloatTypes, CuSolverDxBatchedMatrixRejectsProjectionJIT)
+TYPED_TEST(LUSolverJITTestFloatTypes, CuSolverDxBatchedMatrixProjectionJIT)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using value_type = typename inner_op_type_t<TestType>::type;
 
   constexpr index_t batches = 3;
   constexpr index_t rows = 4;
   constexpr index_t cols = 3;
   auto A = make_tensor<TestType>({batches, rows, cols});
-  auto Factors = make_tensor<TestType>({batches, rows, cols});
-  auto Piv = make_tensor<int64_t>({batches, std::min(rows, cols)});
+  auto RefLU = make_tensor<TestType>({batches, rows, cols});
+  auto RefPiv = make_tensor<int64_t>({batches, std::min(rows, cols)});
+  auto RefCombined = make_tensor<TestType>({batches, rows, cols});
+  auto Combined = make_tensor<TestType>({batches, rows, cols});
+  auto mdiff = make_tensor<value_type>({});
+
+  for (index_t b = 0; b < batches; b++) {
+    for (index_t i = 0; i < rows; i++) {
+      for (index_t j = 0; j < cols; j++) {
+        A(b, i, j) = i == j ? MakeLUJITTestValue<TestType>(static_cast<double>(b + i + 2)) : TestType{};
+      }
+    }
+  }
+
   auto op = lu(A);
-
   EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op));
-  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.LU));
-  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.Piv));
+  EXPECT_TRUE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.LU));
+  EXPECT_TRUE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.Piv));
 
+  cudaExecutor cuda_exec{};
   CUDAJITExecutor exec{};
-  EXPECT_THROW({ (Factors = op.LU).run(exec); }, matx::detail::matxException);
-  EXPECT_THROW({ (Piv = op.Piv).run(exec); }, matx::detail::matxException);
+  (mtie(RefLU, RefPiv) = lu(A)).run(cuda_exec);
+  (RefCombined = RefLU).run(cuda_exec);
+
+  (Combined = op.LU + TestType{} * clone<3>(as_type<TestType>(op.Piv), {matxKeepDim, rows, matxKeepDim})).run(exec);
+  (mdiff = max(abs(Combined - RefCombined))).run(cuda_exec);
+  cuda_exec.sync();
+
+  ASSERT_NEAR(mdiff(), value_type(0), value_type(0.001));
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(LUSolverJITTestFloatTypes, CuSolverDxRank4BatchedMatrixProjectionJIT)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using value_type = typename inner_op_type_t<TestType>::type;
+
+  constexpr index_t batch0 = 2;
+  constexpr index_t batch1 = 2;
+  constexpr index_t rows = 4;
+  constexpr index_t cols = 3;
+  auto A = make_tensor<TestType>({batch0, batch1, rows, cols});
+  auto RefLU = make_tensor<TestType>({batch0, batch1, rows, cols});
+  auto RefPiv = make_tensor<int64_t>({batch0, batch1, std::min(rows, cols)});
+  auto RefCombined = make_tensor<TestType>({batch0, batch1, rows, cols});
+  auto Combined = make_tensor<TestType>({batch0, batch1, rows, cols});
+  auto mdiff = make_tensor<value_type>({});
+
+  for (index_t b0 = 0; b0 < batch0; b0++) {
+    for (index_t b1 = 0; b1 < batch1; b1++) {
+      for (index_t i = 0; i < rows; i++) {
+        for (index_t j = 0; j < cols; j++) {
+          A(b0, b1, i, j) = i == j ?
+            MakeLUJITTestValue<TestType>(static_cast<double>(b0 + b1 + i + 2)) :
+            TestType{};
+        }
+      }
+    }
+  }
+
+  auto op = lu(A);
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op));
+  EXPECT_TRUE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.LU));
+  EXPECT_TRUE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.Piv));
+
+  cudaExecutor cuda_exec{};
+  CUDAJITExecutor exec{};
+  (mtie(RefLU, RefPiv) = lu(A)).run(cuda_exec);
+  (RefCombined = RefLU).run(cuda_exec);
+
+  (Combined = op.LU + TestType{} * clone<4>(as_type<TestType>(op.Piv), {matxKeepDim, matxKeepDim, rows, matxKeepDim})).run(exec);
+  (mdiff = max(abs(Combined - RefCombined))).run(cuda_exec);
+  cuda_exec.sync();
+
+  ASSERT_NEAR(mdiff(), value_type(0), value_type(0.001));
 
   MATX_EXIT_HANDLER();
 }

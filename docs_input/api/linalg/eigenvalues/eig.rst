@@ -8,8 +8,11 @@ Perform an eigenvalue decomposition for Hermitian or real symmetric matrices.
 .. versionadded:: 0.6.0
 
 .. note::
-   ``eig`` is a multi-output solver API and is not currently supported by CUDA JIT fusion or cuSolverDx in MatX.
-   Use a normal non-JIT executor path for eigenvalue decomposition; ``CUDAJITExecutor`` rejects this operator.
+   The ``mtie`` assignment form of ``eig`` uses the normal non-JIT solver path. CUDA JIT fusion is available through
+   lazy projection members such as ``eig(A).Vectors`` and ``eig(A).Values`` when ``-DMATX_EN_MATHDX=ON`` is enabled
+   and the runtime shape/type is supported by cuSolverDx. Projection JIT currently supports rank 2 through 4 square
+   Hermitian or real symmetric matrices with ``float``, ``double``, ``complex<float>``, and ``complex<double>``
+   inputs. Expressions that only reference ``Values`` use the cuSolverDx no-vectors job.
 
 .. doxygenfunction:: eig
 

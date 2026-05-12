@@ -46,6 +46,18 @@ class QREconSolverTestNonHalfTypes : public ::testing::Test{
 TYPED_TEST_SUITE(QREconSolverTestNonHalfTypes,
   MatXFloatNonHalfTypesCUDAExec);
 
+template <typename T>
+T MakeQREconJITTestValue(double value)
+{
+  using SType = typename inner_op_type_t<T>::type;
+  if constexpr (is_complex_v<T>) {
+    return T{static_cast<SType>(value), static_cast<SType>(0)};
+  }
+  else {
+    return static_cast<T>(value);
+  }
+}
+
 #if defined(MATX_EN_MATHDX) && defined(MATX_EN_JIT)
 template <typename TensorType>
 class QREconSolverJITTestNonHalfTypes : public ::testing::Test {
@@ -54,51 +66,118 @@ class QREconSolverJITTestNonHalfTypes : public ::testing::Test {
 TYPED_TEST_SUITE(QREconSolverJITTestNonHalfTypes,
   MatXFloatNonHalfTypesCUDAExec);
 
-TYPED_TEST(QREconSolverJITTestNonHalfTypes, CuSolverDxSingleMatrixRejectsProjectionJIT)
+TYPED_TEST(QREconSolverJITTestNonHalfTypes, CuSolverDxSingleMatrixProjectionJIT)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using value_type = typename inner_op_type_t<TestType>::type;
 
   constexpr index_t rows = 4;
-  constexpr index_t cols = 3;
-  constexpr index_t k = std::min(rows, cols);
+  constexpr index_t cols = 4;
   auto A = make_tensor<TestType>({rows, cols});
-  auto Q = make_tensor<TestType>({rows, k});
-  auto R = make_tensor<TestType>({k, cols});
+  auto Combined = make_tensor<TestType>({rows, cols});
+  auto mdiff = make_tensor<value_type>({});
+
+  for (index_t i = 0; i < rows; i++) {
+    for (index_t j = 0; j < cols; j++) {
+      A(i, j) = i == j ? MakeQREconJITTestValue<TestType>(static_cast<double>(i + 2)) : TestType{};
+    }
+  }
+
   auto op = qr_econ(A);
 
   EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op));
-  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.Q));
-  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.R));
+  EXPECT_TRUE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.Q));
+  EXPECT_TRUE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.R));
 
+  cudaExecutor cuda_exec{};
   CUDAJITExecutor exec{};
-  EXPECT_THROW({ (Q = op.Q).run(exec); }, matx::detail::matxException);
-  EXPECT_THROW({ (R = op.R).run(exec); }, matx::detail::matxException);
+  (Combined = op.Q * op.R).run(exec);
+  (mdiff = max(abs(Combined - A))).run(cuda_exec);
+  cuda_exec.sync();
+
+  ASSERT_NEAR(mdiff(), value_type(0), value_type(0.001));
 
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(QREconSolverJITTestNonHalfTypes, CuSolverDxBatchedMatrixRejectsProjectionJIT)
+TYPED_TEST(QREconSolverJITTestNonHalfTypes, CuSolverDxBatchedMatrixProjectionJIT)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using value_type = typename inner_op_type_t<TestType>::type;
 
   constexpr index_t batches = 3;
   constexpr index_t rows = 4;
-  constexpr index_t cols = 3;
-  constexpr index_t k = std::min(rows, cols);
+  constexpr index_t cols = 4;
   auto A = make_tensor<TestType>({batches, rows, cols});
-  auto Q = make_tensor<TestType>({batches, rows, k});
-  auto R = make_tensor<TestType>({batches, k, cols});
+  auto Combined = make_tensor<TestType>({batches, rows, cols});
+  auto mdiff = make_tensor<value_type>({});
+
+  for (index_t b = 0; b < batches; b++) {
+    for (index_t i = 0; i < rows; i++) {
+      for (index_t j = 0; j < cols; j++) {
+        A(b, i, j) = i == j ? MakeQREconJITTestValue<TestType>(static_cast<double>(b + i + 2)) : TestType{};
+      }
+    }
+  }
+
   auto op = qr_econ(A);
 
   EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op));
-  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.Q));
-  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.R));
+  EXPECT_TRUE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.Q));
+  EXPECT_TRUE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.R));
 
+  cudaExecutor cuda_exec{};
   CUDAJITExecutor exec{};
-  EXPECT_THROW({ (Q = op.Q).run(exec); }, matx::detail::matxException);
-  EXPECT_THROW({ (R = op.R).run(exec); }, matx::detail::matxException);
+  (Combined = op.Q * op.R).run(exec);
+  (mdiff = max(abs(Combined - A))).run(cuda_exec);
+  cuda_exec.sync();
+
+  ASSERT_NEAR(mdiff(), value_type(0), value_type(0.001));
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(QREconSolverJITTestNonHalfTypes, CuSolverDxRank4BatchedMatrixProjectionJIT)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using value_type = typename inner_op_type_t<TestType>::type;
+
+  constexpr index_t batch0 = 2;
+  constexpr index_t batch1 = 2;
+  constexpr index_t rows = 4;
+  constexpr index_t cols = 4;
+  auto A = make_tensor<TestType>({batch0, batch1, rows, cols});
+  auto Combined = make_tensor<TestType>({batch0, batch1, rows, cols});
+  auto mdiff = make_tensor<value_type>({});
+
+  for (index_t b0 = 0; b0 < batch0; b0++) {
+    for (index_t b1 = 0; b1 < batch1; b1++) {
+      for (index_t i = 0; i < rows; i++) {
+        for (index_t j = 0; j < cols; j++) {
+          A(b0, b1, i, j) = i == j ?
+            MakeQREconJITTestValue<TestType>(static_cast<double>(b0 + b1 + i + 2)) :
+            TestType{};
+        }
+      }
+    }
+  }
+
+  auto op = qr_econ(A);
+
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op));
+  EXPECT_TRUE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.Q));
+  EXPECT_TRUE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.R));
+
+  cudaExecutor cuda_exec{};
+  CUDAJITExecutor exec{};
+  (Combined = op.Q * op.R).run(exec);
+  (mdiff = max(abs(Combined - A))).run(cuda_exec);
+  cuda_exec.sync();
+
+  ASSERT_NEAR(mdiff(), value_type(0), value_type(0.001));
 
   MATX_EXIT_HANDLER();
 }

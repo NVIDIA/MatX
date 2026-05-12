@@ -319,6 +319,9 @@ namespace matx
             MATX_LOG_DEBUG("cuBLASDx PASS_THROUGH_THREADS: true");
             return true;
           }
+          else if constexpr (Cap == OperatorCapability::PASS_THROUGH_INNER_RANK) {
+            return 2;
+          }
           else if constexpr (Cap == OperatorCapability::GROUPS_PER_BLOCK) {
             // 2D block operators only support one group per block
             const auto my_cap = cuda::std::array<int, 2>{1, 1};

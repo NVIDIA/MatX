@@ -37,6 +37,9 @@
 #include "matx/operators/base_operator.h"
 #include "matx/operators/solver_projection.h"
 #include "matx/transforms/lu/lu_cuda.h"
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
+  #include "matx/transforms/solver_cusolverdx.h"
+#endif
 #ifdef MATX_EN_CPU_SOLVER
   #include "matx/transforms/lu/lu_lapack.h"
 #endif
@@ -66,12 +69,31 @@ namespace detail {
       mutable piv_value_type *piv_ptr_ = nullptr;
       mutable bool materialized_ = false;
       mutable int materialize_count_ = 0;
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
+      mutable cuSolverDxHelper<a_value_type> dx_lu_helper_;
+#endif
 
     public:
+      using input_type = OpA;
+
       LUState(const OpA &a) : a_(a)
       {
         factors_shape_ = SolverShapeFromInput<RANK>(a_);
         piv_shape_ = SolverVectorShapeFromMatrixShape<RANK>(factors_shape_);
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
+        int major = 0;
+        int minor = 0;
+        int device = 0;
+        MATX_CUDA_CHECK(cudaGetDevice(&device));
+        MATX_CUDA_CHECK(cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device));
+        MATX_CUDA_CHECK(cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device));
+        const int cc = major * 100 + minor * 10;
+
+        dx_lu_helper_.set_m(factors_shape_[RANK - 2]);
+        dx_lu_helper_.set_n(factors_shape_[RANK - 1]);
+        dx_lu_helper_.set_cc(cc);
+        dx_lu_helper_.set_function(CUSOLVERDX_FUNCTION_GETRF_PARTIAL_PIVOT);
+#endif
       }
 
       const auto &FactorsShape() const { return factors_shape_; }
@@ -167,6 +189,89 @@ namespace detail {
           return piv_;
         }
       }
+
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
+      template <int Component>
+      bool SupportsJITProjection() const
+      {
+        return (RANK >= 2) && (RANK <= 4) && dx_lu_helper_.IsSupported();
+      }
+
+      template <int Component>
+      int GetJITProjectionShmRequired() const
+      {
+        return dx_lu_helper_.GetShmRequired();
+      }
+
+      template <int Component>
+      cuda::std::array<int, 2> GetJITProjectionBlockDimRange() const
+      {
+        return dx_lu_helper_.GetBlockDimRange();
+      }
+
+      template <int Component>
+      bool GenerateJITProjectionLTOIR(std::set<std::string> &ltoir_symbols) const
+      {
+        return dx_lu_helper_.GenerateLTOIR(ltoir_symbols);
+      }
+
+      template <int Component>
+      std::string GetJITProjectionTypeName(const std::string &inner_op_jit_name) const
+      {
+        return std::string("JITLUProjectionOp<") + inner_op_jit_name + ", " + std::to_string(Component) + ">";
+      }
+
+      template <int Component>
+      JITCacheKey GetJITProjectionCacheKey() const
+      {
+        auto key = detail::MakeJITCacheKeyForType<LUState<OpA>>("JITLUProjection_v3");
+        detail::HashJITCacheValue(key, Component);
+        detail::HashJITCacheValue(key, RANK);
+        for (int i = 0; i < RANK; ++i) {
+          detail::HashJITCacheValue(key, factors_shape_[i]);
+        }
+        return key;
+      }
+
+      template <int Component>
+      void AddJITProjectionClasses(std::unordered_map<std::string, std::string> &in) const
+      {
+        const std::string class_name = "JITLUProjectionOp";
+        if (in.find(class_name) != in.end()) {
+          return;
+        }
+
+        const std::string solver_func_name = std::string(SOLVER_DX_FUNC_PREFIX) + "_" + dx_lu_helper_.GetSymbolName();
+        in[class_name] =
+          " extern \"C\" __device__ void " + solver_func_name + "(" + detail::type_to_string<a_value_type>() + "*, int*, int*);\n"
+          " template <typename OpA, int Component> struct " + class_name + "  {\n"
+          "  using solver_value_type = typename OpA::value_type;\n"
+          "  using value_type = cuda::std::conditional_t<Component == " + std::to_string(LU_PIV) + ", int64_t, solver_value_type>;\n"
+          "  using matxop = bool;\n"
+          "  typename detail::inner_storage_or_self_t<detail::base_type_t<OpA>> a_;\n"
+          "  template <typename CapType, typename... Is>\n"
+          "  __MATX_INLINE__ __MATX_DEVICE__ value_type operator()(Is... indices) const\n"
+          "  {\n"
+          "    " + dx_lu_helper_.GetLuProjectionFuncStr(solver_func_name, LU_FACTORS, LU_PIV) + "\n"
+          "  }\n"
+          "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank()\n"
+          "  {\n"
+          "    if constexpr (Component == " + std::to_string(LU_PIV) + ") { return OpA::Rank() - 1; }\n"
+          "    else { return OpA::Rank(); }\n"
+          "  }\n"
+          "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const\n"
+          "  {\n"
+          "    if constexpr (Component == " + std::to_string(LU_PIV) + ") {\n"
+          "      if (dim < OpA::Rank() - 2) { return a_.Size(dim); }\n"
+          "      const index_t m = a_.Size(OpA::Rank() - 2);\n"
+          "      const index_t n = a_.Size(OpA::Rank() - 1);\n"
+          "      return m < n ? m : n;\n"
+          "    }\n"
+          "    else { return a_.Size(dim); }\n"
+          "  }\n"
+          "};\n";
+      }
+#endif
   };
 
   template<typename OpA>

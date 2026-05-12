@@ -78,6 +78,9 @@ TYPED_TEST_SUITE(EigenSolverTestFloatTypes,
 TYPED_TEST_SUITE(EigenProjectionSolverTestFloatTypes,
                  MatXFloatNonHalfTypesCUDAExec);
 
+template <typename T>
+T MakeEigenTestValue(double value);
+
 #if defined(MATX_EN_MATHDX) && defined(MATX_EN_JIT)
 template <typename TensorType>
 class EigenSolverJITTestFloatTypes : public ::testing::Test {
@@ -86,7 +89,7 @@ class EigenSolverJITTestFloatTypes : public ::testing::Test {
 TYPED_TEST_SUITE(EigenSolverJITTestFloatTypes,
                  MatXFloatNonHalfTypesCUDAExec);
 
-TYPED_TEST(EigenSolverJITTestFloatTypes, CuSolverDxSingleMatrixRejectsProjectionJIT)
+TYPED_TEST(EigenSolverJITTestFloatTypes, CuSolverDxSingleMatrixProjectionJIT)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
@@ -94,22 +97,44 @@ TYPED_TEST(EigenSolverJITTestFloatTypes, CuSolverDxSingleMatrixRejectsProjection
 
   constexpr index_t n = 4;
   auto A = make_tensor<TestType>({n, n});
-  auto Vectors = make_tensor<TestType>({n, n});
-  auto Values = make_tensor<value_type>({n});
+  auto DiagA = make_tensor<value_type>({n});
+  auto Expected = make_tensor<TestType>({n, n});
+  auto Combined = make_tensor<TestType>({n, n});
+  auto mdiff = make_tensor<value_type>({});
+
+  for (index_t i = 0; i < n; i++) {
+    DiagA(i) = value_type(i + 1);
+    for (index_t j = 0; j < n; j++) {
+      A(i, j) = i == j ? MakeEigenTestValue<TestType>(static_cast<double>(i + 1)) : TestType{};
+      Expected(i, j) = i == j ? MakeEigenTestValue<TestType>(1.0) : TestType{};
+    }
+  }
+
   auto op = eig(A);
 
   EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op));
-  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.Vectors));
-  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.Values));
+  EXPECT_TRUE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.Vectors));
+  EXPECT_TRUE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.Values));
 
+  cudaExecutor cuda_exec{};
   CUDAJITExecutor exec{};
-  EXPECT_THROW({ (Vectors = op.Vectors).run(exec); }, matx::detail::matxException);
-  EXPECT_THROW({ (Values = op.Values).run(exec); }, matx::detail::matxException);
+  if constexpr (is_complex_v<TestType>) {
+    (Combined = op.Vectors + TestType{} * clone<2>(as_type<TestType>(op.Values), {n, matxKeepDim})).run(exec);
+    (mdiff = max(abs(Combined - Expected))).run(cuda_exec);
+  }
+  else {
+    (Combined = (clone<2>(as_type<TestType>(op.Values), {n, matxKeepDim}) -
+                 clone<2>(as_type<TestType>(DiagA), {matxKeepDim, n})) * op.Vectors).run(exec);
+    (mdiff = max(abs(Combined))).run(cuda_exec);
+  }
+  cuda_exec.sync();
+
+  ASSERT_NEAR(mdiff(), value_type(0), value_type(0.001));
 
   MATX_EXIT_HANDLER();
 }
 
-TYPED_TEST(EigenSolverJITTestFloatTypes, CuSolverDxBatchedMatrixRejectsProjectionJIT)
+TYPED_TEST(EigenSolverJITTestFloatTypes, CuSolverDxBatchedMatrixProjectionJIT)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
@@ -118,17 +143,94 @@ TYPED_TEST(EigenSolverJITTestFloatTypes, CuSolverDxBatchedMatrixRejectsProjectio
   constexpr index_t batches = 3;
   constexpr index_t n = 4;
   auto A = make_tensor<TestType>({batches, n, n});
-  auto Vectors = make_tensor<TestType>({batches, n, n});
-  auto Values = make_tensor<value_type>({batches, n});
+  auto DiagA = make_tensor<value_type>({batches, n});
+  auto Expected = make_tensor<TestType>({batches, n, n});
+  auto Combined = make_tensor<TestType>({batches, n, n});
+  auto mdiff = make_tensor<value_type>({});
+
+  for (index_t b = 0; b < batches; b++) {
+    for (index_t i = 0; i < n; i++) {
+      DiagA(b, i) = value_type(b + i + 1);
+      for (index_t j = 0; j < n; j++) {
+        A(b, i, j) = i == j ? MakeEigenTestValue<TestType>(static_cast<double>(b + i + 1)) : TestType{};
+        Expected(b, i, j) = i == j ? MakeEigenTestValue<TestType>(1.0) : TestType{};
+      }
+    }
+  }
+
   auto op = eig(A);
 
   EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op));
-  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.Vectors));
-  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.Values));
+  EXPECT_TRUE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.Vectors));
+  EXPECT_TRUE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.Values));
 
+  cudaExecutor cuda_exec{};
   CUDAJITExecutor exec{};
-  EXPECT_THROW({ (Vectors = op.Vectors).run(exec); }, matx::detail::matxException);
-  EXPECT_THROW({ (Values = op.Values).run(exec); }, matx::detail::matxException);
+  if constexpr (is_complex_v<TestType>) {
+    (Combined = op.Vectors + TestType{} * clone<3>(as_type<TestType>(op.Values), {matxKeepDim, n, matxKeepDim})).run(exec);
+    (mdiff = max(abs(Combined - Expected))).run(cuda_exec);
+  }
+  else {
+    (Combined = (clone<3>(as_type<TestType>(op.Values), {matxKeepDim, n, matxKeepDim}) -
+                 clone<3>(as_type<TestType>(DiagA), {matxKeepDim, matxKeepDim, n})) * op.Vectors).run(exec);
+    (mdiff = max(abs(Combined))).run(cuda_exec);
+  }
+  cuda_exec.sync();
+
+  ASSERT_NEAR(mdiff(), value_type(0), value_type(0.001));
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(EigenSolverJITTestFloatTypes, CuSolverDxRank4BatchedMatrixProjectionJIT)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using value_type = typename inner_op_type_t<TestType>::type;
+
+  constexpr index_t batch0 = 2;
+  constexpr index_t batch1 = 2;
+  constexpr index_t n = 4;
+  auto A = make_tensor<TestType>({batch0, batch1, n, n});
+  auto DiagA = make_tensor<value_type>({batch0, batch1, n});
+  auto Expected = make_tensor<TestType>({batch0, batch1, n, n});
+  auto Combined = make_tensor<TestType>({batch0, batch1, n, n});
+  auto mdiff = make_tensor<value_type>({});
+
+  for (index_t b0 = 0; b0 < batch0; b0++) {
+    for (index_t b1 = 0; b1 < batch1; b1++) {
+      for (index_t i = 0; i < n; i++) {
+        DiagA(b0, b1, i) = value_type(b0 + b1 + i + 1);
+        for (index_t j = 0; j < n; j++) {
+          A(b0, b1, i, j) = i == j ?
+            MakeEigenTestValue<TestType>(static_cast<double>(b0 + b1 + i + 1)) :
+            TestType{};
+          Expected(b0, b1, i, j) = i == j ? MakeEigenTestValue<TestType>(1.0) : TestType{};
+        }
+      }
+    }
+  }
+
+  auto op = eig(A);
+
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op));
+  EXPECT_TRUE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.Vectors));
+  EXPECT_TRUE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.Values));
+
+  cudaExecutor cuda_exec{};
+  CUDAJITExecutor exec{};
+  if constexpr (is_complex_v<TestType>) {
+    (Combined = op.Vectors + TestType{} * clone<4>(as_type<TestType>(op.Values), {matxKeepDim, matxKeepDim, n, matxKeepDim})).run(exec);
+    (mdiff = max(abs(Combined - Expected))).run(cuda_exec);
+  }
+  else {
+    (Combined = (clone<4>(as_type<TestType>(op.Values), {matxKeepDim, matxKeepDim, n, matxKeepDim}) -
+                 clone<4>(as_type<TestType>(DiagA), {matxKeepDim, matxKeepDim, matxKeepDim, n})) * op.Vectors).run(exec);
+    (mdiff = max(abs(Combined))).run(cuda_exec);
+  }
+  cuda_exec.sync();
+
+  ASSERT_NEAR(mdiff(), value_type(0), value_type(0.001));
 
   MATX_EXIT_HANDLER();
 }

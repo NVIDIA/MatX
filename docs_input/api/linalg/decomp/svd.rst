@@ -8,8 +8,8 @@ Perform a singular value decomposition (SVD).
 .. versionadded:: 0.6.0
 
 .. note::
-   ``svd`` is a multi-output solver API and is not currently supported by CUDA JIT fusion or cuSolverDx in MatX.
-   Use a normal non-JIT executor path for SVD; ``CUDAJITExecutor`` rejects this operator.
+   ``svd`` is not currently supported by CUDA JIT fusion in MatX. The runtime ``libcusolverdx`` code-generation API
+   used by MatX does not expose an SVD routine, so use a normal non-JIT executor path for SVD.
 
 .. doxygenfunction:: svd
 

@@ -79,6 +79,10 @@ private:
       case CUSOLVERDX_FUNCTION_GESV_NO_PIVOT:
       case CUSOLVERDX_FUNCTION_GESV_PARTIAL_PIVOT:
       case CUSOLVERDX_FUNCTION_GELS:
+      case CUSOLVERDX_FUNCTION_UNGQR:
+      case CUSOLVERDX_FUNCTION_UNGLQ:
+      case CUSOLVERDX_FUNCTION_UNMQR:
+      case CUSOLVERDX_FUNCTION_UNMLQ:
         return 3;
       default:
         return 2;
@@ -191,10 +195,31 @@ private:
   long long int GetKernelSharedMemoryFloor() const
   {
     const auto elem_size = static_cast<long long int>(sizeof(InputType));
+    const auto minmn = static_cast<long long int>(cuda::std::min(m_, n_));
     switch (function_) {
       case CUSOLVERDX_FUNCTION_POTRF: {
         const auto elems = static_cast<long long int>(n_) * static_cast<long long int>(n_);
         return elems * elem_size + static_cast<long long int>(sizeof(int));
+      }
+      case CUSOLVERDX_FUNCTION_GETRF_PARTIAL_PIVOT: {
+        const auto elems = static_cast<long long int>(m_) * static_cast<long long int>(n_);
+        return elems * elem_size + minmn * static_cast<long long int>(sizeof(int)) + static_cast<long long int>(sizeof(int));
+      }
+      case CUSOLVERDX_FUNCTION_GEQRF:
+      case CUSOLVERDX_FUNCTION_UNGQR: {
+        const auto elems = static_cast<long long int>(m_) * static_cast<long long int>(n_);
+        return elems * elem_size + static_cast<long long int>(k_ == 0 ? cuda::std::min(m_, n_) : k_) * elem_size + static_cast<long long int>(sizeof(int));
+      }
+      case CUSOLVERDX_FUNCTION_HEEV:
+      case CUSOLVERDX_FUNCTION_HTEV: {
+        const auto elems = static_cast<long long int>(n_) * static_cast<long long int>(n_);
+        const auto matrix_bytes = elems * elem_size;
+        const auto lambda_offset = AlignUp(matrix_bytes, static_cast<long long int>(alignof(InputType)));
+        const auto workspace_offset = AlignUp(lambda_offset + static_cast<long long int>(n_) * elem_size,
+                                              static_cast<long long int>(alignof(InputType)));
+        const auto info_offset = AlignUp(workspace_offset + static_cast<long long int>(GetWorkspaceSize()),
+                                         static_cast<long long int>(alignof(int)));
+        return info_offset + static_cast<long long int>(sizeof(int));
       }
       case CUSOLVERDX_FUNCTION_GESV_NO_PIVOT:
       case CUSOLVERDX_FUNCTION_GESV_PARTIAL_PIVOT: {
@@ -205,6 +230,11 @@ private:
         return static_cast<long long int>(m_) * static_cast<long long int>(n_) * elem_size +
                static_cast<long long int>(sizeof(int));
     }
+  }
+
+  static long long int AlignUp(long long int value, long long int alignment)
+  {
+    return ((value + alignment - 1) / alignment) * alignment;
   }
 
   std::string GetTraitSymbolName(cusolverdxDescriptor handle) const
@@ -511,6 +541,328 @@ public:
 
       if (tid < elems) {
         return smem_b[tid];
+      }
+      return value_type{};
+    )";
+    return result;
+  }
+
+  std::string GetLuProjectionFuncStr(const std::string &solver_func_name, int factors_component, int piv_component) const
+  {
+    std::string result = R"(
+      using solver_value_type = typename OpA::value_type;
+      static constexpr index_t m = )";
+    result += std::to_string(static_cast<int>(m_));
+    result += R"(;
+      static constexpr index_t n = )";
+    result += std::to_string(static_cast<int>(n_));
+    result += R"(;
+      static constexpr index_t elems = m * n;
+      static constexpr index_t piv_elems = (m < n ? m : n);
+      extern __shared__ __align__(16) char smem[];
+      solver_value_type* smem_a = reinterpret_cast<solver_value_type*>(smem);
+      int* ipiv = reinterpret_cast<int*>(smem + elems * sizeof(solver_value_type));
+      int* info = reinterpret_cast<int*>(smem + elems * sizeof(solver_value_type) + piv_elems * sizeof(int));
+      const int tid = threadIdx.x + threadIdx.y * blockDim.x + threadIdx.z * blockDim.x * blockDim.y;
+      const int total_threads = blockDim.x * blockDim.y * blockDim.z;
+      cuda::std::array<index_t, Rank()> idx = { static_cast<index_t>(indices)... };
+
+      for (index_t base = 0; base < elems; base += total_threads) {
+        const index_t linear = base + tid;
+        const bool valid = linear < elems;
+        const index_t load_linear = valid ? linear : index_t{0};
+        const index_t row = load_linear / n;
+        const index_t col = load_linear % n;
+        solver_value_type a_value{};
+        if constexpr (OpA::Rank() == 2) {
+          a_value = a_.template operator()<CapType>(row, col);
+        }
+        else if constexpr (OpA::Rank() == 3) {
+          a_value = a_.template operator()<CapType>(idx[0], row, col);
+        }
+        else if constexpr (OpA::Rank() == 4) {
+          a_value = a_.template operator()<CapType>(idx[0], idx[1], row, col);
+        }
+        if (valid) {
+          smem_a[linear] = a_value;
+        }
+      }
+
+      if (tid == 0) {
+        *info = 0;
+      }
+      __syncthreads();
+    )";
+    result += solver_func_name;
+    result += R"((smem_a, ipiv, info);
+      __syncthreads();
+
+      if constexpr (Component == )";
+    result += std::to_string(factors_component);
+    result += R"() {
+        const index_t row = idx[Rank() - 2];
+        const index_t col = idx[Rank() - 1];
+        if (row < m && col < n) {
+          return smem_a[row * n + col];
+        }
+      }
+      else if constexpr (Component == )";
+    result += std::to_string(piv_component);
+    result += R"() {
+        const index_t vec_idx = idx[Rank() - 1];
+        if (vec_idx < piv_elems) {
+          const int pivot = ipiv[vec_idx] == 0 ?
+            static_cast<int>(vec_idx + 1) :
+            static_cast<int>(vec_idx) + ipiv[vec_idx];
+          return static_cast<value_type>(pivot);
+        }
+      }
+      return value_type{};
+    )";
+    return result;
+  }
+
+  std::string GetGeqrfProjectionFuncStr(const std::string &solver_func_name, int out_component, int tau_component) const
+  {
+    std::string result = R"(
+      using solver_value_type = typename OpA::value_type;
+      static constexpr index_t m = )";
+    result += std::to_string(static_cast<int>(m_));
+    result += R"(;
+      static constexpr index_t n = )";
+    result += std::to_string(static_cast<int>(n_));
+    result += R"(;
+      static constexpr index_t elems = m * n;
+      static constexpr index_t tau_elems = (m < n ? m : n);
+      extern __shared__ __align__(16) char smem[];
+      solver_value_type* smem_a = reinterpret_cast<solver_value_type*>(smem);
+      solver_value_type* tau = reinterpret_cast<solver_value_type*>(smem + elems * sizeof(solver_value_type));
+      const int tid = threadIdx.x + threadIdx.y * blockDim.x + threadIdx.z * blockDim.x * blockDim.y;
+      const int total_threads = blockDim.x * blockDim.y * blockDim.z;
+      cuda::std::array<index_t, Rank()> idx = { static_cast<index_t>(indices)... };
+
+      for (index_t base = 0; base < elems; base += total_threads) {
+        const index_t linear = base + tid;
+        const bool valid = linear < elems;
+        const index_t load_linear = valid ? linear : index_t{0};
+        const index_t row = load_linear / n;
+        const index_t col = load_linear % n;
+        solver_value_type a_value{};
+        if constexpr (OpA::Rank() == 2) {
+          a_value = a_.template operator()<CapType>(row, col);
+        }
+        else if constexpr (OpA::Rank() == 3) {
+          a_value = a_.template operator()<CapType>(idx[0], row, col);
+        }
+        else if constexpr (OpA::Rank() == 4) {
+          a_value = a_.template operator()<CapType>(idx[0], idx[1], row, col);
+        }
+        if (valid) {
+          smem_a[linear] = a_value;
+        }
+      }
+
+      __syncthreads();
+    )";
+    result += solver_func_name;
+    result += R"((smem_a, tau);
+      __syncthreads();
+
+      if constexpr (Component == )";
+    result += std::to_string(out_component);
+    result += R"() {
+        const index_t row = idx[Rank() - 2];
+        const index_t col = idx[Rank() - 1];
+        if (row < m && col < n) {
+          return smem_a[row * n + col];
+        }
+      }
+      else if constexpr (Component == )";
+    result += std::to_string(tau_component);
+    result += R"() {
+        const index_t vec_idx = idx[Rank() - 1];
+        if (vec_idx < tau_elems) {
+          return tau[vec_idx];
+        }
+      }
+      return value_type{};
+    )";
+    return result;
+  }
+
+  std::string GetQrProjectionFuncStr(const std::string &geqrf_func_name,
+                                     const std::string &ungqr_func_name,
+                                     int q_component,
+                                     int r_component,
+                                     index_t q_cols,
+                                     index_t r_rows) const
+  {
+    std::string result = R"(
+      using solver_value_type = typename OpA::value_type;
+      static constexpr index_t m = )";
+    result += std::to_string(static_cast<int>(m_));
+    result += R"(;
+      static constexpr index_t n = )";
+    result += std::to_string(static_cast<int>(n_));
+    result += R"(;
+      static constexpr index_t q_cols = )";
+    result += std::to_string(static_cast<int>(q_cols));
+    result += R"(;
+      static constexpr index_t r_rows = )";
+    result += std::to_string(static_cast<int>(r_rows));
+    result += R"(;
+      static constexpr index_t elems = m * n;
+      static constexpr index_t q_elems = m * q_cols;
+      static constexpr index_t tau_elems = q_cols;
+      extern __shared__ __align__(16) char smem[];
+      solver_value_type* smem_a = reinterpret_cast<solver_value_type*>(smem);
+      solver_value_type* tau = reinterpret_cast<solver_value_type*>(smem + elems * sizeof(solver_value_type));
+      const int tid = threadIdx.x + threadIdx.y * blockDim.x + threadIdx.z * blockDim.x * blockDim.y;
+      const int total_threads = blockDim.x * blockDim.y * blockDim.z;
+      cuda::std::array<index_t, Rank()> idx = { static_cast<index_t>(indices)... };
+
+      for (index_t base = 0; base < elems; base += total_threads) {
+        const index_t linear = base + tid;
+        const bool valid = linear < elems;
+        const index_t load_linear = valid ? linear : index_t{0};
+        const index_t row = load_linear / n;
+        const index_t col = load_linear % n;
+        solver_value_type a_value{};
+        if constexpr (OpA::Rank() == 2) {
+          a_value = a_.template operator()<CapType>(row, col);
+        }
+        else if constexpr (OpA::Rank() == 3) {
+          a_value = a_.template operator()<CapType>(idx[0], row, col);
+        }
+        else if constexpr (OpA::Rank() == 4) {
+          a_value = a_.template operator()<CapType>(idx[0], idx[1], row, col);
+        }
+        if (valid) {
+          smem_a[linear] = a_value;
+        }
+      }
+
+      __syncthreads();
+    )";
+    result += geqrf_func_name;
+    result += R"((smem_a, tau);
+      __syncthreads();
+
+      if constexpr (Component == )";
+    result += std::to_string(q_component);
+    result += R"() {
+        for (index_t base = 0; base < q_elems; base += total_threads) {
+          const index_t linear = base + tid;
+          if (linear < q_elems) {
+            const index_t row = linear / q_cols;
+            const index_t col = linear % q_cols;
+            smem_a[linear] = smem_a[row * n + col];
+          }
+        }
+        __syncthreads();
+    )";
+    result += ungqr_func_name;
+    result += R"((smem_a, tau);
+        __syncthreads();
+
+        const index_t row = idx[Rank() - 2];
+        const index_t col = idx[Rank() - 1];
+        if (row < m && col < q_cols) {
+          return smem_a[row * q_cols + col];
+        }
+      }
+      else if constexpr (Component == )";
+    result += std::to_string(r_component);
+    result += R"() {
+        const index_t row = idx[Rank() - 2];
+        const index_t col = idx[Rank() - 1];
+        if (row < r_rows && col < n && row <= col) {
+          return smem_a[row * n + col];
+        }
+      }
+      return value_type{};
+    )";
+    return result;
+  }
+
+  std::string GetHeevProjectionFuncStr(const std::string &solver_func_name, int vectors_component, int values_component) const
+  {
+    using precision_type = typename inner_op_type_t<InputType>::type;
+    std::string result = R"(
+      using solver_value_type = typename OpA::value_type;
+      using precision_type = typename inner_op_type_t<solver_value_type>::type;
+      static constexpr index_t n = )";
+    result += std::to_string(static_cast<int>(n_));
+    result += R"(;
+      static constexpr index_t elems = n * n;
+      static constexpr size_t matrix_bytes = elems * sizeof(solver_value_type);
+      static constexpr size_t lambda_offset = ((matrix_bytes + alignof(solver_value_type) - 1) / alignof(solver_value_type)) * alignof(solver_value_type);
+      static constexpr size_t lambda_bytes = n * sizeof(solver_value_type);
+      static constexpr size_t workspace_offset = ((lambda_offset + lambda_bytes + alignof(solver_value_type) - 1) / alignof(solver_value_type)) * alignof(solver_value_type);
+      static constexpr size_t workspace_bytes = )";
+    result += std::to_string(static_cast<int>(GetWorkspaceSize()));
+    result += R"(;
+      static constexpr size_t info_offset = ((workspace_offset + workspace_bytes + alignof(int) - 1) / alignof(int)) * alignof(int);
+      extern __shared__ __align__(16) char smem[];
+      solver_value_type* smem_a = reinterpret_cast<solver_value_type*>(smem);
+      solver_value_type* lambda = reinterpret_cast<solver_value_type*>(smem + lambda_offset);
+      solver_value_type* workspace = reinterpret_cast<solver_value_type*>(smem + workspace_offset);
+      int* info = reinterpret_cast<int*>(smem + info_offset);
+      const int tid = threadIdx.x + threadIdx.y * blockDim.x + threadIdx.z * blockDim.x * blockDim.y;
+      const int total_threads = blockDim.x * blockDim.y * blockDim.z;
+      cuda::std::array<index_t, Rank()> idx = { static_cast<index_t>(indices)... };
+
+      for (index_t base = 0; base < elems; base += total_threads) {
+        const index_t linear = base + tid;
+        const bool valid = linear < elems;
+        const index_t load_linear = valid ? linear : index_t{0};
+        const index_t row = load_linear / n;
+        const index_t col = load_linear % n;
+        solver_value_type a_value{};
+        if constexpr (OpA::Rank() == 2) {
+          a_value = a_.template operator()<CapType>(row, col);
+        }
+        else if constexpr (OpA::Rank() == 3) {
+          a_value = a_.template operator()<CapType>(idx[0], row, col);
+        }
+        else if constexpr (OpA::Rank() == 4) {
+          a_value = a_.template operator()<CapType>(idx[0], idx[1], row, col);
+        }
+        if (valid) {
+          smem_a[linear] = a_value;
+        }
+      }
+
+      if (tid == 0) {
+        *info = 0;
+      }
+      __syncthreads();
+    )";
+    result += solver_func_name;
+    result += R"((smem_a, lambda, workspace, info);
+      __syncthreads();
+
+      if constexpr (Component == )";
+    result += std::to_string(vectors_component);
+    result += R"() {
+        const index_t row = idx[Rank() - 2];
+        const index_t col = idx[Rank() - 1];
+        if (row < n && col < n) {
+          return smem_a[row * n + col];
+        }
+      }
+      else if constexpr (Component == )";
+    result += std::to_string(values_component);
+    result += R"() {
+        const index_t vec_idx = idx[Rank() - 1];
+        if (vec_idx < n) {
+          if constexpr (is_complex_v<solver_value_type>) {
+            return static_cast<value_type>(lambda[vec_idx].real());
+          }
+          else {
+            return static_cast<value_type>(lambda[vec_idx]);
+          }
+        }
       }
       return value_type{};
     )";

@@ -8,8 +8,10 @@ Perform an LU factorization.
 .. versionadded:: 0.6.0
 
 .. note::
-   ``lu`` is a multi-output solver API and is not currently supported by CUDA JIT fusion or cuSolverDx in MatX.
-   Use a normal non-JIT executor path for LU factorization; ``CUDAJITExecutor`` rejects this operator.
+   The ``mtie`` assignment form of ``lu`` uses the normal non-JIT solver path. CUDA JIT fusion is available through
+   lazy projection members such as ``lu(A).LU`` and ``lu(A).Piv`` when ``-DMATX_EN_MATHDX=ON`` is enabled and the
+   runtime shape/type is supported by cuSolverDx. Projection JIT currently supports ranks 2 through 4 and
+   ``float``, ``double``, ``complex<float>``, and ``complex<double>`` inputs.
 
 .. doxygenfunction:: lu
 

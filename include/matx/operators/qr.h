@@ -37,6 +37,9 @@
 #include "matx/operators/base_operator.h"
 #include "matx/operators/solver_projection.h"
 #include "matx/transforms/qr/qr_cuda.h"
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
+  #include "matx/transforms/solver_cusolverdx.h"
+#endif
 #ifdef MATX_EN_CPU_SOLVER
   #include "matx/transforms/qr/qr_lapack.h"
 #endif
@@ -70,13 +73,43 @@ namespace detail {
       mutable value_type *r_ptr_ = nullptr;
       mutable bool materialized_ = false;
       mutable int materialize_count_ = 0;
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
+      mutable cuSolverDxHelper<value_type> dx_geqrf_helper_;
+      mutable cuSolverDxHelper<value_type> dx_ungqr_helper_;
+#endif
 
     public:
+      using input_type = OpA;
+
       QRState(const OpA &a) : a_(a)
       {
         q_shape_ = SolverShapeFromInput<RANK>(a_);
         r_shape_ = q_shape_;
         q_shape_[RANK - 1] = q_shape_[RANK - 2];
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
+        int major = 0;
+        int minor = 0;
+        int device = 0;
+        MATX_CUDA_CHECK(cudaGetDevice(&device));
+        MATX_CUDA_CHECK(cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device));
+        MATX_CUDA_CHECK(cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device));
+        const int cc = major * 100 + minor * 10;
+
+        const index_t m = r_shape_[RANK - 2];
+        const index_t n = r_shape_[RANK - 1];
+        const index_t k = m < n ? m : n;
+        dx_geqrf_helper_.set_m(m);
+        dx_geqrf_helper_.set_n(n);
+        dx_geqrf_helper_.set_k(k);
+        dx_geqrf_helper_.set_cc(cc);
+        dx_geqrf_helper_.set_function(CUSOLVERDX_FUNCTION_GEQRF);
+
+        dx_ungqr_helper_.set_m(m);
+        dx_ungqr_helper_.set_n(q_shape_[RANK - 1]);
+        dx_ungqr_helper_.set_k(k);
+        dx_ungqr_helper_.set_cc(cc);
+        dx_ungqr_helper_.set_function(CUSOLVERDX_FUNCTION_UNGQR);
+#endif
       }
 
       const auto &Input() const { return a_; }
@@ -151,6 +184,102 @@ namespace detail {
           return r_;
         }
       }
+
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
+      template <int Component>
+      bool SupportsJITProjection() const
+      {
+        const bool square = r_shape_[RANK - 2] == r_shape_[RANK - 1];
+        return (RANK >= 2) && (RANK <= 4) && square &&
+               dx_geqrf_helper_.IsSupported() &&
+               (Component == QR_R || dx_ungqr_helper_.IsSupported());
+      }
+
+      template <int Component>
+      int GetJITProjectionShmRequired() const
+      {
+        if constexpr (Component == QR_Q) {
+          return cuda::std::max(dx_geqrf_helper_.GetShmRequired(), dx_ungqr_helper_.GetShmRequired());
+        }
+        else {
+          return dx_geqrf_helper_.GetShmRequired();
+        }
+      }
+
+      template <int Component>
+      cuda::std::array<int, 2> GetJITProjectionBlockDimRange() const
+      {
+        auto range = dx_geqrf_helper_.GetBlockDimRange();
+        if constexpr (Component == QR_Q) {
+          return combine_capabilities<OperatorCapability::BLOCK_DIM>(range, dx_ungqr_helper_.GetBlockDimRange());
+        }
+        return range;
+      }
+
+      template <int Component>
+      bool GenerateJITProjectionLTOIR(std::set<std::string> &ltoir_symbols) const
+      {
+        bool ok = dx_geqrf_helper_.GenerateLTOIR(ltoir_symbols);
+        if constexpr (Component == QR_Q) {
+          ok = ok && dx_ungqr_helper_.GenerateLTOIR(ltoir_symbols);
+        }
+        return ok;
+      }
+
+      template <int Component>
+      std::string GetJITProjectionTypeName(const std::string &inner_op_jit_name) const
+      {
+        return std::string("JITQRProjectionOp<") + inner_op_jit_name + ", " + std::to_string(Component) + ">";
+      }
+
+      template <int Component>
+      JITCacheKey GetJITProjectionCacheKey() const
+      {
+        auto key = detail::MakeJITCacheKeyForType<QRState<OpA>>("JITQRProjection");
+        detail::HashJITCacheValue(key, Component);
+        detail::HashJITCacheValue(key, RANK);
+        for (int i = 0; i < RANK; ++i) {
+          detail::HashJITCacheValue(key, r_shape_[i]);
+        }
+        return key;
+      }
+
+      template <int Component>
+      void AddJITProjectionClasses(std::unordered_map<std::string, std::string> &in) const
+      {
+        const std::string class_name = "JITQRProjectionOp";
+        if (in.find(class_name) != in.end()) {
+          return;
+        }
+
+        const std::string geqrf_func_name = std::string(SOLVER_DX_FUNC_PREFIX) + "_" + dx_geqrf_helper_.GetSymbolName();
+        const std::string ungqr_func_name = std::string(SOLVER_DX_FUNC_PREFIX) + "_" + dx_ungqr_helper_.GetSymbolName();
+        in[class_name] =
+          " extern \"C\" __device__ void " + geqrf_func_name + "(" + detail::type_to_string<value_type>() + "*, " + detail::type_to_string<value_type>() + "*);\n"
+          " extern \"C\" __device__ void " + ungqr_func_name + "(" + detail::type_to_string<value_type>() + "*, " + detail::type_to_string<value_type>() + "*);\n"
+          " template <typename OpA, int Component> struct " + class_name + "  {\n"
+          "  using value_type = typename OpA::value_type;\n"
+          "  using matxop = bool;\n"
+          "  typename detail::inner_storage_or_self_t<detail::base_type_t<OpA>> a_;\n"
+          "  template <typename CapType, typename... Is>\n"
+          "  __MATX_INLINE__ __MATX_DEVICE__ value_type operator()(Is... indices) const\n"
+          "  {\n"
+          "    " + dx_geqrf_helper_.GetQrProjectionFuncStr(geqrf_func_name, ungqr_func_name, QR_Q, QR_R, q_shape_[RANK - 1], r_shape_[RANK - 2]) + "\n"
+          "  }\n"
+          "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank()\n"
+          "  {\n"
+          "    return OpA::Rank();\n"
+          "  }\n"
+          "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const\n"
+          "  {\n"
+          "    if constexpr (Component == " + std::to_string(QR_Q) + ") {\n"
+          "      if (dim == OpA::Rank() - 1) { return a_.Size(OpA::Rank() - 2); }\n"
+          "    }\n"
+          "    return a_.Size(dim);\n"
+          "  }\n"
+          "};\n";
+      }
+#endif
   };
 
   template<typename OpA>
@@ -256,12 +385,32 @@ namespace detail {
       mutable value_type *tau_ptr_ = nullptr;
       mutable bool materialized_ = false;
       mutable int materialize_count_ = 0;
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
+      mutable cuSolverDxHelper<value_type> dx_geqrf_helper_;
+#endif
 
     public:
+      using input_type = OpA;
+
       SolverQRState(const OpA &a) : a_(a)
       {
         out_shape_ = SolverShapeFromInput<RANK>(a_);
         tau_shape_ = SolverVectorShapeFromMatrixShape<RANK>(out_shape_);
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
+        int major = 0;
+        int minor = 0;
+        int device = 0;
+        MATX_CUDA_CHECK(cudaGetDevice(&device));
+        MATX_CUDA_CHECK(cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device));
+        MATX_CUDA_CHECK(cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device));
+        const int cc = major * 100 + minor * 10;
+
+        dx_geqrf_helper_.set_m(out_shape_[RANK - 2]);
+        dx_geqrf_helper_.set_n(out_shape_[RANK - 1]);
+        dx_geqrf_helper_.set_k(tau_shape_[RANK - 2]);
+        dx_geqrf_helper_.set_cc(cc);
+        dx_geqrf_helper_.set_function(CUSOLVERDX_FUNCTION_GEQRF);
+#endif
       }
 
       const auto &Input() const { return a_; }
@@ -336,6 +485,88 @@ namespace detail {
           return tau_;
         }
       }
+
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
+      template <int Component>
+      bool SupportsJITProjection() const
+      {
+        return (RANK >= 2) && (RANK <= 4) && dx_geqrf_helper_.IsSupported();
+      }
+
+      template <int Component>
+      int GetJITProjectionShmRequired() const
+      {
+        return dx_geqrf_helper_.GetShmRequired();
+      }
+
+      template <int Component>
+      cuda::std::array<int, 2> GetJITProjectionBlockDimRange() const
+      {
+        return dx_geqrf_helper_.GetBlockDimRange();
+      }
+
+      template <int Component>
+      bool GenerateJITProjectionLTOIR(std::set<std::string> &ltoir_symbols) const
+      {
+        return dx_geqrf_helper_.GenerateLTOIR(ltoir_symbols);
+      }
+
+      template <int Component>
+      std::string GetJITProjectionTypeName(const std::string &inner_op_jit_name) const
+      {
+        return std::string("JITQRSolverProjectionOp<") + inner_op_jit_name + ", " + std::to_string(Component) + ">";
+      }
+
+      template <int Component>
+      JITCacheKey GetJITProjectionCacheKey() const
+      {
+        auto key = detail::MakeJITCacheKeyForType<SolverQRState<OpA>>("JITQRSolverProjection");
+        detail::HashJITCacheValue(key, Component);
+        detail::HashJITCacheValue(key, RANK);
+        for (int i = 0; i < RANK; ++i) {
+          detail::HashJITCacheValue(key, out_shape_[i]);
+        }
+        return key;
+      }
+
+      template <int Component>
+      void AddJITProjectionClasses(std::unordered_map<std::string, std::string> &in) const
+      {
+        const std::string class_name = "JITQRSolverProjectionOp";
+        if (in.find(class_name) != in.end()) {
+          return;
+        }
+
+        const std::string solver_func_name = std::string(SOLVER_DX_FUNC_PREFIX) + "_" + dx_geqrf_helper_.GetSymbolName();
+        in[class_name] =
+          " extern \"C\" __device__ void " + solver_func_name + "(" + detail::type_to_string<value_type>() + "*, " + detail::type_to_string<value_type>() + "*);\n"
+          " template <typename OpA, int Component> struct " + class_name + "  {\n"
+          "  using value_type = typename OpA::value_type;\n"
+          "  using matxop = bool;\n"
+          "  typename detail::inner_storage_or_self_t<detail::base_type_t<OpA>> a_;\n"
+          "  template <typename CapType, typename... Is>\n"
+          "  __MATX_INLINE__ __MATX_DEVICE__ value_type operator()(Is... indices) const\n"
+          "  {\n"
+          "    " + dx_geqrf_helper_.GetGeqrfProjectionFuncStr(solver_func_name, QR_SOLVER_OUT, QR_SOLVER_TAU) + "\n"
+          "  }\n"
+          "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank()\n"
+          "  {\n"
+          "    if constexpr (Component == " + std::to_string(QR_SOLVER_TAU) + ") { return OpA::Rank() - 1; }\n"
+          "    else { return OpA::Rank(); }\n"
+          "  }\n"
+          "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const\n"
+          "  {\n"
+          "    if constexpr (Component == " + std::to_string(QR_SOLVER_TAU) + ") {\n"
+          "      if (dim < OpA::Rank() - 2) { return a_.Size(dim); }\n"
+          "      const index_t m = a_.Size(OpA::Rank() - 2);\n"
+          "      const index_t n = a_.Size(OpA::Rank() - 1);\n"
+          "      return m < n ? m : n;\n"
+          "    }\n"
+          "    else { return a_.Size(dim); }\n"
+          "  }\n"
+          "};\n";
+      }
+#endif
   };
 
   template<typename OpA>
@@ -446,8 +677,14 @@ namespace detail {
       mutable value_type *r_ptr_ = nullptr;
       mutable bool materialized_ = false;
       mutable int materialize_count_ = 0;
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
+      mutable cuSolverDxHelper<value_type> dx_geqrf_helper_;
+      mutable cuSolverDxHelper<value_type> dx_ungqr_helper_;
+#endif
 
     public:
+      using input_type = OpA;
+
       EconQRState(const OpA &a) : a_(a)
       {
         q_shape_ = SolverShapeFromInput<RANK>(a_);
@@ -455,6 +692,27 @@ namespace detail {
         const index_t k = q_shape_[RANK - 2] < q_shape_[RANK - 1] ? q_shape_[RANK - 2] : q_shape_[RANK - 1];
         q_shape_[RANK - 1] = k;
         r_shape_[RANK - 2] = k;
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
+        int major = 0;
+        int minor = 0;
+        int device = 0;
+        MATX_CUDA_CHECK(cudaGetDevice(&device));
+        MATX_CUDA_CHECK(cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device));
+        MATX_CUDA_CHECK(cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device));
+        const int cc = major * 100 + minor * 10;
+
+        dx_geqrf_helper_.set_m(a_.Size(RANK - 2));
+        dx_geqrf_helper_.set_n(a_.Size(RANK - 1));
+        dx_geqrf_helper_.set_k(k);
+        dx_geqrf_helper_.set_cc(cc);
+        dx_geqrf_helper_.set_function(CUSOLVERDX_FUNCTION_GEQRF);
+
+        dx_ungqr_helper_.set_m(q_shape_[RANK - 2]);
+        dx_ungqr_helper_.set_n(q_shape_[RANK - 1]);
+        dx_ungqr_helper_.set_k(k);
+        dx_ungqr_helper_.set_cc(cc);
+        dx_ungqr_helper_.set_function(CUSOLVERDX_FUNCTION_UNGQR);
+#endif
       }
 
       const auto &Input() const { return a_; }
@@ -529,6 +787,108 @@ namespace detail {
           return r_;
         }
       }
+
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
+      template <int Component>
+      bool SupportsJITProjection() const
+      {
+        return (RANK >= 2) && (RANK <= 4) &&
+               dx_geqrf_helper_.IsSupported() &&
+               (Component == QR_ECON_R || dx_ungqr_helper_.IsSupported());
+      }
+
+      template <int Component>
+      int GetJITProjectionShmRequired() const
+      {
+        if constexpr (Component == QR_ECON_Q) {
+          return cuda::std::max(dx_geqrf_helper_.GetShmRequired(), dx_ungqr_helper_.GetShmRequired());
+        }
+        else {
+          return dx_geqrf_helper_.GetShmRequired();
+        }
+      }
+
+      template <int Component>
+      cuda::std::array<int, 2> GetJITProjectionBlockDimRange() const
+      {
+        auto range = dx_geqrf_helper_.GetBlockDimRange();
+        if constexpr (Component == QR_ECON_Q) {
+          return combine_capabilities<OperatorCapability::BLOCK_DIM>(range, dx_ungqr_helper_.GetBlockDimRange());
+        }
+        return range;
+      }
+
+      template <int Component>
+      bool GenerateJITProjectionLTOIR(std::set<std::string> &ltoir_symbols) const
+      {
+        bool ok = dx_geqrf_helper_.GenerateLTOIR(ltoir_symbols);
+        if constexpr (Component == QR_ECON_Q) {
+          ok = ok && dx_ungqr_helper_.GenerateLTOIR(ltoir_symbols);
+        }
+        return ok;
+      }
+
+      template <int Component>
+      std::string GetJITProjectionTypeName(const std::string &inner_op_jit_name) const
+      {
+        return std::string("JITEconQRProjectionOp<") + inner_op_jit_name + ", " + std::to_string(Component) + ">";
+      }
+
+      template <int Component>
+      JITCacheKey GetJITProjectionCacheKey() const
+      {
+        auto key = detail::MakeJITCacheKeyForType<EconQRState<OpA>>("JITEconQRProjection");
+        detail::HashJITCacheValue(key, Component);
+        detail::HashJITCacheValue(key, RANK);
+        for (int i = 0; i < RANK; ++i) {
+          detail::HashJITCacheValue(key, q_shape_[i]);
+          detail::HashJITCacheValue(key, r_shape_[i]);
+        }
+        return key;
+      }
+
+      template <int Component>
+      void AddJITProjectionClasses(std::unordered_map<std::string, std::string> &in) const
+      {
+        const std::string class_name = "JITEconQRProjectionOp";
+        if (in.find(class_name) != in.end()) {
+          return;
+        }
+
+        const std::string geqrf_func_name = std::string(SOLVER_DX_FUNC_PREFIX) + "_" + dx_geqrf_helper_.GetSymbolName();
+        const std::string ungqr_func_name = std::string(SOLVER_DX_FUNC_PREFIX) + "_" + dx_ungqr_helper_.GetSymbolName();
+        in[class_name] =
+          " extern \"C\" __device__ void " + geqrf_func_name + "(" + detail::type_to_string<value_type>() + "*, " + detail::type_to_string<value_type>() + "*);\n"
+          " extern \"C\" __device__ void " + ungqr_func_name + "(" + detail::type_to_string<value_type>() + "*, " + detail::type_to_string<value_type>() + "*);\n"
+          " template <typename OpA, int Component> struct " + class_name + "  {\n"
+          "  using value_type = typename OpA::value_type;\n"
+          "  using matxop = bool;\n"
+          "  typename detail::inner_storage_or_self_t<detail::base_type_t<OpA>> a_;\n"
+          "  template <typename CapType, typename... Is>\n"
+          "  __MATX_INLINE__ __MATX_DEVICE__ value_type operator()(Is... indices) const\n"
+          "  {\n"
+          "    " + dx_geqrf_helper_.GetQrProjectionFuncStr(geqrf_func_name, ungqr_func_name, QR_ECON_Q, QR_ECON_R, q_shape_[RANK - 1], r_shape_[RANK - 2]) + "\n"
+          "  }\n"
+          "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank()\n"
+          "  {\n"
+          "    return OpA::Rank();\n"
+          "  }\n"
+          "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const\n"
+          "  {\n"
+          "    const index_t m = a_.Size(OpA::Rank() - 2);\n"
+          "    const index_t n = a_.Size(OpA::Rank() - 1);\n"
+          "    const index_t k = m < n ? m : n;\n"
+          "    if constexpr (Component == " + std::to_string(QR_ECON_Q) + ") {\n"
+          "      if (dim == OpA::Rank() - 1) { return k; }\n"
+          "    }\n"
+          "    else if constexpr (Component == " + std::to_string(QR_ECON_R) + ") {\n"
+          "      if (dim == OpA::Rank() - 2) { return k; }\n"
+          "    }\n"
+          "    return a_.Size(dim);\n"
+          "  }\n"
+          "};\n";
+      }
+#endif
   };
 
   template<typename OpA>

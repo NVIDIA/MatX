@@ -33,6 +33,7 @@
 #pragma once
 
 #include "matx/core/type_utils.h"
+#include "matx/core/operator_utils.h"
 #include "matx/operators/base_operator.h"
 
 namespace matx {
@@ -72,6 +73,7 @@ class SolverProjectionOp : public BaseOp<SolverProjectionOp<State, Component, Te
   public:
     using matxop = bool;
     using value_type = typename TensorType::value_type;
+    using input_type = typename State::input_type;
 
     __MATX_INLINE__ SolverProjectionOp(State *state,
                                        const cuda::std::array<index_t, TensorType::Rank()> &shape,
@@ -120,6 +122,103 @@ class SolverProjectionOp : public BaseOp<SolverProjectionOp<State, Component, Te
     template <OperatorCapability Cap, typename InType>
     __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const
     {
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
+      if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+        if constexpr (requires(State *s) { s->template SupportsJITProjection<Component>(); }) {
+          const bool supported = state_->template SupportsJITProjection<Component>();
+          return combine_capabilities<Cap>(supported, detail::get_operator_capability<Cap>(state_->Input(), in));
+        }
+        else {
+          return false;
+        }
+      }
+      else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+#ifdef MATX_EN_JIT
+        if constexpr (requires(State *s, InType &classes) { s->template AddJITProjectionClasses<Component>(classes); }) {
+          state_->template AddJITProjectionClasses<Component>(in);
+          detail::get_operator_capability<Cap>(state_->Input(), in);
+          return true;
+        }
+        else {
+          return false;
+        }
+#else
+        return false;
+#endif
+      }
+      else if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
+        if constexpr (requires(State *s) { s->template GetJITProjectionShmRequired<Component>(); }) {
+          return combine_capabilities<Cap>(state_->template GetJITProjectionShmRequired<Component>(),
+                                           detail::get_operator_capability<Cap>(state_->Input(), in));
+        }
+        else {
+          auto self_has_cap = capability_attributes<Cap>::default_value;
+          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(state_->Input(), in));
+        }
+      }
+      else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+        const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
+        return combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(state_->Input(), in));
+      }
+      else if constexpr (Cap == OperatorCapability::GLOBAL_KERNEL) {
+        return false;
+      }
+      else if constexpr (Cap == OperatorCapability::PASS_THROUGH_THREADS) {
+        return true;
+      }
+      else if constexpr (Cap == OperatorCapability::PASS_THROUGH_INNER_RANK) {
+        return TensorType::Rank() == input_type::Rank() ? 2 : 1;
+      }
+      else if constexpr (Cap == OperatorCapability::BLOCK_DIM) {
+        if constexpr (requires(State *s) { s->template GetJITProjectionBlockDimRange<Component>(); }) {
+          return combine_capabilities<Cap>(state_->template GetJITProjectionBlockDimRange<Component>(),
+                                           detail::get_operator_capability<Cap>(state_->Input(), in));
+        }
+        else {
+          auto self_has_cap = capability_attributes<Cap>::default_value;
+          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(state_->Input(), in));
+        }
+      }
+      else if constexpr (Cap == OperatorCapability::GENERATE_LTOIR) {
+        if constexpr (requires(State *s, InType &query) { s->template GenerateJITProjectionLTOIR<Component>(query.ltoir_symbols); }) {
+          return combine_capabilities<Cap>(state_->template GenerateJITProjectionLTOIR<Component>(in.ltoir_symbols),
+                                           detail::get_operator_capability<Cap>(state_->Input(), in));
+        }
+        else {
+          return false;
+        }
+      }
+      else if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+#ifdef MATX_EN_JIT
+        const auto inner_op_jit_name = detail::get_operator_capability<Cap>(state_->Input(), in);
+        if constexpr (requires(State *s, const std::string &name) { s->template GetJITProjectionTypeName<Component>(name); }) {
+          return state_->template GetJITProjectionTypeName<Component>(inner_op_jit_name);
+        }
+        else {
+          return std::string(name_);
+        }
+#else
+        return std::string{};
+#endif
+      }
+      else if constexpr (Cap == OperatorCapability::JIT_CACHE_KEY) {
+#ifdef MATX_EN_JIT
+        if constexpr (requires(State *s) { s->template GetJITProjectionCacheKey<Component>(); }) {
+          return combine_capabilities<Cap>(state_->template GetJITProjectionCacheKey<Component>(),
+                                           detail::get_operator_capability<Cap>(state_->Input(), in));
+        }
+        else {
+          return detail::MakeInvalidJITCacheKey();
+        }
+#else
+        return detail::MakeInvalidJITCacheKey();
+#endif
+      }
+      else {
+        auto self_has_cap = capability_attributes<Cap>::default_value;
+        return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(state_->Input(), in));
+      }
+#else
       if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
         return false;
       }
@@ -127,9 +226,22 @@ class SolverProjectionOp : public BaseOp<SolverProjectionOp<State, Component, Te
         return std::string(name_);
       }
       else {
-        return capability_attributes<Cap>::default_value;
+        auto self_has_cap = capability_attributes<Cap>::default_value;
+        return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(state_->Input(), in));
       }
+#endif
     }
+
+#ifdef MATX_EN_JIT
+    struct JIT_Storage {
+      mutable typename detail::inner_storage_or_self_t<detail::base_type_t<input_type>> a_;
+    };
+
+    JIT_Storage ToJITStorage() const
+    {
+      return JIT_Storage{detail::to_jit_storage(state_->Input())};
+    }
+#endif
 };
 
 } // end namespace detail

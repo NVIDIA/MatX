@@ -8,9 +8,13 @@ Perform a QR decomposition.
 .. versionadded:: 0.6.0
 
 .. note::
-   ``qr``, ``qr_econ``, and ``qr_solver`` are multi-output solver APIs and are not currently supported by CUDA JIT
-   fusion or cuSolverDx in MatX. Use a normal non-JIT executor path supported by the QR variant; ``CUDAJITExecutor``
-   rejects these operators.
+   The ``mtie`` assignment forms of ``qr``, ``qr_econ``, and ``qr_solver`` use the normal non-JIT solver path.
+   CUDA JIT fusion is available through lazy projection members such as ``qr(A).Q``, ``qr(A).R``,
+   ``qr_econ(A).Q``, ``qr_econ(A).R``, ``qr_solver(A).Out``, and ``qr_solver(A).Tau`` when
+   ``-DMATX_EN_MATHDX=ON`` is enabled and the runtime shape/type is supported by cuSolverDx. Projection JIT
+   currently supports ranks 2 through 4 and ``float``, ``double``, ``complex<float>``, and
+   ``complex<double>`` inputs. The full ``qr`` projection path is limited to square matrices to preserve its full
+   Q/R output contract; use ``qr_econ`` or ``qr_solver`` projections for rectangular matrices.
 
 .. doxygenfunction:: qr
 

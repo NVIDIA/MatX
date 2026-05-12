@@ -37,6 +37,9 @@
 #include "matx/operators/base_operator.h"
 #include "matx/operators/solver_projection.h"
 #include "matx/transforms/eig/eig_cuda.h"
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
+  #include "matx/transforms/solver_cusolverdx.h"
+#endif
 #ifdef MATX_EN_CPU_SOLVER
   #include "matx/transforms/eig/eig_lapack.h"
 #endif
@@ -71,12 +74,42 @@ namespace detail {
       mutable w_value_type *values_ptr_ = nullptr;
       mutable bool materialized_ = false;
       mutable int materialize_count_ = 0;
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
+      mutable cuSolverDxHelper<a_value_type> dx_heev_values_helper_;
+      mutable cuSolverDxHelper<a_value_type> dx_heev_vectors_helper_;
+#endif
 
     public:
+      using input_type = OpA;
+
       EigState(const OpA &a, EigenMode jobz, SolverFillMode uplo) : a_(a), jobz_(jobz), uplo_(uplo)
       {
         vectors_shape_ = SolverShapeFromInput<RANK>(a_);
         values_shape_ = SolverVectorShapeFromMatrixShape<RANK>(vectors_shape_);
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
+        int major = 0;
+        int minor = 0;
+        int device = 0;
+        MATX_CUDA_CHECK(cudaGetDevice(&device));
+        MATX_CUDA_CHECK(cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device));
+        MATX_CUDA_CHECK(cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device));
+        const int cc = major * 100 + minor * 10;
+
+        const index_t n = vectors_shape_[RANK - 1];
+        dx_heev_values_helper_.set_m(n);
+        dx_heev_values_helper_.set_n(n);
+        dx_heev_values_helper_.set_cc(cc);
+        dx_heev_values_helper_.set_function(CUSOLVERDX_FUNCTION_HEEV);
+        dx_heev_values_helper_.set_fill_mode(uplo_);
+        dx_heev_values_helper_.set_job(CUSOLVERDX_JOB_NO_VECTORS);
+
+        dx_heev_vectors_helper_.set_m(n);
+        dx_heev_vectors_helper_.set_n(n);
+        dx_heev_vectors_helper_.set_cc(cc);
+        dx_heev_vectors_helper_.set_function(CUSOLVERDX_FUNCTION_HEEV);
+        dx_heev_vectors_helper_.set_fill_mode(uplo_);
+        dx_heev_vectors_helper_.set_job(CUSOLVERDX_JOB_OVERWRITE_VECTORS);
+#endif
       }
 
       const auto &Input() const { return a_; }
@@ -153,6 +186,121 @@ namespace detail {
           return values_;
         }
       }
+
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
+      template <int Component>
+      bool SupportsJITProjection() const
+      {
+        const bool square = vectors_shape_[RANK - 2] == vectors_shape_[RANK - 1];
+        if constexpr (Component == EIG_VECTORS) {
+          return (RANK >= 2) && (RANK <= 4) && square &&
+                 jobz_ == EigenMode::VECTOR &&
+                 dx_heev_vectors_helper_.IsSupported();
+        }
+        else {
+          return (RANK >= 2) && (RANK <= 4) && square &&
+                 dx_heev_values_helper_.IsSupported();
+        }
+      }
+
+      template <int Component>
+      int GetJITProjectionShmRequired() const
+      {
+        if constexpr (Component == EIG_VECTORS) {
+          return dx_heev_vectors_helper_.GetShmRequired();
+        }
+        else {
+          return dx_heev_values_helper_.GetShmRequired();
+        }
+      }
+
+      template <int Component>
+      cuda::std::array<int, 2> GetJITProjectionBlockDimRange() const
+      {
+        if constexpr (Component == EIG_VECTORS) {
+          return dx_heev_vectors_helper_.GetBlockDimRange();
+        }
+        else {
+          return dx_heev_values_helper_.GetBlockDimRange();
+        }
+      }
+
+      template <int Component>
+      bool GenerateJITProjectionLTOIR(std::set<std::string> &ltoir_symbols) const
+      {
+        if constexpr (Component == EIG_VECTORS) {
+          return dx_heev_vectors_helper_.GenerateLTOIR(ltoir_symbols);
+        }
+        else {
+          return dx_heev_values_helper_.GenerateLTOIR(ltoir_symbols);
+        }
+      }
+
+      template <int Component>
+      std::string GetJITProjectionTypeName(const std::string &inner_op_jit_name) const
+      {
+        return std::string("JITEigProjectionOp<") + inner_op_jit_name + ", " + std::to_string(Component) + ">";
+      }
+
+      template <int Component>
+      JITCacheKey GetJITProjectionCacheKey() const
+      {
+        auto key = detail::MakeJITCacheKeyForType<EigState<OpA>>("JITEigProjection_v2");
+        detail::HashJITCacheValue(key, Component);
+        detail::HashJITCacheValue(key, RANK);
+        detail::HashJITCacheValue(key, static_cast<int>(jobz_));
+        detail::HashJITCacheValue(key, static_cast<int>(uplo_));
+        for (int i = 0; i < RANK; ++i) {
+          detail::HashJITCacheValue(key, vectors_shape_[i]);
+        }
+        return key;
+      }
+
+      template <int Component>
+      void AddJITProjectionClasses(std::unordered_map<std::string, std::string> &in) const
+      {
+        const std::string class_name = "JITEigProjectionOp";
+        if (in.find(class_name) != in.end()) {
+          return;
+        }
+
+        const std::string values_func_name = std::string(SOLVER_DX_FUNC_PREFIX) + "_" + dx_heev_values_helper_.GetSymbolName();
+        const std::string vectors_func_name = std::string(SOLVER_DX_FUNC_PREFIX) + "_" + dx_heev_vectors_helper_.GetSymbolName();
+        in[class_name] =
+          " extern \"C\" __device__ void " + values_func_name + "(" + detail::type_to_string<a_value_type>() + "*, " + detail::type_to_string<a_value_type>() + "*, " + detail::type_to_string<a_value_type>() + "*, int*);\n"
+          " extern \"C\" __device__ void " + vectors_func_name + "(" + detail::type_to_string<a_value_type>() + "*, " + detail::type_to_string<a_value_type>() + "*, " + detail::type_to_string<a_value_type>() + "*, int*);\n"
+          " template <typename OpA, int Component> struct " + class_name + "  {\n"
+          "  using solver_value_type = typename OpA::value_type;\n"
+          "  using precision_type = typename inner_op_type_t<solver_value_type>::type;\n"
+          "  using value_type = cuda::std::conditional_t<Component == " + std::to_string(EIG_VALUES) + ", precision_type, solver_value_type>;\n"
+          "  using matxop = bool;\n"
+          "  typename detail::inner_storage_or_self_t<detail::base_type_t<OpA>> a_;\n"
+          "  template <typename CapType, typename... Is>\n"
+          "  __MATX_INLINE__ __MATX_DEVICE__ value_type operator()(Is... indices) const\n"
+          "  {\n"
+          "    if constexpr (Component == " + std::to_string(EIG_VALUES) + ") {\n"
+          "      " + dx_heev_values_helper_.GetHeevProjectionFuncStr(values_func_name, EIG_VECTORS, EIG_VALUES) + "\n"
+          "    }\n"
+          "    else {\n"
+          "      " + dx_heev_vectors_helper_.GetHeevProjectionFuncStr(vectors_func_name, EIG_VECTORS, EIG_VALUES) + "\n"
+          "    }\n"
+          "  }\n"
+          "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank()\n"
+          "  {\n"
+          "    if constexpr (Component == " + std::to_string(EIG_VALUES) + ") { return OpA::Rank() - 1; }\n"
+          "    else { return OpA::Rank(); }\n"
+          "  }\n"
+          "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const\n"
+          "  {\n"
+          "    if constexpr (Component == " + std::to_string(EIG_VALUES) + ") {\n"
+          "      if (dim < OpA::Rank() - 2) { return a_.Size(dim); }\n"
+          "      return a_.Size(OpA::Rank() - 1);\n"
+          "    }\n"
+          "    else { return a_.Size(dim); }\n"
+          "  }\n"
+          "};\n";
+      }
+#endif
   };
 
   template<typename OpA>
