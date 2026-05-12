@@ -257,6 +257,11 @@ public:
                                     static_cast<int>(block_dim[2])};
   }
 
+  cuda::std::array<int, 2> GetBlockDimRange() const
+  {
+    return cuda::std::array<int, 2>{32, 1024};
+  }
+
   int GetWorkspaceSize() const
   {
     auto handle = GeneratePlan();
@@ -322,19 +327,27 @@ public:
       value_type* smem_a = reinterpret_cast<value_type*>(smem);
       int* info = reinterpret_cast<int*>(smem + elems * sizeof(value_type));
       const int tid = threadIdx.x + threadIdx.y * blockDim.x + threadIdx.z * blockDim.x * blockDim.y;
+      const int total_threads = blockDim.x * blockDim.y * blockDim.z;
       cuda::std::array<index_t, Rank()> idx = { static_cast<index_t>(indices)... };
 
-      for (index_t linear = tid; linear < elems; linear += blockDim.x * blockDim.y * blockDim.z) {
-        const index_t row = linear / n;
-        const index_t col = linear % n;
+      for (index_t base = 0; base < elems; base += total_threads) {
+        const index_t linear = base + tid;
+        const bool valid = linear < elems;
+        const index_t load_linear = valid ? linear : index_t{0};
+        const index_t row = load_linear / n;
+        const index_t col = load_linear % n;
+        value_type a_value{};
         if constexpr (Rank() == 2) {
-          smem_a[linear] = a_.template operator()<CapType>(row, col);
+          a_value = a_.template operator()<CapType>(row, col);
         }
         else if constexpr (Rank() == 3) {
-          smem_a[linear] = a_.template operator()<CapType>(idx[0], row, col);
+          a_value = a_.template operator()<CapType>(idx[0], row, col);
         }
         else if constexpr (Rank() == 4) {
-          smem_a[linear] = a_.template operator()<CapType>(idx[0], idx[1], row, col);
+          a_value = a_.template operator()<CapType>(idx[0], idx[1], row, col);
+        }
+        if (valid) {
+          smem_a[linear] = a_value;
         }
       }
 
@@ -371,21 +384,29 @@ public:
       int* ipiv = reinterpret_cast<int*>(smem + (2 * elems * sizeof(value_type)));
       int* info = reinterpret_cast<int*>(smem + (2 * elems * sizeof(value_type)) + n * sizeof(int));
       const int tid = threadIdx.x + threadIdx.y * blockDim.x + threadIdx.z * blockDim.x * blockDim.y;
+      const int total_threads = blockDim.x * blockDim.y * blockDim.z;
       cuda::std::array<index_t, Rank()> idx = { static_cast<index_t>(indices)... };
 
-      for (index_t linear = tid; linear < elems; linear += blockDim.x * blockDim.y * blockDim.z) {
-        const index_t row = linear / n;
-        const index_t col = linear % n;
+      for (index_t base = 0; base < elems; base += total_threads) {
+        const index_t linear = base + tid;
+        const bool valid = linear < elems;
+        const index_t load_linear = valid ? linear : index_t{0};
+        const index_t row = load_linear / n;
+        const index_t col = load_linear % n;
+        value_type a_value{};
         if constexpr (Rank() == 2) {
-          smem_a[linear] = a_.template operator()<CapType>(row, col);
+          a_value = a_.template operator()<CapType>(row, col);
         }
         else if constexpr (Rank() == 3) {
-          smem_a[linear] = a_.template operator()<CapType>(idx[0], row, col);
+          a_value = a_.template operator()<CapType>(idx[0], row, col);
         }
         else if constexpr (Rank() == 4) {
-          smem_a[linear] = a_.template operator()<CapType>(idx[0], idx[1], row, col);
+          a_value = a_.template operator()<CapType>(idx[0], idx[1], row, col);
         }
-        smem_b[linear] = row == col ? value_type{1} : value_type{0};
+        if (valid) {
+          smem_a[linear] = a_value;
+          smem_b[linear] = row == col ? value_type{1} : value_type{0};
+        }
       }
 
       if (tid == 0) {

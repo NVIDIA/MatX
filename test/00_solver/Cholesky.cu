@@ -82,8 +82,8 @@ TEST(CholSolverJIT, CuSolverDxRuntimeQueries)
             static_cast<int>(4 * sizeof(float) + sizeof(int)));
 
   const auto block_dim = detail::get_operator_capability<detail::OperatorCapability::BLOCK_DIM>(op);
-  EXPECT_GT(block_dim[0], 0);
-  EXPECT_EQ(block_dim[0], block_dim[1]);
+  EXPECT_EQ(block_dim[0], 32);
+  EXPECT_EQ(block_dim[1], 1024);
 }
 
 TEST(CholSolverJIT, CuSolverDxMatchesCudaPath)

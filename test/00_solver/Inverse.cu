@@ -71,8 +71,8 @@ TEST(InvSolverJIT, CuSolverDxRuntimeQueries)
   EXPECT_GT(detail::get_operator_capability<detail::OperatorCapability::DYN_SHM_SIZE>(op), 0);
 
   const auto block_dim = detail::get_operator_capability<detail::OperatorCapability::BLOCK_DIM>(op);
-  EXPECT_GT(block_dim[0], 0);
-  EXPECT_EQ(block_dim[0], block_dim[1]);
+  EXPECT_EQ(block_dim[0], 32);
+  EXPECT_EQ(block_dim[1], 1024);
 }
 
 TEST(InvSolverJIT, CuSolverDxMatchesCudaPath)
@@ -112,6 +112,30 @@ TEST(InvSolverJIT, CuSolverDxRejectsUnsupportedShape)
 
   CUDAJITExecutor exec{};
   EXPECT_THROW({ (O = op).run(exec); }, matx::detail::matxException);
+}
+
+TEST(InvSolverJIT, CuSolverDxFusedMatmulInverseMatchesPython)
+{
+  MATX_ENTER_HANDLER();
+  auto pb = std::make_unique<detail::MatXPybind>();
+  auto H = make_tensor<float>({4, 3});
+  auto O = make_tensor<float>({3, 3});
+  pb->template InitAndRunTVGenerator<float>("00_solver", "inv_gram", "run", {4, 3});
+  pb->NumpyToTensorView(H, "H");
+
+  auto op = inv(matmul(permute(H, {1, 0}), H));
+  EXPECT_TRUE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op));
+
+  const auto block_dim = detail::get_operator_capability<detail::OperatorCapability::BLOCK_DIM>(op);
+  EXPECT_EQ(block_dim[0], 64);
+  EXPECT_EQ(block_dim[1], 64);
+
+  CUDAJITExecutor exec{};
+  (O = op).run(exec);
+  exec.sync();
+
+  MATX_TEST_ASSERT_COMPARE(pb, O, "gram_inv", 1e-3f);
+  MATX_EXIT_HANDLER();
 }
 #endif
 

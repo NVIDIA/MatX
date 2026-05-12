@@ -287,6 +287,28 @@ namespace matx
             MATX_LOG_DEBUG("cuBLASDx JIT_TYPE_QUERY: {}", result);
             return result;
           }
+          else if constexpr (Cap == OperatorCapability::JIT_CACHE_KEY) {
+#ifdef MATX_EN_JIT
+            auto key = detail::MakeJITCacheKeyForType<self_type>("JITMatMul");
+            const int actual_rank = jit_rank();
+            detail::HashJITCacheValue(key, actual_rank);
+            detail::HashJITCacheValue(key, dx_gemm_helper_.get_m());
+            detail::HashJITCacheValue(key, dx_gemm_helper_.get_n());
+            detail::HashJITCacheValue(key, dx_gemm_helper_.get_k());
+            const bool is_complex = dx_gemm_helper_.get_is_complex();
+            detail::HashJITCacheValue(key, is_complex);
+            detail::HashJITCacheValue(key, alpha_);
+            detail::HashJITCacheValue(key, beta_);
+            for (int i = 0; i < actual_rank; ++i) {
+              detail::HashJITCacheValue(key, out_dims_[i]);
+            }
+            return combine_capabilities<Cap>(key,
+                                             detail::get_operator_capability<Cap>(a_, in),
+                                             detail::get_operator_capability<Cap>(b_, in));
+#else
+            return detail::MakeInvalidJITCacheKey();
+#endif
+          }
           else if constexpr (Cap == OperatorCapability::GLOBAL_KERNEL) {
             // If MathDx is enabled we always return false. Other checks on size and type may prevent JIT compilation.
             MATX_LOG_DEBUG("cuBLASDx GLOBAL_KERNEL: false");

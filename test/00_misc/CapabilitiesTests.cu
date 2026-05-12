@@ -142,6 +142,7 @@ TEST(CapabilitiesTests, DefaultCapabilitiesForNonMatXOps)
   ExpectRange(detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(op, ept_input),
               detail::ElementsPerThread::ONE, detail::ElementsPerThread::MAX);
   EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::JIT_TYPE_QUERY>(op).empty());
+  EXPECT_TRUE(detail::get_operator_capability<detail::OperatorCapability::JIT_CACHE_KEY>(op).valid);
 }
 
 TEST(CapabilitiesTests, QueryTypeMappingCoversEveryCapability)
@@ -162,6 +163,7 @@ TEST(CapabilitiesTests, QueryTypeMappingCoversEveryCapability)
   ExpectQueryType(detail::OperatorCapability::GENERATE_LTOIR, detail::CapabilityQueryType::AND_QUERY);
   ExpectQueryType(detail::OperatorCapability::PASS_THROUGH_THREADS, detail::CapabilityQueryType::OR_QUERY);
   ExpectQueryType(detail::OperatorCapability::UNIT_STRIDE_LAST, detail::CapabilityQueryType::AND_QUERY);
+  ExpectQueryType(detail::OperatorCapability::JIT_CACHE_KEY, detail::CapabilityQueryType::HASH_QUERY);
   ExpectQueryType(detail::OperatorCapability::NONE, detail::CapabilityQueryType::OR_QUERY);
 }
 
@@ -186,6 +188,15 @@ TEST(CapabilitiesTests, CombinesNumericAndStringCapabilities)
   EXPECT_EQ(detail::combine_capabilities<detail::OperatorCapability::JIT_TYPE_QUERY>(
                 std::string("self:"), std::string("child0:"), std::string("child1")),
             "self:child0:child1");
+
+  auto self_key = detail::MakeJITCacheKeyForType<PlainScalarLikeOp>("self");
+  auto child_key = detail::MakeJITCacheKeyForType<int>("child");
+  auto combined_key = detail::combine_capabilities<detail::OperatorCapability::JIT_CACHE_KEY>(self_key, child_key);
+  EXPECT_TRUE(combined_key.valid);
+  EXPECT_TRUE(combined_key.h1 != self_key.h1 || combined_key.h2 != self_key.h2);
+  auto invalid_key = detail::combine_capabilities<detail::OperatorCapability::JIT_CACHE_KEY>(
+      detail::MakeInvalidJITCacheKey(), child_key);
+  EXPECT_FALSE(invalid_key.valid);
 }
 
 TEST(CapabilitiesTests, CombinesRangeCapabilities)

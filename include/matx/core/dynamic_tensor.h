@@ -322,6 +322,21 @@ public:
       return std::string("");
 #endif
     }
+    else if constexpr (Cap == detail::OperatorCapability::JIT_CACHE_KEY) {
+#ifdef MATX_EN_JIT
+      auto key = detail::MakeJITCacheKeyForType<dynamic_tensor_t<T>>("JITDynamicTensor");
+      detail::HashJITCacheValue(key, rank_);
+      for (int i = 0; i < rank_; ++i) {
+        detail::HashJITCacheValue(key, shape_[i]);
+      }
+      for (int i = 0; i < rank_; ++i) {
+        detail::HashJITCacheValue(key, strides_[i]);
+      }
+      return key;
+#else
+      return detail::MakeInvalidJITCacheKey();
+#endif
+    }
     else if constexpr (Cap == detail::OperatorCapability::SUPPORTS_JIT) {
 #ifdef MATX_EN_JIT
       return true;

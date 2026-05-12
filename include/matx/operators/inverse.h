@@ -177,10 +177,7 @@ namespace detail {
           return true;
         }
         else if constexpr (Cap == OperatorCapability::BLOCK_DIM) {
-          const auto block_dim = dx_gesv_helper_.GetBlockDim();
-          const auto threads = block_dim[0] * cuda::std::max(block_dim[1], 1) * cuda::std::max(block_dim[2], 1);
-          const auto my_block = cuda::std::array<int, 2>{threads, threads};
-          return combine_capabilities<Cap>(my_block, detail::get_operator_capability<Cap>(a_, in));
+          return combine_capabilities<Cap>(dx_gesv_helper_.GetBlockDimRange(), detail::get_operator_capability<Cap>(a_, in));
         }
         else if constexpr (Cap == OperatorCapability::GENERATE_LTOIR) {
           return combine_capabilities<Cap>(dx_gesv_helper_.GenerateLTOIR(in.ltoir_symbols),
@@ -192,6 +189,22 @@ namespace detail {
           return get_jit_class_name() + "<" + inner_op_jit_name + ">";
 #else
           return std::string{};
+#endif
+        }
+        else if constexpr (Cap == OperatorCapability::JIT_CACHE_KEY) {
+#ifdef MATX_EN_JIT
+          auto key = detail::MakeJITCacheKeyForType<InvOp<OpA>>("JITInv");
+          detail::HashJITCacheValue(key, Rank());
+          for (int i = 0; i < Rank(); ++i) {
+            detail::HashJITCacheValue(key, Size(i));
+          }
+          if constexpr (OpA::Rank() >= 2) {
+            const index_t n = a_.Size(OpA::Rank() - 1);
+            detail::HashJITCacheValue(key, n);
+          }
+          return combine_capabilities<Cap>(key, detail::get_operator_capability<Cap>(a_, in));
+#else
+          return detail::MakeInvalidJITCacheKey();
 #endif
         }
         else {

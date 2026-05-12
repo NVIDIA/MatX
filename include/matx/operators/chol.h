@@ -183,10 +183,7 @@ namespace detail {
           return true;
         }
         else if constexpr (Cap == OperatorCapability::BLOCK_DIM) {
-          const auto block_dim = dx_potrf_helper_.GetBlockDim();
-          const auto threads = block_dim[0] * cuda::std::max(block_dim[1], 1) * cuda::std::max(block_dim[2], 1);
-          const auto my_block = cuda::std::array<int, 2>{threads, threads};
-          return combine_capabilities<Cap>(my_block, detail::get_operator_capability<Cap>(a_, in));
+          return combine_capabilities<Cap>(dx_potrf_helper_.GetBlockDimRange(), detail::get_operator_capability<Cap>(a_, in));
         }
         else if constexpr (Cap == OperatorCapability::GENERATE_LTOIR) {
           auto result = combine_capabilities<Cap>(dx_potrf_helper_.GenerateLTOIR(in.ltoir_symbols),
