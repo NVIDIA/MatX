@@ -166,64 +166,46 @@ if(WIN32)
         # of /std:c++NN, which breaks any library (e.g. nvbench) that checks __cplusplus
         # directly in .cxx files compiled by cl.exe (not through nvcc). The equivalent
         # -Xcompiler=/Zc:__cplusplus in CMAKE_CUDA_FLAGS only reaches cl.exe for .cu files.
+        add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/Zc:__cplusplus>")
         add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/Zc:__cplusplus>")
 
-        # /Zc:__cplusplus makes MSVC report the true value of __cplusplus.
-        # /utf-8: Required by fmt 11+ on MSVC (including 11.2.0) to satisfy the static_assert in
-        # include/fmt/base.h:
-        #   enum { is_utf8_enabled = "\u00A7"[1] == '\xA7' };
-        #   enum { use_utf8 = !FMT_WIN32 || is_utf8_enabled };
-        #   static_assert(!FMT_UNICODE || use_utf8, "Unicode support requires compiling with /utf-8");
-        # Without /utf-8, MSVC encodes "\u00A7" (§) as the single byte 0xA7 in the current
-        # Windows code page, so [1] == '\0' != '\xA7' and is_utf8_enabled = 0. The assertion fires.
-        # With /utf-8, MSVC encodes it as the two UTF-8 bytes 0xC2 0xA7, so [1] == 0xA7 and
-        # the assertion passes. This assertion is evaluated by cl.exe (the host compiler), so
-        # -Xcompiler=/utf-8 is sufficient to reach cl.exe for both .cu and .cxx files.
-        # This was NOT changed in fmt 11.2.0 — the only fix in 11.2.0 was the char32_t
-        # lookup-table literals (see the note on nvbench bump in cmake/versions.json).
-        # NOTE: -DFMT_UNICODE=0 was previously also injected here as a belt-and-suspenders guard.
-        # -DFMT_UNICODE=0: required for .cu files on Windows/MSVC. nvcc's CUDA frontend does
-        # not inherit /utf-8 from -Xcompiler=/utf-8, so the fmt static_assert
-        #   static_assert(!FMT_UNICODE || use_utf8, "Unicode support requires compiling with /utf-8")
-        # fires when FMT_UNICODE=1 (the default). -Xcompiler=/utf-8 alone is insufficient.
-        #
-        # NOTE: /std:c++NN is NOT set here. Per-target CUDA_STANDARD/CXX_STANDARD is sufficient:
-        # nvcc translates its -std=c++NN flag to /std:c++NN for cl.exe in each .cu compilation.
-        # Hardcoding /std:c++17 here would override /std:c++20 for targets like MatX examples
-        # and tests that require C++20 features (e.g. std::source_location, concepts, etc.).
-        set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler=/Zc:__cplusplus -Xcompiler=/utf-8 -DFMT_UNICODE=0")
         # /wd4996: suppress "deprecated" warnings from NVIDIA's own headers (cusparse.h,
         # cusolverDn.h, etc.) that annotate types scheduled for removal. These warnings
         # originate in external SDK headers and cannot be fixed in MatX; without /wd4996
         # they become errors under /WX.
-        set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler=/wd4996")
+        add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/wd4996>")
+
         # /wd4100: suppress unreferenced formal parameter warnings from third-party headers
         # (Python 3.14 cpython/unicodeobject.h has intentional _unused_op parameters).
-        set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler=/wd4100")
+        add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/wd4100>")
         add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/wd4100>")
+
         # /wd4864: VS18 new warning for dependent-name template calls on free function
         # templates. Correct code, not a real ambiguity; suppress to unblock /WX builds.
-        set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler=/wd4864")
+        add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/wd4864>")
         add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/wd4864>")
+
         # /wd4702: unreachable code in constexpr-if chains — MSVC false positive when every
         # if-constexpr branch returns but a fallback return is still needed for non-MSVC.
-        set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler=/wd4702")
+        add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/wd4702>")
         add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/wd4702>")
+
         # /wd4324: structure padded due to alignas — intentional in CUDA operator types.
-        set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler=/wd4324")
+        add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/wd4324>")
         add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/wd4324>")
+
         # /wd4714: __forceinline function not inlined — expected for large templated
         # functions such as get_type_str() instantiated over complex operator types.
-        set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler=/wd4714")
+        add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/wd4714>")
         add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/wd4714>")
+
         # /wd4127: conditional expression is constant — common in template/constexpr code.
         # VS18 2025+ (MSVC 1950+) resolves most of these automatically; suppress only on
         # VS17 2022 and earlier.
         if(MSVC_VERSION LESS 1950)
-            set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler=/wd4127")
+            add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/wd4127>")
             add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/wd4127>")
         endif()
-        add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/utf-8>")
     endif()
 endif()
 
@@ -535,76 +517,7 @@ if (MATX_BUILD_EXAMPLES)
 endif()
 
 if (MATX_BUILD_BENCHMARKS)
-    # Pre-register fmt to fix the nvcc char32_t parse error in benchmarks.
-    #
-    # NOTE: fmt (fmtlib) is NOT a dependency of the MatX library itself. The MatX headers
-    # use printf-style format strings and std::format (C++20) exclusively. fmt enters the
-    # build only here, as a transitive dependency of nvbench (the benchmarking framework
-    # used by the targets in bench/). Non-benchmark builds are entirely unaffected.
-    #
-    # Background: fractional_part_rounding_thresholds() in fmt/format.h used char32_t
-    # U"..." string literals with values (e.g. 0x9999999a) exceeding U+10FFFF. nvcc's
-    # CUDA frontend rejects these with "character value is out of range"; gcc/clang accept
-    # arbitrary char32_t bit patterns and are unaffected. Affected: fmt 11.1.4–12.1.0.
-    # nvbench (at the git_tag in cmake/versions.json) pins fmt 11.2.0, which falls in the
-    # affected range. See: https://github.com/fmtlib/fmt/pull/4719 for more detail
-    #
-    # Fix strategy: pre-register fmt 11.2.0 (same version nvbench pins, so nvbench stays
-    # compatible) with a PATCH_COMMAND that applies the upstream fix from fmtlib/fmt commit
-    # 03cfb8645e2646fce738fe9d8e13fe7d7d947ad4. That commit replaces the char32_t U"..."
-    # literals with semantically identical char16_t u"..." literals split across two arrays
-    # and recombined via bitshift, which nvcc accepts. --ignore-whitespace handles CRLF
-    # line endings on Windows.
-    #
-    # Why not upgrade to fmt 12.x (which includes this fix natively)? fmt 12.x requires
-    # C++20. nvbench compiles its own .cu sources with -std=c++17, so fmt 12.x headers
-    # produce a secondary error under C++17. Staying on 11.2.0 + patch avoids this.
-    #
-    # TODO: This override can be removed once:
-    # (a) nvbench updates to a fmt version that pre-dates 11.1.4 (no char32_t literals), or
-    # (b) nvbench updates to a fmt version with the char16_t fix AND targets C++20 so that
-    #     fmt 12.x headers compile cleanly, or
-    # (c) nvcc's parser is fixed to accept char32_t values > U+10FFFF.
-    # Check cmake/versions.json nvbench git_tag vs https://github.com/NVIDIA/nvbench.
-    if (MSVC)
-        message(STATUS "MatX: pre-registering fmt 11.2.0 with char32_t patch for nvcc compatibility")
-        CPMAddPackage(
-            NAME fmt
-            GIT_REPOSITORY "https://github.com/fmtlib/fmt.git"
-            GIT_TAG "11.2.0"
-        )
-        set(_fmt_patch "${CMAKE_CURRENT_SOURCE_DIR}/cmake/patches/fmt-11.2.0-nvcc-char32-fix.patch")
-        execute_process(
-            COMMAND git apply --ignore-whitespace --check --reverse "${_fmt_patch}"
-            WORKING_DIRECTORY "${fmt_SOURCE_DIR}"
-            RESULT_VARIABLE _fmt_patch_already_applied
-            OUTPUT_QUIET
-            ERROR_QUIET
-        )
-        if(NOT _fmt_patch_already_applied EQUAL 0)
-            message(STATUS "MatX: applying fmt char32_t patch")
-            execute_process(
-                COMMAND git apply --ignore-whitespace "${_fmt_patch}"
-                WORKING_DIRECTORY "${fmt_SOURCE_DIR}"
-                RESULT_VARIABLE _fmt_patch_result
-            )
-            if(NOT _fmt_patch_result EQUAL 0)
-                message(FATAL_ERROR "MatX: failed to apply fmt char32_t patch (exit ${_fmt_patch_result})")
-            endif()
-        else()
-            message(STATUS "MatX: fmt char32_t patch already applied, skipping")
-        endif()
-        unset(_fmt_patch)
-        unset(_fmt_patch_already_applied)
-        unset(_fmt_patch_result)
-    endif()
-
-    set(_nvbench_extra_args)
-    if(WIN32)
-        list(APPEND _nvbench_extra_args BUILD_STATIC)
-    endif()
-    rapids_cpm_nvbench( ${_nvbench_extra_args}
-                        CPM_ARGS 
+    rapids_cpm_nvbench( CPM_ARGS 
                         OPTIONS
                         "CMAKE_CXX_STANDARD 20"
                         "CMAKE_CUDA_STANDARD 20")
