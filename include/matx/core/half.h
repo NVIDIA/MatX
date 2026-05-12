@@ -1521,28 +1521,8 @@ public:
 
 }} // namespace cuda::std
 
-// std::formatter specializations for matxFp16 and matxBf16.
-//
-// Guard rationale:
-//
-// 1. #ifndef __CUDACC_RTC__
-//    nvcc's runtime compilation (NVRTC) mode does not have access to host-side
-//    system headers such as <format>. Attempting to include them in RTC mode
-//    causes a hard compilation error, so the entire block must be excluded.
-//
-// 2. __has_include(<format>)
-//    <format> is a C++20 standard library header. It may be absent on older
-//    toolchains (e.g. GCC < 13 with libstdc++, MSVC < 19.29, libc++ < 14)
-//    even when __cplusplus reports C++20. The feature-test macro avoids a
-//    hard error on those platforms and makes the specializations opt-in.
-//
-// 3. __cplusplus >= 202002L
-//    std::formatter and the formatting machinery require C++20. Some compilers
-//    ship <format> in their headers but only activate it when compiling in
-//    C++20 mode; the version check guards against accidental inclusion in
-//    C++17 translation units where the templates would be ill-formed.
 #ifndef __CUDACC_RTC__
-#if __has_include(<format>) && __cplusplus >= 202002L
+#if __has_include(<format>)
   // Add std::formatter specializations for matxFp16 and matxBf16
   #include <format>
 
