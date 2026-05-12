@@ -78,6 +78,62 @@ TYPED_TEST_SUITE(EigenSolverTestFloatTypes,
 TYPED_TEST_SUITE(EigenProjectionSolverTestFloatTypes,
                  MatXFloatNonHalfTypesCUDAExec);
 
+#if defined(MATX_EN_MATHDX) && defined(MATX_EN_JIT)
+template <typename TensorType>
+class EigenSolverJITTestFloatTypes : public ::testing::Test {
+};
+
+TYPED_TEST_SUITE(EigenSolverJITTestFloatTypes,
+                 MatXFloatNonHalfTypesCUDAExec);
+
+TYPED_TEST(EigenSolverJITTestFloatTypes, CuSolverDxSingleMatrixRejectsProjectionJIT)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using value_type = typename inner_op_type_t<TestType>::type;
+
+  constexpr index_t n = 4;
+  auto A = make_tensor<TestType>({n, n});
+  auto Vectors = make_tensor<TestType>({n, n});
+  auto Values = make_tensor<value_type>({n});
+  auto op = eig(A);
+
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op));
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.Vectors));
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.Values));
+
+  CUDAJITExecutor exec{};
+  EXPECT_THROW({ (Vectors = op.Vectors).run(exec); }, matx::detail::matxException);
+  EXPECT_THROW({ (Values = op.Values).run(exec); }, matx::detail::matxException);
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(EigenSolverJITTestFloatTypes, CuSolverDxBatchedMatrixRejectsProjectionJIT)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using value_type = typename inner_op_type_t<TestType>::type;
+
+  constexpr index_t batches = 3;
+  constexpr index_t n = 4;
+  auto A = make_tensor<TestType>({batches, n, n});
+  auto Vectors = make_tensor<TestType>({batches, n, n});
+  auto Values = make_tensor<value_type>({batches, n});
+  auto op = eig(A);
+
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op));
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.Vectors));
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.Values));
+
+  CUDAJITExecutor exec{};
+  EXPECT_THROW({ (Vectors = op.Vectors).run(exec); }, matx::detail::matxException);
+  EXPECT_THROW({ (Values = op.Values).run(exec); }, matx::detail::matxException);
+
+  MATX_EXIT_HANDLER();
+}
+#endif
+
 template <typename T>
 T MakeEigenTestValue(double value)
 {

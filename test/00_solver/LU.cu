@@ -73,6 +73,62 @@ class LUSolverTestFloatTypes : public LUSolverTest<TensorType> {
 TYPED_TEST_SUITE(LUSolverTestFloatTypes,
                  MatXFloatNonHalfTypesAllExecs);
 
+#if defined(MATX_EN_MATHDX) && defined(MATX_EN_JIT)
+template <typename TensorType>
+class LUSolverJITTestFloatTypes : public ::testing::Test {
+};
+
+TYPED_TEST_SUITE(LUSolverJITTestFloatTypes,
+                 MatXFloatNonHalfTypesCUDAExec);
+
+TYPED_TEST(LUSolverJITTestFloatTypes, CuSolverDxSingleMatrixRejectsProjectionJIT)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+
+  constexpr index_t rows = 4;
+  constexpr index_t cols = 3;
+  auto A = make_tensor<TestType>({rows, cols});
+  auto Factors = make_tensor<TestType>({rows, cols});
+  auto Piv = make_tensor<int64_t>({std::min(rows, cols)});
+  auto op = lu(A);
+
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op));
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.LU));
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.Piv));
+
+  CUDAJITExecutor exec{};
+  EXPECT_THROW({ (Factors = op.LU).run(exec); }, matx::detail::matxException);
+  EXPECT_THROW({ (Piv = op.Piv).run(exec); }, matx::detail::matxException);
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(LUSolverJITTestFloatTypes, CuSolverDxBatchedMatrixRejectsProjectionJIT)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+
+  constexpr index_t batches = 3;
+  constexpr index_t rows = 4;
+  constexpr index_t cols = 3;
+  auto A = make_tensor<TestType>({batches, rows, cols});
+  auto Factors = make_tensor<TestType>({batches, rows, cols});
+  auto Piv = make_tensor<int64_t>({batches, std::min(rows, cols)});
+  auto op = lu(A);
+
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op));
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.LU));
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.Piv));
+
+  CUDAJITExecutor exec{};
+  EXPECT_THROW({ (Factors = op.LU).run(exec); }, matx::detail::matxException);
+  EXPECT_THROW({ (Piv = op.Piv).run(exec); }, matx::detail::matxException);
+
+  MATX_EXIT_HANDLER();
+}
+#endif
+
 TYPED_TEST(LUSolverTestFloatTypes, LUBasic)
 {
   MATX_ENTER_HANDLER();

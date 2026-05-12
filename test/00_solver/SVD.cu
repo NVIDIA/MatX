@@ -90,6 +90,71 @@ TYPED_TEST_SUITE(SVDSolverTestNonHalfTypes, MatXFloatNonHalfTypesAllExecs);
 TYPED_TEST_SUITE(SVDPISolverTestNonHalfTypes, MatXFloatNonHalfTypesCUDAExec);
 TYPED_TEST_SUITE(SVDProjectionSolverTestNonHalfTypes, MatXFloatNonHalfTypesCUDAExec);
 
+#if defined(MATX_EN_MATHDX) && defined(MATX_EN_JIT)
+template <typename TensorType>
+class SVDSolverJITTestNonHalfTypes : public ::testing::Test {
+};
+
+TYPED_TEST_SUITE(SVDSolverJITTestNonHalfTypes, MatXFloatNonHalfTypesCUDAExec);
+
+TYPED_TEST(SVDSolverJITTestNonHalfTypes, CuSolverDxSingleMatrixRejectsProjectionJIT)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using value_type = typename inner_op_type_t<TestType>::type;
+
+  constexpr index_t rows = 4;
+  constexpr index_t cols = 3;
+  constexpr index_t k = std::min(rows, cols);
+  auto A = make_tensor<TestType>({rows, cols});
+  auto U = make_tensor<TestType>({rows, k});
+  auto S = make_tensor<value_type>({k});
+  auto VT = make_tensor<TestType>({k, cols});
+  auto op = svd(A, SVDMode::REDUCED);
+
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op));
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.U));
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.S));
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.VT));
+
+  CUDAJITExecutor exec{};
+  EXPECT_THROW({ (U = op.U).run(exec); }, matx::detail::matxException);
+  EXPECT_THROW({ (S = op.S).run(exec); }, matx::detail::matxException);
+  EXPECT_THROW({ (VT = op.VT).run(exec); }, matx::detail::matxException);
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(SVDSolverJITTestNonHalfTypes, CuSolverDxBatchedMatrixRejectsProjectionJIT)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using value_type = typename inner_op_type_t<TestType>::type;
+
+  constexpr index_t batches = 3;
+  constexpr index_t rows = 4;
+  constexpr index_t cols = 3;
+  constexpr index_t k = std::min(rows, cols);
+  auto A = make_tensor<TestType>({batches, rows, cols});
+  auto U = make_tensor<TestType>({batches, rows, k});
+  auto S = make_tensor<value_type>({batches, k});
+  auto VT = make_tensor<TestType>({batches, k, cols});
+  auto op = svd(A, SVDMode::REDUCED);
+
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op));
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.U));
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.S));
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.VT));
+
+  CUDAJITExecutor exec{};
+  EXPECT_THROW({ (U = op.U).run(exec); }, matx::detail::matxException);
+  EXPECT_THROW({ (S = op.S).run(exec); }, matx::detail::matxException);
+  EXPECT_THROW({ (VT = op.VT).run(exec); }, matx::detail::matxException);
+
+  MATX_EXIT_HANDLER();
+}
+#endif
+
 template <typename T>
 T MakeSVDTestValue(double value)
 {

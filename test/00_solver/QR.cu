@@ -74,6 +74,109 @@ class QRSolverTestFloatTypes : public QRSolverTest<TensorType> {
 TYPED_TEST_SUITE(QRSolverTestFloatTypes,
                  MatXFloatNonHalfTypesAllExecs);
 
+#if defined(MATX_EN_MATHDX) && defined(MATX_EN_JIT)
+template <typename TensorType>
+class QRSolverJITTestFloatTypes : public ::testing::Test {
+};
+
+TYPED_TEST_SUITE(QRSolverJITTestFloatTypes,
+                 MatXFloatNonHalfTypesCUDAExec);
+
+TYPED_TEST(QRSolverJITTestFloatTypes, CuSolverDxSingleMatrixRejectsQRProjectionJIT)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+
+  constexpr index_t rows = 4;
+  constexpr index_t cols = 3;
+  auto A = make_tensor<TestType>({rows, cols});
+  auto Q = make_tensor<TestType>({rows, rows});
+  auto R = make_tensor<TestType>({rows, cols});
+  auto op = qr(A);
+
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op));
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.Q));
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.R));
+
+  CUDAJITExecutor exec{};
+  EXPECT_THROW({ (Q = op.Q).run(exec); }, matx::detail::matxException);
+  EXPECT_THROW({ (R = op.R).run(exec); }, matx::detail::matxException);
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(QRSolverJITTestFloatTypes, CuSolverDxBatchedMatrixRejectsQRProjectionJIT)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+
+  constexpr index_t batches = 3;
+  constexpr index_t rows = 4;
+  constexpr index_t cols = 3;
+  auto A = make_tensor<TestType>({batches, rows, cols});
+  auto Q = make_tensor<TestType>({batches, rows, rows});
+  auto R = make_tensor<TestType>({batches, rows, cols});
+  auto op = qr(A);
+
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op));
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.Q));
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.R));
+
+  CUDAJITExecutor exec{};
+  EXPECT_THROW({ (Q = op.Q).run(exec); }, matx::detail::matxException);
+  EXPECT_THROW({ (R = op.R).run(exec); }, matx::detail::matxException);
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(QRSolverJITTestFloatTypes, CuSolverDxSingleMatrixRejectsQRSolverProjectionJIT)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+
+  constexpr index_t rows = 4;
+  constexpr index_t cols = 3;
+  auto A = make_tensor<TestType>({rows, cols});
+  auto Out = make_tensor<TestType>({rows, cols});
+  auto Tau = make_tensor<TestType>({std::min(rows, cols)});
+  auto op = qr_solver(A);
+
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op));
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.Out));
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.Tau));
+
+  CUDAJITExecutor exec{};
+  EXPECT_THROW({ (Out = op.Out).run(exec); }, matx::detail::matxException);
+  EXPECT_THROW({ (Tau = op.Tau).run(exec); }, matx::detail::matxException);
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(QRSolverJITTestFloatTypes, CuSolverDxBatchedMatrixRejectsQRSolverProjectionJIT)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+
+  constexpr index_t batches = 3;
+  constexpr index_t rows = 4;
+  constexpr index_t cols = 3;
+  auto A = make_tensor<TestType>({batches, rows, cols});
+  auto Out = make_tensor<TestType>({batches, rows, cols});
+  auto Tau = make_tensor<TestType>({batches, std::min(rows, cols)});
+  auto op = qr_solver(A);
+
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op));
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.Out));
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.Tau));
+
+  CUDAJITExecutor exec{};
+  EXPECT_THROW({ (Out = op.Out).run(exec); }, matx::detail::matxException);
+  EXPECT_THROW({ (Tau = op.Tau).run(exec); }, matx::detail::matxException);
+
+  MATX_EXIT_HANDLER();
+}
+#endif
+
 TYPED_TEST(QRSolverTestFloatTypes, QRBasic)
 {
   MATX_ENTER_HANDLER();

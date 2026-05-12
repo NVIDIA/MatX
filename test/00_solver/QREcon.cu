@@ -46,6 +46,64 @@ class QREconSolverTestNonHalfTypes : public ::testing::Test{
 TYPED_TEST_SUITE(QREconSolverTestNonHalfTypes,
   MatXFloatNonHalfTypesCUDAExec);
 
+#if defined(MATX_EN_MATHDX) && defined(MATX_EN_JIT)
+template <typename TensorType>
+class QREconSolverJITTestNonHalfTypes : public ::testing::Test {
+};
+
+TYPED_TEST_SUITE(QREconSolverJITTestNonHalfTypes,
+  MatXFloatNonHalfTypesCUDAExec);
+
+TYPED_TEST(QREconSolverJITTestNonHalfTypes, CuSolverDxSingleMatrixRejectsProjectionJIT)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+
+  constexpr index_t rows = 4;
+  constexpr index_t cols = 3;
+  constexpr index_t k = std::min(rows, cols);
+  auto A = make_tensor<TestType>({rows, cols});
+  auto Q = make_tensor<TestType>({rows, k});
+  auto R = make_tensor<TestType>({k, cols});
+  auto op = qr_econ(A);
+
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op));
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.Q));
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.R));
+
+  CUDAJITExecutor exec{};
+  EXPECT_THROW({ (Q = op.Q).run(exec); }, matx::detail::matxException);
+  EXPECT_THROW({ (R = op.R).run(exec); }, matx::detail::matxException);
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(QREconSolverJITTestNonHalfTypes, CuSolverDxBatchedMatrixRejectsProjectionJIT)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+
+  constexpr index_t batches = 3;
+  constexpr index_t rows = 4;
+  constexpr index_t cols = 3;
+  constexpr index_t k = std::min(rows, cols);
+  auto A = make_tensor<TestType>({batches, rows, cols});
+  auto Q = make_tensor<TestType>({batches, rows, k});
+  auto R = make_tensor<TestType>({batches, k, cols});
+  auto op = qr_econ(A);
+
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op));
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.Q));
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.R));
+
+  CUDAJITExecutor exec{};
+  EXPECT_THROW({ (Q = op.Q).run(exec); }, matx::detail::matxException);
+  EXPECT_THROW({ (R = op.R).run(exec); }, matx::detail::matxException);
+
+  MATX_EXIT_HANDLER();
+}
+#endif
+
 template <typename TestType, int RANK>
 void qr_econ_test( const index_t (&AshapeA)[RANK]) { 
   using AType = TestType;
