@@ -69,6 +69,7 @@ namespace detail {
       mutable value_type *q_ptr_ = nullptr;
       mutable value_type *r_ptr_ = nullptr;
       mutable bool materialized_ = false;
+      mutable int materialize_count_ = 0;
 
     public:
       QRState(const OpA &a) : a_(a)
@@ -86,6 +87,7 @@ namespace detail {
       void Materialize(Executor &&ex) const
       {
         if (materialized_) {
+          materialize_count_++;
           return;
         }
 
@@ -97,12 +99,17 @@ namespace detail {
         detail::AllocateTempTensor(r_, std::forward<Executor>(ex), r_shape_, &r_ptr_);
         qr_impl(q_, r_, a_, std::forward<Executor>(ex));
         materialized_ = true;
+        materialize_count_ = 1;
       }
 
       template <typename Executor>
       void Release(Executor &&ex) const
       {
         if (!materialized_) {
+          return;
+        }
+        if (materialize_count_ > 1) {
+          materialize_count_--;
           return;
         }
 
@@ -131,6 +138,7 @@ namespace detail {
         }
 
         materialized_ = false;
+        materialize_count_ = 0;
       }
 
       template <int Component>
@@ -247,6 +255,7 @@ namespace detail {
       mutable value_type *out_ptr_ = nullptr;
       mutable value_type *tau_ptr_ = nullptr;
       mutable bool materialized_ = false;
+      mutable int materialize_count_ = 0;
 
     public:
       SolverQRState(const OpA &a) : a_(a)
@@ -263,6 +272,7 @@ namespace detail {
       void Materialize(Executor &&ex) const
       {
         if (materialized_) {
+          materialize_count_++;
           return;
         }
 
@@ -274,12 +284,17 @@ namespace detail {
         detail::AllocateTempTensor(tau_, std::forward<Executor>(ex), tau_shape_, &tau_ptr_);
         qr_solver_impl(out_, tau_, a_, std::forward<Executor>(ex));
         materialized_ = true;
+        materialize_count_ = 1;
       }
 
       template <typename Executor>
       void Release(Executor &&ex) const
       {
         if (!materialized_) {
+          return;
+        }
+        if (materialize_count_ > 1) {
+          materialize_count_--;
           return;
         }
 
@@ -308,6 +323,7 @@ namespace detail {
         }
 
         materialized_ = false;
+        materialize_count_ = 0;
       }
 
       template <int Component>
@@ -429,6 +445,7 @@ namespace detail {
       mutable value_type *q_ptr_ = nullptr;
       mutable value_type *r_ptr_ = nullptr;
       mutable bool materialized_ = false;
+      mutable int materialize_count_ = 0;
 
     public:
       EconQRState(const OpA &a) : a_(a)
@@ -448,6 +465,7 @@ namespace detail {
       void Materialize(Executor &&ex) const
       {
         if (materialized_) {
+          materialize_count_++;
           return;
         }
 
@@ -459,12 +477,17 @@ namespace detail {
         detail::AllocateTempTensor(r_, std::forward<Executor>(ex), r_shape_, &r_ptr_);
         qr_econ_impl(q_, r_, a_, std::forward<Executor>(ex));
         materialized_ = true;
+        materialize_count_ = 1;
       }
 
       template <typename Executor>
       void Release(Executor &&ex) const
       {
         if (!materialized_) {
+          return;
+        }
+        if (materialize_count_ > 1) {
+          materialize_count_--;
           return;
         }
 
@@ -493,6 +516,7 @@ namespace detail {
         }
 
         materialized_ = false;
+        materialize_count_ = 0;
       }
 
       template <int Component>

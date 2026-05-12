@@ -65,6 +65,7 @@ namespace detail {
       mutable a_value_type *factors_ptr_ = nullptr;
       mutable piv_value_type *piv_ptr_ = nullptr;
       mutable bool materialized_ = false;
+      mutable int materialize_count_ = 0;
 
     public:
       LUState(const OpA &a) : a_(a)
@@ -81,6 +82,7 @@ namespace detail {
       void Materialize(Executor &&ex) const
       {
         if (materialized_) {
+          materialize_count_++;
           return;
         }
 
@@ -113,12 +115,17 @@ namespace detail {
 #endif
         }
         materialized_ = true;
+        materialize_count_ = 1;
       }
 
       template <typename Executor>
       void Release(Executor &&ex) const
       {
         if (!materialized_) {
+          return;
+        }
+        if (materialize_count_ > 1) {
+          materialize_count_--;
           return;
         }
 
@@ -147,6 +154,7 @@ namespace detail {
         }
 
         materialized_ = false;
+        materialize_count_ = 0;
       }
 
       template <int Component>

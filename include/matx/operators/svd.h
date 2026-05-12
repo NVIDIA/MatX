@@ -72,6 +72,7 @@ namespace detail {
       mutable s_value_type *s_ptr_ = nullptr;
       mutable a_value_type *vt_ptr_ = nullptr;
       mutable bool materialized_ = false;
+      mutable int materialize_count_ = 0;
 
     public:
       SVDState(const OpA &a, const SVDMode jobz, const SVDHostAlgo algo) : a_(a), jobz_(jobz), algo_(algo)
@@ -99,6 +100,7 @@ namespace detail {
       void Materialize(Executor &&ex) const
       {
         if (materialized_) {
+          materialize_count_++;
           return;
         }
 
@@ -116,12 +118,17 @@ namespace detail {
           svd_impl(u_, s_, vt_, a_, std::forward<Executor>(ex), jobz_, algo_);
         }
         materialized_ = true;
+        materialize_count_ = 1;
       }
 
       template <typename Executor>
       void Release(Executor &&ex) const
       {
         if (!materialized_) {
+          return;
+        }
+        if (materialize_count_ > 1) {
+          materialize_count_--;
           return;
         }
 
@@ -160,6 +167,7 @@ namespace detail {
         }
 
         materialized_ = false;
+        materialize_count_ = 0;
       }
 
       template <int Component>

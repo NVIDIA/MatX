@@ -116,7 +116,8 @@ TYPED_TEST(InvSolverJITTestFloatTypes, CuSolverDxRuntimeQueries)
   auto op = inv(A);
 
   EXPECT_TRUE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op));
-  EXPECT_GT(detail::get_operator_capability<detail::OperatorCapability::DYN_SHM_SIZE>(op), 0);
+  EXPECT_GE(detail::get_operator_capability<detail::OperatorCapability::DYN_SHM_SIZE>(op),
+            static_cast<int>(2 * 4 * sizeof(TestType) + 3 * sizeof(int)));
 
   const auto block_dim = detail::get_operator_capability<detail::OperatorCapability::BLOCK_DIM>(op);
   EXPECT_EQ(block_dim[0], 32);
@@ -190,6 +191,20 @@ TYPED_TEST(InvSolverJITTestFloatTypes, CuSolverDxRejectsUnsupportedShape)
 
   auto A = make_tensor<TestType>({2, 3});
   auto O = make_tensor<TestType>({2, 3});
+  auto op = inv(A);
+
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op));
+
+  CUDAJITExecutor exec{};
+  EXPECT_THROW({ (O = op).run(exec); }, matx::detail::matxException);
+}
+
+TYPED_TEST(InvSolverJITTestFloatTypes, CuSolverDxRejectsUnsupportedRank)
+{
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+
+  auto A = make_tensor<TestType>({1, 1, 1, 2, 2});
+  auto O = make_tensor<TestType>({1, 1, 1, 2, 2});
   auto op = inv(A);
 
   EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op));

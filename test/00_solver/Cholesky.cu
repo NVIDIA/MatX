@@ -202,6 +202,20 @@ TYPED_TEST(CholSolverJITTestNonHalfFloatTypes, CuSolverDxRejectsUnsupportedShape
   CUDAJITExecutor exec{};
   EXPECT_THROW({ (O = op).run(exec); }, matx::detail::matxException);
 }
+
+TYPED_TEST(CholSolverJITTestNonHalfFloatTypes, CuSolverDxRejectsUnsupportedRank)
+{
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+
+  auto A = make_tensor<TestType>({1, 1, 1, 2, 2});
+  auto O = make_tensor<TestType>({1, 1, 1, 2, 2});
+  auto op = chol(A, SolverFillMode::LOWER);
+
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op));
+
+  CUDAJITExecutor exec{};
+  EXPECT_THROW({ (O = op).run(exec); }, matx::detail::matxException);
+}
 #endif
 
 TYPED_TEST(CholSolverTestNonHalfFloatTypes, CholeskyBasic)

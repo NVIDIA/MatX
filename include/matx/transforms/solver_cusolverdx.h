@@ -110,6 +110,103 @@ private:
     }
   }
 
+  class DescriptorHandle {
+  private:
+    cusolverdxDescriptor handle_{};
+
+  public:
+    DescriptorHandle() = default;
+    DescriptorHandle(const DescriptorHandle&) = delete;
+    DescriptorHandle& operator=(const DescriptorHandle&) = delete;
+    DescriptorHandle(DescriptorHandle&& other) noexcept : handle_(other.handle_)
+    {
+      other.handle_ = {};
+    }
+    DescriptorHandle& operator=(DescriptorHandle&& other) noexcept
+    {
+      if (this != &other) {
+        reset();
+        handle_ = other.handle_;
+        other.handle_ = {};
+      }
+      return *this;
+    }
+    ~DescriptorHandle()
+    {
+      reset();
+    }
+
+    cusolverdxDescriptor get() const { return handle_; }
+    cusolverdxDescriptor* put() { return &handle_; }
+
+  private:
+    void reset()
+    {
+      if (handle_ != 0) {
+        cusolverdxDestroyDescriptor(handle_);
+        handle_ = {};
+      }
+    }
+  };
+
+  class CodeHandle {
+  private:
+    commondxCode code_{};
+
+  public:
+    CodeHandle() = default;
+    CodeHandle(const CodeHandle&) = delete;
+    CodeHandle& operator=(const CodeHandle&) = delete;
+    CodeHandle(CodeHandle&& other) noexcept : code_(other.code_)
+    {
+      other.code_ = {};
+    }
+    CodeHandle& operator=(CodeHandle&& other) noexcept
+    {
+      if (this != &other) {
+        reset();
+        code_ = other.code_;
+        other.code_ = {};
+      }
+      return *this;
+    }
+    ~CodeHandle()
+    {
+      reset();
+    }
+
+    commondxCode get() const { return code_; }
+    commondxCode* put() { return &code_; }
+
+  private:
+    void reset()
+    {
+      if (code_ != 0) {
+        commondxDestroyCode(code_);
+        code_ = {};
+      }
+    }
+  };
+
+  long long int GetKernelSharedMemoryFloor() const
+  {
+    const auto elem_size = static_cast<long long int>(sizeof(InputType));
+    switch (function_) {
+      case CUSOLVERDX_FUNCTION_POTRF: {
+        const auto elems = static_cast<long long int>(n_) * static_cast<long long int>(n_);
+        return elems * elem_size + static_cast<long long int>(sizeof(int));
+      }
+      case CUSOLVERDX_FUNCTION_GESV_NO_PIVOT:
+      case CUSOLVERDX_FUNCTION_GESV_PARTIAL_PIVOT: {
+        const auto elems = static_cast<long long int>(n_) * static_cast<long long int>(n_);
+        return 2 * elems * elem_size + (static_cast<long long int>(n_) + 1) * static_cast<long long int>(sizeof(int));
+      }
+      default:
+        return static_cast<long long int>(m_) * static_cast<long long int>(n_) * elem_size +
+               static_cast<long long int>(sizeof(int));
+    }
+  }
+
   std::string GetTraitSymbolName(cusolverdxDescriptor handle) const
   {
     size_t symbol_name_size = 0;
@@ -145,35 +242,35 @@ public:
   cusolverdxFunction get_function() const { return function_; }
   SolverFillMode get_fill_mode() const { return fill_mode_; }
 
-  cusolverdxDescriptor GeneratePlan() const
+  DescriptorHandle GeneratePlan() const
   {
     MATX_ASSERT_STR(is_supported_value_type, matxInvalidParameter, "Unsupported input type for cuSolverDx");
 
-    cusolverdxDescriptor h_;
-    LIBCUSOLVERDX_CHECK(cusolverdxCreateDescriptor(&h_));
+    DescriptorHandle h_;
+    LIBCUSOLVERDX_CHECK(cusolverdxCreateDescriptor(h_.put()));
 
     long long int sizes[3] = {
         static_cast<long long int>(m_),
         static_cast<long long int>(n_),
         static_cast<long long int>(k_)};
-    LIBCUSOLVERDX_CHECK(cusolverdxSetOperatorInt64s(h_, CUSOLVERDX_OPERATOR_SIZE, GetSizeCount(), sizes));
-    LIBCUSOLVERDX_CHECK(cusolverdxSetOperatorInt64(h_, CUSOLVERDX_OPERATOR_TYPE, GetType()));
-    LIBCUSOLVERDX_CHECK(cusolverdxSetOperatorInt64(h_, CUSOLVERDX_OPERATOR_PRECISION, GetPrecision()));
-    LIBCUSOLVERDX_CHECK(cusolverdxSetOperatorInt64(h_, CUSOLVERDX_OPERATOR_SM, cc_));
-    LIBCUSOLVERDX_CHECK(cusolverdxSetOperatorInt64(h_, CUSOLVERDX_OPERATOR_EXECUTION, COMMONDX_EXECUTION_BLOCK));
-    LIBCUSOLVERDX_CHECK(cusolverdxSetOperatorInt64(h_, CUSOLVERDX_OPERATOR_API, CUSOLVERDX_API_SMEM));
-    LIBCUSOLVERDX_CHECK(cusolverdxSetOperatorInt64(h_, CUSOLVERDX_OPERATOR_FUNCTION, function_));
+    LIBCUSOLVERDX_CHECK(cusolverdxSetOperatorInt64s(h_.get(), CUSOLVERDX_OPERATOR_SIZE, GetSizeCount(), sizes));
+    LIBCUSOLVERDX_CHECK(cusolverdxSetOperatorInt64(h_.get(), CUSOLVERDX_OPERATOR_TYPE, GetType()));
+    LIBCUSOLVERDX_CHECK(cusolverdxSetOperatorInt64(h_.get(), CUSOLVERDX_OPERATOR_PRECISION, GetPrecision()));
+    LIBCUSOLVERDX_CHECK(cusolverdxSetOperatorInt64(h_.get(), CUSOLVERDX_OPERATOR_SM, cc_));
+    LIBCUSOLVERDX_CHECK(cusolverdxSetOperatorInt64(h_.get(), CUSOLVERDX_OPERATOR_EXECUTION, COMMONDX_EXECUTION_BLOCK));
+    LIBCUSOLVERDX_CHECK(cusolverdxSetOperatorInt64(h_.get(), CUSOLVERDX_OPERATOR_API, CUSOLVERDX_API_SMEM));
+    LIBCUSOLVERDX_CHECK(cusolverdxSetOperatorInt64(h_.get(), CUSOLVERDX_OPERATOR_FUNCTION, function_));
 
     long long int arrangements[2] = {CUSOLVERDX_ARRANGEMENT_ROW_MAJOR, CUSOLVERDX_ARRANGEMENT_ROW_MAJOR};
-    LIBCUSOLVERDX_CHECK(cusolverdxSetOperatorInt64s(h_, CUSOLVERDX_OPERATOR_ARRANGEMENT, 2, arrangements));
+    LIBCUSOLVERDX_CHECK(cusolverdxSetOperatorInt64s(h_.get(), CUSOLVERDX_OPERATOR_ARRANGEMENT, 2, arrangements));
 
     if (UsesFillMode()) {
       const auto fill = fill_mode_ == SolverFillMode::LOWER ? CUSOLVERDX_FILL_MODE_LOWER : CUSOLVERDX_FILL_MODE_UPPER;
-      LIBCUSOLVERDX_CHECK(cusolverdxSetOperatorInt64(h_, CUSOLVERDX_OPERATOR_FILL_MODE, fill));
+      LIBCUSOLVERDX_CHECK(cusolverdxSetOperatorInt64(h_.get(), CUSOLVERDX_OPERATOR_FILL_MODE, fill));
     }
 
     if (UsesJob()) {
-      LIBCUSOLVERDX_CHECK(cusolverdxSetOperatorInt64(h_, CUSOLVERDX_OPERATOR_JOB, job_));
+      LIBCUSOLVERDX_CHECK(cusolverdxSetOperatorInt64(h_.get(), CUSOLVERDX_OPERATOR_JOB, job_));
     }
 
     return h_;
@@ -227,8 +324,7 @@ public:
       auto handle = GeneratePlan();
       long long int shm = 0;
       const bool supported =
-          cusolverdxGetTraitInt64(handle, CUSOLVERDX_TRAIT_SHARED_MEMORY_SIZE, &shm) == COMMONDX_SUCCESS;
-      cusolverdxDestroyDescriptor(handle);
+          cusolverdxGetTraitInt64(handle.get(), CUSOLVERDX_TRAIT_SHARED_MEMORY_SIZE, &shm) == COMMONDX_SUCCESS;
       return supported;
     }
   }
@@ -237,21 +333,16 @@ public:
   {
     auto handle = GeneratePlan();
     long long int shared_memory_size = 0;
-    LIBCUSOLVERDX_CHECK(cusolverdxGetTraitInt64(handle, CUSOLVERDX_TRAIT_SHARED_MEMORY_SIZE, &shared_memory_size));
-    cusolverdxDestroyDescriptor(handle);
+    LIBCUSOLVERDX_CHECK(cusolverdxGetTraitInt64(handle.get(), CUSOLVERDX_TRAIT_SHARED_MEMORY_SIZE, &shared_memory_size));
 
-    const auto matrix_bytes = static_cast<long long int>(m_) * static_cast<long long int>(n_) *
-                              static_cast<long long int>(sizeof(InputType));
-    const auto info_bytes = static_cast<long long int>(16 + sizeof(int));
-    return static_cast<int>(cuda::std::max(shared_memory_size, matrix_bytes + info_bytes));
+    return static_cast<int>(cuda::std::max(shared_memory_size, GetKernelSharedMemoryFloor()));
   }
 
   cuda::std::array<int, 3> GetBlockDim() const
   {
     auto handle = GeneratePlan();
     cuda::std::array<long long int, 3> block_dim = {0, 0, 0};
-    LIBCUSOLVERDX_CHECK(cusolverdxGetTraitInt64s(handle, CUSOLVERDX_TRAIT_BLOCK_DIM, 3, block_dim.data()));
-    cusolverdxDestroyDescriptor(handle);
+    LIBCUSOLVERDX_CHECK(cusolverdxGetTraitInt64s(handle.get(), CUSOLVERDX_TRAIT_BLOCK_DIM, 3, block_dim.data()));
     return cuda::std::array<int, 3>{static_cast<int>(block_dim[0]),
                                     static_cast<int>(block_dim[1]),
                                     static_cast<int>(block_dim[2])};
@@ -266,14 +357,12 @@ public:
   {
     auto handle = GeneratePlan();
     long long int workspace_size = 0;
-    LIBCUSOLVERDX_CHECK(cusolverdxGetTraitInt64(handle, CUSOLVERDX_TRAIT_WORKSPACE_SIZE, &workspace_size));
-    cusolverdxDestroyDescriptor(handle);
+    LIBCUSOLVERDX_CHECK(cusolverdxGetTraitInt64(handle.get(), CUSOLVERDX_TRAIT_WORKSPACE_SIZE, &workspace_size));
     return static_cast<int>(workspace_size);
   }
 
   bool GenerateLTOIR(std::set<std::string> &ltoir_symbols)
   {
-    LTOIRData ltoir;
     const auto symbol_name = std::string(SOLVER_DX_FUNC_PREFIX) + "_" + GetSymbolName();
     ltoir_symbols.insert(symbol_name);
 
@@ -282,33 +371,35 @@ public:
     }
 
     auto handle = GeneratePlan();
-    LIBCUSOLVERDX_CHECK(cusolverdxSetOptionStr(handle, COMMONDX_OPTION_SYMBOL_NAME, symbol_name.c_str()));
-    const auto trait_symbol_name = GetTraitSymbolName(handle);
+    LIBCUSOLVERDX_CHECK(cusolverdxSetOptionStr(handle.get(), COMMONDX_OPTION_SYMBOL_NAME, symbol_name.c_str()));
+    const auto trait_symbol_name = GetTraitSymbolName(handle.get());
     MATX_ASSERT_STR(trait_symbol_name == symbol_name,
                     matxInvalidParameter,
                     "cuSolverDx returned an unexpected symbol name");
 
-    commondxCode code;
-    LIBCUSOLVERDX_CHECK(commondxCreateCode(&code));
-    LIBCUSOLVERDX_CHECK(commondxSetCodeOptionInt64(code, COMMONDX_OPTION_TARGET_SM, cc_));
-    LIBCUSOLVERDX_CHECK(cusolverdxFinalizeCode(code, handle));
+    CodeHandle code;
+    LIBCUSOLVERDX_CHECK(commondxCreateCode(code.put()));
+    LIBCUSOLVERDX_CHECK(commondxSetCodeOptionInt64(code.get(), COMMONDX_OPTION_TARGET_SM, cc_));
+    LIBCUSOLVERDX_CHECK(cusolverdxFinalizeCode(code.get(), handle.get()));
 
-    LIBCUSOLVERDX_CHECK(commondxGetCodeLTOIRSize(code, &ltoir.length));
-    ltoir.data = static_cast<char*>(malloc(ltoir.length));
-    MATX_ASSERT_STR(ltoir.data != nullptr, matxInvalidParameter, "Failed to allocate cuSolverDx LTOIR data");
-    LIBCUSOLVERDX_CHECK(commondxGetCodeLTOIR(code, ltoir.length, ltoir.data));
+    size_t ltoir_length = 0;
+    LIBCUSOLVERDX_CHECK(commondxGetCodeLTOIRSize(code.get(), &ltoir_length));
+    if (ltoir_length == 0) {
+      MATX_LOG_ERROR("cuSolverDx returned empty LTOIR for: {}", symbol_name);
+      return false;
+    }
+    std::unique_ptr<char, decltype(&free)> ltoir(static_cast<char*>(malloc(ltoir_length)), &free);
+    if (ltoir == nullptr) {
+      MATX_LOG_ERROR("Failed to allocate cuSolverDx LTOIR data for: {}", symbol_name);
+      return false;
+    }
+    LIBCUSOLVERDX_CHECK(commondxGetCodeLTOIR(code.get(), ltoir_length, ltoir.get()));
 
-    if (!detail::GetCache().StoreLTOIRCachedBytes(symbol_name, ltoir.data, ltoir.length)) {
-      free(ltoir.data);
+    char *ltoir_data = ltoir.release();
+    if (!detail::GetCache().StoreLTOIRCachedBytes(symbol_name, ltoir_data, ltoir_length)) {
       MATX_LOG_ERROR("Failed to store cuSolverDx LTOIR cached bytes for: {}", symbol_name);
       return false;
     }
-
-    ltoir.data = nullptr;
-    ltoir.length = 0;
-
-    LIBCUSOLVERDX_CHECK(commondxDestroyCode(code));
-    LIBCUSOLVERDX_CHECK(cusolverdxDestroyDescriptor(handle));
 
     return true;
   }

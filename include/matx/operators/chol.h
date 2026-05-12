@@ -73,9 +73,9 @@ namespace detail {
         int major = 0;
         int minor = 0;
         int device = 0;
-        cudaGetDevice(&device);
-        cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device);
-        cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device);
+        MATX_CUDA_CHECK(cudaGetDevice(&device));
+        MATX_CUDA_CHECK(cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device));
+        MATX_CUDA_CHECK(cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device));
         const int cc = major * 100 + minor * 10;
 
         if constexpr (OpA::Rank() >= 2) {
@@ -153,7 +153,7 @@ namespace detail {
           return result;
         }
         else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
-          const bool supported = (OpA::Rank() >= 2) &&
+          const bool supported = (OpA::Rank() >= 2) && (OpA::Rank() <= 4) &&
                                  (a_.Size(OpA::Rank() - 2) == a_.Size(OpA::Rank() - 1)) &&
                                  dx_potrf_helper_.IsSupported();
           auto result = combine_capabilities<Cap>(supported, detail::get_operator_capability<Cap>(a_, in));

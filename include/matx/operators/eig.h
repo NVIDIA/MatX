@@ -70,6 +70,7 @@ namespace detail {
       mutable a_value_type *vectors_ptr_ = nullptr;
       mutable w_value_type *values_ptr_ = nullptr;
       mutable bool materialized_ = false;
+      mutable int materialize_count_ = 0;
 
     public:
       EigState(const OpA &a, EigenMode jobz, SolverFillMode uplo) : a_(a), jobz_(jobz), uplo_(uplo)
@@ -88,6 +89,7 @@ namespace detail {
       void Materialize(Executor &&ex) const
       {
         if (materialized_) {
+          materialize_count_++;
           return;
         }
 
@@ -99,12 +101,17 @@ namespace detail {
         detail::AllocateTempTensor(values_, std::forward<Executor>(ex), values_shape_, &values_ptr_);
         eig_impl(vectors_, values_, a_, std::forward<Executor>(ex), jobz_, uplo_);
         materialized_ = true;
+        materialize_count_ = 1;
       }
 
       template <typename Executor>
       void Release(Executor &&ex) const
       {
         if (!materialized_) {
+          return;
+        }
+        if (materialize_count_ > 1) {
+          materialize_count_--;
           return;
         }
 
@@ -133,6 +140,7 @@ namespace detail {
         }
 
         materialized_ = false;
+        materialize_count_ = 0;
       }
 
       template <int Component>
