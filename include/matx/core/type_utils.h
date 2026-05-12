@@ -265,9 +265,8 @@ template <typename T> constexpr MatXDataType_t TypeToInt()
   if constexpr (std::is_same_v<T, uint64_t>)
     return MATX_TYPE_UINT64;
 
-MATX_IGNORE_WARNING_PUSH_MSVC(4702)
+MATX_IGNORE_WARNING_NEXT_LINE_MSVC(4702)
   return MATX_TYPE_INVALID;
-MATX_IGNORE_WARNING_POP_MSVC
 }
 
 template <MatXDataType_t IntType> struct IntToType {
@@ -361,9 +360,8 @@ template <typename T> constexpr cudaDataType_t MatXTypeToCudaType()
     return CUDA_C_16BF;
   }
 
-MATX_IGNORE_WARNING_PUSH_MSVC(4702)
+MATX_IGNORE_WARNING_NEXT_LINE_MSVC(4702)
   return CUDA_C_32F;
-MATX_IGNORE_WARNING_POP_MSVC
 }
 
 template <typename T> constexpr cublasComputeType_t MatXTypeToCudaComputeType()
@@ -381,9 +379,8 @@ template <typename T> constexpr cublasComputeType_t MatXTypeToCudaComputeType()
     return CUBLAS_COMPUTE_64F;
   }
 
-MATX_IGNORE_WARNING_PUSH_MSVC(4702)
+MATX_IGNORE_WARNING_NEXT_LINE_MSVC(4702)
   return CUBLAS_COMPUTE_32F;
-MATX_IGNORE_WARNING_POP_MSVC
 }
 
 template <typename T>

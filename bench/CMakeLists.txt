@@ -38,16 +38,16 @@ function(create_bench_executable bench_file)
         # nvcc does not recognize MSVC-style /flags as its own options; passing them
         # directly without -Xcompiler causes nvcc to treat them as extra input files,
         # triggering "A single input file is required for a non-link phase".
-        # /bigobj raises the COFF section limit from 2^16 to 2^32,
-        # required for heavily-templated translation units.
         target_compile_options(${target_name} PRIVATE
             $<$<COMPILE_LANGUAGE:CXX>:/W4>
             $<$<COMPILE_LANGUAGE:CXX>:/WX>
-            $<$<COMPILE_LANGUAGE:CXX>:/bigobj>
             $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/W4>
             $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/WX>
-            $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/bigobj>
         )
+
+        # cudart_static.lib pulls in LIBCMT (static CRT); suppress the LNK4098 warning
+        # that results from mixing it with the /MD (dynamic CRT) runtime used elsewhere.
+        target_link_options(${target_name} PRIVATE /NODEFAULTLIB:LIBCMT)
     else()
         target_compile_options(${target_name} PRIVATE ${WARN_FLAGS})
         target_compile_options(${target_name} PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:${MATX_CUDA_FLAGS}>)

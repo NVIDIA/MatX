@@ -111,9 +111,13 @@ namespace matx {
 
     #define MATX_IGNORE_WARNING_POP_MSVC \
         __pragma(warning(pop))
+
+    #define MATX_IGNORE_WARNING_NEXT_LINE_MSVC(WARN_ID) \
+        __pragma(warning(suppress : WARN_ID))
 #else
     #define MATX_IGNORE_WARNING_PUSH_MSVC(WARN_ID)
     #define MATX_IGNORE_WARNING_POP_MSVC
+    #define MATX_IGNORE_WARNING_NEXT_LINE_MSVC(WARN_ID)
 #endif
 
 // std::ceil is not constexpr until C++23
