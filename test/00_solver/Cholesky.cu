@@ -35,8 +35,38 @@
 #include "test_types.h"
 #include "utilities.h"
 #include "gtest/gtest.h"
+#include <algorithm>
+#include <cmath>
 
 using namespace matx;
+
+namespace {
+template <typename T>
+__MATX_INLINE__ T CholJITValue(double real, double imag = 0.0)
+{
+  if constexpr (cuda::std::is_same_v<T, cuda::std::complex<float>>) {
+    return T{static_cast<float>(real), static_cast<float>(imag)};
+  }
+  else if constexpr (cuda::std::is_same_v<T, cuda::std::complex<double>>) {
+    return T{real, imag};
+  }
+  else {
+    return static_cast<T>(real);
+  }
+}
+
+template <typename T>
+double CholJITAbsDiff(const T &a, const T &b)
+{
+  if constexpr (is_complex_v<T>) {
+    return std::max(std::abs(static_cast<double>(a.real() - b.real())),
+                    std::abs(static_cast<double>(a.imag() - b.imag())));
+  }
+  else {
+    return std::abs(static_cast<double>(a - b));
+  }
+}
+}
 
 template <typename T> class CholSolverTest : public ::testing::Test {
 protected:
@@ -72,31 +102,42 @@ TYPED_TEST_SUITE(CholSolverTestNonHalfFloatTypes,
   MatXFloatNonHalfTypesAllExecs);
 
 #if defined(MATX_EN_MATHDX) && defined(MATX_EN_JIT)
-TEST(CholSolverJIT, CuSolverDxRuntimeQueries)
+template <typename TensorType>
+class CholSolverJITTestNonHalfFloatTypes : public ::testing::Test {
+};
+
+TYPED_TEST_SUITE(CholSolverJITTestNonHalfFloatTypes,
+  MatXFloatNonHalfTypesCUDAExec);
+
+TYPED_TEST(CholSolverJITTestNonHalfFloatTypes, CuSolverDxRuntimeQueries)
 {
-  auto A = make_tensor<float>({2, 2});
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+
+  auto A = make_tensor<TestType>({2, 2});
   auto op = chol(A, SolverFillMode::LOWER);
 
   EXPECT_TRUE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op));
   EXPECT_GE(detail::get_operator_capability<detail::OperatorCapability::DYN_SHM_SIZE>(op),
-            static_cast<int>(4 * sizeof(float) + sizeof(int)));
+            static_cast<int>(4 * sizeof(TestType) + sizeof(int)));
 
   const auto block_dim = detail::get_operator_capability<detail::OperatorCapability::BLOCK_DIM>(op);
   EXPECT_EQ(block_dim[0], 32);
   EXPECT_EQ(block_dim[1], 1024);
 }
 
-TEST(CholSolverJIT, CuSolverDxMatchesCudaPath)
+TYPED_TEST(CholSolverJITTestNonHalfFloatTypes, CuSolverDxMatchesCudaPath)
 {
-  auto A_jit = make_tensor<float>({2, 2});
-  auto A_cuda = make_tensor<float>({2, 2});
-  auto O_jit = make_tensor<float>({2, 2});
-  auto O_cuda = make_tensor<float>({2, 2});
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
-  A_jit(0, 0) = 4.0f;
-  A_jit(0, 1) = 2.0f;
-  A_jit(1, 0) = 2.0f;
-  A_jit(1, 1) = 3.0f;
+  auto A_jit = make_tensor<TestType>({2, 2});
+  auto A_cuda = make_tensor<TestType>({2, 2});
+  auto O_jit = make_tensor<TestType>({2, 2});
+  auto O_cuda = make_tensor<TestType>({2, 2});
+
+  A_jit(0, 0) = CholJITValue<TestType>(4.0);
+  A_jit(0, 1) = CholJITValue<TestType>(2.0);
+  A_jit(1, 0) = CholJITValue<TestType>(2.0);
+  A_jit(1, 1) = CholJITValue<TestType>(3.0);
   (A_cuda = A_jit).run(cudaExecutor{});
 
   CUDAJITExecutor jit_exec{};
@@ -108,26 +149,28 @@ TEST(CholSolverJIT, CuSolverDxMatchesCudaPath)
 
   for (index_t i = 0; i < 2; i++) {
     for (index_t j = 0; j <= i; j++) {
-      ASSERT_NEAR(O_jit(i, j), O_cuda(i, j), 1e-4f);
+      ASSERT_NEAR(CholJITAbsDiff(O_jit(i, j), O_cuda(i, j)), 0.0, 1e-4);
     }
   }
 }
 
-TEST(CholSolverJIT, CuSolverDxBatchedMatchesCudaPath)
+TYPED_TEST(CholSolverJITTestNonHalfFloatTypes, CuSolverDxBatchedMatchesCudaPath)
 {
-  auto A_jit = make_tensor<float>({2, 2, 2});
-  auto A_cuda = make_tensor<float>({2, 2, 2});
-  auto O_jit = make_tensor<float>({2, 2, 2});
-  auto O_cuda = make_tensor<float>({2, 2, 2});
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
-  A_jit(0, 0, 0) = 4.0f;
-  A_jit(0, 0, 1) = 2.0f;
-  A_jit(0, 1, 0) = 2.0f;
-  A_jit(0, 1, 1) = 3.0f;
-  A_jit(1, 0, 0) = 9.0f;
-  A_jit(1, 0, 1) = 3.0f;
-  A_jit(1, 1, 0) = 3.0f;
-  A_jit(1, 1, 1) = 5.0f;
+  auto A_jit = make_tensor<TestType>({2, 2, 2});
+  auto A_cuda = make_tensor<TestType>({2, 2, 2});
+  auto O_jit = make_tensor<TestType>({2, 2, 2});
+  auto O_cuda = make_tensor<TestType>({2, 2, 2});
+
+  A_jit(0, 0, 0) = CholJITValue<TestType>(4.0);
+  A_jit(0, 0, 1) = CholJITValue<TestType>(2.0);
+  A_jit(0, 1, 0) = CholJITValue<TestType>(2.0);
+  A_jit(0, 1, 1) = CholJITValue<TestType>(3.0);
+  A_jit(1, 0, 0) = CholJITValue<TestType>(9.0);
+  A_jit(1, 0, 1) = CholJITValue<TestType>(3.0);
+  A_jit(1, 1, 0) = CholJITValue<TestType>(3.0);
+  A_jit(1, 1, 1) = CholJITValue<TestType>(5.0);
   (A_cuda = A_jit).run(cudaExecutor{});
 
   CUDAJITExecutor jit_exec{};
@@ -140,16 +183,18 @@ TEST(CholSolverJIT, CuSolverDxBatchedMatchesCudaPath)
   for (index_t b = 0; b < 2; b++) {
     for (index_t i = 0; i < 2; i++) {
       for (index_t j = 0; j <= i; j++) {
-        ASSERT_NEAR(O_jit(b, i, j), O_cuda(b, i, j), 1e-4f);
+        ASSERT_NEAR(CholJITAbsDiff(O_jit(b, i, j), O_cuda(b, i, j)), 0.0, 1e-4);
       }
     }
   }
 }
 
-TEST(CholSolverJIT, CuSolverDxRejectsUnsupportedShape)
+TYPED_TEST(CholSolverJITTestNonHalfFloatTypes, CuSolverDxRejectsUnsupportedShape)
 {
-  auto A = make_tensor<float>({2, 3});
-  auto O = make_tensor<float>({2, 3});
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+
+  auto A = make_tensor<TestType>({2, 3});
+  auto O = make_tensor<TestType>({2, 3});
   auto op = chol(A, SolverFillMode::LOWER);
 
   EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op));
