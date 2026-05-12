@@ -169,6 +169,11 @@ if(WIN32)
         add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/Zc:__cplusplus>")
         add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/Zc:__cplusplus>")
 
+        # /bigobj raises the COFF section limit from 2^16 to 2^32,
+        # required for heavily-templated translation units.
+        add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/bigobj>")
+        add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/bigobj>")
+
         # /wd4996: suppress "deprecated" warnings from NVIDIA's own headers (cusparse.h,
         # cusolverDn.h, etc.) that annotate types scheduled for removal. These warnings
         # originate in external SDK headers and cannot be fixed in MatX; without /wd4996

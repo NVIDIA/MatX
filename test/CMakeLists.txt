@@ -123,14 +123,11 @@ function(create_test_executable test_file)
         # nvcc does not recognize MSVC-style /flags as its own options; passing them
         # directly without -Xcompiler causes nvcc to treat them as extra input files,
         # triggering "A single input file is required for a non-link phase".
-        # Add /bigobj for heavily-templated tests.
         target_compile_options(${target_name} PRIVATE
             $<$<COMPILE_LANGUAGE:CXX>:/W4>
             $<$<COMPILE_LANGUAGE:CXX>:/WX>
             $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/W4>
             $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/WX>
-            $<$<COMPILE_LANGUAGE:CXX>:/bigobj>
-            $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/bigobj>
             # /wd4459: local declaration hides global — triggered inside Google Test's
             # gtest-matchers.h header; cannot be fixed in MatX.
             $<$<COMPILE_LANGUAGE:CXX>:/wd4459>
@@ -141,6 +138,10 @@ function(create_test_executable test_file)
             $<$<COMPILE_LANGUAGE:CXX>:/wd4244>
             $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/wd4244>
         )
+
+        # cudart_static.lib pulls in LIBCMT (static CRT); suppress the LNK4098 warning
+        # that results from mixing it with the /MD (dynamic CRT) runtime used elsewhere.
+        target_link_options(${target_name} PRIVATE /NODEFAULTLIB:LIBCMT)
     else()
         target_compile_options(${target_name} PRIVATE ${WARN_FLAGS})
         target_compile_options(${target_name} PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:${MATX_CUDA_FLAGS}>)

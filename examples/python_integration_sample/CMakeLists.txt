@@ -53,6 +53,13 @@ endif()
 
 add_library(matxutil MODULE matxutil.cu)
 target_link_libraries(matxutil PRIVATE matx::matx CUDA::cudart)
+
+if (MSVC)
+    # cudart_static.lib pulls in LIBCMT (static CRT); suppress the LNK4098 warning
+    # that results from mixing it with the /MD (dynamic CRT) runtime used elsewhere.
+    target_link_options(matxutil PRIVATE /NODEFAULTLIB:LIBCMT)
+endif()
+
 set_target_properties(matxutil PROPERTIES SUFFIX ".so" PREFIX "")
 
 configure_file(

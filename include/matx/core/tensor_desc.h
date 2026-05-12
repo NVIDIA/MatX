@@ -305,10 +305,9 @@ public:
 
 // gcc 14.1 incorrectly reports shape_ as uninitialized in some contexts
 MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
-MATX_IGNORE_WARNING_PUSH_MSVC(4702)
+MATX_IGNORE_WARNING_NEXT_LINE_MSVC(4702)
     return *(shape_.begin() + dim);
 MATX_IGNORE_WARNING_POP_GCC
-MATX_IGNORE_WARNING_POP_MSVC
   }
 
   /**
@@ -338,11 +337,10 @@ MATX_IGNORE_WARNING_POP_MSVC
         so it can never count up to 3. */
 MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
 MATX_IGNORE_WARNING_PUSH_GCC("-Warray-bounds")
-MATX_IGNORE_WARNING_PUSH_MSVC(4702)
+MATX_IGNORE_WARNING_NEXT_LINE_MSVC(4702)
     return *(stride_.begin() + dim);
 MATX_IGNORE_WARNING_POP_GCC
 MATX_IGNORE_WARNING_POP_GCC
-MATX_IGNORE_WARNING_POP_MSVC
   }
 
   /**
