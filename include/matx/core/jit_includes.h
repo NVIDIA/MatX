@@ -44,3 +44,4 @@
 #include "matx/operators/scalar_ops.h"
 #include "matx/core/operator_utils.h"
 #include <cub/block/block_load_to_shared.cuh>
+#include "matx/transforms/cub_device.h"

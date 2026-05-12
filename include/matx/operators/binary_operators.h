@@ -62,7 +62,7 @@ namespace matx
    */
   template <typename T, typename S>
     requires (!std::is_same_v<T, S> && std::is_arithmetic_v<S>)
-  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ 
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__
   auto operator*(const cuda::std::complex<T> &c, S n) -> cuda::std::complex<T>
   {
     return c * T(n);
@@ -79,7 +79,7 @@ namespace matx
    */
   template <typename T, typename S>
     requires (!std::is_same_v<T, S> && std::is_arithmetic_v<S>)
-  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ 
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__
   auto operator*(S n, const cuda::std::complex<T> &c) -> cuda::std::complex<T>
   {
     return T(n) * c;
@@ -106,6 +106,26 @@ namespace matx
           is_dynamic_tensor_v<I1> || is_dynamic_tensor_v<I2> ||
           is_dynamic_rank_op_v<I1> || is_dynamic_rank_op_v<I2>>;
 
+        template <typename Candidate>
+        static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr bool ContainsBlockReduction()
+        {
+          if constexpr (requires { typename Candidate::matx_jit_contains_block_reduction; }) {
+            return Candidate::matx_jit_contains_block_reduction::value;
+          }
+          else {
+            return requires { typename Candidate::matx_jit_block_reduction; };
+          }
+        }
+
+        using matx_jit_contains_block_reduction =
+            cuda::std::bool_constant<ContainsBlockReduction<I1>() || ContainsBlockReduction<I2>()>;
+
+        template <typename Candidate>
+        static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr bool IsDirectBlockReduction()
+        {
+          return requires { typename Candidate::matx_jit_block_reduction; };
+        }
+
 #ifdef MATX_EN_JIT
         struct JIT_Storage {
           typename detail::inner_storage_or_self_t<detail::base_type_t<I1>> in1_;
@@ -115,8 +135,8 @@ namespace matx
 
         JIT_Storage ToJITStorage() const {
           return JIT_Storage{detail::to_jit_storage(in1_), detail::to_jit_storage(in2_), detail::to_jit_storage(op_)};
-        }        
-#endif        
+        }
+#endif
 
       __MATX_INLINE__ const std::string str() const {
         return op_.str(get_type_str(in1_), get_type_str(in2_));
@@ -139,8 +159,15 @@ namespace matx
       {
         const auto &lhs = in1_;
         const auto &rhs = in2_;
-        const auto i1 = get_value<CapType>(lhs, indices...);
-        const auto i2 = get_value<CapType>(rhs, indices...);
+        using ScalarCap = CapabilityParams<ElementsPerThread::ONE, CapType::jit>;
+        using I1Cap = cuda::std::conditional_t<matx_jit_contains_block_reduction::value &&
+                                                (!ContainsBlockReduction<I1>() || IsDirectBlockReduction<I1>()),
+                                                ScalarCap, CapType>;
+        using I2Cap = cuda::std::conditional_t<matx_jit_contains_block_reduction::value &&
+                                                (!ContainsBlockReduction<I2>() || IsDirectBlockReduction<I2>()),
+                                                ScalarCap, CapType>;
+        const auto i1 = get_value<I1Cap>(lhs, indices...);
+        const auto i2 = get_value<I2Cap>(rhs, indices...);
 
         return op_.template operator()<CapType>(i1, i2);
       }
@@ -150,7 +177,7 @@ namespace matx
       __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ decltype(auto) operator()(Is... indices) const
       {
         return this->template operator()<DefaultCapabilities>(indices...);
-      }      
+      }
 
       template <typename CapType, typename ArrayType>
         requires is_std_array_c<ArrayType>
@@ -180,6 +207,17 @@ namespace matx
            std::string("template <typename I1, typename I2, typename Op> struct " + func_name + "  {\n") +
                "  using value_type = typename Op::value_type;\n" +
                "  using matxop = bool;\n" +
+               "  template <typename Candidate>\n" +
+               "  static __MATX_INLINE__ constexpr bool ContainsBlockReduction()\n" +
+               "  {\n" +
+               "    if constexpr (requires { typename Candidate::matx_jit_contains_block_reduction; }) {\n" +
+               "      return Candidate::matx_jit_contains_block_reduction::value;\n" +
+               "    }\n" +
+               "    else {\n" +
+               "      return requires { typename Candidate::matx_jit_block_reduction; };\n" +
+               "    }\n" +
+               "  }\n" +
+               "  using matx_jit_contains_block_reduction = cuda::std::bool_constant<ContainsBlockReduction<I1>() || ContainsBlockReduction<I2>()>;\n" +
                "  constexpr static cuda::std::array<index_t, " + std::to_string(actual_rank) + "> out_dims_ = { " +
                dims_str + " };\n" +
                "  typename detail::inner_storage_or_self_t<detail::base_type_t<I1>> in1_;\n" +
@@ -188,8 +226,11 @@ namespace matx
                "  template <typename CapType, typename... Is>\n" +
                "  __MATX_INLINE__ __MATX_DEVICE__  decltype(auto) operator()(Is... indices) const\n" +
                "  {\n" +
-               "    auto i1 = get_value<CapType>(in1_, indices...);\n" +
-               "    auto i2 = get_value<CapType>(in2_, indices...);\n" +
+               "    using ScalarCap = CapabilityParams<ElementsPerThread::ONE, CapType::jit>;\n" +
+               "    using I1Cap = cuda::std::conditional_t<matx_jit_contains_block_reduction::value && !ContainsBlockReduction<I1>(), ScalarCap, CapType>;\n" +
+               "    using I2Cap = cuda::std::conditional_t<matx_jit_contains_block_reduction::value && !ContainsBlockReduction<I2>(), ScalarCap, CapType>;\n" +
+               "    auto i1 = get_value<I1Cap>(in1_, indices...);\n" +
+               "    auto i2 = get_value<I2Cap>(in2_, indices...);\n" +
                "    auto result = op_.template operator()<CapType>(i1, i2);\n" +
                "    return result;\n" +
                "  }\n" +
@@ -203,7 +244,7 @@ namespace matx
                "  }\n" +
                "};\n"
         );
-      }      
+      }
 #endif
 
       template <OperatorCapability Cap, typename InType>
@@ -222,43 +263,66 @@ namespace matx
         }
         else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
 #ifdef MATX_EN_JIT
-          return combine_capabilities<Cap>(true, 
+          return combine_capabilities<Cap>(true,
                                         detail::get_operator_capability<Cap>(in1_, in),
                                         detail::get_operator_capability<Cap>(in2_, in));
 #else
           return false;
 #endif
         }
-        else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+	        else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
 #ifdef MATX_EN_JIT
           // Get the key/value pair from get_jit_op_str()
           const auto [key, value] = get_jit_op_str();
-          
+
           // Insert into the map if the key doesn't exist
           if (in.find(key) == in.end()) {
             in[key] = value;
           }
-          
+
           // Also handle child operators
           detail::get_operator_capability<Cap>(in1_, in);
           detail::get_operator_capability<Cap>(in2_, in);
           detail::get_operator_capability<Cap>(op_, in);
-          
+
           // Always return true for now
           return true;
 #else
-          return false;
+	          return false;
 #endif
-        }    
-        else if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
-          // The dynamic shmem size is the sum of the dynamic shmem sizes of the two operands.
-          return 
+	        }
+	        else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD ||
+	                           Cap == OperatorCapability::MAX_EPT_VEC_LOAD) {
+	          if constexpr (matx_jit_contains_block_reduction::value) {
+	            if constexpr (ContainsBlockReduction<I1>() && ContainsBlockReduction<I2>()) {
+	              return combine_capabilities<Cap>(
+	                  capability_attributes<Cap>::default_value,
+	                  detail::get_operator_capability<Cap>(in1_, in),
+	                  detail::get_operator_capability<Cap>(in2_, in));
+	            }
+	            else if constexpr (ContainsBlockReduction<I1>()) {
+	              return detail::get_operator_capability<Cap>(in1_, in);
+	            }
+	            else {
+	              return detail::get_operator_capability<Cap>(in2_, in);
+	            }
+	          }
+	          else {
+	            auto self_has_cap = capability_attributes<Cap>::default_value;
+	            return combine_capabilities<Cap>(self_has_cap,
+	                                          detail::get_operator_capability<Cap>(in1_, in),
+	                                          detail::get_operator_capability<Cap>(in2_, in));
+	          }
+	        }
+	        else if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
+	          // The dynamic shmem size is the sum of the dynamic shmem sizes of the two operands.
+          return
             detail::get_operator_capability<Cap>(in1_, in) +
             detail::get_operator_capability<Cap>(in2_, in);
-        }   
+        }
         else {
           auto self_has_cap = capability_attributes<Cap>::default_value;
-          return combine_capabilities<Cap>(self_has_cap, 
+          return combine_capabilities<Cap>(self_has_cap,
                                         detail::get_operator_capability<Cap>(in1_, in),
                                         detail::get_operator_capability<Cap>(in2_, in));
         }

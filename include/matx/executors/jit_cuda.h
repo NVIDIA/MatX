@@ -226,10 +226,13 @@ namespace matx
 
           bool global_kernel = detail::get_operator_capability<detail::OperatorCapability::GLOBAL_KERNEL>(op);
           bool pass_through_threads = detail::get_operator_capability<detail::OperatorCapability::PASS_THROUGH_THREADS>(op);
+          bool block_reduces_rank = detail::get_operator_capability<detail::OperatorCapability::BLOCK_REDUCES_RANK>(op);
           if (global_kernel) {
             MATX_LOG_DEBUG("Operator operates on a global level");
           } else if (pass_through_threads) {
             MATX_LOG_DEBUG("Operator uses pass-through threads (bounds checking at tensor level)");
+          } else if (block_reduces_rank) {
+            MATX_LOG_DEBUG("Operator uses a reduced-rank block collective");
           } else {
             MATX_LOG_DEBUG("Operator operates on a block level");
           }
@@ -297,6 +300,8 @@ namespace matx
 
                 if (global_kernel) {
                   stride = detail::get_grid_dims<RANK>(blocks, threads, sizes, static_cast<int>(best_ept), 256);
+                } else if (block_reduces_rank) {
+                  stride = detail::get_grid_dims_block_reduce<RANK>(blocks, threads, sizes, groups_per_block, block_size);
                 } else {
                   stride = detail::get_grid_dims_block<RANK>(blocks, threads, sizes, static_cast<int>(best_ept), groups_per_block, block_size, true);
                 }
@@ -316,6 +321,8 @@ namespace matx
 
                 if (global_kernel) {
                   stride = detail::get_grid_dims<RANK>(blocks, threads, sizes, static_cast<int>(best_ept), 256);
+                } else if (block_reduces_rank) {
+                  stride = detail::get_grid_dims_block_reduce<RANK>(blocks, threads, sizes, groups_per_block, block_size);
                 } else {
                   stride = detail::get_grid_dims_block<RANK>(blocks, threads, sizes, static_cast<int>(best_ept), groups_per_block, block_size, true);
                 }
@@ -343,7 +350,7 @@ namespace matx
             MATX_LOG_DEBUG("Shm size {}, Stride {}, estimated EPT {}, blocks {}x{}x{} threads {}x{}x{}, pass_through_threads {}",
                 shm_size, stride, static_cast<int>(best_ept), blocks.x, blocks.y, blocks.z, threads.x, threads.y, threads.z, pass_through_threads);
             const int osize = RANK == 0 ? 1 : static_cast<int>(op.Size(RANK - 1));
-            detail::nvrtc_compile_and_run("output.cu", op, sizes, blocks, threads, best_ept, stride, shm_size, osize, global_kernel, pass_through_threads);
+            detail::nvrtc_compile_and_run("output.cu", op, sizes, blocks, threads, best_ept, stride, shm_size, osize, global_kernel, pass_through_threads, block_reduces_rank);
           }
           else {
             // ND kernel support for ranks > 4 (JIT path)

@@ -45,7 +45,7 @@ namespace detail
 {
   /**
    * @brief Base class for CUDA executors with common functionality
-   * 
+   *
    * This class provides stream management, profiling, and synchronization
    * functionality that is shared between JIT and non-JIT CUDA executors.
    */
@@ -56,7 +56,7 @@ namespace detail
 
       /**
        * @brief Construct a new CudaExecutorBase with a stream
-       * 
+       *
        * @param stream CUDA stream
        * @param profiling Whether to enable profiling
        */
@@ -76,7 +76,7 @@ namespace detail
 
       /**
        * @brief Construct a new CudaExecutorBase object using the default stream
-       * 
+       *
        */
       CudaExecutorBase() : stream_(0), profiling_(false), start_(nullptr), stop_(nullptr) {
         if (profiling_) {
@@ -99,30 +99,30 @@ namespace detail
 
       /**
        * @brief Synchronize the cuda executor's stream
-       * 
+       *
        */
       void sync() { cudaStreamSynchronize(stream_); }
 
       /**
        * @brief Start a timer for profiling workload
        */
-      void start_timer() { 
+      void start_timer() {
         if (profiling_) {
-          cudaEventRecord(start_, stream_); 
+          cudaEventRecord(start_, stream_);
         }
       }
 
       /**
        * @brief Stop a timer for profiling workload
-       */      
-      void stop_timer() { 
+       */
+      void stop_timer() {
         if (profiling_) {
-          cudaEventRecord(stop_, stream_); 
+          cudaEventRecord(stop_, stream_);
         }
       }
 
       /**
-       * @brief Get the time in milliseconds between start_timer and stop_timer. 
+       * @brief Get the time in milliseconds between start_timer and stop_timer.
        * This will block until the event is synchronized
        */
       float get_time_ms() {
@@ -144,10 +144,10 @@ namespace detail
 
   /**
    * @brief Create a kernel provider that returns appropriate kernel function pointers
-   * 
+   *
    * This function creates a lambda that provides kernel function pointers based on EPT,
    * rank, and stride parameters. Used by both JIT and non-JIT CUDA executors.
-   * 
+   *
    * @tparam Op Operator type
    * @param sizes Array of dimension sizes
    * @param is_jit Whether this is for JIT compilation
@@ -164,14 +164,14 @@ namespace detail
       dim3 local_blocks = 1;
       dim3 local_threads = 1;
       [[maybe_unused]] bool stride;
-      
+
       if (is_jit && !global_kernel) {
         stride = get_grid_dims_block<Op::Rank()>(local_blocks, local_threads, sizes, static_cast<int>(ept), 1, 1024, true);
       } else {
         stride = get_grid_dims<Op::Rank()>(local_blocks, local_threads, sizes, static_cast<int>(ept), is_jit ? 1024 : 256);
       }
 
-#ifdef __CUDACC__        
+#ifdef __CUDACC__
       // Return appropriate kernel function pointer based on EPT, rank, and stride
       switch (ept) {
         case ElementsPerThread::THIRTY_TWO:
@@ -180,13 +180,13 @@ namespace detail
           } else if constexpr (Op::Rank() == 1) {
             return (const void*)matxOpT1Kernel<CapabilityParams<ElementsPerThread::THIRTY_TWO, false>, Op>;
           } else if constexpr (Op::Rank() == 2) {
-            return stride ? (const void*)matxOpT2StrideKernel<CapabilityParams<ElementsPerThread::THIRTY_TWO, false>, Op> 
+            return stride ? (const void*)matxOpT2StrideKernel<CapabilityParams<ElementsPerThread::THIRTY_TWO, false>, Op>
                           : (const void*)matxOpT2Kernel<CapabilityParams<ElementsPerThread::THIRTY_TWO, false>, Op>;
           } else if constexpr (Op::Rank() == 3) {
-            return stride ? (const void*)matxOpT3StrideKernel<CapabilityParams<ElementsPerThread::THIRTY_TWO, false>, Op> 
+            return stride ? (const void*)matxOpT3StrideKernel<CapabilityParams<ElementsPerThread::THIRTY_TWO, false>, Op>
                           : (const void*)matxOpT3Kernel<CapabilityParams<ElementsPerThread::THIRTY_TWO, false>, Op>;
           } else if constexpr (Op::Rank() == 4) {
-            return stride ? (const void*)matxOpT4StrideKernel<CapabilityParams<ElementsPerThread::THIRTY_TWO, false>, Op> 
+            return stride ? (const void*)matxOpT4StrideKernel<CapabilityParams<ElementsPerThread::THIRTY_TWO, false>, Op>
                           : (const void*)matxOpT4Kernel<CapabilityParams<ElementsPerThread::THIRTY_TWO, false>, Op>;
           }
           break;
@@ -196,13 +196,13 @@ namespace detail
           } else if constexpr (Op::Rank() == 1) {
             return (const void*)matxOpT1Kernel<CapabilityParams<ElementsPerThread::SIXTEEN, false>, Op>;
           } else if constexpr (Op::Rank() == 2) {
-            return stride ? (const void*)matxOpT2StrideKernel<CapabilityParams<ElementsPerThread::SIXTEEN, false>, Op> 
+            return stride ? (const void*)matxOpT2StrideKernel<CapabilityParams<ElementsPerThread::SIXTEEN, false>, Op>
                           : (const void*)matxOpT2Kernel<CapabilityParams<ElementsPerThread::SIXTEEN, false>, Op>;
           } else if constexpr (Op::Rank() == 3) {
-            return stride ? (const void*)matxOpT3StrideKernel<CapabilityParams<ElementsPerThread::SIXTEEN, false>, Op> 
+            return stride ? (const void*)matxOpT3StrideKernel<CapabilityParams<ElementsPerThread::SIXTEEN, false>, Op>
                           : (const void*)matxOpT3Kernel<CapabilityParams<ElementsPerThread::SIXTEEN, false>, Op>;
           } else if constexpr (Op::Rank() == 4) {
-            return stride ? (const void*)matxOpT4StrideKernel<CapabilityParams<ElementsPerThread::SIXTEEN, false>, Op> 
+            return stride ? (const void*)matxOpT4StrideKernel<CapabilityParams<ElementsPerThread::SIXTEEN, false>, Op>
                           : (const void*)matxOpT4Kernel<CapabilityParams<ElementsPerThread::SIXTEEN, false>, Op>;
           }
           break;
@@ -212,13 +212,13 @@ namespace detail
           } else if constexpr (Op::Rank() == 1) {
             return (const void*)matxOpT1Kernel<CapabilityParams<ElementsPerThread::EIGHT, false>, Op>;
           } else if constexpr (Op::Rank() == 2) {
-            return stride ? (const void*)matxOpT2StrideKernel<CapabilityParams<ElementsPerThread::EIGHT, false>, Op> 
+            return stride ? (const void*)matxOpT2StrideKernel<CapabilityParams<ElementsPerThread::EIGHT, false>, Op>
                           : (const void*)matxOpT2Kernel<CapabilityParams<ElementsPerThread::EIGHT, false>, Op>;
           } else if constexpr (Op::Rank() == 3) {
-            return stride ? (const void*)matxOpT3StrideKernel<CapabilityParams<ElementsPerThread::EIGHT, false>, Op> 
+            return stride ? (const void*)matxOpT3StrideKernel<CapabilityParams<ElementsPerThread::EIGHT, false>, Op>
                           : (const void*)matxOpT3Kernel<CapabilityParams<ElementsPerThread::EIGHT, false>, Op>;
           } else if constexpr (Op::Rank() == 4) {
-            return stride ? (const void*)matxOpT4StrideKernel<CapabilityParams<ElementsPerThread::EIGHT, false>, Op> 
+            return stride ? (const void*)matxOpT4StrideKernel<CapabilityParams<ElementsPerThread::EIGHT, false>, Op>
                           : (const void*)matxOpT4Kernel<CapabilityParams<ElementsPerThread::EIGHT, false>, Op>;
           }
           break;
@@ -228,13 +228,13 @@ namespace detail
           } else if constexpr (Op::Rank() == 1) {
             return (const void*)matxOpT1Kernel<CapabilityParams<ElementsPerThread::FOUR, false>, Op>;
           } else if constexpr (Op::Rank() == 2) {
-            return stride ? (const void*)matxOpT2StrideKernel<CapabilityParams<ElementsPerThread::FOUR, false>, Op> 
+            return stride ? (const void*)matxOpT2StrideKernel<CapabilityParams<ElementsPerThread::FOUR, false>, Op>
                           : (const void*)matxOpT2Kernel<CapabilityParams<ElementsPerThread::FOUR, false>, Op>;
           } else if constexpr (Op::Rank() == 3) {
-            return stride ? (const void*)matxOpT3StrideKernel<CapabilityParams<ElementsPerThread::FOUR, false>, Op> 
+            return stride ? (const void*)matxOpT3StrideKernel<CapabilityParams<ElementsPerThread::FOUR, false>, Op>
                           : (const void*)matxOpT3Kernel<CapabilityParams<ElementsPerThread::FOUR, false>, Op>;
           } else if constexpr (Op::Rank() == 4) {
-            return stride ? (const void*)matxOpT4StrideKernel<CapabilityParams<ElementsPerThread::FOUR, false>, Op> 
+            return stride ? (const void*)matxOpT4StrideKernel<CapabilityParams<ElementsPerThread::FOUR, false>, Op>
                           : (const void*)matxOpT4Kernel<CapabilityParams<ElementsPerThread::FOUR, false>, Op>;
           }
           break;
@@ -244,13 +244,13 @@ namespace detail
           } else if constexpr (Op::Rank() == 1) {
             return (const void*)matxOpT1Kernel<CapabilityParams<ElementsPerThread::TWO, false>, Op>;
           } else if constexpr (Op::Rank() == 2) {
-            return stride ? (const void*)matxOpT2StrideKernel<CapabilityParams<ElementsPerThread::TWO, false>, Op> 
+            return stride ? (const void*)matxOpT2StrideKernel<CapabilityParams<ElementsPerThread::TWO, false>, Op>
                           : (const void*)matxOpT2Kernel<CapabilityParams<ElementsPerThread::TWO, false>, Op>;
           } else if constexpr (Op::Rank() == 3) {
-            return stride ? (const void*)matxOpT3StrideKernel<CapabilityParams<ElementsPerThread::TWO, false>, Op> 
+            return stride ? (const void*)matxOpT3StrideKernel<CapabilityParams<ElementsPerThread::TWO, false>, Op>
                           : (const void*)matxOpT3Kernel<CapabilityParams<ElementsPerThread::TWO, false>, Op>;
           } else if constexpr (Op::Rank() == 4) {
-            return stride ? (const void*)matxOpT4StrideKernel<CapabilityParams<ElementsPerThread::TWO, false>, Op> 
+            return stride ? (const void*)matxOpT4StrideKernel<CapabilityParams<ElementsPerThread::TWO, false>, Op>
                           : (const void*)matxOpT4Kernel<CapabilityParams<ElementsPerThread::TWO, false>, Op>;
           }
           break;
@@ -260,27 +260,27 @@ namespace detail
           } else if constexpr (Op::Rank() == 1) {
             return (const void*)matxOpT1Kernel<CapabilityParams<ElementsPerThread::ONE, false>, Op>;
           } else if constexpr (Op::Rank() == 2) {
-            return stride ? (const void*)matxOpT2StrideKernel<CapabilityParams<ElementsPerThread::ONE, false>, Op> 
+            return stride ? (const void*)matxOpT2StrideKernel<CapabilityParams<ElementsPerThread::ONE, false>, Op>
                           : (const void*)matxOpT2Kernel<CapabilityParams<ElementsPerThread::ONE, false>, Op>;
           } else if constexpr (Op::Rank() == 3) {
-            return stride ? (const void*)matxOpT3StrideKernel<CapabilityParams<ElementsPerThread::ONE, false>, Op> 
+            return stride ? (const void*)matxOpT3StrideKernel<CapabilityParams<ElementsPerThread::ONE, false>, Op>
                           : (const void*)matxOpT3Kernel<CapabilityParams<ElementsPerThread::ONE, false>, Op>;
           } else if constexpr (Op::Rank() == 4) {
-            return stride ? (const void*)matxOpT4StrideKernel<CapabilityParams<ElementsPerThread::ONE, false>, Op> 
+            return stride ? (const void*)matxOpT4StrideKernel<CapabilityParams<ElementsPerThread::ONE, false>, Op>
                           : (const void*)matxOpT4Kernel<CapabilityParams<ElementsPerThread::ONE, false>, Op>;
           }
           break;
         default:
           return (const void*)nullptr;
       }
-#endif      
+#endif
       return (const void*)nullptr;
     };
   }
 
   /**
    * Find the best launch parameters by testing EPT values for optimal occupancy
-   * 
+   *
    * @tparam Op Operator type
    * @tparam KernelProvider Function type that provides kernel function pointer for a given EPT
    * @param op Operator instance
@@ -293,7 +293,7 @@ namespace detail
   auto find_best_launch_params(const Op &op, KernelProvider kernel_provider, int block_size, bool use_jit = false) {
     // Get device properties for constraints
     constexpr int min_occupancy = 2;
-    int groups_per_block = 1;        
+    int groups_per_block = 1;
     int max_dynamic_shm, max_threads_per_block, regs_per_multiprocessor;
     int dev;
     MATX_CUDA_CHECK(cudaGetDevice(&dev));
@@ -302,7 +302,7 @@ namespace detail
     MATX_CUDA_CHECK(cudaDeviceGetAttribute(&regs_per_multiprocessor, cudaDevAttrMaxRegistersPerMultiprocessor, dev));
 
     const auto jit_query_in = detail::EPTQueryInput{use_jit};
-    auto ept_bounds = detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(op, jit_query_in);  
+    auto ept_bounds = detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(op, jit_query_in);
 
     // If we don't need async loads we don't want ILP to be higher than an individual vector load
     bool async_loads_requested = detail::get_operator_capability<detail::OperatorCapability::ASYNC_LOADS_REQUESTED>(op);
@@ -315,20 +315,25 @@ namespace detail
     // Start with maximum EPT and work down
     auto current_ept = ept_bounds[1];
     auto min_ept = ept_bounds[0];
-    
+
     while (current_ept >= min_ept) {
       MATX_LOG_TRACE("Finding best launch params: current_ept {}, min_ept {}", static_cast<int>(current_ept), static_cast<int>(min_ept));
-      int shm_size = 0; // Default to no shm since non-JIT doesn't use any
-      // Get kernel function pointer for this EPT and check register usage (if available)
+      int shm_size = 0; // Dynamic shared memory passed to the kernel launch.
+      // Get kernel function pointer for this EPT and check register usage.
       auto kernel_func = kernel_provider(current_ept);
-      bool register_viable = true;  // Default to viable for JIT
+      bool register_viable = true;
+      int num_regs = 0;
 
       cudaFuncAttributes attr;
+      if (kernel_func == nullptr) {
+        MATX_THROW(matxInvalidParameter, "No kernel provider available for selected elements-per-thread value");
+      }
       MATX_CUDA_CHECK(cudaFuncGetAttributes(&attr, (const void*)kernel_func));
+      num_regs = attr.numRegs;
 
       const auto set_ept_query = detail::SetEPTQueryInput{current_ept};
       const auto set_ept = detail::get_operator_capability<detail::OperatorCapability::SET_ELEMENTS_PER_THREAD>(op, set_ept_query);
-      
+
       // Determine block size for register calculation
       if (use_jit) {
         const auto group_range = detail::get_operator_capability<detail::OperatorCapability::GROUPS_PER_BLOCK>(op);
@@ -351,30 +356,32 @@ namespace detail
           }
 
           MATX_LOG_DEBUG("Trying groups_per_block {} with {} batches", current_groups_per_block, total_batches);
-          
+
           groups_per_block = current_groups_per_block;
           const auto set_groups_per_block_query = detail::SetGroupsPerBlockQueryInput{groups_per_block};
-          const auto set_groups_per_block = detail::get_operator_capability<detail::OperatorCapability::SET_GROUPS_PER_BLOCK>(op, set_groups_per_block_query);            
+          const auto set_groups_per_block = detail::get_operator_capability<detail::OperatorCapability::SET_GROUPS_PER_BLOCK>(op, set_groups_per_block_query);
           // Use the max block size for now
           block_size = detail::get_operator_capability<detail::OperatorCapability::BLOCK_DIM>(op)[1];
           shm_size = detail::get_operator_capability<detail::OperatorCapability::DYN_SHM_SIZE>(op);
-          
+          const int static_shm_size = detail::get_operator_capability<detail::OperatorCapability::STATIC_SHM_SIZE>(op);
+          const int total_shm_size = shm_size + static_shm_size;
+
           // Check register pressure constraint
-          register_viable = (attr.numRegs * block_size * min_occupancy) <= regs_per_multiprocessor;
-          
+          register_viable = (num_regs * block_size * min_occupancy) <= regs_per_multiprocessor;
+
           // Check dynamic shared memory constraint
-          bool shm_viable = (shm_size * 2) < max_dynamic_shm;
-          
+          bool shm_viable = (total_shm_size * min_occupancy) < max_dynamic_shm;
+
           if (shm_viable && register_viable) {
-            MATX_LOG_DEBUG("Selected EPT {}: jits {}, registers {}, shm_size {}, block_size {}, groups_per_block {}", 
-                           static_cast<int>(current_ept), use_jit, attr.numRegs, shm_size, block_size, groups_per_block);
+            MATX_LOG_DEBUG("Selected EPT {}: jits {}, registers {}, dyn_shm_size {}, static_shm_size {}, block_size {}, groups_per_block {}",
+                           static_cast<int>(current_ept), use_jit, num_regs, shm_size, static_shm_size, block_size, groups_per_block);
             return cuda::std::make_tuple(current_ept, shm_size, block_size, groups_per_block);
           }
           else {
-            MATX_LOG_DEBUG("EPT {} with groups_per_block {} failed constraints: shm_viable {} ({} of {}), register_viable {} (regs={}) block size {}",
-                           static_cast<int>(current_ept), groups_per_block, shm_viable, shm_size, max_dynamic_shm, register_viable, attr.numRegs, block_size);
+            MATX_LOG_DEBUG("EPT {} with groups_per_block {} failed constraints: shm_viable {} (dyn {}, static {}, total {} of {}), register_viable {} (regs={}) block size {}",
+                           static_cast<int>(current_ept), groups_per_block, shm_viable, shm_size, static_shm_size, total_shm_size, max_dynamic_shm, register_viable, num_regs, block_size);
           }
-          
+
           // Break if we're at the minimum
           if (current_groups_per_block == min_groups_per_block) break;
         }
@@ -382,25 +389,25 @@ namespace detail
       else {
         // Non-JIT path - check constraints without groups_per_block loop
         // Check register pressure constraint
-        register_viable = (attr.numRegs * block_size * min_occupancy) <= regs_per_multiprocessor;
-        
+        register_viable = (num_regs * block_size * min_occupancy) <= regs_per_multiprocessor;
+
         // Check dynamic shared memory constraint
         bool shm_viable = (shm_size * 2) < max_dynamic_shm;
-        
+
         if (shm_viable && register_viable) {
-          MATX_LOG_DEBUG("Selected EPT {}: jits {}, registers {}, shm_size {}, block_size {}, groups_per_block {}", 
-                         static_cast<int>(current_ept), use_jit, attr.numRegs, shm_size, block_size, groups_per_block);
+          MATX_LOG_DEBUG("Selected EPT {}: jits {}, registers {}, shm_size {}, block_size {}, groups_per_block {}",
+                         static_cast<int>(current_ept), use_jit, num_regs, shm_size, block_size, groups_per_block);
           return cuda::std::make_tuple(current_ept, shm_size, block_size, groups_per_block);
         }
         else {
           MATX_LOG_DEBUG("EPT {} failed constraints: shm_viable {} ({} of {}), register_viable {} (regs={}) block size {}, groups_per_block {}",
-                         static_cast<int>(current_ept), shm_viable, shm_size, max_dynamic_shm, register_viable, attr.numRegs, block_size, groups_per_block);
+                         static_cast<int>(current_ept), shm_viable, shm_size, max_dynamic_shm, register_viable, num_regs, block_size, groups_per_block);
         }
       }
 
-      // Cut EPT in half
+      // Cut EPT in half. MatX JIT only selects powers of two in [1, 32].
       if (current_ept == detail::ElementsPerThread::ONE) break;
-      
+
       switch (current_ept) {
         case detail::ElementsPerThread::THIRTY_TWO:
           current_ept = detail::ElementsPerThread::SIXTEEN;
@@ -421,7 +428,7 @@ namespace detail
           current_ept = detail::ElementsPerThread::ONE;
       }
     }
-    
+
     // Fallback to minimum EPT
     const auto set_ept_query = detail::SetEPTQueryInput{min_ept};
     const auto set_ept = detail::get_operator_capability<detail::OperatorCapability::SET_ELEMENTS_PER_THREAD>(op, set_ept_query);

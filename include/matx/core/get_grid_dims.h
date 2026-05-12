@@ -300,6 +300,34 @@ inline bool get_grid_dims_block(dim3 &blocks, dim3 &threads, const cuda::std::ar
   return stride;
 }
 
+template <int RANK>
+inline bool get_grid_dims_block_reduce(dim3 &blocks, dim3 &threads, const cuda::std::array<index_t, RANK> &sizes,
+                                       int groups_per_block, int block_size)
+{
+  threads.x = block_size;
+  threads.y = groups_per_block;
+  threads.z = 1;
+
+  index_t total_outputs = 1;
+  if constexpr (RANK > 0) {
+    for (int r = 0; r < RANK; r++) {
+      total_outputs *= sizes[r];
+    }
+  }
+
+  blocks.x = static_cast<int>((total_outputs + groups_per_block - 1) / groups_per_block);
+  blocks.y = 1;
+  blocks.z = 1;
+
+  if (static_cast<int64_t>(threads.x) * static_cast<int64_t>(threads.y) > 1024) {
+    MATX_THROW(matxInvalidParameter, "Block-reduction launch exceeds CUDA maximum threads per block");
+  }
+
+  MATX_LOG_DEBUG("BlockReduce: Blocks {}x{}x{} Threads {}x{}x{} groups_per_block={}",
+                 blocks.x, blocks.y, blocks.z, threads.x, threads.y, threads.z, groups_per_block);
+  return false;
+}
+
 // For 2D block operators (e.g., cuBLASDx GEMM) where all threads in a block cooperate 
 // on the last 2 dimensions and blockIdx is used purely for batching
 template <int RANK>

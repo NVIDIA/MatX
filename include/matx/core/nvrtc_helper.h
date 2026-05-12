@@ -49,8 +49,10 @@
 #include <source_location>
 #include <vector>
 #include <string>
+#include <string_view>
 #include <mutex>
 #include <cctype>
+#include <regex>
 
 
 namespace matx {
@@ -113,6 +115,16 @@ inline std::string resolve_nvrtc_cuda_arch() {
 }
 
 inline std::filesystem::path resolve_build_dir_for_deps() {
+    if (const char *build_dir_env = std::getenv("MATX_NVRTC_BUILD_DIR")) {
+      const auto configured = std::filesystem::path(build_dir_env);
+      if (std::filesystem::exists(configured / "_deps" / "cccl-src")) {
+        return configured;
+      }
+
+      MATX_LOG_WARN("Configured MATX_NVRTC_BUILD_DIR='{}' does not contain _deps/cccl-src. Falling back to cwd search",
+                    configured.string());
+    }
+
     auto cur = std::filesystem::current_path();
 
     while (true) {
@@ -132,11 +144,46 @@ inline std::filesystem::path resolve_build_dir_for_deps() {
     return std::filesystem::current_path();
 }
 
-std::vector<std::string> __MATX_HOST__ __MATX_INLINE__ get_preprocessor_options() {
-    // Get the project root from the current file's location
+inline std::filesystem::path resolve_matx_root() {
     const auto source_path = std::filesystem::path(std::source_location::current().file_name());
-    // This assumes nvrtc.h is in <root>/include/matx/core/
-    const auto matx_root = source_path.parent_path().parent_path().parent_path().parent_path();
+
+    auto root_from_header = [](const std::filesystem::path &header_path) {
+      return header_path.parent_path().parent_path().parent_path().parent_path();
+    };
+
+    if (source_path.is_absolute()) {
+      const auto candidate = root_from_header(source_path);
+      if (std::filesystem::exists(candidate / "include" / "matx" / "core" / "jit_includes.h")) {
+        return candidate;
+      }
+    }
+    else if (std::filesystem::exists(source_path)) {
+      const auto candidate = root_from_header(std::filesystem::absolute(source_path));
+      if (std::filesystem::exists(candidate / "include" / "matx" / "core" / "jit_includes.h")) {
+        return candidate;
+      }
+    }
+
+    auto cur = std::filesystem::current_path();
+    while (true) {
+      if (std::filesystem::exists(cur / "include" / "matx" / "core" / "jit_includes.h")) {
+        return cur;
+      }
+
+      const auto parent = cur.parent_path();
+      if (parent == cur) {
+        break;
+      }
+      cur = parent;
+    }
+
+    MATX_LOG_WARN("Could not locate MatX source root from '{}' or cwd '{}'. Using cwd for NVRTC include paths",
+                  source_path.string(), std::filesystem::current_path().string());
+    return std::filesystem::current_path();
+}
+
+std::vector<std::string> __MATX_HOST__ __MATX_INLINE__ get_preprocessor_options() {
+    const auto matx_root = resolve_matx_root();
     const auto build_dir = resolve_build_dir_for_deps();
 
     std::vector<std::string> options;
@@ -232,23 +279,146 @@ inline std::string read_file_contents(const std::string& filepath) {
 
 // Get the full path to jit_includes.h
 inline std::string get_jit_includes_path() {
-    const auto source_path = std::filesystem::path(std::source_location::current().file_name());
-    const auto matx_root = source_path.parent_path().parent_path().parent_path().parent_path();
+    const auto matx_root = resolve_matx_root();
     return (matx_root / "include" / "matx" / "core" / "jit_includes.h").string();
 }
 
+inline std::string make_cub_shmem_probe_source(const std::string &algorithm,
+                                               const std::string &value_type,
+                                               int ept,
+                                               int block_size)
+{
+  std::string block_decl;
+  if (algorithm == "sort") {
+    block_decl = "using BlockT = cub::BlockRadixSort<T, " + std::to_string(block_size) + ", " +
+                 std::to_string(ept) + ">;\n";
+  }
+  else if (algorithm == "sort_pairs") {
+    block_decl = "using BlockT = cub::BlockRadixSort<T, " + std::to_string(block_size) + ", " +
+                 std::to_string(ept) + ", index_t>;\n";
+  }
+  else if (algorithm == "scan") {
+    block_decl = "using BlockT = cub::BlockScan<T, " + std::to_string(block_size) + ">;\n";
+  }
+  else {
+    block_decl = "using BlockT = cub::BlockReduce<T, " + std::to_string(block_size) + ">;\n";
+  }
+
+  return std::string(
+    "#include <matx/core/jit_includes.h>\n"
+    "using namespace matx;\n"
+    "using namespace matx::detail;\n"
+    "using T = ") + value_type + ";\n" +
+    block_decl +
+    "extern \"C\" __device__ int temp_storage_size = static_cast<int>(sizeof(BlockT::TempStorage));\n";
+}
+
+inline int nvrtc_get_cub_block_shmem_size(const std::string &algorithm,
+                                          const std::string &value_type,
+                                          int ept,
+                                          int block_size)
+{
+  static std::unordered_map<std::string, int> shmem_cache;
+  static std::mutex shmem_cache_mutex;
+
+  const std::string cache_key = algorithm + "_" + value_type + "_E" +
+                                std::to_string(ept) + "_B" + std::to_string(block_size);
+  {
+    std::lock_guard<std::mutex> lock(shmem_cache_mutex);
+    auto it = shmem_cache.find(cache_key);
+    if (it != shmem_cache.end()) {
+      return it->second;
+    }
+  }
+
+  MATX_LOG_DEBUG("Compiling CUB shared-memory probe for {}", cache_key);
+
+  std::string jit_includes_path = get_jit_includes_path();
+  std::string jit_includes_content = read_file_contents(jit_includes_path);
+  std::string source = make_cub_shmem_probe_source(algorithm, value_type, ept, block_size);
+
+  const char *headers[] = {jit_includes_content.c_str()};
+  const char *include_names[] = {"matx/core/jit_includes.h"};
+
+  nvrtcProgram prog;
+  NVRTC_CHECK(nvrtcCreateProgram(&prog, source.c_str(), "matx_cub_shmem_probe.cu", 1, headers, include_names));
+
+  auto options = get_preprocessor_options();
+  options.push_back("-include=matx/core/jit_includes.h");
+  options.push_back("-default-device");
+  for (auto &option : options) {
+    static constexpr std::string_view sm_arch_prefix = "-arch=sm_";
+    if (option.rfind(sm_arch_prefix, 0) == 0) {
+      option = "-arch=compute_" + option.substr(sm_arch_prefix.size());
+    }
+  }
+
+  std::vector<const char*> opts;
+  for (const auto &opt : options) {
+    opts.push_back(opt.c_str());
+  }
+
+  nvrtcResult compile_result = nvrtcCompileProgram(prog, static_cast<int>(opts.size()), opts.data());
+
+  size_t log_size;
+  NVRTC_CHECK(nvrtcGetProgramLogSize(prog, &log_size));
+  if (log_size > 1) {
+    std::vector<char> log(log_size);
+    NVRTC_CHECK(nvrtcGetProgramLog(prog, log.data()));
+    MATX_LOG_DEBUG("CUB shared-memory probe compilation log:\n{}", log.data());
+  }
+
+  if (compile_result != NVRTC_SUCCESS) {
+    nvrtcDestroyProgram(&prog);
+    MATX_THROW(matxInvalidParameter, "NVRTC CUB shared-memory probe compilation failed");
+  }
+
+  size_t ptx_size = 0;
+  NVRTC_CHECK(nvrtcGetPTXSize(prog, &ptx_size));
+  std::string ptx(ptx_size, '\0');
+  NVRTC_CHECK(nvrtcGetPTX(prog, ptx.data()));
+  NVRTC_CHECK(nvrtcDestroyProgram(&prog));
+
+  const std::regex temp_storage_regex(
+      R"((?:\.visible\s+)?\.global\s+\.align\s+4\s+\.u32\s+temp_storage_size\s*=\s*([0-9]+)\s*;)");
+  std::smatch match;
+  if (!std::regex_search(ptx, match, temp_storage_regex)) {
+    MATX_LOG_ERROR("Could not find CUB temp storage initializer in NVRTC PTX for {}", cache_key);
+    MATX_LOG_DEBUG("CUB shared-memory probe PTX:\n{}", ptx);
+    MATX_THROW(matxInvalidParameter, "NVRTC CUB shared-memory probe PTX did not contain temp_storage_size initializer");
+  }
+
+  const int host_result = std::stoi(match[1].str());
+
+  {
+    std::lock_guard<std::mutex> lock(shmem_cache_mutex);
+    shmem_cache[cache_key] = host_result;
+  }
+
+  MATX_LOG_DEBUG("CUB shared-memory probe {} emitted {} bytes", cache_key, host_result);
+  return host_result;
+}
+
 template <typename Op>
-std::string get_kernel_name([[maybe_unused]] const Op &op, bool stride, bool global_kernel, bool pass_through_threads = false) {
-  return get_kernel_name_for_rank<Op::Rank()>(stride, global_kernel, pass_through_threads);
+std::string get_kernel_name([[maybe_unused]] const Op &op, bool stride, bool global_kernel,
+                            bool pass_through_threads = false, [[maybe_unused]] bool block_reduces_rank = false) {
+  return get_kernel_name_for_rank<Op::Rank()>(stride, global_kernel, pass_through_threads, block_reduces_rank);
 }
 
 template <int RANK>
-std::string get_kernel_name_for_rank(bool stride, bool global_kernel, bool pass_through_threads = false) {
+std::string get_kernel_name_for_rank(bool stride, bool global_kernel, bool pass_through_threads = false,
+                                     [[maybe_unused]] bool block_reduces_rank = false) {
   if constexpr (RANK == 0) {
-    return "matx::detail::matxOpT0Kernel";
+    if (global_kernel) {
+      return "matx::detail::matxOpT0Kernel";
+    }
+    return "matx::detail::matxOpT0KernelBlock";
   }
   else if constexpr (RANK == 1) {
-    return global_kernel ? "matx::detail::matxOpT1Kernel" : "matx::detail::matxOpT1KernelBlock";
+    if (global_kernel) {
+      return "matx::detail::matxOpT1Kernel";
+    }
+    return "matx::detail::matxOpT1KernelBlock";
   }
   else if constexpr (RANK == 2) {
     if (pass_through_threads) {
@@ -327,7 +497,8 @@ std::string generate_capability_params_string([[maybe_unused]] const Op &op, Ele
          "  static constexpr int osize = " + std::to_string(osize) + ";\n"
          "  static constexpr int block_size = " + std::to_string(block_size) + ";\n"
          "  static constexpr bool pass_through_threads = " + pass_through_str + ";\n"
-         "};\n"
+         "  using scalar_cap = CapabilityParams<ElementsPerThread::ONE, JIT>;\n"
+	         "};\n"
          "using CurrentCapabilities = CapabilityParams<" + ept_str + ", " + jit_str + ">;\n"
          "} }\n";
    
@@ -384,7 +555,7 @@ inline std::string qualify_jit_type_names(const std::string& type_str) {
 }
 
 template <typename Op, typename SizeArray>
-auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, const SizeArray &sa, dim3 &blocks, dim3 &threads, ElementsPerThread ept, bool stride, int dynamic_shmem_size, int osize, bool global_kernel, bool pass_through_threads = false) {
+auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, const SizeArray &sa, dim3 &blocks, dim3 &threads, ElementsPerThread ept, bool stride, int dynamic_shmem_size, int osize, bool global_kernel, bool pass_through_threads = false, bool block_reduces_rank = false) {
   // The actual rank comes from the size array, which may differ from Op::Rank()
   // for dynamic tensor expressions (where Op::Rank() = MATX_MAX_DYNAMIC_RANK).
   constexpr int RANK = std::tuple_size_v<SizeArray>;
@@ -403,7 +574,7 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, cons
   auto capstr = generate_capability_params_string(op, ept, false, osize, threads.x, pass_through_threads);
   const auto kernel_op_type = detail::get_operator_capability<OperatorCapability::JIT_TYPE_QUERY>(op);
   
-  std::string kernel_name = get_kernel_name_for_rank<RANK>(stride, global_kernel, pass_through_threads);
+  std::string kernel_name = get_kernel_name_for_rank<RANK>(stride, global_kernel, pass_through_threads, block_reduces_rank);
   std::string cache_key = kernel_name + "_" + kernel_op_type;
 
   MATX_LOG_DEBUG("nvrtc_compile_and_run called with operator type: {}", typeid(op).name());
