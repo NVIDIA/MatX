@@ -86,8 +86,8 @@ namespace matx
     };
 
     // Global cache for JIT launch parameters, keyed by operator type string from JIT_TYPE_QUERY
-    static std::unordered_map<std::string, JITLaunchParams> jit_launch_params_cache;
-    static std::mutex jit_launch_params_mutex;
+    inline std::unordered_map<std::string, JITLaunchParams> jit_launch_params_cache;
+    inline std::mutex jit_launch_params_mutex;
   }  // namespace detail
 
   /**

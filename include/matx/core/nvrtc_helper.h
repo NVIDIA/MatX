@@ -321,8 +321,9 @@ inline int nvrtc_get_cub_block_shmem_size(const std::string &algorithm,
   static std::unordered_map<std::string, int> shmem_cache;
   static std::mutex shmem_cache_mutex;
 
+  const int cache_ept = (algorithm == "sort" || algorithm == "sort_pairs") ? ept : 1;
   const std::string cache_key = algorithm + "_" + value_type + "_E" +
-                                std::to_string(ept) + "_B" + std::to_string(block_size);
+                                std::to_string(cache_ept) + "_B" + std::to_string(block_size);
   {
     std::lock_guard<std::mutex> lock(shmem_cache_mutex);
     auto it = shmem_cache.find(cache_key);
@@ -804,13 +805,13 @@ launch_kernel:
   // Get device attributes
   int device;
   CUDA_RT_CHECK(cudaGetDevice(&device));
-  int static_shared_size;
-  CUDA_RT_CHECK(cudaDeviceGetAttribute(&static_shared_size, cudaDevAttrMaxSharedMemoryPerBlock, device));
+  int max_shared_memory_per_block;
+  CUDA_RT_CHECK(cudaDeviceGetAttribute(&max_shared_memory_per_block, cudaDevAttrMaxSharedMemoryPerBlock, device));
 
   // Set dynamic shared memory if needed
-  if (dynamic_shmem_size > static_shared_size) {
-    MATX_LOG_DEBUG("Requested dynamic shared memory ({} bytes) exceeds static shared memory ({}) for kernel, using dynamic shared memory", 
-                   dynamic_shmem_size, static_shared_size);
+  if (dynamic_shmem_size > max_shared_memory_per_block) {
+    MATX_LOG_DEBUG("Requested dynamic shared memory ({} bytes) exceeds default per-block shared memory limit ({})",
+                   dynamic_shmem_size, max_shared_memory_per_block);
     CUDA_CHECK(cuFuncSetAttribute(kernel_func, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, dynamic_shmem_size));
   }
 
