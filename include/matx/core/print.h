@@ -730,8 +730,7 @@ namespace matx {
     requires (Op::Rank() > 0 && sizeof...(Args) == 0)
   void fprint(FILE* fp, const Op &op, [[maybe_unused]] Args... dims) {
     cuda::std::array<int, Op::Rank()> arr = {0};
-    auto tp = cuda::std::tuple_cat(arr);
-    cuda::std::apply([&](auto &&...args) { fprint(fp, op, args...); }, tp);
+    cuda::std::apply([&](auto &&...args) { fprint(fp, op, args...); }, arr);
   }
 
   // Complete hide this version from doxygen, otherwise we get
@@ -757,8 +756,7 @@ namespace matx {
     requires (Op::Rank() > 0 && sizeof...(Args) == 0)
   void print(const Op &op, [[maybe_unused]] Args... dims) {
     cuda::std::array<int, Op::Rank()> arr = {0};
-    auto tp = cuda::std::tuple_cat(arr);
-    cuda::std::apply([&](auto &&...args) { fprint(stdout, op, args...); }, tp);
+    cuda::std::apply([&](auto &&...args) { fprint(stdout, op, args...); }, arr);
   }
 
   /**

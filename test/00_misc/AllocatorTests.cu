@@ -116,7 +116,11 @@ struct AlignedDebugAllocator {
     // Duck-typed interface
     void* allocate(size_t bytes) {
         size_t aligned_bytes = (bytes + alignment_ - 1) & ~(alignment_ - 1);
+#ifdef _WIN32
+        void* ptr = _aligned_malloc(aligned_bytes, alignment_);
+#else
         void* ptr = std::aligned_alloc(alignment_, aligned_bytes);
+#endif
         std::cout << "AlignedDebugAllocator::allocate(" << bytes 
                   << ") aligned to " << aligned_bytes << " -> " << ptr << std::endl;
         return ptr;
@@ -124,7 +128,11 @@ struct AlignedDebugAllocator {
     
     void deallocate(void* ptr, size_t bytes) {
         std::cout << "AlignedDebugAllocator::deallocate(" << ptr << ", " << bytes << ")" << std::endl;
+#ifdef _WIN32
+        _aligned_free(ptr);
+#else
         std::free(ptr);
+#endif
     }
 };
 

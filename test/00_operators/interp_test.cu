@@ -23,28 +23,28 @@ TEST(InterpTests, Interp)
 
   // example-begin interp-test-1
   auto x = make_tensor<TestType>({5});
-  x.SetVals({0.0, 1.0, 3.0, 3.5, 4.0});
+  x.SetVals({static_cast<TestType>(0.0), static_cast<TestType>(1.0), static_cast<TestType>(3.0), static_cast<TestType>(3.5), static_cast<TestType>(4.0)});
 
   auto v = make_tensor<TestType>(x.Shape());
-  v.SetVals({0.0, 2.0, 1.0, 3.0, 4.0});
+  v.SetVals({static_cast<TestType>(0.0), static_cast<TestType>(2.0), static_cast<TestType>(1.0), static_cast<TestType>(3.0), static_cast<TestType>(4.0)});
 
   auto xq = make_tensor<TestType>({6});
-  xq.SetVals({-1.0, 0.0, 0.25, 1.0, 1.5, 5.0});
+  xq.SetVals({static_cast<TestType>(-1.0), static_cast<TestType>(0.0), static_cast<TestType>(0.25), static_cast<TestType>(1.0), static_cast<TestType>(1.5), static_cast<TestType>(5.0)});
 
   auto vq_linear = make_tensor<TestType>({xq.Size(0)});
-  vq_linear.SetVals({0.0, 0.0, 0.5, 2.0, 1.75, 4.0});
+  vq_linear.SetVals({static_cast<TestType>(0.0), static_cast<TestType>(0.0), static_cast<TestType>(0.5), static_cast<TestType>(2.0), static_cast<TestType>(1.75), static_cast<TestType>(4.0)});
 
   auto vq_nearest = make_tensor<TestType>({xq.Size(0)});
-  vq_nearest.SetVals({0.0, 0.0, 0.0, 2.0, 2.0, 4.0});
+  vq_nearest.SetVals({static_cast<TestType>(0.0), static_cast<TestType>(0.0), static_cast<TestType>(0.0), static_cast<TestType>(2.0), static_cast<TestType>(2.0), static_cast<TestType>(4.0)});
 
   auto vq_next = make_tensor<TestType>({xq.Size(0)});
-  vq_next.SetVals({0.0, 0.0, 2.0, 2.0, 1.0, 4.0});
+  vq_next.SetVals({static_cast<TestType>(0.0), static_cast<TestType>(0.0), static_cast<TestType>(2.0), static_cast<TestType>(2.0), static_cast<TestType>(1.0), static_cast<TestType>(4.0)});
 
   auto vq_prev = make_tensor<TestType>({xq.Size(0)});
-  vq_prev.SetVals({0.0, 0.0, 0.0, 2.0, 2.0, 4.0});
+  vq_prev.SetVals({static_cast<TestType>(0.0), static_cast<TestType>(0.0), static_cast<TestType>(0.0), static_cast<TestType>(2.0), static_cast<TestType>(2.0), static_cast<TestType>(4.0)});
 
   auto vq_spline = make_tensor<TestType>({xq.Size(0)});
-  vq_spline.SetVals({-10.7391, 0.0, 1.1121, 2.0, 1.3804, -8.1739});
+  vq_spline.SetVals({static_cast<TestType>(-10.7391), static_cast<TestType>(0.0), static_cast<TestType>(1.1121), static_cast<TestType>(2.0), static_cast<TestType>(1.3804), static_cast<TestType>(-8.1739)});
 
 
 

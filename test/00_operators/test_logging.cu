@@ -31,6 +31,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "matx.h"
+#include "utilities.h"
 #include <gtest/gtest.h>
 #include <cstdlib>
 #include <fstream>

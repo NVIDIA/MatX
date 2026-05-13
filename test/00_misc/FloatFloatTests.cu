@@ -37,6 +37,13 @@
 #include "gtest/gtest.h"
 
 #include <bit>
+#include <numbers>  // std::numbers::pi, ::e, ::sqrt2 — C++20, host-only.
+                    // This file is test/reference code that runs on the host;
+                    // std::numbers is intentionally used here for its type-safe
+                    // API (std::numbers::pi_v<float>, etc.).
+                    // In device code or shared headers, use M_PI / M_E from
+                    // matx/core/defines.h instead — nvcc's device front-end
+                    // does not parse <numbers>.
 
 using namespace matx;
 
@@ -895,7 +902,7 @@ TYPED_TEST(FltFltExecutorTests, Floor) {
     this->exec.sync();
 
     const double pi_floor_ref_f64 = std::floor(std::numbers::pi);
-    const float pi_floor_ref_f32 = std::floor(std::numbers::pi_v<float>);
+    [[maybe_unused]] const float pi_floor_ref_f32 = std::floor(std::numbers::pi_v<float>);
 
     // For floor of pi, the result should be exactly 3.0 (which is representable exactly)
     EXPECT_EQ(floor_result(), 3.0);
@@ -2591,7 +2598,7 @@ TYPED_TEST(FltFltExecutorTests, ConvertFromDoubleAccuracy) {
     if (!std::isnormal(hi)) continue;
 
     // 0.5 * ulp(hi), using the upper-side step (the standard "ulp" definition).
-    const double half_ulp_hi = std::ldexp(1.0, std::ilogb(hi) - 24);
+    [[maybe_unused]] const double half_ulp_hi = std::ldexp(1.0, std::ilogb(hi) - 24);
 
     // Property (3): |x - (hi+lo)| <= 8 ulp(x), only when both hi and lo are in normal
     // range. lo is allowed to be exactly zero, but only when the residual really is

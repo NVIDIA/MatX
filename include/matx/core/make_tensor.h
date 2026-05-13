@@ -720,7 +720,13 @@ auto make_tensor( T *const data,
   MATX_LOG_DEBUG("make_tensor<T,RANK>(data, shape, strides, owning): ptr={}, shape={}, strides={}, owning={}", 
                  reinterpret_cast<const void*>(data), shape_str, strides_str, owning);
 
+#ifdef _MSC_VER
+  cuda::std::array<index_t, RANK> shape_arr, strides_arr;
+  for (int i = 0; i < RANK; i++) { shape_arr[i] = shape[i]; strides_arr[i] = strides[i]; }
+  DefaultDescriptor<RANK>  desc{std::move(shape_arr), std::move(strides_arr)};
+#else
   DefaultDescriptor<RANK>  desc{shape, strides};
+#endif
   auto storage = owning ? make_owning_storage<T>(desc.TotalSize()) : make_non_owning_storage<T>(data, desc.TotalSize());
   return tensor_t<T,RANK, decltype(desc)>{std::move(storage), std::move(desc), data};
 }

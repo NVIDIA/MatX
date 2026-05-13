@@ -96,10 +96,10 @@ TYPED_TEST(SarBpTestNonComplexNonHalfFloatTypes, NonMixedTypes)
   const index_t image_height = 128;
 
   auto zero_image = matx::zeros<complex_t>({image_height, image_width});
-  const TestType min_x = -10.0;
-  const TestType max_x = 10.0;
-  const TestType min_y = -10.0;
-  const TestType max_y = 10.0;
+  const TestType min_x = static_cast<TestType>(-10.0);
+  const TestType max_x = static_cast<TestType>(10.0);
+  const TestType min_y = static_cast<TestType>(-10.0);
+  const TestType max_y = static_cast<TestType>(10.0);
   auto pix_coords_x = matx::linspace<TestType>(min_x, max_x, image_width);
   auto pix_coords_y = matx::linspace<TestType>(min_y, max_y, image_height);
   auto pix_coords_yclone = matx::clone<2>(pix_coords_y, {matx::matxKeepDim, image_width});
@@ -112,8 +112,8 @@ TYPED_TEST(SarBpTestNonComplexNonHalfFloatTypes, NonMixedTypes)
   auto platform_positions = matx::make_tensor<apc_t>({num_pulses});
   auto image = matx::make_tensor<complex_t>({image_height, image_width});
   const TestType plat_dx = (max_x - min_x) / num_pulses;
-  const TestType plat_y = -1000.0;
-  const TestType plat_z = 1000.0;
+  const TestType plat_y = static_cast<TestType>(-1000.0);
+  const TestType plat_z = static_cast<TestType>(1000.0);
   for (index_t i = 0; i < num_pulses; i++) {
     const TestType plat_x = min_x + static_cast<TestType>(i) * plat_dx;
     platform_positions(i) = apc_t{plat_x, plat_y, plat_z};
@@ -240,8 +240,8 @@ TYPED_TEST(SarBpTestDoubleType, PointTarget)
   assert(image_height % 4 == 0);
   const double target_x = pix_x_min + pix_dx * (image_width / 4.0);
   const double target_y = pix_y_min + pix_dy * (image_height / 4.0);
-  // Target range relative to mocomp point (0,0,0)
-  const double target_R = ::sqrt(target_x * target_x + target_y * target_y);
+  // Target range relative to mocomp point (0,0,0) — used for parameter setup
+  [[maybe_unused]] const double target_R = ::sqrt(target_x * target_x + target_y * target_y);
 
   matx::SarBpParams bp_params;
   bp_params.del_r = ::sqrt((image_width * pix_dx) * (image_width * pix_dx) + (image_height * pix_dy) * (image_height * pix_dy)) / num_range_bins;

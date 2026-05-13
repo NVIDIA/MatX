@@ -115,7 +115,7 @@ TEST(TensorStats, Hist)
   tensor_t<float, 1> inv({10});
   tensor_t<int, 1> outv({levels - 1});
 
-  inv.SetVals({2.2, 6.0, 7.1, 2.9, 3.5, 0.3, 2.9, 2.0, 6.1, 999.5});
+  inv.SetVals({2.2f, 6.0f, 7.1f, 2.9f, 3.5f, 0.3f, 2.9f, 2.0f, 6.1f, 999.5f});
 
   cudaExecutor exec{};
 

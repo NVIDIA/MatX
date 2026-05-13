@@ -45,6 +45,24 @@
 #include <regex>
 #include <unordered_map>
 
+#ifdef _MSC_VER
+inline int setenv(const char* name, const char* value, int overwrite) {
+  if (!overwrite) {
+    size_t requiredSize;
+    getenv_s(&requiredSize, nullptr, 0, name);
+    if (requiredSize != 0) {
+      return 0; // Variable already exists and overwrite is not allowed
+    }
+  }
+  return _putenv_s(name, value);
+}
+inline int unsetenv(const char* name) {
+  // _putenv with "NAME=" (no value after '=') removes the variable
+  std::string var = std::string(name) + "=";
+  return _putenv(var.c_str());
+}
+#endif
+
 namespace matx {
 
 /**

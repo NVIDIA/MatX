@@ -360,7 +360,7 @@ namespace detail {
     // ( (static_assert(std::is_same_v<ChildCapTypes, CapType>,"Child capability type mismatch.")), ...); // C++17 fold for static_assert
 
     CapabilityQueryType query_type = get_query_type(Cap);
-    CapType children_aggregated_val;
+    CapType children_aggregated_val{};
 
     // Step 1: Aggregate children capabilities
     if constexpr (sizeof...(ChildCapTypes) == 0) {

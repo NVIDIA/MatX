@@ -157,6 +157,13 @@ public:
     InitFromShape(cuda::std::move(tshape));
   }
 
+#ifndef _MSC_VER
+  // MSVC/nvcc on Windows eagerly validates C-array (&arr)[N] parameter signatures in every
+  // member function during class template instantiation, even when RANK==0 makes N==0 (which
+  // is invalid in standard C++). GCC/Clang permit zero-sized arrays as an extension so these
+  // overloads compile there. On Windows, the equivalent cuda::std::array overloads below are
+  // available on all platforms and provide the same functionality.
+
   /**
    * @brief Constructor with perfect-forwarded shape and C array of strides
    *
@@ -211,6 +218,7 @@ public:
       *(shape_.begin() + i) = shape[i];
     }
   }
+#endif // !_MSC_VER
 
   /**
    * Check if a descriptor is contiguous in memory for all elements in the view
@@ -297,6 +305,7 @@ public:
 
 // gcc 14.1 incorrectly reports shape_ as uninitialized in some contexts
 MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
+MATX_IGNORE_WARNING_NEXT_LINE_MSVC(4702)
     return *(shape_.begin() + dim);
 MATX_IGNORE_WARNING_POP_GCC
   }
@@ -328,6 +337,7 @@ MATX_IGNORE_WARNING_POP_GCC
         so it can never count up to 3. */
 MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
 MATX_IGNORE_WARNING_PUSH_GCC("-Warray-bounds")
+MATX_IGNORE_WARNING_NEXT_LINE_MSVC(4702)
     return *(stride_.begin() + dim);
 MATX_IGNORE_WARNING_POP_GCC
 MATX_IGNORE_WARNING_POP_GCC
@@ -437,7 +447,7 @@ private:
       const auto shape = make_shape();
       m[m.size()-1] = 1;
       if constexpr (m.size() > 1) {
-        for (int i = m.size()-2; i >= 0; i--) {
+        for (int i = static_cast<int>(m.size())-2; i >= 0; i--) {
             m[i] = m[i+1] * shape[i + 1];
         }
       }

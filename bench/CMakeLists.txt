@@ -34,7 +34,20 @@ function(create_bench_executable bench_file)
     set_property(TARGET ${target_name} PROPERTY ENABLE_EXPORTS 1)
 
     if (MSVC)
-        target_compile_options(${target_name} PRIVATE /W4 /WX)
+        # /W4 and /WX must be wrapped in -Xcompiler for CUDA source files.
+        # nvcc does not recognize MSVC-style /flags as its own options; passing them
+        # directly without -Xcompiler causes nvcc to treat them as extra input files,
+        # triggering "A single input file is required for a non-link phase".
+        target_compile_options(${target_name} PRIVATE
+            $<$<COMPILE_LANGUAGE:CXX>:/W4>
+            $<$<COMPILE_LANGUAGE:CXX>:/WX>
+            $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/W4>
+            $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/WX>
+        )
+
+        # cudart_static.lib pulls in LIBCMT (static CRT); suppress the LNK4098 warning
+        # that results from mixing it with the /MD (dynamic CRT) runtime used elsewhere.
+        target_link_options(${target_name} PRIVATE /NODEFAULTLIB:LIBCMT)
     else()
         target_compile_options(${target_name} PRIVATE ${WARN_FLAGS})
         target_compile_options(${target_name} PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:${MATX_CUDA_FLAGS}>)

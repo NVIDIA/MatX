@@ -80,6 +80,9 @@ namespace matx {
 #if defined(__clang__ )
     #define MATX_IGNORE_WARNING_PUSH_GCC(WARN_MSG)
     #define MATX_IGNORE_WARNING_POP_GCC
+    #define MATX_IGNORE_WARNING_PUSH_MSVC(WARN_ID)
+    #define MATX_IGNORE_WARNING_POP_MSVC
+    #define MATX_IGNORE_WARNING_NEXT_LINE_MSVC(WARN_ID)
 
     #define MATX_IGNORE_WARNING_PUSH_CLANG(WARN_MSG) \
         _Pragma("clang diagnostic push") \
@@ -90,6 +93,9 @@ namespace matx {
 #elif defined(__GNUC__)
     #define MATX_IGNORE_WARNING_PUSH_CLANG(WARN_MSG)
     #define MATX_IGNORE_WARNING_POP_CLANG
+    #define MATX_IGNORE_WARNING_PUSH_MSVC(WARN_ID)
+    #define MATX_IGNORE_WARNING_POP_MSVC
+    #define MATX_IGNORE_WARNING_NEXT_LINE_MSVC(WARN_ID)
 
     #define MATX_IGNORE_WARNING_PUSH_GCC(WARN_MSG) \
         _Pragma("GCC diagnostic push") \
@@ -97,17 +103,48 @@ namespace matx {
 
     #define MATX_IGNORE_WARNING_POP_GCC \
         _Pragma("GCC diagnostic pop")
+#elif defined(_MSC_VER)
+    #define MATX_IGNORE_WARNING_PUSH_GCC(WARN_MSG)
+    #define MATX_IGNORE_WARNING_POP_GCC
+    #define MATX_IGNORE_WARNING_PUSH_CLANG(WARN_MSG)
+    #define MATX_IGNORE_WARNING_POP_CLANG
+
+    #define MATX_IGNORE_WARNING_PUSH_MSVC(WARN_ID) \
+        __pragma(warning(push)) \
+        __pragma(warning(disable : WARN_ID))
+
+    #define MATX_IGNORE_WARNING_POP_MSVC \
+        __pragma(warning(pop))
+
+    #define MATX_IGNORE_WARNING_NEXT_LINE_MSVC(WARN_ID) \
+        __pragma(warning(suppress : WARN_ID))
 #else
     #define MATX_IGNORE_WARNING_PUSH_GCC(WARN_MSG)
     #define MATX_IGNORE_WARNING_POP_GCC
     #define MATX_IGNORE_WARNING_PUSH_CLANG(WARN_MSG)
     #define MATX_IGNORE_WARNING_POP_CLANG
+    #define MATX_IGNORE_WARNING_PUSH_MSVC(WARN_ID)
+    #define MATX_IGNORE_WARNING_POP_MSVC
+    #define MATX_IGNORE_WARNING_NEXT_LINE_MSVC(WARN_ID)
 #endif
 
 // std::ceil is not constexpr until C++23
 #define MATX_ROUND_UP(N, S) ((((N) + (S) - 1) / (S)) * (S))
 
-enum {
+// MATX_VISIBILITY_DEFAULT: marks a symbol for export in shared library builds.
+// On GCC/Clang this expands to __attribute__((visibility("default"))).
+// On MSVC, __attribute__ is not supported and visibility is controlled by
+// __declspec(dllexport/dllimport), so the attribute is silenced here.
+#if defined(_MSC_VER)
+  #define MATX_VISIBILITY_DEFAULT
+#else
+  #define MATX_VISIBILITY_DEFAULT __attribute__ ((visibility ("default")))
+#endif
+
+// Explicit underlying type prevents MSVC C4309 ("truncation of constant
+// value") when index_t is 64-bit: a plain enum defaults to int (32-bit),
+// causing LLONG_MAX to truncate and /WX to turn that into an error.
+enum : index_t {
   matxKeepDim     = cuda::std::numeric_limits<index_t>::max(),
   matxDropDim     = cuda::std::numeric_limits<index_t>::max() - 1,
   matxEnd         = cuda::std::numeric_limits<index_t>::max() - 2,

@@ -77,6 +77,21 @@ concept is_noshape = cuda::std::is_same_v<detail::NoShape, T>;
 template <class T>
 inline constexpr bool is_noshape_v = cuda::std::is_same_v<detail::NoShape, T>;
 
+/**
+ * @brief Get the rank of a shape type, returning 0 for NoShape.
+ *
+ * cuda::std::tuple_size is not specialized for NoShape, so querying it
+ * directly causes an incomplete-type error. This helper avoids the issue.
+ */
+template <typename S>
+struct shape_rank_t {
+  static constexpr int value = (int)cuda::std::tuple_size<cuda::std::remove_cvref_t<S>>::value;
+};
+template <>
+struct shape_rank_t<detail::NoShape> {
+  static constexpr int value = 0;
+};
+
 
 
 /**

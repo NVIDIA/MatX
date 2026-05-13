@@ -85,9 +85,11 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Reshape)
     for (index_t j = 0; j < t4.Size(1); j++) {
       for (index_t k = 0; k < t4.Size(2); k++) {
         for (index_t l = 0; l < t4.Size(3); l++) {
+          MATX_IGNORE_WARNING_PUSH_MSVC(4244)
           MATX_ASSERT_EQ(rsv1(l + k * t4.Size(3) + j * t4.Size(3) * t4.Size(2) +
                               i * t4.Size(3) * t4.Size(2) * t4.Size(1)),
-                         (TestType)(i + j + k + (double)l));
+                         static_cast<TestType>(i + j + k + l));
+          MATX_IGNORE_WARNING_POP_MSVC
         }
       }
     }

@@ -245,7 +245,7 @@ TYPED_TEST(BasicGeneratorTestsFloat, Alternate)
   exec.sync();
 
   for (int i = 0; i < 10; i++) {
-    MATX_ASSERT_EQ(td(i), (TestType)-2* (TestType)(i&1) + (TestType)1)
+    MATX_ASSERT_EQ(td(i), static_cast<TestType>(-2.0f) * static_cast<TestType>(static_cast<float>(i & 1)) + static_cast<TestType>(1.0f))
   }
 
   MATX_EXIT_HANDLER();
@@ -783,8 +783,8 @@ TYPED_TEST(BasicGeneratorTestsFloatNonComplex, Logspace)
   // example-begin logspace-gen-test-1
   index_t count = 20;
   tensor_t<TestType, 1> t1{{count}};
-  TestType start = 1.0f;
-  TestType stop = 2.0f;
+  TestType start = static_cast<TestType>(1.0f);
+  TestType stop = static_cast<TestType>(2.0f);
   auto s = t1.Shape();
 
   // Create a logarithmically-spaced sequence of numbers and assign to tensor "t1"
@@ -838,8 +838,8 @@ TYPED_TEST(BasicGeneratorTestsNumeric, Eye)
   (t4 = eye_op).run(exec);
   // example-end eye-gen-test-1
 
-  TestType one = 1.0f;
-  TestType zero = 0.0f;
+  TestType one = static_cast<TestType>(1.0f);
+  TestType zero = static_cast<TestType>(0.0f);
 
   exec.sync();
 
@@ -902,7 +902,7 @@ TYPED_TEST(BasicGeneratorTestsNumeric, Diag)
   (t4 = diag4).run(exec);
   // example-end diag-gen-test-1
 
-  TestType zero = 0.0f;
+  TestType zero = static_cast<TestType>(0.0f);
 
   exec.sync();
 

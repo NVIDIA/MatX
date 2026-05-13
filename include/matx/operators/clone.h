@@ -155,7 +155,7 @@ MATX_IGNORE_WARNING_POP_GCC
           if constexpr (CapType::ept == ElementsPerThread::ONE) {
   MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
             cuda::std::array<index_t, Rank()> sind{indices...};
-            cuda::std::array<index_t, T::Rank()> gind;
+            cuda::std::array<index_t, T::Rank()> gind{};
   MATX_IGNORE_WARNING_POP_GCC
 
             // gather indices

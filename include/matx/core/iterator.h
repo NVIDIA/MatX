@@ -234,6 +234,12 @@ struct RandomOperatorOutputIterator {
     }
   }
 
+  // Const overload required by MSVC 18 conformance mode (C++20 iterator requirements)
+  [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ reference operator*() const
+  {
+    return const_cast<self_type *>(this)->operator*();
+  }
+
   [[nodiscard]] __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ self_type operator+(difference_type offset) const
   {
     return self_type{t_, offset_ + offset};

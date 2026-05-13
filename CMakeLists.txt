@@ -152,6 +152,68 @@ rapids_cpm_cccl(
 
 target_link_libraries(matx INTERFACE CCCL::CCCL)
 
+if(WIN32)
+    # Prevent wingdi.h from defining ERROR=0, which breaks MATX_LOG_ERROR
+    target_compile_definitions(matx INTERFACE NOMINMAX WIN32_LEAN_AND_MEAN NOGDI _USE_MATH_DEFINES)
+
+    if(MSVC)
+        # /Zc:preprocessor: MSVC conformance preprocessor required by libcudacxx / MatX.
+        # Passed as -Xcompiler so it reaches cl.exe through nvcc.
+        add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/Zc:preprocessor>")
+        add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/Zc:preprocessor>")
+
+        # /Zc:__cplusplus: Without this MSVC always reports __cplusplus=199711L regardless
+        # of /std:c++NN, which breaks any library (e.g. nvbench) that checks __cplusplus
+        # directly in .cxx files compiled by cl.exe (not through nvcc). The equivalent
+        # -Xcompiler=/Zc:__cplusplus in CMAKE_CUDA_FLAGS only reaches cl.exe for .cu files.
+        add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/Zc:__cplusplus>")
+        add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/Zc:__cplusplus>")
+
+        # /bigobj raises the COFF section limit from 2^16 to 2^32,
+        # required for heavily-templated translation units.
+        add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/bigobj>")
+        add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/bigobj>")
+
+        # /wd4996: suppress "deprecated" warnings from NVIDIA's own headers (cusparse.h,
+        # cusolverDn.h, etc.) that annotate types scheduled for removal. These warnings
+        # originate in external SDK headers and cannot be fixed in MatX; without /wd4996
+        # they become errors under /WX.
+        add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/wd4996>")
+
+        # /wd4100: suppress unreferenced formal parameter warnings from third-party headers
+        # (Python 3.14 cpython/unicodeobject.h has intentional _unused_op parameters).
+        add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/wd4100>")
+        add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/wd4100>")
+
+        # /wd4864: VS18 new warning for dependent-name template calls on free function
+        # templates. Correct code, not a real ambiguity; suppress to unblock /WX builds.
+        add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/wd4864>")
+        add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/wd4864>")
+
+        # /wd4702: unreachable code in constexpr-if chains — MSVC false positive when every
+        # if-constexpr branch returns but a fallback return is still needed for non-MSVC.
+        add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/wd4702>")
+        add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/wd4702>")
+
+        # /wd4324: structure padded due to alignas — intentional in CUDA operator types.
+        add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/wd4324>")
+        add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/wd4324>")
+
+        # /wd4714: __forceinline function not inlined — expected for large templated
+        # functions such as get_type_str() instantiated over complex operator types.
+        add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/wd4714>")
+        add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/wd4714>")
+
+        # /wd4127: conditional expression is constant — common in template/constexpr code.
+        # VS18 2025+ (MSVC 1950+) resolves most of these automatically; suppress only on
+        # VS17 2022 and earlier.
+        if(MSVC_VERSION LESS 1950)
+            add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/wd4127>")
+            add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/wd4127>")
+        endif()
+    endif()
+endif()
+
 # Set flags for compiling tests faster (only for nvcc)
 if (NOT CMAKE_CUDA_COMPILER_ID STREQUAL "Clang")
     set(MATX_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} --threads 0 -ftemplate-backtrace-limit=0 --extended-lambda)
