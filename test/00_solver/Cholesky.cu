@@ -154,6 +154,42 @@ TYPED_TEST(CholSolverJITTestNonHalfFloatTypes, CuSolverDxMatchesCudaPath)
   }
 }
 
+TEST(CholSolverJITRegression, CuSolverDxMultipleSizesInOneJITExpression)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = float;
+
+  auto A2 = make_tensor<TestType>({2, 2});
+  auto A3 = make_tensor<TestType>({3, 3});
+  auto Out = make_tensor<TestType>({2, 2});
+  auto Ref = make_tensor<TestType>({2, 2});
+  auto mdiff = make_tensor<TestType>({});
+
+  for (index_t i = 0; i < 2; i++) {
+    for (index_t j = 0; j < 2; j++) {
+      A2(i, j) = i == j ? TestType(i + 4) : TestType{};
+    }
+  }
+  for (index_t i = 0; i < 3; i++) {
+    for (index_t j = 0; j < 3; j++) {
+      A3(i, j) = i == j ? TestType(i + 6) : TestType{};
+    }
+  }
+
+  CUDAJITExecutor jit_exec{};
+  cudaExecutor cuda_exec{};
+  (Out = chol(A2, SolverFillMode::LOWER) +
+         slice<2>(chol(A3, SolverFillMode::LOWER), {0, 0}, {2, 2})).run(jit_exec);
+  (Ref = chol(A2, SolverFillMode::LOWER) +
+         slice<2>(chol(A3, SolverFillMode::LOWER), {0, 0}, {2, 2})).run(cuda_exec);
+  (mdiff = max(abs(Out - Ref))).run(cuda_exec);
+  cuda_exec.sync();
+
+  ASSERT_NEAR(mdiff(), TestType(0), TestType(0.001));
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(CholSolverJITTestNonHalfFloatTypes, CuSolverDxBatchedMatchesCudaPath)
 {
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;

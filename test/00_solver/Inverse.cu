@@ -150,6 +150,39 @@ TYPED_TEST(InvSolverJITTestFloatTypes, CuSolverDxMatchesCudaPath)
   }
 }
 
+TEST(InvSolverJITRegression, CuSolverDxMultipleSizesInOneJITExpression)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = float;
+
+  auto A2 = make_tensor<TestType>({2, 2});
+  auto A3 = make_tensor<TestType>({3, 3});
+  auto Out = make_tensor<TestType>({2, 2});
+  auto Ref = make_tensor<TestType>({2, 2});
+  auto mdiff = make_tensor<TestType>({});
+
+  A2(0, 0) = TestType{4};
+  A2(0, 1) = TestType{1};
+  A2(1, 0) = TestType{2};
+  A2(1, 1) = TestType{3};
+  for (index_t i = 0; i < 3; i++) {
+    for (index_t j = 0; j < 3; j++) {
+      A3(i, j) = i == j ? TestType(i + 5) : TestType{};
+    }
+  }
+
+  CUDAJITExecutor jit_exec{};
+  cudaExecutor cuda_exec{};
+  (Out = inv(A2) + slice<2>(inv(A3), {0, 0}, {2, 2})).run(jit_exec);
+  (Ref = inv(A2) + slice<2>(inv(A3), {0, 0}, {2, 2})).run(cuda_exec);
+  (mdiff = max(abs(Out - Ref))).run(cuda_exec);
+  cuda_exec.sync();
+
+  ASSERT_NEAR(mdiff(), TestType(0), TestType(0.001));
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(InvSolverJITTestFloatTypes, CuSolverDxBatchedMatchesCudaPath)
 {
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;

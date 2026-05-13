@@ -110,7 +110,11 @@ namespace detail {
       }
 
       __MATX_INLINE__ std::string get_jit_class_name() const {
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
+        return std::string("JITCholOp_") + dx_potrf_helper_.GetSymbolName();
+#else
         return "JITCholOp";
+#endif
       }
 
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
@@ -194,6 +198,23 @@ namespace detail {
           MATX_LOG_DEBUG("cuSolverDx POTRF GENERATE_LTOIR: {}", result);
           return result;
         }
+        else if constexpr (Cap == OperatorCapability::JIT_CACHE_KEY) {
+#ifdef MATX_EN_JIT
+          auto key = detail::MakeJITCacheKeyForType<CholOp<OpA>>("JITChol");
+          detail::HashJITCacheValue(key, Rank());
+          detail::HashJITCacheValue(key, static_cast<int>(uplo_));
+          for (int i = 0; i < Rank(); ++i) {
+            detail::HashJITCacheValue(key, Size(i));
+          }
+          if constexpr (OpA::Rank() >= 2) {
+            detail::HashJITCacheValue(key, dx_potrf_helper_.get_n());
+          }
+          detail::HashJITCacheString(key, dx_potrf_helper_.GetSymbolName());
+          return combine_capabilities<Cap>(key, detail::get_operator_capability<Cap>(a_, in));
+#else
+          return detail::MakeInvalidJITCacheKey();
+#endif
+        }
         else if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
 #ifdef MATX_EN_JIT
           const auto inner_op_jit_name = detail::get_operator_capability<Cap>(a_, in);
@@ -256,7 +277,16 @@ namespace detail {
           a_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
 
-        matxFree(ptr); 
+        if (ptr != nullptr) {
+          if constexpr (is_cuda_executor_v<Executor>) {
+            matxFree(ptr, ex.getStream());
+          }
+          else {
+            matxFree(ptr);
+          }
+          ptr = nullptr;
+        }
+        prerun_done_ = false;
       }        
 
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const

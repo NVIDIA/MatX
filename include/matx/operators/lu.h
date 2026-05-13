@@ -216,9 +216,15 @@ namespace detail {
       }
 
       template <int Component>
+      std::string GetJITProjectionClassName() const
+      {
+        return std::string("JITLUProjectionOp_") + dx_lu_helper_.GetSymbolName();
+      }
+
+      template <int Component>
       std::string GetJITProjectionTypeName(const std::string &inner_op_jit_name) const
       {
-        return std::string("JITLUProjectionOp<") + inner_op_jit_name + ", " + std::to_string(Component) + ">";
+        return GetJITProjectionClassName<Component>() + "<" + inner_op_jit_name + ", " + std::to_string(Component) + ">";
       }
 
       template <int Component>
@@ -230,13 +236,14 @@ namespace detail {
         for (int i = 0; i < RANK; ++i) {
           detail::HashJITCacheValue(key, factors_shape_[i]);
         }
+        detail::HashJITCacheString(key, dx_lu_helper_.GetSymbolName());
         return key;
       }
 
       template <int Component>
       void AddJITProjectionClasses(std::unordered_map<std::string, std::string> &in) const
       {
-        const std::string class_name = "JITLUProjectionOp";
+        const std::string class_name = GetJITProjectionClassName<Component>();
         if (in.find(class_name) != in.end()) {
           return;
         }

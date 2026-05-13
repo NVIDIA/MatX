@@ -237,9 +237,17 @@ namespace detail {
       }
 
       template <int Component>
+      std::string GetJITProjectionClassName() const
+      {
+        return std::string("JITEigProjectionOp_") +
+               dx_heev_values_helper_.GetSymbolName() + "_" +
+               dx_heev_vectors_helper_.GetSymbolName();
+      }
+
+      template <int Component>
       std::string GetJITProjectionTypeName(const std::string &inner_op_jit_name) const
       {
-        return std::string("JITEigProjectionOp<") + inner_op_jit_name + ", " + std::to_string(Component) + ">";
+        return GetJITProjectionClassName<Component>() + "<" + inner_op_jit_name + ", " + std::to_string(Component) + ">";
       }
 
       template <int Component>
@@ -253,13 +261,15 @@ namespace detail {
         for (int i = 0; i < RANK; ++i) {
           detail::HashJITCacheValue(key, vectors_shape_[i]);
         }
+        detail::HashJITCacheString(key, dx_heev_values_helper_.GetSymbolName());
+        detail::HashJITCacheString(key, dx_heev_vectors_helper_.GetSymbolName());
         return key;
       }
 
       template <int Component>
       void AddJITProjectionClasses(std::unordered_map<std::string, std::string> &in) const
       {
-        const std::string class_name = "JITEigProjectionOp";
+        const std::string class_name = GetJITProjectionClassName<Component>();
         if (in.find(class_name) != in.end()) {
           return;
         }
@@ -267,8 +277,8 @@ namespace detail {
         const std::string values_func_name = std::string(SOLVER_DX_FUNC_PREFIX) + "_" + dx_heev_values_helper_.GetSymbolName();
         const std::string vectors_func_name = std::string(SOLVER_DX_FUNC_PREFIX) + "_" + dx_heev_vectors_helper_.GetSymbolName();
         in[class_name] =
-          " extern \"C\" __device__ void " + values_func_name + "(" + detail::type_to_string<a_value_type>() + "*, " + detail::type_to_string<a_value_type>() + "*, " + detail::type_to_string<a_value_type>() + "*, int*);\n"
-          " extern \"C\" __device__ void " + vectors_func_name + "(" + detail::type_to_string<a_value_type>() + "*, " + detail::type_to_string<a_value_type>() + "*, " + detail::type_to_string<a_value_type>() + "*, int*);\n"
+          " extern \"C\" __device__ void " + values_func_name + "(" + detail::type_to_string<a_value_type>() + "*, " + detail::type_to_string<w_value_type>() + "*, " + detail::type_to_string<a_value_type>() + "*, int*);\n"
+          " extern \"C\" __device__ void " + vectors_func_name + "(" + detail::type_to_string<a_value_type>() + "*, " + detail::type_to_string<w_value_type>() + "*, " + detail::type_to_string<a_value_type>() + "*, int*);\n"
           " template <typename OpA, int Component> struct " + class_name + "  {\n"
           "  using solver_value_type = typename OpA::value_type;\n"
           "  using precision_type = typename inner_op_type_t<solver_value_type>::type;\n"

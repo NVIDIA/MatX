@@ -212,10 +212,11 @@ private:
       }
       case CUSOLVERDX_FUNCTION_HEEV:
       case CUSOLVERDX_FUNCTION_HTEV: {
+        using precision_type = typename inner_op_type_t<InputType>::type;
         const auto elems = static_cast<long long int>(n_) * static_cast<long long int>(n_);
         const auto matrix_bytes = elems * elem_size;
-        const auto lambda_offset = AlignUp(matrix_bytes, static_cast<long long int>(alignof(InputType)));
-        const auto workspace_offset = AlignUp(lambda_offset + static_cast<long long int>(n_) * elem_size,
+        const auto lambda_offset = AlignUp(matrix_bytes, static_cast<long long int>(alignof(precision_type)));
+        const auto workspace_offset = AlignUp(lambda_offset + static_cast<long long int>(n_) * static_cast<long long int>(sizeof(precision_type)),
                                               static_cast<long long int>(alignof(InputType)));
         const auto info_offset = AlignUp(workspace_offset + static_cast<long long int>(GetWorkspaceSize()),
                                          static_cast<long long int>(alignof(int)));
@@ -440,6 +441,7 @@ public:
       using value_type = )";
     result += detail::type_to_string<InputType>();
     result += R"(;
+      static_assert(Rank() >= 2 && Rank() <= 4, "cuSolverDx JIT supports matrix operator ranks 2 through 4");
       static constexpr index_t n = )";
     result += std::to_string(static_cast<int>(n_));
     result += R"(;
@@ -481,8 +483,10 @@ public:
     result += R"((smem_a, info);
       __syncthreads();
 
-      if (tid < elems) {
-        return smem_a[tid];
+      const index_t out_row = idx[Rank() - 2];
+      const index_t out_col = idx[Rank() - 1];
+      if (out_row < n && out_col < n) {
+        return smem_a[out_row * n + out_col];
       }
       return value_type{};
     )";
@@ -495,6 +499,7 @@ public:
       using value_type = )";
     result += detail::type_to_string<InputType>();
     result += R"(;
+      static_assert(Rank() >= 2 && Rank() <= 4, "cuSolverDx JIT supports matrix operator ranks 2 through 4");
       static constexpr index_t n = )";
     result += std::to_string(static_cast<int>(n_));
     result += R"(;
@@ -539,8 +544,10 @@ public:
     result += R"((smem_a, ipiv, smem_b, info);
       __syncthreads();
 
-      if (tid < elems) {
-        return smem_b[tid];
+      const index_t out_row = idx[Rank() - 2];
+      const index_t out_col = idx[Rank() - 1];
+      if (out_row < n && out_col < n) {
+        return smem_b[out_row * n + out_col];
       }
       return value_type{};
     )";
@@ -551,6 +558,7 @@ public:
   {
     std::string result = R"(
       using solver_value_type = typename OpA::value_type;
+      static_assert(OpA::Rank() >= 2 && OpA::Rank() <= 4, "cuSolverDx JIT projections support input ranks 2 through 4");
       static constexpr index_t m = )";
     result += std::to_string(static_cast<int>(m_));
     result += R"(;
@@ -626,6 +634,7 @@ public:
   {
     std::string result = R"(
       using solver_value_type = typename OpA::value_type;
+      static_assert(OpA::Rank() >= 2 && OpA::Rank() <= 4, "cuSolverDx JIT projections support input ranks 2 through 4");
       static constexpr index_t m = )";
     result += std::to_string(static_cast<int>(m_));
     result += R"(;
@@ -699,6 +708,7 @@ public:
   {
     std::string result = R"(
       using solver_value_type = typename OpA::value_type;
+      static_assert(OpA::Rank() >= 2 && OpA::Rank() <= 4, "cuSolverDx JIT projections support input ranks 2 through 4");
       static constexpr index_t m = )";
     result += std::to_string(static_cast<int>(m_));
     result += R"(;
@@ -787,17 +797,17 @@ public:
 
   std::string GetHeevProjectionFuncStr(const std::string &solver_func_name, int vectors_component, int values_component) const
   {
-    using precision_type = typename inner_op_type_t<InputType>::type;
     std::string result = R"(
       using solver_value_type = typename OpA::value_type;
       using precision_type = typename inner_op_type_t<solver_value_type>::type;
+      static_assert(OpA::Rank() >= 2 && OpA::Rank() <= 4, "cuSolverDx JIT projections support input ranks 2 through 4");
       static constexpr index_t n = )";
     result += std::to_string(static_cast<int>(n_));
     result += R"(;
       static constexpr index_t elems = n * n;
       static constexpr size_t matrix_bytes = elems * sizeof(solver_value_type);
-      static constexpr size_t lambda_offset = ((matrix_bytes + alignof(solver_value_type) - 1) / alignof(solver_value_type)) * alignof(solver_value_type);
-      static constexpr size_t lambda_bytes = n * sizeof(solver_value_type);
+      static constexpr size_t lambda_offset = ((matrix_bytes + alignof(precision_type) - 1) / alignof(precision_type)) * alignof(precision_type);
+      static constexpr size_t lambda_bytes = n * sizeof(precision_type);
       static constexpr size_t workspace_offset = ((lambda_offset + lambda_bytes + alignof(solver_value_type) - 1) / alignof(solver_value_type)) * alignof(solver_value_type);
       static constexpr size_t workspace_bytes = )";
     result += std::to_string(static_cast<int>(GetWorkspaceSize()));
@@ -805,7 +815,7 @@ public:
       static constexpr size_t info_offset = ((workspace_offset + workspace_bytes + alignof(int) - 1) / alignof(int)) * alignof(int);
       extern __shared__ __align__(16) char smem[];
       solver_value_type* smem_a = reinterpret_cast<solver_value_type*>(smem);
-      solver_value_type* lambda = reinterpret_cast<solver_value_type*>(smem + lambda_offset);
+      precision_type* lambda = reinterpret_cast<precision_type*>(smem + lambda_offset);
       solver_value_type* workspace = reinterpret_cast<solver_value_type*>(smem + workspace_offset);
       int* info = reinterpret_cast<int*>(smem + info_offset);
       const int tid = threadIdx.x + threadIdx.y * blockDim.x + threadIdx.z * blockDim.x * blockDim.y;
@@ -856,12 +866,7 @@ public:
     result += R"() {
         const index_t vec_idx = idx[Rank() - 1];
         if (vec_idx < n) {
-          if constexpr (is_complex_v<solver_value_type>) {
-            return static_cast<value_type>(lambda[vec_idx].real());
-          }
-          else {
-            return static_cast<value_type>(lambda[vec_idx]);
-          }
+          return static_cast<value_type>(lambda[vec_idx]);
         }
       }
       return value_type{};

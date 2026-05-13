@@ -133,6 +133,44 @@ TYPED_TEST(LUSolverJITTestFloatTypes, CuSolverDxSingleMatrixProjectionJIT)
   MATX_EXIT_HANDLER();
 }
 
+TEST(LUSolverJITRegression, CuSolverDxMultipleSizesInOneJITExpression)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = float;
+
+  auto A2 = make_tensor<TestType>({2, 2});
+  auto A3 = make_tensor<TestType>({3, 3});
+  auto Out = make_tensor<TestType>({2, 2});
+  auto Ref = make_tensor<TestType>({2, 2});
+  auto mdiff = make_tensor<TestType>({});
+
+  for (index_t i = 0; i < 2; i++) {
+    for (index_t j = 0; j < 2; j++) {
+      A2(i, j) = i == j ? TestType(i + 2) : TestType{};
+    }
+  }
+  for (index_t i = 0; i < 3; i++) {
+    for (index_t j = 0; j < 3; j++) {
+      A3(i, j) = i == j ? TestType(i + 5) : TestType{};
+    }
+  }
+
+  auto op2 = lu(A2);
+  auto op3 = lu(A3);
+  auto ref2 = lu(A2);
+  auto ref3 = lu(A3);
+  CUDAJITExecutor jit_exec{};
+  cudaExecutor cuda_exec{};
+  (Out = op2.LU + slice<2>(op3.LU, {0, 0}, {2, 2})).run(jit_exec);
+  (Ref = ref2.LU + slice<2>(ref3.LU, {0, 0}, {2, 2})).run(cuda_exec);
+  (mdiff = max(abs(Out - Ref))).run(cuda_exec);
+  cuda_exec.sync();
+
+  ASSERT_NEAR(mdiff(), TestType(0), TestType(0.001));
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(LUSolverJITTestFloatTypes, CuSolverDxBatchedMatrixProjectionJIT)
 {
   MATX_ENTER_HANDLER();

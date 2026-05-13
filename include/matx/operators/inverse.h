@@ -108,7 +108,11 @@ namespace detail {
       }
 
       __MATX_INLINE__ std::string get_jit_class_name() const {
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
+        return std::string("JITInvOp_") + dx_gesv_helper_.GetSymbolName();
+#else
         return "JITInvOp";
+#endif
       }
 
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
@@ -205,6 +209,7 @@ namespace detail {
             const index_t n = a_.Size(OpA::Rank() - 1);
             detail::HashJITCacheValue(key, n);
           }
+          detail::HashJITCacheString(key, dx_gesv_helper_.GetSymbolName());
           return combine_capabilities<Cap>(key, detail::get_operator_capability<Cap>(a_, in));
 #else
           return detail::MakeInvalidJITCacheKey();
@@ -267,7 +272,16 @@ namespace detail {
           a_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }  
 
-        matxFree(ptr);
+        if (ptr != nullptr) {
+          if constexpr (is_cuda_executor_v<Executor>) {
+            matxFree(ptr, ex.getStream());
+          }
+          else {
+            matxFree(ptr);
+          }
+          ptr = nullptr;
+        }
+        prerun_done_ = false;
       }
   };
 }

@@ -227,9 +227,17 @@ namespace detail {
       }
 
       template <int Component>
+      std::string GetJITProjectionClassName() const
+      {
+        return std::string("JITQRProjectionOp_") +
+               dx_geqrf_helper_.GetSymbolName() + "_" +
+               dx_ungqr_helper_.GetSymbolName();
+      }
+
+      template <int Component>
       std::string GetJITProjectionTypeName(const std::string &inner_op_jit_name) const
       {
-        return std::string("JITQRProjectionOp<") + inner_op_jit_name + ", " + std::to_string(Component) + ">";
+        return GetJITProjectionClassName<Component>() + "<" + inner_op_jit_name + ", " + std::to_string(Component) + ">";
       }
 
       template <int Component>
@@ -241,13 +249,15 @@ namespace detail {
         for (int i = 0; i < RANK; ++i) {
           detail::HashJITCacheValue(key, r_shape_[i]);
         }
+        detail::HashJITCacheString(key, dx_geqrf_helper_.GetSymbolName());
+        detail::HashJITCacheString(key, dx_ungqr_helper_.GetSymbolName());
         return key;
       }
 
       template <int Component>
       void AddJITProjectionClasses(std::unordered_map<std::string, std::string> &in) const
       {
-        const std::string class_name = "JITQRProjectionOp";
+        const std::string class_name = GetJITProjectionClassName<Component>();
         if (in.find(class_name) != in.end()) {
           return;
         }
@@ -512,9 +522,15 @@ namespace detail {
       }
 
       template <int Component>
+      std::string GetJITProjectionClassName() const
+      {
+        return std::string("JITQRSolverProjectionOp_") + dx_geqrf_helper_.GetSymbolName();
+      }
+
+      template <int Component>
       std::string GetJITProjectionTypeName(const std::string &inner_op_jit_name) const
       {
-        return std::string("JITQRSolverProjectionOp<") + inner_op_jit_name + ", " + std::to_string(Component) + ">";
+        return GetJITProjectionClassName<Component>() + "<" + inner_op_jit_name + ", " + std::to_string(Component) + ">";
       }
 
       template <int Component>
@@ -526,13 +542,14 @@ namespace detail {
         for (int i = 0; i < RANK; ++i) {
           detail::HashJITCacheValue(key, out_shape_[i]);
         }
+        detail::HashJITCacheString(key, dx_geqrf_helper_.GetSymbolName());
         return key;
       }
 
       template <int Component>
       void AddJITProjectionClasses(std::unordered_map<std::string, std::string> &in) const
       {
-        const std::string class_name = "JITQRSolverProjectionOp";
+        const std::string class_name = GetJITProjectionClassName<Component>();
         if (in.find(class_name) != in.end()) {
           return;
         }
@@ -829,9 +846,17 @@ namespace detail {
       }
 
       template <int Component>
+      std::string GetJITProjectionClassName() const
+      {
+        return std::string("JITEconQRProjectionOp_") +
+               dx_geqrf_helper_.GetSymbolName() + "_" +
+               dx_ungqr_helper_.GetSymbolName();
+      }
+
+      template <int Component>
       std::string GetJITProjectionTypeName(const std::string &inner_op_jit_name) const
       {
-        return std::string("JITEconQRProjectionOp<") + inner_op_jit_name + ", " + std::to_string(Component) + ">";
+        return GetJITProjectionClassName<Component>() + "<" + inner_op_jit_name + ", " + std::to_string(Component) + ">";
       }
 
       template <int Component>
@@ -844,13 +869,15 @@ namespace detail {
           detail::HashJITCacheValue(key, q_shape_[i]);
           detail::HashJITCacheValue(key, r_shape_[i]);
         }
+        detail::HashJITCacheString(key, dx_geqrf_helper_.GetSymbolName());
+        detail::HashJITCacheString(key, dx_ungqr_helper_.GetSymbolName());
         return key;
       }
 
       template <int Component>
       void AddJITProjectionClasses(std::unordered_map<std::string, std::string> &in) const
       {
-        const std::string class_name = "JITEconQRProjectionOp";
+        const std::string class_name = GetJITProjectionClassName<Component>();
         if (in.find(class_name) != in.end()) {
           return;
         }

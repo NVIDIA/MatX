@@ -129,6 +129,44 @@ TYPED_TEST(QRSolverJITTestFloatTypes, CuSolverDxSingleMatrixQRProjectionJIT)
   MATX_EXIT_HANDLER();
 }
 
+TEST(QRSolverJITRegression, CuSolverDxQRMultipleSizesInOneJITExpression)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = float;
+
+  auto A2 = make_tensor<TestType>({2, 2});
+  auto A3 = make_tensor<TestType>({3, 3});
+  auto Out = make_tensor<TestType>({2, 2});
+  auto Ref = make_tensor<TestType>({2, 2});
+  auto mdiff = make_tensor<TestType>({});
+
+  for (index_t i = 0; i < 2; i++) {
+    for (index_t j = 0; j < 2; j++) {
+      A2(i, j) = i == j ? TestType(i + 2) : TestType{};
+    }
+  }
+  for (index_t i = 0; i < 3; i++) {
+    for (index_t j = 0; j < 3; j++) {
+      A3(i, j) = i == j ? TestType(i + 5) : TestType{};
+    }
+  }
+
+  auto op2 = qr(A2);
+  auto op3 = qr(A3);
+  auto ref2 = qr(A2);
+  auto ref3 = qr(A3);
+  CUDAJITExecutor jit_exec{};
+  cudaExecutor cuda_exec{};
+  (Out = op2.R + slice<2>(op3.R, {0, 0}, {2, 2})).run(jit_exec);
+  (Ref = ref2.R + slice<2>(ref3.R, {0, 0}, {2, 2})).run(cuda_exec);
+  (mdiff = max(abs(Out - Ref))).run(cuda_exec);
+  cuda_exec.sync();
+
+  ASSERT_NEAR(mdiff(), TestType(0), TestType(0.001));
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(QRSolverJITTestFloatTypes, CuSolverDxBatchedMatrixQRProjectionJIT)
 {
   MATX_ENTER_HANDLER();
@@ -244,6 +282,48 @@ TYPED_TEST(QRSolverJITTestFloatTypes, CuSolverDxSingleMatrixQRSolverProjectionJI
   cuda_exec.sync();
 
   ASSERT_NEAR(mdiff(), value_type(0), value_type(0.001));
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(QRSolverJITRegression, CuSolverDxQRSolverMultipleSizesInOneJITExpression)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = float;
+
+  auto A2 = make_tensor<TestType>({2, 2});
+  auto A3 = make_tensor<TestType>({3, 3});
+  auto Out = make_tensor<TestType>({2, 2});
+  auto Ref = make_tensor<TestType>({2, 2});
+  auto mdiff = make_tensor<TestType>({});
+
+  A2(0, 0) = TestType{4};
+  A2(0, 1) = TestType{1};
+  A2(1, 0) = TestType{2};
+  A2(1, 1) = TestType{3};
+
+  A3(0, 0) = TestType{7};
+  A3(0, 1) = TestType{1};
+  A3(0, 2) = TestType{2};
+  A3(1, 0) = TestType{3};
+  A3(1, 1) = TestType{8};
+  A3(1, 2) = TestType{1};
+  A3(2, 0) = TestType{2};
+  A3(2, 1) = TestType{4};
+  A3(2, 2) = TestType{9};
+
+  auto op2 = qr_solver(A2);
+  auto op3 = qr_solver(A3);
+  auto ref2 = qr_solver(A2);
+  auto ref3 = qr_solver(A3);
+  CUDAJITExecutor jit_exec{};
+  cudaExecutor cuda_exec{};
+  (Out = op2.Out + slice<2>(op3.Out, {0, 0}, {2, 2})).run(jit_exec);
+  (Ref = ref2.Out + slice<2>(ref3.Out, {0, 0}, {2, 2})).run(cuda_exec);
+  (mdiff = max(abs(Out - Ref))).run(cuda_exec);
+  cuda_exec.sync();
+
+  ASSERT_NEAR(mdiff(), TestType(0), TestType(0.001));
 
   MATX_EXIT_HANDLER();
 }
