@@ -36,6 +36,7 @@
 #include "matx/core/error.h"
 #include <cuda/std/array>
 #include <cuda/std/functional>
+#include <cuda/std/limits>
 #include <cuda/std/__numeric/accumulate.h>
 
 namespace matx {
@@ -315,7 +316,11 @@ inline bool get_grid_dims_block_reduce(dim3 &blocks, dim3 &threads, const cuda::
     }
   }
 
-  blocks.x = static_cast<int>((total_outputs + groups_per_block - 1) / groups_per_block);
+  const index_t raw_blocks = (total_outputs + groups_per_block - 1) / groups_per_block;
+  if (raw_blocks > static_cast<index_t>(cuda::std::numeric_limits<int>::max())) {
+    MATX_THROW(matxInvalidParameter, "Block-reduction launch: batch size exceeds CUDA maximum gridDim.x");
+  }
+  blocks.x = static_cast<unsigned int>(raw_blocks);
   blocks.y = 1;
   blocks.z = 1;
 
