@@ -51,23 +51,41 @@
 
 namespace matx::detail {
 
+#if defined(MATX_EN_OMP) && !defined(__CUDACC_RTC__)
+class ScopedOmpNumThreads {
+public:
+  explicit ScopedOmpNumThreads(const int threads) : previous_threads_(omp_get_max_threads())
+  {
+    omp_set_num_threads(threads);
+  }
+
+  ScopedOmpNumThreads(const ScopedOmpNumThreads &) = delete;
+  ScopedOmpNumThreads &operator=(const ScopedOmpNumThreads &) = delete;
+
+  ~ScopedOmpNumThreads()
+  {
+    omp_set_num_threads(previous_threads_);
+  }
+
+private:
+  int previous_threads_;
+};
+#endif
+
 template <ThreadsMode MODE>
-__MATX_INLINE__ bool use_parallel_host_thrust(const HostExecutor<MODE> &exec)
+__MATX_INLINE__ int get_parallel_host_thrust_threads(const HostExecutor<MODE> &exec)
 {
-  static_cast<void>(exec);
 #if defined(MATX_EN_OMP) && !defined(__CUDACC_RTC__)
   if constexpr (MODE != ThreadsMode::SINGLE) {
     const int threads = exec.GetNumThreads();
-    if (threads > 1) {
-      omp_set_num_threads(threads);
-      return true;
+    if (threads > 1 && !omp_in_parallel()) {
+      return threads;
     }
   }
-#else
-  static_cast<void>(exec);
 #endif
 
-  return false;
+  static_cast<void>(exec);
+  return 0;
 }
 
 template <typename InputIt, typename T, typename BinaryOp, ThreadsMode MODE>
@@ -76,12 +94,12 @@ __MATX_INLINE__ T host_reduce(const HostExecutor<MODE> &exec, InputIt first, Inp
   static_cast<void>(exec);
 #if defined(MATX_EN_OMP) && !defined(__CUDACC_RTC__)
   if constexpr (MODE != ThreadsMode::SINGLE) {
-    if (use_parallel_host_thrust(exec)) {
+    const int threads = get_parallel_host_thrust_threads(exec);
+    if (threads > 0) {
+      ScopedOmpNumThreads thread_guard{threads};
       return thrust::reduce(thrust::omp::par, first, last, init, op);
     }
   }
-#else
-  static_cast<void>(exec);
 #endif
 
   return std::accumulate(first, last, init, op);
@@ -93,12 +111,12 @@ __MATX_INLINE__ T host_reduce(const HostExecutor<MODE> &exec, InputIt first, Inp
   static_cast<void>(exec);
 #if defined(MATX_EN_OMP) && !defined(__CUDACC_RTC__)
   if constexpr (MODE != ThreadsMode::SINGLE) {
-    if (use_parallel_host_thrust(exec)) {
+    const int threads = get_parallel_host_thrust_threads(exec);
+    if (threads > 0) {
+      ScopedOmpNumThreads thread_guard{threads};
       return thrust::reduce(thrust::omp::par, first, last, init);
     }
   }
-#else
-  static_cast<void>(exec);
 #endif
 
   return std::accumulate(first, last, init);
@@ -110,13 +128,13 @@ __MATX_INLINE__ void host_sort(const HostExecutor<MODE> &exec, RandomIt first, R
   static_cast<void>(exec);
 #if defined(MATX_EN_OMP) && !defined(__CUDACC_RTC__)
   if constexpr (MODE != ThreadsMode::SINGLE) {
-    if (use_parallel_host_thrust(exec)) {
+    const int threads = get_parallel_host_thrust_threads(exec);
+    if (threads > 0) {
+      ScopedOmpNumThreads thread_guard{threads};
       thrust::sort(thrust::omp::par, first, last, comp);
       return;
     }
   }
-#else
-  static_cast<void>(exec);
 #endif
 
   std::sort(first, last, comp);
@@ -128,13 +146,13 @@ __MATX_INLINE__ void host_sort(const HostExecutor<MODE> &exec, RandomIt first, R
   static_cast<void>(exec);
 #if defined(MATX_EN_OMP) && !defined(__CUDACC_RTC__)
   if constexpr (MODE != ThreadsMode::SINGLE) {
-    if (use_parallel_host_thrust(exec)) {
+    const int threads = get_parallel_host_thrust_threads(exec);
+    if (threads > 0) {
+      ScopedOmpNumThreads thread_guard{threads};
       thrust::sort(thrust::omp::par, first, last);
       return;
     }
   }
-#else
-  static_cast<void>(exec);
 #endif
 
   std::sort(first, last);
@@ -152,14 +170,14 @@ __MATX_INLINE__ void host_sort_copy(const HostExecutor<MODE> &exec,
 #if defined(MATX_EN_OMP) && !defined(__CUDACC_RTC__)
   // Thrust does not provide partial_sort_copy; copy+sort is equivalent only when ranges match.
   if constexpr (MODE != ThreadsMode::SINGLE) {
-    if (((last - first) == (out_last - out_first)) && use_parallel_host_thrust(exec)) {
+    const int threads = get_parallel_host_thrust_threads(exec);
+    if (((last - first) == (out_last - out_first)) && threads > 0) {
+      ScopedOmpNumThreads thread_guard{threads};
       thrust::copy(thrust::omp::par, first, last, out_first);
       thrust::sort(thrust::omp::par, out_first, out_last, comp);
       return;
     }
   }
-#else
-  static_cast<void>(exec);
 #endif
 
   std::partial_sort_copy(first, last, out_first, out_last, comp);
@@ -176,14 +194,14 @@ __MATX_INLINE__ void host_sort_copy(const HostExecutor<MODE> &exec,
 #if defined(MATX_EN_OMP) && !defined(__CUDACC_RTC__)
   // Thrust does not provide partial_sort_copy; copy+sort is equivalent only when ranges match.
   if constexpr (MODE != ThreadsMode::SINGLE) {
-    if (((last - first) == (out_last - out_first)) && use_parallel_host_thrust(exec)) {
+    const int threads = get_parallel_host_thrust_threads(exec);
+    if (((last - first) == (out_last - out_first)) && threads > 0) {
+      ScopedOmpNumThreads thread_guard{threads};
       thrust::copy(thrust::omp::par, first, last, out_first);
       thrust::sort(thrust::omp::par, out_first, out_last);
       return;
     }
   }
-#else
-  static_cast<void>(exec);
 #endif
 
   std::partial_sort_copy(first, last, out_first, out_last);
@@ -198,13 +216,13 @@ __MATX_INLINE__ void host_inclusive_scan(const HostExecutor<MODE> &exec,
   static_cast<void>(exec);
 #if defined(MATX_EN_OMP) && !defined(__CUDACC_RTC__)
   if constexpr (MODE != ThreadsMode::SINGLE) {
-    if (use_parallel_host_thrust(exec)) {
+    const int threads = get_parallel_host_thrust_threads(exec);
+    if (threads > 0) {
+      ScopedOmpNumThreads thread_guard{threads};
       thrust::inclusive_scan(thrust::omp::par, first, last, out);
       return;
     }
   }
-#else
-  static_cast<void>(exec);
 #endif
 
   std::partial_sum(first, last, out);
@@ -216,12 +234,12 @@ __MATX_INLINE__ ForwardIt host_max_element(const HostExecutor<MODE> &exec, Forwa
   static_cast<void>(exec);
 #if defined(MATX_EN_OMP) && !defined(__CUDACC_RTC__)
   if constexpr (MODE != ThreadsMode::SINGLE) {
-    if (use_parallel_host_thrust(exec)) {
+    const int threads = get_parallel_host_thrust_threads(exec);
+    if (threads > 0) {
+      ScopedOmpNumThreads thread_guard{threads};
       return thrust::max_element(thrust::omp::par, first, last);
     }
   }
-#else
-  static_cast<void>(exec);
 #endif
 
   return std::max_element(first, last);
@@ -233,12 +251,12 @@ __MATX_INLINE__ ForwardIt host_min_element(const HostExecutor<MODE> &exec, Forwa
   static_cast<void>(exec);
 #if defined(MATX_EN_OMP) && !defined(__CUDACC_RTC__)
   if constexpr (MODE != ThreadsMode::SINGLE) {
-    if (use_parallel_host_thrust(exec)) {
+    const int threads = get_parallel_host_thrust_threads(exec);
+    if (threads > 0) {
+      ScopedOmpNumThreads thread_guard{threads};
       return thrust::min_element(thrust::omp::par, first, last);
     }
   }
-#else
-  static_cast<void>(exec);
 #endif
 
   return std::min_element(first, last);
@@ -250,12 +268,12 @@ __MATX_INLINE__ bool host_any_of(const HostExecutor<MODE> &exec, InputIt first, 
   static_cast<void>(exec);
 #if defined(MATX_EN_OMP) && !defined(__CUDACC_RTC__)
   if constexpr (MODE != ThreadsMode::SINGLE) {
-    if (use_parallel_host_thrust(exec)) {
+    const int threads = get_parallel_host_thrust_threads(exec);
+    if (threads > 0) {
+      ScopedOmpNumThreads thread_guard{threads};
       return thrust::any_of(thrust::omp::par, first, last, pred);
     }
   }
-#else
-  static_cast<void>(exec);
 #endif
 
   return std::any_of(first, last, pred);
@@ -267,12 +285,12 @@ __MATX_INLINE__ bool host_all_of(const HostExecutor<MODE> &exec, InputIt first, 
   static_cast<void>(exec);
 #if defined(MATX_EN_OMP) && !defined(__CUDACC_RTC__)
   if constexpr (MODE != ThreadsMode::SINGLE) {
-    if (use_parallel_host_thrust(exec)) {
+    const int threads = get_parallel_host_thrust_threads(exec);
+    if (threads > 0) {
+      ScopedOmpNumThreads thread_guard{threads};
       return thrust::all_of(thrust::omp::par, first, last, pred);
     }
   }
-#else
-  static_cast<void>(exec);
 #endif
 
   return std::all_of(first, last, pred);
@@ -284,12 +302,12 @@ __MATX_INLINE__ ForwardIt host_unique(const HostExecutor<MODE> &exec, ForwardIt 
   static_cast<void>(exec);
 #if defined(MATX_EN_OMP) && !defined(__CUDACC_RTC__)
   if constexpr (MODE != ThreadsMode::SINGLE) {
-    if (use_parallel_host_thrust(exec)) {
+    const int threads = get_parallel_host_thrust_threads(exec);
+    if (threads > 0) {
+      ScopedOmpNumThreads thread_guard{threads};
       return thrust::unique(thrust::omp::par, first, last);
     }
   }
-#else
-  static_cast<void>(exec);
 #endif
 
   return std::unique(first, last);
