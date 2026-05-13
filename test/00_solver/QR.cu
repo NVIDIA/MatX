@@ -129,6 +129,53 @@ TYPED_TEST(QRSolverJITTestFloatTypes, CuSolverDxSingleMatrixQRProjectionJIT)
   MATX_EXIT_HANDLER();
 }
 
+TEST(QRSolverJITRegression, CuSolverDxQRNonDiagonalHouseholderJIT)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = float;
+
+  constexpr index_t rows = 4;
+  constexpr index_t cols = 4;
+  auto A = make_tensor<TestType>({rows, cols});
+  auto Q = make_tensor<TestType>({rows, cols});
+  auto R = make_tensor<TestType>({rows, cols});
+  auto Combined = make_tensor<TestType>({rows, cols});
+  auto mdiff = make_tensor<TestType>({});
+
+  A(0, 0) = TestType{4};
+  A(0, 1) = TestType{1};
+  A(0, 2) = TestType{2};
+  A(0, 3) = TestType{0.5f};
+  A(1, 0) = TestType{2};
+  A(1, 1) = TestType{5};
+  A(1, 2) = TestType{1};
+  A(1, 3) = TestType{1};
+  A(2, 0) = TestType{1};
+  A(2, 1) = TestType{3};
+  A(2, 2) = TestType{6};
+  A(2, 3) = TestType{2};
+  A(3, 0) = TestType{0.5f};
+  A(3, 1) = TestType{1};
+  A(3, 2) = TestType{2};
+  A(3, 3) = TestType{7};
+
+  auto op = qr(A);
+  EXPECT_TRUE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.Q));
+  EXPECT_TRUE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.R));
+
+  cudaExecutor cuda_exec{};
+  CUDAJITExecutor jit_exec{};
+  (Q = op.Q).run(jit_exec);
+  (R = op.R).run(jit_exec);
+  (Combined = matmul(Q, R)).run(cuda_exec);
+  (mdiff = max(abs(Combined - A))).run(cuda_exec);
+  cuda_exec.sync();
+
+  ASSERT_NEAR(mdiff(), TestType(0), TestType(0.001));
+
+  MATX_EXIT_HANDLER();
+}
+
 TEST(QRSolverJITRegression, CuSolverDxQRMultipleSizesInOneJITExpression)
 {
   MATX_ENTER_HANDLER();
