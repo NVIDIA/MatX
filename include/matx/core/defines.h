@@ -97,14 +97,7 @@ namespace matx {
 
     #define MATX_IGNORE_WARNING_POP_GCC \
         _Pragma("GCC diagnostic pop")
-#else
-    #define MATX_IGNORE_WARNING_PUSH_GCC(WARN_MSG)
-    #define MATX_IGNORE_WARNING_POP_GCC
-    #define MATX_IGNORE_WARNING_PUSH_CLANG(WARN_MSG)
-    #define MATX_IGNORE_WARNING_POP_CLANG
-#endif
-
-#if defined(_MSC_VER)
+#elif defined(_MSC_VER)
     #define MATX_IGNORE_WARNING_PUSH_MSVC(WARN_ID) \
         __pragma(warning(push)) \
         __pragma(warning(disable : WARN_ID))
@@ -115,6 +108,10 @@ namespace matx {
     #define MATX_IGNORE_WARNING_NEXT_LINE_MSVC(WARN_ID) \
         __pragma(warning(suppress : WARN_ID))
 #else
+    #define MATX_IGNORE_WARNING_PUSH_GCC(WARN_MSG)
+    #define MATX_IGNORE_WARNING_POP_GCC
+    #define MATX_IGNORE_WARNING_PUSH_CLANG(WARN_MSG)
+    #define MATX_IGNORE_WARNING_POP_CLANG
     #define MATX_IGNORE_WARNING_PUSH_MSVC(WARN_ID)
     #define MATX_IGNORE_WARNING_POP_MSVC
     #define MATX_IGNORE_WARNING_NEXT_LINE_MSVC(WARN_ID)
