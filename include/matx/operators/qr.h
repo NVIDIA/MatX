@@ -615,6 +615,8 @@ namespace detail {
       template <int Component>
       std::string GetJITProjectionClassName() const
       {
+        // OUT and TAU deliberately share one generated class because
+        // GetGeqrfProjectionFuncStr dispatches on Component inside the body.
         return std::string("JITQRSolverProjectionOp_R") + std::to_string(RANK) + "_" + dx_geqrf_helper_.GetSymbolName();
       }
 
