@@ -221,8 +221,10 @@ std::vector<std::string> __MATX_HOST__ __MATX_INLINE__ get_preprocessor_options(
   do {                                                                         \
     nvrtcResult result = call;                                                 \
     if (result != NVRTC_SUCCESS) {                                             \
-      MATX_LOG_ERROR("NVRTC error: {}", nvrtcGetErrorString(result));          \
-      std::exit(EXIT_FAILURE);                                                 \
+      std::string error_msg = std::string("NVRTC error: ") +                   \
+                              nvrtcGetErrorString(result);                     \
+      MATX_LOG_ERROR("{}", error_msg);                                         \
+      MATX_THROW(matxInvalidParameter, error_msg);                             \
     }                                                                          \
   } while (0)
 
@@ -231,10 +233,12 @@ std::vector<std::string> __MATX_HOST__ __MATX_INLINE__ get_preprocessor_options(
   do {                                                                         \
     CUresult result = call;                                                    \
     if (result != CUDA_SUCCESS) {                                              \
-      const char* errStr;                                                      \
+      const char* errStr = nullptr;                                            \
       cuGetErrorString(result, &errStr);                                       \
-      MATX_LOG_ERROR("CUDA error: {}", errStr);                                \
-      std::exit(EXIT_FAILURE);                                                 \
+      std::string error_msg = std::string("CUDA error: ") +                    \
+                              (errStr != nullptr ? errStr : "unknown");       \
+      MATX_LOG_ERROR("{}", error_msg);                                         \
+      MATX_THROW(matxCudaError, error_msg);                                    \
     }                                                                          \
   } while (0)
 
@@ -243,8 +247,10 @@ std::vector<std::string> __MATX_HOST__ __MATX_INLINE__ get_preprocessor_options(
   do {                                                                         \
     cudaError_t result = call;                                                 \
     if (result != cudaSuccess) {                                               \
-      MATX_LOG_ERROR("CUDA Runtime error: {}", cudaGetErrorString(result));    \
-      std::exit(EXIT_FAILURE);                                                 \
+      std::string error_msg = std::string("CUDA Runtime error: ") +            \
+                              cudaGetErrorString(result);                      \
+      MATX_LOG_ERROR("{}", error_msg);                                         \
+      MATX_THROW(matxCudaError, error_msg);                                    \
     }                                                                          \
   } while (0)
 
@@ -253,17 +259,22 @@ std::vector<std::string> __MATX_HOST__ __MATX_INLINE__ get_preprocessor_options(
       do {                                                                                                               \
           nvJitLinkResult result = (ans);                                                                                \
           if (result != NVJITLINK_SUCCESS) {                                                                             \
-              MATX_LOG_ERROR("nvJitLink error: {}", static_cast<int>(result));                                           \
-              size_t lsize;                                                                                              \
-              result = nvJitLinkGetErrorLogSize(handle, &lsize);                                                         \
-              if (result == NVJITLINK_SUCCESS && lsize > 0) {                                                            \
-                  std::vector<char> log(lsize);                                                                          \
-                  result = nvJitLinkGetErrorLog(handle, log.data());                                                     \
-                  if (result == NVJITLINK_SUCCESS) {                                                                     \
-                      MATX_LOG_ERROR("nvJitLink log: {}", log.data());                                                   \
+              std::string error_msg = "nvJitLink error: " + std::to_string(static_cast<int>(result));                    \
+              MATX_LOG_ERROR("{}", error_msg);                                                                           \
+              if ((handle) != nullptr) {                                                                                 \
+                  size_t lsize;                                                                                          \
+                  result = nvJitLinkGetErrorLogSize(handle, &lsize);                                                     \
+                  if (result == NVJITLINK_SUCCESS && lsize > 0) {                                                        \
+                      std::vector<char> log(lsize);                                                                      \
+                      result = nvJitLinkGetErrorLog(handle, log.data());                                                 \
+                      if (result == NVJITLINK_SUCCESS) {                                                                 \
+                          MATX_LOG_ERROR("nvJitLink log: {}", log.data());                                               \
+                          error_msg += ": ";                                                                             \
+                          error_msg += log.data();                                                                        \
+                      }                                                                                                  \
                   }                                                                                                      \
               }                                                                                                          \
-              abort();                                                                                                   \
+              MATX_THROW(matxInvalidParameter, error_msg);                                                               \
           }                                                                                                              \
       } while (0)
   #endif // NVJITLINK_CHECK
@@ -593,15 +604,18 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name,
   const auto all_jit_classes_string = get_all_jit_classes_string(op);
   auto capstr = generate_capability_params_string(op, ept, true, osize, threads.x, pass_through_threads);
   const auto kernel_op_type = detail::get_operator_capability<OperatorCapability::JIT_TYPE_QUERY>(op);
+  int current_device = 0;
+  CUDA_RT_CHECK(cudaGetDevice(&current_device));
+  const std::string device_cache_prefix = "device_" + std::to_string(current_device) + "_";
   
   std::string kernel_name = get_kernel_name_for_rank<RANK>(stride, global_kernel, pass_through_threads, block_reduces_rank);
-  std::string cache_key = kernel_name + "_" + kernel_op_type;
+  std::string cache_key = device_cache_prefix + kernel_name + "_" + kernel_op_type;
 
   MATX_LOG_DEBUG("nvrtc_compile_and_run called with operator type: {}", typeid(op).name());
   
   CUfunction kernel_func;
   std::string lowered_name;
-  const auto cubin_filename = detail::GetCache().TypeStringToFilename(kernel_op_type);
+  const auto cubin_filename = detail::GetCache().TypeStringToFilename(device_cache_prefix + kernel_op_type);
   
   // Check if kernel is already compiled and cached in memory
   {
