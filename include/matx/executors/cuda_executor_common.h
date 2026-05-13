@@ -38,6 +38,7 @@
 #include "matx/executors/kernel.h"
 #include "matx/core/log.h"
 #include <cuda/std/array>
+#include <cstdint>
 
 namespace matx
 {
@@ -294,10 +295,12 @@ namespace detail
     // Get device properties for constraints
     constexpr int min_occupancy = 2;
     int groups_per_block = 1;
-    int max_dynamic_shm, max_threads_per_block, regs_per_multiprocessor;
+    int max_shared_memory_per_block, max_shared_memory_per_multiprocessor;
+    int max_threads_per_block, regs_per_multiprocessor;
     int dev;
     MATX_CUDA_CHECK(cudaGetDevice(&dev));
-    MATX_CUDA_CHECK(cudaDeviceGetAttribute(&max_dynamic_shm, cudaDevAttrMaxSharedMemoryPerBlock , dev));
+    MATX_CUDA_CHECK(cudaDeviceGetAttribute(&max_shared_memory_per_block, cudaDevAttrMaxSharedMemoryPerBlock, dev));
+    MATX_CUDA_CHECK(cudaDeviceGetAttribute(&max_shared_memory_per_multiprocessor, cudaDevAttrMaxSharedMemoryPerMultiprocessor, dev));
     MATX_CUDA_CHECK(cudaDeviceGetAttribute(&max_threads_per_block, cudaDevAttrMaxThreadsPerBlock, dev));
     MATX_CUDA_CHECK(cudaDeviceGetAttribute(&regs_per_multiprocessor, cudaDevAttrMaxRegistersPerMultiprocessor, dev));
 
@@ -369,8 +372,10 @@ namespace detail
           // Check register pressure constraint
           register_viable = (num_regs * block_size * min_occupancy) <= regs_per_multiprocessor;
 
-          // Check dynamic shared memory constraint
-          bool shm_viable = (total_shm_size * min_occupancy) < max_dynamic_shm;
+          // Check per-block shared memory and per-SM occupancy constraints.
+          const auto total_shm_for_occupancy = static_cast<int64_t>(total_shm_size) * min_occupancy;
+          bool shm_viable = total_shm_size <= max_shared_memory_per_block &&
+                            total_shm_for_occupancy <= max_shared_memory_per_multiprocessor;
 
           if (shm_viable && register_viable) {
             MATX_LOG_DEBUG("Selected EPT {}: jits {}, registers {}, dyn_shm_size {}, static_shm_size {}, block_size {}, groups_per_block {}",
@@ -378,8 +383,9 @@ namespace detail
             return cuda::std::make_tuple(current_ept, shm_size, block_size, groups_per_block);
           }
           else {
-            MATX_LOG_DEBUG("EPT {} with groups_per_block {} failed constraints: shm_viable {} (dyn {}, static {}, total {} of {}), register_viable {} (regs={}) block size {}",
-                           static_cast<int>(current_ept), groups_per_block, shm_viable, shm_size, static_shm_size, total_shm_size, max_dynamic_shm, register_viable, num_regs, block_size);
+            MATX_LOG_DEBUG("EPT {} with groups_per_block {} failed constraints: shm_viable {} (dyn {}, static {}, total {} <= block_limit {}, occupancy_total {} <= sm_limit {}), register_viable {} (regs={}) block size {}",
+                           static_cast<int>(current_ept), groups_per_block, shm_viable, shm_size, static_shm_size, total_shm_size, max_shared_memory_per_block,
+                           total_shm_for_occupancy, max_shared_memory_per_multiprocessor, register_viable, num_regs, block_size);
           }
 
           // Break if we're at the minimum
@@ -391,8 +397,10 @@ namespace detail
         // Check register pressure constraint
         register_viable = (num_regs * block_size * min_occupancy) <= regs_per_multiprocessor;
 
-        // Check dynamic shared memory constraint
-        bool shm_viable = (shm_size * 2) < max_dynamic_shm;
+        // Check per-block shared memory and per-SM occupancy constraints.
+        const auto shm_for_occupancy = static_cast<int64_t>(shm_size) * min_occupancy;
+        bool shm_viable = shm_size <= max_shared_memory_per_block &&
+                          shm_for_occupancy <= max_shared_memory_per_multiprocessor;
 
         if (shm_viable && register_viable) {
           MATX_LOG_DEBUG("Selected EPT {}: jits {}, registers {}, shm_size {}, block_size {}, groups_per_block {}",
@@ -400,8 +408,9 @@ namespace detail
           return cuda::std::make_tuple(current_ept, shm_size, block_size, groups_per_block);
         }
         else {
-          MATX_LOG_DEBUG("EPT {} failed constraints: shm_viable {} ({} of {}), register_viable {} (regs={}) block size {}, groups_per_block {}",
-                         static_cast<int>(current_ept), shm_viable, shm_size, max_dynamic_shm, register_viable, num_regs, block_size, groups_per_block);
+          MATX_LOG_DEBUG("EPT {} failed constraints: shm_viable {} ({} <= block_limit {}, occupancy_total {} <= sm_limit {}), register_viable {} (regs={}) block size {}, groups_per_block {}",
+                         static_cast<int>(current_ept), shm_viable, shm_size, max_shared_memory_per_block, shm_for_occupancy,
+                         max_shared_memory_per_multiprocessor, register_viable, num_regs, block_size, groups_per_block);
         }
       }
 

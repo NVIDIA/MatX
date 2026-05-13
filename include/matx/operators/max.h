@@ -172,11 +172,7 @@ namespace detail {
 
       template <typename CapType, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
-#if defined(__CUDA_ARCH__) && defined(__CUDACC_RTC__)
-        return BlockReduce<CapType, BlockReduceType::MAX, 1>::RunLastDim(a_, indices...);
-#else
         return tmp_out_.template operator()<CapType>(indices...);
-#endif
       }
 
       template <typename... Is>
