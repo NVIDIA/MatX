@@ -38,6 +38,50 @@
 
 using namespace matx;
 
+#ifdef MATX_EN_JIT
+struct EmptyLastDimJitOp {
+  using matxop = bool;
+  using value_type = float;
+
+  static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+  {
+    return 2;
+  }
+
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
+  {
+    return dim == 0 ? 2 : 0;
+  }
+
+  __MATX_INLINE__ std::string str() const
+  {
+    return "EmptyLastDimJitOp";
+  }
+
+  template <typename CapType, typename... Is>
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ value_type operator()(Is...) const
+  {
+    return value_type{};
+  }
+
+  template <detail::OperatorCapability Cap, typename InType>
+  __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const
+  {
+    if constexpr (Cap == detail::OperatorCapability::SUPPORTS_JIT) {
+      return true;
+    }
+    else if constexpr (Cap == detail::OperatorCapability::JIT_TYPE_QUERY) {
+      return std::string{"EmptyLastDimJitOp"};
+    }
+    else if constexpr (Cap == detail::OperatorCapability::JIT_CLASS_QUERY) {
+      return true;
+    }
+    else {
+      return detail::capability_attributes<Cap>::default_value;
+    }
+  }
+};
+#endif
 
 template <typename T> struct CUBTestsData {
   using GTestType = cuda::std::tuple_element_t<0, T>;
@@ -463,6 +507,39 @@ TEST(TensorStats, CubBlockJIT)
       ASSERT_NEAR(ndiv_max_out(i, j), ndiv_expected_max, 0.001f);
     }
   }
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(TensorStats, CubBlockJITRejectsEmptyCriticalDim)
+{
+  MATX_ENTER_HANDLER();
+
+  EmptyLastDimJitOp empty{};
+
+  auto sum_op = sum<EmptyLastDimJitOp, 1>(empty);
+  auto prod_op = prod<EmptyLastDimJitOp, 1>(empty);
+  auto min_op = matx::min<EmptyLastDimJitOp, 1>(empty);
+  auto max_op = matx::max<EmptyLastDimJitOp, 1>(empty);
+  auto cumsum_op = cumsum(empty);
+  auto sort_op = matx::sort(empty, SORT_DIR_ASC);
+  auto argsort_op = argsort(empty, SORT_DIR_ASC);
+
+  EXPECT_FALSE(jit_supported(sum_op));
+  EXPECT_FALSE(jit_supported(prod_op));
+  EXPECT_FALSE(jit_supported(min_op));
+  EXPECT_FALSE(jit_supported(max_op));
+  EXPECT_FALSE(jit_supported(cumsum_op));
+  EXPECT_FALSE(jit_supported(sort_op));
+  EXPECT_FALSE(jit_supported(argsort_op));
+
+  EXPECT_EQ(detail::get_operator_capability<detail::OperatorCapability::STATIC_SHM_SIZE>(sum_op), 0);
+  EXPECT_EQ(detail::get_operator_capability<detail::OperatorCapability::STATIC_SHM_SIZE>(prod_op), 0);
+  EXPECT_EQ(detail::get_operator_capability<detail::OperatorCapability::STATIC_SHM_SIZE>(min_op), 0);
+  EXPECT_EQ(detail::get_operator_capability<detail::OperatorCapability::STATIC_SHM_SIZE>(max_op), 0);
+  EXPECT_EQ(detail::get_operator_capability<detail::OperatorCapability::STATIC_SHM_SIZE>(cumsum_op), 0);
+  EXPECT_EQ(detail::get_operator_capability<detail::OperatorCapability::STATIC_SHM_SIZE>(sort_op), 0);
+  EXPECT_EQ(detail::get_operator_capability<detail::OperatorCapability::STATIC_SHM_SIZE>(argsort_op), 0);
 
   MATX_EXIT_HANDLER();
 }

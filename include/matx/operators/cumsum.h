@@ -84,6 +84,9 @@ namespace detail {
       }
 
       __MATX_INLINE__ static int LargestPowerOfTwoDivisorAtMost(index_t value, int limit = 32) {
+        if (value <= 0 || limit <= 0) {
+          return 0;
+        }
         int result = 1;
         for (int candidate = 2; candidate <= limit; candidate *= 2) {
           if ((value % candidate) == 0) {
@@ -107,13 +110,17 @@ namespace detail {
       }
 
       __MATX_INLINE__ bool BlockSizeFitsAtMaxEPT() const {
+        const auto critical_dim_size = CriticalDimSize();
+        if (critical_dim_size <= 0) {
+          return false;
+        }
         const int max_ept = MaxJitElementsPerThread();
-        return max_ept > 0 && static_cast<int>(CriticalDimSize() / max_ept) <= 1024;
+        return max_ept > 0 && static_cast<int>(critical_dim_size / max_ept) <= 1024;
       }
 
       __MATX_INLINE__ int CurrentBlockThreads() const {
         const int ept = static_cast<int>(current_ept_);
-        return static_cast<int>(CriticalDimSize() / ept);
+        return ept > 0 ? static_cast<int>(CriticalDimSize() / ept) : 0;
       }
 
       __MATX_INLINE__ int BatchGroupSize() const {
@@ -259,9 +266,12 @@ namespace detail {
         }
         else if constexpr (Cap == OperatorCapability::STATIC_SHM_SIZE) {
 #if defined(MATX_EN_JIT) && defined(__CUDACC__)
-          const int self_shm = GetCubBlockShmRequired<value_type>(CubBlockAlgorithm::SCAN,
-                                                                  current_ept_,
-                                                                  CurrentBlockThreads());
+          const int block_threads = CurrentBlockThreads();
+          const int self_shm = block_threads > 0 ?
+            GetCubBlockShmRequired<value_type>(CubBlockAlgorithm::SCAN,
+                                               current_ept_,
+                                               block_threads) :
+            capability_attributes<Cap>::default_value;
           return combine_capabilities<Cap>(self_shm, detail::get_operator_capability<Cap>(a_, in));
 #else
           return combine_capabilities<Cap>(capability_attributes<Cap>::default_value, detail::get_operator_capability<Cap>(a_, in));
