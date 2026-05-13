@@ -558,8 +558,10 @@ TEST(TensorStats, CubBlockJITRejectsComplexReductions)
 
   auto sum_op = sum(complex_in, {1});
   auto prod_op = prod(complex_in, {1});
+  auto cumsum_op = cumsum(complex_in);
   EXPECT_FALSE(jit_supported(sum_op));
   EXPECT_FALSE(jit_supported(prod_op));
+  EXPECT_FALSE(jit_supported(cumsum_op));
 
   MATX_EXIT_HANDLER();
 }
