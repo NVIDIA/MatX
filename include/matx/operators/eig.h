@@ -256,7 +256,9 @@ namespace detail {
         auto key = detail::MakeJITCacheKeyForType<EigState<OpA>>("JITEigProjection_v2");
         detail::HashJITCacheValue(key, Component);
         detail::HashJITCacheValue(key, RANK);
-        detail::HashJITCacheValue(key, static_cast<int>(jobz_));
+        if constexpr (Component == EIG_VECTORS) {
+          detail::HashJITCacheValue(key, static_cast<int>(jobz_));
+        }
         detail::HashJITCacheValue(key, static_cast<int>(uplo_));
         for (int i = 0; i < RANK; ++i) {
           detail::HashJITCacheValue(key, vectors_shape_[i]);

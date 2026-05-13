@@ -194,7 +194,13 @@ private:
     }
   };
 
-  long long int GetKernelSharedMemoryFloor() const
+  bool KernelSharedMemoryFloorNeedsWorkspace() const
+  {
+    return function_ == CUSOLVERDX_FUNCTION_HEEV ||
+           function_ == CUSOLVERDX_FUNCTION_HTEV;
+  }
+
+  long long int GetKernelSharedMemoryFloor(long long int workspace_size = -1) const
   {
     const auto elem_size = static_cast<long long int>(sizeof(InputType));
     const auto minmn = static_cast<long long int>(cuda::std::min(m_, n_));
@@ -220,7 +226,10 @@ private:
         const auto lambda_offset = AlignUp(matrix_bytes, static_cast<long long int>(alignof(precision_type)));
         const auto workspace_offset = AlignUp(lambda_offset + static_cast<long long int>(n_) * static_cast<long long int>(sizeof(precision_type)),
                                               static_cast<long long int>(alignof(InputType)));
-        const auto info_offset = AlignUp(workspace_offset + static_cast<long long int>(GetWorkspaceSize()),
+        if (workspace_size < 0) {
+          workspace_size = GetWorkspaceSize();
+        }
+        const auto info_offset = AlignUp(workspace_offset + workspace_size,
                                          static_cast<long long int>(alignof(int)));
         return info_offset + static_cast<long long int>(sizeof(int));
       }
@@ -368,7 +377,8 @@ public:
     long long int shared_memory_size = 0;
     LIBCUSOLVERDX_CHECK(cusolverdxGetTraitInt64(handle.get(), CUSOLVERDX_TRAIT_SHARED_MEMORY_SIZE, &shared_memory_size));
 
-    const auto required = cuda::std::max(shared_memory_size, GetKernelSharedMemoryFloor());
+    const auto workspace_size = KernelSharedMemoryFloorNeedsWorkspace() ? GetWorkspaceSize(handle.get()) : -1;
+    const auto required = cuda::std::max(shared_memory_size, GetKernelSharedMemoryFloor(workspace_size));
     MATX_ASSERT_STR(required <= static_cast<long long int>(std::numeric_limits<int>::max()),
                     matxInvalidParameter,
                     "cuSolverDx shared memory requirement exceeds CUDA launch parameter range");
@@ -390,12 +400,17 @@ public:
     return cuda::std::array<int, 2>{32, 1024};
   }
 
+  long long int GetWorkspaceSize(cusolverdxDescriptor handle) const
+  {
+    long long int workspace_size = 0;
+    LIBCUSOLVERDX_CHECK(cusolverdxGetTraitInt64(handle, CUSOLVERDX_TRAIT_WORKSPACE_SIZE, &workspace_size));
+    return workspace_size;
+  }
+
   long long int GetWorkspaceSize() const
   {
     auto handle = GeneratePlan();
-    long long int workspace_size = 0;
-    LIBCUSOLVERDX_CHECK(cusolverdxGetTraitInt64(handle.get(), CUSOLVERDX_TRAIT_WORKSPACE_SIZE, &workspace_size));
-    return workspace_size;
+    return GetWorkspaceSize(handle.get());
   }
 
   bool GenerateLTOIR(std::set<std::string> &ltoir_symbols)
