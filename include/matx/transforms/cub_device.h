@@ -119,6 +119,7 @@ namespace detail {
     (void)algorithm;
     (void)ept;
     (void)block_size;
+    MATX_THROW(matxNotSupported, "CUB block shared-memory queries require MATX_EN_JIT");
     return 0;
 #endif
   }

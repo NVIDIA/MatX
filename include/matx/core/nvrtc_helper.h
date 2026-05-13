@@ -310,7 +310,7 @@ inline std::string make_cub_shmem_probe_source(const std::string &algorithm,
     "using namespace matx::detail;\n"
     "using T = ") + value_type + ";\n" +
     block_decl +
-    "extern \"C\" __device__ int temp_storage_size = static_cast<int>(sizeof(BlockT::TempStorage));\n";
+    "extern \"C\" __device__ unsigned int temp_storage_size = static_cast<unsigned int>(sizeof(BlockT::TempStorage));\n";
 }
 
 inline int nvrtc_get_cub_block_shmem_size(const std::string &algorithm,
@@ -380,7 +380,7 @@ inline int nvrtc_get_cub_block_shmem_size(const std::string &algorithm,
   NVRTC_CHECK(nvrtcDestroyProgram(&prog));
 
   const std::regex temp_storage_regex(
-      R"((?:\.visible\s+)?\.global\s+\.align\s+4\s+\.u32\s+temp_storage_size\s*=\s*([0-9]+)\s*;)");
+      R"((?:\.visible\s+)?\.global\s+\.align\s+4\s+\.[us]32\s+temp_storage_size\s*=\s*([0-9]+)\s*;)");
   std::smatch match;
   if (!std::regex_search(ptx, match, temp_storage_regex)) {
     MATX_LOG_ERROR("Could not find CUB temp storage initializer in NVRTC PTX for {}", cache_key);

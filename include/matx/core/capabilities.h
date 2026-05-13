@@ -260,6 +260,7 @@ namespace detail {
     static constexpr int default_value = 0;
     static constexpr int min_identity = cuda::std::numeric_limits<int>::max();
     static constexpr int max_identity = 0;
+    static constexpr int sum_identity = 0;
   };
 
   template <>
@@ -279,6 +280,7 @@ namespace detail {
     static constexpr int default_value = 32;
     static constexpr int min_identity = 32;
     static constexpr int max_identity = 1;
+    static constexpr int sum_identity = 0;
   };
 
   template <>
@@ -419,7 +421,7 @@ namespace detail {
         } else if (query_type == CapabilityQueryType::MAX_QUERY) {
           children_aggregated_val = capability_attributes<Cap>::max_identity;
         } else if (query_type == CapabilityQueryType::SUM_QUERY) {
-          children_aggregated_val = capability_attributes<Cap>::default_value;
+          children_aggregated_val = capability_attributes<Cap>::sum_identity;
         } else {
           // Default identity for int if not MIN_QUERY or MAX_QUERY (e.g. if it was SUM_QUERY, identity would be 0)
           // This path needs clear definition if other query types are used for int.
@@ -457,7 +459,7 @@ namespace detail {
                   children_aggregated_val = static_cast<CapType>(cuda::std::max(static_cast<int>(children_aggregated_val), static_cast<int>(val)));
               }
           } else if (query_type == CapabilityQueryType::SUM_QUERY) {
-              children_aggregated_val = capability_attributes<Cap>::default_value;
+              children_aggregated_val = capability_attributes<Cap>::sum_identity;
               ((children_aggregated_val += child_vals), ...);
           } else {
               // Not implemented for other query types.
