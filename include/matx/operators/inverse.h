@@ -259,6 +259,11 @@ namespace detail {
 
         InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
 
+        if constexpr (is_cuda_jit_executor_v<Executor>) {
+          prerun_done_ = true;
+          return;
+        }
+
         detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), a_.Shape(), &ptr);
 
         prerun_done_ = true;

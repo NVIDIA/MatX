@@ -399,15 +399,16 @@ public:
     symbol_name += std::to_string(static_cast<int>(job_));
     symbol_name += "_T";
     symbol_name += is_complex_v<InputType> ? "C" : "R";
-    symbol_name += "_CC";
-    symbol_name += std::to_string(cc_);
 
     if constexpr (cuda::std::is_same_v<InputType, float> || cuda::std::is_same_v<InputType, cuda::std::complex<float>>) {
-      symbol_name += "_F32";
+      symbol_name += "F32";
     }
     else if constexpr (cuda::std::is_same_v<InputType, double> || cuda::std::is_same_v<InputType, cuda::std::complex<double>>) {
-      symbol_name += "_F64";
+      symbol_name += "F64";
     }
+
+    symbol_name += "_CC";
+    symbol_name += std::to_string(cc_);
 
 #if defined(CUDART_VERSION)
     symbol_name += "_CUDA";
@@ -443,6 +444,9 @@ public:
 
   cuda::std::array<int, 2> GetBlockDimRange() const
   {
+    // cuSolverDx SMEM operators loop internally over the matrix work, so any
+    // warp-multiple block size in this range is valid. The exact trait block
+    // dimension is a descriptor recommendation, not the launch minimum.
     return cuda::std::array<int, 2>{32, 1024};
   }
 

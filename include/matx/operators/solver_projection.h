@@ -37,6 +37,8 @@
 #include "matx/operators/base_operator.h"
 
 #include <memory>
+#include <mutex>
+#include <unordered_map>
 #include <utility>
 
 namespace matx {
@@ -73,16 +75,141 @@ class SolverProjectionStorage : public BaseOp<SolverProjectionStorage<State, Com
     mutable TensorType tensor_;
     const char *name_;
 
+    struct LifetimeEntry {
+      std::shared_ptr<State> owner;
+      size_t count = 0;
+    };
+
+    static std::mutex &LifetimeMutex()
+    {
+      static std::mutex mutex;
+      return mutex;
+    }
+
+    static std::unordered_map<State *, LifetimeEntry> &LifetimeRegistry()
+    {
+      static std::unordered_map<State *, LifetimeEntry> registry;
+      return registry;
+    }
+
+    static void RetainState(const std::shared_ptr<State> &owner)
+    {
+      State *state = owner.get();
+      if (state == nullptr) {
+        return;
+      }
+
+      std::lock_guard<std::mutex> lock(LifetimeMutex());
+      auto &entry = LifetimeRegistry()[state];
+      if (!entry.owner) {
+        entry.owner = owner;
+      }
+      entry.count++;
+    }
+
+    static void RetainState(State *state)
+    {
+      if (state == nullptr) {
+        return;
+      }
+
+      std::lock_guard<std::mutex> lock(LifetimeMutex());
+      auto it = LifetimeRegistry().find(state);
+      if (it != LifetimeRegistry().end()) {
+        it->second.count++;
+      }
+    }
+
+    static void ReleaseState(State *state) noexcept
+    {
+      if (state == nullptr) {
+        return;
+      }
+
+      try {
+        std::lock_guard<std::mutex> lock(LifetimeMutex());
+        auto it = LifetimeRegistry().find(state);
+        if (it == LifetimeRegistry().end()) {
+          return;
+        }
+
+        if (it->second.count > 1) {
+          it->second.count--;
+        }
+        else {
+          LifetimeRegistry().erase(it);
+        }
+      }
+      catch (...) {
+      }
+    }
+
   public:
     using matxop = bool;
     using value_type = typename TensorType::value_type;
     using input_type = typename State::input_type;
 
-    __MATX_INLINE__ SolverProjectionStorage(State *state,
+    __MATX_INLINE__ SolverProjectionStorage(const std::shared_ptr<State> &state,
                                             const cuda::std::array<index_t, TensorType::Rank()> &shape,
                                             const char *name) :
-      state_(state), shape_(shape), name_(name)
+      state_(state.get()), shape_(shape), name_(name)
     {
+      RetainState(state);
+    }
+
+    __MATX_HOST__ __MATX_DEVICE__ SolverProjectionStorage(const SolverProjectionStorage &other) :
+      state_(other.state_), shape_(other.shape_), tensor_(other.tensor_), name_(other.name_)
+    {
+#ifndef __CUDA_ARCH__
+      RetainState(state_);
+#endif
+    }
+
+    __MATX_HOST__ __MATX_DEVICE__ SolverProjectionStorage(SolverProjectionStorage &&other) noexcept :
+      state_(other.state_), shape_(other.shape_), tensor_(other.tensor_), name_(other.name_)
+    {
+      other.state_ = nullptr;
+      other.name_ = nullptr;
+    }
+
+    __MATX_HOST__ __MATX_DEVICE__ SolverProjectionStorage &operator=(const SolverProjectionStorage &other)
+    {
+      if (this != &other) {
+#ifndef __CUDA_ARCH__
+        ReleaseState(state_);
+#endif
+        state_ = other.state_;
+        shape_ = other.shape_;
+        tensor_ = other.tensor_;
+        name_ = other.name_;
+#ifndef __CUDA_ARCH__
+        RetainState(state_);
+#endif
+      }
+      return *this;
+    }
+
+    __MATX_HOST__ __MATX_DEVICE__ SolverProjectionStorage &operator=(SolverProjectionStorage &&other) noexcept
+    {
+      if (this != &other) {
+#ifndef __CUDA_ARCH__
+        ReleaseState(state_);
+#endif
+        state_ = other.state_;
+        shape_ = other.shape_;
+        tensor_ = other.tensor_;
+        name_ = other.name_;
+        other.state_ = nullptr;
+        other.name_ = nullptr;
+      }
+      return *this;
+    }
+
+    __MATX_HOST__ __MATX_DEVICE__ ~SolverProjectionStorage()
+    {
+#ifndef __CUDA_ARCH__
+      ReleaseState(state_);
+#endif
     }
 
     __MATX_INLINE__ std::string str() const { return name_; }
@@ -112,14 +239,28 @@ class SolverProjectionStorage : public BaseOp<SolverProjectionStorage<State, Com
     template <typename ShapeType, typename Executor>
     __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
     {
-      state_->Materialize(std::forward<Executor>(ex));
-      tensor_ = state_->template Tensor<Component>();
+      if constexpr (is_cuda_jit_executor_v<Executor>) {
+        if constexpr (is_matx_op<input_type>()) {
+          state_->Input().PreRun(detail::NoShape{}, std::forward<Executor>(ex));
+        }
+      }
+      else {
+        state_->Materialize(std::forward<Executor>(ex));
+        tensor_ = state_->template Tensor<Component>();
+      }
     }
 
     template <typename ShapeType, typename Executor>
     __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
     {
-      state_->Release(std::forward<Executor>(ex));
+      if constexpr (is_cuda_jit_executor_v<Executor>) {
+        if constexpr (is_matx_op<input_type>()) {
+          state_->Input().PostRun(detail::NoShape{}, std::forward<Executor>(ex));
+        }
+      }
+      else {
+        state_->Release(std::forward<Executor>(ex));
+      }
     }
 
     template <OperatorCapability Cap, typename InType>
@@ -266,7 +407,7 @@ class SolverProjectionOp : public BaseOp<SolverProjectionOp<State, Component, Te
     __MATX_INLINE__ SolverProjectionOp(std::shared_ptr<State> state,
                                        const cuda::std::array<index_t, TensorType::Rank()> &shape,
                                        const char *name) :
-      state_owner_(std::move(state)), storage_(state_owner_.get(), shape, name)
+      state_owner_(std::move(state)), storage_(state_owner_, shape, name)
     {
     }
 

@@ -245,6 +245,42 @@ TEST(LUSolverJITRegression, CuSolverDxProjectionCopiedFromTemporaryKeepsStateAli
   MATX_EXIT_HANDLER();
 }
 
+TEST(LUSolverJITRegression, CuSolverDxProjectionInCompoundExpressionKeepsStateAlive)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = float;
+
+  constexpr index_t rows = 3;
+  constexpr index_t cols = 3;
+  auto A = make_tensor<TestType>({rows, cols});
+  auto RefLU = make_tensor<TestType>({rows, cols});
+  auto RefPiv = make_tensor<int64_t>({std::min(rows, cols)});
+  auto Out = make_tensor<TestType>({rows, cols});
+  auto mdiff = make_tensor<TestType>({});
+
+  A(0, 0) = TestType{3};
+  A(0, 1) = TestType{1};
+  A(0, 2) = TestType{2};
+  A(1, 0) = TestType{1};
+  A(1, 1) = TestType{4};
+  A(1, 2) = TestType{1};
+  A(2, 0) = TestType{2};
+  A(2, 1) = TestType{1};
+  A(2, 2) = TestType{5};
+
+  auto Expr = lu(A).LU + TestType{0};
+  cudaExecutor cuda_exec{};
+  CUDAJITExecutor jit_exec{};
+  (mtie(RefLU, RefPiv) = lu(A)).run(cuda_exec);
+  (Out = Expr).run(jit_exec);
+  (mdiff = max(abs(Out - RefLU))).run(cuda_exec);
+  cuda_exec.sync();
+
+  ASSERT_NEAR(mdiff(), TestType(0), TestType(0.001));
+
+  MATX_EXIT_HANDLER();
+}
+
 TEST(LUSolverJITRegression, CuSolverDxSameSizeDifferentRanksInOneJITExpression)
 {
   MATX_ENTER_HANDLER();
