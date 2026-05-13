@@ -299,11 +299,11 @@ namespace detail {
         }
 
         const std::string geqrf_func_name = std::string(SOLVER_DX_FUNC_PREFIX) + "_" + dx_geqrf_helper_.GetSymbolName();
-        const std::string ungqr_func_name = std::string(SOLVER_DX_FUNC_PREFIX) + "_" + dx_ungqr_helper_.GetSymbolName();
         std::string externs =
           " extern \"C\" __device__ void " + geqrf_func_name + "(" + detail::type_to_string<value_type>() + "*, " + detail::type_to_string<value_type>() + "*);\n";
         std::string projection_body;
         if constexpr (Component == QR_Q) {
+          const std::string ungqr_func_name = std::string(SOLVER_DX_FUNC_PREFIX) + "_" + dx_ungqr_helper_.GetSymbolName();
           externs +=
             " extern \"C\" __device__ void " + ungqr_func_name + "(" + detail::type_to_string<value_type>() + "*, " + detail::type_to_string<value_type>() + "*);\n";
           projection_body = dx_geqrf_helper_.GetQrProjectionFuncStr(geqrf_func_name, ungqr_func_name, QR_Q, QR_R, q_shape_[RANK - 1], r_shape_[RANK - 2]);
@@ -1019,11 +1019,11 @@ namespace detail {
         }
 
         const std::string geqrf_func_name = std::string(SOLVER_DX_FUNC_PREFIX) + "_" + dx_geqrf_helper_.GetSymbolName();
-        const std::string ungqr_func_name = std::string(SOLVER_DX_FUNC_PREFIX) + "_" + dx_ungqr_helper_.GetSymbolName();
         std::string externs =
           " extern \"C\" __device__ void " + geqrf_func_name + "(" + detail::type_to_string<value_type>() + "*, " + detail::type_to_string<value_type>() + "*);\n";
         std::string projection_body;
         if constexpr (Component == QR_ECON_Q) {
+          const std::string ungqr_func_name = std::string(SOLVER_DX_FUNC_PREFIX) + "_" + dx_ungqr_helper_.GetSymbolName();
           externs +=
             " extern \"C\" __device__ void " + ungqr_func_name + "(" + detail::type_to_string<value_type>() + "*, " + detail::type_to_string<value_type>() + "*);\n";
           projection_body = dx_geqrf_helper_.GetQrProjectionFuncStr(geqrf_func_name, ungqr_func_name, QR_ECON_Q, QR_ECON_R, q_shape_[RANK - 1], r_shape_[RANK - 2]);

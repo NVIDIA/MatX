@@ -312,16 +312,16 @@ namespace detail {
           return;
         }
 
-        const std::string values_func_name = std::string(SOLVER_DX_FUNC_PREFIX) + "_" + dx_heev_values_helper_.GetSymbolName();
-        const std::string vectors_func_name = std::string(SOLVER_DX_FUNC_PREFIX) + "_" + dx_heev_vectors_helper_.GetSymbolName();
         std::string externs;
         std::string projection_body;
         if constexpr (Component == EIG_VALUES) {
+          const std::string values_func_name = std::string(SOLVER_DX_FUNC_PREFIX) + "_" + dx_heev_values_helper_.GetSymbolName();
           externs =
             " extern \"C\" __device__ void " + values_func_name + "(" + detail::type_to_string<a_value_type>() + "*, " + detail::type_to_string<w_value_type>() + "*, " + detail::type_to_string<a_value_type>() + "*, int*);\n";
           projection_body = dx_heev_values_helper_.GetHeevProjectionFuncStr(values_func_name, EIG_VECTORS, EIG_VALUES);
         }
         else {
+          const std::string vectors_func_name = std::string(SOLVER_DX_FUNC_PREFIX) + "_" + dx_heev_vectors_helper_.GetSymbolName();
           externs =
             " extern \"C\" __device__ void " + vectors_func_name + "(" + detail::type_to_string<a_value_type>() + "*, " + detail::type_to_string<w_value_type>() + "*, " + detail::type_to_string<a_value_type>() + "*, int*);\n";
           projection_body = dx_heev_vectors_helper_.GetHeevProjectionFuncStr(vectors_func_name, EIG_VECTORS, EIG_VALUES);
