@@ -167,7 +167,7 @@ fused JIT expression; non-JIT CUDA execution through cudaExecutor remains availa
    "prod", "|partial|", "|yes|", "|no|", "Reduction transform; host execution is available but reductions are not generally parallelized across host threads."
    "pwelch", "|no|", "|yes|", "|no|", "CUDA-only spectral estimation transform."
    "qr", "|no|", "|yes|", "|yes|", "CUDA solver transform. CUDAJITExecutor supports cuSolverDx-backed lazy projections for supported types and shapes."
-   "qr_econ", "|no|", "|yes|", "|yes|", "CUDA solver transform. CUDAJITExecutor supports cuSolverDx-backed lazy projections for supported types and shapes."
+   "qr_econ", "|no|", "|yes|", "|yes|", "CUDA solver transform. CUDAJITExecutor supports cuSolverDx-backed lazy projections for supported types and shapes; the Q projection is limited to non-wide matrices where m >= n."
    "qr_solver", "|yes|", "|yes|", "|yes|", "Host support requires the CPU solver backend. CUDAJITExecutor supports cuSolverDx-backed lazy projections for supported types and shapes."
    "r2c", "|yes|", "|yes|", "|yes|", "Real-to-complex view/cast expression."
    "random", "|yes|", "|yes|", "|no|", "Random generator state is not JIT-fused."

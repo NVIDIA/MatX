@@ -14,7 +14,8 @@ Perform a QR decomposition.
    ``-DMATX_EN_MATHDX=ON`` is enabled and the runtime shape/type is supported by cuSolverDx. Projection JIT
    currently supports ranks 2 through 4 and ``float``, ``double``, ``complex<float>``, and
    ``complex<double>`` inputs. The full ``qr`` projection path is limited to square matrices to preserve its full
-   Q/R output contract; use ``qr_econ`` or ``qr_solver`` projections for rectangular matrices.
+   Q/R output contract. ``qr_econ(A).Q`` JIT fusion is currently limited to non-wide matrices where ``m >= n``;
+   ``qr_econ(A).R`` and ``qr_solver`` projections support rectangular matrices when cuSolverDx supports the shape.
 
 .. doxygenfunction:: qr
 

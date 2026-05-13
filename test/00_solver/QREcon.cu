@@ -143,6 +143,19 @@ TEST(QREconSolverJITRegression, CuSolverDxMultipleSizesInOneJITExpression)
   MATX_EXIT_HANDLER();
 }
 
+TEST(QREconSolverJITRegression, CuSolverDxWideQProjectionRejectsJIT)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = float;
+
+  auto A = make_tensor<TestType>({3, 4});
+  auto op = qr_econ(A);
+
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.Q));
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(QREconSolverJITTestNonHalfTypes, CuSolverDxBatchedMatrixProjectionJIT)
 {
   MATX_ENTER_HANDLER();

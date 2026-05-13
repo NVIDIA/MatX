@@ -171,6 +171,44 @@ TEST(LUSolverJITRegression, CuSolverDxMultipleSizesInOneJITExpression)
   MATX_EXIT_HANDLER();
 }
 
+TEST(LUSolverJITRegression, CuSolverDxPivotProjectionUsedInFusedExpression)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = float;
+
+  constexpr index_t rows = 3;
+  constexpr index_t cols = 3;
+  auto A = make_tensor<TestType>({rows, cols});
+  auto RefLU = make_tensor<TestType>({rows, cols});
+  auto RefPiv = make_tensor<int64_t>({std::min(rows, cols)});
+  auto RefCombined = make_tensor<TestType>({rows, cols});
+  auto Combined = make_tensor<TestType>({rows, cols});
+  auto mdiff = make_tensor<TestType>({});
+
+  A(0, 0) = TestType{1};
+  A(0, 1) = TestType{2};
+  A(0, 2) = TestType{3};
+  A(1, 0) = TestType{9};
+  A(1, 1) = TestType{8};
+  A(1, 2) = TestType{7};
+  A(2, 0) = TestType{4};
+  A(2, 1) = TestType{6};
+  A(2, 2) = TestType{5};
+
+  auto op = lu(A);
+  CUDAJITExecutor jit_exec{};
+  cudaExecutor cuda_exec{};
+  (mtie(RefLU, RefPiv) = lu(A)).run(cuda_exec);
+  (RefCombined = TestType{1.0e-6f} * RefLU + clone<2>(as_type<TestType>(RefPiv), {rows, matxKeepDim})).run(cuda_exec);
+  (Combined = TestType{1.0e-6f} * op.LU + clone<2>(as_type<TestType>(op.Piv), {rows, matxKeepDim})).run(jit_exec);
+  (mdiff = max(abs(Combined - RefCombined))).run(cuda_exec);
+  cuda_exec.sync();
+
+  ASSERT_NEAR(mdiff(), TestType(0), TestType(0.001));
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(LUSolverJITTestFloatTypes, CuSolverDxBatchedMatrixProjectionJIT)
 {
   MATX_ENTER_HANDLER();

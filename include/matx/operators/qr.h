@@ -348,6 +348,15 @@ namespace detail {
           state_->Input().PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
       }
+
+      template <typename ShapeType, typename Executor>
+      __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
+      {
+        if constexpr (is_matx_op<OpA>()) {
+          state_->Input().PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
+      }
+
       // Size is not relevant in qr() since there are multiple return values and it
       // is not allowed to be called in larger expressions
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
@@ -643,6 +652,14 @@ namespace detail {
         }
       }
 
+      template <typename ShapeType, typename Executor>
+      __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) noexcept
+      {
+        if constexpr (is_matx_op<OpA>()) {
+          state_->Input().PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
+      }
+
       // Size is not relevant in qr_solver() since there are multiple return values and it
       // is not allowed to be called in larger expressions
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
@@ -809,9 +826,10 @@ namespace detail {
       template <int Component>
       bool SupportsJITProjection() const
       {
+        const bool q_layout_safe = a_.Size(RANK - 2) >= a_.Size(RANK - 1);
         return (RANK >= 2) && (RANK <= 4) &&
                dx_geqrf_helper_.IsSupported() &&
-               (Component == QR_ECON_R || dx_ungqr_helper_.IsSupported());
+               (Component == QR_ECON_R || (q_layout_safe && dx_ungqr_helper_.IsSupported()));
       }
 
       template <int Component>
@@ -970,6 +988,14 @@ namespace detail {
       {
         if constexpr (is_matx_op<OpA>()) {
           state_->Input().PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
+      }
+
+      template <typename ShapeType, typename Executor>
+      __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) noexcept
+      {
+        if constexpr (is_matx_op<OpA>()) {
+          state_->Input().PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
       }
 

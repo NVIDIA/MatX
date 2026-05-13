@@ -137,8 +137,9 @@ MathDx Compatibility
      - Enabled via ``-DMATX_EN_MATHDX=ON`` for ``chol``, ``inv``, and selected projection outputs from
        ``lu``, ``qr``, ``qr_solver``, ``qr_econ``, and ``eig``. The current cuSolverDx JIT path supports rank
        2 through 4 matrices with ``float``, ``double``, ``complex<float>``, and ``complex<double>`` values.
-       ``chol``, ``inv``, ``qr``, and ``eig`` require square matrices in the JIT path; use ``qr_econ`` or
-       ``qr_solver`` projections for rectangular QR forms. Multi-output ``mtie`` assignments still use the normal
+       ``chol``, ``inv``, ``qr``, and ``eig`` require square matrices in the JIT path. ``qr_econ(A).Q`` JIT fusion
+       is currently limited to non-wide matrices where ``m >= n``; use ``qr_econ(A).R`` or ``qr_solver`` projections
+       for other rectangular QR forms. Multi-output ``mtie`` assignments still use the normal
        non-JIT solver path, while projection expressions such as ``auto op = lu(A); (Y = op.LU).run(CUDAJITExecutor{})``
        may be fused. ``svd`` is not JIT-fused because the runtime ``libcusolverdx`` code-generation API does not
        expose an SVD routine.

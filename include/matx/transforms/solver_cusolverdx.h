@@ -426,8 +426,7 @@ public:
     }
     LIBCUSOLVERDX_CHECK(commondxGetCodeLTOIR(code.get(), ltoir_length, ltoir.get()));
 
-    char *ltoir_data = ltoir.release();
-    if (!detail::GetCache().StoreLTOIRCachedBytes(symbol_name, ltoir_data, ltoir_length)) {
+    if (!detail::GetCache().StoreLTOIRCachedBytes(symbol_name, static_cast<const char*>(ltoir.get()), ltoir_length)) {
       MATX_LOG_ERROR("Failed to store cuSolverDx LTOIR cached bytes for: {}", symbol_name);
       return false;
     }
@@ -621,7 +620,7 @@ public:
         if (vec_idx < piv_elems) {
           const int pivot = ipiv[vec_idx] == 0 ?
             static_cast<int>(vec_idx + 1) :
-            static_cast<int>(vec_idx) + ipiv[vec_idx];
+            ipiv[vec_idx];
           return static_cast<value_type>(pivot);
         }
       }

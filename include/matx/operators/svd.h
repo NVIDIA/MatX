@@ -253,6 +253,14 @@ namespace detail {
         }
       }
 
+      template <typename ShapeType, typename Executor>
+      __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
+      {
+        if constexpr (is_matx_op<OpA>()) {
+          state_->Input().PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
+      }
+
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
       {
         return OpA::Rank();
@@ -370,6 +378,14 @@ namespace detail {
         }
       }
 
+      template <typename ShapeType, typename Executor>
+      __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) noexcept
+      {
+        if constexpr (is_matx_op<OpA>()) {
+          a_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
+      }
+
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size([[maybe_unused]] int dim) const
       {
         return 0;
@@ -458,6 +474,14 @@ namespace detail {
       {
         if constexpr (is_matx_op<OpA>()) {
           a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
+      }
+
+      template <typename ShapeType, typename Executor>
+      __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) noexcept
+      {
+        if constexpr (is_matx_op<OpA>()) {
+          a_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
       }
 

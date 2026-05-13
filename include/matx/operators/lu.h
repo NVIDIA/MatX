@@ -337,6 +337,15 @@ namespace detail {
           state_->Input().PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
       }
+
+      template <typename ShapeType, typename Executor>
+      __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
+      {
+        if constexpr (is_matx_op<OpA>()) {
+          state_->Input().PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
+      }
+
       // Size is not relevant in eig() since there are multiple return values and it
       // is not allowed to be called in larger expressions
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
