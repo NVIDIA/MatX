@@ -861,6 +861,72 @@ public:
     return result;
   }
 
+  std::string GetQrRProjectionFuncStr(const std::string &geqrf_func_name,
+                                      int r_component,
+                                      index_t r_rows) const
+  {
+    std::string result = R"(
+      using solver_value_type = typename OpA::value_type;
+      static_assert(OpA::Rank() >= 2 && OpA::Rank() <= 4, "cuSolverDx JIT projections support input ranks 2 through 4");
+      static constexpr index_t m = )";
+    result += std::to_string(static_cast<int>(m_));
+    result += R"(;
+      static constexpr index_t n = )";
+    result += std::to_string(static_cast<int>(n_));
+    result += R"(;
+      static constexpr index_t r_rows = )";
+    result += std::to_string(static_cast<int>(r_rows));
+    result += R"(;
+      static constexpr index_t elems = m * n;
+      static constexpr index_t tau_elems = m < n ? m : n;
+      extern __shared__ __align__(16) char smem[];
+      solver_value_type* smem_a = reinterpret_cast<solver_value_type*>(smem);
+      solver_value_type* tau = reinterpret_cast<solver_value_type*>(smem + elems * sizeof(solver_value_type));
+      const int tid = threadIdx.x + threadIdx.y * blockDim.x + threadIdx.z * blockDim.x * blockDim.y;
+      const int total_threads = blockDim.x * blockDim.y * blockDim.z;
+      cuda::std::array<index_t, Rank()> idx = { static_cast<index_t>(indices)... };
+
+      for (index_t base = 0; base < elems; base += total_threads) {
+        const index_t linear = base + tid;
+        const bool valid = linear < elems;
+        const index_t load_linear = valid ? linear : index_t{0};
+        const index_t row = load_linear / n;
+        const index_t col = load_linear % n;
+        solver_value_type a_value{};
+        if constexpr (OpA::Rank() == 2) {
+          a_value = a_.template operator()<CapType>(row, col);
+        }
+        else if constexpr (OpA::Rank() == 3) {
+          a_value = a_.template operator()<CapType>(idx[0], row, col);
+        }
+        else if constexpr (OpA::Rank() == 4) {
+          a_value = a_.template operator()<CapType>(idx[0], idx[1], row, col);
+        }
+        if (valid) {
+          smem_a[linear] = a_value;
+        }
+      }
+
+      __syncthreads();
+    )";
+    result += geqrf_func_name;
+    result += R"((smem_a, tau);
+      __syncthreads();
+
+      if constexpr (Component == )";
+    result += std::to_string(r_component);
+    result += R"() {
+        const index_t row = idx[Rank() - 2];
+        const index_t col = idx[Rank() - 1];
+        if (row < r_rows && col < n && row <= col) {
+          return smem_a[row * n + col];
+        }
+      }
+      return value_type{};
+    )";
+    return result;
+  }
+
   std::string GetHeevProjectionFuncStr(const std::string &solver_func_name, int vectors_component, int values_component) const
   {
     std::string result = R"(

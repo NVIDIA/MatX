@@ -266,8 +266,8 @@ namespace detail {
       std::string GetJITProjectionClassName() const
       {
         return std::string("JITQRProjectionOp_R") + std::to_string(RANK) + "_" +
-               dx_geqrf_helper_.GetSymbolName() + "_" +
-               dx_ungqr_helper_.GetSymbolName();
+               dx_geqrf_helper_.GetSymbolName() + "_C" + std::to_string(Component) + "_" +
+               (Component == QR_Q ? dx_ungqr_helper_.GetSymbolName() : std::string("R"));
       }
 
       template <int Component>
@@ -300,9 +300,19 @@ namespace detail {
 
         const std::string geqrf_func_name = std::string(SOLVER_DX_FUNC_PREFIX) + "_" + dx_geqrf_helper_.GetSymbolName();
         const std::string ungqr_func_name = std::string(SOLVER_DX_FUNC_PREFIX) + "_" + dx_ungqr_helper_.GetSymbolName();
+        std::string externs =
+          " extern \"C\" __device__ void " + geqrf_func_name + "(" + detail::type_to_string<value_type>() + "*, " + detail::type_to_string<value_type>() + "*);\n";
+        std::string projection_body;
+        if constexpr (Component == QR_Q) {
+          externs +=
+            " extern \"C\" __device__ void " + ungqr_func_name + "(" + detail::type_to_string<value_type>() + "*, " + detail::type_to_string<value_type>() + "*);\n";
+          projection_body = dx_geqrf_helper_.GetQrProjectionFuncStr(geqrf_func_name, ungqr_func_name, QR_Q, QR_R, q_shape_[RANK - 1], r_shape_[RANK - 2]);
+        }
+        else {
+          projection_body = dx_geqrf_helper_.GetQrRProjectionFuncStr(geqrf_func_name, QR_R, r_shape_[RANK - 2]);
+        }
         in[class_name] =
-          " extern \"C\" __device__ void " + geqrf_func_name + "(" + detail::type_to_string<value_type>() + "*, " + detail::type_to_string<value_type>() + "*);\n"
-          " extern \"C\" __device__ void " + ungqr_func_name + "(" + detail::type_to_string<value_type>() + "*, " + detail::type_to_string<value_type>() + "*);\n"
+          externs +
           " template <typename OpA, int Component> struct " + class_name + "  {\n"
           "  using value_type = typename OpA::value_type;\n"
           "  using matxop = bool;\n"
@@ -310,7 +320,7 @@ namespace detail {
           "  template <typename CapType, typename... Is>\n"
           "  __MATX_INLINE__ __MATX_DEVICE__ value_type operator()(Is... indices) const\n"
           "  {\n"
-          "    " + dx_geqrf_helper_.GetQrProjectionFuncStr(geqrf_func_name, ungqr_func_name, QR_Q, QR_R, q_shape_[RANK - 1], r_shape_[RANK - 2]) + "\n"
+          "    " + projection_body + "\n"
           "  }\n"
           "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank()\n"
           "  {\n"
@@ -975,8 +985,8 @@ namespace detail {
       std::string GetJITProjectionClassName() const
       {
         return std::string("JITEconQRProjectionOp_R") + std::to_string(RANK) + "_" +
-               dx_geqrf_helper_.GetSymbolName() + "_" +
-               dx_ungqr_helper_.GetSymbolName();
+               dx_geqrf_helper_.GetSymbolName() + "_C" + std::to_string(Component) + "_" +
+               (Component == QR_ECON_Q ? dx_ungqr_helper_.GetSymbolName() : std::string("R"));
       }
 
       template <int Component>
@@ -1010,9 +1020,19 @@ namespace detail {
 
         const std::string geqrf_func_name = std::string(SOLVER_DX_FUNC_PREFIX) + "_" + dx_geqrf_helper_.GetSymbolName();
         const std::string ungqr_func_name = std::string(SOLVER_DX_FUNC_PREFIX) + "_" + dx_ungqr_helper_.GetSymbolName();
+        std::string externs =
+          " extern \"C\" __device__ void " + geqrf_func_name + "(" + detail::type_to_string<value_type>() + "*, " + detail::type_to_string<value_type>() + "*);\n";
+        std::string projection_body;
+        if constexpr (Component == QR_ECON_Q) {
+          externs +=
+            " extern \"C\" __device__ void " + ungqr_func_name + "(" + detail::type_to_string<value_type>() + "*, " + detail::type_to_string<value_type>() + "*);\n";
+          projection_body = dx_geqrf_helper_.GetQrProjectionFuncStr(geqrf_func_name, ungqr_func_name, QR_ECON_Q, QR_ECON_R, q_shape_[RANK - 1], r_shape_[RANK - 2]);
+        }
+        else {
+          projection_body = dx_geqrf_helper_.GetQrRProjectionFuncStr(geqrf_func_name, QR_ECON_R, r_shape_[RANK - 2]);
+        }
         in[class_name] =
-          " extern \"C\" __device__ void " + geqrf_func_name + "(" + detail::type_to_string<value_type>() + "*, " + detail::type_to_string<value_type>() + "*);\n"
-          " extern \"C\" __device__ void " + ungqr_func_name + "(" + detail::type_to_string<value_type>() + "*, " + detail::type_to_string<value_type>() + "*);\n"
+          externs +
           " template <typename OpA, int Component> struct " + class_name + "  {\n"
           "  using value_type = typename OpA::value_type;\n"
           "  using matxop = bool;\n"
@@ -1020,7 +1040,7 @@ namespace detail {
           "  template <typename CapType, typename... Is>\n"
           "  __MATX_INLINE__ __MATX_DEVICE__ value_type operator()(Is... indices) const\n"
           "  {\n"
-          "    " + dx_geqrf_helper_.GetQrProjectionFuncStr(geqrf_func_name, ungqr_func_name, QR_ECON_Q, QR_ECON_R, q_shape_[RANK - 1], r_shape_[RANK - 2]) + "\n"
+          "    " + projection_body + "\n"
           "  }\n"
           "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank()\n"
           "  {\n"

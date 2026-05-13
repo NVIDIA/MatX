@@ -276,8 +276,8 @@ namespace detail {
       std::string GetJITProjectionClassName() const
       {
         return std::string("JITEigProjectionOp_R") + std::to_string(RANK) + "_" +
-               dx_heev_values_helper_.GetSymbolName() + "_" +
-               dx_heev_vectors_helper_.GetSymbolName();
+               (Component == EIG_VALUES ? dx_heev_values_helper_.GetSymbolName() : dx_heev_vectors_helper_.GetSymbolName()) +
+               "_C" + std::to_string(Component);
       }
 
       template <int Component>
@@ -314,9 +314,20 @@ namespace detail {
 
         const std::string values_func_name = std::string(SOLVER_DX_FUNC_PREFIX) + "_" + dx_heev_values_helper_.GetSymbolName();
         const std::string vectors_func_name = std::string(SOLVER_DX_FUNC_PREFIX) + "_" + dx_heev_vectors_helper_.GetSymbolName();
+        std::string externs;
+        std::string projection_body;
+        if constexpr (Component == EIG_VALUES) {
+          externs =
+            " extern \"C\" __device__ void " + values_func_name + "(" + detail::type_to_string<a_value_type>() + "*, " + detail::type_to_string<w_value_type>() + "*, " + detail::type_to_string<a_value_type>() + "*, int*);\n";
+          projection_body = dx_heev_values_helper_.GetHeevProjectionFuncStr(values_func_name, EIG_VECTORS, EIG_VALUES);
+        }
+        else {
+          externs =
+            " extern \"C\" __device__ void " + vectors_func_name + "(" + detail::type_to_string<a_value_type>() + "*, " + detail::type_to_string<w_value_type>() + "*, " + detail::type_to_string<a_value_type>() + "*, int*);\n";
+          projection_body = dx_heev_vectors_helper_.GetHeevProjectionFuncStr(vectors_func_name, EIG_VECTORS, EIG_VALUES);
+        }
         in[class_name] =
-          " extern \"C\" __device__ void " + values_func_name + "(" + detail::type_to_string<a_value_type>() + "*, " + detail::type_to_string<w_value_type>() + "*, " + detail::type_to_string<a_value_type>() + "*, int*);\n"
-          " extern \"C\" __device__ void " + vectors_func_name + "(" + detail::type_to_string<a_value_type>() + "*, " + detail::type_to_string<w_value_type>() + "*, " + detail::type_to_string<a_value_type>() + "*, int*);\n"
+          externs +
           " template <typename OpA, int Component> struct " + class_name + "  {\n"
           "  using solver_value_type = typename OpA::value_type;\n"
           "  using precision_type = typename inner_op_type_t<solver_value_type>::type;\n"
@@ -326,12 +337,7 @@ namespace detail {
           "  template <typename CapType, typename... Is>\n"
           "  __MATX_INLINE__ __MATX_DEVICE__ value_type operator()(Is... indices) const\n"
           "  {\n"
-          "    if constexpr (Component == " + std::to_string(EIG_VALUES) + ") {\n"
-          "      " + dx_heev_values_helper_.GetHeevProjectionFuncStr(values_func_name, EIG_VECTORS, EIG_VALUES) + "\n"
-          "    }\n"
-          "    else {\n"
-          "      " + dx_heev_vectors_helper_.GetHeevProjectionFuncStr(vectors_func_name, EIG_VECTORS, EIG_VALUES) + "\n"
-          "    }\n"
+          "    " + projection_body + "\n"
           "  }\n"
           "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank()\n"
           "  {\n"
