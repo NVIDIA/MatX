@@ -299,6 +299,10 @@ inline std::string make_cub_shmem_probe_source(const std::string &algorithm,
   }
   else if (algorithm == "scan") {
     block_decl = "using BlockT = cub::BlockScan<T, " + std::to_string(block_size) + ">;\n";
+    block_decl += "__device__ void instantiate_scan_items(typename BlockT::TempStorage &storage) {\n"
+                  "  T items[" + std::to_string(ept) + "]{};\n"
+                  "  BlockT(storage).InclusiveSum(items, items);\n"
+                  "}\n";
   }
   else {
     block_decl = "using BlockT = cub::BlockReduce<T, " + std::to_string(block_size) + ">;\n";
@@ -321,7 +325,7 @@ inline int nvrtc_get_cub_block_shmem_size(const std::string &algorithm,
   static std::unordered_map<std::string, int> shmem_cache;
   static std::mutex shmem_cache_mutex;
 
-  const int cache_ept = (algorithm == "sort" || algorithm == "sort_pairs") ? ept : 1;
+  const int cache_ept = (algorithm == "sort" || algorithm == "sort_pairs" || algorithm == "scan") ? ept : 1;
   const std::string cache_key = algorithm + "_" + value_type + "_E" +
                                 std::to_string(cache_ept) + "_B" + std::to_string(block_size);
   {

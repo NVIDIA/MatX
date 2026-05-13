@@ -289,7 +289,9 @@ namespace detail {
         items[i] = block_op_get_last_dim_item<CapType>(op, i, indices...);
       }
 
-      BlockScanT(temp_storage).InclusiveSum(items, items);
+      // CUB BlockScan takes ITEMS_PER_THREAD on the InclusiveSum overload, not
+      // as a BlockScan class template parameter.
+      BlockScanT(temp_storage).template InclusiveSum<ept>(items, items);
       return thread_data;
     }
   };
