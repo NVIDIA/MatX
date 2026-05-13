@@ -245,8 +245,7 @@ public:
     }
     else {
       using ScalarCap = CapabilityParams<ElementsPerThread::ONE, CapType::jit>;
-      using EvalCap = cuda::std::conditional_t<requires { typename Op::matx_jit_block_reduction; }, ScalarCap, CapType>;
-      const auto in_val = detail::get_value<EvalCap>(static_cast<const decltype(op_)&>(op_), indices...);
+      const auto in_val = detail::get_value<CapType>(static_cast<const decltype(op_)&>(op_), indices...);
       using out_type = decltype(out_.template operator()<CapType>(indices...));
 
 #if MATX_CHECK_NARROWING_CONVERSIONS
