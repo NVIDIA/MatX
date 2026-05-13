@@ -389,8 +389,6 @@ TEST(TensorStats, CubBlockJIT)
   tensor_t<float, 2> ndiv_min_out({rows, batches});
   tensor_t<float, 2> ndiv_max_out({rows, batches});
   tensor_t<float, 3> ndiv_scan_out({rows, batches, ndiv_cols});
-  tensor_t<float, 3> ndiv_sort_out({rows, batches, ndiv_cols});
-  tensor_t<index_t, 3> ndiv_argsort_out({rows, batches, ndiv_cols});
   tensor_t<float, 2> shift_in({rows, batches});
   tensor_t<float, 2> mixed_out({rows, batches});
   tensor_t<float, 3> scan_out({rows, batches, cols});
@@ -426,8 +424,6 @@ TEST(TensorStats, CubBlockJIT)
   (ndiv_min_out = min(ndiv_in, {2})).run(exec);
   (ndiv_max_out = max(ndiv_in, {2})).run(exec);
   (ndiv_scan_out = cumsum(ndiv_in)).run(exec);
-  (ndiv_sort_out = matx::sort(ndiv_in, SORT_DIR_ASC)).run(exec);
-  (ndiv_argsort_out = argsort(ndiv_in, SORT_DIR_ASC)).run(exec);
   (mixed_out = sum(in, {2}) + fftshift1D(shift_in) + 5.0f).run(exec);
   (scan_out = cumsum(in)).run(exec);
   (sort_out = matx::sort(in, SORT_DIR_ASC)).run(exec);
@@ -437,6 +433,9 @@ TEST(TensorStats, CubBlockJIT)
   (scalar_sum = sum(vector_in)).run(exec);
   (scalar_prod = prod(vector_in)).run(exec);
   exec.sync();
+
+  EXPECT_FALSE(jit_supported(matx::sort(ndiv_in, SORT_DIR_ASC)));
+  EXPECT_FALSE(jit_supported(argsort(ndiv_in, SORT_DIR_ASC)));
 
   float expected_scalar_sum = 0.0f;
   float expected_scalar_prod = 1.0f;
@@ -493,12 +492,6 @@ TEST(TensorStats, CubBlockJIT)
         ndiv_expected_max = cuda::std::max(ndiv_expected_max, ndiv_in(i, j, k));
         ndiv_running += ndiv_in(i, j, k);
         ASSERT_NEAR(ndiv_scan_out(i, j, k), ndiv_running, 0.001f);
-        if (k > 0) {
-          ASSERT_LE(ndiv_sort_out(i, j, k - 1), ndiv_sort_out(i, j, k));
-          ASSERT_LE(ndiv_in(i, j, ndiv_argsort_out(i, j, k - 1)), ndiv_in(i, j, ndiv_argsort_out(i, j, k)));
-        }
-        ASSERT_GE(ndiv_argsort_out(i, j, k), static_cast<index_t>(0));
-        ASSERT_LT(ndiv_argsort_out(i, j, k), ndiv_cols);
       }
       ASSERT_NEAR(ndiv_reduce_out(i, j), ndiv_expected_sum, 0.001f);
       const auto ndiv_prod_tol = cuda::std::max(0.001f, ndiv_expected_prod * 1e-5f);
@@ -552,6 +545,22 @@ TEST(TensorStats, CubBlockJITRejectsComplexArgsortKeys)
 
   auto argsort_op = argsort(complex_in, SORT_DIR_ASC);
   EXPECT_FALSE(jit_supported(argsort_op));
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(TensorStats, CubBlockJITRejectsNonPowerOfTwoSortDim)
+{
+  MATX_ENTER_HANDLER();
+
+  tensor_t<float, 2> nonpow_in({2, 12});
+
+  auto sort_op = matx::sort(nonpow_in, SORT_DIR_ASC);
+  auto argsort_op = argsort(nonpow_in, SORT_DIR_ASC);
+  EXPECT_FALSE(jit_supported(sort_op));
+  EXPECT_FALSE(jit_supported(argsort_op));
+  EXPECT_EQ(detail::get_operator_capability<detail::OperatorCapability::STATIC_SHM_SIZE>(sort_op), 0);
+  EXPECT_EQ(detail::get_operator_capability<detail::OperatorCapability::STATIC_SHM_SIZE>(argsort_op), 0);
 
   MATX_EXIT_HANDLER();
 }

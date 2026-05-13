@@ -86,13 +86,18 @@ namespace detail {
         return JIT_Storage{detail::to_jit_storage(a_)};
       }
 
-      __MATX_INLINE__ static int LargestPowerOfTwoDivisorAtMost(index_t value, int limit = 32) {
+      __MATX_INLINE__ static bool IsPowerOfTwo(index_t value) {
+        return value > 0 && (value & (value - 1)) == 0;
+      }
+
+      __MATX_INLINE__ static int LargestValidPowerOfTwoEPTAtMost(index_t value, int limit = 32) {
         if (value <= 0 || limit <= 0) {
           return 0;
         }
-        int result = 1;
-        for (int candidate = 2; candidate <= limit; candidate *= 2) {
-          if ((value % candidate) == 0) {
+
+        int result = 0;
+        for (int candidate = 1; candidate <= limit && candidate <= value; candidate *= 2) {
+          if ((value % candidate) == 0 && IsPowerOfTwo(value / candidate)) {
             result = candidate;
           }
         }
@@ -109,8 +114,18 @@ namespace detail {
       }
 
       __MATX_INLINE__ int MaxJitElementsPerThread() const {
-        return LargestPowerOfTwoDivisorAtMost(CriticalDimSize(),
-                                             MaxCubJitElementsPerThreadByBytes<key_type>());
+        return LargestValidPowerOfTwoEPTAtMost(CriticalDimSize(),
+                                               MaxCubJitElementsPerThreadByBytes<key_type>());
+      }
+
+      __MATX_INLINE__ int BlockThreadsForEPT(int ept) const {
+        const auto critical_dim_size = CriticalDimSize();
+        if (critical_dim_size <= 0 || ept <= 0 || (critical_dim_size % ept) != 0) {
+          return 0;
+        }
+
+        const auto block_threads = critical_dim_size / ept;
+        return IsPowerOfTwo(block_threads) ? static_cast<int>(block_threads) : 0;
       }
 
       __MATX_INLINE__ bool BlockSizeFitsAtMaxEPT() const {
@@ -119,12 +134,13 @@ namespace detail {
           return false;
         }
         const int max_ept = MaxJitElementsPerThread();
-        return max_ept > 0 && static_cast<int>(critical_dim_size / max_ept) <= 1024;
+        const int block_threads = BlockThreadsForEPT(max_ept);
+        return block_threads > 0 && block_threads <= 1024;
       }
 
       __MATX_INLINE__ int CurrentBlockThreads() const {
         const int ept = static_cast<int>(current_ept_);
-        return ept > 0 ? static_cast<int>(CriticalDimSize() / ept) : 0;
+        return BlockThreadsForEPT(ept);
       }
 
       __MATX_INLINE__ int MaxGroupsPerBlock() const {
