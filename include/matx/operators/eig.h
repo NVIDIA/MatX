@@ -373,8 +373,8 @@ namespace detail {
       __MATX_INLINE__ std::string str() const { return "eig()"; }
       __MATX_INLINE__ EigOp(const OpA &a, EigenMode jobz, SolverFillMode uplo) :
         state_(std::make_shared<state_type>(a, jobz, uplo)),
-        Vectors(state_.get(), state_->VectorsShape(), "eig().Vectors"),
-        Values(state_.get(), state_->ValuesShape(), "eig().Values")
+        Vectors(state_, state_->VectorsShape(), "eig().Vectors"),
+        Values(state_, state_->ValuesShape(), "eig().Values")
       {
         MATX_LOG_TRACE("{} constructor: jobz={}, uplo={}", str(), static_cast<int>(jobz), static_cast<int>(uplo));
       };

@@ -348,8 +348,8 @@ namespace detail {
       __MATX_INLINE__ std::string str() const { return "qr(" + get_type_str(state_->Input()) + ")"; }
       __MATX_INLINE__ QROp(const OpA &a) :
         state_(std::make_shared<state_type>(a)),
-        Q(state_.get(), state_->QShape(), "qr().Q"),
-        R(state_.get(), state_->RShape(), "qr().R")
+        Q(state_, state_->QShape(), "qr().Q"),
+        R(state_, state_->RShape(), "qr().R")
       {
         MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
       };
@@ -688,8 +688,8 @@ namespace detail {
       __MATX_INLINE__ std::string str() const { return "qr_solver()"; }
       __MATX_INLINE__ SolverQROp(const OpA &a) :
         state_(std::make_shared<state_type>(a)),
-        Out(state_.get(), state_->OutShape(), "qr_solver().Out"),
-        Tau(state_.get(), state_->TauShape(), "qr_solver().Tau")
+        Out(state_, state_->OutShape(), "qr_solver().Out"),
+        Tau(state_, state_->TauShape(), "qr_solver().Tau")
       {
         MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
       }
@@ -1064,8 +1064,8 @@ namespace detail {
       __MATX_INLINE__ std::string str() const { return "qr_econ()"; }
       __MATX_INLINE__ EconQROp(const OpA &a) :
         state_(std::make_shared<state_type>(a)),
-        Q(state_.get(), state_->QShape(), "qr_econ().Q"),
-        R(state_.get(), state_->RShape(), "qr_econ().R")
+        Q(state_, state_->QShape(), "qr_econ().Q"),
+        R(state_, state_->RShape(), "qr_econ().R")
       {
       }
 

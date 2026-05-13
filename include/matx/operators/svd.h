@@ -256,9 +256,9 @@ namespace detail {
       __MATX_INLINE__ std::string str() const { return "svd(" + get_type_str(state_->Input()) + ")"; }
       __MATX_INLINE__ SVDOp(const OpA &a, const SVDMode jobz, const SVDHostAlgo algo) :
         state_(std::make_shared<state_type>(a, jobz, algo)),
-        U(state_.get(), state_->UShape(), "svd().U"),
-        S(state_.get(), state_->SShape(), "svd().S"),
-        VT(state_.get(), state_->VTShape(), "svd().VT")
+        U(state_, state_->UShape(), "svd().U"),
+        S(state_, state_->SShape(), "svd().S"),
+        VT(state_, state_->VTShape(), "svd().VT")
       {
         MATX_LOG_TRACE("{} constructor: jobz={}, algo={}", str(), static_cast<int>(jobz), static_cast<int>(algo));
       };

@@ -349,8 +349,8 @@ namespace detail {
       __MATX_INLINE__ std::string str() const { return "lu()"; }
       __MATX_INLINE__ LUOp(const OpA &a) :
         state_(std::make_shared<state_type>(a)),
-        LU(state_.get(), state_->FactorsShape(), "lu().LU"),
-        Piv(state_.get(), state_->PivShape(), "lu().Piv")
+        LU(state_, state_->FactorsShape(), "lu().LU"),
+        Piv(state_, state_->PivShape(), "lu().Piv")
       {
         MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
       };

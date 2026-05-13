@@ -36,6 +36,9 @@
 #include "matx/core/operator_utils.h"
 #include "matx/operators/base_operator.h"
 
+#include <memory>
+#include <utility>
+
 namespace matx {
 namespace detail {
 
@@ -62,7 +65,7 @@ __MATX_INLINE__ cuda::std::array<index_t, RANK - 1> SolverVectorShapeFromMatrixS
 }
 
 template <typename State, int Component, typename TensorType>
-class SolverProjectionOp : public BaseOp<SolverProjectionOp<State, Component, TensorType>>
+class SolverProjectionStorage : public BaseOp<SolverProjectionStorage<State, Component, TensorType>>
 {
   private:
     State *state_;
@@ -75,9 +78,9 @@ class SolverProjectionOp : public BaseOp<SolverProjectionOp<State, Component, Te
     using value_type = typename TensorType::value_type;
     using input_type = typename State::input_type;
 
-    __MATX_INLINE__ SolverProjectionOp(State *state,
-                                       const cuda::std::array<index_t, TensorType::Rank()> &shape,
-                                       const char *name) :
+    __MATX_INLINE__ SolverProjectionStorage(State *state,
+                                            const cuda::std::array<index_t, TensorType::Rank()> &shape,
+                                            const char *name) :
       state_(state), shape_(shape), name_(name)
     {
     }
@@ -242,6 +245,91 @@ class SolverProjectionOp : public BaseOp<SolverProjectionOp<State, Component, Te
       return JIT_Storage{detail::to_jit_storage(state_->Input())};
     }
 #endif
+};
+
+template <typename State, int Component, typename TensorType>
+class SolverProjectionOp : public BaseOp<SolverProjectionOp<State, Component, TensorType>>
+{
+  private:
+    using storage_type = SolverProjectionStorage<State, Component, TensorType>;
+
+    // Host-side lifetime owner. base_type below strips projections to storage_type
+    // before expression/device execution so shared_ptr is never copied into kernels.
+    std::shared_ptr<State> state_owner_;
+    storage_type storage_;
+
+  public:
+    using matxop = bool;
+    using value_type = typename storage_type::value_type;
+    using input_type = typename storage_type::input_type;
+
+    __MATX_INLINE__ SolverProjectionOp(std::shared_ptr<State> state,
+                                       const cuda::std::array<index_t, TensorType::Rank()> &shape,
+                                       const char *name) :
+      state_owner_(std::move(state)), storage_(state_owner_.get(), shape, name)
+    {
+    }
+
+    __MATX_INLINE__ operator const storage_type&() const noexcept
+    {
+      return storage_;
+    }
+
+    __MATX_INLINE__ std::string str() const { return storage_.str(); }
+
+    template <typename... Is>
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const noexcept
+    {
+      return storage_(indices...);
+    }
+
+    template <typename CapType, typename... Is>
+    __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const noexcept
+    {
+      return storage_.template operator()<CapType>(indices...);
+    }
+
+    static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+    {
+      return storage_type::Rank();
+    }
+
+    constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
+    {
+      return storage_.Size(dim);
+    }
+
+    template <typename ShapeType, typename Executor>
+    __MATX_INLINE__ void PreRun(ShapeType &&shape, Executor &&ex) const noexcept
+    {
+      storage_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+    }
+
+    template <typename ShapeType, typename Executor>
+    __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) const noexcept
+    {
+      storage_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+    }
+
+    template <OperatorCapability Cap, typename InType>
+    __MATX_INLINE__ __MATX_HOST__ auto get_capability(InType &in) const
+    {
+      return storage_.template get_capability<Cap>(in);
+    }
+
+#ifdef MATX_EN_JIT
+    using JIT_Storage = typename storage_type::JIT_Storage;
+
+    JIT_Storage ToJITStorage() const
+    {
+      return storage_.ToJITStorage();
+    }
+#endif
+};
+
+template <typename State, int Component, typename TensorType>
+struct base_type<SolverProjectionOp<State, Component, TensorType>> {
+  using type = SolverProjectionStorage<State, Component, TensorType>;
 };
 
 } // end namespace detail
