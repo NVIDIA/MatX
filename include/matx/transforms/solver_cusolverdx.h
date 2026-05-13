@@ -38,6 +38,11 @@ private:
   cusolverdxFunction function_ = CUSOLVERDX_FUNCTION_POTRF;
   SolverFillMode fill_mode_ = SolverFillMode::UPPER;
   cusolverdxJob job_ = CUSOLVERDX_JOB_NO_VECTORS;
+  mutable bool traits_cached_ = false;
+  mutable bool traits_supported_ = false;
+  mutable long long int trait_shared_memory_size_ = 0;
+  mutable long long int trait_workspace_size_ = 0;
+  mutable cuda::std::array<int, 3> trait_block_dim_ = {0, 0, 0};
 
   static constexpr bool is_supported_value_type =
       cuda::std::is_same_v<InputType, float> ||
@@ -224,14 +229,14 @@ private:
         const auto elems = static_cast<long long int>(n_) * static_cast<long long int>(n_);
         const auto matrix_bytes = elems * elem_size;
         const auto lambda_offset = AlignUp(matrix_bytes, static_cast<long long int>(alignof(precision_type)));
-        const auto workspace_offset = AlignUp(lambda_offset + static_cast<long long int>(n_) * static_cast<long long int>(sizeof(precision_type)),
+        const auto info_offset = AlignUp(lambda_offset + static_cast<long long int>(n_) * static_cast<long long int>(sizeof(precision_type)),
+                                         static_cast<long long int>(alignof(int)));
+        const auto workspace_offset = AlignUp(info_offset + static_cast<long long int>(sizeof(int)),
                                               static_cast<long long int>(alignof(InputType)));
         if (workspace_size < 0) {
           workspace_size = GetWorkspaceSize();
         }
-        const auto info_offset = AlignUp(workspace_offset + workspace_size,
-                                         static_cast<long long int>(alignof(int)));
-        return info_offset + static_cast<long long int>(sizeof(int));
+        return workspace_offset + workspace_size;
       }
       case CUSOLVERDX_FUNCTION_GESV_NO_PIVOT:
       case CUSOLVERDX_FUNCTION_GESV_PARTIAL_PIVOT: {
@@ -247,6 +252,66 @@ private:
   static long long int AlignUp(long long int value, long long int alignment)
   {
     return ((value + alignment - 1) / alignment) * alignment;
+  }
+
+  void InvalidateTraitCache()
+  {
+    traits_cached_ = false;
+    traits_supported_ = false;
+    trait_shared_memory_size_ = 0;
+    trait_workspace_size_ = 0;
+    trait_block_dim_ = {0, 0, 0};
+  }
+
+  bool TryCacheTraits() const
+  {
+    if (traits_cached_) {
+      return traits_supported_;
+    }
+
+    traits_cached_ = true;
+    traits_supported_ = false;
+    trait_shared_memory_size_ = 0;
+    trait_workspace_size_ = 0;
+    trait_block_dim_ = {0, 0, 0};
+
+    if constexpr (!is_supported_value_type) {
+      return false;
+    }
+    else {
+      if (m_ <= 0 || n_ <= 0) {
+        return false;
+      }
+
+      auto handle = GeneratePlan();
+      long long int shared_memory_size = 0;
+      if (cusolverdxGetTraitInt64(handle.get(), CUSOLVERDX_TRAIT_SHARED_MEMORY_SIZE, &shared_memory_size) != COMMONDX_SUCCESS) {
+        return false;
+      }
+
+      long long int workspace_size = 0;
+      if (cusolverdxGetTraitInt64(handle.get(), CUSOLVERDX_TRAIT_WORKSPACE_SIZE, &workspace_size) != COMMONDX_SUCCESS) {
+        return false;
+      }
+
+      cuda::std::array<long long int, 3> block_dim = {0, 0, 0};
+      if (cusolverdxGetTraitInt64s(handle.get(), CUSOLVERDX_TRAIT_BLOCK_DIM, 3, block_dim.data()) != COMMONDX_SUCCESS) {
+        return false;
+      }
+
+      trait_shared_memory_size_ = shared_memory_size;
+      trait_workspace_size_ = workspace_size;
+      trait_block_dim_ = cuda::std::array<int, 3>{static_cast<int>(block_dim[0]),
+                                                  static_cast<int>(block_dim[1]),
+                                                  static_cast<int>(block_dim[2])};
+      traits_supported_ = true;
+      return true;
+    }
+  }
+
+  void EnsureTraitsCached() const
+  {
+    MATX_ASSERT_STR(TryCacheTraits(), matxInvalidParameter, "cuSolverDx trait query failed");
   }
 
   std::string GetTraitSymbolName(cusolverdxDescriptor handle) const
@@ -269,13 +334,13 @@ private:
 public:
   cuSolverDxHelper() = default;
 
-  void set_m(index_t m) { m_ = m; }
-  void set_n(index_t n) { n_ = n; }
-  void set_k(index_t k) { k_ = k; }
-  void set_cc(int cc) { cc_ = cc; }
-  void set_function(cusolverdxFunction function) { function_ = function; }
-  void set_fill_mode(SolverFillMode fill_mode) { fill_mode_ = fill_mode; }
-  void set_job(cusolverdxJob job) { job_ = job; }
+  void set_m(index_t m) { m_ = m; InvalidateTraitCache(); }
+  void set_n(index_t n) { n_ = n; InvalidateTraitCache(); }
+  void set_k(index_t k) { k_ = k; InvalidateTraitCache(); }
+  void set_cc(int cc) { cc_ = cc; InvalidateTraitCache(); }
+  void set_function(cusolverdxFunction function) { function_ = function; InvalidateTraitCache(); }
+  void set_fill_mode(SolverFillMode fill_mode) { fill_mode_ = fill_mode; InvalidateTraitCache(); }
+  void set_job(cusolverdxJob job) { job_ = job; InvalidateTraitCache(); }
 
   index_t get_m() const { return m_; }
   index_t get_n() const { return n_; }
@@ -356,29 +421,14 @@ public:
 
   bool IsSupported() const
   {
-    if constexpr (!is_supported_value_type) {
-      return false;
-    }
-    else {
-      if (m_ <= 0 || n_ <= 0) {
-        return false;
-      }
-      auto handle = GeneratePlan();
-      long long int shm = 0;
-      const bool supported =
-          cusolverdxGetTraitInt64(handle.get(), CUSOLVERDX_TRAIT_SHARED_MEMORY_SIZE, &shm) == COMMONDX_SUCCESS;
-      return supported;
-    }
+    return TryCacheTraits();
   }
 
   int GetShmRequired() const
   {
-    auto handle = GeneratePlan();
-    long long int shared_memory_size = 0;
-    LIBCUSOLVERDX_CHECK(cusolverdxGetTraitInt64(handle.get(), CUSOLVERDX_TRAIT_SHARED_MEMORY_SIZE, &shared_memory_size));
-
-    const auto workspace_size = KernelSharedMemoryFloorNeedsWorkspace() ? GetWorkspaceSize(handle.get()) : -1;
-    const auto required = cuda::std::max(shared_memory_size, GetKernelSharedMemoryFloor(workspace_size));
+    EnsureTraitsCached();
+    const auto workspace_size = KernelSharedMemoryFloorNeedsWorkspace() ? trait_workspace_size_ : -1;
+    const auto required = cuda::std::max(trait_shared_memory_size_, GetKernelSharedMemoryFloor(workspace_size));
     MATX_ASSERT_STR(required <= static_cast<long long int>(std::numeric_limits<int>::max()),
                     matxInvalidParameter,
                     "cuSolverDx shared memory requirement exceeds CUDA launch parameter range");
@@ -387,12 +437,8 @@ public:
 
   cuda::std::array<int, 3> GetBlockDim() const
   {
-    auto handle = GeneratePlan();
-    cuda::std::array<long long int, 3> block_dim = {0, 0, 0};
-    LIBCUSOLVERDX_CHECK(cusolverdxGetTraitInt64s(handle.get(), CUSOLVERDX_TRAIT_BLOCK_DIM, 3, block_dim.data()));
-    return cuda::std::array<int, 3>{static_cast<int>(block_dim[0]),
-                                    static_cast<int>(block_dim[1]),
-                                    static_cast<int>(block_dim[2])};
+    EnsureTraitsCached();
+    return trait_block_dim_;
   }
 
   cuda::std::array<int, 2> GetBlockDimRange() const
@@ -409,8 +455,8 @@ public:
 
   long long int GetWorkspaceSize() const
   {
-    auto handle = GeneratePlan();
-    return GetWorkspaceSize(handle.get());
+    EnsureTraitsCached();
+    return trait_workspace_size_;
   }
 
   bool GenerateLTOIR(std::set<std::string> &ltoir_symbols)
@@ -828,16 +874,13 @@ public:
       static constexpr size_t matrix_bytes = elems * sizeof(solver_value_type);
       static constexpr size_t lambda_offset = ((matrix_bytes + alignof(precision_type) - 1) / alignof(precision_type)) * alignof(precision_type);
       static constexpr size_t lambda_bytes = n * sizeof(precision_type);
-      static constexpr size_t workspace_offset = ((lambda_offset + lambda_bytes + alignof(solver_value_type) - 1) / alignof(solver_value_type)) * alignof(solver_value_type);
-      static constexpr size_t workspace_bytes = )";
-    result += std::to_string(GetWorkspaceSize());
-    result += R"(;
-      static constexpr size_t info_offset = ((workspace_offset + workspace_bytes + alignof(int) - 1) / alignof(int)) * alignof(int);
+      static constexpr size_t info_offset = ((lambda_offset + lambda_bytes + alignof(int) - 1) / alignof(int)) * alignof(int);
+      static constexpr size_t workspace_offset = ((info_offset + sizeof(int) + alignof(solver_value_type) - 1) / alignof(solver_value_type)) * alignof(solver_value_type);
       extern __shared__ __align__(16) char smem[];
       solver_value_type* smem_a = reinterpret_cast<solver_value_type*>(smem);
       precision_type* lambda = reinterpret_cast<precision_type*>(smem + lambda_offset);
-      solver_value_type* workspace = reinterpret_cast<solver_value_type*>(smem + workspace_offset);
       int* info = reinterpret_cast<int*>(smem + info_offset);
+      solver_value_type* workspace = reinterpret_cast<solver_value_type*>(smem + workspace_offset);
       const int tid = threadIdx.x + threadIdx.y * blockDim.x + threadIdx.z * blockDim.x * blockDim.y;
       const int total_threads = blockDim.x * blockDim.y * blockDim.z;
       cuda::std::array<index_t, Rank()> idx = { static_cast<index_t>(indices)... };

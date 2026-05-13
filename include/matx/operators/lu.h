@@ -112,29 +112,76 @@ namespace detail {
           a_.PreRun(detail::NoShape{}, std::forward<Executor>(ex));
         }
 
-        detail::AllocateTempTensor(factors_, std::forward<Executor>(ex), factors_shape_, &factors_ptr_);
-        detail::AllocateTempTensor(piv_, std::forward<Executor>(ex), piv_shape_, &piv_ptr_);
-        if constexpr (is_cuda_executor_v<Executor>) {
-          lu_impl(factors_, piv_, a_, std::forward<Executor>(ex));
-        }
-        else {
-#if MATX_EN_CPU_SOLVER
-          if constexpr (std::is_same_v<piv_value_type, lapack_int_t>) {
+        const auto cleanup = [&]() noexcept {
+          try {
+            if (factors_ptr_ != nullptr) {
+              if constexpr (is_cuda_executor_v<Executor>) {
+                matxFree(factors_ptr_, ex.getStream());
+              }
+              else {
+                matxFree(factors_ptr_);
+              }
+              factors_ptr_ = nullptr;
+            }
+
+            if (piv_ptr_ != nullptr) {
+              if constexpr (is_cuda_executor_v<Executor>) {
+                matxFree(piv_ptr_, ex.getStream());
+              }
+              else {
+                matxFree(piv_ptr_);
+              }
+              piv_ptr_ = nullptr;
+            }
+
+            if constexpr (is_matx_op<OpA>()) {
+              a_.PostRun(detail::NoShape{}, std::forward<Executor>(ex));
+            }
+          }
+          catch (...) {
+          }
+          materialized_ = false;
+          materialize_count_ = 0;
+        };
+
+        try {
+          detail::AllocateTempTensor(factors_, std::forward<Executor>(ex), factors_shape_, &factors_ptr_);
+          detail::AllocateTempTensor(piv_, std::forward<Executor>(ex), piv_shape_, &piv_ptr_);
+          if constexpr (is_cuda_executor_v<Executor>) {
             lu_impl(factors_, piv_, a_, std::forward<Executor>(ex));
           }
           else {
-            detail::tensor_impl_t<lapack_int_t, RANK - 1> lapack_piv;
-            lapack_int_t *lapack_piv_ptr = nullptr;
-            detail::AllocateTempTensor(lapack_piv, std::forward<Executor>(ex), piv_shape_, &lapack_piv_ptr);
-            lu_impl(factors_, lapack_piv, a_, std::forward<Executor>(ex));
-            for (index_t i = 0; i < lapack_piv.TotalSize(); i++) {
-              piv_.Data()[i] = static_cast<piv_value_type>(lapack_piv.Data()[i]);
+#if MATX_EN_CPU_SOLVER
+            if constexpr (std::is_same_v<piv_value_type, lapack_int_t>) {
+              lu_impl(factors_, piv_, a_, std::forward<Executor>(ex));
             }
-            matxFree(lapack_piv_ptr);
-          }
+            else {
+              detail::tensor_impl_t<lapack_int_t, RANK - 1> lapack_piv;
+              lapack_int_t *lapack_piv_ptr = nullptr;
+              try {
+                detail::AllocateTempTensor(lapack_piv, std::forward<Executor>(ex), piv_shape_, &lapack_piv_ptr);
+                lu_impl(factors_, lapack_piv, a_, std::forward<Executor>(ex));
+                for (index_t i = 0; i < lapack_piv.TotalSize(); i++) {
+                  piv_.Data()[i] = static_cast<piv_value_type>(lapack_piv.Data()[i]);
+                }
+                matxFree(lapack_piv_ptr);
+                lapack_piv_ptr = nullptr;
+              }
+              catch (...) {
+                if (lapack_piv_ptr != nullptr) {
+                  matxFree(lapack_piv_ptr);
+                }
+                throw;
+              }
+            }
 #else
-          lu_impl(factors_, piv_, a_, std::forward<Executor>(ex));
+            lu_impl(factors_, piv_, a_, std::forward<Executor>(ex));
 #endif
+          }
+        }
+        catch (...) {
+          cleanup();
+          throw;
         }
         materialized_ = true;
         materialize_count_ = 1;
