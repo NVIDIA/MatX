@@ -305,6 +305,9 @@ namespace detail {
       using scan_type = typename Op::value_type;
       using BlockScanT = cub::BlockScan<scan_type, CapType::block_size>;
 
+      // CCCL BlockScan's TempStorage is a property of the block dimensions and
+      // algorithm. ITEMS_PER_THREAD is supplied to the InclusiveSum overload
+      // below rather than to the BlockScan class template.
       __shared__ typename BlockScanT::TempStorage temp_storage;
 
       using ret_type = cuda::std::conditional_t<CapType::ept == ElementsPerThread::ONE, scan_type, Vector<scan_type, ept>>;

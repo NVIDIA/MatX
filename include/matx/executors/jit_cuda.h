@@ -85,7 +85,15 @@ namespace matx
       bool pass_through_threads;         // Whether all threads must call operator() (bounds checking at tensor level)
     };
 
-    // Global cache for JIT launch parameters, keyed by operator type string from JIT_TYPE_QUERY
+    inline std::string GetJITLaunchParamsCacheKey(const std::string &kernel_op_type)
+    {
+      int device = 0;
+      MATX_CUDA_CHECK(cudaGetDevice(&device));
+      return std::to_string(device) + ":" + kernel_op_type;
+    }
+
+    // Global cache for JIT launch parameters, keyed by CUDA device and operator type
+    // string from JIT_TYPE_QUERY.
     inline std::unordered_map<std::string, JITLaunchParams> jit_launch_params_cache;
     inline std::mutex jit_launch_params_mutex;
   }  // namespace detail
@@ -240,13 +248,14 @@ namespace matx
           if constexpr (RANK <= 4) {
             // Get operator type string for cache lookup
             const auto kernel_op_type = detail::get_operator_capability<detail::OperatorCapability::JIT_TYPE_QUERY>(op);
+            const auto launch_params_cache_key = detail::GetJITLaunchParamsCacheKey(kernel_op_type);
 
             // Check if we have cached launch parameters for this operator type
             detail::JITLaunchParams cached_params;
             bool has_cached_params = false;
             {
               std::lock_guard<std::mutex> lock(detail::jit_launch_params_mutex);
-              auto it = detail::jit_launch_params_cache.find(kernel_op_type);
+              auto it = detail::jit_launch_params_cache.find(launch_params_cache_key);
               if (it != detail::jit_launch_params_cache.end()) {
                 cached_params = it->second;
                 has_cached_params = true;
@@ -343,7 +352,7 @@ namespace matx
 
               {
                 std::lock_guard<std::mutex> lock(detail::jit_launch_params_mutex);
-                detail::jit_launch_params_cache[kernel_op_type] = params_to_cache;
+                detail::jit_launch_params_cache[launch_params_cache_key] = params_to_cache;
               }
             }
 
@@ -356,13 +365,14 @@ namespace matx
             // ND kernel support for ranks > 4 (JIT path)
             // Get operator type string for cache lookup
             const auto kernel_op_type = detail::get_operator_capability<detail::OperatorCapability::JIT_TYPE_QUERY>(op);
+            const auto launch_params_cache_key = detail::GetJITLaunchParamsCacheKey(kernel_op_type);
 
             // Check if we have cached launch parameters for this operator type
             detail::JITLaunchParams cached_params;
             bool has_cached_params = false;
             {
               std::lock_guard<std::mutex> lock(detail::jit_launch_params_mutex);
-              auto it = detail::jit_launch_params_cache.find(kernel_op_type);
+              auto it = detail::jit_launch_params_cache.find(launch_params_cache_key);
               if (it != detail::jit_launch_params_cache.end()) {
                 cached_params = it->second;
                 has_cached_params = true;
@@ -402,7 +412,7 @@ namespace matx
               params_to_cache.pass_through_threads = pass_through_threads;
               {
                 std::lock_guard<std::mutex> lock(detail::jit_launch_params_mutex);
-                detail::jit_launch_params_cache[kernel_op_type] = params_to_cache;
+                detail::jit_launch_params_cache[launch_params_cache_key] = params_to_cache;
               }
             }
 
