@@ -788,8 +788,7 @@ public:
     result += std::to_string(static_cast<int>(r_rows));
     result += R"(;
       static constexpr index_t elems = m * n;
-      static constexpr index_t q_elems = m * q_cols;
-      static constexpr index_t tau_elems = q_cols;
+      static_assert(q_cols == n, "cuSolverDx QR Q projection requires Q and input leading dimensions to match");
       extern __shared__ __align__(16) char smem[];
       solver_value_type* smem_a = reinterpret_cast<solver_value_type*>(smem);
       solver_value_type* tau = reinterpret_cast<solver_value_type*>(smem + elems * sizeof(solver_value_type));
@@ -827,15 +826,6 @@ public:
       if constexpr (Component == )";
     result += std::to_string(q_component);
     result += R"() {
-        for (index_t base = 0; base < q_elems; base += total_threads) {
-          const index_t linear = base + tid;
-          if (linear < q_elems) {
-            const index_t row = linear / q_cols;
-            const index_t col = linear % q_cols;
-            smem_a[linear] = smem_a[row * n + col];
-          }
-        }
-        __syncthreads();
     )";
     result += ungqr_func_name;
     result += R"((smem_a, tau);

@@ -265,6 +265,8 @@ namespace detail {
       template <int Component>
       std::string GetJITProjectionClassName() const
       {
+        // LU factors and pivots deliberately share one generated class because
+        // GetLuProjectionFuncStr dispatches on Component inside the body.
         return std::string("JITLUProjectionOp_R") + std::to_string(RANK) + "_" + dx_lu_helper_.GetSymbolName();
       }
 
