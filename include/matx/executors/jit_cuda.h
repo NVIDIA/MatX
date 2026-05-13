@@ -350,7 +350,7 @@ namespace matx
             MATX_LOG_DEBUG("Shm size {}, Stride {}, estimated EPT {}, blocks {}x{}x{} threads {}x{}x{}, pass_through_threads {}",
                 shm_size, stride, static_cast<int>(best_ept), blocks.x, blocks.y, blocks.z, threads.x, threads.y, threads.z, pass_through_threads);
             const int osize = RANK == 0 ? 1 : static_cast<int>(op.Size(RANK - 1));
-            detail::nvrtc_compile_and_run("output.cu", op, sizes, blocks, threads, best_ept, stride, shm_size, osize, global_kernel, pass_through_threads, block_reduces_rank);
+            detail::nvrtc_compile_and_run("output.cu", op, sizes, blocks, threads, best_ept, stride, shm_size, osize, global_kernel, stream_, pass_through_threads, block_reduces_rank);
           }
           else {
             // ND kernel support for ranks > 4 (JIT path)
@@ -414,7 +414,7 @@ namespace matx
                 stride, blocks.x, blocks.y, blocks.z, threads.x, threads.y, threads.z, dims);
 
             // Use ND kernel through JIT compilation
-            detail::nvrtc_compile_and_run("output.cu", op, sizes, blocks, threads, best_ept, stride, 0, osize, true);
+            detail::nvrtc_compile_and_run("output.cu", op, sizes, blocks, threads, best_ept, stride, 0, osize, true, stream_);
           }
 
 #else

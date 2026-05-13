@@ -555,7 +555,19 @@ inline std::string qualify_jit_type_names(const std::string& type_str) {
 }
 
 template <typename Op, typename SizeArray>
-auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name, Op op, const SizeArray &sa, dim3 &blocks, dim3 &threads, ElementsPerThread ept, bool stride, int dynamic_shmem_size, int osize, bool global_kernel, bool pass_through_threads = false, bool block_reduces_rank = false) {
+auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name,
+                           Op op,
+                           const SizeArray &sa,
+                           dim3 &blocks,
+                           dim3 &threads,
+                           ElementsPerThread ept,
+                           bool stride,
+                           int dynamic_shmem_size,
+                           int osize,
+                           bool global_kernel,
+                           cudaStream_t stream,
+                           bool pass_through_threads = false,
+                           bool block_reduces_rank = false) {
   // The actual rank comes from the size array, which may differ from Op::Rank()
   // for dynamic tensor expressions (where Op::Rank() = MATX_MAX_DYNAMIC_RANK).
   constexpr int RANK = std::tuple_size_v<SizeArray>;
@@ -822,7 +834,7 @@ launch_kernel:
                               blocks.x, blocks.y, blocks.z,
                               threads.x, threads.y, threads.z,
                               dynamic_shmem_size,
-                              nullptr,  // stream
+                              stream,
                               args,
                               nullptr));
   }
@@ -850,7 +862,7 @@ launch_kernel:
                               blocks.x, blocks.y, blocks.z,
                               threads.x, threads.y, threads.z,
                               dynamic_shmem_size,
-                              nullptr,  // stream
+                              stream,
                               args,
                               nullptr));
   }
