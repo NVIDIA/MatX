@@ -80,6 +80,9 @@ namespace matx {
 #if defined(__clang__ )
     #define MATX_IGNORE_WARNING_PUSH_GCC(WARN_MSG)
     #define MATX_IGNORE_WARNING_POP_GCC
+    #define MATX_IGNORE_WARNING_PUSH_MSVC(WARN_ID)
+    #define MATX_IGNORE_WARNING_POP_MSVC
+    #define MATX_IGNORE_WARNING_NEXT_LINE_MSVC(WARN_ID)
 
     #define MATX_IGNORE_WARNING_PUSH_CLANG(WARN_MSG) \
         _Pragma("clang diagnostic push") \
@@ -90,6 +93,9 @@ namespace matx {
 #elif defined(__GNUC__)
     #define MATX_IGNORE_WARNING_PUSH_CLANG(WARN_MSG)
     #define MATX_IGNORE_WARNING_POP_CLANG
+    #define MATX_IGNORE_WARNING_PUSH_MSVC(WARN_ID)
+    #define MATX_IGNORE_WARNING_POP_MSVC
+    #define MATX_IGNORE_WARNING_NEXT_LINE_MSVC(WARN_ID)
 
     #define MATX_IGNORE_WARNING_PUSH_GCC(WARN_MSG) \
         _Pragma("GCC diagnostic push") \
@@ -98,6 +104,11 @@ namespace matx {
     #define MATX_IGNORE_WARNING_POP_GCC \
         _Pragma("GCC diagnostic pop")
 #elif defined(_MSC_VER)
+    #define MATX_IGNORE_WARNING_PUSH_GCC(WARN_MSG)
+    #define MATX_IGNORE_WARNING_POP_GCC
+    #define MATX_IGNORE_WARNING_PUSH_CLANG(WARN_MSG)
+    #define MATX_IGNORE_WARNING_POP_CLANG
+
     #define MATX_IGNORE_WARNING_PUSH_MSVC(WARN_ID) \
         __pragma(warning(push)) \
         __pragma(warning(disable : WARN_ID))
