@@ -214,6 +214,48 @@ TEST(QRSolverJITRegression, CuSolverDxQRMultipleSizesInOneJITExpression)
   MATX_EXIT_HANDLER();
 }
 
+TEST(QRSolverJITRegression, CuSolverDxRectangularRProjectionJIT)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = float;
+
+  constexpr index_t rows = 4;
+  constexpr index_t cols = 3;
+  auto A = make_tensor<TestType>({rows, cols});
+  auto R = make_tensor<TestType>({rows, cols});
+  auto RefR = make_tensor<TestType>({rows, cols});
+  auto mdiff = make_tensor<TestType>({});
+
+  A(0, 0) = TestType{4};
+  A(0, 1) = TestType{1};
+  A(0, 2) = TestType{2};
+  A(1, 0) = TestType{2};
+  A(1, 1) = TestType{5};
+  A(1, 2) = TestType{1};
+  A(2, 0) = TestType{1};
+  A(2, 1) = TestType{3};
+  A(2, 2) = TestType{6};
+  A(3, 0) = TestType{0.5f};
+  A(3, 1) = TestType{1};
+  A(3, 2) = TestType{2};
+
+  auto op = qr(A);
+  auto ref = qr(A);
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.Q));
+  EXPECT_TRUE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.R));
+
+  CUDAJITExecutor jit_exec{};
+  cudaExecutor cuda_exec{};
+  (R = op.R).run(jit_exec);
+  (RefR = ref.R).run(cuda_exec);
+  (mdiff = max(abs(R - RefR))).run(cuda_exec);
+  cuda_exec.sync();
+
+  ASSERT_NEAR(mdiff(), TestType(0), TestType(0.001));
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(QRSolverJITTestFloatTypes, CuSolverDxBatchedMatrixQRProjectionJIT)
 {
   MATX_ENTER_HANDLER();

@@ -111,7 +111,7 @@ namespace detail {
 
       __MATX_INLINE__ std::string get_jit_class_name() const {
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
-        return std::string("JITCholOp_") + dx_potrf_helper_.GetSymbolName();
+        return std::string("JITCholOp_R") + std::to_string(Rank()) + "_" + dx_potrf_helper_.GetSymbolName();
 #else
         return "JITCholOp";
 #endif
@@ -136,7 +136,7 @@ namespace detail {
             "  }\n" +
             "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank()\n" +
             "  {\n" +
-            "    return " + std::to_string(Rank()) + ";\n" +
+            "    return OpA::Rank();\n" +
             "  }\n" +
             "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const\n" +
             "  {\n" +

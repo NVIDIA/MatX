@@ -190,9 +190,9 @@ namespace detail {
       bool SupportsJITProjection() const
       {
         const bool square = r_shape_[RANK - 2] == r_shape_[RANK - 1];
-        return (RANK >= 2) && (RANK <= 4) && square &&
+        return (RANK >= 2) && (RANK <= 4) &&
                dx_geqrf_helper_.IsSupported() &&
-               (Component == QR_R || dx_ungqr_helper_.IsSupported());
+               (Component == QR_R || (square && dx_ungqr_helper_.IsSupported()));
       }
 
       template <int Component>
@@ -229,7 +229,7 @@ namespace detail {
       template <int Component>
       std::string GetJITProjectionClassName() const
       {
-        return std::string("JITQRProjectionOp_") +
+        return std::string("JITQRProjectionOp_R") + std::to_string(RANK) + "_" +
                dx_geqrf_helper_.GetSymbolName() + "_" +
                dx_ungqr_helper_.GetSymbolName();
       }
@@ -533,7 +533,7 @@ namespace detail {
       template <int Component>
       std::string GetJITProjectionClassName() const
       {
-        return std::string("JITQRSolverProjectionOp_") + dx_geqrf_helper_.GetSymbolName();
+        return std::string("JITQRSolverProjectionOp_R") + std::to_string(RANK) + "_" + dx_geqrf_helper_.GetSymbolName();
       }
 
       template <int Component>
@@ -866,7 +866,7 @@ namespace detail {
       template <int Component>
       std::string GetJITProjectionClassName() const
       {
-        return std::string("JITEconQRProjectionOp_") +
+        return std::string("JITEconQRProjectionOp_R") + std::to_string(RANK) + "_" +
                dx_geqrf_helper_.GetSymbolName() + "_" +
                dx_ungqr_helper_.GetSymbolName();
       }

@@ -209,6 +209,45 @@ TEST(LUSolverJITRegression, CuSolverDxPivotProjectionUsedInFusedExpression)
   MATX_EXIT_HANDLER();
 }
 
+TEST(LUSolverJITRegression, CuSolverDxSameSizeDifferentRanksInOneJITExpression)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = float;
+
+  auto A2 = make_tensor<TestType>({2, 2});
+  auto A3 = make_tensor<TestType>({1, 2, 2});
+  auto Out = make_tensor<TestType>({2, 2});
+  auto Ref = make_tensor<TestType>({2, 2});
+  auto mdiff = make_tensor<TestType>({});
+
+  A2(0, 0) = TestType{3};
+  A2(0, 1) = TestType{1};
+  A2(1, 0) = TestType{2};
+  A2(1, 1) = TestType{4};
+
+  A3(0, 0, 0) = TestType{5};
+  A3(0, 0, 1) = TestType{2};
+  A3(0, 1, 0) = TestType{1};
+  A3(0, 1, 1) = TestType{6};
+
+  auto op2 = lu(A2);
+  auto op3 = lu(A3);
+  Ref(0, 0) = TestType{8};
+  Ref(0, 1) = TestType{3};
+  Ref(1, 0) = TestType{2.0f / 3.0f + 1.0f / 5.0f};
+  Ref(1, 1) = TestType{10.0f / 3.0f + 28.0f / 5.0f};
+
+  CUDAJITExecutor jit_exec{};
+  cudaExecutor cuda_exec{};
+  (Out = op2.LU + slice<2>(op3.LU, {0, 0, 0}, {matxDropDim, 2, 2})).run(jit_exec);
+  (mdiff = max(abs(Out - Ref))).run(cuda_exec);
+  cuda_exec.sync();
+
+  ASSERT_NEAR(mdiff(), TestType(0), TestType(0.001));
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(LUSolverJITTestFloatTypes, CuSolverDxBatchedMatrixProjectionJIT)
 {
   MATX_ENTER_HANDLER();

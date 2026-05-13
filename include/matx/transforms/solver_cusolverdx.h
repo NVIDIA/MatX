@@ -12,6 +12,8 @@
 #include "matx/core/log.h"
 #include "matx/core/operator_options.h"
 
+#include <limits>
+
 #define SOLVER_DX_FUNC_PREFIX "solver_cusolverdx_func"
 
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
@@ -366,7 +368,11 @@ public:
     long long int shared_memory_size = 0;
     LIBCUSOLVERDX_CHECK(cusolverdxGetTraitInt64(handle.get(), CUSOLVERDX_TRAIT_SHARED_MEMORY_SIZE, &shared_memory_size));
 
-    return static_cast<int>(cuda::std::max(shared_memory_size, GetKernelSharedMemoryFloor()));
+    const auto required = cuda::std::max(shared_memory_size, GetKernelSharedMemoryFloor());
+    MATX_ASSERT_STR(required <= static_cast<long long int>(std::numeric_limits<int>::max()),
+                    matxInvalidParameter,
+                    "cuSolverDx shared memory requirement exceeds CUDA launch parameter range");
+    return static_cast<int>(required);
   }
 
   cuda::std::array<int, 3> GetBlockDim() const
@@ -384,12 +390,12 @@ public:
     return cuda::std::array<int, 2>{32, 1024};
   }
 
-  int GetWorkspaceSize() const
+  long long int GetWorkspaceSize() const
   {
     auto handle = GeneratePlan();
     long long int workspace_size = 0;
     LIBCUSOLVERDX_CHECK(cusolverdxGetTraitInt64(handle.get(), CUSOLVERDX_TRAIT_WORKSPACE_SIZE, &workspace_size));
-    return static_cast<int>(workspace_size);
+    return workspace_size;
   }
 
   bool GenerateLTOIR(std::set<std::string> &ltoir_symbols)
@@ -440,7 +446,7 @@ public:
       using value_type = )";
     result += detail::type_to_string<InputType>();
     result += R"(;
-      static_assert(Rank() >= 2 && Rank() <= 4, "cuSolverDx JIT supports matrix operator ranks 2 through 4");
+      static_assert(OpA::Rank() >= 2 && OpA::Rank() <= 4, "cuSolverDx JIT supports matrix operator ranks 2 through 4");
       static constexpr index_t n = )";
     result += std::to_string(static_cast<int>(n_));
     result += R"(;
@@ -498,7 +504,7 @@ public:
       using value_type = )";
     result += detail::type_to_string<InputType>();
     result += R"(;
-      static_assert(Rank() >= 2 && Rank() <= 4, "cuSolverDx JIT supports matrix operator ranks 2 through 4");
+      static_assert(OpA::Rank() >= 2 && OpA::Rank() <= 4, "cuSolverDx JIT supports matrix operator ranks 2 through 4");
       static constexpr index_t n = )";
     result += std::to_string(static_cast<int>(n_));
     result += R"(;
@@ -809,7 +815,7 @@ public:
       static constexpr size_t lambda_bytes = n * sizeof(precision_type);
       static constexpr size_t workspace_offset = ((lambda_offset + lambda_bytes + alignof(solver_value_type) - 1) / alignof(solver_value_type)) * alignof(solver_value_type);
       static constexpr size_t workspace_bytes = )";
-    result += std::to_string(static_cast<int>(GetWorkspaceSize()));
+    result += std::to_string(GetWorkspaceSize());
     result += R"(;
       static constexpr size_t info_offset = ((workspace_offset + workspace_bytes + alignof(int) - 1) / alignof(int)) * alignof(int);
       extern __shared__ __align__(16) char smem[];

@@ -239,7 +239,7 @@ namespace detail {
       template <int Component>
       std::string GetJITProjectionClassName() const
       {
-        return std::string("JITEigProjectionOp_") +
+        return std::string("JITEigProjectionOp_R") + std::to_string(RANK) + "_" +
                dx_heev_values_helper_.GetSymbolName() + "_" +
                dx_heev_vectors_helper_.GetSymbolName();
       }
