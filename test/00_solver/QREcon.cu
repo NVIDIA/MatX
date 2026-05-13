@@ -248,11 +248,13 @@ void qr_econ_test( const index_t (&AshapeA)[RANK]) {
 
   ASSERT_NEAR( mdiffQTQ(), SType(0), .00001);
   ASSERT_NEAR( mdiffQR(), SType(0), .00001);
+  ClearCachesAndAllocations();
 }
 
 TYPED_TEST(QREconSolverTestNonHalfTypes, QREcon)
 {
   MATX_ENTER_HANDLER();
+  ClearCachesAndAllocations();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;  
   
   qr_econ_test<TestType>({4,4});
@@ -274,6 +276,7 @@ TYPED_TEST(QREconSolverTestNonHalfTypes, QREcon)
 TYPED_TEST(QREconSolverTestNonHalfTypes, ProjectionAPI)
 {
   MATX_ENTER_HANDLER();
+  ClearCachesAndAllocations();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using SType = typename inner_op_type_t<TestType>::type;
 
