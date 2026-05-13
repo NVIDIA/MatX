@@ -34,10 +34,24 @@ function(find_and_configure_pybind11)
     # This ensures pybind11 headers and cmake config are installed with matx
     set(PYBIND11_INSTALL ON CACHE BOOL "Install pybind11 headers and cmake config")
     set(PYBIND11_FINDPYTHON ON CACHE BOOL "Use FindPython for pybind11")
+
+    if(DEFINED CMAKE_WARN_DEPRECATED)
+        set(MATX_CMAKE_WARN_DEPRECATED_WAS_DEFINED TRUE)
+        set(MATX_CMAKE_WARN_DEPRECATED "${CMAKE_WARN_DEPRECATED}")
+    else()
+        set(MATX_CMAKE_WARN_DEPRECATED_WAS_DEFINED FALSE)
+    endif()
+    set(CMAKE_WARN_DEPRECATED OFF)
     
     CPMFindPackage(NAME pybind11
         GIT_REPOSITORY  https://github.com/pybind/pybind11.git
         GIT_TAG         a5b9e50)
+
+    if(MATX_CMAKE_WARN_DEPRECATED_WAS_DEFINED)
+        set(CMAKE_WARN_DEPRECATED "${MATX_CMAKE_WARN_DEPRECATED}")
+    else()
+        unset(CMAKE_WARN_DEPRECATED)
+    endif()
   
     if(pybind11_FOUND)
         set(pybind11_FOUND TRUE PARENT_SCOPE)    

@@ -1,5 +1,15 @@
 cmake_minimum_required(VERSION 3.25.2)
 
+if(POLICY CMP0144)
+    # Preserve current behavior: CI may export upper-case package root variables
+    # that should not override dependencies fetched through CPM.
+    cmake_policy(SET CMP0144 OLD)
+endif()
+if(POLICY CMP0169)
+    # rapids-cmake currently drives CPM through FetchContent_Populate.
+    cmake_policy(SET CMP0169 OLD)
+endif()
+
 set(MATX_VERSION 1.0.0)
 
 # Used for config file generation
@@ -86,6 +96,10 @@ option(MATX_DISABLE_EXCEPTIONS "Disable C++ exceptions and log errors instead" O
 
 set(MATX_EN_PYBIND11 OFF CACHE BOOL "Enable pybind11 support")
 
+if (MATX_BUILD_BENCHMARKS AND CMAKE_VERSION VERSION_LESS 3.30.4)
+    message(FATAL_ERROR "MATX_BUILD_BENCHMARKS=ON requires CMake 3.30.4 or newer because bundled nvbench requires it")
+endif()
+
 set(cudss_DIR "" CACHE PATH "Directory where cuDSS is installed.")
 set(cutensor_DIR "" CACHE PATH "Directory where cuTENSOR is installed.")
 set(cutensornet_DIR "" CACHE PATH "Directory where cuTensorNet is installed.")
@@ -118,8 +132,12 @@ if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
     endif()
 endif()
 
-# CPM is required for all package management
-include(public/cpm-cmake/cmake/CPM.cmake)
+# CPM is required for all package management. rapids_cpm_init loads it for the
+# main build, so only include the vendored copy when MatX is configured without
+# that initialization path.
+if(NOT COMMAND CPMAddPackage)
+    include(public/cpm-cmake/cmake/CPM.cmake)
+endif()
 # Helper for selecting build type
 include(cmake/BuildType.cmake)
 
@@ -170,6 +188,10 @@ endif()
 
 # Set preferred compiler warning flags. nvc++ doesn't support most warnings
 string(FIND "${CMAKE_CUDA_HOST_COMPILER}" "nvc++" IS_NVCPP)
+if (${IS_NVCPP} GREATER -1 OR CMAKE_CXX_COMPILER_ID STREQUAL "NVHPC")
+    target_compile_options(matx INTERFACE
+        $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=--diag_suppress=if_consteval_in_nonconstexpr_function>)
+endif()
 if (NOT ${IS_NVCPP} GREATER -1)
     set(WARN_FLAGS
         -Wall

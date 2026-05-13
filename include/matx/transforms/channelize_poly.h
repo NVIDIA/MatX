@@ -516,7 +516,7 @@ inline void FusedChan(OutType o, const InType &i,
     // automatically grows the dispatch table; no per-N switch case to
     // update. A runtime value outside the range falls through to MATX_THROW.
     constexpr int kMinChan = 2;
-    constexpr int kMaxChan = static_cast<int>(FusedChanThreshold);
+    [[maybe_unused]] constexpr int kMaxChan = static_cast<int>(FusedChanThreshold);
     const bool matched = [&]<int... Is>(cuda::std::integer_sequence<int, Is...>) {
       return ((num_channels == kMinChan + Is
                  ? (ChannelizePoly1D_FusedChan<THREADS, kMinChan + Is, IsUnitStride,

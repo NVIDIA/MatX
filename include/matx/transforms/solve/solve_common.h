@@ -154,8 +154,8 @@ __MATX_INLINE__ index_t GetDenseSolveNumRhs(const BTensor &b)
 }
 
 __MATX_INLINE__ void CheckDenseSolveInfo(const int info,
-                                         const char *provider,
-                                         const char *routine)
+                                         [[maybe_unused]] const char *provider,
+                                         [[maybe_unused]] const char *routine)
 {
   if (info < 0) {
     MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
