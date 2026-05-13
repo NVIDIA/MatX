@@ -544,6 +544,18 @@ TEST(TensorStats, CubBlockJITRejectsEmptyCriticalDim)
   MATX_EXIT_HANDLER();
 }
 
+TEST(TensorStats, CubBlockJITRejectsComplexArgsortKeys)
+{
+  MATX_ENTER_HANDLER();
+
+  tensor_t<cuda::std::complex<float>, 2> complex_in({2, 8});
+
+  auto argsort_op = argsort(complex_in, SORT_DIR_ASC);
+  EXPECT_FALSE(jit_supported(argsort_op));
+
+  MATX_EXIT_HANDLER();
+}
+
 TEST(TensorStats, CubBlockJITMultiDimReductions)
 {
   MATX_ENTER_HANDLER();

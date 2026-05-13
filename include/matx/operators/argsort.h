@@ -62,6 +62,7 @@ namespace detail {
 
     public:
       using matxop = bool;
+      using key_type = typename OpA::value_type;
       using value_type = index_t;
       using matx_transform_op = bool;
       using sort_xform_op = bool;
@@ -109,7 +110,7 @@ namespace detail {
 
       __MATX_INLINE__ int MaxJitElementsPerThread() const {
         return LargestPowerOfTwoDivisorAtMost(CriticalDimSize(),
-                                             MaxCubJitElementsPerThreadByBytes<value_type>());
+                                             MaxCubJitElementsPerThreadByBytes<key_type>());
       }
 
       __MATX_INLINE__ bool BlockSizeFitsAtMaxEPT() const {
@@ -220,7 +221,7 @@ namespace detail {
         else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
           bool supported = true;
 #if defined(MATX_EN_JIT) && defined(__CUDACC__)
-          supported = OpA::Rank() > 0 && !is_complex_v<typename OpA::value_type> &&
+          supported = OpA::Rank() > 0 && !is_complex_v<key_type> &&
                       BlockSizeFitsAtMaxEPT();
 #else
           supported = false;
@@ -269,9 +270,9 @@ namespace detail {
 #if defined(MATX_EN_JIT) && defined(__CUDACC__)
           const int block_threads = CurrentBlockThreads();
           const int self_shm = block_threads > 0 ?
-            GetCubBlockShmRequired<typename OpA::value_type>(CubBlockAlgorithm::SORT_PAIRS,
-                                                             current_ept_,
-                                                             block_threads) :
+            GetCubBlockShmRequired<key_type>(CubBlockAlgorithm::SORT_PAIRS,
+                                             current_ept_,
+                                             block_threads) :
             capability_attributes<Cap>::default_value;
           return combine_capabilities<Cap>(self_shm, detail::get_operator_capability<Cap>(a_, in));
 #else
