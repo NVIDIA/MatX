@@ -240,7 +240,8 @@ namespace detail {
         else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
           bool supported = true;
 #if defined(MATX_EN_JIT) && defined(__CUDACC__)
-          supported = ((InRank - ORank) >= 1) && BlockSizeFitsAtMaxEPT();
+          supported = ((InRank - ORank) >= 1) && !is_complex_v<value_type> &&
+                      BlockSizeFitsAtMaxEPT();
 #else
           supported = false;
 #endif

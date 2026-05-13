@@ -550,6 +550,20 @@ TEST(TensorStats, CubBlockJITRejectsComplexArgsortKeys)
   MATX_EXIT_HANDLER();
 }
 
+TEST(TensorStats, CubBlockJITRejectsComplexReductions)
+{
+  MATX_ENTER_HANDLER();
+
+  tensor_t<cuda::std::complex<float>, 2> complex_in({2, 8});
+
+  auto sum_op = sum(complex_in, {1});
+  auto prod_op = prod(complex_in, {1});
+  EXPECT_FALSE(jit_supported(sum_op));
+  EXPECT_FALSE(jit_supported(prod_op));
+
+  MATX_EXIT_HANDLER();
+}
+
 TEST(TensorStats, CubBlockJITRejectsNonPowerOfTwoCollectiveDim)
 {
   MATX_ENTER_HANDLER();

@@ -339,7 +339,7 @@ inline int nvrtc_get_cub_block_shmem_size(const std::string &algorithm,
   static std::unordered_map<std::string, int> shmem_cache;
   static std::mutex shmem_cache_mutex;
 
-  const int cache_ept = (algorithm == "sort" || algorithm == "sort_pairs" || algorithm == "scan") ? ept : 1;
+  const int cache_ept = (algorithm == "sort" || algorithm == "sort_pairs") ? ept : 1;
   const std::string cache_key = algorithm + "_" + value_type + "_E" +
                                 std::to_string(cache_ept) + "_B" + std::to_string(block_size);
   {
