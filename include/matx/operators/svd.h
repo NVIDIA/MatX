@@ -110,14 +110,59 @@ namespace detail {
           a_.PreRun(detail::NoShape{}, std::forward<Executor>(ex));
         }
 
-        detail::AllocateTempTensor(u_, std::forward<Executor>(ex), u_shape_, &u_ptr_);
-        detail::AllocateTempTensor(s_, std::forward<Executor>(ex), s_shape_, &s_ptr_);
-        detail::AllocateTempTensor(vt_, std::forward<Executor>(ex), vt_shape_, &vt_ptr_);
-        if constexpr (is_cuda_executor_v<Executor>) {
-          svd_impl(u_, s_, vt_, a_, std::forward<Executor>(ex), jobz_);
+        const auto cleanup = [&]() noexcept {
+          try {
+            if (u_ptr_ != nullptr) {
+              if constexpr (is_cuda_executor_v<Executor>) {
+                matxFree(u_ptr_, ex.getStream());
+              }
+              else {
+                matxFree(u_ptr_);
+              }
+              u_ptr_ = nullptr;
+            }
+            if (s_ptr_ != nullptr) {
+              if constexpr (is_cuda_executor_v<Executor>) {
+                matxFree(s_ptr_, ex.getStream());
+              }
+              else {
+                matxFree(s_ptr_);
+              }
+              s_ptr_ = nullptr;
+            }
+            if (vt_ptr_ != nullptr) {
+              if constexpr (is_cuda_executor_v<Executor>) {
+                matxFree(vt_ptr_, ex.getStream());
+              }
+              else {
+                matxFree(vt_ptr_);
+              }
+              vt_ptr_ = nullptr;
+            }
+            if constexpr (is_matx_op<OpA>()) {
+              a_.PostRun(detail::NoShape{}, std::forward<Executor>(ex));
+            }
+          }
+          catch (...) {
+          }
+          materialized_ = false;
+          materialize_count_ = 0;
+        };
+
+        try {
+          detail::AllocateTempTensor(u_, std::forward<Executor>(ex), u_shape_, &u_ptr_);
+          detail::AllocateTempTensor(s_, std::forward<Executor>(ex), s_shape_, &s_ptr_);
+          detail::AllocateTempTensor(vt_, std::forward<Executor>(ex), vt_shape_, &vt_ptr_);
+          if constexpr (is_cuda_executor_v<Executor>) {
+            svd_impl(u_, s_, vt_, a_, std::forward<Executor>(ex), jobz_);
+          }
+          else {
+            svd_impl(u_, s_, vt_, a_, std::forward<Executor>(ex), jobz_, algo_);
+          }
         }
-        else {
-          svd_impl(u_, s_, vt_, a_, std::forward<Executor>(ex), jobz_, algo_);
+        catch (...) {
+          cleanup();
+          throw;
         }
         materialized_ = true;
         materialize_count_ = 1;

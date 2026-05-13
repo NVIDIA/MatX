@@ -130,9 +130,45 @@ namespace detail {
           a_.PreRun(detail::NoShape{}, std::forward<Executor>(ex));
         }
 
-        detail::AllocateTempTensor(vectors_, std::forward<Executor>(ex), vectors_shape_, &vectors_ptr_);
-        detail::AllocateTempTensor(values_, std::forward<Executor>(ex), values_shape_, &values_ptr_);
-        eig_impl(vectors_, values_, a_, std::forward<Executor>(ex), jobz_, uplo_);
+        const auto cleanup = [&]() noexcept {
+          try {
+            if (vectors_ptr_ != nullptr) {
+              if constexpr (is_cuda_executor_v<Executor>) {
+                matxFree(vectors_ptr_, ex.getStream());
+              }
+              else {
+                matxFree(vectors_ptr_);
+              }
+              vectors_ptr_ = nullptr;
+            }
+            if (values_ptr_ != nullptr) {
+              if constexpr (is_cuda_executor_v<Executor>) {
+                matxFree(values_ptr_, ex.getStream());
+              }
+              else {
+                matxFree(values_ptr_);
+              }
+              values_ptr_ = nullptr;
+            }
+            if constexpr (is_matx_op<OpA>()) {
+              a_.PostRun(detail::NoShape{}, std::forward<Executor>(ex));
+            }
+          }
+          catch (...) {
+          }
+          materialized_ = false;
+          materialize_count_ = 0;
+        };
+
+        try {
+          detail::AllocateTempTensor(vectors_, std::forward<Executor>(ex), vectors_shape_, &vectors_ptr_);
+          detail::AllocateTempTensor(values_, std::forward<Executor>(ex), values_shape_, &values_ptr_);
+          eig_impl(vectors_, values_, a_, std::forward<Executor>(ex), jobz_, uplo_);
+        }
+        catch (...) {
+          cleanup();
+          throw;
+        }
         materialized_ = true;
         materialize_count_ = 1;
       }

@@ -128,9 +128,45 @@ namespace detail {
           a_.PreRun(detail::NoShape{}, std::forward<Executor>(ex));
         }
 
-        detail::AllocateTempTensor(q_, std::forward<Executor>(ex), q_shape_, &q_ptr_);
-        detail::AllocateTempTensor(r_, std::forward<Executor>(ex), r_shape_, &r_ptr_);
-        qr_impl(q_, r_, a_, std::forward<Executor>(ex));
+        const auto cleanup = [&]() noexcept {
+          try {
+            if (q_ptr_ != nullptr) {
+              if constexpr (is_cuda_executor_v<Executor>) {
+                matxFree(q_ptr_, ex.getStream());
+              }
+              else {
+                matxFree(q_ptr_);
+              }
+              q_ptr_ = nullptr;
+            }
+            if (r_ptr_ != nullptr) {
+              if constexpr (is_cuda_executor_v<Executor>) {
+                matxFree(r_ptr_, ex.getStream());
+              }
+              else {
+                matxFree(r_ptr_);
+              }
+              r_ptr_ = nullptr;
+            }
+            if constexpr (is_matx_op<OpA>()) {
+              a_.PostRun(detail::NoShape{}, std::forward<Executor>(ex));
+            }
+          }
+          catch (...) {
+          }
+          materialized_ = false;
+          materialize_count_ = 0;
+        };
+
+        try {
+          detail::AllocateTempTensor(q_, std::forward<Executor>(ex), q_shape_, &q_ptr_);
+          detail::AllocateTempTensor(r_, std::forward<Executor>(ex), r_shape_, &r_ptr_);
+          qr_impl(q_, r_, a_, std::forward<Executor>(ex));
+        }
+        catch (...) {
+          cleanup();
+          throw;
+        }
         materialized_ = true;
         materialize_count_ = 1;
       }
@@ -448,9 +484,45 @@ namespace detail {
           a_.PreRun(detail::NoShape{}, std::forward<Executor>(ex));
         }
 
-        detail::AllocateTempTensor(out_, std::forward<Executor>(ex), out_shape_, &out_ptr_);
-        detail::AllocateTempTensor(tau_, std::forward<Executor>(ex), tau_shape_, &tau_ptr_);
-        qr_solver_impl(out_, tau_, a_, std::forward<Executor>(ex));
+        const auto cleanup = [&]() noexcept {
+          try {
+            if (out_ptr_ != nullptr) {
+              if constexpr (is_cuda_executor_v<Executor>) {
+                matxFree(out_ptr_, ex.getStream());
+              }
+              else {
+                matxFree(out_ptr_);
+              }
+              out_ptr_ = nullptr;
+            }
+            if (tau_ptr_ != nullptr) {
+              if constexpr (is_cuda_executor_v<Executor>) {
+                matxFree(tau_ptr_, ex.getStream());
+              }
+              else {
+                matxFree(tau_ptr_);
+              }
+              tau_ptr_ = nullptr;
+            }
+            if constexpr (is_matx_op<OpA>()) {
+              a_.PostRun(detail::NoShape{}, std::forward<Executor>(ex));
+            }
+          }
+          catch (...) {
+          }
+          materialized_ = false;
+          materialize_count_ = 0;
+        };
+
+        try {
+          detail::AllocateTempTensor(out_, std::forward<Executor>(ex), out_shape_, &out_ptr_);
+          detail::AllocateTempTensor(tau_, std::forward<Executor>(ex), tau_shape_, &tau_ptr_);
+          qr_solver_impl(out_, tau_, a_, std::forward<Executor>(ex));
+        }
+        catch (...) {
+          cleanup();
+          throw;
+        }
         materialized_ = true;
         materialize_count_ = 1;
       }
@@ -765,9 +837,45 @@ namespace detail {
           a_.PreRun(detail::NoShape{}, std::forward<Executor>(ex));
         }
 
-        detail::AllocateTempTensor(q_, std::forward<Executor>(ex), q_shape_, &q_ptr_);
-        detail::AllocateTempTensor(r_, std::forward<Executor>(ex), r_shape_, &r_ptr_);
-        qr_econ_impl(q_, r_, a_, std::forward<Executor>(ex));
+        const auto cleanup = [&]() noexcept {
+          try {
+            if (q_ptr_ != nullptr) {
+              if constexpr (is_cuda_executor_v<Executor>) {
+                matxFree(q_ptr_, ex.getStream());
+              }
+              else {
+                matxFree(q_ptr_);
+              }
+              q_ptr_ = nullptr;
+            }
+            if (r_ptr_ != nullptr) {
+              if constexpr (is_cuda_executor_v<Executor>) {
+                matxFree(r_ptr_, ex.getStream());
+              }
+              else {
+                matxFree(r_ptr_);
+              }
+              r_ptr_ = nullptr;
+            }
+            if constexpr (is_matx_op<OpA>()) {
+              a_.PostRun(detail::NoShape{}, std::forward<Executor>(ex));
+            }
+          }
+          catch (...) {
+          }
+          materialized_ = false;
+          materialize_count_ = 0;
+        };
+
+        try {
+          detail::AllocateTempTensor(q_, std::forward<Executor>(ex), q_shape_, &q_ptr_);
+          detail::AllocateTempTensor(r_, std::forward<Executor>(ex), r_shape_, &r_ptr_);
+          qr_econ_impl(q_, r_, a_, std::forward<Executor>(ex));
+        }
+        catch (...) {
+          cleanup();
+          throw;
+        }
         materialized_ = true;
         materialize_count_ = 1;
       }
