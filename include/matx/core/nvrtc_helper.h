@@ -203,6 +203,10 @@ std::vector<std::string> __MATX_HOST__ __MATX_INLINE__ get_preprocessor_options(
     const char* cuda_path = std::getenv("CUDA_PATH");
     std::string cuda_inc_dir = cuda_path ? std::string(cuda_path) + "/include" : "/usr/local/cuda/include";
     options.push_back("-I" + cuda_inc_dir);
+    const auto cuda_cccl_dir = std::filesystem::path(cuda_inc_dir) / "cccl";
+    if (std::filesystem::exists(cuda_cccl_dir)) {
+      options.push_back("-I" + cuda_cccl_dir.string());
+    }
     
     const std::string nvrtc_arch = resolve_nvrtc_cuda_arch();
     options.push_back("-arch=sm_" + nvrtc_arch);
@@ -298,11 +302,10 @@ inline std::string make_cub_shmem_probe_source(const std::string &algorithm,
                  std::to_string(ept) + ", index_t>;\n";
   }
   else if (algorithm == "scan") {
+    // BlockScan's TempStorage depends on the block dimensions/algorithm, not
+    // the InclusiveSum ITEMS_PER_THREAD member-function template parameter.
     block_decl = "using BlockT = cub::BlockScan<T, " + std::to_string(block_size) + ">;\n";
-    block_decl += "__device__ void instantiate_scan_items(typename BlockT::TempStorage &storage) {\n"
-                  "  T items[" + std::to_string(ept) + "]{};\n"
-                  "  BlockT(storage).InclusiveSum(items, items);\n"
-                  "}\n";
+    block_decl += "// BlockScan TempStorage is independent of the InclusiveSum ITEMS_PER_THREAD overload.\n";
   }
   else {
     block_decl = "using BlockT = cub::BlockReduce<T, " + std::to_string(block_size) + ">;\n";
@@ -588,7 +591,7 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name,
   static std::mutex kernel_cache_mutex;
   
   const auto all_jit_classes_string = get_all_jit_classes_string(op);
-  auto capstr = generate_capability_params_string(op, ept, false, osize, threads.x, pass_through_threads);
+  auto capstr = generate_capability_params_string(op, ept, true, osize, threads.x, pass_through_threads);
   const auto kernel_op_type = detail::get_operator_capability<OperatorCapability::JIT_TYPE_QUERY>(op);
   
   std::string kernel_name = get_kernel_name_for_rank<RANK>(stride, global_kernel, pass_through_threads, block_reduces_rank);

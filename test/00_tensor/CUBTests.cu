@@ -544,6 +544,90 @@ TEST(TensorStats, CubBlockJITRejectsEmptyCriticalDim)
   MATX_EXIT_HANDLER();
 }
 
+TEST(TensorStats, CubBlockJITMultiDimReductions)
+{
+  MATX_ENTER_HANDLER();
+
+  CUDAJITExecutor exec{};
+  constexpr index_t rows = 4;
+  constexpr index_t cols = 8;
+  constexpr index_t batches = 3;
+  constexpr index_t mid = 5;
+  constexpr index_t inner = 6;
+
+  tensor_t<float, 2> full_in({rows, cols});
+  tensor_t<float, 0> full_sum{{}};
+  tensor_t<float, 0> full_prod{{}};
+  tensor_t<float, 0> full_min{{}};
+  tensor_t<float, 0> full_max{{}};
+  tensor_t<float, 3> trailing_in({batches, mid, inner});
+  tensor_t<float, 1> trailing_sum({batches});
+
+  for (index_t i = 0; i < rows; i++) {
+    for (index_t j = 0; j < cols; j++) {
+      full_in(i, j) = 1.0f + 0.01f * static_cast<float>((i * cols + j) % 11);
+    }
+  }
+
+  for (index_t b = 0; b < batches; b++) {
+    for (index_t i = 0; i < mid; i++) {
+      for (index_t j = 0; j < inner; j++) {
+        trailing_in(b, i, j) = static_cast<float>(b + i + j + 1);
+      }
+    }
+  }
+
+  auto sum_op = sum(full_in);
+  auto prod_op = prod(full_in);
+  auto min_op = matx::min(full_in);
+  auto max_op = matx::max(full_in);
+  auto trailing_op = sum(trailing_in, {1, 2});
+
+  ASSERT_TRUE(jit_supported(sum_op));
+  ASSERT_TRUE(jit_supported(prod_op));
+  ASSERT_TRUE(jit_supported(min_op));
+  ASSERT_TRUE(jit_supported(max_op));
+  ASSERT_TRUE(jit_supported(trailing_op));
+
+  (full_sum = sum_op).run(exec);
+  (full_prod = prod_op).run(exec);
+  (full_min = min_op).run(exec);
+  (full_max = max_op).run(exec);
+  (trailing_sum = trailing_op).run(exec);
+  exec.sync();
+
+  float expected_sum = 0.0f;
+  float expected_prod = 1.0f;
+  float expected_min = full_in(0, 0);
+  float expected_max = full_in(0, 0);
+  for (index_t i = 0; i < rows; i++) {
+    for (index_t j = 0; j < cols; j++) {
+      const float value = full_in(i, j);
+      expected_sum += value;
+      expected_prod *= value;
+      expected_min = cuda::std::min(expected_min, value);
+      expected_max = cuda::std::max(expected_max, value);
+    }
+  }
+
+  ASSERT_NEAR(full_sum(), expected_sum, 0.001f);
+  ASSERT_NEAR(full_prod(), expected_prod, cuda::std::max(0.001f, expected_prod * 1e-5f));
+  ASSERT_NEAR(full_min(), expected_min, 0.001f);
+  ASSERT_NEAR(full_max(), expected_max, 0.001f);
+
+  for (index_t b = 0; b < batches; b++) {
+    float expected_trailing_sum = 0.0f;
+    for (index_t i = 0; i < mid; i++) {
+      for (index_t j = 0; j < inner; j++) {
+        expected_trailing_sum += trailing_in(b, i, j);
+      }
+    }
+    ASSERT_NEAR(trailing_sum(b), expected_trailing_sum, 0.001f);
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
 TEST(TensorStats, CubBlockJITWithOperatorInput)
 {
   MATX_ENTER_HANDLER();

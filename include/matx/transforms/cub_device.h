@@ -93,6 +93,32 @@ namespace detail {
                                             cuda::std::make_index_sequence<sizeof...(Is)>{});
   }
 
+  template <typename CapType, typename Op, size_t PrefixRank>
+  __MATX_INLINE__ __MATX_DEVICE__ decltype(auto) block_op_get_flat_dim_item(
+      const Op &op,
+      index_t item,
+      const cuda::std::array<index_t, PrefixRank> &prefix_indices)
+  {
+    constexpr int rank = Op::Rank();
+    static_assert(PrefixRank <= static_cast<size_t>(rank),
+                  "Block CUB prefix rank cannot exceed operand rank");
+
+    cuda::std::array<index_t, rank> scalar_indices{};
+    for (int r = 0; r < static_cast<int>(PrefixRank); r++) {
+      scalar_indices[r] = prefix_indices[r];
+    }
+
+    for (int r = rank - 1; r >= static_cast<int>(PrefixRank); r--) {
+      const index_t dim_size = op.Size(r);
+      scalar_indices[r] = item % dim_size;
+      item /= dim_size;
+    }
+
+    return block_op_get_value_at<CapType>(op,
+                                          scalar_indices,
+                                          cuda::std::make_index_sequence<rank>{});
+  }
+
 #ifndef __CUDACC_RTC__
   template <typename T>
   __MATX_INLINE__ __MATX_HOST__ int GetCubBlockShmRequired(CubBlockAlgorithm algorithm,
@@ -296,8 +322,8 @@ namespace detail {
     }
   };
 
-      template <typename CapType, BlockReduceType ReduceType, int ReduceSize, bool ScalarLoads = false>
-      struct BlockReduce {
+  template <typename CapType, BlockReduceType ReduceType, int ReduceSize, bool ScalarLoads = false>
+  struct BlockReduce {
     template <typename reduce_type>
     static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ int GetShmRequired() {
       using BlockReduceT = cub::BlockReduce<reduce_type, CapType::block_size>;
@@ -311,45 +337,49 @@ namespace detail {
       using BlockReduceT = cub::BlockReduce<reduce_type, CapType::block_size>;
 
       __shared__ typename BlockReduceT::TempStorage temp_storage;
+      cuda::std::array<index_t, sizeof...(Is)> prefix_indices{static_cast<index_t>(indices)...};
 
       reduce_type partial = cub_identity_value<reduce_type, ReduceType>();
       const int linear_base = static_cast<int>(threadIdx.x) * ept;
+      static constexpr bool reduce_last_dim_only = (sizeof...(Is) + 1) == Op::Rank();
 
-          if constexpr (ScalarLoads) {
-            using ScalarCap = typename CapType::scalar_cap;
-            #pragma unroll
-            for (int i = 0; i < ept; i++) {
-              if (linear_base + i < ReduceSize) {
-                partial = cub_combine_value<reduce_type, ReduceType>(
-                    partial,
-                    op.template operator()<ScalarCap>(indices..., static_cast<index_t>(linear_base + i)));
-              }
-            }
+      if constexpr (ScalarLoads || !reduce_last_dim_only) {
+        using ScalarCap = typename CapType::scalar_cap;
+        #pragma unroll
+        for (int i = 0; i < ept; i++) {
+          if (linear_base + i < ReduceSize) {
+            partial = cub_combine_value<reduce_type, ReduceType>(
+                partial,
+                block_op_get_flat_dim_item<ScalarCap>(op,
+                                                      static_cast<index_t>(linear_base + i),
+                                                      prefix_indices));
           }
-          else if constexpr (ept == 1) {
-            if (linear_base < ReduceSize) {
-              partial = op.template operator()<CapType>(indices..., static_cast<index_t>(threadIdx.x));
-            }
+        }
+      }
+      else if constexpr (ept == 1) {
+        if (linear_base < ReduceSize) {
+          partial = op.template operator()<CapType>(indices..., static_cast<index_t>(threadIdx.x));
+        }
+      }
+      else if constexpr ((ReduceSize % ept) == 0) {
+        auto thread_data = op.template operator()<CapType>(indices..., static_cast<index_t>(threadIdx.x));
+        reduce_type (&items)[ept] = reinterpret_cast<reduce_type (&)[ept]>(thread_data);
+        #pragma unroll
+        for (int i = 0; i < ept; i++) {
+          partial = cub_combine_value<reduce_type, ReduceType>(partial, items[i]);
+        }
+      }
+      else {
+        using ScalarCap = typename CapType::scalar_cap;
+        #pragma unroll
+        for (int i = 0; i < ept; i++) {
+          if (linear_base + i < ReduceSize) {
+            partial = cub_combine_value<reduce_type, ReduceType>(
+                partial,
+                op.template operator()<ScalarCap>(indices..., static_cast<index_t>(linear_base + i)));
           }
-          else if constexpr ((ReduceSize % ept) == 0) {
-            auto thread_data = op.template operator()<CapType>(indices..., static_cast<index_t>(threadIdx.x));
-            reduce_type (&items)[ept] = reinterpret_cast<reduce_type (&)[ept]>(thread_data);
-            #pragma unroll
-            for (int i = 0; i < ept; i++) {
-              partial = cub_combine_value<reduce_type, ReduceType>(partial, items[i]);
-            }
-          }
-          else {
-            using ScalarCap = typename CapType::scalar_cap;
-            #pragma unroll
-            for (int i = 0; i < ept; i++) {
-              if (linear_base + i < ReduceSize) {
-                partial = cub_combine_value<reduce_type, ReduceType>(
-                    partial,
-                    op.template operator()<ScalarCap>(indices..., static_cast<index_t>(linear_base + i)));
-              }
-            }
-          }
+        }
+      }
 
       const int valid_threads = (ReduceSize + ept - 1) / ept;
       if constexpr (ReduceType == BlockReduceType::SUM) {
