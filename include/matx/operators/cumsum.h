@@ -343,10 +343,10 @@ namespace detail {
 }
 
 /**
- * Compute a cumulative sum (prefix sum) of rows of a tensor
+ * Compute an inclusive cumulative sum (prefix sum) along the innermost dimension
  *
- * Computes an exclusive cumulative sum over rows in a tensor. For example, and
- * input tensor of [1, 2, 3, 4] would give the output [1, 3, 6, 10].
+ * Computes an inclusive cumulative sum over the innermost dimension of a tensor.
+ * For example, an input tensor of [1, 2, 3, 4] gives the output [1, 3, 6, 10].
  *
  * @tparam InputOperator
  *   Input operator type
