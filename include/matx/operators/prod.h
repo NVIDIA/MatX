@@ -104,18 +104,13 @@ namespace detail {
       }
 
       __MATX_INLINE__ int MaxJitElementsPerThread() const {
-        return LargestPowerOfTwoAtMost(ReduceSize(), MaxCubJitElementsPerThreadByBytes<value_type>());
-      }
-
-      __MATX_INLINE__ static int LargestPowerOfTwoAtMost(index_t value, int limit = 32) {
-        if (value <= 0 || limit <= 0) {
+        const auto reduce_size = ReduceSize();
+        const int limit = MaxCubJitElementsPerThreadByBytes<value_type>();
+        if (reduce_size <= 0 || limit <= 0) {
           return 0;
         }
-        int result = 1;
-        for (int candidate = 2; candidate <= limit && candidate <= value; candidate *= 2) {
-          result = candidate;
-        }
-        return result;
+        const auto capped = cuda::std::min(reduce_size, static_cast<index_t>(limit));
+        return static_cast<int>(cuda::prev_power_of_two(capped));
       }
 
       __MATX_INLINE__ bool BlockSizeFitsAtMaxEPT() const {

@@ -85,22 +85,13 @@ namespace detail {
         return JIT_Storage{detail::to_jit_storage(a_)};
       }
 
-      __MATX_INLINE__ static bool IsPowerOfTwo(index_t value) {
-        return value > 0 && (value & (value - 1)) == 0;
-      }
-
-      __MATX_INLINE__ static int LargestValidPowerOfTwoEPTAtMost(index_t value, int limit = 32) {
-        if (value <= 0 || limit <= 0) {
+      __MATX_INLINE__ static int LargestValidCubEPTAtMost(index_t value, int limit = 32) {
+        if (value <= 0 || limit <= 0 || !cuda::is_power_of_two(value)) {
           return 0;
         }
 
-        int result = 0;
-        for (int candidate = 1; candidate <= limit && candidate <= value; candidate *= 2) {
-          if ((value % candidate) == 0 && IsPowerOfTwo(value / candidate)) {
-            result = candidate;
-          }
-        }
-        return result;
+        const auto capped = cuda::std::min(value, static_cast<index_t>(limit));
+        return static_cast<int>(cuda::prev_power_of_two(capped));
       }
 
       __MATX_INLINE__ index_t CriticalDimSize() const {
@@ -113,7 +104,7 @@ namespace detail {
       }
 
       __MATX_INLINE__ int MaxJitElementsPerThread() const {
-        return LargestValidPowerOfTwoEPTAtMost(CriticalDimSize(), MaxCubJitElementsPerThreadByBytes<value_type>());
+        return LargestValidCubEPTAtMost(CriticalDimSize(), MaxCubJitElementsPerThreadByBytes<value_type>());
       }
 
       __MATX_INLINE__ int BlockThreadsForEPT(int ept) const {
@@ -123,7 +114,7 @@ namespace detail {
         }
 
         const auto block_threads = critical_dim_size / ept;
-        return IsPowerOfTwo(block_threads) ? static_cast<int>(block_threads) : 0;
+        return cuda::is_power_of_two(block_threads) ? static_cast<int>(block_threads) : 0;
       }
 
       __MATX_INLINE__ bool BlockSizeFitsAtMaxEPT() const {

@@ -36,6 +36,7 @@
 #include "matx/core/type_utils.h"
 #include "matx/core/utils.h"
 #include "matx/core/operator_options.h"
+#include <cuda/cmath>
 #include <cuda/std/type_traits>
 #include <cuda/std/limits>
 #include <cuda/std/__algorithm/min.h>
@@ -57,11 +58,8 @@ namespace detail {
       byte_limited = 1;
     }
 
-    int result = 1;
-    for (int candidate = 2; candidate <= limit && candidate <= byte_limited; candidate *= 2) {
-      result = candidate;
-    }
-    return result;
+    const int capped = cuda::std::min(limit, byte_limited);
+    return capped > 0 ? static_cast<int>(cuda::prev_power_of_two(capped)) : 0;
   }
 
   struct LTOIRQueryInput {
