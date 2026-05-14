@@ -505,6 +505,91 @@ TEST(TensorStats, CubBlockJIT)
   MATX_EXIT_HANDLER();
 }
 
+TEST(TensorStats, CubBlockJITRankPreservingMultiDimBatches)
+{
+  MATX_ENTER_HANDLER();
+
+  CUDAJITExecutor exec{};
+  constexpr index_t outer = 2;
+  constexpr index_t batches = 4;
+  constexpr index_t cols = 16;
+  constexpr index_t t4_mid = 3;
+
+  tensor_t<float, 3> in({outer, batches, cols});
+  tensor_t<float, 3> scan_out({outer, batches, cols});
+  tensor_t<float, 3> sort_out({outer, batches, cols});
+  tensor_t<index_t, 3> argsort_out({outer, batches, cols});
+  tensor_t<float, 4> t4_in({outer, t4_mid, batches, cols});
+  tensor_t<float, 4> t4_scan_out({outer, t4_mid, batches, cols});
+
+  for (index_t i = 0; i < outer; i++) {
+    for (index_t j = 0; j < batches; j++) {
+      const float base = static_cast<float>(1000 * i + 100 * j);
+      for (index_t k = 0; k < cols; k++) {
+        in(i, j, k) = base + static_cast<float>(cols - k);
+        scan_out(i, j, k) = -1.0f;
+        sort_out(i, j, k) = -1.0f;
+        argsort_out(i, j, k) = -1;
+      }
+    }
+  }
+
+  for (index_t i = 0; i < outer; i++) {
+    for (index_t j = 0; j < t4_mid; j++) {
+      for (index_t k = 0; k < batches; k++) {
+        const float base = static_cast<float>(1000 * i + 100 * j + 10 * k);
+        for (index_t l = 0; l < cols; l++) {
+          t4_in(i, j, k, l) = base + static_cast<float>(l + 1);
+          t4_scan_out(i, j, k, l) = -1.0f;
+        }
+      }
+    }
+  }
+
+  auto scan_op = cumsum(in);
+  auto sort_op = matx::sort(in, SORT_DIR_ASC);
+  auto argsort_op = argsort(in, SORT_DIR_ASC);
+  auto t4_scan_op = cumsum(t4_in);
+  ASSERT_TRUE(jit_supported(scan_op));
+  ASSERT_TRUE(jit_supported(sort_op));
+  ASSERT_TRUE(jit_supported(argsort_op));
+  ASSERT_TRUE(jit_supported(t4_scan_op));
+
+  (scan_out = scan_op).run(exec);
+  (sort_out = sort_op).run(exec);
+  (argsort_out = argsort_op).run(exec);
+  (t4_scan_out = t4_scan_op).run(exec);
+  exec.sync();
+
+  for (index_t i = 0; i < outer; i++) {
+    for (index_t j = 0; j < batches; j++) {
+      const float base = static_cast<float>(1000 * i + 100 * j);
+      float running = 0.0f;
+      for (index_t k = 0; k < cols; k++) {
+        running += base + static_cast<float>(cols - k);
+        ASSERT_NEAR(scan_out(i, j, k), running, 0.001f);
+        ASSERT_NEAR(sort_out(i, j, k), base + static_cast<float>(k + 1), 0.001f);
+        ASSERT_EQ(argsort_out(i, j, k), cols - 1 - k);
+      }
+    }
+  }
+
+  for (index_t i = 0; i < outer; i++) {
+    for (index_t j = 0; j < t4_mid; j++) {
+      for (index_t k = 0; k < batches; k++) {
+        const float base = static_cast<float>(1000 * i + 100 * j + 10 * k);
+        float running = 0.0f;
+        for (index_t l = 0; l < cols; l++) {
+          running += base + static_cast<float>(l + 1);
+          ASSERT_NEAR(t4_scan_out(i, j, k, l), running, 0.001f);
+        }
+      }
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
 TEST(TensorStats, CubBlockJITRejectsEmptyCriticalDim)
 {
   MATX_ENTER_HANDLER();

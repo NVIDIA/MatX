@@ -457,6 +457,8 @@ std::string get_kernel_name_for_rank(bool stride, bool global_kernel, bool pass_
       return "matx::detail::matxOpT2KernelBlock2D";
     } else if (stride) {
       return global_kernel ? "matx::detail::matxOpT2StrideKernel" : "matx::detail::matxOpT2StrideKernelBlock";
+    } else if (!global_kernel && block_reduces_rank) {
+      return "matx::detail::matxOpT2KernelBlockReduce";
     } else {
       return global_kernel ? "matx::detail::matxOpT2Kernel" : "matx::detail::matxOpT2KernelBlock";
     }
@@ -466,6 +468,8 @@ std::string get_kernel_name_for_rank(bool stride, bool global_kernel, bool pass_
       return "matx::detail::matxOpT3KernelBlock2D";
     } else if (stride) {
       return global_kernel ? "matx::detail::matxOpT3StrideKernel" : "matx::detail::matxOpT3StrideKernelBlock";
+    } else if (!global_kernel && block_reduces_rank) {
+      return "matx::detail::matxOpT3KernelBlockReduce";
     } else {
       return global_kernel ? "matx::detail::matxOpT3Kernel" : "matx::detail::matxOpT3KernelBlock";
     }
@@ -475,6 +479,8 @@ std::string get_kernel_name_for_rank(bool stride, bool global_kernel, bool pass_
       return "matx::detail::matxOpT4KernelBlock2D";
     } else if (stride) {
       return global_kernel ? "matx::detail::matxOpT4StrideKernel" : "matx::detail::matxOpT4StrideKernelBlock";
+    } else if (!global_kernel && block_reduces_rank) {
+      return "matx::detail::matxOpT4KernelBlockReduce";
     } else {
       return global_kernel ? "matx::detail::matxOpT4Kernel" : "matx::detail::matxOpT4KernelBlock";
     }
@@ -628,7 +634,7 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name,
   
   CUfunction kernel_func;
   std::string lowered_name;
-  const auto cubin_filename = detail::GetCache().TypeStringToFilename(device_cache_prefix + kernel_op_type);
+  const auto cubin_filename = detail::GetCache().TypeStringToFilename(cache_key);
   
   // Check if kernel is already compiled and cached in memory
   {
