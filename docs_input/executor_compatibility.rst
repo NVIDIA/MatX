@@ -6,17 +6,17 @@ Executor Compatibility
 MatX's executor design allows expressions to run on different targets while leaving user code largely unchanged. This page summarizes
 which public operators are expected to work with each executor family.
 
-.. |yes| raw:: html
+.. |yes| image:: _static/executor_status_yes.svg
+   :alt: Supported
+   :height: 1em
 
-   <span style="color:#198754;font-weight:700;">&#10003;</span>
+.. |partial| image:: _static/executor_status_partial.svg
+   :alt: Partially supported
+   :height: 1em
 
-.. |partial| raw:: html
-
-   <span style="color:#fd7e14;font-weight:700;">&#11042;</span>
-
-.. |no| raw:: html
-
-   <span style="color:#dc3545;font-weight:700;">&#10007;</span>
+.. |no| image:: _static/executor_status_no.svg
+   :alt: Not supported
+   :height: 1em
 
 Legend:
 
