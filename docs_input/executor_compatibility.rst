@@ -20,7 +20,7 @@ which public operators are expected to work with each executor family.
 
 Legend:
 
-* |yes| Supported.
+* |yes| Fully Supported.
 * |partial| Partially supported, or supported with executor-specific limitations described in the notes.
 * |no| Not supported.
 
