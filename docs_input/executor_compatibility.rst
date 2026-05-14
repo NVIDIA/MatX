@@ -6,17 +6,11 @@ Executor Compatibility
 MatX's executor design allows expressions to run on different targets while leaving user code largely unchanged. This page summarizes
 which public operators are expected to work with each executor family.
 
-.. |yes| image:: _static/executor_status_yes.svg
-   :alt: Supported
-   :height: 1em
+.. |yes| replace:: ✅
 
-.. |partial| image:: _static/executor_status_partial.svg
-   :alt: Partially supported
-   :height: 1em
+.. |partial| replace:: 🟧
 
-.. |no| image:: _static/executor_status_no.svg
-   :alt: Not supported
-   :height: 1em
+.. |no| replace:: ❌
 
 Legend:
 
