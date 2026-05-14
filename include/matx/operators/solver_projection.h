@@ -79,6 +79,9 @@ class SolverProjectionStorage : public BaseOp<SolverProjectionStorage<State, Com
       std::shared_ptr<State> owner;
       std::shared_ptr<std::mutex> execution_mutex;
       size_t count = 0;
+      // Balances shared input PreRun/PostRun for multiple projections from the
+      // same solver state in one JIT expression.
+      size_t jit_prerun_count = 0;
     };
 
     static std::mutex &LifetimeMutex()
@@ -143,6 +146,70 @@ class SolverProjectionStorage : public BaseOp<SolverProjectionStorage<State, Com
       }
       catch (...) {
         return {};
+      }
+    }
+
+    template <typename Executor>
+    static void JITPreRunInput(State *state, Executor &&ex)
+    {
+      auto execution_mutex = GetExecutionMutex(state);
+      MATX_ASSERT_STR(execution_mutex != nullptr,
+                      matxInvalidParameter,
+                      "Solver projection state lifetime entry is missing");
+
+      std::lock_guard<std::mutex> execution_lock(*execution_mutex);
+      {
+        std::lock_guard<std::mutex> lifetime_lock(LifetimeMutex());
+        auto it = LifetimeRegistry().find(state);
+        MATX_ASSERT_STR(it != LifetimeRegistry().end(),
+                        matxInvalidParameter,
+                        "Solver projection state lifetime entry is missing");
+        if (it->second.jit_prerun_count > 0) {
+          it->second.jit_prerun_count++;
+          return;
+        }
+      }
+
+      state->Input().PreRun(detail::NoShape{}, std::forward<Executor>(ex));
+
+      std::lock_guard<std::mutex> lifetime_lock(LifetimeMutex());
+      auto it = LifetimeRegistry().find(state);
+      MATX_ASSERT_STR(it != LifetimeRegistry().end(),
+                      matxInvalidParameter,
+                      "Solver projection state lifetime entry is missing");
+      it->second.jit_prerun_count = 1;
+    }
+
+    template <typename Executor>
+    static void JITPostRunInput(State *state, Executor &&ex) noexcept
+    {
+      auto execution_mutex = GetExecutionMutex(state);
+      if (!execution_mutex) {
+        return;
+      }
+
+      try {
+        std::lock_guard<std::mutex> execution_lock(*execution_mutex);
+        bool should_postrun = false;
+        {
+          std::lock_guard<std::mutex> lifetime_lock(LifetimeMutex());
+          auto it = LifetimeRegistry().find(state);
+          if (it == LifetimeRegistry().end() || it->second.jit_prerun_count == 0) {
+            return;
+          }
+          if (it->second.jit_prerun_count > 1) {
+            it->second.jit_prerun_count--;
+            return;
+          }
+          it->second.jit_prerun_count = 0;
+          should_postrun = true;
+        }
+
+        if (should_postrun) {
+          state->Input().PostRun(detail::NoShape{}, std::forward<Executor>(ex));
+        }
+      }
+      catch (...) {
       }
     }
 
@@ -271,7 +338,7 @@ class SolverProjectionStorage : public BaseOp<SolverProjectionStorage<State, Com
 
       if constexpr (is_cuda_jit_executor_v<Executor>) {
         if constexpr (is_matx_op<input_type>()) {
-          state_->Input().PreRun(detail::NoShape{}, std::forward<Executor>(ex));
+          JITPreRunInput(state_, std::forward<Executor>(ex));
         }
       }
       else {
@@ -290,7 +357,7 @@ class SolverProjectionStorage : public BaseOp<SolverProjectionStorage<State, Com
     {
       if constexpr (is_cuda_jit_executor_v<Executor>) {
         if constexpr (is_matx_op<input_type>()) {
-          state_->Input().PostRun(detail::NoShape{}, std::forward<Executor>(ex));
+          JITPostRunInput(state_, std::forward<Executor>(ex));
         }
       }
       else {
