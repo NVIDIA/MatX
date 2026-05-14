@@ -51,6 +51,7 @@
 namespace matx
 {
   namespace detail {
+#ifdef MATX_EN_JIT
     /**
      * @brief Cached launch parameters for JIT kernels
      * 
@@ -261,6 +262,7 @@ namespace matx
       GetCache().StoreLTOIRMetadata(GetJITLaunchParamsMetadataFilename(jit_cache_key),
                                     SerializeJITLaunchParams(params));
     }
+#endif
   }  // namespace detail
 
   /**
