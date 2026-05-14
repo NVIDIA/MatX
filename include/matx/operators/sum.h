@@ -128,9 +128,9 @@ namespace detail {
       }
 
 	      __MATX_INLINE__ auto get_jit_op_str() const {
-	        const std::string class_name = get_jit_class_name();
-	        const bool scalar_loads = detail::get_operator_capability<OperatorCapability::GLOBAL_KERNEL>(a_);
-	        return cuda::std::make_tuple(
+        const std::string class_name = get_jit_class_name();
+        const bool scalar_loads = detail::get_operator_capability<OperatorCapability::GLOBAL_KERNEL>(a_);
+        return cuda::std::make_tuple(
           class_name,
           std::string("template <typename OpA> struct " + class_name + "  {\n") +
           "  using input_type = typename OpA::value_type;\n" +
@@ -145,7 +145,7 @@ namespace detail {
           "  template <typename CapType, typename... Is>\n" +
           "  __MATX_INLINE__ __MATX_DEVICE__ value_type operator()(Is... indices) const\n" +
           "  {\n" +
-	          "    return BlockReduce<CapType, BlockReduceType::SUM, ReduceSize_, " + std::string(scalar_loads ? "true" : "false") + ">::RunLastDim(a_, indices...);\n" +
+          "    return BlockReduce<CapType, BlockReduceType::SUM, ReduceSize_, " + std::string(scalar_loads ? "true" : "false") + ">::RunLastDim(a_, indices...);\n" +
           "  }\n" +
           "  template <typename CapType, typename Out, typename... Is>\n" +
           "  __MATX_INLINE__ __MATX_DEVICE__ value_type Store(Out &out, Is... indices) const\n" +
@@ -203,19 +203,19 @@ namespace detail {
           return false;
 #endif
         }
-	        else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+        else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
 #if defined(MATX_EN_JIT) && defined(__CUDACC__)
-	          if (in.jit) {
-	            const auto max_ept = static_cast<ElementsPerThread>(MaxJitElementsPerThread());
-	            const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, max_ept};
-	            if (detail::get_operator_capability<OperatorCapability::GLOBAL_KERNEL>(a_)) {
-	              return my_cap;
-	            }
-	            return combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(a_, in));
-	          }
+          if (in.jit) {
+            const auto max_ept = static_cast<ElementsPerThread>(MaxJitElementsPerThread());
+            const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, max_ept};
+            if (detail::get_operator_capability<OperatorCapability::GLOBAL_KERNEL>(a_)) {
+              return my_cap;
+            }
+            return combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(a_, in));
+          }
 #endif
-	          return combine_capabilities<Cap>(capability_attributes<Cap>::default_value, detail::get_operator_capability<Cap>(a_, in));
-	        }
+          return combine_capabilities<Cap>(capability_attributes<Cap>::default_value, detail::get_operator_capability<Cap>(a_, in));
+        }
         else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
           bool supported = true;
 #if defined(MATX_EN_JIT) && defined(__CUDACC__)
@@ -254,25 +254,25 @@ namespace detail {
           return capability_attributes<Cap>::default_value;
 #endif
         }
-	        else if constexpr (Cap == OperatorCapability::BLOCK_REDUCES_RANK) {
+        else if constexpr (Cap == OperatorCapability::BLOCK_REDUCES_RANK) {
 #ifdef MATX_EN_JIT
-	          return true;
+          return true;
 #else
-	          return capability_attributes<Cap>::default_value;
+          return capability_attributes<Cap>::default_value;
 #endif
-	        }
+        }
         else if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
-	          return combine_capabilities<Cap>(capability_attributes<Cap>::default_value, detail::get_operator_capability<Cap>(a_, in));
-	        }
-	        else if constexpr (Cap == OperatorCapability::MAX_EPT_VEC_LOAD) {
+          return combine_capabilities<Cap>(capability_attributes<Cap>::default_value, detail::get_operator_capability<Cap>(a_, in));
+        }
+        else if constexpr (Cap == OperatorCapability::MAX_EPT_VEC_LOAD) {
 #if defined(MATX_EN_JIT) && defined(__CUDACC__)
-	          if (detail::get_operator_capability<OperatorCapability::GLOBAL_KERNEL>(a_)) {
-	            return MaxJitElementsPerThread();
-	          }
+          if (detail::get_operator_capability<OperatorCapability::GLOBAL_KERNEL>(a_)) {
+            return MaxJitElementsPerThread();
+          }
 #endif
-	          return combine_capabilities<Cap>(capability_attributes<Cap>::default_value, detail::get_operator_capability<Cap>(a_, in));
-	        }
-	        else if constexpr (Cap == OperatorCapability::STATIC_SHM_SIZE) {
+          return combine_capabilities<Cap>(capability_attributes<Cap>::default_value, detail::get_operator_capability<Cap>(a_, in));
+        }
+        else if constexpr (Cap == OperatorCapability::STATIC_SHM_SIZE) {
 #if defined(MATX_EN_JIT) && defined(__CUDACC__)
           const int block_threads = CurrentBlockThreads();
           const int self_shm = block_threads > 0 ?
@@ -340,6 +340,8 @@ namespace detail {
         }
 
         matxFree(ptr);
+        ptr = nullptr;
+        prerun_done_ = false;
       }
 
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const

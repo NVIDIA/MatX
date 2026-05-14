@@ -125,6 +125,10 @@ namespace detail {
   template <typename T>
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr bool CubJitReductionFitsInBlock(index_t reduce_size, int max_threads = 1024)
   {
+    if (reduce_size <= 0) {
+      return false;
+    }
+
     const int max_ept = CubJitMaxReductionEPT<T>(reduce_size);
     const int block_threads = CubJitReductionBlockThreads(reduce_size, max_ept);
     return max_ept > 0 && block_threads > 0 && block_threads <= max_threads;
@@ -159,6 +163,10 @@ namespace detail {
   template <typename T>
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr bool CubJitPowerOfTwoCollectiveFitsInBlock(index_t critical_dim_size, int max_threads = 1024)
   {
+    if (critical_dim_size <= 0) {
+      return false;
+    }
+
     const int max_ept = CubJitMaxPowerOfTwoCollectiveEPT<T>(critical_dim_size);
     const int block_threads = CubJitPowerOfTwoCollectiveBlockThreads(critical_dim_size, max_ept);
     return block_threads > 0 && block_threads <= max_threads;

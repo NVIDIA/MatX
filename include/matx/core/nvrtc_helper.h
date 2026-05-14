@@ -53,6 +53,7 @@
 #include <mutex>
 #include <cctype>
 #include <regex>
+#include <limits>
 
 
 namespace matx {
@@ -412,7 +413,7 @@ inline int nvrtc_get_cub_block_shmem_size(const std::string &algorithm,
   NVRTC_CHECK(nvrtcDestroyProgram(&prog));
 
   const std::regex temp_storage_regex(
-      R"((?:\.visible\s+)?\.global\s+\.align\s+4\s+\.[us]32\s+temp_storage_size\s*=\s*([0-9]+)\s*;)");
+      R"((?:\.visible\s+)?\.global\s+(?:\.align\s+[0-9]+\s+)?\.(?:[usb]32)\s+temp_storage_size\s*=\s*([0-9]+)\s*;)");
   std::smatch match;
   if (!std::regex_search(ptx, match, temp_storage_regex)) {
     MATX_LOG_ERROR("Could not find CUB temp storage initializer in NVRTC PTX for {}", cache_key);
@@ -420,7 +421,13 @@ inline int nvrtc_get_cub_block_shmem_size(const std::string &algorithm,
     MATX_THROW(matxInvalidParameter, "NVRTC CUB shared-memory probe PTX did not contain temp_storage_size initializer");
   }
 
-  const int host_result = std::stoi(match[1].str());
+  const auto parsed_result = std::stoll(match[1].str());
+  if (parsed_result <= 0 || parsed_result > static_cast<long long>(std::numeric_limits<int>::max())) {
+    MATX_LOG_ERROR("Invalid CUB temp storage size {} in NVRTC PTX for {}", parsed_result, cache_key);
+    MATX_LOG_DEBUG("CUB shared-memory probe PTX:\n{}", ptx);
+    MATX_THROW(matxInvalidParameter, "NVRTC CUB shared-memory probe emitted invalid temp_storage_size");
+  }
+  const int host_result = static_cast<int>(parsed_result);
 
   {
     std::lock_guard<std::mutex> lock(shmem_cache_mutex);

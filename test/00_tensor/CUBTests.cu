@@ -823,6 +823,47 @@ TEST(TensorStats, CubBlockJITUnaryOverReduction)
   MATX_EXIT_HANDLER();
 }
 
+TEST(TensorStats, CubBlockJITRepeatedRunReusesExpression)
+{
+  MATX_ENTER_HANDLER();
+
+  CUDAJITExecutor exec{};
+  constexpr index_t rows = 2;
+  constexpr index_t cols = 16;
+
+  tensor_t<float, 2> in({rows, cols});
+  tensor_t<float, 1> reduce_out({rows});
+  tensor_t<float, 2> scan_out({rows, cols});
+
+  auto reduce_expr = sum(in, {1});
+  auto scan_expr = cumsum(in);
+  ASSERT_TRUE(jit_supported(reduce_expr));
+  ASSERT_TRUE(jit_supported(scan_expr));
+
+  for (index_t pass = 0; pass < 2; pass++) {
+    for (index_t i = 0; i < rows; i++) {
+      for (index_t j = 0; j < cols; j++) {
+        in(i, j) = static_cast<float>((pass + 1) * (10 * i + j + 1));
+      }
+    }
+
+    (reduce_out = reduce_expr).run(exec);
+    (scan_out = scan_expr).run(exec);
+    exec.sync();
+
+    for (index_t i = 0; i < rows; i++) {
+      float running = 0.0f;
+      for (index_t j = 0; j < cols; j++) {
+        running += in(i, j);
+        ASSERT_NEAR(scan_out(i, j), running, 0.001f);
+      }
+      ASSERT_NEAR(reduce_out(i), running, 0.001f);
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
 TEST(TensorStats, CubBlockJITWithFFT)
 {
   MATX_ENTER_HANDLER();
