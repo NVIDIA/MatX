@@ -66,15 +66,6 @@ __MATX_INLINE__ cuda::std::array<index_t, RANK - 1> SolverVectorShapeFromMatrixS
   return vec_shape;
 }
 
-template <typename State>
-struct SolverProjectionExecutionLock {
-  static std::mutex &Mutex()
-  {
-    static std::mutex mutex;
-    return mutex;
-  }
-};
-
 template <typename State, int Component, typename TensorType>
 class SolverProjectionStorage : public BaseOp<SolverProjectionStorage<State, Component, TensorType>>
 {
@@ -86,6 +77,7 @@ class SolverProjectionStorage : public BaseOp<SolverProjectionStorage<State, Com
 
     struct LifetimeEntry {
       std::shared_ptr<State> owner;
+      std::shared_ptr<std::mutex> execution_mutex;
       size_t count = 0;
     };
 
@@ -113,6 +105,9 @@ class SolverProjectionStorage : public BaseOp<SolverProjectionStorage<State, Com
       if (!entry.owner) {
         entry.owner = owner;
       }
+      if (!entry.execution_mutex) {
+        entry.execution_mutex = std::make_shared<std::mutex>();
+      }
       entry.count++;
     }
 
@@ -125,7 +120,29 @@ class SolverProjectionStorage : public BaseOp<SolverProjectionStorage<State, Com
       std::lock_guard<std::mutex> lock(LifetimeMutex());
       auto it = LifetimeRegistry().find(state);
       if (it != LifetimeRegistry().end()) {
+        if (!it->second.execution_mutex) {
+          it->second.execution_mutex = std::make_shared<std::mutex>();
+        }
         it->second.count++;
+      }
+    }
+
+    static std::shared_ptr<std::mutex> GetExecutionMutex(State *state) noexcept
+    {
+      if (state == nullptr) {
+        return {};
+      }
+
+      try {
+        std::lock_guard<std::mutex> lock(LifetimeMutex());
+        auto it = LifetimeRegistry().find(state);
+        if (it == LifetimeRegistry().end()) {
+          return {};
+        }
+        return it->second.execution_mutex;
+      }
+      catch (...) {
+        return {};
       }
     }
 
@@ -258,7 +275,11 @@ class SolverProjectionStorage : public BaseOp<SolverProjectionStorage<State, Com
         }
       }
       else {
-        std::lock_guard<std::mutex> lock(SolverProjectionExecutionLock<State>::Mutex());
+        auto execution_mutex = GetExecutionMutex(state_);
+        MATX_ASSERT_STR(execution_mutex != nullptr,
+                        matxInvalidParameter,
+                        "Solver projection state lifetime entry is missing");
+        std::lock_guard<std::mutex> lock(*execution_mutex);
         state_->Materialize(std::forward<Executor>(ex));
         tensor_ = state_->template Tensor<Component>();
       }
@@ -273,8 +294,14 @@ class SolverProjectionStorage : public BaseOp<SolverProjectionStorage<State, Com
         }
       }
       else {
-        std::lock_guard<std::mutex> lock(SolverProjectionExecutionLock<State>::Mutex());
-        state_->Release(std::forward<Executor>(ex));
+        auto execution_mutex = GetExecutionMutex(state_);
+        if (execution_mutex) {
+          std::lock_guard<std::mutex> lock(*execution_mutex);
+          state_->Release(std::forward<Executor>(ex));
+        }
+        else {
+          state_->Release(std::forward<Executor>(ex));
+        }
       }
     }
 
