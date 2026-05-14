@@ -101,7 +101,11 @@ namespace detail {
       template <int Component>
       void ValidateProjection() const
       {
-        if constexpr (Component == SVD_U) {
+        if constexpr (Component == SVD_S) {
+          // SVDMode::NONE maps to cuSolver jobz='N': singular values are still computed,
+          // while U and VT are intentionally omitted.
+        }
+        else if constexpr (Component == SVD_U) {
           if (jobz_ == SVDMode::NONE) {
             MATX_THROW(matxInvalidParameter, "svd().U cannot be used when SVDMode::NONE is selected");
           }
