@@ -14,10 +14,9 @@ else()
   set(NOT_SUBPROJECT OFF)
 endif()
 
-# CMake 3.24 can auto-detect GPUs, but it's not standard on any distrobution. For now, rapids-cmake has a utility
-# function to do it, so we grab that as a dependency. The user can optionally override GPU_ARCH to specify
-# their own. We check if rapids-cmake exists for projects that already include it so we don't have conflicting
-# directories
+# Use the vendored rapids-cmake copy for GPU architecture discovery unless a parent
+# project already provided it. The user can optionally override GPU_ARCH to specify
+# their own.
 if(NOT DEFINED rapids-cmake-dir)
   include(FetchContent)
   # Tell FetchContent to just use the local copy of rapids-cmake:
@@ -423,11 +422,7 @@ target_link_libraries(matx INTERFACE
     CUDA::cusolver
     CUDA::cusparse)
 
-if (CMAKE_VERSION VERSION_LESS 3.25.0)
-    target_link_libraries(matx INTERFACE CUDA::nvToolsExt)
-else()
-    target_link_libraries(matx INTERFACE CUDA::nvtx3)
-endif()
+target_link_libraries(matx INTERFACE CUDA::nvtx3)
 
 # Build config files if the user isn't adding this as a subdirectory. At this point our transitive target
 # should have all build properties needed based on the options passed in
