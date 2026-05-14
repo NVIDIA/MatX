@@ -43,15 +43,15 @@
 #if defined(MATX_EN_JIT) && !defined(__CUDACC_RTC__)
   #include "matx/core/nvrtc_helper.h"
 #endif
-#include <cub/version.cuh>
+#include <cuda/std/version>
 #include <cub/block/block_radix_sort.cuh>
 #include <cub/block/block_reduce.cuh>
 #include <cub/block/block_scan.cuh>
 #if defined(MATX_EN_JIT)
-  #ifndef CUB_VERSION
-    #error "MatX CUB block JIT support requires CCCL/CUB 3.3.0 or newer"
-  #elif CUB_VERSION < 300300
-    #error "MatX CUB block JIT support requires CCCL/CUB 3.3.0 or newer"
+  #ifndef CCCL_VERSION
+    #error "MatX CUB block JIT support requires CCCL 3.3.0 or newer"
+  #elif CCCL_VERSION < 3003000
+    #error "MatX CUB block JIT support requires CCCL 3.3.0 or newer"
   #endif
 #endif
 #ifndef __CUDACC_RTC__
