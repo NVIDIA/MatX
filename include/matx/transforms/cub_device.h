@@ -46,6 +46,10 @@
 #include <cub/block/block_radix_sort.cuh>
 #include <cub/block/block_reduce.cuh>
 #include <cub/block/block_scan.cuh>
+#ifndef __CUDACC_RTC__
+  #include <cuda/cmath>
+  #include <cuda/std/__algorithm/min.h>
+#endif
 #include <cuda/std/limits>
 #include <cuda/std/utility>
 
@@ -70,6 +74,88 @@ namespace detail {
     SORT,
     SORT_PAIRS
   };
+
+#ifndef __CUDACC_RTC__
+  template <typename T>
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr int MaxCubJitElementsPerThreadByBytes(int limit = 32)
+  {
+    constexpr int element_size = static_cast<int>(sizeof(T));
+    int byte_limited = 16 / element_size;
+    if (byte_limited < 1) {
+      byte_limited = 1;
+    }
+
+    const int capped = cuda::std::min(limit, byte_limited);
+    return capped > 0 ? static_cast<int>(cuda::prev_power_of_two(capped)) : 0;
+  }
+
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr int CubJitMaxReductionEPT(index_t reduce_size, int limit)
+  {
+    if (reduce_size <= 0 || limit <= 0) {
+      return 0;
+    }
+
+    const auto capped = cuda::std::min(reduce_size, static_cast<index_t>(limit));
+    return static_cast<int>(cuda::prev_power_of_two(capped));
+  }
+
+  template <typename T>
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr int CubJitMaxReductionEPT(index_t reduce_size)
+  {
+    return CubJitMaxReductionEPT(reduce_size, MaxCubJitElementsPerThreadByBytes<T>());
+  }
+
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr int CubJitReductionBlockThreads(index_t reduce_size, int ept)
+  {
+    if (reduce_size <= 0 || ept <= 0) {
+      return 0;
+    }
+
+    return static_cast<int>((reduce_size + ept - 1) / ept);
+  }
+
+  template <typename T>
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr bool CubJitReductionFitsInBlock(index_t reduce_size, int max_threads = 1024)
+  {
+    const int max_ept = CubJitMaxReductionEPT<T>(reduce_size);
+    const int block_threads = CubJitReductionBlockThreads(reduce_size, max_ept);
+    return max_ept > 0 && block_threads > 0 && block_threads <= max_threads;
+  }
+
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr int CubJitMaxPowerOfTwoCollectiveEPT(index_t critical_dim_size, int limit)
+  {
+    if (critical_dim_size <= 0 || limit <= 0 || !cuda::is_power_of_two(critical_dim_size)) {
+      return 0;
+    }
+
+    const auto capped = cuda::std::min(critical_dim_size, static_cast<index_t>(limit));
+    return static_cast<int>(cuda::prev_power_of_two(capped));
+  }
+
+  template <typename T>
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr int CubJitMaxPowerOfTwoCollectiveEPT(index_t critical_dim_size)
+  {
+    return CubJitMaxPowerOfTwoCollectiveEPT(critical_dim_size, MaxCubJitElementsPerThreadByBytes<T>());
+  }
+
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr int CubJitPowerOfTwoCollectiveBlockThreads(index_t critical_dim_size, int ept)
+  {
+    if (critical_dim_size <= 0 || ept <= 0 || (critical_dim_size % ept) != 0) {
+      return 0;
+    }
+
+    const auto block_threads = critical_dim_size / ept;
+    return cuda::is_power_of_two(block_threads) ? static_cast<int>(block_threads) : 0;
+  }
+
+  template <typename T>
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr bool CubJitPowerOfTwoCollectiveFitsInBlock(index_t critical_dim_size, int max_threads = 1024)
+  {
+    const int max_ept = CubJitMaxPowerOfTwoCollectiveEPT<T>(critical_dim_size);
+    const int block_threads = CubJitPowerOfTwoCollectiveBlockThreads(critical_dim_size, max_ept);
+    return block_threads > 0 && block_threads <= max_threads;
+  }
+#endif
 
   template <typename CapType, typename Op, size_t Rank, size_t... I>
   __MATX_INLINE__ __MATX_DEVICE__ decltype(auto) block_op_get_value_at(

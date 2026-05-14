@@ -86,15 +86,6 @@ namespace detail {
         return JIT_Storage{detail::to_jit_storage(a_)};
       }
 
-      __MATX_INLINE__ static int LargestValidCubEPTAtMost(index_t value, int limit = 32) {
-        if (value <= 0 || limit <= 0 || !cuda::is_power_of_two(value)) {
-          return 0;
-        }
-
-        const auto capped = cuda::std::min(value, static_cast<index_t>(limit));
-        return static_cast<int>(cuda::prev_power_of_two(capped));
-      }
-
       __MATX_INLINE__ index_t CriticalDimSize() const {
         if constexpr (OpA::Rank() == 0) {
           return 0;
@@ -105,28 +96,15 @@ namespace detail {
       }
 
       __MATX_INLINE__ int MaxJitElementsPerThread() const {
-        return LargestValidCubEPTAtMost(CriticalDimSize(),
-                                        MaxCubJitElementsPerThreadByBytes<key_type>());
+        return CubJitMaxPowerOfTwoCollectiveEPT<key_type>(CriticalDimSize());
       }
 
       __MATX_INLINE__ int BlockThreadsForEPT(int ept) const {
-        const auto critical_dim_size = CriticalDimSize();
-        if (critical_dim_size <= 0 || ept <= 0 || (critical_dim_size % ept) != 0) {
-          return 0;
-        }
-
-        const auto block_threads = critical_dim_size / ept;
-        return cuda::is_power_of_two(block_threads) ? static_cast<int>(block_threads) : 0;
+        return CubJitPowerOfTwoCollectiveBlockThreads(CriticalDimSize(), ept);
       }
 
       __MATX_INLINE__ bool BlockSizeFitsAtMaxEPT() const {
-        const auto critical_dim_size = CriticalDimSize();
-        if (critical_dim_size <= 0) {
-          return false;
-        }
-        const int max_ept = MaxJitElementsPerThread();
-        const int block_threads = BlockThreadsForEPT(max_ept);
-        return block_threads > 0 && block_threads <= 1024;
+        return CubJitPowerOfTwoCollectiveFitsInBlock<key_type>(CriticalDimSize());
       }
 
       __MATX_INLINE__ int CurrentBlockThreads() const {

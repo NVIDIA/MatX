@@ -96,31 +96,15 @@ namespace detail {
       }
 
       __MATX_INLINE__ int MaxJitElementsPerThread() const {
-        const auto reduce_size = ReduceSize();
-        const int limit = MaxCubJitElementsPerThreadByBytes<value_type>();
-        if (reduce_size <= 0 || limit <= 0) {
-          return 0;
-        }
-        const auto capped = cuda::std::min(reduce_size, static_cast<index_t>(limit));
-        return static_cast<int>(cuda::prev_power_of_two(capped));
+        return CubJitMaxReductionEPT<value_type>(ReduceSize());
       }
 
       __MATX_INLINE__ bool BlockSizeFitsAtMaxEPT() const {
-        const auto reduce_size = ReduceSize();
-        if (reduce_size <= 0) {
-          return false;
-        }
-        const int max_ept = MaxJitElementsPerThread();
-        return max_ept > 0 && static_cast<int>((reduce_size + max_ept - 1) / max_ept) <= 1024;
+        return CubJitReductionFitsInBlock<value_type>(ReduceSize());
       }
 
       __MATX_INLINE__ int CurrentBlockThreads() const {
-        const int ept = static_cast<int>(current_ept_);
-        if (ept <= 0) {
-          return 0;
-        }
-        const auto reduce_size = ReduceSize();
-        return reduce_size > 0 ? static_cast<int>((reduce_size + ept - 1) / ept) : 0;
+        return CubJitReductionBlockThreads(ReduceSize(), static_cast<int>(current_ept_));
       }
 
       __MATX_INLINE__ int MaxGroupsPerBlock() const {

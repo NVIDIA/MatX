@@ -36,7 +36,6 @@
 #include "matx/core/type_utils.h"
 #include "matx/core/utils.h"
 #include "matx/core/operator_options.h"
-#include <cuda/cmath>
 #include <cuda/std/type_traits>
 #include <cuda/std/limits>
 #include <cuda/std/__algorithm/min.h>
@@ -48,19 +47,6 @@
 namespace matx {
 
 namespace detail {
-
-  template <typename T>
-  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr int MaxCubJitElementsPerThreadByBytes(int limit = 32)
-  {
-    constexpr int element_size = static_cast<int>(sizeof(T));
-    int byte_limited = 16 / element_size;
-    if (byte_limited < 1) {
-      byte_limited = 1;
-    }
-
-    const int capped = cuda::std::min(limit, byte_limited);
-    return capped > 0 ? static_cast<int>(cuda::prev_power_of_two(capped)) : 0;
-  }
 
   struct LTOIRQueryInput {
     std::set<std::string> ltoir_symbols;
