@@ -128,7 +128,9 @@ namespace matx
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
     {
       using ScalarCap = CapabilityParams<ElementsPerThread::ONE, CapType::jit>;
-      using I1Cap = cuda::std::conditional_t<IsDirectBlockReduction<I1>(), ScalarCap, CapType>;
+      using I1Cap = cuda::std::conditional_t<matx_jit_contains_block_reduction::value &&
+                                              (!ContainsBlockReduction<I1>() && !IsDirectBlockReduction<I1>()),
+                                              ScalarCap, CapType>;
       auto i1 = get_value<I1Cap>(in1_, indices...);
       return op_.template operator()<CapType>(i1);
     }
@@ -170,6 +172,11 @@ namespace matx
             "      return requires { typename Candidate::matx_jit_block_reduction; };\n"
             "    }\n"
             "  }\n"
+            "  template <typename Candidate>\n"
+            "  static __MATX_INLINE__ constexpr bool IsDirectBlockReduction()\n"
+            "  {\n"
+            "    return requires { typename Candidate::matx_jit_block_reduction; };\n"
+            "  }\n"
             "  using matx_jit_contains_block_reduction = cuda::std::bool_constant<ContainsBlockReduction<I1>()>;\n" +
             "  constexpr static cuda::std::array<index_t, " + std::to_string(actual_rank) + "> out_dims_ = { " +
             dims_str + " };\n" +
@@ -179,12 +186,14 @@ namespace matx
             "  __MATX_INLINE__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) const\n" +
             "  {\n" +
             (actual_rank > 0 ?
-            "    if constexpr (!CapType::pass_through_threads) {\n"
+            "    if constexpr (!matx_jit_contains_block_reduction::value && !CapType::pass_through_threads) {\n"
             "      if ((threadIdx.x * static_cast<int>(CapType::ept)) > Size(Rank() - 1)) {\n"
             "        return detail::GetJitSentinelValue<CapType, value_type>();\n"
             "      }\n"
             "    }\n" : "") +
-            "    auto i1 = get_value<CapType>(in1_, indices...);\n" +
+            "    using ScalarCap = CapabilityParams<ElementsPerThread::ONE, CapType::jit>;\n" +
+            "    using I1Cap = cuda::std::conditional_t<matx_jit_contains_block_reduction::value && (!ContainsBlockReduction<I1>() && !IsDirectBlockReduction<I1>()), ScalarCap, CapType>;\n" +
+            "    auto i1 = get_value<I1Cap>(in1_, indices...);\n" +
             "    return op_.template operator()<CapType>(i1);\n" +
             "  }\n" +
             "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank()\n" +

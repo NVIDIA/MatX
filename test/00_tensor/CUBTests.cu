@@ -704,6 +704,40 @@ TEST(TensorStats, CubBlockJITWithOperatorInput)
   MATX_EXIT_HANDLER();
 }
 
+TEST(TensorStats, CubBlockJITUnaryOverReduction)
+{
+  MATX_ENTER_HANDLER();
+
+  CUDAJITExecutor exec{};
+  constexpr index_t rows = 3;
+  constexpr index_t cols = 16;
+
+  tensor_t<float, 2> in({rows, cols});
+  tensor_t<float, 1> out({rows});
+
+  for (index_t i = 0; i < rows; i++) {
+    for (index_t j = 0; j < cols; j++) {
+      in(i, j) = -1.0f * static_cast<float>(i + j + 1);
+    }
+  }
+
+  auto expr = abs(sum(in, {1}));
+  ASSERT_TRUE(jit_supported(expr));
+
+  (out = expr).run(exec);
+  exec.sync();
+
+  for (index_t i = 0; i < rows; i++) {
+    float expected_sum = 0.0f;
+    for (index_t j = 0; j < cols; j++) {
+      expected_sum += in(i, j);
+    }
+    ASSERT_NEAR(out(i), cuda::std::abs(expected_sum), 0.001f);
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
 TEST(TensorStats, CubBlockJITWithFFT)
 {
   MATX_ENTER_HANDLER();
