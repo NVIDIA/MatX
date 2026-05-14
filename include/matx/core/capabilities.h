@@ -177,6 +177,7 @@ namespace detail {
     BLOCK_REDUCES_RANK, // Block-level operator's critical dimension is not part of the output rank
     UNIT_STRIDE_LAST, // Whether all leaf tensors have stride[RANK-1] == 1
     JIT_CACHE_KEY, // Fixed-size cache key for JIT expressions that can avoid building JIT_TYPE_QUERY on cache hits.
+    VALID_USAGE, // Validate that the expression is semantically usable before launch.
     // Add more capabilities as needed
   };
 
@@ -419,13 +420,30 @@ namespace detail {
     static constexpr bool and_identity = true;
   };
 
+  template <>
+  struct capability_attributes<OperatorCapability::VALID_USAGE> {
+    using type = bool;
+    using input_type = VoidCapabilityType;
+    static constexpr bool default_value = true;
+    static constexpr bool or_identity = false;
+    static constexpr bool and_identity = true;
+  };
+
 
   template <OperatorCapability Cap, typename OperatorType, typename InType>
   __MATX_INLINE__ __MATX_HOST__ typename capability_attributes<Cap>::type
   get_operator_capability(const OperatorType& op, InType& in) {
     static_assert(std::is_same_v<remove_cvref_t<InType>, typename capability_attributes<Cap>::input_type>, "Input type mismatch");
     if constexpr (is_matx_jit_class<OperatorType>) {
-      return op.template get_capability<Cap, InType>(in);
+      if constexpr (requires { op.template get_capability<Cap, InType>(in); }) {
+        return op.template get_capability<Cap, InType>(in);
+      }
+      else if constexpr (requires { op.template get_capability<Cap>(); }) {
+        return op.template get_capability<Cap>();
+      }
+      else {
+        return capability_attributes<Cap>::default_value;
+      }
     } else {
       // Default capabilities for non-MatX ops
       if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
@@ -498,6 +516,8 @@ namespace detail {
         return CapabilityQueryType::AND_QUERY; // All leaf tensors must have stride[RANK-1] == 1
       case OperatorCapability::JIT_CACHE_KEY:
         return CapabilityQueryType::HASH_QUERY; // Build a fixed-size fingerprint of the expression tree.
+      case OperatorCapability::VALID_USAGE:
+        return CapabilityQueryType::AND_QUERY; // Validate all operators in an expression tree.
       default:
         // Default to OR_QUERY or handle as an error/assertion if a capability isn't mapped.
         return CapabilityQueryType::OR_QUERY;

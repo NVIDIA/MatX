@@ -209,6 +209,35 @@ TYPED_TEST(SVDProjectionSolverTestNonHalfTypes, ProjectionAPI)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(SVDProjectionSolverTestNonHalfTypes, ProjectionModeNoneRejectsVectorOutputs)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using value_type = typename inner_op_type_t<TestType>::type;
+
+  constexpr index_t m = 8;
+  constexpr index_t n = 5;
+  constexpr index_t k = cuda::std::min(m, n);
+
+  auto A = make_tensor<TestType>({m, n});
+  auto S = make_tensor<value_type>({k});
+  auto U = make_tensor<TestType>({m, m});
+  auto VT = make_tensor<TestType>({n, n});
+  auto UPlus = make_tensor<TestType>({m, m});
+
+  (A = random<TestType>(A.Shape(), NORMAL)).run(this->exec);
+
+  auto op = svd(A, SVDMode::NONE);
+  (S = op.S).run(this->exec);
+  this->exec.sync();
+
+  EXPECT_THROW({ (U = op.U).run(this->exec); }, matx::detail::matxException);
+  EXPECT_THROW({ (VT = op.VT).run(this->exec); }, matx::detail::matxException);
+  EXPECT_THROW({ (UPlus = op.U + TestType{}).run(this->exec); }, matx::detail::matxException);
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasic)
 {
   MATX_ENTER_HANDLER();

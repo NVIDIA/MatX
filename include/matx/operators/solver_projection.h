@@ -237,8 +237,12 @@ class SolverProjectionStorage : public BaseOp<SolverProjectionStorage<State, Com
     }
 
     template <typename ShapeType, typename Executor>
-    __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
+    __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const
     {
+      if constexpr (requires(State *s) { s->template ValidateProjection<Component>(); }) {
+        state_->template ValidateProjection<Component>();
+      }
+
       if constexpr (is_cuda_jit_executor_v<Executor>) {
         if constexpr (is_matx_op<input_type>()) {
           state_->Input().PreRun(detail::NoShape{}, std::forward<Executor>(ex));
@@ -266,6 +270,14 @@ class SolverProjectionStorage : public BaseOp<SolverProjectionStorage<State, Com
     template <OperatorCapability Cap, typename InType>
     __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const
     {
+      if constexpr (Cap == OperatorCapability::VALID_USAGE) {
+        if constexpr (requires(State *s) { s->template ValidateProjection<Component>(); }) {
+          state_->template ValidateProjection<Component>();
+        }
+
+        return combine_capabilities<Cap>(true, detail::get_operator_capability<Cap>(state_->Input(), in));
+      }
+      else {
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
       if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
         if constexpr (requires(State *s) { s->template SupportsJITProjection<Component>(); }) {
@@ -374,6 +386,7 @@ class SolverProjectionStorage : public BaseOp<SolverProjectionStorage<State, Com
         return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(state_->Input(), in));
       }
 #endif
+      }
     }
 
 #ifdef MATX_EN_JIT
@@ -441,7 +454,7 @@ class SolverProjectionOp : public BaseOp<SolverProjectionOp<State, Component, Te
     }
 
     template <typename ShapeType, typename Executor>
-    __MATX_INLINE__ void PreRun(ShapeType &&shape, Executor &&ex) const noexcept
+    __MATX_INLINE__ void PreRun(ShapeType &&shape, Executor &&ex) const
     {
       storage_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
     }

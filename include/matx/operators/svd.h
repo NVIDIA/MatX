@@ -98,6 +98,21 @@ namespace detail {
       SVDMode Jobz() const { return jobz_; }
       SVDHostAlgo Algo() const { return algo_; }
 
+      template <int Component>
+      void ValidateProjection() const
+      {
+        if constexpr (Component == SVD_U) {
+          if (jobz_ == SVDMode::NONE) {
+            MATX_THROW(matxInvalidParameter, "svd().U cannot be used when SVDMode::NONE is selected");
+          }
+        }
+        else if constexpr (Component == SVD_VT) {
+          if (jobz_ == SVDMode::NONE) {
+            MATX_THROW(matxInvalidParameter, "svd().VT cannot be used when SVDMode::NONE is selected");
+          }
+        }
+      }
+
       template <typename Executor>
       void Materialize(Executor &&ex) const
       {
@@ -220,6 +235,8 @@ namespace detail {
       template <int Component>
       auto Tensor() const
       {
+        ValidateProjection<Component>();
+
         if constexpr (Component == SVD_U) {
           return u_;
         }

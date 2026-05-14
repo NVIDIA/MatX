@@ -189,6 +189,8 @@ public:
     static_assert(is_matx_op_lvalue<T>() == true, "Invalid operator on LHS of set/operator=");
     static_assert(!is_matx_transform_op<T>(), "Cannot use transform operator on LHS of assignment");
 
+    detail::get_operator_capability<detail::OperatorCapability::VALID_USAGE>(op_);
+
     // set() is a placeholder when using mtie() for multiple return types, so we don't need to check compatible
     // sizes
     if constexpr (!is_mtie<T>()) {
