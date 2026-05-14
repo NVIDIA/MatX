@@ -66,6 +66,15 @@ __MATX_INLINE__ cuda::std::array<index_t, RANK - 1> SolverVectorShapeFromMatrixS
   return vec_shape;
 }
 
+template <typename State>
+struct SolverProjectionExecutionLock {
+  static std::mutex &Mutex()
+  {
+    static std::mutex mutex;
+    return mutex;
+  }
+};
+
 template <typename State, int Component, typename TensorType>
 class SolverProjectionStorage : public BaseOp<SolverProjectionStorage<State, Component, TensorType>>
 {
@@ -249,6 +258,7 @@ class SolverProjectionStorage : public BaseOp<SolverProjectionStorage<State, Com
         }
       }
       else {
+        std::lock_guard<std::mutex> lock(SolverProjectionExecutionLock<State>::Mutex());
         state_->Materialize(std::forward<Executor>(ex));
         tensor_ = state_->template Tensor<Component>();
       }
@@ -263,6 +273,7 @@ class SolverProjectionStorage : public BaseOp<SolverProjectionStorage<State, Com
         }
       }
       else {
+        std::lock_guard<std::mutex> lock(SolverProjectionExecutionLock<State>::Mutex());
         state_->Release(std::forward<Executor>(ex));
       }
     }

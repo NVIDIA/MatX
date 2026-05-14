@@ -326,6 +326,17 @@ public:
           "        valid = valid && idx_arr[dim] < out_.Size(dim);\n" +
           "      }\n" +
           "    }\n" +
+          "    if (!valid) {\n" +
+          "      if constexpr (!CapType::pass_through_threads) {\n" +
+          "        if constexpr (is_vector_v<in_val_type>) {\n" +
+          "          using scalar_type = typename in_val_type::value_type;\n" +
+          "          return in_val_type{scalar_type{}};\n" +
+          "        }\n" +
+          "        else {\n" +
+          "          return in_val_type{};\n" +
+          "        }\n" +
+          "      }\n" +
+          "    }\n" +
           "    auto in_val = detail::get_value<CapType>(op_, indices...);\n" +
           "    using out_type = decltype(out_.template operator()<CapType>(indices...));\n" +
           "    if (!valid) {\n" +

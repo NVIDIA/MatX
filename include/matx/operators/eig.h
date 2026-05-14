@@ -118,6 +118,16 @@ namespace detail {
       EigenMode Jobz() const { return jobz_; }
       SolverFillMode Uplo() const { return uplo_; }
 
+      template <int Component>
+      void ValidateProjection() const
+      {
+        if constexpr (Component == EIG_VECTORS) {
+          if (jobz_ != EigenMode::VECTOR) {
+            MATX_THROW(matxInvalidParameter, "eig().Vectors cannot be used when EigenMode::NO_VECTOR is selected");
+          }
+        }
+      }
+
       template <typename Executor>
       void Materialize(Executor &&ex) const
       {
@@ -215,6 +225,8 @@ namespace detail {
       template <int Component>
       auto Tensor() const
       {
+        ValidateProjection<Component>();
+
         if constexpr (Component == EIG_VECTORS) {
           return vectors_;
         }

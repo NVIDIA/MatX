@@ -221,16 +221,23 @@ TYPED_TEST(SVDProjectionSolverTestNonHalfTypes, ProjectionModeNoneRejectsVectorO
 
   auto A = make_tensor<TestType>({m, n});
   auto S = make_tensor<value_type>({k});
+  auto SRef = make_tensor<value_type>({k});
   auto U = make_tensor<TestType>({m, m});
   auto VT = make_tensor<TestType>({n, n});
+  auto URef = make_tensor<TestType>({m, k});
+  auto VTRef = make_tensor<TestType>({k, n});
   auto UPlus = make_tensor<TestType>({m, m});
+  auto mdiff = make_tensor<value_type>({});
 
   (A = random<TestType>(A.Shape(), NORMAL)).run(this->exec);
 
   auto op = svd(A, SVDMode::NONE);
   (S = op.S).run(this->exec);
+  (mtie(URef, SRef, VTRef) = svd(A, SVDMode::REDUCED)).run(this->exec);
+  (mdiff = max(abs(S - SRef))).run(this->exec);
   this->exec.sync();
 
+  ASSERT_NEAR(mdiff(), value_type(0), value_type(0.001));
   EXPECT_THROW({ (U = op.U).run(this->exec); }, matx::detail::matxException);
   EXPECT_THROW({ (VT = op.VT).run(this->exec); }, matx::detail::matxException);
   EXPECT_THROW({ (UPlus = op.U + TestType{}).run(this->exec); }, matx::detail::matxException);

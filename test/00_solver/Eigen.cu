@@ -314,6 +314,35 @@ TYPED_TEST(EigenProjectionSolverTestFloatTypes, ProjectionAPI)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(EigenProjectionSolverTestFloatTypes, ProjectionNoVectorModeRejectsVectors)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using value_type = typename inner_op_type_t<TestType>::type;
+
+  constexpr index_t n = 4;
+  cudaExecutor exec{};
+  auto Bv = make_tensor<TestType>({n, n});
+  auto Values = make_tensor<value_type>({n});
+  auto Vectors = make_tensor<TestType>({n, n});
+  auto VectorsPlus = make_tensor<TestType>({n, n});
+
+  for (index_t i = 0; i < n; i++) {
+    for (index_t j = 0; j < n; j++) {
+      Bv(i, j) = i == j ? MakeEigenTestValue<TestType>(static_cast<double>(i + 1)) : TestType{};
+    }
+  }
+
+  auto op = eig(Bv, EigenMode::NO_VECTOR);
+  (Values = op.Values).run(exec);
+  exec.sync();
+
+  EXPECT_THROW({ (Vectors = op.Vectors).run(exec); }, matx::detail::matxException);
+  EXPECT_THROW({ (VectorsPlus = op.Vectors + TestType{}).run(exec); }, matx::detail::matxException);
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(EigenSolverTestFloatTypes, EigenBasic)
 {
   MATX_ENTER_HANDLER();

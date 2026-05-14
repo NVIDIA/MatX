@@ -108,6 +108,15 @@ class InvSolverJITTestFloatTypes : public ::testing::Test {
 TYPED_TEST_SUITE(InvSolverJITTestFloatTypes,
   MatXFloatNonHalfTypesCUDAExec);
 
+TEST(InvSolverJITRegression, SelectsPassThroughBlockDimFromIntersection)
+{
+  EXPECT_EQ(detail::SelectJITPassThroughBlockDim(cuda::std::array<int, 2>{64, 64}), 64);
+  EXPECT_EQ(detail::SelectJITPassThroughBlockDim(cuda::std::array<int, 2>{32, 1024}), 256);
+  EXPECT_EQ(detail::SelectJITPassThroughBlockDim(cuda::std::array<int, 2>{512, 1024}), 512);
+  EXPECT_THROW({ detail::SelectJITPassThroughBlockDim(cuda::std::array<int, 2>{128, 64}); },
+               matx::detail::matxException);
+}
+
 TYPED_TEST(InvSolverJITTestFloatTypes, CuSolverDxRuntimeQueries)
 {
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
