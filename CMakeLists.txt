@@ -1,15 +1,10 @@
-cmake_minimum_required(VERSION 3.25.2)
+cmake_minimum_required(VERSION 3.30.4)
 
 if(POLICY CMP0144)
     # Preserve current behavior: CI may export upper-case package root variables
     # that should not override dependencies fetched through CPM.
     cmake_policy(SET CMP0144 OLD)
 endif()
-if(POLICY CMP0169)
-    # rapids-cmake currently drives CPM through FetchContent_Populate.
-    cmake_policy(SET CMP0169 OLD)
-endif()
-
 set(MATX_VERSION 1.0.0)
 
 # Used for config file generation
@@ -29,7 +24,7 @@ if(NOT DEFINED rapids-cmake-dir)
   FetchContent_Declare(rapids-cmake SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/cmake/rapids-cmake")
 
   # Tell FetchContent to download remote copy of rapids-cmake:
-  #FetchContent_Declare(rapids-cmake URL https://github.com/rapidsai/rapids-cmake/archive/refs/heads/branch-24.12.zip)
+  #FetchContent_Declare(rapids-cmake URL https://github.com/rapidsai/rapids-cmake/archive/refs/tags/v26.04.00.zip)
   FetchContent_MakeAvailable(rapids-cmake)
 else()
   # The include() commands below search the module path for the corresponding .cmake files
@@ -95,10 +90,6 @@ option(MATX_CHECK_NARROWING_CONVERSIONS "Enable compile-time checks for narrowin
 option(MATX_DISABLE_EXCEPTIONS "Disable C++ exceptions and log errors instead" OFF)
 
 set(MATX_EN_PYBIND11 OFF CACHE BOOL "Enable pybind11 support")
-
-if (MATX_BUILD_BENCHMARKS AND CMAKE_VERSION VERSION_LESS 3.30.4)
-    message(FATAL_ERROR "MATX_BUILD_BENCHMARKS=ON requires CMake 3.30.4 or newer because bundled nvbench requires it")
-endif()
 
 set(cudss_DIR "" CACHE PATH "Directory where cuDSS is installed.")
 set(cutensor_DIR "" CACHE PATH "Directory where cuTENSOR is installed.")
@@ -188,10 +179,6 @@ endif()
 
 # Set preferred compiler warning flags. nvc++ doesn't support most warnings
 string(FIND "${CMAKE_CUDA_HOST_COMPILER}" "nvc++" IS_NVCPP)
-if (${IS_NVCPP} GREATER -1 OR CMAKE_CXX_COMPILER_ID STREQUAL "NVHPC")
-    target_compile_options(matx INTERFACE
-        $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=--diag_suppress=if_consteval_in_nonconstexpr_function>)
-endif()
 if (NOT ${IS_NVCPP} GREATER -1)
     set(WARN_FLAGS
         -Wall

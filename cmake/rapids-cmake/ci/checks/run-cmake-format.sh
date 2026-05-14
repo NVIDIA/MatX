@@ -1,6 +1,7 @@
 #!/bin/bash
 
-# Copyright (c) 2021-2023, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2021-2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
 
 # This script is a wrapper for cmakelang that may be used with pre-commit. The
 # wrapping is necessary because RAPIDS libraries split configuration for
@@ -25,7 +26,7 @@
 # Usage:
 # bash run-cmake-format.sh {cmake-format,cmake-lint} infile [infile ...]
 
-RAPIDS_CMAKE_ROOT="$(realpath $(dirname $0)/../..)"
+RAPIDS_CMAKE_ROOT="$(realpath "$(dirname "$0")"/../..)"
 DEFAULT_RAPIDS_CMAKE_FORMAT_FILE="${RAPIDS_CMAKE_ROOT}/cmake-format-rapids-cmake.json"
 
 if [ -z ${RAPIDS_CMAKE_FORMAT_FILE:+PLACEHOLDER} ]; then
@@ -47,13 +48,13 @@ if [[ $1 == "cmake-format" ]]; then
   # We cannot pass multiple input files because of a bug in cmake-format.
   # See: https://github.com/cheshirekow/cmake_format/issues/284
   for cmake_file in "${@:2}"; do
-    cmake-format --in-place --first-comment-is-literal --config-files ${RAPIDS_CMAKE_FORMAT_FILE} ${RAPIDS_CMAKE_ROOT}/ci/checks/cmake_config_format.json -- ${cmake_file}
+    cmake-format --in-place --config-files "${RAPIDS_CMAKE_FORMAT_FILE}" "${RAPIDS_CMAKE_ROOT}"/ci/checks/cmake_config_format.json -- "${cmake_file}"
   done
 elif [[ $1 == "cmake-lint" ]]; then
   # Since the pre-commit hook is verbose, we have to be careful to only
   # present cmake-lint's output (which is quite verbose) if we actually
   # observe a failure.
-  OUTPUT=$(cmake-lint --config-files ${RAPIDS_CMAKE_FORMAT_FILE} ${RAPIDS_CMAKE_ROOT}/ci/checks/cmake_config_format.json ${RAPIDS_CMAKE_ROOT}/ci/checks/cmake_config_lint.json -- ${@:2})
+  OUTPUT=$(cmake-lint --config-files "${RAPIDS_CMAKE_FORMAT_FILE}" "${RAPIDS_CMAKE_ROOT}"/ci/checks/cmake_config_format.json "${RAPIDS_CMAKE_ROOT}"/ci/checks/cmake_config_lint.json -- "${@:2}")
   status=$?
 
   if ! [ ${status} -eq 0 ]; then

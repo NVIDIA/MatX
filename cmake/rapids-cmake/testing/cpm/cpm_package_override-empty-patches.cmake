@@ -1,18 +1,9 @@
-#=============================================================================
-# Copyright (c) 2024, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#=============================================================================
+# =============================================================================
+# cmake-format: off
+# SPDX-FileCopyrightText: Copyright (c) 2024-2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
+# cmake-format: on
+# =============================================================================
 include(${rapids-cmake-dir}/cpm/init.cmake)
 include(${rapids-cmake-dir}/cpm/package_override.cmake)
 
@@ -20,7 +11,7 @@ rapids_cpm_init()
 
 # Need to write out an override file
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/override.json
-  [=[
+     [=[
 {
   "packages": {
     "rmm": {
@@ -42,14 +33,14 @@ rapids_cpm_package_override(${CMAKE_CURRENT_BINARY_DIR}/override.json)
 include("${rapids-cmake-dir}/cpm/detail/package_details.cmake")
 include("${rapids-cmake-dir}/cpm/detail/generate_patch_command.cmake")
 
-rapids_cpm_package_details(rmm version repository tag shallow exclude)
-rapids_cpm_generate_patch_command(rmm ${version} patch_command)
+rapids_cpm_package_details_internal(rmm version repository tag src_subdir shallow exclude)
+rapids_cpm_generate_patch_command(rmm ${version} patch_command build_patch_only)
 if(patch_command)
   message(FATAL_ERROR "no patch command expected for rmm")
 endif()
 
-rapids_cpm_package_details(CCCL version repository tag shallow exclude)
-rapids_cpm_generate_patch_command(CCCL ${version} patch_command)
+rapids_cpm_package_details_internal(CCCL version repository tag src_subdir shallow exclude)
+rapids_cpm_generate_patch_command(CCCL ${version} patch_command build_patch_only)
 if(patch_command)
   message(FATAL_ERROR "no patch command expected for cccl")
 endif()

@@ -90,9 +90,9 @@ static constexpr bool IsDenseSolveVectorRHS()
 }
 
 template <typename OutputTensor, typename ATensor, typename BTensor>
-__MATX_INLINE__ void ValidateDenseSolve(OutputTensor &&out,
-                                        const ATensor &a,
-                                        const BTensor &b)
+__MATX_INLINE__ void ValidateDenseSolve([[maybe_unused]] OutputTensor &&out,
+                                        [[maybe_unused]] const ATensor &a,
+                                        [[maybe_unused]] const BTensor &b)
 {
   using OutTensor_t = remove_cvref_t<OutputTensor>;
   using ATensor_t = remove_cvref_t<ATensor>;

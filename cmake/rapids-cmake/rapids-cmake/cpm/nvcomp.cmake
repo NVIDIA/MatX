@@ -1,18 +1,9 @@
-#=============================================================================
-# Copyright (c) 2021-2024, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#=============================================================================
+# =============================================================================
+# cmake-format: off
+# SPDX-FileCopyrightText: Copyright (c) 2021-2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
+# cmake-format: on
+# =============================================================================
 include_guard(GLOBAL)
 
 #[=======================================================================[.rst:
@@ -72,25 +63,13 @@ function(rapids_cpm_nvcomp)
   list(APPEND CMAKE_MESSAGE_CONTEXT "rapids.cpm.nvcomp")
 
   set(options)
-  set(one_value USE_PROPRIETARY_BINARY BUILD_EXPORT_SET INSTALL_EXPORT_SET)
+  set(one_value USE_PROPRIETARY_BINARY)
   set(multi_value)
   cmake_parse_arguments(_RAPIDS "${options}" "${one_value}" "${multi_value}" ${ARGN})
 
-  # Fix up _RAPIDS_UNPARSED_ARGUMENTS to have EXPORT_SETS as this is need for rapids_cpm_find
-  if(_RAPIDS_INSTALL_EXPORT_SET)
-    list(APPEND _RAPIDS_EXPORT_ARGUMENTS INSTALL_EXPORT_SET ${_RAPIDS_INSTALL_EXPORT_SET})
-  endif()
-  if(_RAPIDS_BUILD_EXPORT_SET)
-    list(APPEND _RAPIDS_EXPORT_ARGUMENTS BUILD_EXPORT_SET ${_RAPIDS_BUILD_EXPORT_SET})
-  endif()
-  set(_RAPIDS_UNPARSED_ARGUMENTS ${_RAPIDS_EXPORT_ARGUMENTS})
-
-  include("${rapids-cmake-dir}/cpm/detail/package_details.cmake")
-  rapids_cpm_package_details(nvcomp version repository tag shallow exclude)
-  set(to_exclude OFF)
-  if(NOT _RAPIDS_INSTALL_EXPORT_SET OR exclude)
-    set(to_exclude ON)
-  endif()
+  include("${rapids-cmake-dir}/cpm/detail/package_info.cmake")
+  rapids_cpm_package_info(nvcomp ${_RAPIDS_UNPARSED_ARGUMENTS} VERSION_VAR version FIND_VAR
+                          find_args CPM_VAR cpm_find_info TO_INSTALL_VAR to_install)
 
   # first search locally if `rapids_cmake_always_download` is false
   if(NOT rapids_cmake_always_download)
@@ -178,24 +157,10 @@ function(rapids_cpm_nvcomp)
     endif()
   endif()
 
-  include("${rapids-cmake-dir}/cpm/detail/generate_patch_command.cmake")
-  rapids_cpm_generate_patch_command(nvcomp ${version} patch_command)
-
-  # Apply any patch commands to the proprietary binary
-  if(nvcomp_proprietary_binary AND patch_command)
-    execute_process(COMMAND ${patch_command} WORKING_DIRECTORY ${nvcomp_ROOT})
-  endif()
-
   include("${rapids-cmake-dir}/cpm/find.cmake")
-  rapids_cpm_find(nvcomp ${version} ${_RAPIDS_UNPARSED_ARGUMENTS}
-                  GLOBAL_TARGETS nvcomp::nvcomp
-                  CPM_ARGS
-                  GIT_REPOSITORY ${repository}
-                  GIT_TAG ${tag}
-                  GIT_SHALLOW ${shallow}
-                  EXCLUDE_FROM_ALL ${to_exclude} ${patch_command}
-                  OPTIONS "BUILD_STATIC ON" "BUILD_TESTS OFF" "BUILD_BENCHMARKS OFF"
-                          "BUILD_EXAMPLES OFF")
+  rapids_cpm_find(nvcomp ${version} ${find_args} GLOBAL_TARGETS nvcomp::nvcomp
+                  CPM_ARGS ${cpm_find_info} OPTIONS "BUILD_STATIC ON" "BUILD_TESTS OFF"
+                                                    "BUILD_BENCHMARKS OFF" "BUILD_EXAMPLES OFF")
 
   include("${rapids-cmake-dir}/cpm/detail/display_patch_status.cmake")
   rapids_cpm_display_patch_status(nvcomp)
@@ -218,7 +183,7 @@ function(rapids_cpm_nvcomp)
 
   # Set up up install rules when using the proprietary_binary. When building from source, nvcomp
   # will set the correct install rules
-  if(NOT to_exclude AND nvcomp_proprietary_binary)
+  if(to_install AND nvcomp_proprietary_binary)
     include("${rapids-cmake-dir}/cmake/install_lib_dir.cmake")
     rapids_cmake_install_lib_dir(lib_dir)
     include(GNUInstallDirs)

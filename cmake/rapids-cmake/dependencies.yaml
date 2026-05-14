@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2022-2026, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
+
 # Dependency list for https://github.com/rapidsai/dependency-file-generator
 files:
   test:
@@ -28,112 +31,48 @@ dependencies:
     common:
       - output_types: [conda, requirements]
         packages:
-          - cmake>=3.26.4
+          - cmake>=3.30.4
           - ninja
       - output_types: conda
         packages:
           - c-compiler
           - cxx-compiler
+          - cuda-nvcc
           - make
     specific:
       - output_types: conda
         matrices:
           - matrix:
-              cuda: "11.[245]"
-            packages:
-              - gcc<11.0.0
-          - matrix:
-              cuda: "11.[68]"
-            packages:
-              - gcc<12.0.0
-          - matrix:
-              cuda: "12.*"
+              cuda: "12.[23]"
             packages:
               - gcc<13.0.0
+          - matrix:
+              cuda: "12.[456]"
+            packages:
+              - gcc<14.0.0
+          - matrix:
+              cuda: "12.[89]"
+            packages:
+              - gcc<15.0.0
+          - matrix:
+              cuda: "13.*"
+            packages:
+              - gcc<16.0.0
       - output_types: conda
         matrices:
           - matrix:
               arch: x86_64
             packages:
-              - sysroot_linux-64==2.17
+              - sysroot_linux-64==2.28
           - matrix:
               arch: aarch64
             packages:
-              - sysroot_linux-aarch64==2.17
-      - output_types: conda
-        matrices:
-          - matrix:
-              arch: x86_64
-              cuda: "11.2"
-            packages:
-              - nvcc_linux-64=11.2
-          - matrix:
-              arch: aarch64
-              cuda: "11.2"
-            packages:
-              - nvcc_linux-aarch64=11.2
-          - matrix:
-              arch: x86_64
-              cuda: "11.4"
-            packages:
-              - nvcc_linux-64=11.4
-          - matrix:
-              arch: aarch64
-              cuda: "11.4"
-            packages:
-              - nvcc_linux-aarch64=11.4
-          - matrix:
-              arch: x86_64
-              cuda: "11.5"
-            packages:
-              - nvcc_linux-64=11.5
-          - matrix:
-              arch: aarch64
-              cuda: "11.5"
-            packages:
-              - nvcc_linux-aarch64=11.5
-          - matrix:
-              arch: x86_64
-              cuda: "11.8"
-            packages:
-              - nvcc_linux-64=11.8
-          - matrix:
-              arch: aarch64
-              cuda: "11.8"
-            packages:
-              - nvcc_linux-aarch64=11.8
-          - matrix:
-              cuda: "12.*"
-            packages:
-              - cuda-nvcc
+              - sysroot_linux-aarch64==2.28
+
   cuda_version:
     specific:
       - output_types: conda
         matrices:
-          - matrix:
-              cuda: "11.2"
-            packages:
-              - cuda-version=11.2
-          - matrix:
-              cuda: "11.4"
-            packages:
-              - cuda-version=11.4
-          - matrix:
-              cuda: "11.5"
-            packages:
-              - cuda-version=11.5
-          - matrix:
-              cuda: "11.6"
-            packages:
-              - cuda-version=11.6
-          - matrix:
-              cuda: "11.8"
-            packages:
-              - cuda-version=11.8
-          - matrix:
-              cuda: "12.0"
-            packages:
-              - cuda-version=12.0
           - matrix:
               cuda: "12.2"
             packages:
@@ -142,18 +81,27 @@ dependencies:
               cuda: "12.5"
             packages:
               - cuda-version=12.5
+          - matrix:
+              cuda: "12.8"
+            packages:
+              - cuda-version=12.8
+          - matrix:
+              cuda: "12.9"
+            packages:
+              - cuda-version=12.9
+          - matrix:
+              cuda: "13.0"
+            packages:
+              - cuda-version=13.0
+          - matrix:
+              cuda: "13.1"
+            packages:
+              - cuda-version=13.1
   cuda:
-    specific:
+    common:
       - output_types: conda
-        matrices:
-          - matrix:
-              cuda: "11.*"
-            packages:
-              - cudatoolkit
-          - matrix:
-              cuda: "12.*"
-            packages:
-              - cuda-cupti-dev
+        packages:
+          - cuda-cupti-dev
   docs:
     common:
       - output_types: [conda]
@@ -168,20 +116,13 @@ dependencies:
     common:
       - output_types: [conda, requirements]
         packages:
-          - cython>=0.29,<0.30
+          - cython
           - libpng
           - zlib
-      - output_types: [conda]
-        packages:
-          - fmt==11.0.2
   py_version:
     specific:
       - output_types: conda
         matrices:
-          - matrix:
-              py: "3.10"
-            packages:
-              - python=3.10
           - matrix:
               py: "3.11"
             packages:
@@ -191,8 +132,16 @@ dependencies:
             packages:
               - python=3.12
           - matrix:
+              py: "3.13"
             packages:
-              - python>=3.10,<3.13
+              - python=3.13
+          - matrix:
+              py: "3.14"
+            packages:
+              - python=3.14
+          - matrix:
+            packages:
+              - python>=3.11
   style_checks:
     common:
       - output_types: [conda, requirements]

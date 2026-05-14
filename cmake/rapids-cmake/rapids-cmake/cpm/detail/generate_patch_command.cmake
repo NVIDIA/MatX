@@ -1,18 +1,9 @@
-#=============================================================================
-# Copyright (c) 2022-2024, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#=============================================================================
+# =============================================================================
+# cmake-format: off
+# SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
+# cmake-format: on
+# =============================================================================
 include_guard(GLOBAL)
 
 #[=======================================================================[.rst:
@@ -25,11 +16,11 @@ Applies any relevant patches to the provided CPM package
 
 .. code-block:: cmake
 
-  rapids_cpm_generate_patch_command(<pkg> <version> patch_command)
+  rapids_cpm_generate_patch_command(<pkg> <version> patch_command build_patch_only)
 
 #]=======================================================================]
 # cmake-lint: disable=R0915,E1120
-function(rapids_cpm_generate_patch_command package_name version patch_command)
+function(rapids_cpm_generate_patch_command package_name version patch_command build_patch_only)
   list(APPEND CMAKE_MESSAGE_CONTEXT "rapids.cpm.generate_patch_command")
 
   include("${rapids-cmake-dir}/cpm/detail/load_preset_versions.cmake")
@@ -40,8 +31,10 @@ function(rapids_cpm_generate_patch_command package_name version patch_command)
   get_default_json(${package_name} json_data)
   get_override_json(${package_name} override_json_data)
 
-  get_property(json_path GLOBAL PROPERTY rapids_cpm_${package_name}_json_file)
-  get_property(override_json_path GLOBAL PROPERTY rapids_cpm_${package_name}_override_json_file)
+  string(TOLOWER "${package_name}" normalized_pkg_name)
+  get_property(json_path GLOBAL PROPERTY rapids_cpm_${normalized_pkg_name}_json_file)
+  get_property(override_json_path GLOBAL
+               PROPERTY rapids_cpm_${normalized_pkg_name}_override_json_file)
 
   string(JSON json_data ERROR_VARIABLE no_default_patch GET "${json_data}" patches)
   string(JSON override_json_data ERROR_VARIABLE no_override_patch GET "${override_json_data}"
@@ -76,6 +69,7 @@ function(rapids_cpm_generate_patch_command package_name version patch_command)
   set(patch_files_to_run)
   set(patch_issues_to_ref)
   set(patch_required_to_apply)
+  set(${build_patch_only} BUILD_PATCH_ONLY PARENT_SCOPE)
 
   # Gather number of patches
   string(JSON patch_count LENGTH "${json_data}")
@@ -85,8 +79,24 @@ function(rapids_cpm_generate_patch_command package_name version patch_command)
       string(JSON patch_data GET "${json_data}" ${index})
       rapids_cpm_json_get_value(${patch_data} fixed_in)
       if(NOT fixed_in OR version VERSION_LESS fixed_in)
+        set(build)
+
         rapids_cpm_json_get_value(${patch_data} file)
+        rapids_cpm_json_get_value(${patch_data} inline_patch)
         rapids_cpm_json_get_value(${patch_data} issue)
+        rapids_cpm_json_get_value(${patch_data} build)
+
+        # Convert any embedded patch to a file.
+        if(inline_patch)
+          include("${rapids-cmake-dir}/cpm/detail/convert_patch_json.cmake")
+          rapids_cpm_convert_patch_json(FROM_JSON_TO_FILE inline_patch FILE_VAR file PACKAGE_NAME
+                                        ${package_name} INDEX ${index})
+        endif()
+
+        if(NOT build)
+          set(${build_patch_only} PARENT_SCOPE)
+        endif()
+
         if(file AND issue)
           cmake_language(EVAL CODE "set(file ${file})")
           cmake_path(IS_RELATIVE file is_relative)
@@ -101,6 +111,7 @@ function(rapids_cpm_generate_patch_command package_name version patch_command)
           list(APPEND patch_required_to_apply "${required}")
         endif()
         unset(file)
+        unset(inline_patch)
         unset(issue)
       endif()
     endforeach()
