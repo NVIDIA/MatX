@@ -36,7 +36,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexNonHalfAllExecs, R2COp)
 
   if constexpr (is_cuda_jit_executor_v<ExecType>) {
     if (!jit_supported(r2c(fft(t1), N1)) || !jit_supported(r2c(fft(t2), N2))) {
-      GTEST_SKIP();
+      GTEST_SKIP() << "r2c(fft(real)) is not supported by the CUDA JIT executor for this type and shape";
     }
   }
 
