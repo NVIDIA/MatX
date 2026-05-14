@@ -32,7 +32,7 @@ still using |yes| when the operator is supported for that executor. CUDAJITExecu
 fused JIT expression; non-JIT CUDA execution through cudaExecutor remains available for the broader CUDA library paths.
 
 .. csv-table:: Operator Executor Compatibility Matrix
-   :header: "Operator", "HostExecutor", "cudaExecutor", "CUDAJITExecutor", "Notes"
+   :header: "Operator", "HostExecutor", "CUDAExecutor", "CUDAJITExecutor", "Notes"
    :widths: 24 14 10 12 52
    :class: table-alternating-row-colors
 
