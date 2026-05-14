@@ -125,6 +125,18 @@ inline std::filesystem::path resolve_build_dir_for_deps() {
                     configured.string());
     }
 
+#ifdef MATX_NVRTC_BUILD_DIR_DEFAULT
+    {
+      const auto configured = std::filesystem::path(MATX_NVRTC_BUILD_DIR_DEFAULT);
+      if (std::filesystem::exists(configured / "_deps" / "cccl-src")) {
+        return configured;
+      }
+
+      MATX_LOG_WARN("Configured MATX_NVRTC_BUILD_DIR_DEFAULT='{}' does not contain _deps/cccl-src. Falling back to cwd search",
+                    configured.string());
+    }
+#endif
+
     auto cur = std::filesystem::current_path();
 
     while (true) {
@@ -182,7 +194,7 @@ inline std::filesystem::path resolve_matx_root() {
     return std::filesystem::current_path();
 }
 
-std::vector<std::string> __MATX_HOST__ __MATX_INLINE__ get_preprocessor_options() {
+std::vector<std::string> __MATX_HOST__ __MATX_INLINE__ get_preprocessor_options(std::string_view nvrtc_arch_override = {}) {
     const auto matx_root = resolve_matx_root();
     const auto build_dir = resolve_build_dir_for_deps();
 
@@ -208,7 +220,7 @@ std::vector<std::string> __MATX_HOST__ __MATX_INLINE__ get_preprocessor_options(
       options.push_back("-I" + cuda_cccl_dir.string());
     }
     
-    const std::string nvrtc_arch = resolve_nvrtc_cuda_arch();
+    const std::string nvrtc_arch = nvrtc_arch_override.empty() ? resolve_nvrtc_cuda_arch() : std::string(nvrtc_arch_override);
     options.push_back("-arch=sm_" + nvrtc_arch);
     
     options.push_back("-std=c++20");
@@ -339,8 +351,9 @@ inline int nvrtc_get_cub_block_shmem_size(const std::string &algorithm,
   static std::unordered_map<std::string, int> shmem_cache;
   static std::mutex shmem_cache_mutex;
 
+  const std::string nvrtc_arch = resolve_nvrtc_cuda_arch();
   const int cache_ept = (algorithm == "sort" || algorithm == "sort_pairs") ? ept : 1;
-  const std::string cache_key = algorithm + "_" + value_type + "_E" +
+  const std::string cache_key = "A" + nvrtc_arch + "_" + algorithm + "_" + value_type + "_E" +
                                 std::to_string(cache_ept) + "_B" + std::to_string(block_size);
   {
     std::lock_guard<std::mutex> lock(shmem_cache_mutex);
@@ -362,7 +375,7 @@ inline int nvrtc_get_cub_block_shmem_size(const std::string &algorithm,
   nvrtcProgram prog;
   NVRTC_CHECK(nvrtcCreateProgram(&prog, source.c_str(), "matx_cub_shmem_probe.cu", 1, headers, include_names));
 
-  auto options = get_preprocessor_options();
+  auto options = get_preprocessor_options(nvrtc_arch);
   options.push_back("-include=matx/core/jit_includes.h");
   options.push_back("-default-device");
   for (auto &option : options) {

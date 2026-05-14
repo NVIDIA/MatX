@@ -341,6 +341,7 @@ if (MATX_EN_JIT OR MATX_EN_MATHDX)
     string(REGEX REPLACE "-virtual$" "" NVRTC_CUDA_ARCH "${NVRTC_CUDA_ARCH}")
     target_compile_definitions(matx INTERFACE NVRTC_CUDA_ARCH="${NVRTC_CUDA_ARCH}")
     target_compile_definitions(matx INTERFACE NVRTC_CXX_STANDARD="${CMAKE_CXX_STANDARD}")
+    target_compile_definitions(matx INTERFACE "$<BUILD_INTERFACE:MATX_NVRTC_BUILD_DIR_DEFAULT=\"${CMAKE_BINARY_DIR}\">")
     
     # Link NVRTC library
     target_link_libraries(matx INTERFACE CUDA::nvrtc)
