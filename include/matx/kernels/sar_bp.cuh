@@ -75,9 +75,24 @@ static __device__ __forceinline__ double NewtonRaphsonSqrt(double x) {
 }
 
 __device__ inline fltflt ComputeRangeToPixelFloatFloat(fltflt apx, fltflt apy, fltflt apz, float px, float py, float pz) {
-    const fltflt dx = px - apx;
-    const fltflt dy = py - apy;
-    const fltflt dz = pz - apz;
+    // Build the three (px - apx) differences and feed them into
+    // fltflt_norm3d. We deliberately skip the trailing fast_two_sum that a
+    // full fltflt_sub would apply: |dx.lo| ends up bounded by ULP(dx.hi)
+    // rather than the canonical ULP(dx.hi)/2 (overlap factor k ~ 2), which
+    // norm3d tolerates with proportionally higher error. For this application,
+    // the slightly higher error is acceptable for typical SAR scenarios.
+    //
+    // We use the general fltflt_two_sum (6 fp32 ops) for all three
+    // dimensions. When it is known that one coordinate is always
+    // greater than the other (e.g., |apz.hi| >= |pz|), then we can use
+    // the faster fltflt_fast_two_sum as fltflt_fast_two_sum(apz.hi, -pz)
+    // where the result dz is immediately squared in fltflt_norm3d().
+    fltflt dx = fltflt_two_sum(px, -apx.hi);
+    fltflt dy = fltflt_two_sum(py, -apy.hi);
+    fltflt dz = fltflt_two_sum(pz, -apz.hi);
+    dx.lo = detail::fadd_rn(dx.lo, -apx.lo);
+    dy.lo = detail::fadd_rn(dy.lo, -apy.lo);
+    dz.lo = detail::fadd_rn(dz.lo, -apz.lo);
     return fltflt_norm3d(dx, dy, dz);
 }
 
@@ -248,7 +263,7 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
     }
 
     const index_t num_pulses = range_profiles.Size(0);
-    const index_t num_range_bins = range_profiles.Size(1);
+    const int32_t num_range_bins = static_cast<int32_t>(range_profiles.Size(1));
 
     static_assert(cuda::std::is_same_v<voxel_loc_t, double3> || cuda::std::is_same_v<voxel_loc_t, double4> ||
         cuda::std::is_same_v<voxel_loc_t, float3> || cuda::std::is_same_v<voxel_loc_t, float4>, "SarBp: VoxLocType must represent a 2D operator of type double3, double4, float3, or float4");
@@ -283,7 +298,7 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
     };
 
     [[maybe_unused]] const loose_compute_t phase_correction_partial_loose = static_cast<loose_compute_t>(phase_correction_partial);
-    const auto get_reference_phase = [&phase_lut, &phase_correction_partial, &phase_correction_partial_loose](strict_or_ff_compute_t diffR, index_t bin_floor_int, loose_compute_t w) -> loose_complex_compute_t {
+    const auto get_reference_phase = [&phase_lut, &phase_correction_partial, &phase_correction_partial_loose](strict_or_ff_compute_t diffR, int32_t bin_floor_int, loose_compute_t w) -> loose_complex_compute_t {
         if constexpr (PhaseLUT) {
             const loose_complex_compute_t base_phase = phase_lut[bin_floor_int];
             loose_compute_t incr_sinx, incr_cosx;
@@ -370,7 +385,7 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
             const index_t p = pulse_base + ip;
             strict_or_ff_compute_t diffR;
             loose_compute_t w;
-            index_t bin_floor_int;
+            int32_t bin_floor_int;
             if constexpr (ComputeType == SarBpComputeType::FloatFloat) {
                 // This is just the distance to the pixel rather than the differential range to the MCP.
                 // We use diffR because otherwise we would need to initialize diffR to avoid a
@@ -385,7 +400,7 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
                 // bin.lo may push bin over a boundary, in which case floor and frac are incorrect.
                 // Compute an adjustment based on whether or not the fractional part is outside (0.0, 1.0).
                 const float adjust = ::floorf(frac);  // -1, 0, or 1
-                bin_floor_int = static_cast<index_t>(floor_hi + adjust);
+                bin_floor_int = static_cast<int32_t>(floor_hi + adjust);
                 w = frac - adjust;
             } else if constexpr (UseSharedPreamble) {
                 // Float / Mixed with shared-mem preamble: antenna position and
@@ -417,7 +432,7 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
                     bin_floor = ::floorf(bin);
                 }
                 w = static_cast<loose_compute_t>(bin - bin_floor);
-                bin_floor_int = static_cast<index_t>(bin_floor);
+                bin_floor_int = static_cast<int32_t>(bin_floor);
                 // diffR is unused when PhaseLUT=true (required for this branch);
                 // assign to avoid any maybe-uninitialized warning downstream.
                 diffR = dist;
@@ -432,9 +447,9 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
                     bin_floor = ::floorf(bin);
                 }
                 w = static_cast<loose_compute_t>(bin - bin_floor);
-                bin_floor_int = static_cast<index_t>(bin_floor);
+                bin_floor_int = static_cast<int32_t>(bin_floor);
             }
-            if (bin_floor_int >= 0 && bin_floor_int < static_cast<index_t>(num_range_bins-1)) {
+            if (bin_floor_int >= 0 && bin_floor_int < num_range_bins-1) {
                 // rp accessor picks the fast pointer path on IsUnitStride or
                 // falls through to operator().
                 const range_profiles_t sample_lo = rp(p, bin_floor_int);

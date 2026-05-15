@@ -234,6 +234,16 @@ namespace experimental {
 /**
 * @brief SAR backprojection.
 *
+* @note The number of range bins (\p range_profiles second dimension) is capped at 2^24 (16,777,216).
+* The kernel computes per-pulse-pixel bin indices via \c floorf() applied to an fp32 value and then
+* casts the result to a 32-bit integer for tensor indexing. fp32 can exactly represent all integers
+* in [-2^24, 2^24]; above 2^24 the representable gaps grow (2.0 at 2^24+, 4.0 at 2^25+, ...), so the
+* floor would no longer reliably distinguish adjacent bins. The transform throws \c matxInvalidParameter
+* at launch if \c range_profiles.Size(1) exceeds this limit. Typical raw num_range_bins is on the
+* order of 10^4-10^5 and well below this bound. The limit can be reached, however, when heavy range
+* oversampling is applied: an upsample factor that pushes the FFT length above ~2^24 / num_samples_raw
+* (e.g., upsampling 32k raw samples by 512x or more) will trigger the runtime check.
+*
 * @tparam ImageType Type of initial_image and output image. ImageType must represent a 2D operator of size image_height x image_width for an image of the corresponding dimensions.
 * ImageType must be a complex type. Typical data types are cuda::std::complex<float> or cuda::std::complex<double>.
 * @tparam RangeProfilesType Type of range_profiles. RangeProfilesType must represent a 2D operator of size num_pulses x num_range_bins containing the range-compressed complex samples.

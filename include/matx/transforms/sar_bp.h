@@ -75,6 +75,20 @@ inline void sar_bp_impl(OutImageType &out, const InitialImageType &initial_image
     }
   }
 
+  // The kernel computes the integer bin index via floorf() on the fp32 bin
+  // value and then converts the result to int32_t for indexing. fp32 can
+  // exactly represent all integers in [-2^24, 2^24]; above that, the gaps
+  // grow (2.0 at 2^24+, 4.0 at 2^25+, ...), so floorf() can return an
+  // incorrect bin near the upper boundary. We therefore cap the number of
+  // range bins at 2^24 = 16,777,216, which keeps every valid bin index
+  // representable.
+  constexpr index_t MAX_RANGE_BINS = static_cast<index_t>(1) << 24;
+  if (range_profiles.Size(1) > MAX_RANGE_BINS) {
+    MATX_THROW(matxInvalidParameter,
+               "sar_bp: num_range_bins exceeds the maximum supported value of 2^24 "
+               "(16,777,216) -- fp32 mantissa cannot exactly represent bin indices above 2^24");
+  }
+
   const double dr_inv = 1.0 / params.del_r;
 
   const dim3 block(16, 16);
