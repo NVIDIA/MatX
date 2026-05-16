@@ -460,6 +460,7 @@ static int run_bp_device(PosTensor blk_positions, RtmTensor blk_rtm,
   std::ofstream out(ctx.output_file, std::ios::binary);
   if (!out.is_open()) {
     std::cerr << "ERROR: cannot open " << ctx.output_file << " for writing" << std::endl;
+    MATX_CUDA_CHECK(cudaFreeHost(h_image));
     return 1;
   }
   out.write(reinterpret_cast<const char *>(h_image),
@@ -752,20 +753,29 @@ int main(int argc, char **argv) {
 
   // If the user selected the fltflt precision, convert the platform positions
   // and range_to_mcp values in-place from double to fltflt. Both types are
-  // 8 bytes per scalar (double = 8 bytes, fltflt = 2*4 bytes) with an 8-byte
-  // alignment requirement, so we convert in-place to save memory.
+  // 8 bytes per scalar (double = 8 bytes, fltflt = 2 * 4 bytes); see the
+  // static_asserts in run_bp_device(). We perform the type-punning via
+  // unsigned char* + std::memcpy rather than reinterpret_cast through
+  // double*/fltflt*, because the latter would alias the same storage as two
+  // incompatible types and is undefined behaviour under strict aliasing.
+  // unsigned char* may alias any object type, and std::memcpy of
+  // trivially-copyable types is the standards-blessed way to bit-cast.
   if (precision_type == "fltflt") {
-    matx::fltflt *pos_ff = reinterpret_cast<matx::fltflt *>(h_positions);
-    const double *pos_d = reinterpret_cast<const double *>(h_positions);
+    auto *pos_bytes = reinterpret_cast<unsigned char *>(h_positions);
     for (size_t i = 0; i < static_cast<size_t>(num_pulses) * 3; i++) {
-      const double d = pos_d[i];                  // read double
-      pos_ff[i] = matx::fltflt(d);                // overwrite as fltflt (same 8 bytes)
+      unsigned char *slot = pos_bytes + i * sizeof(double);
+      double d;
+      std::memcpy(&d, slot, sizeof(double));      // read double
+      const matx::fltflt ff(d);
+      std::memcpy(slot, &ff, sizeof(matx::fltflt)); // overwrite as fltflt
     }
-    matx::fltflt *rtm_ff = reinterpret_cast<matx::fltflt *>(h_range_to_mcp);
-    const double *rtm_d = reinterpret_cast<const double *>(h_range_to_mcp);
+    auto *rtm_bytes = reinterpret_cast<unsigned char *>(h_range_to_mcp);
     for (size_t i = 0; i < static_cast<size_t>(num_pulses); i++) {
-      const double d = rtm_d[i];
-      rtm_ff[i] = matx::fltflt(d);
+      unsigned char *slot = rtm_bytes + i * sizeof(double);
+      double d;
+      std::memcpy(&d, slot, sizeof(double));
+      const matx::fltflt ff(d);
+      std::memcpy(slot, &ff, sizeof(matx::fltflt));
     }
   }
 
