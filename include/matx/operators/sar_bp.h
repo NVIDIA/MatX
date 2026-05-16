@@ -234,15 +234,17 @@ namespace experimental {
 /**
 * @brief SAR backprojection.
 *
-* @note The number of range bins (\p range_profiles second dimension) is capped at 2^24 (16,777,216).
-* The kernel computes per-pulse-pixel bin indices via \c floorf() applied to an fp32 value and then
-* casts the result to a 32-bit integer for tensor indexing. fp32 can exactly represent all integers
-* in [-2^24, 2^24]; above 2^24 the representable gaps grow (2.0 at 2^24+, 4.0 at 2^25+, ...), so the
-* floor would no longer reliably distinguish adjacent bins. The transform throws \c matxInvalidParameter
-* at launch if \c range_profiles.Size(1) exceeds this limit. Typical raw num_range_bins is on the
-* order of 10^4-10^5 and well below this bound. The limit can be reached, however, when heavy range
-* oversampling is applied: an upsample factor that pushes the FFT length above ~2^24 / num_samples_raw
-* (e.g., upsampling 32k raw samples by 512x or more) will trigger the runtime check.
+* @note The number of range bins (\p range_profiles second dimension) is constrained as follows:
+* For the Float, Mixed, and FloatFloat compute types, num_range_bins is capped at 2^24 (16,777,216).
+* Those paths compute the per-pulse bin offset and (for Float / FloatFloat) the bin floor in fp32, and
+* fp32 can exactly represent all integers only in [-2^24, 2^24]; above 2^24 the representable gaps grow
+* (2.0 at 2^24+, 4.0 at 2^25+, ...), so the bin index would lose precision near the upper boundary.
+* The Double compute type uses fp64 throughout for the bin computation and is only constrained by the
+* int32_t tensor-indexing limit (num_range_bins <= cuda::std::numeric_limits<int32_t>::max()). The transform throws
+* \c matxInvalidParameter at launch if these limits are exceeded. Typical raw num_range_bins is on the
+* order of 10^4-10^5 and well below the 2^24 bound. The fp32 limit can be reached, however, when heavy
+* range oversampling is applied. An upsample factor that pushes the FFT length above ~2^24 /
+* num_samples_raw (e.g., upsampling 32k raw samples by 512x or more) for non-Double compute types will trigger the runtime check.
 *
 * @tparam ImageType Type of initial_image and output image. ImageType must represent a 2D operator of size image_height x image_width for an image of the corresponding dimensions.
 * ImageType must be a complex type. Typical data types are cuda::std::complex<float> or cuda::std::complex<double>.

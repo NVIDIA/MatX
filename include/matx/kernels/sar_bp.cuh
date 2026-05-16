@@ -74,26 +74,98 @@ static __device__ __forceinline__ double NewtonRaphsonSqrt(double x) {
     return NR_2;
 }
 
-__device__ inline fltflt ComputeRangeToPixelFloatFloat(fltflt apx, fltflt apy, fltflt apz, float px, float py, float pz) {
-    // Build the three (px - apx) differences and feed them into
-    // fltflt_norm3d. We deliberately skip the trailing fast_two_sum that a
-    // full fltflt_sub would apply: |dx.lo| ends up bounded by ULP(dx.hi)
-    // rather than the canonical ULP(dx.hi)/2 (overlap factor k ~ 2), which
-    // norm3d tolerates with proportionally higher error. For this application,
-    // the slightly higher error is acceptable for typical SAR scenarios.
-    //
-    // We use the general fltflt_two_sum (6 fp32 ops) for all three
-    // dimensions. When it is known that one coordinate is always
-    // greater than the other (e.g., |apz.hi| >= |pz|), then we can use
-    // the faster fltflt_fast_two_sum as fltflt_fast_two_sum(apz.hi, -pz)
-    // where the result dz is immediately squared in fltflt_norm3d().
+// ComputeBinToPixelFloatFloat() fuses the FloatFloat path's
+// coordinate-difference, squared-norm, sqrt, and scale/add steps that would
+// otherwise be a separate norm3d + fma_approx pair. The kernel only needs the
+// range bin (FloatFloat requires PhaseLUT, so the bare range R is never used
+// for phase), so we never materialize a canonical R -- the Newton sqrt
+// correction is treated as the low part of R and fed directly into the
+// scaled-add. Mathematically this is the same approximation class as
+// fma_approx(fltflt_sqrt_fast(...), dr_inv, mcp_partial), but it saves the
+// final fast_two_sum normalization inside sqrt_fast (~3 fp32 ops per
+// pixel-pulse).
+//
+// Stages:
+//   1. Loose dx/dy/dz via TwoSum + lo-add (no trailing renormalize). Resulting
+//      pairs may be non-canonical when px ~= apx.hi (cancellation), so the
+//      norm-3d stage below retains lo*lo terms.
+//   2. Squared-norm accumulation with lo*lo retention -- equivalent to a
+//      loose fltflt_norm3d() that accepts non-canonical inputs (see comments
+//      below for the cancellation rationale).
+//   3. One Newton-Raphson sqrt step on (sum_hi, sum_lo) without the final
+//      fast_two_sum -- yn ~= sqrt(sum_hi), r_lo = Newton correction, with
+//      (yn + r_lo) representing R to ~fast_sqrt precision.
+//   4. bin = R * dr_inv + mcp_partial via fma_approx fed with the
+//      non-canonical R = {yn, r_lo}. fma_approx drops the a.lo*b.lo term
+//      regardless, so the only "lost" piece versus a canonical R is
+//      r_lo * dr_inv.lo, which is O(ULP^2 * R) and well below the kernel's
+//      error budget.
+//
+// Domain: at least one of dx/dy/dz must not fully cancel (sum of squared
+// distances must be strictly positive) -- three-way simultaneous
+// cancellation is not a meaningful SAR geometry and is not supported.
+__device__ inline fltflt ComputeBinToPixelFloatFloat(
+    fltflt apx, fltflt apy, fltflt apz,
+    float px, float py, float pz,
+    fltflt dr_inv,
+    fltflt mcp_partial)
+{
+    // Stage 1: loose dx/dy/dz. We use the general fltflt_two_sum (6 fp32 ops)
+    // for all three dimensions. When it is known that one coordinate is
+    // always greater than the other (e.g., |apz.hi| >= |pz|), the faster
+    // fltflt_fast_two_sum as fltflt_fast_two_sum(apz.hi, -pz) could be used
+    // instead.
     fltflt dx = fltflt_two_sum(px, -apx.hi);
     fltflt dy = fltflt_two_sum(py, -apy.hi);
     fltflt dz = fltflt_two_sum(pz, -apz.hi);
     dx.lo = detail::fadd_rn(dx.lo, -apx.lo);
     dy.lo = detail::fadd_rn(dy.lo, -apy.lo);
     dz.lo = detail::fadd_rn(dz.lo, -apz.lo);
-    return fltflt_norm3d(dx, dy, dz);
+
+    // Stage 2: squared-norm accumulation. Same body as the canonical
+    // fltflt_norm3d() but with explicit dx.lo*dx.lo / dy.lo*dy.lo /
+    // dz.lo*dz.lo contributions retained. The canonical helper drops those
+    // as O(eps^2 * sum_hi); for our non-canonical inputs (post-cancellation
+    // |lo| can approach |hi|), they carry the cancelled dimension's full
+    // contribution and must be kept. Cost: 3 fmaf_rn ops vs canonical.
+    const fltflt px2 = fltflt_two_prod_fma(dx.hi, dx.hi);
+    const fltflt py2 = fltflt_two_prod_fma(dy.hi, dy.hi);
+    const fltflt pz2 = fltflt_two_prod_fma(dz.hi, dz.hi);
+    const fltflt s = fltflt_two_sum(px2.hi, py2.hi);
+    const fltflt t = fltflt_two_sum(s.hi, pz2.hi);
+
+    float sum_lo = detail::fadd_rn(t.lo, s.lo);
+    sum_lo = detail::fadd_rn(sum_lo, px2.lo);
+    sum_lo = detail::fadd_rn(sum_lo, py2.lo);
+    sum_lo = detail::fadd_rn(sum_lo, pz2.lo);
+    sum_lo = detail::fmaf_rn(detail::fadd_rn(dx.hi, dx.hi), dx.lo, sum_lo);
+    sum_lo = detail::fmaf_rn(detail::fadd_rn(dy.hi, dy.hi), dy.lo, sum_lo);
+    sum_lo = detail::fmaf_rn(detail::fadd_rn(dz.hi, dz.hi), dz.lo, sum_lo);
+    sum_lo = detail::fmaf_rn(dx.lo, dx.lo, sum_lo);
+    sum_lo = detail::fmaf_rn(dy.lo, dy.lo, sum_lo);
+    sum_lo = detail::fmaf_rn(dz.lo, dz.lo, sum_lo);
+    const float sum_hi = t.hi;
+
+    // Stage 3: Newton-Raphson sqrt step without final normalize. This is the
+    // body of fltflt_sqrt_fast minus the trailing fast_two_sum(yn, correction)
+    // that would canonicalize R, and also minus the (a.hi == 0) guard. For
+    // SAR sum_hi is always strictly positive (sum of three squared distances;
+    // exact three-way cancellation would require the antenna to coincide
+    // with the pixel at fp32 precision, which is not a physical SAR
+    // geometry). The guard's conditional disturbs the rsqrt-FMUL dependency
+    // chain enough to cost ~6% throughput on the SAR kernel, so we omit it
+    // and rely on the geometry precondition.
+    const float xn = detail::fltflt_rsqrt(sum_hi);
+    const float yn = detail::fmul_rn(sum_hi, xn);  // ~ sqrt(sum_hi)
+    const float residual = detail::fadd_rn(
+        detail::fmaf_rn(-yn, yn, sum_hi), sum_lo);
+    const float r_lo = detail::fmul_rn(detail::fmul_rn(xn, 0.5f), residual);
+
+    // Stage 4: bin = R * dr_inv + mcp_partial, where R = {yn, r_lo} is the
+    // non-canonical sqrt result. fma_approx tolerates this because its only
+    // dropped term is a.lo*b.lo = r_lo * dr_inv.lo, which is O(ULP^2 * R)
+    // regardless of whether (yn, r_lo) has been canonicalized.
+    return fltflt_fma_approx(fltflt{yn, r_lo}, dr_inv, mcp_partial);
 }
 
 template <typename PlatPosAccessor, SarBpComputeType ComputeType, typename strict_compute_t, typename loose_compute_t>
@@ -387,14 +459,16 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
             loose_compute_t w;
             int32_t bin_floor_int;
             if constexpr (ComputeType == SarBpComputeType::FloatFloat) {
-                // This is just the distance to the pixel rather than the differential range to the MCP.
-                // We use diffR because otherwise we would need to initialize diffR to avoid a
-                // compiler warning about uninitialized use of diffR.
-                diffR = ComputeRangeToPixelFloatFloat(
-                    sh_mem.ant_pos[ip][0], sh_mem.ant_pos[ip][1], sh_mem.ant_pos[ip][2], px, py, pz);
-                // sh_mem.ant_pos[ip][3] is -mcp * dr_inv + bin_offset, so here we compute
-                // dist * dr_inv + (-mcp * dr_inv + bin_offset) = (dist - mcp) * dr_inv + bin_offset
-                const fltflt bin = fltflt_fma_approx(diffR, dr_inv, sh_mem.ant_pos[ip][3]);
+                // ComputeBinToPixelFloatFloat fuses the coordinate-difference,
+                // squared-norm, sqrt, and (R-mcp)*dr_inv + bin_offset chain into
+                // one helper that never materializes a canonical R. The
+                // shared-memory slot sh_mem.ant_pos[ip][3] holds
+                // -mcp*dr_inv + bin_offset, precomputed in the pulse-block
+                // preamble.
+                const fltflt bin = ComputeBinToPixelFloatFloat(
+                    sh_mem.ant_pos[ip][0], sh_mem.ant_pos[ip][1], sh_mem.ant_pos[ip][2],
+                    px, py, pz, dr_inv, sh_mem.ant_pos[ip][3]);
+                diffR = bin;  // unused below (FloatFloat requires PhaseLUT); assign to silence maybe-uninitialized warning
                 float floor_hi = ::floorf(bin.hi);
                 float frac = (bin.hi - floor_hi) + bin.lo;
                 // bin.lo may push bin over a boundary, in which case floor and frac are incorrect.

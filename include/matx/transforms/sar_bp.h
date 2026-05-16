@@ -75,18 +75,34 @@ inline void sar_bp_impl(OutImageType &out, const InitialImageType &initial_image
     }
   }
 
-  // The kernel computes the integer bin index via floorf() on the fp32 bin
-  // value and then converts the result to int32_t for indexing. fp32 can
-  // exactly represent all integers in [-2^24, 2^24]; above that, the gaps
-  // grow (2.0 at 2^24+, 4.0 at 2^25+, ...), so floorf() can return an
-  // incorrect bin near the upper boundary. We therefore cap the number of
-  // range bins at 2^24 = 16,777,216, which keeps every valid bin index
-  // representable.
-  constexpr index_t MAX_RANGE_BINS = static_cast<index_t>(1) << 24;
-  if (range_profiles.Size(1) > MAX_RANGE_BINS) {
+  // The kernel converts the integer bin index to int32_t for indexing the
+  // range_profiles tensor, so num_range_bins must always fit in int32_t.
+  if (range_profiles.Size(1) > static_cast<index_t>(cuda::std::numeric_limits<int32_t>::max())) {
+    MATX_THROW(matxInvalidParameter,
+               "sar_bp: num_range_bins exceeds cuda::std::numeric_limits<int32_t>::max() -- "
+               "the kernel indexes range bins via a 32-bit integer");
+  }
+
+  // The Float, Mixed, and FloatFloat compute types all use loose_compute_t =
+  // float, which makes the per-pulse `bin_offset = 0.5 * (num_range_bins - 1)`
+  // an fp32 value. fp32 can exactly represent all integers in [-2^24, 2^24];
+  // above that, the gaps grow (2.0 at 2^24+, 4.0 at 2^25+, ...), so
+  // bin_offset would lose precision and bin_floor_int would be off by up to
+  // ~1 bin for every pixel. (Float and FloatFloat additionally use floorf()
+  // on an fp32 bin value, which is constrained by the same limit.) We
+  // therefore cap num_range_bins at 2^24 for those paths.
+  //
+  // The Double compute type uses loose_compute_t = double throughout, so the
+  // fp32 mantissa argument does not apply and only the int32_t indexing cap
+  // above is required.
+  const bool fp32_bin_path = params.compute_type != SarBpComputeType::Double;
+  constexpr index_t FP32_MAX_RANGE_BINS = static_cast<index_t>(1) << 24;
+  if (fp32_bin_path && range_profiles.Size(1) > FP32_MAX_RANGE_BINS) {
     MATX_THROW(matxInvalidParameter,
                "sar_bp: num_range_bins exceeds the maximum supported value of 2^24 "
-               "(16,777,216) -- fp32 mantissa cannot exactly represent bin indices above 2^24");
+               "(16,777,216) for Float/Mixed/FloatFloat compute types -- fp32 mantissa "
+               "cannot exactly represent bin indices above 2^24. Use the Double "
+               "compute type for larger range-bin counts.");
   }
 
   const double dr_inv = 1.0 / params.del_r;
