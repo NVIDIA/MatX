@@ -146,19 +146,30 @@ __device__ inline fltflt ComputeBinToPixelFloatFloat(
     sum_lo = detail::fmaf_rn(dz.lo, dz.lo, sum_lo);
     const float sum_hi = t.hi;
 
-    // Stage 3: Newton-Raphson sqrt step without final normalize. This is the
-    // body of fltflt_sqrt_fast minus the trailing fast_two_sum(yn, correction)
-    // that would canonicalize R, and also minus the (a.hi == 0) guard. For
-    // SAR sum_hi is always strictly positive (sum of three squared distances;
-    // exact three-way cancellation would require the antenna to coincide
-    // with the pixel at fp32 precision, which is not a physical SAR
-    // geometry). The guard's conditional disturbs the rsqrt-FMUL dependency
-    // chain enough to cost ~6% throughput on the SAR kernel, so we omit it
-    // and rely on the geometry precondition.
-    const float xn = detail::fltflt_rsqrt(sum_hi);
-    const float yn = detail::fmul_rn(sum_hi, xn);  // ~ sqrt(sum_hi)
+    // Renormalize the (sum_hi, sum_lo) pair before sqrt. This is required for
+    // the three-way fp32 cancellation corner: if all three dx.hi/dy.hi/dz.hi
+    // round to zero (antenna sub-ULP-close to the pixel in every dimension)
+    // but the lo*lo terms accumulated above carry a positive contribution,
+    // sum_hi is zero while sum_lo holds the true squared distance. Without
+    // this renormalize, rsqrt(sum_hi) returns +inf and the subsequent
+    // fmul(sum_hi, xn) gives 0 * inf = NaN, poisoning the bin.
+    //
+    // fast_two_sum's |a| >= |b| precondition is satisfied for ordinary SAR
+    // (sum_hi dominates by 6+ orders of magnitude); when sum_hi = 0 the
+    // precondition is violated but the addition 0 + sum_lo is exact, so the
+    // returned (s, err) still represent the value correctly.
+    const fltflt sum_sq = fltflt_fast_two_sum(sum_hi, sum_lo);
+
+    // Stage 3: Newton-Raphson sqrt step without the trailing
+    // fast_two_sum(yn, correction) that fltflt_sqrt_fast applies. We drop
+    // the (a.hi == 0) guard from sqrt_fast because the renormalize above
+    // already canonicalized the pair; sum_sq.hi == 0 now only occurs when
+    // the true squared distance is exactly zero (antenna coincident with
+    // the pixel at fp64 precision), which is not a physical SAR geometry.
+    const float xn = detail::fltflt_rsqrt(sum_sq.hi);
+    const float yn = detail::fmul_rn(sum_sq.hi, xn);  // ~ sqrt(sum_sq.hi)
     const float residual = detail::fadd_rn(
-        detail::fmaf_rn(-yn, yn, sum_hi), sum_lo);
+        detail::fmaf_rn(-yn, yn, sum_sq.hi), sum_sq.lo);
     const float r_lo = detail::fmul_rn(detail::fmul_rn(xn, 0.5f), residual);
 
     // Stage 4: bin = R * dr_inv + mcp_partial, where R = {yn, r_lo} is the
