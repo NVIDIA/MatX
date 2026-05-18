@@ -632,7 +632,8 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name,
   const auto kernel_op_type = detail::get_operator_capability<OperatorCapability::JIT_TYPE_QUERY>(op);
   int current_device = 0;
   CUDA_RT_CHECK(cudaGetDevice(&current_device));
-  const std::string device_cache_prefix = "device_" + std::to_string(current_device) + "_";
+  const std::string nvrtc_arch = resolve_nvrtc_cuda_arch();
+  const std::string device_cache_prefix = "device_" + std::to_string(current_device) + "_sm_" + nvrtc_arch + "_";
   
   std::string kernel_name = get_kernel_name_for_rank<RANK>(stride, global_kernel, pass_through_threads, block_reduces_rank);
   std::string cache_key = device_cache_prefix + kernel_name + "_" + kernel_op_type;
@@ -730,7 +731,7 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name,
     NVRTC_CHECK(nvrtcAddNameExpression(prog, kernel_name_expr.c_str()));
     
     // Get compilation options
-    auto options = get_preprocessor_options();
+    auto options = get_preprocessor_options(nvrtc_arch);
     
     // Add -include directives for the generated headers (matching Jitify behavior)
     // IMPORTANT: Include jit_includes.h FIRST to ensure all base types are defined
@@ -786,7 +787,6 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name,
 
     // Link and LTO-IR files if needed
     nvJitLinkHandle handle {};
-    const std::string nvrtc_arch = resolve_nvrtc_cuda_arch();
     std::vector<std::string> link_options = { "-lto", std::string("-arch=sm_") + nvrtc_arch };
 
     std::vector<const char*> lto_opts;
