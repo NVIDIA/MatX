@@ -343,6 +343,7 @@ namespace detail
 
       // Determine block size for register calculation
       if (use_jit) {
+        const bool global_kernel = detail::get_operator_capability<detail::OperatorCapability::GLOBAL_KERNEL>(op);
         const auto group_range = detail::get_operator_capability<detail::OperatorCapability::GROUPS_PER_BLOCK>(op);
         int min_groups_per_block = group_range[0];
         int max_groups_per_block = group_range[1];
@@ -369,8 +370,11 @@ namespace detail
           groups_per_block = current_groups_per_block;
           const auto set_groups_per_block_query = detail::SetGroupsPerBlockQueryInput{groups_per_block};
           const auto set_groups_per_block = detail::get_operator_capability<detail::OperatorCapability::SET_GROUPS_PER_BLOCK>(op, set_groups_per_block_query);
-          // Use the max block size for now
-          block_size = detail::get_operator_capability<detail::OperatorCapability::BLOCK_DIM>(op)[1];
+          const auto block_dim_range = detail::get_operator_capability<detail::OperatorCapability::BLOCK_DIM>(op);
+          if (block_dim_range[0] == detail::capability_attributes<detail::OperatorCapability::BLOCK_DIM>::invalid) {
+            MATX_THROW(matxInvalidParameter, "No valid JIT block dimension satisfies the fused operator requirements");
+          }
+          block_size = global_kernel ? 256 : block_dim_range[0];
           shm_size = detail::get_operator_capability<detail::OperatorCapability::DYN_SHM_SIZE>(op);
           const int static_shm_size = detail::get_operator_capability<detail::OperatorCapability::STATIC_SHM_SIZE>(op);
           const int total_shm_size = shm_size + static_shm_size;
@@ -448,6 +452,14 @@ namespace detail
     const auto set_ept_query = detail::SetEPTQueryInput{min_ept};
     const auto set_ept = detail::get_operator_capability<detail::OperatorCapability::SET_ELEMENTS_PER_THREAD>(op, set_ept_query);
     int shm_size = detail::get_operator_capability<detail::OperatorCapability::DYN_SHM_SIZE>(op);
+    if (use_jit) {
+      const auto block_dim_range = detail::get_operator_capability<detail::OperatorCapability::BLOCK_DIM>(op);
+      if (block_dim_range[0] == detail::capability_attributes<detail::OperatorCapability::BLOCK_DIM>::invalid) {
+        MATX_THROW(matxInvalidParameter, "No valid JIT block dimension satisfies the fused operator requirements");
+      }
+      const bool global_kernel = detail::get_operator_capability<detail::OperatorCapability::GLOBAL_KERNEL>(op);
+      block_size = global_kernel ? 256 : block_dim_range[0];
+    }
     //printf("Fallback to minimum EPT %d with shm_size %d\n", static_cast<int>(min_ept), shm_size);
     return cuda::std::make_tuple(min_ept, shm_size, block_size, groups_per_block);
   }

@@ -104,6 +104,12 @@ namespace matx
                 detail::array_to_string(out_dims_, actual_rank) + " };\n" +
                 "  constexpr static cuda::std::array<int32_t, Rank_> dims_ = " + dims_array + ";\n" +
                 "  typename detail::inner_storage_or_self_t<detail::base_type_t<T>> op_;\n" +
+                "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ bool IsIdentityPermutation() {\n" +
+                "    for(int32_t r = 0; r < Rank_; r++) {\n" +
+                "      if(dims_[r] != r) return false;\n" +
+                "    }\n" +
+                "    return true;\n" +
+                "  }\n" +
                 "  template <size_t K, typename Dims, typename Inds>\n" +
                 "  static __MATX_INLINE__ __MATX_DEVICE__ index_t lookup_for_axis_(const Dims &dims, const Inds &inds) {\n" +
                 "    index_t result = 0;\n" +
@@ -123,7 +129,13 @@ namespace matx
                 "      const cuda::std::array<index_t, Rank_> inds{indices...};\n" +
                 "      return apply_permuted_<CapType>(op_, dims_, inds, cuda::std::make_index_sequence<Rank_>{});\n" +
                 "    } else {\n" +
-                "      return Vector<value_type, static_cast<index_t>(CapType::ept)>{};\n" +
+                "      if constexpr (IsIdentityPermutation()) {\n" +
+                "        auto value = get_value<CapType>(op_, indices...);\n" +
+                "        return value;\n" +
+                "      }\n" +
+                "      else {\n" +
+                "        return Vector<value_type, static_cast<index_t>(CapType::ept)>{};\n" +
+                "      }\n" +
                 "    }\n" +
                 "  }\n" +
                 "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() { return Rank_; }\n" +
@@ -154,6 +166,16 @@ namespace matx
             dims_[i] = dims[i];
           }
           MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
+        }
+
+        __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ bool IsIdentityPermutation() const
+        {
+          for (int r = 0; r < Rank(); r++) {
+            if (dims_[r] != r) {
+              return false;
+            }
+          }
+          return true;
         }
 
         // For permuted-output axis K, find the input axis j with dims[j]==K
@@ -205,6 +227,16 @@ namespace matx
                                             dims, inds,
                                             cuda::std::make_index_sequence<Rank()>{});
           } else {
+            bool identity = true;
+            for (int r = 0; r < Rank(); r++) {
+              if (dims[r] != r) {
+                identity = false;
+              }
+            }
+            if (identity) {
+              auto value = get_value<CapType>(cuda::std::forward<Op>(op), indices...);
+              return value;
+            }
             return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
           }
         }
@@ -296,6 +328,9 @@ namespace matx
             return detail::get_operator_capability<Cap>(op_, in);
           }
           else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            if (IsIdentityPermutation()) {
+              return detail::get_operator_capability<Cap>(op_, in);
+            }
             const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
             return combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(op_, in));
           } else {

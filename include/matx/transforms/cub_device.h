@@ -84,6 +84,8 @@ namespace detail {
   };
 
 #ifndef __CUDACC_RTC__
+  static constexpr int CubJitMaxBlockThreads = 1024;
+
   template <typename T>
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr int MaxCubJitElementsPerThreadByBytes(int limit = 32)
   {
@@ -123,7 +125,7 @@ namespace detail {
   }
 
   template <typename T>
-  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr bool CubJitReductionFitsInBlock(index_t reduce_size, int max_threads = 1024)
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr bool CubJitReductionFitsInBlock(index_t reduce_size, int max_threads = CubJitMaxBlockThreads)
   {
     if (reduce_size <= 0) {
       return false;
@@ -161,7 +163,7 @@ namespace detail {
   }
 
   template <typename T>
-  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr bool CubJitPowerOfTwoCollectiveFitsInBlock(index_t critical_dim_size, int max_threads = 1024)
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr bool CubJitPowerOfTwoCollectiveFitsInBlock(index_t critical_dim_size, int max_threads = CubJitMaxBlockThreads)
   {
     if (critical_dim_size <= 0) {
       return false;
@@ -190,9 +192,22 @@ namespace detail {
     scalar_indices[sizeof...(Is) - 1] =
         static_cast<index_t>(threadIdx.x) * static_cast<int>(CapType::ept) + static_cast<index_t>(item);
     using ScalarCap = typename CapType::scalar_cap;
-    return block_op_get_value_at<ScalarCap>(op,
-                                            scalar_indices,
-                                            cuda::std::make_index_sequence<sizeof...(Is)>{});
+    auto value = block_op_get_value_at<ScalarCap>(op,
+                                                  scalar_indices,
+                                                  cuda::std::make_index_sequence<sizeof...(Is)>{});
+    return GetVectorVal(value, 0);
+  }
+
+  template <typename CapType, typename Op, typename... Is>
+  __MATX_INLINE__ __MATX_DEVICE__ decltype(auto) block_op_get_last_dim_vector(const Op &op,
+                                                                              Is... indices)
+  {
+    static_assert(sizeof...(Is) > 0, "Block CUB operators require at least one index");
+    cuda::std::array<index_t, sizeof...(Is)> vector_indices{static_cast<index_t>(indices)...};
+    vector_indices[sizeof...(Is) - 1] = static_cast<index_t>(threadIdx.x);
+    return block_op_get_value_at<CapType>(op,
+                                          vector_indices,
+                                          cuda::std::make_index_sequence<sizeof...(Is)>{});
   }
 
   template <typename CapType, typename Op, size_t PrefixRank>
@@ -216,9 +231,10 @@ namespace detail {
       item /= dim_size;
     }
 
-    return block_op_get_value_at<CapType>(op,
-                                          scalar_indices,
-                                          cuda::std::make_index_sequence<rank>{});
+    auto value = block_op_get_value_at<CapType>(op,
+                                                scalar_indices,
+                                                cuda::std::make_index_sequence<rank>{});
+    return GetVectorVal(value, 0);
   }
 
 #ifndef __CUDACC_RTC__
@@ -336,9 +352,10 @@ namespace detail {
       using ret_type = cuda::std::conditional_t<CapType::ept == ElementsPerThread::ONE, sort_type, Vector<sort_type, ept>>;
       ret_type thread_data{};
       sort_type (&items)[ept] = reinterpret_cast<sort_type (&)[ept]>(thread_data);
+      auto input_items = block_op_get_last_dim_vector<CapType>(op, indices...);
       #pragma unroll
       for (int i = 0; i < ept; i++) {
-        items[i] = block_op_get_last_dim_item<CapType>(op, i, indices...);
+        items[i] = GetVectorVal(input_items, i);
       }
 
       if constexpr (Direction == BlockSortDirection::ASCENDING) {
@@ -376,9 +393,10 @@ namespace detail {
       index_t (&values)[ept] = reinterpret_cast<index_t (&)[ept]>(thread_values);
 
       const index_t linear_base = static_cast<index_t>(threadIdx.x) * ept;
+      auto input_items = block_op_get_last_dim_vector<CapType>(op, indices...);
       #pragma unroll
       for (int i = 0; i < ept; i++) {
-        keys[i] = block_op_get_last_dim_item<CapType>(op, i, indices...);
+        keys[i] = GetVectorVal(input_items, i);
         values[i] = linear_base + i;
       }
 
@@ -415,9 +433,10 @@ namespace detail {
       using ret_type = cuda::std::conditional_t<CapType::ept == ElementsPerThread::ONE, scan_type, Vector<scan_type, ept>>;
       ret_type thread_data{};
       scan_type (&items)[ept] = reinterpret_cast<scan_type (&)[ept]>(thread_data);
+      auto input_items = block_op_get_last_dim_vector<CapType>(op, indices...);
       #pragma unroll
       for (int i = 0; i < ept; i++) {
-        items[i] = block_op_get_last_dim_item<CapType>(op, i, indices...);
+        items[i] = GetVectorVal(input_items, i);
       }
 
       // CUB BlockScan takes ITEMS_PER_THREAD on the InclusiveSum overload, not
@@ -448,16 +467,20 @@ namespace detail {
       const int linear_base = static_cast<int>(threadIdx.x) * ept;
       static constexpr bool reduce_last_dim_only = (sizeof...(Is) + 1) == Op::Rank();
 
-      if constexpr (ScalarLoads || !reduce_last_dim_only) {
+      if constexpr (CapType::pass_through_threads || ScalarLoads || !reduce_last_dim_only) {
         using ScalarCap = typename CapType::scalar_cap;
         #pragma unroll
         for (int i = 0; i < ept; i++) {
-          if (linear_base + i < ReduceSize) {
+          const bool valid_item = linear_base + i < ReduceSize;
+          if (valid_item || CapType::pass_through_threads) {
+            const index_t item = valid_item ? static_cast<index_t>(linear_base + i) : static_cast<index_t>(ReduceSize - 1);
+            auto value = block_op_get_flat_dim_item<ScalarCap>(op, item, prefix_indices);
+            if (!valid_item) {
+              continue;
+            }
             partial = cub_combine_value<reduce_type, ReduceType>(
                 partial,
-                block_op_get_flat_dim_item<ScalarCap>(op,
-                                                      static_cast<index_t>(linear_base + i),
-                                                      prefix_indices));
+                value);
           }
         }
       }

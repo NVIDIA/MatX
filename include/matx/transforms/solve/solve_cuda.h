@@ -309,7 +309,7 @@ public:
                     h_b_array.size() * sizeof(T *), cudaMemcpyHostToDevice,
                     stream);
 
-    auto ret = cublasSetStream(handle_.get(), stream);
+    [[maybe_unused]] auto ret = cublasSetStream(handle_.get(), stream);
     MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxSolverError);
 
     ret = DenseSolveGetrfBatched(handle_.get(), n, d_a_array_.get(), n,
@@ -354,7 +354,7 @@ public:
     handle_.Create();
     dn_params_.Create();
 
-    auto ret = cusolverDnSetStream(handle_.get(), stream);
+    [[maybe_unused]] auto ret = cusolverDnSetStream(handle_.get(), stream);
     MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
 
     ret = cusolverDnXgetrf_bufferSize(
@@ -383,7 +383,7 @@ public:
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
     const auto stream = exec.getStream();
-    auto ret = cusolverDnSetStream(handle_.get(), stream);
+    [[maybe_unused]] auto ret = cusolverDnSetStream(handle_.get(), stream);
     MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
 
     std::vector<T *> h_a_array;

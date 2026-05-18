@@ -183,7 +183,7 @@ namespace detail {
         if constexpr (Cap == OperatorCapability::BLOCK_DIM) {
 #if defined(MATX_EN_JIT) && defined(__CUDACC__)
           const int block_threads = CurrentBlockThreads();
-          const auto my_cap = cuda::std::array<int, 2>{block_threads, block_threads};
+          const auto my_cap = cuda::std::array<int, 2>{block_threads, CubJitMaxBlockThreads};
           return combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(a_, in));
 #else
           return combine_capabilities<Cap>(capability_attributes<Cap>::default_value, detail::get_operator_capability<Cap>(a_, in));
@@ -219,8 +219,7 @@ namespace detail {
         else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
           bool supported = true;
 #if defined(MATX_EN_JIT) && defined(__CUDACC__)
-          supported = ((InRank - ORank) >= 1) && !is_complex_v<value_type> &&
-                      BlockSizeFitsAtMaxEPT();
+          supported = ((InRank - ORank) >= 1) && BlockSizeFitsAtMaxEPT();
 #else
           supported = false;
 #endif

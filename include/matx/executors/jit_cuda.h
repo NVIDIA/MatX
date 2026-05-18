@@ -286,7 +286,10 @@ namespace matx
               if (pass_through_threads) {
                 // For pass-through operators (e.g., cuBLASDx), block dimensions are fixed by the operator
                 auto block_dim_range = detail::get_operator_capability<detail::OperatorCapability::BLOCK_DIM>(op);
-                block_size = block_dim_range[1];  // Use the max block size
+                if (block_dim_range[0] == detail::capability_attributes<detail::OperatorCapability::BLOCK_DIM>::invalid) {
+                  MATX_THROW(matxInvalidParameter, "No valid JIT block dimension satisfies the fused operator requirements");
+                }
+                block_size = block_dim_range[0];
                 stride = detail::get_grid_dims_block_2d<RANK>(blocks, threads, sizes, block_size);
 
                 // EPT is 1 for 2D block operators - the operator handles elements internally

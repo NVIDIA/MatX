@@ -100,6 +100,7 @@ namespace detail {
     static constexpr bool unit_stride_last = UNIT_STRIDE_LAST;
     static constexpr int osize = 0;
     static constexpr int block_size = 0;
+    static constexpr bool pass_through_threads = false;
     using scalar_cap = CapabilityParams<ElementsPerThread::ONE, JIT, UNIT_STRIDE_LAST>;
 
     // For JIT there will be other capabilties patched in with a string
