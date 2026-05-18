@@ -112,6 +112,8 @@ namespace matx
 #endif
 
 	      __MATX_INLINE__ std::string str() const { return "hermitian(" + op_.str() + ")"; }
+        __MATX_INLINE__ const auto& Input() const noexcept { return op_; }
+
         __MATX_INLINE__ HermitianTransOp(const T1 &op) : op_(op) {
           MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
           static_assert(Rank() >= 2, "Hermitian operation needs input with rank >= 2");

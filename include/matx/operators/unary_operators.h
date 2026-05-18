@@ -87,6 +87,10 @@ namespace matx
       return op_.str() + "(" + get_type_str(in1_) + ")";
     }
 
+    __MATX_INLINE__ const auto& Input() const noexcept {
+      return in1_;
+    }
+
     __MATX_INLINE__ matxUnaryOp(const I1 &in1, const Op &op) : in1_(in1), op_(op) {
       MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
       if constexpr (Rank() > 0) {
