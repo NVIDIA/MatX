@@ -187,7 +187,7 @@ inline bool get_grid_dims_block(dim3 &blocks, dim3 &threads, const cuda::std::ar
   blocks.y = 1;
   blocks.z = 1;    
 
-  if (RANK > 1) {
+  if constexpr (RANK > 1) {
     MATX_ASSERT_STR_EXP(sizes[sizes.size() - 2] % groups_per_block, 0, matxInvalidParameter, "Second to last dimension must be divisible by groups_per_block");
   }
 

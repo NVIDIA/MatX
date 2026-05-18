@@ -346,9 +346,11 @@ namespace detail
           max_groups_per_block = 1024;
         }
 
-        int total_batches = 1;
+        index_t total_batches = 1;
         if constexpr (Op::Rank() > 0) {
-          total_batches = static_cast<int>(TotalSize(op) / op.Size(Op::Rank() - 1));
+          const bool block_reduces_rank =
+            detail::get_operator_capability<detail::OperatorCapability::BLOCK_REDUCES_RANK>(op);
+          total_batches = block_reduces_rank ? TotalSize(op) : (TotalSize(op) / op.Size(Op::Rank() - 1));
         }
 
         // Iterate through all possible groups_per_block values
