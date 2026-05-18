@@ -233,11 +233,17 @@ namespace matx
                 identity = false;
               }
             }
+            using value_return_t = decltype(get_value<CapType>(cuda::std::forward<Op>(op), indices...));
             if (identity) {
               auto value = get_value<CapType>(cuda::std::forward<Op>(op), indices...);
               return value;
             }
-            return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
+            if constexpr (is_vector_v<value_return_t>) {
+              return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
+            }
+            else {
+              return value_type{};
+            }
           }
         }
 
