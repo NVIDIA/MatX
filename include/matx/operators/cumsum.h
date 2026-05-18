@@ -206,6 +206,9 @@ namespace detail {
         else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
           bool supported = true;
 #if defined(MATX_EN_JIT) && defined(__CUDACC__)
+          // Complex values are intentionally supported for arithmetic CUB
+          // collectives. Ordered collectives such as min/max reject complex
+          // values because there is no valid ordering.
           supported = OpA::Rank() > 0 && BlockSizeFitsAtMaxEPT();
 #else
           supported = false;

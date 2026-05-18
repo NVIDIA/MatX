@@ -195,13 +195,22 @@ inline std::filesystem::path resolve_matx_root() {
     return std::filesystem::current_path();
 }
 
-inline void append_nvrtc_include_dirs(std::vector<std::string> &options, std::string_view include_dirs) {
+inline bool append_nvrtc_include_dirs(std::vector<std::string> &options, std::string_view include_dirs) {
+    bool appended = false;
     size_t start = 0;
     while (start <= include_dirs.size()) {
       const size_t end = include_dirs.find('|', start);
       const auto dir = include_dirs.substr(start, end == std::string_view::npos ? std::string_view::npos : end - start);
       if (!dir.empty()) {
-        options.push_back("-I" + std::string(dir));
+        const std::string dir_string(dir);
+        if (std::filesystem::exists(dir_string)) {
+          options.push_back("-I" + dir_string);
+          appended = true;
+        }
+        else {
+          MATX_LOG_WARN("Configured NVRTC include directory '{}' does not exist. Ignoring it.",
+                        dir_string);
+        }
       }
 
       if (end == std::string_view::npos) {
@@ -209,6 +218,39 @@ inline void append_nvrtc_include_dirs(std::vector<std::string> &options, std::st
       }
       start = end + 1;
     }
+
+    return appended;
+}
+
+inline bool append_nvrtc_cccl_build_include_dirs(std::vector<std::string> &options,
+                                                 const std::filesystem::path &build_dir) {
+    const auto cccl_root = build_dir / "_deps" / "cccl-src";
+    if (!std::filesystem::exists(cccl_root)) {
+      return false;
+    }
+
+    options.push_back("-I" + (cccl_root / "thrust").string());
+    options.push_back("-I" + (cccl_root / "libcudacxx" / "include").string());
+    options.push_back("-I" + (cccl_root / "cub").string());
+    return true;
+}
+
+inline bool append_nvrtc_cuda_include_dirs(std::vector<std::string> &options) {
+    const char* cuda_path = std::getenv("CUDA_PATH");
+    std::string cuda_inc_dir = cuda_path ? std::string(cuda_path) + "/include" : "/usr/local/cuda/include";
+    bool appended = false;
+    if (std::filesystem::exists(cuda_inc_dir)) {
+      options.push_back("-I" + cuda_inc_dir);
+      appended = true;
+    }
+
+    const auto cuda_cccl_dir = std::filesystem::path(cuda_inc_dir) / "cccl";
+    if (std::filesystem::exists(cuda_cccl_dir)) {
+      options.push_back("-I" + cuda_cccl_dir.string());
+      appended = true;
+    }
+
+    return appended;
 }
 
 std::vector<std::string> __MATX_HOST__ __MATX_INLINE__ get_preprocessor_options(std::string_view nvrtc_arch_override = {}) {
@@ -231,14 +273,16 @@ std::vector<std::string> __MATX_HOST__ __MATX_INLINE__ get_preprocessor_options(
     options.push_back("-DMATX_EN_MATHDX");
 #endif
     options.push_back("-I" + matx_root.string() + "/include");
+    bool has_cccl_include_dirs = false;
 #ifdef MATX_NVRTC_CCCL_INCLUDE_DIRS_DEFAULT
-    append_nvrtc_include_dirs(options, MATX_NVRTC_CCCL_INCLUDE_DIRS_DEFAULT);
-#else
-    // Dependencies in the build directory
-    options.push_back("-I" + (build_dir / "_deps/cccl-src/thrust").string());
-    options.push_back("-I" + (build_dir / "_deps/cccl-src/libcudacxx/include").string());
-    options.push_back("-I" + (build_dir / "_deps/cccl-src/cub").string());
+    has_cccl_include_dirs = append_nvrtc_include_dirs(options, MATX_NVRTC_CCCL_INCLUDE_DIRS_DEFAULT);
 #endif
+    if (!has_cccl_include_dirs) {
+      if (build_dir.empty()) {
+        build_dir = resolve_build_dir_for_deps();
+      }
+      has_cccl_include_dirs = append_nvrtc_cccl_build_include_dirs(options, build_dir);
+    }
     //options.push_back("-I" + (build_dir / "_deps/pybind11-src/include").string());
 #ifdef MATX_EN_MATHDX
     options.push_back("-I" + (build_dir / "_deps/mathdx-src/nvidia/mathdx/25.06/include").string());
@@ -246,13 +290,9 @@ std::vector<std::string> __MATX_HOST__ __MATX_INLINE__ get_preprocessor_options(
 #endif
 
     // System paths
-    // Get CUDA include directory manually for pure NVRTC
-    const char* cuda_path = std::getenv("CUDA_PATH");
-    std::string cuda_inc_dir = cuda_path ? std::string(cuda_path) + "/include" : "/usr/local/cuda/include";
-    options.push_back("-I" + cuda_inc_dir);
-    const auto cuda_cccl_dir = std::filesystem::path(cuda_inc_dir) / "cccl";
-    if (std::filesystem::exists(cuda_cccl_dir)) {
-      options.push_back("-I" + cuda_cccl_dir.string());
+    has_cccl_include_dirs = append_nvrtc_cuda_include_dirs(options) || has_cccl_include_dirs;
+    if (!has_cccl_include_dirs) {
+      MATX_LOG_WARN("No CCCL include directories found for NVRTC. CUB block JIT compilation may fail.");
     }
     
     const std::string nvrtc_arch = nvrtc_arch_override.empty() ? resolve_nvrtc_cuda_arch() : std::string(nvrtc_arch_override);
