@@ -195,21 +195,55 @@ inline std::filesystem::path resolve_matx_root() {
     return std::filesystem::current_path();
 }
 
+inline void append_nvrtc_include_dirs(std::vector<std::string> &options, std::string_view include_dirs) {
+    size_t start = 0;
+    while (start <= include_dirs.size()) {
+      const size_t end = include_dirs.find('|', start);
+      const auto dir = include_dirs.substr(start, end == std::string_view::npos ? std::string_view::npos : end - start);
+      if (!dir.empty()) {
+        options.push_back("-I" + std::string(dir));
+      }
+
+      if (end == std::string_view::npos) {
+        break;
+      }
+      start = end + 1;
+    }
+}
+
 std::vector<std::string> __MATX_HOST__ __MATX_INLINE__ get_preprocessor_options(std::string_view nvrtc_arch_override = {}) {
     const auto matx_root = resolve_matx_root();
-    const auto build_dir = resolve_build_dir_for_deps();
+    bool need_build_dir = false;
+#ifndef MATX_NVRTC_CCCL_INCLUDE_DIRS_DEFAULT
+    need_build_dir = true;
+#endif
+#ifdef MATX_EN_MATHDX
+    need_build_dir = true;
+#endif
+    std::filesystem::path build_dir;
+    if (need_build_dir) {
+      build_dir = resolve_build_dir_for_deps();
+    }
 
     std::vector<std::string> options;
-    options.push_back("-DMATX_EN_MATHDX");
     options.push_back("-DMATX_EN_JIT");
+#ifdef MATX_EN_MATHDX
+    options.push_back("-DMATX_EN_MATHDX");
+#endif
     options.push_back("-I" + matx_root.string() + "/include");
+#ifdef MATX_NVRTC_CCCL_INCLUDE_DIRS_DEFAULT
+    append_nvrtc_include_dirs(options, MATX_NVRTC_CCCL_INCLUDE_DIRS_DEFAULT);
+#else
     // Dependencies in the build directory
     options.push_back("-I" + (build_dir / "_deps/cccl-src/thrust").string());
     options.push_back("-I" + (build_dir / "_deps/cccl-src/libcudacxx/include").string());
     options.push_back("-I" + (build_dir / "_deps/cccl-src/cub").string());
+#endif
     //options.push_back("-I" + (build_dir / "_deps/pybind11-src/include").string());
+#ifdef MATX_EN_MATHDX
     options.push_back("-I" + (build_dir / "_deps/mathdx-src/nvidia/mathdx/25.06/include").string());
     options.push_back("-I" + (build_dir / "_deps/mathdx-src/nvidia/mathdx/25.06/external/cutlass/include").string());
+#endif
 
     // System paths
     // Get CUDA include directory manually for pure NVRTC
