@@ -1,18 +1,9 @@
-#=============================================================================
-# Copyright (c) 2023, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#=============================================================================
+# =============================================================================
+# cmake-format: off
+# SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
+# cmake-format: on
+# =============================================================================
 cmake_minimum_required(VERSION 3.23)
 
 include(${rapids-cmake-dir}/cpm/init.cmake)
@@ -33,20 +24,17 @@ endfunction()
 # We will install with the custom install location set in this file
 call_cccl_with_custom_install_loc()
 
-# Call for `cccl` again but ensure we don't re-invoke the install
-# rules overwriting the custom install location in files
-# like thrust-header-search.cmake
+# Call for `cccl` again but ensure we don't re-invoke the install rules overwriting the custom
+# install location in files like thrust-header-search.cmake
 rapids_cpm_cccl(INSTALL_EXPORT_SET export_set)
 
-# Install our project so we can verify `cccl`/`thrust` has preserved
-# the correct install location
-add_custom_target(install_project ALL
-  COMMAND ${CMAKE_COMMAND} --install "${CMAKE_BINARY_DIR}" --prefix check_thrust/install/
-  )
+# Install our project so we can verify `cccl`/`thrust` has preserved the correct install location
+add_custom_target(install_project ALL COMMAND ${CMAKE_COMMAND} --install "${CMAKE_BINARY_DIR}"
+                                              --prefix check_thrust/install/)
 
-# Add a custom command that verifies that the expect files have
-# been installed for each component
-file(WRITE "${CMAKE_BINARY_DIR}/check_thrust/CMakeLists.txt" [=[
+# Add a custom command that verifies that the expect files have been installed for each component
+file(WRITE "${CMAKE_BINARY_DIR}/check_thrust/CMakeLists.txt"
+     [=[
 cmake_minimum_required(VERSION 3.20)
 project(verify_install_targets LANGUAGES CXX)
 
@@ -66,9 +54,8 @@ if(NOT from_install_prefix STREQUAL expected)
 endif()
 ]=])
 
-
 add_custom_target(verify_thrust_header_search ALL
-  COMMAND ${CMAKE_COMMAND} -E rm -rf "${CMAKE_BINARY_DIR}/check_thrust/build"
-  COMMAND ${CMAKE_COMMAND} -S="${CMAKE_BINARY_DIR}/check_thrust" -B="${CMAKE_BINARY_DIR}/install/build"
-)
+                  COMMAND ${CMAKE_COMMAND} -E rm -rf "${CMAKE_BINARY_DIR}/check_thrust/build"
+                  COMMAND ${CMAKE_COMMAND} -S="${CMAKE_BINARY_DIR}/check_thrust"
+                          -B="${CMAKE_BINARY_DIR}/install/build")
 add_dependencies(verify_thrust_header_search install_project)

@@ -2,56 +2,53 @@
   "packages": {
     "benchmark": {
       "version": "1.8.0",
+      "git_shallow": false,
       "git_url": "https://github.com/google/benchmark.git",
-      "git_tag": "v${version}"
+      "git_tag": "2dd015dfef425c866d9a43f2c67d8b52d709acb6"
     },
     "bs_thread_pool": {
       "version": "4.1.0",
+      "git_shallow": false,
       "git_url": "https://github.com/bshoshany/thread-pool.git",
       "git_tag": "097aa718f25d44315cadb80b407144ad455ee4f9"
     },
     "CCCL": {
-      "version": "2.5.0",
-      "git_shallow": false,
-      "git_url": "https://github.com/NVIDIA/cccl.git",
-      "git_tag": "e21d607157218540cd7c45461213fb96adf720b7"
+      "version": "3.3.0",
+      "url": "https://github.com/NVIDIA/cccl/archive/09094af138841ef521de1adbbdd18ab8b3dad47b.tar.gz",
+      "url_hash": "SHA256=83e2ff50f71ef4d478e9e7aea209f383aa0a012f0443d37e9501844a46d3a80f"
     },
     "cuco": {
       "version": "0.0.1",
       "git_shallow": false,
       "always_download": true,
       "git_url": "https://github.com/NVIDIA/cuCollections.git",
-      "git_tag": "dc0f9fc20c2a544e53099e640a681b347532391a"
+      "git_tag": "f517bbb1277753b1852dfd388993383e401eaa38"
     },
-    "fmt": {
-      "version": "11.0.2",
-      "git_url": "https://github.com/fmtlib/fmt.git",
-      "git_tag": "${version}",
-      "patches": [
-        {
-          "file": "fmt/fix_11_0_2_unreachable_loop.diff",
-          "issue": "fmt 11.0.2 produces a warning about an unreachable loop when compiled with nvcc"
-        }
-      ]
+    "rapids_logger": {
+      "version": "0.2.3",
+      "git_url": "https://github.com/rapidsai/rapids-logger.git",
+      "git_tag": "4c72b598f99c8aa06af49468b3fc82f3931c6bf6"
     },
     "GTest": {
-      "version": "1.13.0",
+      "version": "1.16.0",
+      "git_shallow": false,
       "git_url": "https://github.com/google/googletest.git",
-      "git_tag": "v${version}"
+      "git_tag": "6910c9d9165801d8827d628cb72eb7ea9dd538c5"
     },
     "nvbench": {
       "version": "0.0",
       "git_shallow": false,
       "git_url": "https://github.com/NVIDIA/nvbench.git",
-      "git_tag": "555d628e9b250868c9da003e4407087ff1982e8e"
+      "git_tag": "b88a45f4170af4e907e69af22a55af67859d3b49"
     },
     "nvcomp": {
-      "version": "4.1.0.6",
+      "version": "5.1.0.21",
+      "git_shallow": false,
       "git_url": "https://github.com/NVIDIA/nvcomp.git",
-      "git_tag": "v2.2.0",
+      "git_tag": "a6e4e64a177e07cd2e5c8c5e07bb66ffefceae84",
       "proprietary_binary_cuda_version_mapping": {
-        "11": "11",
-        "12": "12"
+        "12": "12",
+        "13": "13"
       },
       "proprietary_binary": {
         "x86_64-linux": "https://developer.download.nvidia.com/compute/nvcomp/redist/nvcomp/linux-x86_64/nvcomp-linux-x86_64-${version}_cuda${cuda-toolkit-version-mapping}-archive.tar.xz",
@@ -59,19 +56,17 @@
       }
     },
     "nvtx3": {
-      "version": "3.1.0",
+      "version": "3.2.0",
+      "git_shallow": false,
       "git_url": "https://github.com/NVIDIA/NVTX.git",
-      "git_tag": "v${version}"
+      "git_tag": "69c9949150ac1c310758a304082228a36d5e4758",
+      "source_subdir": "c"
     },
     "rmm": {
       "version": "${rapids-cmake-version}",
       "git_url": "https://github.com/rapidsai/rmm.git",
-      "git_tag": "branch-${version}"
-    },
-    "spdlog": {
-      "version": "1.14.1",
-      "git_url": "https://github.com/gabime/spdlog.git",
-      "git_tag": "v${version}"
+      "git_tag": "${rapids-cmake-checkout-tag}",
+      "source_subdir": "cpp"
     }
   }
 }

@@ -1,4 +1,5 @@
-# Copyright (c) 2023-2024, NVIDIA CORPORATION.
+# SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
 #
 # Configuration file for the Sphinx documentation builder.
 #
@@ -13,6 +14,8 @@
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
 import datetime
+import os.path
+import packaging.version
 import sphinx_rtd_theme
 
 # -- Project information -----------------------------------------------------
@@ -21,14 +24,17 @@ project = "rapids-cmake"
 copyright = f"2021-{datetime.datetime.today().year}, NVIDIA Corporation"
 author = "NVIDIA Corporation"
 
+with open(os.path.join(os.path.dirname(__file__), "../VERSION")) as f:
+    RAPIDS_CMAKE_VERSION = packaging.version.Version(f.read())
+
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
 # built documents.
 #
 # The short X.Y version.
-version = "24.12"
+version = f"{RAPIDS_CMAKE_VERSION.major:02}.{RAPIDS_CMAKE_VERSION.minor:02}"
 # The full version, including alpha/beta/rc tags.
-release = "24.12.00"
+release = f"{RAPIDS_CMAKE_VERSION.major:02}.{RAPIDS_CMAKE_VERSION.minor:02}.{RAPIDS_CMAKE_VERSION.micro:02}"
 
 
 # -- General configuration ---------------------------------------------------

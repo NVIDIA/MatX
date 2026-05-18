@@ -1,7 +1,5 @@
 # <div align="left"><img src="https://rapids.ai/assets/images/rapids_logo.png" width="90px"/>&nbsp;rapids-cmake</div>
 
-**NOTE:** For the latest stable [README.md](https://github.com/rapidsai/rapids-cmake/blob/main/README.md) ensure you are on the `main` branch.
-
 ## Overview
 
 This is a collection of CMake modules that are useful for all CUDA RAPIDS
@@ -19,7 +17,7 @@ Content](https://cmake.org/cmake/help/latest/module/FetchContent.html) into your
 cmake_minimum_required(...)
 
 if(NOT EXISTS ${CMAKE_CURRENT_BINARY_DIR}/<PROJECT>_RAPIDS.cmake)
-  file(DOWNLOAD https://raw.githubusercontent.com/rapidsai/rapids-cmake/branch-<VERSION_MAJOR>.<VERSION_MINOR>/RAPIDS.cmake
+  file(DOWNLOAD https://raw.githubusercontent.com/rapidsai/rapids-cmake/release/26.04/RAPIDS.cmake
     ${CMAKE_CURRENT_BINARY_DIR}/<PROJECT>_RAPIDS.cmake)
 endif()
 include(${CMAKE_CURRENT_BINARY_DIR}/<PROJECT>_RAPIDS.cmake)
@@ -78,7 +76,7 @@ The most commonly used function are:
 
 - `rapids_cuda_init_architectures(<project_name>)` handles initialization of `CMAKE_CUDA_ARCHITECTURE`. MUST BE CALLED BEFORE `PROJECT()`
 - `rapids_cuda_init_runtime(<mode>)` handles initialization of `CMAKE_CUDA_RUNTIME_LIBRARY`.
-- `rapids_cuda_patch_toolkit()` corrects bugs in the CUDAToolkit module that are being upstreamed.
+- `rapids_cuda_enable_fatbin_compression()` handles the optimal compile flags for fatbin compression to make smaller binaries
 
 ### cython
 
@@ -123,7 +121,7 @@ The most commonly used functions are:
 At times projects or developers will need to verify ``rapids-cmake`` branches. To do this you can set variables that control which repository ``RAPIDS.cmake`` downloads, which should be done like this:
 
 ```cmake
-  # To override the version that is pulled:
+  # To set the version that is pulled (this must be set for RAPIDS.cmake to work):
   set(rapids-cmake-version "<version>")
 
   # To override the GitHub repository:
@@ -145,7 +143,7 @@ At times projects or developers will need to verify ``rapids-cmake`` branches. T
   # This only works when specifying
   #
   # set(rapids-cmake-fetch-via-git "ON")
-  # set(rapids-cmake-branch "branch-<cal_ver>")
+  # set(rapids-cmake-branch "release/<cal_ver>")
   #
   # or
   # set(rapids-cmake-fetch-via-git "ON")
@@ -154,9 +152,7 @@ At times projects or developers will need to verify ``rapids-cmake`` branches. T
   #
   set(rapids-cmake-fetch-via-git "ON")
 
-  file(DOWNLOAD https://raw.githubusercontent.com/rapidsai/rapids-cmake/branch-22.10/RAPIDS.cmake
-      ${CMAKE_CURRENT_BINARY_DIR}/RAPIDS.cmake)
-  include(${CMAKE_CURRENT_BINARY_DIR}/RAPIDS.cmake)
+  include(${CMAKE_CURRENT_LIST_DIR}/RAPIDS.cmake)
 ```
 
 A few notes:
@@ -164,8 +160,9 @@ A few notes:
 - An explicitly defined ``rapids-cmake-url`` will always be used
 - `rapids-cmake-sha` takes precedence over `rapids-cmake-tag`
 - `rapids-cmake-tag` takes precedence over `rapids-cmake-branch`
-- It is advised to always set `rapids-cmake-version` to the version expected by the repo your modifications will pull
+- The CMake variable `rapids-cmake-version` must be set to a rapids-cmake version, formatted as `MAJOR.MINOR`
+- `RAPIDS.cmake` should be copied in and placed next to the above file
 
 ## Contributing
 
-Review the [CONTRIBUTING.md](https://github.com/rapidsai/rapids-cmake/blob/main/CONTRIBUTING.md) file for information on how to contribute code and issues to the project.
+Review the [CONTRIBUTING.md](https://github.com/rapidsai/rapids-cmake/blob/release/26.04/CONTRIBUTING.md) file for information on how to contribute code and issues to the project.

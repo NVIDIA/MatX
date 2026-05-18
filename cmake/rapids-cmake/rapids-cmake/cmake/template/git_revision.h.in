@@ -1,0 +1,12 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) @current_year@, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+#pragma once
+
+#define @_RAPIDS_GIT_PREFIX@_GIT_BRANCH "@_RAPIDS_WRITE_BRANCH@"
+#define @_RAPIDS_GIT_PREFIX@_GIT_SHA1 "@_RAPIDS_WRITE_SHA1@"
+#define @_RAPIDS_GIT_PREFIX@_GIT_VERSION "@_RAPIDS_WRITE_VERSION@"
+#if (@_RAPIDS_GIT_IS_DIRTY@)
+#  define @_RAPIDS_GIT_PREFIX@_GIT_IS_DIRTY
+#endif

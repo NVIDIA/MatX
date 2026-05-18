@@ -1,6 +1,6 @@
 {
   "packages": {
-    "fmt": {
+    "GTest": {
       "version": "100.1.0"
     }
   }

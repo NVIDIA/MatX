@@ -1,5 +1,10 @@
-cmake_minimum_required(VERSION 3.25.2)
+cmake_minimum_required(VERSION 3.30.4)
 
+if(POLICY CMP0144)
+    # Preserve current behavior: CI may export upper-case package root variables
+    # that should not override dependencies fetched through CPM.
+    cmake_policy(SET CMP0144 OLD)
+endif()
 set(MATX_VERSION 1.0.0)
 
 # Used for config file generation
@@ -9,17 +14,16 @@ else()
   set(NOT_SUBPROJECT OFF)
 endif()
 
-# CMake 3.24 can auto-detect GPUs, but it's not standard on any distrobution. For now, rapids-cmake has a utility
-# function to do it, so we grab that as a dependency. The user can optionally override GPU_ARCH to specify
-# their own. We check if rapids-cmake exists for projects that already include it so we don't have conflicting
-# directories
+# Use the vendored rapids-cmake copy for GPU architecture discovery unless a parent
+# project already provided it. The user can optionally override GPU_ARCH to specify
+# their own.
 if(NOT DEFINED rapids-cmake-dir)
   include(FetchContent)
   # Tell FetchContent to just use the local copy of rapids-cmake:
   FetchContent_Declare(rapids-cmake SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/cmake/rapids-cmake")
 
   # Tell FetchContent to download remote copy of rapids-cmake:
-  #FetchContent_Declare(rapids-cmake URL https://github.com/rapidsai/rapids-cmake/archive/refs/heads/branch-24.12.zip)
+  #FetchContent_Declare(rapids-cmake URL https://github.com/rapidsai/rapids-cmake/archive/refs/tags/v26.04.00.zip)
   FetchContent_MakeAvailable(rapids-cmake)
 else()
   # The include() commands below search the module path for the corresponding .cmake files
@@ -118,8 +122,12 @@ if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
     endif()
 endif()
 
-# CPM is required for all package management
-include(public/cpm-cmake/cmake/CPM.cmake)
+# CPM is required for all package management. rapids_cpm_init loads it for the
+# main build, so only include the vendored copy when MatX is configured without
+# that initialization path.
+if(NOT COMMAND CPMAddPackage)
+    include(public/cpm-cmake/cmake/CPM.cmake)
+endif()
 # Helper for selecting build type
 include(cmake/BuildType.cmake)
 
@@ -414,11 +422,7 @@ target_link_libraries(matx INTERFACE
     CUDA::cusolver
     CUDA::cusparse)
 
-if (CMAKE_VERSION VERSION_LESS 3.25.0)
-    target_link_libraries(matx INTERFACE CUDA::nvToolsExt)
-else()
-    target_link_libraries(matx INTERFACE CUDA::nvtx3)
-endif()
+target_link_libraries(matx INTERFACE CUDA::nvtx3)
 
 # Build config files if the user isn't adding this as a subdirectory. At this point our transitive target
 # should have all build properties needed based on the options passed in

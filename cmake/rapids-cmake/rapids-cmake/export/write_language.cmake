@@ -1,18 +1,9 @@
-#=============================================================================
-# Copyright (c) 2021-2024, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#=============================================================================
+# =============================================================================
+# cmake-format: off
+# SPDX-FileCopyrightText: Copyright (c) 2021-2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
+# cmake-format: on
+# =============================================================================
 include_guard(GLOBAL)
 
 #[=======================================================================[.rst:
@@ -73,31 +64,33 @@ endif()
 #
 # So what we need to do is the following:
 #
-# 1. Transform each `set` in CMake@lang@Compiler to be a `PARENT_SCOPE`
-#    This allows us to propagate up immediate information that is
-#    used by commands such target_compile_features.
+# For non-root directories:
+#   1. Transform each `set` in CMake@lang@Compiler to be a `PARENT_SCOPE`
+#      This allows us to propagate up immediate information that is
+#      used by commands such target_compile_features.
 #
-# 2. Make sure that every directory including root also re-executes
-#    `CMake@lang@Information` This can't be deferred as the contents
-#    are required if any target is constructed
+#   2. Include `CMake@lang@Information` this can't be deferred as the contents
+#      are required if any target is constructed
+#
+# For root directories we only need to include `CMake@lang@Information`
 #
 
 # Expose the language at the current scope
 enable_language(@lang@)
-
 
 if(NOT EXISTS "${CMAKE_BINARY_DIR}/cmake/PropagateCMake@lang@Compiler.cmake")
   # 1.
   # Take everything that `enable_language` generated and transform all sets to PARENT_SCOPE ()
   # This will allow our parent directory to be able to call CMake@lang@Information
   file(STRINGS "${CMAKE_BINARY_DIR}/CMakeFiles/${CMAKE_VERSION}/CMake@lang@Compiler.cmake" rapids_code_to_transform)
-  set(rapids_code_to_execute )
+  set(rapids_code_to_execute "if(NOT CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)\n")
   foreach( line IN LISTS rapids_code_to_transform)
     if(line MATCHES "[ ]*set")
       string(REPLACE ")" " PARENT_SCOPE)" line "${line}")
     endif()
     string(APPEND rapids_code_to_execute "${line}\n")
   endforeach()
+  string(APPEND rapids_code_to_execute "endif()\n")
 
   # 2.
   # Make sure we call "CMake@lang@Information" for the current directory

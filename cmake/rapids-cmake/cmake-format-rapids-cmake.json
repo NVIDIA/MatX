@@ -6,6 +6,15 @@
           "nargs": 1
         }
       },
+      "rapids_cmake_download_with_retry": {
+        "pargs": {
+          "nargs": 3
+        },
+        "kwargs": {
+          "MAX_RETRIES": 1,
+          "RETRY_DELAY": 1
+        }
+      },
       "rapids_cmake_install_lib_dir": {
         "pargs": {
           "nargs": 1,
@@ -57,6 +66,12 @@
         "kwargs": {
           "PREFIX": 1
         }
+      },
+      "rapids_cpm_download": {
+        "pargs": {
+          "nargs": 0
+        },
+        "kwargs": {}
       },
       "rapids_cpm_find": {
         "pargs": {
@@ -112,7 +127,10 @@
       },
       "rapids_cpm_cccl": {
         "pargs": {
-          "nargs": 0
+          "nargs": 0,
+          "flags": [
+            "ENABLE_UNSTABLE"
+          ]
         },
         "kwargs": {
           "BUILD_EXPORT_SET": 1,
@@ -120,15 +138,6 @@
         }
       },
       "rapids_cpm_cuco": {
-        "pargs": {
-          "nargs": 0
-        },
-        "kwargs": {
-          "BUILD_EXPORT_SET": 1,
-          "INSTALL_EXPORT_SET": 1
-        }
-      },
-      "rapids_cpm_fmt": {
         "pargs": {
           "nargs": 0
         },
@@ -159,6 +168,11 @@
         "kwargs": {
           "BUILD_EXPORT_SET": 1,
           "INSTALL_EXPORT_SET": 1
+        }
+      },
+      "rapids_cpm_rapids_logger": {
+        "pargs": {
+          "nargs": 0
         }
       },
       "rapids_cpm_nvbench": {
@@ -201,14 +215,14 @@
           "INSTALL_EXPORT_SET": 1
         }
       },
-      "rapids_cpm_spdlog": {
+      "rapids_cuda_enable_fatbin_compression": {
         "pargs": {
           "nargs": 0
         },
         "kwargs": {
-          "BUILD_EXPORT_SET": 1,
-          "FMT_OPTION": 1,
-          "INSTALL_EXPORT_SET": 1
+          "VARIABLE": 1,
+          "TARGET": 1,
+          "TUNE_FOR": 1
         }
       },
       "rapids_cuda_init_architectures": {
@@ -361,6 +375,11 @@
           "SOURCE_FILES": "*",
           "LINKED_LIBRARIES": "*",
           "INSTALL_DIR": "1"
+        }
+      },
+      "rapids_cython_find_prefix_paths": {
+        "pargs": {
+          "nargs": "2"
         }
       },
       "rapids_cython_add_rpath_entries": {

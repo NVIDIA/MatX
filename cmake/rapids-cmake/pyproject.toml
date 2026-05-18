@@ -1,0 +1,11 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
+
+[tool.codespell]
+# note: pre-commit passes explicit lists of files here, which this skip file list doesn't override -
+# this is only to allow you to run codespell interactively
+skip = "./.git,./rapids-cmake/cpm/patches/"
+# ignore short words, and typename parameters
+ignore-regex = "\\b(.{1,4}|[A-Z]\\w*T)\\b"
+builtin = "clear"
+quiet-level = 3
