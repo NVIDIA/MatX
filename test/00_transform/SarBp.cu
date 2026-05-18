@@ -211,6 +211,100 @@ TYPED_TEST(SarBpTestDoubleType, MixedPrecision)
   MATX_EXIT_HANDLER();
 }
 
+// Verify the num_range_bins boundary at 2^24 for compute types that compute
+// the per-pulse bin_offset in fp32 (Float, Mixed, FloatFloat). fp32 can
+// exactly represent all integers in [-2^24, 2^24] but not above, so those
+// paths accept num_range_bins == 2^24 and reject anything larger.
+//
+// To avoid a 128 MB phase-LUT allocation in the positive case, we use Mixed
+// compute with SarBpFeature::None, which routes through the no-LUT code path.
+// All bulk inputs use operator generators (matx::ones / matx::zeros) so the
+// only allocated memory is the tiny output image and a 1-element
+// platform_positions tensor.
+TYPED_TEST(SarBpTestDoubleType, RangeBinsLimitFp32Path)
+{
+  MATX_ENTER_HANDLER();
+
+  using complex_t = cuda::std::complex<float>;
+
+  constexpr index_t MAX_RANGE_BINS = static_cast<index_t>(1) << 24;
+  const index_t num_pulses = 1;
+  const index_t image_width = 4;
+  const index_t image_height = 4;
+
+  auto zero_image = matx::zeros<complex_t>({image_height, image_width});
+  auto voxel_locations = matx::zipvec(
+    matx::zeros<float>({image_height, image_width}),
+    matx::zeros<float>({image_height, image_width}),
+    matx::zeros<float>({image_height, image_width}));
+  auto range_to_mcp = matx::zeros<double>({num_pulses});
+  auto platform_positions = matx::make_tensor<double3>({num_pulses});
+  platform_positions(0) = double3{0.0, 0.0, 1000.0};
+  auto image = matx::make_tensor<complex_t>({image_height, image_width});
+
+  SarBpParams params;
+  params.compute_type = SarBpComputeType::Mixed;
+  params.features = SarBpFeature::None;  // skip phase-LUT alloc
+  params.center_frequency = 10.0e9;
+  params.del_r = 1.0;
+
+  auto run = [&](index_t num_range_bins) {
+    auto range_profiles = matx::ones<complex_t>({num_pulses, num_range_bins});
+    (image = matx::experimental::sar_bp(
+      zero_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, params)).run(this->exec);
+    this->exec.sync();
+  };
+
+  // num_range_bins == 2^24 is the inclusive upper bound and must not throw.
+  EXPECT_NO_THROW(run(MAX_RANGE_BINS));
+
+  // num_range_bins == 2^24 + 1 must throw matxException.
+  ASSERT_THROW(run(MAX_RANGE_BINS + 1), matx::detail::matxException);
+
+  MATX_EXIT_HANDLER();
+}
+
+// Verify that the Double compute type is exempt from the 2^24 cap. Double
+// uses loose_compute_t = double throughout, so bin_offset and the bin floor
+// are fp64 and the fp32 mantissa limit does not apply. Only the int32_t
+// indexing cap (num_range_bins <= INT32_MAX) constrains this path.
+TYPED_TEST(SarBpTestDoubleType, RangeBinsLimitDoublePath)
+{
+  MATX_ENTER_HANDLER();
+
+  using complex_t = cuda::std::complex<double>;
+
+  constexpr index_t MAX_RANGE_BINS = static_cast<index_t>(1) << 24;
+  const index_t num_pulses = 1;
+  const index_t image_width = 4;
+  const index_t image_height = 4;
+
+  auto zero_image = matx::zeros<complex_t>({image_height, image_width});
+  auto voxel_locations = matx::zipvec(
+    matx::zeros<double>({image_height, image_width}),
+    matx::zeros<double>({image_height, image_width}),
+    matx::zeros<double>({image_height, image_width}));
+  auto range_to_mcp = matx::zeros<double>({num_pulses});
+  auto platform_positions = matx::make_tensor<double3>({num_pulses});
+  platform_positions(0) = double3{0.0, 0.0, 1000.0};
+  auto image = matx::make_tensor<complex_t>({image_height, image_width});
+
+  SarBpParams params;
+  params.compute_type = SarBpComputeType::Double;
+  params.features = SarBpFeature::None;  // skip phase-LUT alloc
+  params.center_frequency = 10.0e9;
+  params.del_r = 1.0;
+
+  auto range_profiles = matx::ones<complex_t>({num_pulses, MAX_RANGE_BINS + 1});
+  EXPECT_NO_THROW({
+    (image = matx::experimental::sar_bp(
+      zero_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, params)).run(this->exec);
+    this->exec.sync();
+  });
+
+  MATX_EXIT_HANDLER();
+}
+
 // Test with a simplified point target. In this case, there is a single reflector at a known position.
 // The range profile data will be populated with the negation of the phase model applied in the backprojector
 // for the two range bins that will be interpolated by the backprojector. Other range bins will be populated with 0.
