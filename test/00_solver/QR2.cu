@@ -127,3 +127,25 @@ TYPED_TEST(QR2SolverTestNonHalfTypes, QR2)
   
   MATX_EXIT_HANDLER();
 }
+
+TYPED_TEST(QR2SolverTestNonHalfTypes, ProjectionAPI)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using SType = typename inner_op_type_t<TestType>::type;
+
+  cudaExecutor exec{};
+  auto A = make_tensor<TestType>({4, 3});
+  auto QR = make_tensor<TestType>({4, 3});
+  auto mdiff = make_tensor<SType>({});
+
+  (A = random<TestType>(A.Shape(), NORMAL)).run(exec);
+
+  auto op = qr(A);
+  (QR = matmul(op.Q, op.R)).run(exec);
+  (mdiff = max(abs(A - QR))).run(exec);
+  exec.sync();
+
+  ASSERT_NEAR(mdiff(), SType(0), SType(0.0001));
+  MATX_EXIT_HANDLER();
+}

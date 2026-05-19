@@ -7,6 +7,10 @@ Perform a singular value decomposition (SVD).
 
 .. versionadded:: 0.6.0
 
+.. note::
+   ``svd`` is not currently supported by CUDA JIT fusion in MatX. The runtime ``libcusolverdx`` code-generation API
+   used by MatX does not expose an SVD routine, so use a normal non-JIT executor path for SVD.
+
 .. doxygenfunction:: svd
 
 Enums

@@ -1,111 +1,214 @@
 .. _executor_compatibility:
 
 Executor Compatibility
-#######################
+######################
 
-MatX's executor design allows for computations to run on different targets while leaving the code unchanged.
-This document outlines the compatibility of various functions with these executors, categorized into two types:
+MatX's executor design allows expressions to run on different targets while leaving user code largely unchanged. This page summarizes
+which public operators are expected to work with each executor family.
 
-1. **Element-wise operations**: These operations can be executed on any executor.
-2. **Transforms**: These invoke library calls (e.g., CUDA libraries or CPU libraries on the host) or use custom kernels.
+.. |yes| replace:: ✅
 
-Note that there can be small differences in results between the Host executor and CUDA executor due to the way floating-point
-arithmetic is performed. Also, on the host, most functions with the exception of reductions support multithreading.
+.. |partial| replace:: 🟧
 
-The following table outlines the compatibility of different transforms with the different executors.
+.. |no| replace:: ❌
 
-.. list-table:: Transform Executor Compatibility Matrix
-  :widths: 10 10 10 10 20
-  :header-rows: 1
-  :class: table-alternating-row-colors
-  
-  * - Transform
-    - Half Precision
-    - Host
-    - GPU
-    - Notes
-  * - fft
-    - GPU only
-    - Yes
-    - Yes
-    - 
-  * - matmul
-    - Yes
-    - Yes
-    - Yes
-    -
-  * - outer
-    - Yes
-    - Yes
-    - Yes
-    - 
-  * - matvec
-    - Yes
-    - Yes
-    - Yes
-    - 
-  * - chol
-    - No
-    - Yes
-    - Yes
-    - 
-  * - lu
-    - No
-    - Yes
-    - Yes
-    - L & U are returned in the lower and upper half of the output respectively
-  * - qr
-    - No
-    - Yes
-    - Yes
-    - Returns householder vectors and scalar factors on host
-  * - eig
-    - No
-    - Yes
-    - Yes
-    - Hermitian/symmetric inputs only
-  * - svd
-    - No
-    - Yes
-    - Yes
-    - Different methods on GPU for smaller matrices
-  * - inv
-    - No
-    - No
-    - Yes
-    - 
-  * - pinv
-    - No
-    - Yes
-    - Yes
-    - 
-  * - det
-    - No
-    - Yes
-    - Yes
-    - 
-  * - trace
-    - No
-    - Yes
-    - Yes
-    - 
-  * - conv/corr
-    - Only for `direct` method
-    - Limited
-    - Yes
-    - Host only supprts 1D convolution using `fft` method
-  * - hist
-    - No
-    - No
-    - Yes
-    - Single-threaded host
-  * - sort
-    - No
-    - Yes
-    - Yes
-    - Single-threaded host
-  * - cumsum
-    - No
-    - Limited
-    - Yes
-    - Host only supports 1 and 2D cumsum and is single-threaded
+Legend:
+
+* |yes| Fully Supported.
+* |partial| Partially supported, or supported with executor-specific limitations described in the notes.
+* |no| Not supported.
+
+Note that there can be small differences in results between host executors and CUDA executors because floating-point arithmetic is
+performed by different libraries and devices. HostExecutor covers SingleThreadedHostExecutor, SelectThreadsHostExecutor, and
+AllThreadsHostExecutor. Host executor support for FFT, BLAS, and solver routines depends on the corresponding CPU backend CMake
+options. Optional backend dependencies such as CPU BLAS, CPU solver libraries, or MathDx requirements are documented in the notes while
+still using |yes| when the operator is supported for that executor. CUDAJITExecutor support means the operator can participate in a
+fused JIT expression; non-JIT CUDA execution through cudaExecutor remains available for the broader CUDA library paths.
+
+.. csv-table:: Operator Executor Compatibility Matrix
+   :header: "Operator", "HostExecutor", "CUDAExecutor", "CUDAJITExecutor", "Notes"
+   :widths: 24 14 10 12 52
+   :class: table-alternating-row-colors
+
+   "abs", "|yes|", "|yes|", "|yes|", "Element-wise expression."
+   "abs2", "|yes|", "|yes|", "|yes|", "Element-wise expression."
+   "acos", "|yes|", "|yes|", "|yes|", "Element-wise expression."
+   "acosh", "|yes|", "|yes|", "|yes|", "Element-wise expression."
+   "all", "|partial|", "|yes|", "|no|", "Reduction transform; host execution is available but reductions are not generally parallelized across host threads."
+   "allclose", "|partial|", "|yes|", "|no|", "Reduction transform with tolerance comparison; host execution is available but reductions are not generally parallelized across host threads."
+   "alternate", "|yes|", "|yes|", "|yes|", "Generator expression."
+   "ambgfun", "|no|", "|yes|", "|no|", "CUDA-only radar transform."
+   "angle", "|yes|", "|yes|", "|yes|", "Element-wise expression."
+   "any", "|partial|", "|yes|", "|no|", "Reduction transform; host execution is available but reductions are not generally parallelized across host threads."
+   "apply", "|yes|", "|yes|", "|partial|", "User callable must be valid for the selected executor; JIT expressions require device/JIT-compatible callable code."
+   "apply_idx", "|yes|", "|yes|", "|partial|", "User callable receives indices and must be valid for the selected executor; JIT expressions require device/JIT-compatible callable code."
+   "argmax", "|partial|", "|yes|", "|no|", "Reduction transform; host execution is available but reductions are not generally parallelized across host threads."
+   "argmin", "|partial|", "|yes|", "|no|", "Reduction transform; host execution is available but reductions are not generally parallelized across host threads."
+   "argminmax", "|partial|", "|yes|", "|no|", "Reduction transform; host execution is available but reductions are not generally parallelized across host threads."
+   "argsort", "|yes|", "|yes|", "|no|", "Sort transform; CUDA path uses device sort support."
+   "as_complex_double", "|yes|", "|yes|", "|yes|", "Cast expression."
+   "as_complex_float", "|yes|", "|yes|", "|yes|", "Cast expression."
+   "as_double", "|yes|", "|yes|", "|yes|", "Cast expression."
+   "as_float", "|yes|", "|yes|", "|yes|", "Cast expression."
+   "as_int16", "|yes|", "|yes|", "|yes|", "Cast expression."
+   "as_int32", "|yes|", "|yes|", "|yes|", "Cast expression."
+   "as_int64", "|yes|", "|yes|", "|yes|", "Cast expression."
+   "as_int8", "|yes|", "|yes|", "|yes|", "Cast expression."
+   "as_type", "|yes|", "|yes|", "|yes|", "Cast expression."
+   "as_uint16", "|yes|", "|yes|", "|yes|", "Cast expression."
+   "as_uint32", "|yes|", "|yes|", "|yes|", "Cast expression."
+   "as_uint64", "|yes|", "|yes|", "|yes|", "Cast expression."
+   "as_uint8", "|yes|", "|yes|", "|yes|", "Cast expression."
+   "asin", "|yes|", "|yes|", "|yes|", "Element-wise expression."
+   "asinh", "|yes|", "|yes|", "|yes|", "Element-wise expression."
+   "atan", "|yes|", "|yes|", "|yes|", "Element-wise expression."
+   "atan2", "|yes|", "|yes|", "|yes|", "Element-wise expression."
+   "atanh", "|yes|", "|yes|", "|yes|", "Element-wise expression."
+   "at", "|yes|", "|yes|", "|yes|", "Indexing/view expression."
+   "bartlett", "|yes|", "|yes|", "|yes|", "Window generator expression."
+   "blackman", "|yes|", "|yes|", "|yes|", "Window generator expression."
+   "cart2sph", "|yes|", "|yes|", "|yes|", "Element-wise coordinate conversion expression."
+   "ceil", "|yes|", "|yes|", "|yes|", "Element-wise expression."
+   "cgsolve", "|no|", "|yes|", "|no|", "CUDA iterative solver path."
+   "channelize_poly", "|no|", "|yes|", "|no|", "CUDA-only polyphase channelizer."
+   "chirp", "|yes|", "|yes|", "|yes|", "Generator expression."
+   "chol", "|yes|", "|yes|", "|yes|", "Host support requires the CPU solver backend. CUDAJITExecutor support uses cuSolverDx through MathDx for supported rank 2-4 square float, double, complex-float, and complex-double matrices."
+   "clone", "|yes|", "|yes|", "|yes|", "View expression."
+   "concat", "|yes|", "|yes|", "|yes|", "View/expression composition."
+   "conj", "|yes|", "|yes|", "|yes|", "Element-wise expression."
+   "conv1d", "|partial|", "|yes|", "|no|", "Direct CUDA convolution is CUDA-only; FFT convolution can use the CPU FFT backend when enabled."
+   "conv2d", "|no|", "|yes|", "|no|", "CUDA-only convolution transform."
+   "copy", "|yes|", "|yes|", "|no|", "Executor-dispatched assignment/copy transform; CUDAJITExecutor fuses expression evaluation instead of using this transform directly."
+   "corr", "|partial|", "|yes|", "|no|", "Correlation transform; host FFT backend may be required depending on mode and input."
+   "cos", "|yes|", "|yes|", "|yes|", "Element-wise expression."
+   "cosh", "|yes|", "|yes|", "|yes|", "Element-wise expression."
+   "cov", "|no|", "|yes|", "|no|", "CUDA-only covariance transform."
+   "cross", "|yes|", "|yes|", "|yes|", "Small vector expression."
+   "cumsum", "|partial|", "|yes|", "|no|", "Scan transform; host execution is available but does not generally use multithreaded host executor paths."
+   "dct", "|no|", "|yes|", "|no|", "CUDA-only DCT transform."
+   "det", "|yes|", "|yes|", "|yes|", "Built from solver functionality; host support requires the CPU solver backend. JIT support follows cuSolverDx matrix type and shape limits."
+   "diag", "|yes|", "|yes|", "|yes|", "Generator/view expression."
+   "downsample", "|yes|", "|yes|", "|yes|", "View/reindex expression."
+   "eig", "|yes|", "|yes|", "|yes|", "Host support requires the CPU solver backend. CUDAJITExecutor supports the cuSolverDx-backed projection path for supported types and shapes."
+   "einsum", "|no|", "|yes|", "|partial|", "CUDA transform. JIT support is available when the expression lowers to supported fused element-wise or matmul-style work."
+   "erf", "|yes|", "|yes|", "|yes|", "Element-wise expression."
+   "exp", "|yes|", "|yes|", "|yes|", "Element-wise expression."
+   "expj", "|yes|", "|yes|", "|yes|", "Element-wise expression."
+   "eye", "|yes|", "|yes|", "|yes|", "Generator expression."
+   "fft", "|yes|", "|yes|", "|yes|", "Host support requires the CPU FFT backend. CUDAJITExecutor support uses cuFFTDx through MathDx for supported runtime shapes, precisions, and layouts."
+   "fft2", "|yes|", "|yes|", "|no|", "Host support requires the CPU FFT backend. Current MathDx JIT fusion is for supported 1D FFT paths."
+   "fftfreq", "|yes|", "|yes|", "|yes|", "Generator expression."
+   "fftshift1D", "|yes|", "|yes|", "|yes|", "View/reindex expression."
+   "fftshift2D", "|yes|", "|yes|", "|yes|", "View/reindex expression."
+   "fill", "|yes|", "|yes|", "|yes|", "Generator expression."
+   "filter", "|no|", "|yes|", "|no|", "CUDA-only filter transform."
+   "find", "|yes|", "|yes|", "|no|", "Search/compaction transform."
+   "find_idx", "|yes|", "|yes|", "|no|", "Search/compaction transform."
+   "find_peaks", "|yes|", "|yes|", "|no|", "Search transform."
+   "flattop", "|yes|", "|yes|", "|yes|", "Window generator expression."
+   "flatten", "|yes|", "|yes|", "|yes|", "View expression."
+   "fliplr", "|yes|", "|yes|", "|yes|", "View/reindex expression."
+   "flipud", "|yes|", "|yes|", "|yes|", "View/reindex expression."
+   "floor", "|yes|", "|yes|", "|yes|", "Element-wise expression."
+   "fmod", "|yes|", "|yes|", "|yes|", "Element-wise expression."
+   "frexp", "|yes|", "|yes|", "|yes|", "Element-wise mantissa/exponent expression."
+   "frexpc", "|yes|", "|yes|", "|yes|", "Element-wise mantissa/exponent expression for complex values."
+   "hamming", "|yes|", "|yes|", "|yes|", "Window generator expression."
+   "hanning", "|yes|", "|yes|", "|yes|", "Window generator expression."
+   "hermitianT", "|yes|", "|yes|", "|yes|", "View/expression composition."
+   "hist", "|no|", "|yes|", "|no|", "CUDA-only histogram transform."
+   "ifft", "|yes|", "|yes|", "|yes|", "Host support requires the CPU FFT backend. CUDAJITExecutor support uses cuFFTDx through MathDx for supported runtime shapes, precisions, and layouts."
+   "ifft2", "|yes|", "|yes|", "|no|", "Host support requires the CPU FFT backend. Current MathDx JIT fusion is for supported 1D FFT paths."
+   "ifftshift1D", "|yes|", "|yes|", "|yes|", "View/reindex expression."
+   "ifftshift2D", "|yes|", "|yes|", "|yes|", "View/reindex expression."
+   "IF", "|yes|", "|yes|", "|yes|", "Conditional expression."
+   "IFELSE", "|yes|", "|yes|", "|yes|", "Conditional expression."
+   "imag", "|yes|", "|yes|", "|yes|", "Element-wise expression."
+   "index", "|yes|", "|yes|", "|yes|", "Index generator expression."
+   "interp1", "|partial|", "|yes|", "|partial|", "Linear interpolation is expression-friendly. Spline interpolation uses CUDA-only transform support."
+   "inv", "|no|", "|yes|", "|yes|", "CUDA solver transform. CUDAJITExecutor support uses cuSolverDx through MathDx for supported rank 2-4 square float, double, complex-float, and complex-double matrices."
+   "isclose", "|yes|", "|yes|", "|yes|", "Element-wise comparison expression."
+   "isinf", "|yes|", "|yes|", "|yes|", "Element-wise predicate expression."
+   "isnan", "|yes|", "|yes|", "|yes|", "Element-wise predicate expression."
+   "kron", "|yes|", "|yes|", "|yes|", "Kronecker product uses matmul-style support where possible; host requires CPU BLAS support for library-backed paths and JIT follows MathDx BLAS limits."
+   "lcollapse", "|yes|", "|yes|", "|yes|", "View expression."
+   "legendre", "|yes|", "|yes|", "|yes|", "Element-wise polynomial expression."
+   "linspace", "|yes|", "|yes|", "|yes|", "Generator expression."
+   "log", "|yes|", "|yes|", "|yes|", "Element-wise expression."
+   "log10", "|yes|", "|yes|", "|yes|", "Element-wise expression."
+   "log2", "|yes|", "|yes|", "|yes|", "Element-wise expression."
+   "logspace", "|yes|", "|yes|", "|yes|", "Generator expression."
+   "lu", "|yes|", "|yes|", "|yes|", "Host support requires the CPU solver backend. CUDAJITExecutor supports cuSolverDx-backed lazy projections for supported types and shapes."
+   "matmul", "|yes|", "|yes|", "|yes|", "Host support requires the CPU BLAS backend and supported floating or complex types. CUDAJITExecutor support uses cuBLASDx through MathDx for supported runtime shapes, precisions, layouts, and block-size intersections."
+   "matrix_norm", "|partial|", "|yes|", "|no|", "Reduction transform; host execution is available but reductions are not generally parallelized across host threads."
+   "matvec", "|yes|", "|yes|", "|yes|", "Host support requires the CPU BLAS backend and supported floating or complex types. CUDAJITExecutor support follows cuBLASDx matmul constraints."
+   "max", "|partial|", "|yes|", "|no|", "Reduction transform; host execution is available but reductions are not generally parallelized across host threads. Element-wise maximum through binary operators remains JIT-compatible."
+   "mean", "|partial|", "|yes|", "|no|", "Reduction/statistics transform; host execution is available but reductions are not generally parallelized across host threads."
+   "median", "|yes|", "|yes|", "|no|", "Sort/statistics transform."
+   "meshgrid", "|yes|", "|yes|", "|yes|", "Generator/view expression."
+   "min", "|partial|", "|yes|", "|no|", "Reduction transform; host execution is available but reductions are not generally parallelized across host threads. Element-wise minimum through binary operators remains JIT-compatible."
+   "mvdr", "|partial|", "|yes|", "|partial|", "Built from solver, BLAS, and expression components; accelerated paths inherit backend and JIT restrictions from those components."
+   "normalize", "|partial|", "|yes|", "|no|", "Reduction-based expression; host execution is available but reductions are not generally parallelized across host threads."
+   "ones", "|yes|", "|yes|", "|yes|", "Generator expression."
+   "outer", "|yes|", "|yes|", "|yes|", "Host support requires the CPU BLAS backend for library-backed paths. CUDAJITExecutor support follows cuBLASDx matmul constraints."
+   "overlap", "|yes|", "|yes|", "|yes|", "View expression."
+   "pad", "|yes|", "|yes|", "|yes|", "View/expression composition."
+   "percentile", "|yes|", "|yes|", "|no|", "Sort/statistics transform."
+   "permute", "|yes|", "|yes|", "|yes|", "View/reindex expression."
+   "pinv", "|yes|", "|yes|", "|no|", "SVD-backed solver transform; host support requires the CPU solver backend. cuSolverDx JIT SVD projection is not currently enabled."
+   "polyval", "|yes|", "|yes|", "|yes|", "Element-wise polynomial evaluation expression."
+   "pow", "|yes|", "|yes|", "|yes|", "Element-wise expression."
+   "prod", "|partial|", "|yes|", "|no|", "Reduction transform; host execution is available but reductions are not generally parallelized across host threads."
+   "pwelch", "|no|", "|yes|", "|no|", "CUDA-only spectral estimation transform."
+   "qr", "|no|", "|yes|", "|yes|", "CUDA solver transform. CUDAJITExecutor supports cuSolverDx-backed lazy projections for supported types and shapes."
+   "qr_econ", "|no|", "|yes|", "|yes|", "CUDA solver transform. CUDAJITExecutor supports cuSolverDx-backed lazy projections for supported types and shapes; the Q projection is limited to non-wide matrices where m >= n."
+   "qr_solver", "|yes|", "|yes|", "|yes|", "Host support requires the CPU solver backend. CUDAJITExecutor supports cuSolverDx-backed lazy projections for supported types and shapes."
+   "r2c", "|yes|", "|yes|", "|yes|", "Real-to-complex view/cast expression."
+   "random", "|yes|", "|yes|", "|no|", "Random generator state is not JIT-fused."
+   "randomi", "|yes|", "|yes|", "|no|", "Random integer generator state is not JIT-fused."
+   "range", "|yes|", "|yes|", "|yes|", "Generator expression."
+   "rcollapse", "|yes|", "|yes|", "|yes|", "View expression."
+   "real", "|yes|", "|yes|", "|yes|", "Element-wise expression."
+   "reduce", "|no|", "|yes|", "|no|", "Generic custom reduction currently uses CUDA reduction support."
+   "remap", "|yes|", "|yes|", "|yes|", "View/reindex expression."
+   "repmat", "|yes|", "|yes|", "|yes|", "View/expression composition."
+   "resample_poly", "|no|", "|yes|", "|no|", "CUDA-only resampling transform."
+   "reshape", "|yes|", "|yes|", "|yes|", "View expression."
+   "reverse", "|yes|", "|yes|", "|yes|", "View/reindex expression."
+   "round", "|yes|", "|yes|", "|yes|", "Element-wise expression."
+   "rsqrt", "|yes|", "|yes|", "|yes|", "Element-wise expression."
+   "sar_bp", "|no|", "|yes|", "|no|", "CUDA-only SAR backprojection transform."
+   "select", "|yes|", "|yes|", "|yes|", "Selection expression."
+   "shift", "|yes|", "|yes|", "|yes|", "View/reindex expression."
+   "sign", "|yes|", "|yes|", "|yes|", "Element-wise expression."
+   "sin", "|yes|", "|yes|", "|yes|", "Element-wise expression."
+   "sincos", "|yes|", "|yes|", "|yes|", "Element-wise expression."
+   "sinh", "|yes|", "|yes|", "|yes|", "Element-wise expression."
+   "slice", "|yes|", "|yes|", "|yes|", "View expression."
+   "softmax", "|no|", "|yes|", "|no|", "CUDA-only reduction-style transform."
+   "solve", "|yes|", "|yes|", "|yes|", "Solver transform; host support requires the CPU solver backend. JIT support follows the underlying cuSolverDx factorization limits when it lowers to a supported solver projection."
+   "sort", "|partial|", "|yes|", "|no|", "Sort transform; host execution is available but does not generally use multithreaded host executor paths."
+   "sph2cart", "|yes|", "|yes|", "|yes|", "Element-wise coordinate conversion expression."
+   "sqrt", "|yes|", "|yes|", "|yes|", "Element-wise expression."
+   "stack", "|yes|", "|yes|", "|yes|", "View/expression composition."
+   "stdd", "|partial|", "|yes|", "|no|", "Reduction/statistics transform; host execution is available but reductions are not generally parallelized across host threads."
+   "sum", "|partial|", "|yes|", "|no|", "Reduction transform; host execution is available but reductions are not generally parallelized across host threads."
+   "svd", "|yes|", "|yes|", "|no|", "Host support requires the CPU solver backend. CUDAJITExecutor SVD projection is not currently enabled."
+   "svdbpi", "|no|", "|yes|", "|no|", "CUDA-only batched power-iteration SVD transform."
+   "svdpi", "|no|", "|yes|", "|no|", "CUDA-only power-iteration SVD transform."
+   "tan", "|yes|", "|yes|", "|yes|", "Element-wise expression."
+   "tanh", "|yes|", "|yes|", "|yes|", "Element-wise expression."
+   "toeplitz", "|yes|", "|yes|", "|yes|", "Generator/expression composition."
+   "trace", "|partial|", "|yes|", "|no|", "Reduction-style matrix transform; host execution is available but reductions are not generally parallelized across host threads."
+   "transpose", "|yes|", "|yes|", "|yes|", "View/reindex expression."
+   "transpose_matrix", "|yes|", "|yes|", "|yes|", "View/reindex expression."
+   "unique", "|yes|", "|yes|", "|no|", "Sort/compaction transform."
+   "unwrap", "|yes|", "|yes|", "|yes|", "Element-wise/reindex expression."
+   "upsample", "|yes|", "|yes|", "|yes|", "View/reindex expression."
+   "var", "|partial|", "|yes|", "|no|", "Reduction/statistics transform; host execution is available but reductions are not generally parallelized across host threads."
+   "vector_norm", "|partial|", "|yes|", "|no|", "Reduction transform; host execution is available but reductions are not generally parallelized across host threads."
+   "zeros", "|yes|", "|yes|", "|yes|", "Generator expression."
+   "zipvec", "|yes|", "|yes|", "|yes|", "Vector packing expression."
+   "arithmetic operators", "|yes|", "|yes|", "|yes|", "Includes unary minus and binary ``+``, ``-``, ``*``, ``/``, and ``%`` element-wise operators."
+   "comparison operators", "|yes|", "|yes|", "|yes|", "Includes ``==``, ``!=``, ``<``, ``<=``, ``>``, and ``>=`` element-wise operators."
+   "logical operators", "|yes|", "|yes|", "|yes|", "Includes element-wise ``!``, ``&&``, ``||``, ``&``, ``|``, and ``^`` operators."

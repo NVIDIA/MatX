@@ -41,8 +41,13 @@
 #include <cuda/std/__algorithm/min.h>
 #include <cuda/std/__algorithm/max.h>
 #include <cuda/std/array>
+#include <cstdint>
+#include <cstdio>
 #include <string>
+#include <string_view>
 #include <set>
+#include <type_traits>
+#include <typeinfo>
 
 namespace matx {
 
@@ -52,6 +57,101 @@ namespace detail {
     std::set<std::string> ltoir_symbols;
     ElementsPerThread ept;
   };
+
+  struct JITCacheKey {
+    uint64_t h1 = 14695981039346656037ull;
+    uint64_t h2 = 1099511628211ull;
+    bool valid = false;
+
+    __MATX_INLINE__ __MATX_HOST__ bool operator==(const JITCacheKey &rhs) const noexcept {
+      return valid == rhs.valid && h1 == rhs.h1 && h2 == rhs.h2;
+    }
+  };
+
+  struct JITCacheKeyHash {
+    __MATX_INLINE__ __MATX_HOST__ std::size_t operator()(const JITCacheKey &key) const noexcept {
+      return static_cast<std::size_t>(key.h1 ^ (key.h2 + 0x9e3779b97f4a7c15ull + (key.h1 << 6) + (key.h1 >> 2)));
+    }
+  };
+
+  __MATX_INLINE__ __MATX_HOST__ JITCacheKey MakeInvalidJITCacheKey() {
+    return {};
+  }
+
+  __MATX_INLINE__ __MATX_HOST__ void HashJITCacheByte(JITCacheKey &key, unsigned char byte) {
+    key.h1 ^= static_cast<uint64_t>(byte);
+    key.h1 *= 1099511628211ull;
+    key.h2 ^= static_cast<uint64_t>(byte) + 0x9e3779b97f4a7c15ull + (key.h2 << 6) + (key.h2 >> 2);
+    key.h2 *= 0xff51afd7ed558ccdull;
+  }
+
+  __MATX_INLINE__ __MATX_HOST__ void HashJITCacheBytes(JITCacheKey &key, const void *data, size_t bytes) {
+    const auto *ptr = static_cast<const unsigned char *>(data);
+    for (size_t i = 0; i < bytes; ++i) {
+      HashJITCacheByte(key, ptr[i]);
+    }
+  }
+
+  __MATX_INLINE__ __MATX_HOST__ void HashJITCacheString(JITCacheKey &key, std::string_view value) {
+    HashJITCacheBytes(key, value.data(), value.size());
+    HashJITCacheByte(key, 0xff);
+  }
+
+  template <typename T>
+  __MATX_INLINE__ __MATX_HOST__ void HashJITCacheValue(JITCacheKey &key, const T &value) {
+    static_assert(std::is_trivially_copyable_v<T>, "JIT cache key values must be trivially copyable");
+    HashJITCacheBytes(key, &value, sizeof(T));
+    HashJITCacheByte(key, 0xfe);
+  }
+
+  template <typename T>
+  __MATX_INLINE__ __MATX_HOST__ void HashJITCacheType(JITCacheKey &key) {
+#if defined(__clang__) || defined(__GNUC__)
+    HashJITCacheString(key, std::string_view{__PRETTY_FUNCTION__});
+#elif defined(_MSC_VER)
+    HashJITCacheString(key, std::string_view{__FUNCSIG__});
+#else
+    HashJITCacheString(key, std::string_view{typeid(T).name()});
+#endif
+  }
+
+  template <typename T>
+  __MATX_INLINE__ __MATX_HOST__ JITCacheKey MakeJITCacheKeyForType(std::string_view tag = {}) {
+    static const auto base_key = []() {
+      auto key = JITCacheKey{};
+      key.valid = true;
+      HashJITCacheString(key, "matx_jit_cache_key_v1");
+      HashJITCacheType<T>(key);
+      return key;
+    }();
+    auto key = base_key;
+    if (!tag.empty()) {
+      HashJITCacheString(key, tag);
+    }
+    return key;
+  }
+
+  __MATX_INLINE__ __MATX_HOST__ JITCacheKey CombineJITCacheKeys(JITCacheKey key, const JITCacheKey &child) {
+    if (!key.valid || !child.valid) {
+      return MakeInvalidJITCacheKey();
+    }
+    HashJITCacheString(key, "child");
+    HashJITCacheValue(key, child.h1);
+    HashJITCacheValue(key, child.h2);
+    return key;
+  }
+
+  __MATX_INLINE__ __MATX_HOST__ std::string JITCacheKeyToHex(const JITCacheKey &key) {
+    char hash_str[33];
+    snprintf(hash_str, sizeof(hash_str), "%016llx%016llx",
+             static_cast<unsigned long long>(key.h1),
+             static_cast<unsigned long long>(key.h2));
+    return std::string(hash_str);
+  }
+
+  __MATX_INLINE__ __MATX_HOST__ std::string JITCacheKeyToFilename(const JITCacheKey &key, std::string_view prefix = "JITKey") {
+    return std::string(prefix) + "_" + JITCacheKeyToHex(key) + ".cubin";
+  }
 
   // Enum for different operator capabilities
   enum class OperatorCapability {
@@ -73,8 +173,11 @@ namespace detail {
     ALIASED_MEMORY, // Whether the operator's input and output pointers alias
     GLOBAL_KERNEL, // Kernel operates entirely on a global level per chunk of data. False when at least one operator works on a block level
     PASS_THROUGH_THREADS, // All threads must call operator() on nested operators; bounds checking done at tensor level
+    PASS_THROUGH_INNER_RANK, // Number of trailing dimensions cooperatively handled by a pass-through block operator
     BLOCK_REDUCES_RANK, // Block-level operator's critical dimension is not part of the output rank
     UNIT_STRIDE_LAST, // Whether all leaf tensors have stride[RANK-1] == 1
+    JIT_CACHE_KEY, // Fixed-size cache key for JIT expressions that can avoid building JIT_TYPE_QUERY on cache hits.
+    VALID_USAGE, // Validate that the expression is semantically usable before launch.
     // Add more capabilities as needed
   };
 
@@ -89,6 +192,7 @@ namespace detail {
     SUM_QUERY,  // Result is the sum of the capabilities of the operator and its children.
     STR_CAT_QUERY,  // Result is the concatenation of the capabilities of the operator and its children.
     RANGE_QUERY,  // Result is the range of the capabilities of the operator and its children.
+    HASH_QUERY,  // Result is a fixed-size fingerprint of the operator and its children.
   };
 
 
@@ -101,6 +205,7 @@ namespace detail {
     static constexpr int osize = 0;
     static constexpr int block_size = 0;
     static constexpr bool pass_through_threads = false;
+    static constexpr int pass_through_inner_rank = 2;
     using scalar_cap = CapabilityParams<ElementsPerThread::ONE, JIT, UNIT_STRIDE_LAST>;
 
     // For JIT there will be other capabilties patched in with a string
@@ -239,6 +344,13 @@ namespace detail {
   };
 
   template <>
+  struct capability_attributes<OperatorCapability::JIT_CACHE_KEY> {
+    using type = JITCacheKey;
+    using input_type = VoidCapabilityType;
+    static inline const JITCacheKey default_value = MakeInvalidJITCacheKey();
+  };
+
+  template <>
   struct capability_attributes<OperatorCapability::DYN_SHM_SIZE> {
     using type = int;
     using input_type = VoidCapabilityType;
@@ -278,6 +390,16 @@ namespace detail {
   };
 
   template <>
+  struct capability_attributes<OperatorCapability::PASS_THROUGH_INNER_RANK> {
+    using type = int;
+    using input_type = VoidCapabilityType;
+    static constexpr int default_value = 2;
+    static constexpr int min_identity = 2;
+    static constexpr int max_identity = 1;
+    static constexpr int sum_identity = 0;
+  };
+
+  template <>
   struct capability_attributes<OperatorCapability::BLOCK_REDUCES_RANK> {
     using type = bool;
     using input_type = VoidCapabilityType;
@@ -298,17 +420,37 @@ namespace detail {
     static constexpr bool and_identity = true;
   };
 
+  template <>
+  struct capability_attributes<OperatorCapability::VALID_USAGE> {
+    using type = bool;
+    using input_type = VoidCapabilityType;
+    static constexpr bool default_value = true;
+    static constexpr bool or_identity = false;
+    static constexpr bool and_identity = true;
+  };
+
 
   template <OperatorCapability Cap, typename OperatorType, typename InType>
   __MATX_INLINE__ __MATX_HOST__ typename capability_attributes<Cap>::type
   get_operator_capability(const OperatorType& op, InType& in) {
     static_assert(std::is_same_v<remove_cvref_t<InType>, typename capability_attributes<Cap>::input_type>, "Input type mismatch");
     if constexpr (is_matx_jit_class<OperatorType>) {
-      return op.template get_capability<Cap, InType>(in);
+      if constexpr (requires { op.template get_capability<Cap, InType>(in); }) {
+        return op.template get_capability<Cap, InType>(in);
+      }
+      else if constexpr (requires { op.template get_capability<Cap>(); }) {
+        return op.template get_capability<Cap>();
+      }
+      else {
+        return capability_attributes<Cap>::default_value;
+      }
     } else {
       // Default capabilities for non-MatX ops
       if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
         return detail::type_to_string<OperatorType>();
+      }
+      else if constexpr (Cap == OperatorCapability::JIT_CACHE_KEY) {
+        return detail::MakeJITCacheKeyForType<OperatorType>();
       }
       else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
         // If this is not a matx operator (like a constant or a lambda), we assume it supports JIT.
@@ -366,10 +508,16 @@ namespace detail {
         return CapabilityQueryType::AND_QUERY; // The expression should generate LTOIR code if all its children generate it.
       case OperatorCapability::PASS_THROUGH_THREADS:
         return CapabilityQueryType::OR_QUERY; // If ANY operator needs pass-through, all threads must call operator()
+      case OperatorCapability::PASS_THROUGH_INNER_RANK:
+        return CapabilityQueryType::MAX_QUERY; // Use the widest cooperative trailing rank in the expression.
       case OperatorCapability::BLOCK_REDUCES_RANK:
         return CapabilityQueryType::OR_QUERY; // If ANY operator reduces rank, use the reduced-rank block kernel.
       case OperatorCapability::UNIT_STRIDE_LAST:
         return CapabilityQueryType::AND_QUERY; // All leaf tensors must have stride[RANK-1] == 1
+      case OperatorCapability::JIT_CACHE_KEY:
+        return CapabilityQueryType::HASH_QUERY; // Build a fixed-size fingerprint of the expression tree.
+      case OperatorCapability::VALID_USAGE:
+        return CapabilityQueryType::AND_QUERY; // Validate all operators in an expression tree.
       default:
         // Default to OR_QUERY or handle as an error/assertion if a capability isn't mapped.
         return CapabilityQueryType::OR_QUERY;
@@ -415,6 +563,8 @@ namespace detail {
         MATX_IGNORE_WARNING_POP_GCC
       } else if constexpr (std::is_same_v<CapType, std::string>) {
         children_aggregated_val = capability_attributes<Cap>::default_value;
+      } else if constexpr (std::is_same_v<CapType, JITCacheKey>) {
+        children_aggregated_val = MakeJITCacheKeyForType<void>("children");
       } else {
         // Fallback for other types, should be defined in capability_attributes
         children_aggregated_val = capability_attributes<Cap>::default_value;
@@ -454,6 +604,13 @@ namespace detail {
         if (query_type == CapabilityQueryType::STR_CAT_QUERY) {
           children_aggregated_val = capability_attributes<Cap>::default_value;
           ((children_aggregated_val += child_vals), ...);
+        } else {
+          children_aggregated_val = capability_attributes<Cap>::default_value;
+        }
+      } else if constexpr (std::is_same_v<CapType, JITCacheKey>) {
+        if (query_type == CapabilityQueryType::HASH_QUERY) {
+          children_aggregated_val = MakeJITCacheKeyForType<void>("children");
+          ((children_aggregated_val = CombineJITCacheKeys(children_aggregated_val, child_vals)), ...);
         } else {
           children_aggregated_val = capability_attributes<Cap>::default_value;
         }
@@ -527,6 +684,13 @@ namespace detail {
         } else {
             MATX_ASSERT_STR(false, matxInvalidParameter, "Not implemented for other query types.");
             return self_val;
+        }
+    } else if constexpr (std::is_same_v<CapType, JITCacheKey>) {
+        if (query_type == CapabilityQueryType::HASH_QUERY) {
+          return CombineJITCacheKeys(self_val, children_aggregated_val);
+        } else {
+          MATX_ASSERT_STR(false, matxInvalidParameter, "Not implemented for other query types.");
+          return self_val;
         }
     } else {
         // Handle RANGE_QUERY for cuda::std::array<T, 2> types

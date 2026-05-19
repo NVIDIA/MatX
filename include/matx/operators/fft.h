@@ -186,9 +186,9 @@ namespace matx
             int major = 0;
             int minor = 0;
             int device;
-            cudaGetDevice(&device);            
-            cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device);
-            cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device);
+            MATX_CUDA_CHECK(cudaGetDevice(&device));
+            MATX_CUDA_CHECK(cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device));
+            MATX_CUDA_CHECK(cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device));
             int cc = major * 100 + minor * 10;
             dx_fft_helper_.set_fft_size(fft_size_);
             dx_fft_helper_.set_fft_type(DeduceFFTTransformType<typename scalar_to_complex<typename OpA::value_type>::ctype, value_type>());

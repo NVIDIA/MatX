@@ -88,6 +88,15 @@ namespace matx
           return std::format("JITSlice_{}", params_str);
         }
 
+        __MATX_INLINE__ std::string get_jit_stride_type_name() const {
+          if constexpr (std::is_same_v<StrideType, NoStride>) {
+            return "matx::detail::NoStride";
+          }
+          else {
+            return std::format("cuda::std::array<matx::index_t, {}>", T::Rank());
+          }
+        }
+
         __MATX_INLINE__ auto get_jit_op_str() const {
           std::string func_name = get_jit_class_name();
           const int actual_input_rank = detail::get_dyn_rank(op_);
@@ -223,7 +232,7 @@ namespace matx
           if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
 #ifdef MATX_EN_JIT
             const auto op_jit_name = detail::get_operator_capability<Cap>(op_, in);
-            return std::format("{}<{}>", get_jit_class_name(), op_jit_name);
+            return std::format("{}<{},{}>", get_jit_class_name(), op_jit_name, get_jit_stride_type_name());
 #else
             return "";
 #endif

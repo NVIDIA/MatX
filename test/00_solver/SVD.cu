@@ -82,8 +82,78 @@ template <typename TensorType>
 class SVDPISolverTestNonHalfTypes : public SVDTest<TensorType> {
 };
 
+template <typename TensorType>
+class SVDProjectionSolverTestNonHalfTypes : public SVDTest<TensorType> {
+};
+
 TYPED_TEST_SUITE(SVDSolverTestNonHalfTypes, MatXFloatNonHalfTypesAllExecs);
 TYPED_TEST_SUITE(SVDPISolverTestNonHalfTypes, MatXFloatNonHalfTypesCUDAExec);
+TYPED_TEST_SUITE(SVDProjectionSolverTestNonHalfTypes, MatXFloatNonHalfTypesCUDAExec);
+
+#if defined(MATX_EN_MATHDX) && defined(MATX_EN_JIT)
+template <typename TensorType>
+class SVDSolverJITTestNonHalfTypes : public ::testing::Test {
+};
+
+TYPED_TEST_SUITE(SVDSolverJITTestNonHalfTypes, MatXFloatNonHalfTypesCUDAExec);
+
+TYPED_TEST(SVDSolverJITTestNonHalfTypes, CuSolverDxSingleMatrixRejectsProjectionJIT)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using value_type = typename inner_op_type_t<TestType>::type;
+
+  constexpr index_t rows = 4;
+  constexpr index_t cols = 3;
+  constexpr index_t k = std::min(rows, cols);
+  auto A = make_tensor<TestType>({rows, cols});
+  auto U = make_tensor<TestType>({rows, k});
+  auto S = make_tensor<value_type>({k});
+  auto VT = make_tensor<TestType>({k, cols});
+  auto op = svd(A, SVDMode::REDUCED);
+
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op));
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.U));
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.S));
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.VT));
+
+  CUDAJITExecutor exec{};
+  EXPECT_THROW({ (U = op.U).run(exec); }, matx::detail::matxException);
+  EXPECT_THROW({ (S = op.S).run(exec); }, matx::detail::matxException);
+  EXPECT_THROW({ (VT = op.VT).run(exec); }, matx::detail::matxException);
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(SVDSolverJITTestNonHalfTypes, CuSolverDxBatchedMatrixRejectsProjectionJIT)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using value_type = typename inner_op_type_t<TestType>::type;
+
+  constexpr index_t batches = 3;
+  constexpr index_t rows = 4;
+  constexpr index_t cols = 3;
+  constexpr index_t k = std::min(rows, cols);
+  auto A = make_tensor<TestType>({batches, rows, cols});
+  auto U = make_tensor<TestType>({batches, rows, k});
+  auto S = make_tensor<value_type>({batches, k});
+  auto VT = make_tensor<TestType>({batches, k, cols});
+  auto op = svd(A, SVDMode::REDUCED);
+
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op));
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.U));
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.S));
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.VT));
+
+  CUDAJITExecutor exec{};
+  EXPECT_THROW({ (U = op.U).run(exec); }, matx::detail::matxException);
+  EXPECT_THROW({ (S = op.S).run(exec); }, matx::detail::matxException);
+  EXPECT_THROW({ (VT = op.VT).run(exec); }, matx::detail::matxException);
+
+  MATX_EXIT_HANDLER();
+}
+#endif
 
 template <typename T>
 T MakeSVDTestValue(double value)
@@ -113,6 +183,66 @@ TEST(SVDInternalTests, CUDASelectsExpectedSVDMethods)
             static_cast<int>(detail::SVDMethod::GESVD));
   EXPECT_EQ(static_cast<int>(detail::GetCUDASVDMethod(generated_batched)),
             static_cast<int>(detail::SVDMethod::GESVDJ_BATCHED));
+}
+
+TYPED_TEST(SVDProjectionSolverTestNonHalfTypes, ProjectionAPI)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using value_type = typename inner_op_type_t<TestType>::type;
+
+  constexpr index_t m = 8;
+  constexpr index_t n = 5;
+
+  auto A = make_tensor<TestType>({m, n});
+  auto UDVT = make_tensor<TestType>({m, n});
+  auto mdiff = make_tensor<value_type>({});
+
+  (A = random<TestType>(A.Shape(), NORMAL)).run(this->exec);
+
+  auto op = svd(A, SVDMode::REDUCED);
+  (UDVT = matmul(matmul(op.U, diag(as_type<TestType>(op.S))), op.VT)).run(this->exec);
+  (mdiff = max(abs(A - UDVT))).run(this->exec);
+  this->exec.sync();
+
+  ASSERT_NEAR(mdiff(), value_type(0), value_type(0.001));
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(SVDProjectionSolverTestNonHalfTypes, ProjectionModeNoneRejectsVectorOutputs)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using value_type = typename inner_op_type_t<TestType>::type;
+
+  constexpr index_t m = 8;
+  constexpr index_t n = 5;
+  constexpr index_t k = cuda::std::min(m, n);
+
+  auto A = make_tensor<TestType>({m, n});
+  auto S = make_tensor<value_type>({k});
+  auto SRef = make_tensor<value_type>({k});
+  auto U = make_tensor<TestType>({m, m});
+  auto VT = make_tensor<TestType>({n, n});
+  auto URef = make_tensor<TestType>({m, k});
+  auto VTRef = make_tensor<TestType>({k, n});
+  auto UPlus = make_tensor<TestType>({m, m});
+  auto mdiff = make_tensor<value_type>({});
+
+  (A = random<TestType>(A.Shape(), NORMAL)).run(this->exec);
+
+  auto op = svd(A, SVDMode::NONE);
+  (S = op.S).run(this->exec);
+  (mtie(URef, SRef, VTRef) = svd(A, SVDMode::REDUCED)).run(this->exec);
+  (mdiff = max(abs(S - SRef))).run(this->exec);
+  this->exec.sync();
+
+  ASSERT_NEAR(mdiff(), value_type(0), value_type(0.001));
+  EXPECT_THROW({ (U = op.U).run(this->exec); }, matx::detail::matxException);
+  EXPECT_THROW({ (VT = op.VT).run(this->exec); }, matx::detail::matxException);
+  EXPECT_THROW({ (UPlus = op.U + TestType{}).run(this->exec); }, matx::detail::matxException);
+
+  MATX_EXIT_HANDLER();
 }
 
 TYPED_TEST(SVDSolverTestNonHalfTypes, SVDBasic)

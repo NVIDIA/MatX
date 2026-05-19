@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright (c) 2021, NVIDIA CORPORATION.
+# Copyright (c) 2021-2026, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,84 +14,25 @@
 # limitations under the License.
 #=============================================================================
 
-#[=======================================================================[.rst:
-FindMathDx
---------
-
-Find MathDx
-
-Imported targets
-^^^^^^^^^^^^^^^^
-
-This module defines the following :prop_tgt:`IMPORTED` target(s):
-
-``MathDx::MathDx``
-  The MathDx library, if found.
-
-Result variables
-^^^^^^^^^^^^^^^^
-
-This module will set the following variables in your project:
-
-``MathDx_FOUND``
-  True if MathDx is found.
-``MathDx_INCLUDE_DIRS``
-  The include directories needed to use MathDx.
-``MathDx_VERSION_STRING``
-  The version of the MathDx library found. [OPTIONAL]
-
-#]=======================================================================]
 set(MathDx_VERSION_FULL ${MathDx_VERSION}.${MathDx_NANO})
 
-# Prefer using a Config module if it exists for this project
-set(MathDx_NO_CONFIG FALSE)
-if(NOT MathDx_NO_CONFIG)
-  find_package(MathDx CONFIG QUIET HINTS ${MathDx_DIR})
-  if(MathDx_FOUND)
-    find_package_handle_standard_args(MathDx DEFAULT_MSG MathDx_CONFIG)
-    return()
-  endif()
+if(NOT CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL 13.0)
+  message(FATAL_ERROR "MATX_EN_MATHDX requires CUDA 13.0 or newer for MathDx ${MathDx_VERSION_FULL}")
 endif()
 
-find_path(MathDx_INCLUDE_DIR NAMES MathDx.h)
+set(MATHDX_CUDA_VERSION "cuda13")
+set(MATHDX_CUDA_SUFFIX "cuda13.0")
 
-# Search for the MathDx library
-find_library(MathDx_LIBRARY 
-  NAMES MathDx mathdx
-  HINTS ${MathDx_DIR}
-  PATH_SUFFIXES lib lib64
+message(STATUS "Using MathDx ${MathDx_VERSION_FULL} (${MATHDX_CUDA_VERSION})")
+message(STATUS "Using libmathdx ${LIBMATHDX_VERSION} (${MATHDX_CUDA_VERSION})")
+
+CPMAddPackage(
+  NAME MathDx
+  VERSION ${MathDx_VERSION_FULL}
+  URL https://developer.nvidia.com/downloads/compute/cuSOLVERDx/redist/cuSOLVERDx/${MATHDX_CUDA_VERSION}/nvidia-mathdx-${MathDx_VERSION_FULL}-${MATHDX_CUDA_VERSION}.tar.gz
+  DOWNLOAD_ONLY YES
 )
 
-include(${CMAKE_ROOT}/Modules/FindPackageHandleStandardArgs.cmake)
-
-find_package_handle_standard_args(MathDx
-                                  REQUIRED_VARS MathDx_LIBRARY MathDx_INCLUDE_DIR
-                                  VERSION_VAR )
-
-if(NOT MathDx_FOUND)
-  set(MathDx_FILENAME libMathDx-linux-x86_64-${MathDx_VERSION}-archive)
-
-  message(STATUS "MathDx not found. Downloading library. By continuing this download you accept to the license terms of MathDx")
-
-  CPMAddPackage(
-    NAME MathDx
-    VERSION ${MathDx_VERSION}
-    URL https://developer.download.nvidia.com/compute/cuFFTDx/redist/cuFFTDx/nvidia-mathdx-${MathDx_VERSION_FULL}.tar.gz
-    DOWNLOAD_ONLY YES 
-  )
-endif()
-
-# Download libmathdx based on CUDA version and platform
-# Detect CUDA version (12 or 13)
-if(CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL 13.0)
-  set(LIBMATHDX_CUDA_VERSION "cuda13")
-  set(LIBMATHDX_CUDA_SUFFIX "cuda13.0")
-else()
-  set(LIBMATHDX_CUDA_VERSION "cuda12")
-  set(LIBMATHDX_CUDA_SUFFIX "cuda12.0")
-endif()
-
-# Detect platform
 if(WIN32)
   set(LIBMATHDX_PLATFORM "win32-x86_64")
   set(LIBMATHDX_EXT "zip")
@@ -103,63 +44,51 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   endif()
   set(LIBMATHDX_EXT "tar.gz")
 else()
-  message(WARNING "Unsupported platform for libmathdx download")
+  message(FATAL_ERROR "Unsupported platform for libmathdx download")
 endif()
 
-# Set libmathdx version
-set(LIBMATHDX_VERSION "0.2.3")
+set(LIBMATHDX_URL "https://developer.nvidia.com/downloads/compute/cublasdx/redist/cublasdx/${MATHDX_CUDA_VERSION}/libmathdx-${LIBMATHDX_PLATFORM}-${LIBMATHDX_VERSION}-${MATHDX_CUDA_SUFFIX}.${LIBMATHDX_EXT}")
 
-# Download libmathdx if platform is supported
-if(DEFINED LIBMATHDX_PLATFORM)
-  set(LIBMATHDX_URL "https://developer.nvidia.com/downloads/compute/cublasdx/redist/cublasdx/${LIBMATHDX_CUDA_VERSION}/libmathdx-${LIBMATHDX_PLATFORM}-${LIBMATHDX_VERSION}-${LIBMATHDX_CUDA_SUFFIX}.${LIBMATHDX_EXT}")
-  
-  message(STATUS "Downloading libmathdx for ${LIBMATHDX_PLATFORM} with ${LIBMATHDX_CUDA_VERSION}")
-  message(STATUS "libmathdx URL: ${LIBMATHDX_URL}")
-  
-  CPMAddPackage(
-    NAME libmathdx
-    VERSION ${LIBMATHDX_VERSION}
-    URL ${LIBMATHDX_URL}
-    DOWNLOAD_ONLY YES
-  )
-  
-  # Add libmathdx to the search paths
-  set(LIBMATHDX_ROOT "${PROJECT_BINARY_DIR}/_deps/libmathdx-src")
-  list(APPEND CMAKE_PREFIX_PATH "${LIBMATHDX_ROOT}")
-  
-  # Find libmathdx library file
-  find_library(LIBMATHDX_LIBRARY
-    NAMES mathdx libmathdx
-    PATHS "${LIBMATHDX_ROOT}/lib"
-    NO_DEFAULT_PATH
-  )
-  
-  # Set include directories (in both local and parent scope)
-  set(LIBMATHDX_INCLUDE_DIR "${LIBMATHDX_ROOT}/include")
-  set(LIBMATHDX_INCLUDE_DIR "${LIBMATHDX_INCLUDE_DIR}" PARENT_SCOPE)
-  
-  if(LIBMATHDX_LIBRARY AND EXISTS ${LIBMATHDX_INCLUDE_DIR})
-    message(STATUS "Found libmathdx library: ${LIBMATHDX_LIBRARY}")
-    message(STATUS "Found libmathdx include dir: ${LIBMATHDX_INCLUDE_DIR}")
-    
-    # Create libmathdx target
-    if(NOT TARGET libmathdx::libmathdx)
-      add_library(libmathdx::libmathdx INTERFACE IMPORTED)
-      set_target_properties(libmathdx::libmathdx PROPERTIES
-        INTERFACE_INCLUDE_DIRECTORIES "${LIBMATHDX_INCLUDE_DIR}"
-        INTERFACE_LINK_LIBRARIES "${LIBMATHDX_LIBRARY}"
-      )
-    endif()
-  else()
-    message(WARNING "Could not find libmathdx library or include directory after download")
-  endif()
-endif()
+message(STATUS "libmathdx URL: ${LIBMATHDX_URL}")
 
-find_package(mathdx REQUIRED COMPONENTS cufftdx CONFIG
-PATHS
-    "${PROJECT_BINARY_DIR}/_deps/mathdx-src/nvidia/mathdx/${MathDx_VERSION}/lib/cmake/mathdx/"
-    "${PROJECT_BINARY_DIR}/_deps/libmathdx-src/lib/cmake/libmathdx/"
-    "${PROJECT_BINARY_DIR}/_deps/libmathdx-src"
-    "/opt/nvidia/mathdx/${MathDx_VERSION_FULL}"
+CPMAddPackage(
+  NAME libmathdx
+  VERSION ${LIBMATHDX_VERSION}
+  URL ${LIBMATHDX_URL}
+  DOWNLOAD_ONLY YES
 )
 
+set(MATX_MATHDX_ROOT "${PROJECT_BINARY_DIR}/_deps/mathdx-src/nvidia/mathdx/${MathDx_VERSION}")
+set(MATHDX_INCLUDE_DIR "${MATX_MATHDX_ROOT}/include")
+set(MATHDX_CUTLASS_INCLUDE_DIR "${MATX_MATHDX_ROOT}/external/cutlass/include")
+set(LIBMATHDX_ROOT "${PROJECT_BINARY_DIR}/_deps/libmathdx-src")
+set(LIBMATHDX_INCLUDE_DIR "${LIBMATHDX_ROOT}/include")
+
+find_library(LIBMATHDX_LIBRARY
+  NAMES mathdx libmathdx
+  PATHS "${LIBMATHDX_ROOT}/lib"
+  NO_DEFAULT_PATH
+)
+
+if(NOT LIBMATHDX_LIBRARY OR NOT EXISTS "${LIBMATHDX_INCLUDE_DIR}/libmathdx.h")
+  message(FATAL_ERROR "Could not find libmathdx ${LIBMATHDX_VERSION} library or headers after download")
+endif()
+
+if(NOT TARGET libmathdx::libmathdx)
+  add_library(libmathdx::libmathdx INTERFACE IMPORTED)
+  set_target_properties(libmathdx::libmathdx PROPERTIES
+    INTERFACE_INCLUDE_DIRECTORIES "${LIBMATHDX_INCLUDE_DIR}"
+    INTERFACE_LINK_LIBRARIES "${LIBMATHDX_LIBRARY}"
+  )
+endif()
+
+set(cublasdx_CUTLASS_ROOT "${MATX_MATHDX_ROOT}/external/cutlass")
+set(cusolverdx_CUTLASS_ROOT "${MATX_MATHDX_ROOT}/external/cutlass")
+
+find_package(mathdx REQUIRED COMPONENTS cufftdx cublasdx cusolverdx CONFIG
+  PATHS
+    "${MATX_MATHDX_ROOT}/lib/cmake/mathdx"
+    "/opt/nvidia/mathdx/${MathDx_VERSION}"
+)
+
+set(MATHDX_ROOT "${MATX_MATHDX_ROOT}")

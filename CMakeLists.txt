@@ -159,6 +159,9 @@ rapids_cpm_cccl(
 )
 
 target_link_libraries(matx INTERFACE CCCL::CCCL)
+if(CCCL_SOURCE_DIR)
+    target_compile_definitions(matx INTERFACE MATX_CCCL_SOURCE_DIR="${CCCL_SOURCE_DIR}")
+endif()
 
 # Set flags for compiling tests faster (only for nvcc)
 if (NOT CMAKE_CUDA_COMPILER_ID STREQUAL "Clang")
@@ -364,13 +367,28 @@ if (MATX_EN_JIT OR MATX_EN_MATHDX)
     
     # Link NVRTC library
     target_link_libraries(matx INTERFACE CUDA::nvrtc)
+    if(TARGET CUDA::nvJitLink)
+        target_link_libraries(matx INTERFACE CUDA::nvJitLink)
+    endif()
 endif()
 
 if (MATX_EN_MATHDX)
-    set(MathDx_VERSION 25.06)
+    set(MathDx_VERSION 26.03)
     set(MathDx_NANO 0)
+    set(LIBMATHDX_VERSION 0.3.2)
     include(cmake/FindMathDx.cmake)
     target_compile_definitions(matx INTERFACE MATX_EN_MATHDX)
+    target_compile_definitions(matx INTERFACE
+        MATX_MATHDX_INCLUDE_DIR="${MATHDX_INCLUDE_DIR}"
+        MATX_MATHDX_CUTLASS_INCLUDE_DIR="${MATHDX_CUTLASS_INCLUDE_DIR}"
+        MATX_LIBMATHDX_INCLUDE_DIR="${LIBMATHDX_INCLUDE_DIR}"
+    )
+    if(EXISTS "${MATHDX_ROOT}/lib/libcusolverdx.fatbin")
+        target_compile_definitions(matx INTERFACE MATX_CUSOLVERDX_FATBIN="${MATHDX_ROOT}/lib/libcusolverdx.fatbin")
+    endif()
+    if(EXISTS "${MATHDX_ROOT}/lib/libcusolverdx.a")
+        target_compile_definitions(matx INTERFACE MATX_CUSOLVERDX_LIBRARY="${MATHDX_ROOT}/lib/libcusolverdx.a")
+    endif()
     
     # Link libmathdx if available
     if(TARGET libmathdx::libmathdx)
@@ -379,7 +397,7 @@ if (MATX_EN_MATHDX)
     endif()
     
     # Link mathdx components
-    target_link_libraries(matx INTERFACE mathdx::cufftdx)
+    target_link_libraries(matx INTERFACE mathdx::cufftdx mathdx::cublasdx_no_lto mathdx::cusolverdx)
 endif()
 
 if (MATX_EN_CUDSS)

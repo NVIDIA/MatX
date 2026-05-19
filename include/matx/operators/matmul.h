@@ -186,9 +186,9 @@ namespace matx
           int major = 0;
           int minor = 0;
           int device;
-          cudaGetDevice(&device);
-          cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device);
-          cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device);
+          MATX_CUDA_CHECK(cudaGetDevice(&device));
+          MATX_CUDA_CHECK(cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device));
+          MATX_CUDA_CHECK(cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device));
           int cc = major * 100 + minor * 10;  // Compute capability as __CUDA_ARCH__ digits (e.g., 890 for SM 8.9)
           
           dx_gemm_helper_.set_m(a_.Size(OpA::Rank() - 2));
@@ -287,6 +287,28 @@ namespace matx
             MATX_LOG_DEBUG("cuBLASDx JIT_TYPE_QUERY: {}", result);
             return result;
           }
+          else if constexpr (Cap == OperatorCapability::JIT_CACHE_KEY) {
+#ifdef MATX_EN_JIT
+            auto key = detail::MakeJITCacheKeyForType<self_type>("JITMatMul");
+            const int actual_rank = jit_rank();
+            detail::HashJITCacheValue(key, actual_rank);
+            detail::HashJITCacheValue(key, dx_gemm_helper_.get_m());
+            detail::HashJITCacheValue(key, dx_gemm_helper_.get_n());
+            detail::HashJITCacheValue(key, dx_gemm_helper_.get_k());
+            const bool is_complex = dx_gemm_helper_.get_is_complex();
+            detail::HashJITCacheValue(key, is_complex);
+            detail::HashJITCacheValue(key, alpha_);
+            detail::HashJITCacheValue(key, beta_);
+            for (int i = 0; i < actual_rank; ++i) {
+              detail::HashJITCacheValue(key, out_dims_[i]);
+            }
+            return combine_capabilities<Cap>(key,
+                                             detail::get_operator_capability<Cap>(a_, in),
+                                             detail::get_operator_capability<Cap>(b_, in));
+#else
+            return detail::MakeInvalidJITCacheKey();
+#endif
+          }
           else if constexpr (Cap == OperatorCapability::GLOBAL_KERNEL) {
             // If MathDx is enabled we always return false. Other checks on size and type may prevent JIT compilation.
             MATX_LOG_DEBUG("cuBLASDx GLOBAL_KERNEL: false");
@@ -296,6 +318,9 @@ namespace matx
             // cuBLASDx needs all threads to call operator() for block-level cooperation
             MATX_LOG_DEBUG("cuBLASDx PASS_THROUGH_THREADS: true");
             return true;
+          }
+          else if constexpr (Cap == OperatorCapability::PASS_THROUGH_INNER_RANK) {
+            return 2;
           }
           else if constexpr (Cap == OperatorCapability::GROUPS_PER_BLOCK) {
             // 2D block operators only support one group per block

@@ -35,8 +35,47 @@
 #include "test_types.h"
 #include "utilities.h"
 #include "gtest/gtest.h"
+#include <algorithm>
+#include <cmath>
 
 using namespace matx;
+
+namespace {
+template <typename T>
+__MATX_INLINE__ T InvJITValue(double real, double imag = 0.0)
+{
+  if constexpr (cuda::std::is_same_v<T, cuda::std::complex<float>>) {
+    return T{static_cast<float>(real), static_cast<float>(imag)};
+  }
+  else if constexpr (cuda::std::is_same_v<T, cuda::std::complex<double>>) {
+    return T{real, imag};
+  }
+  else {
+    return static_cast<T>(real);
+  }
+}
+
+template <typename T>
+double InvJITAbsDiff(const T &a, const T &b)
+{
+  if constexpr (is_complex_v<T>) {
+    return std::max(std::abs(static_cast<double>(a.real() - b.real())),
+                    std::abs(static_cast<double>(a.imag() - b.imag())));
+  }
+  else {
+    return std::abs(static_cast<double>(a - b));
+  }
+}
+
+template <typename T, typename TensorType>
+void FillInvJITMatrix2x2(TensorType &A)
+{
+  A(0, 0) = InvJITValue<T>(4.0, 0.25);
+  A(0, 1) = InvJITValue<T>(7.0, -0.5);
+  A(1, 0) = InvJITValue<T>(2.0, 0.125);
+  A(1, 1) = InvJITValue<T>(6.0, 0.375);
+}
+}
 
 template <typename T> class InvSolverTest : public ::testing::Test {
   using GTestType = cuda::std::tuple_element_t<0, T>;
@@ -60,6 +99,201 @@ class InvSolverTestFloatTypes : public InvSolverTest<TensorType> {
 
 TYPED_TEST_SUITE(InvSolverTestFloatTypes,
   MatXFloatNonHalfTypesCUDAExec);
+
+#if defined(MATX_EN_MATHDX) && defined(MATX_EN_JIT)
+template <typename TensorType>
+class InvSolverJITTestFloatTypes : public ::testing::Test {
+};
+
+TYPED_TEST_SUITE(InvSolverJITTestFloatTypes,
+  MatXFloatNonHalfTypesCUDAExec);
+
+TEST(InvSolverJITRegression, SelectsPassThroughBlockDimFromIntersection)
+{
+  EXPECT_EQ(detail::SelectJITPassThroughBlockDim(cuda::std::array<int, 2>{64, 64}), 64);
+  EXPECT_EQ(detail::SelectJITPassThroughBlockDim(cuda::std::array<int, 2>{32, 1024}), 256);
+  EXPECT_EQ(detail::SelectJITPassThroughBlockDim(cuda::std::array<int, 2>{512, 1024}), 512);
+  EXPECT_THROW({ detail::SelectJITPassThroughBlockDim(cuda::std::array<int, 2>{128, 64}); },
+               matx::detail::matxException);
+}
+
+TYPED_TEST(InvSolverJITTestFloatTypes, CuSolverDxRuntimeQueries)
+{
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+
+  auto A = make_tensor<TestType>({2, 2});
+  auto op = inv(A);
+
+  EXPECT_TRUE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op));
+  EXPECT_GE(detail::get_operator_capability<detail::OperatorCapability::DYN_SHM_SIZE>(op),
+            static_cast<int>(2 * 4 * sizeof(TestType) + 3 * sizeof(int)));
+
+  const auto block_dim = detail::get_operator_capability<detail::OperatorCapability::BLOCK_DIM>(op);
+  EXPECT_EQ(block_dim[0], 32);
+  EXPECT_EQ(block_dim[1], 1024);
+}
+
+TYPED_TEST(InvSolverJITTestFloatTypes, CuSolverDxMatchesCudaPath)
+{
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+
+  auto A_jit = make_tensor<TestType>({2, 2});
+  auto A_cuda = make_tensor<TestType>({2, 2});
+  auto O_jit = make_tensor<TestType>({2, 2});
+  auto O_cuda = make_tensor<TestType>({2, 2});
+
+  FillInvJITMatrix2x2<TestType>(A_jit);
+  (A_cuda = A_jit).run(cudaExecutor{});
+
+  CUDAJITExecutor jit_exec{};
+  cudaExecutor cuda_exec{};
+  (O_jit = inv(A_jit)).run(jit_exec);
+  (O_cuda = inv(A_cuda)).run(cuda_exec);
+  jit_exec.sync();
+  cuda_exec.sync();
+
+  for (index_t i = 0; i < 2; i++) {
+    for (index_t j = 0; j < 2; j++) {
+      ASSERT_NEAR(InvJITAbsDiff(O_jit(i, j), O_cuda(i, j)), 0.0, 1e-4);
+    }
+  }
+}
+
+TEST(InvSolverJITRegression, CuSolverDxMultipleSizesInOneJITExpression)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = float;
+
+  auto A2 = make_tensor<TestType>({2, 2});
+  auto A3 = make_tensor<TestType>({3, 3});
+  auto Out = make_tensor<TestType>({2, 2});
+  auto Ref = make_tensor<TestType>({2, 2});
+  auto mdiff = make_tensor<TestType>({});
+
+  A2(0, 0) = TestType{4};
+  A2(0, 1) = TestType{1};
+  A2(1, 0) = TestType{2};
+  A2(1, 1) = TestType{3};
+  for (index_t i = 0; i < 3; i++) {
+    for (index_t j = 0; j < 3; j++) {
+      A3(i, j) = i == j ? TestType(i + 5) : TestType{};
+    }
+  }
+
+  CUDAJITExecutor jit_exec{};
+  cudaExecutor cuda_exec{};
+  (Out = inv(A2) + slice<2>(inv(A3), {0, 0}, {2, 2})).run(jit_exec);
+  (Ref = inv(A2) + slice<2>(inv(A3), {0, 0}, {2, 2})).run(cuda_exec);
+  (mdiff = max(abs(Out - Ref))).run(cuda_exec);
+  cuda_exec.sync();
+
+  ASSERT_NEAR(mdiff(), TestType(0), TestType(0.001));
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(InvSolverJITTestFloatTypes, CuSolverDxBatchedMatchesCudaPath)
+{
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+
+  auto A_jit = make_tensor<TestType>({2, 2, 2});
+  auto A_cuda = make_tensor<TestType>({2, 2, 2});
+  auto O_jit = make_tensor<TestType>({2, 2, 2});
+  auto O_cuda = make_tensor<TestType>({2, 2, 2});
+
+  A_jit(0, 0, 0) = InvJITValue<TestType>(4.0, 0.25);
+  A_jit(0, 0, 1) = InvJITValue<TestType>(7.0, -0.5);
+  A_jit(0, 1, 0) = InvJITValue<TestType>(2.0, 0.125);
+  A_jit(0, 1, 1) = InvJITValue<TestType>(6.0, 0.375);
+  A_jit(1, 0, 0) = InvJITValue<TestType>(5.0, -0.125);
+  A_jit(1, 0, 1) = InvJITValue<TestType>(3.0, 0.25);
+  A_jit(1, 1, 0) = InvJITValue<TestType>(1.0, -0.375);
+  A_jit(1, 1, 1) = InvJITValue<TestType>(4.0, 0.5);
+  (A_cuda = A_jit).run(cudaExecutor{});
+
+  CUDAJITExecutor jit_exec{};
+  cudaExecutor cuda_exec{};
+  (O_jit = inv(A_jit)).run(jit_exec);
+  (O_cuda = inv(A_cuda)).run(cuda_exec);
+  jit_exec.sync();
+  cuda_exec.sync();
+
+  for (index_t b = 0; b < 2; b++) {
+    for (index_t i = 0; i < 2; i++) {
+      for (index_t j = 0; j < 2; j++) {
+        ASSERT_NEAR(InvJITAbsDiff(O_jit(b, i, j), O_cuda(b, i, j)), 0.0, 1e-4);
+      }
+    }
+  }
+}
+
+TYPED_TEST(InvSolverJITTestFloatTypes, CuSolverDxRejectsUnsupportedShape)
+{
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+
+  auto A = make_tensor<TestType>({2, 3});
+  auto O = make_tensor<TestType>({2, 3});
+  auto op = inv(A);
+
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op));
+
+  CUDAJITExecutor exec{};
+  EXPECT_THROW({ (O = op).run(exec); }, matx::detail::matxException);
+}
+
+TYPED_TEST(InvSolverJITTestFloatTypes, CuSolverDxRejectsUnsupportedRank)
+{
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+
+  auto A = make_tensor<TestType>({1, 1, 1, 2, 2});
+  auto O = make_tensor<TestType>({1, 1, 1, 2, 2});
+  auto op = inv(A);
+
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op));
+
+  CUDAJITExecutor exec{};
+  EXPECT_THROW({ (O = op).run(exec); }, matx::detail::matxException);
+}
+
+TYPED_TEST(InvSolverJITTestFloatTypes, CuSolverDxFusedMatmulInverseMatchesCudaPath)
+{
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+
+  auto H_jit = make_tensor<TestType>({4, 3});
+  auto H_cuda = make_tensor<TestType>({4, 3});
+  auto O_jit = make_tensor<TestType>({3, 3});
+  auto O_cuda = make_tensor<TestType>({3, 3});
+
+  for (index_t i = 0; i < 4; i++) {
+    for (index_t j = 0; j < 3; j++) {
+      const auto diag = i == j ? 2.0 : 0.0;
+      H_jit(i, j) = InvJITValue<TestType>(diag + 0.17 * static_cast<double>((i + 1) * (j + 1)),
+                                          0.03 * static_cast<double>(i - j));
+    }
+  }
+  (H_cuda = H_jit).run(cudaExecutor{});
+
+  auto op = inv(matmul(permute(H_jit, {1, 0}), H_jit));
+  EXPECT_TRUE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op));
+
+  const auto block_dim = detail::get_operator_capability<detail::OperatorCapability::BLOCK_DIM>(op);
+  EXPECT_EQ(block_dim[0], 64);
+  EXPECT_EQ(block_dim[1], 64);
+
+  CUDAJITExecutor jit_exec{};
+  cudaExecutor cuda_exec{};
+  (O_jit = op).run(jit_exec);
+  (O_cuda = inv(matmul(permute(H_cuda, {1, 0}), H_cuda))).run(cuda_exec);
+  jit_exec.sync();
+  cuda_exec.sync();
+
+  for (index_t i = 0; i < 3; i++) {
+    for (index_t j = 0; j < 3; j++) {
+      ASSERT_NEAR(InvJITAbsDiff(O_jit(i, j), O_cuda(i, j)), 0.0, 1e-3);
+    }
+  }
+}
+#endif
 
 TYPED_TEST(InvSolverTestFloatTypes, Inv4x4)
 {

@@ -35,7 +35,11 @@
 
 #include "matx/core/type_utils.h"
 #include "matx/operators/base_operator.h"
+#include "matx/operators/solver_projection.h"
 #include "matx/transforms/qr/qr_cuda.h"
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
+  #include "matx/transforms/solver_cusolverdx.h"
+#endif
 #ifdef MATX_EN_CPU_SOLVER
   #include "matx/transforms/qr/qr_lapack.h"
 #endif
@@ -43,20 +47,329 @@
 namespace matx {
 
 namespace detail {
+  enum QRComponents : int {
+    QR_Q = 0,
+    QR_R = 1,
+    QR_SOLVER_OUT = 2,
+    QR_SOLVER_TAU = 3,
+    QR_ECON_Q = 4,
+    QR_ECON_R = 5
+  };
+
+  template<typename OpA>
+  class QRState
+  {
+    private:
+      static_assert(OpA::Rank() >= 2, "qr() requires input rank 2 or higher");
+      using value_type = typename OpA::value_type;
+      static constexpr int RANK = OpA::Rank();
+
+      typename detail::base_type_t<OpA> a_;
+      cuda::std::array<index_t, RANK> q_shape_;
+      cuda::std::array<index_t, RANK> r_shape_;
+      mutable detail::tensor_impl_t<value_type, RANK> q_;
+      mutable detail::tensor_impl_t<value_type, RANK> r_;
+      mutable value_type *q_ptr_ = nullptr;
+      mutable value_type *r_ptr_ = nullptr;
+      mutable bool materialized_ = false;
+      mutable int materialize_count_ = 0;
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
+      mutable cuSolverDxHelper<value_type> dx_geqrf_helper_;
+      mutable cuSolverDxHelper<value_type> dx_ungqr_helper_;
+#endif
+
+    public:
+      using input_type = OpA;
+
+      QRState(const OpA &a) : a_(a)
+      {
+        q_shape_ = SolverShapeFromInput<RANK>(a_);
+        r_shape_ = q_shape_;
+        q_shape_[RANK - 1] = q_shape_[RANK - 2];
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
+        int major = 0;
+        int minor = 0;
+        int device = 0;
+        MATX_CUDA_CHECK(cudaGetDevice(&device));
+        MATX_CUDA_CHECK(cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device));
+        MATX_CUDA_CHECK(cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device));
+        const int cc = major * 100 + minor * 10;
+
+        const index_t m = r_shape_[RANK - 2];
+        const index_t n = r_shape_[RANK - 1];
+        const index_t k = m < n ? m : n;
+        dx_geqrf_helper_.set_m(m);
+        dx_geqrf_helper_.set_n(n);
+        dx_geqrf_helper_.set_k(k);
+        dx_geqrf_helper_.set_cc(cc);
+        dx_geqrf_helper_.set_function(CUSOLVERDX_FUNCTION_GEQRF);
+
+        dx_ungqr_helper_.set_m(m);
+        dx_ungqr_helper_.set_n(q_shape_[RANK - 1]);
+        dx_ungqr_helper_.set_k(k);
+        dx_ungqr_helper_.set_cc(cc);
+        dx_ungqr_helper_.set_function(CUSOLVERDX_FUNCTION_UNGQR);
+#endif
+      }
+
+      const auto &Input() const { return a_; }
+      const auto &QShape() const { return q_shape_; }
+      const auto &RShape() const { return r_shape_; }
+
+      template <typename Executor>
+      void Materialize(Executor &&ex) const
+      {
+        if (materialized_) {
+          materialize_count_++;
+          return;
+        }
+
+        if constexpr (is_matx_op<OpA>()) {
+          a_.PreRun(detail::NoShape{}, std::forward<Executor>(ex));
+        }
+
+        const auto cleanup = [&]() noexcept {
+          try {
+            if (q_ptr_ != nullptr) {
+              if constexpr (is_cuda_executor_v<Executor>) {
+                matxFree(q_ptr_, ex.getStream());
+              }
+              else {
+                matxFree(q_ptr_);
+              }
+              q_ptr_ = nullptr;
+            }
+            if (r_ptr_ != nullptr) {
+              if constexpr (is_cuda_executor_v<Executor>) {
+                matxFree(r_ptr_, ex.getStream());
+              }
+              else {
+                matxFree(r_ptr_);
+              }
+              r_ptr_ = nullptr;
+            }
+            if constexpr (is_matx_op<OpA>()) {
+              a_.PostRun(detail::NoShape{}, std::forward<Executor>(ex));
+            }
+          }
+          catch (...) {
+          }
+          materialized_ = false;
+          materialize_count_ = 0;
+        };
+
+        try {
+          detail::AllocateTempTensor(q_, std::forward<Executor>(ex), q_shape_, &q_ptr_);
+          detail::AllocateTempTensor(r_, std::forward<Executor>(ex), r_shape_, &r_ptr_);
+          qr_impl(q_, r_, a_, std::forward<Executor>(ex));
+        }
+        catch (...) {
+          cleanup();
+          throw;
+        }
+        materialized_ = true;
+        materialize_count_ = 1;
+      }
+
+      template <typename Executor>
+      void Release(Executor &&ex) const
+      {
+        if (!materialized_) {
+          return;
+        }
+        if (materialize_count_ > 1) {
+          materialize_count_--;
+          return;
+        }
+
+        if constexpr (is_matx_op<OpA>()) {
+          a_.PostRun(detail::NoShape{}, std::forward<Executor>(ex));
+        }
+
+        if (q_ptr_ != nullptr) {
+          if constexpr (is_cuda_executor_v<Executor>) {
+            matxFree(q_ptr_, ex.getStream());
+          }
+          else {
+            matxFree(q_ptr_);
+          }
+          q_ptr_ = nullptr;
+        }
+
+        if (r_ptr_ != nullptr) {
+          if constexpr (is_cuda_executor_v<Executor>) {
+            matxFree(r_ptr_, ex.getStream());
+          }
+          else {
+            matxFree(r_ptr_);
+          }
+          r_ptr_ = nullptr;
+        }
+
+        materialized_ = false;
+        materialize_count_ = 0;
+      }
+
+      template <int Component>
+      auto Tensor() const
+      {
+        if constexpr (Component == QR_Q) {
+          return q_;
+        }
+        else {
+          return r_;
+        }
+      }
+
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
+      template <int Component>
+      bool SupportsJITProjection() const
+      {
+        const bool square = r_shape_[RANK - 2] == r_shape_[RANK - 1];
+        return (RANK >= 2) && (RANK <= 4) &&
+               dx_geqrf_helper_.IsSupported() &&
+               (Component == QR_R || (square && dx_ungqr_helper_.IsSupported()));
+      }
+
+      template <int Component>
+      int GetJITProjectionShmRequired() const
+      {
+        if constexpr (Component == QR_Q) {
+          return cuda::std::max(dx_geqrf_helper_.GetShmRequired(), dx_ungqr_helper_.GetShmRequired());
+        }
+        else {
+          return dx_geqrf_helper_.GetShmRequired();
+        }
+      }
+
+      template <int Component>
+      cuda::std::array<int, 2> GetJITProjectionBlockDimRange() const
+      {
+        auto range = dx_geqrf_helper_.GetBlockDimRange();
+        if constexpr (Component == QR_Q) {
+          return combine_capabilities<OperatorCapability::BLOCK_DIM>(range, dx_ungqr_helper_.GetBlockDimRange());
+        }
+        return range;
+      }
+
+      template <int Component>
+      bool GenerateJITProjectionLTOIR(std::set<std::string> &ltoir_symbols) const
+      {
+        bool ok = dx_geqrf_helper_.GenerateLTOIR(ltoir_symbols);
+        if constexpr (Component == QR_Q) {
+          ok = ok && dx_ungqr_helper_.GenerateLTOIR(ltoir_symbols);
+        }
+        return ok;
+      }
+
+      template <int Component>
+      std::string GetJITProjectionClassName() const
+      {
+        return std::string("JITQRProjectionOp_R") + std::to_string(RANK) + "_" +
+               dx_geqrf_helper_.GetSymbolName() + "_C" + std::to_string(Component) + "_" +
+               (Component == QR_Q ? dx_ungqr_helper_.GetSymbolName() : std::string("R"));
+      }
+
+      template <int Component>
+      std::string GetJITProjectionTypeName(const std::string &inner_op_jit_name) const
+      {
+        return GetJITProjectionClassName<Component>() + "<" + inner_op_jit_name + ", " + std::to_string(Component) + ">";
+      }
+
+      template <int Component>
+      JITCacheKey GetJITProjectionCacheKey() const
+      {
+        auto key = detail::MakeJITCacheKeyForType<QRState<OpA>>("JITQRProjection");
+        detail::HashJITCacheValue(key, Component);
+        detail::HashJITCacheValue(key, RANK);
+        if constexpr (Component == QR_Q) {
+          for (int i = 0; i < RANK; ++i) {
+            detail::HashJITCacheValue(key, q_shape_[i]);
+            detail::HashJITCacheValue(key, r_shape_[i]);
+          }
+          detail::HashJITCacheString(key, dx_geqrf_helper_.GetSymbolName());
+          detail::HashJITCacheString(key, dx_ungqr_helper_.GetSymbolName());
+        }
+        else {
+          for (int i = 0; i < RANK; ++i) {
+            detail::HashJITCacheValue(key, r_shape_[i]);
+          }
+          detail::HashJITCacheString(key, dx_geqrf_helper_.GetSymbolName());
+        }
+        return key;
+      }
+
+      template <int Component>
+      void AddJITProjectionClasses(std::unordered_map<std::string, std::string> &in) const
+      {
+        const std::string class_name = GetJITProjectionClassName<Component>();
+        if (in.find(class_name) != in.end()) {
+          return;
+        }
+
+        const std::string geqrf_func_name = std::string(SOLVER_DX_FUNC_PREFIX) + "_" + dx_geqrf_helper_.GetSymbolName();
+        std::string externs =
+          " extern \"C\" __device__ void " + geqrf_func_name + "(" + detail::type_to_string<value_type>() + "*, " + detail::type_to_string<value_type>() + "*);\n";
+        std::string projection_body;
+        if constexpr (Component == QR_Q) {
+          const std::string ungqr_func_name = std::string(SOLVER_DX_FUNC_PREFIX) + "_" + dx_ungqr_helper_.GetSymbolName();
+          externs +=
+            " extern \"C\" __device__ void " + ungqr_func_name + "(" + detail::type_to_string<value_type>() + "*, " + detail::type_to_string<value_type>() + "*);\n";
+          projection_body = dx_geqrf_helper_.GetQrProjectionFuncStr(geqrf_func_name, ungqr_func_name, QR_Q, QR_R, q_shape_[RANK - 1], r_shape_[RANK - 2]);
+        }
+        else {
+          projection_body = dx_geqrf_helper_.GetQrRProjectionFuncStr(geqrf_func_name, QR_R, r_shape_[RANK - 2]);
+        }
+        in[class_name] =
+          externs +
+          " template <typename OpA, int Component> struct " + class_name + "  {\n"
+          "  using value_type = typename OpA::value_type;\n"
+          "  using matxop = bool;\n"
+          "  typename detail::inner_storage_or_self_t<detail::base_type_t<OpA>> a_;\n"
+          "  template <typename CapType, typename... Is>\n"
+          "  __MATX_INLINE__ __MATX_DEVICE__ value_type operator()(Is... indices) const\n"
+          "  {\n"
+          "    " + projection_body + "\n"
+          "  }\n"
+          "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank()\n"
+          "  {\n"
+          "    return OpA::Rank();\n"
+          "  }\n"
+          "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const\n"
+          "  {\n"
+          "    if constexpr (Component == " + std::to_string(QR_Q) + ") {\n"
+          "      if (dim == OpA::Rank() - 1) { return a_.Size(OpA::Rank() - 2); }\n"
+          "    }\n"
+          "    return a_.Size(dim);\n"
+          "  }\n"
+          "};\n";
+      }
+#endif
+  };
+
   template<typename OpA>
   class QROp : public BaseOp<QROp<OpA>>
   {
     private:
-      typename detail::base_type_t<OpA> a_;
+      using state_type = QRState<OpA>;
+      std::shared_ptr<state_type> state_;
 
     public:
       using matxop = bool;
       using value_type = typename OpA::value_type;
       using matx_transform_op = bool;
       using qr_xform_op = bool;
+      using tensor_type = detail::tensor_impl_t<value_type, OpA::Rank()>;
 
-      __MATX_INLINE__ std::string str() const { return "qr(" + get_type_str(a_) + ")"; }
-      __MATX_INLINE__ QROp(const OpA &a) : a_(a) {
+      SolverProjectionOp<state_type, QR_Q, tensor_type> Q;
+      SolverProjectionOp<state_type, QR_R, tensor_type> R;
+
+      __MATX_INLINE__ std::string str() const { return "qr(" + get_type_str(state_->Input()) + ")"; }
+      __MATX_INLINE__ QROp(const OpA &a) :
+        state_(std::make_shared<state_type>(a)),
+        Q(state_, state_->QShape(), "qr().Q"),
+        R(state_, state_->RShape(), "qr().R")
+      {
         MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
       };
 
@@ -67,7 +380,7 @@ namespace detail {
       template <OperatorCapability Cap, typename InType>
       __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
         auto self_has_cap = capability_attributes<Cap>::default_value;
-        return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
+        return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(state_->Input(), in));
       }
 
       template <typename Out, typename Executor>
@@ -75,7 +388,7 @@ namespace detail {
         static_assert(is_cuda_executor_v<Executor>, "qr() only supports the CUDA executor currently");
         static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 3 outputs on qr(). ie: (mtie(Q, R) = qr(A))");
 
-        qr_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), a_, ex);
+        qr_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), state_->Input(), ex);
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -87,14 +400,23 @@ namespace detail {
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
       {
         if constexpr (is_matx_op<OpA>()) {
-          a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          state_->Input().PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
       }
+
+      template <typename ShapeType, typename Executor>
+      __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
+      {
+        if constexpr (is_matx_op<OpA>()) {
+          state_->Input().PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
+      }
+
       // Size is not relevant in qr() since there are multiple return values and it
       // is not allowed to be called in larger expressions
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
       {
-        return a_.Size(dim);
+        return state_->Input().Size(dim);
       }
 
   };
@@ -121,19 +443,275 @@ __MATX_INLINE__ auto qr(const AType &A) {
 
 namespace detail {
   template<typename OpA>
+  class SolverQRState
+  {
+    private:
+      static_assert(OpA::Rank() >= 2, "qr_solver() requires input rank 2 or higher");
+      using value_type = typename OpA::value_type;
+      static constexpr int RANK = OpA::Rank();
+
+      typename detail::base_type_t<OpA> a_;
+      cuda::std::array<index_t, RANK> out_shape_;
+      cuda::std::array<index_t, RANK - 1> tau_shape_;
+      mutable detail::tensor_impl_t<value_type, RANK> out_;
+      mutable detail::tensor_impl_t<value_type, RANK - 1> tau_;
+      mutable value_type *out_ptr_ = nullptr;
+      mutable value_type *tau_ptr_ = nullptr;
+      mutable bool materialized_ = false;
+      mutable int materialize_count_ = 0;
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
+      mutable cuSolverDxHelper<value_type> dx_geqrf_helper_;
+#endif
+
+    public:
+      using input_type = OpA;
+
+      SolverQRState(const OpA &a) : a_(a)
+      {
+        out_shape_ = SolverShapeFromInput<RANK>(a_);
+        tau_shape_ = SolverVectorShapeFromMatrixShape<RANK>(out_shape_);
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
+        int major = 0;
+        int minor = 0;
+        int device = 0;
+        MATX_CUDA_CHECK(cudaGetDevice(&device));
+        MATX_CUDA_CHECK(cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device));
+        MATX_CUDA_CHECK(cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device));
+        const int cc = major * 100 + minor * 10;
+
+        dx_geqrf_helper_.set_m(out_shape_[RANK - 2]);
+        dx_geqrf_helper_.set_n(out_shape_[RANK - 1]);
+        dx_geqrf_helper_.set_k(tau_shape_[RANK - 2]);
+        dx_geqrf_helper_.set_cc(cc);
+        dx_geqrf_helper_.set_function(CUSOLVERDX_FUNCTION_GEQRF);
+#endif
+      }
+
+      const auto &Input() const { return a_; }
+      const auto &OutShape() const { return out_shape_; }
+      const auto &TauShape() const { return tau_shape_; }
+
+      template <typename Executor>
+      void Materialize(Executor &&ex) const
+      {
+        if (materialized_) {
+          materialize_count_++;
+          return;
+        }
+
+        if constexpr (is_matx_op<OpA>()) {
+          a_.PreRun(detail::NoShape{}, std::forward<Executor>(ex));
+        }
+
+        const auto cleanup = [&]() noexcept {
+          try {
+            if (out_ptr_ != nullptr) {
+              if constexpr (is_cuda_executor_v<Executor>) {
+                matxFree(out_ptr_, ex.getStream());
+              }
+              else {
+                matxFree(out_ptr_);
+              }
+              out_ptr_ = nullptr;
+            }
+            if (tau_ptr_ != nullptr) {
+              if constexpr (is_cuda_executor_v<Executor>) {
+                matxFree(tau_ptr_, ex.getStream());
+              }
+              else {
+                matxFree(tau_ptr_);
+              }
+              tau_ptr_ = nullptr;
+            }
+            if constexpr (is_matx_op<OpA>()) {
+              a_.PostRun(detail::NoShape{}, std::forward<Executor>(ex));
+            }
+          }
+          catch (...) {
+          }
+          materialized_ = false;
+          materialize_count_ = 0;
+        };
+
+        try {
+          detail::AllocateTempTensor(out_, std::forward<Executor>(ex), out_shape_, &out_ptr_);
+          detail::AllocateTempTensor(tau_, std::forward<Executor>(ex), tau_shape_, &tau_ptr_);
+          qr_solver_impl(out_, tau_, a_, std::forward<Executor>(ex));
+        }
+        catch (...) {
+          cleanup();
+          throw;
+        }
+        materialized_ = true;
+        materialize_count_ = 1;
+      }
+
+      template <typename Executor>
+      void Release(Executor &&ex) const
+      {
+        if (!materialized_) {
+          return;
+        }
+        if (materialize_count_ > 1) {
+          materialize_count_--;
+          return;
+        }
+
+        if constexpr (is_matx_op<OpA>()) {
+          a_.PostRun(detail::NoShape{}, std::forward<Executor>(ex));
+        }
+
+        if (out_ptr_ != nullptr) {
+          if constexpr (is_cuda_executor_v<Executor>) {
+            matxFree(out_ptr_, ex.getStream());
+          }
+          else {
+            matxFree(out_ptr_);
+          }
+          out_ptr_ = nullptr;
+        }
+
+        if (tau_ptr_ != nullptr) {
+          if constexpr (is_cuda_executor_v<Executor>) {
+            matxFree(tau_ptr_, ex.getStream());
+          }
+          else {
+            matxFree(tau_ptr_);
+          }
+          tau_ptr_ = nullptr;
+        }
+
+        materialized_ = false;
+        materialize_count_ = 0;
+      }
+
+      template <int Component>
+      auto Tensor() const
+      {
+        if constexpr (Component == QR_SOLVER_OUT) {
+          return out_;
+        }
+        else {
+          return tau_;
+        }
+      }
+
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
+      template <int Component>
+      bool SupportsJITProjection() const
+      {
+        return (RANK >= 2) && (RANK <= 4) && dx_geqrf_helper_.IsSupported();
+      }
+
+      template <int Component>
+      int GetJITProjectionShmRequired() const
+      {
+        return dx_geqrf_helper_.GetShmRequired();
+      }
+
+      template <int Component>
+      cuda::std::array<int, 2> GetJITProjectionBlockDimRange() const
+      {
+        return dx_geqrf_helper_.GetBlockDimRange();
+      }
+
+      template <int Component>
+      bool GenerateJITProjectionLTOIR(std::set<std::string> &ltoir_symbols) const
+      {
+        return dx_geqrf_helper_.GenerateLTOIR(ltoir_symbols);
+      }
+
+      template <int Component>
+      std::string GetJITProjectionClassName() const
+      {
+        // OUT and TAU deliberately share one generated class because
+        // GetGeqrfProjectionFuncStr dispatches on Component inside the body.
+        return std::string("JITQRSolverProjectionOp_R") + std::to_string(RANK) + "_" + dx_geqrf_helper_.GetSymbolName();
+      }
+
+      template <int Component>
+      std::string GetJITProjectionTypeName(const std::string &inner_op_jit_name) const
+      {
+        return GetJITProjectionClassName<Component>() + "<" + inner_op_jit_name + ", " + std::to_string(Component) + ">";
+      }
+
+      template <int Component>
+      JITCacheKey GetJITProjectionCacheKey() const
+      {
+        auto key = detail::MakeJITCacheKeyForType<SolverQRState<OpA>>("JITQRSolverProjection");
+        detail::HashJITCacheValue(key, Component);
+        detail::HashJITCacheValue(key, RANK);
+        for (int i = 0; i < RANK; ++i) {
+          detail::HashJITCacheValue(key, out_shape_[i]);
+        }
+        detail::HashJITCacheString(key, dx_geqrf_helper_.GetSymbolName());
+        return key;
+      }
+
+      template <int Component>
+      void AddJITProjectionClasses(std::unordered_map<std::string, std::string> &in) const
+      {
+        const std::string class_name = GetJITProjectionClassName<Component>();
+        if (in.find(class_name) != in.end()) {
+          return;
+        }
+
+        const std::string solver_func_name = std::string(SOLVER_DX_FUNC_PREFIX) + "_" + dx_geqrf_helper_.GetSymbolName();
+        in[class_name] =
+          " extern \"C\" __device__ void " + solver_func_name + "(" + detail::type_to_string<value_type>() + "*, " + detail::type_to_string<value_type>() + "*);\n"
+          " template <typename OpA, int Component> struct " + class_name + "  {\n"
+          "  using value_type = typename OpA::value_type;\n"
+          "  using matxop = bool;\n"
+          "  typename detail::inner_storage_or_self_t<detail::base_type_t<OpA>> a_;\n"
+          "  template <typename CapType, typename... Is>\n"
+          "  __MATX_INLINE__ __MATX_DEVICE__ value_type operator()(Is... indices) const\n"
+          "  {\n"
+          "    " + dx_geqrf_helper_.GetGeqrfProjectionFuncStr(solver_func_name, QR_SOLVER_OUT, QR_SOLVER_TAU) + "\n"
+          "  }\n"
+          "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank()\n"
+          "  {\n"
+          "    if constexpr (Component == " + std::to_string(QR_SOLVER_TAU) + ") { return OpA::Rank() - 1; }\n"
+          "    else { return OpA::Rank(); }\n"
+          "  }\n"
+          "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const\n"
+          "  {\n"
+          "    if constexpr (Component == " + std::to_string(QR_SOLVER_TAU) + ") {\n"
+          "      if (dim < OpA::Rank() - 2) { return a_.Size(dim); }\n"
+          "      const index_t m = a_.Size(OpA::Rank() - 2);\n"
+          "      const index_t n = a_.Size(OpA::Rank() - 1);\n"
+          "      return m < n ? m : n;\n"
+          "    }\n"
+          "    else { return a_.Size(dim); }\n"
+          "  }\n"
+          "};\n";
+      }
+#endif
+  };
+
+  template<typename OpA>
   class SolverQROp : public BaseOp<SolverQROp<OpA>>
   {
     private:
-      typename detail::base_type_t<OpA> a_;
+      using state_type = SolverQRState<OpA>;
+      std::shared_ptr<state_type> state_;
 
     public:
       using matxop = bool;
       using value_type = typename OpA::value_type;
       using matx_transform_op = bool;
       using qr_solver_xform_op = bool;
+      using out_type = detail::tensor_impl_t<value_type, OpA::Rank()>;
+      using tau_type = detail::tensor_impl_t<value_type, OpA::Rank() - 1>;
+
+      SolverProjectionOp<state_type, QR_SOLVER_OUT, out_type> Out;
+      SolverProjectionOp<state_type, QR_SOLVER_TAU, tau_type> Tau;
 
       __MATX_INLINE__ std::string str() const { return "qr_solver()"; }
-      __MATX_INLINE__ SolverQROp(const OpA &a) : a_(a) {
+      __MATX_INLINE__ SolverQROp(const OpA &a) :
+        state_(std::make_shared<state_type>(a)),
+        Out(state_, state_->OutShape(), "qr_solver().Out"),
+        Tau(state_, state_->TauShape(), "qr_solver().Tau")
+      {
         MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
       }
 
@@ -144,14 +722,14 @@ namespace detail {
       template <OperatorCapability Cap, typename InType>
       __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
         auto self_has_cap = capability_attributes<Cap>::default_value;
-        return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
+        return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(state_->Input(), in));
       }
 
       template <typename Out, typename Executor>
-      void Exec(Out &&out, Executor &&ex) {
+      void Exec(Out &&out, Executor &&ex) const {
         static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 2 outputs on qr_solver(). ie: (mtie(A, tau) = qr_solver(A))");     
 
-        qr_solver_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), a_, ex);
+        qr_solver_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), state_->Input(), ex);
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -160,10 +738,18 @@ namespace detail {
       }
 
       template <typename ShapeType, typename Executor>
-      __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) noexcept
+      __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
       {
         if constexpr (is_matx_op<OpA>()) {
-          a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          state_->Input().PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
+      }
+
+      template <typename ShapeType, typename Executor>
+      __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
+      {
+        if constexpr (is_matx_op<OpA>()) {
+          state_->Input().PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
       }
 
@@ -171,7 +757,7 @@ namespace detail {
       // is not allowed to be called in larger expressions
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
       {
-        return a_.Size(dim);
+        return state_->Input().Size(dim);
       }
 
   };
@@ -202,19 +788,325 @@ __MATX_INLINE__ auto qr_solver(const OpA &a) {
 
 namespace detail {
   template<typename OpA>
+  class EconQRState
+  {
+    private:
+      static_assert(OpA::Rank() >= 2, "qr_econ() requires input rank 2 or higher");
+      using value_type = typename OpA::value_type;
+      static constexpr int RANK = OpA::Rank();
+
+      typename detail::base_type_t<OpA> a_;
+      cuda::std::array<index_t, RANK> q_shape_;
+      cuda::std::array<index_t, RANK> r_shape_;
+      mutable detail::tensor_impl_t<value_type, RANK> q_;
+      mutable detail::tensor_impl_t<value_type, RANK> r_;
+      mutable value_type *q_ptr_ = nullptr;
+      mutable value_type *r_ptr_ = nullptr;
+      mutable bool materialized_ = false;
+      mutable int materialize_count_ = 0;
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
+      mutable cuSolverDxHelper<value_type> dx_geqrf_helper_;
+      mutable cuSolverDxHelper<value_type> dx_ungqr_helper_;
+#endif
+
+    public:
+      using input_type = OpA;
+
+      EconQRState(const OpA &a) : a_(a)
+      {
+        q_shape_ = SolverShapeFromInput<RANK>(a_);
+        r_shape_ = q_shape_;
+        const index_t k = q_shape_[RANK - 2] < q_shape_[RANK - 1] ? q_shape_[RANK - 2] : q_shape_[RANK - 1];
+        q_shape_[RANK - 1] = k;
+        r_shape_[RANK - 2] = k;
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
+        int major = 0;
+        int minor = 0;
+        int device = 0;
+        MATX_CUDA_CHECK(cudaGetDevice(&device));
+        MATX_CUDA_CHECK(cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device));
+        MATX_CUDA_CHECK(cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device));
+        const int cc = major * 100 + minor * 10;
+
+        dx_geqrf_helper_.set_m(a_.Size(RANK - 2));
+        dx_geqrf_helper_.set_n(a_.Size(RANK - 1));
+        dx_geqrf_helper_.set_k(k);
+        dx_geqrf_helper_.set_cc(cc);
+        dx_geqrf_helper_.set_function(CUSOLVERDX_FUNCTION_GEQRF);
+
+        dx_ungqr_helper_.set_m(q_shape_[RANK - 2]);
+        dx_ungqr_helper_.set_n(q_shape_[RANK - 1]);
+        dx_ungqr_helper_.set_k(k);
+        dx_ungqr_helper_.set_cc(cc);
+        dx_ungqr_helper_.set_function(CUSOLVERDX_FUNCTION_UNGQR);
+#endif
+      }
+
+      const auto &Input() const { return a_; }
+      const auto &QShape() const { return q_shape_; }
+      const auto &RShape() const { return r_shape_; }
+
+      template <typename Executor>
+      void Materialize(Executor &&ex) const
+      {
+        if (materialized_) {
+          materialize_count_++;
+          return;
+        }
+
+        if constexpr (is_matx_op<OpA>()) {
+          a_.PreRun(detail::NoShape{}, std::forward<Executor>(ex));
+        }
+
+        const auto cleanup = [&]() noexcept {
+          try {
+            if (q_ptr_ != nullptr) {
+              if constexpr (is_cuda_executor_v<Executor>) {
+                matxFree(q_ptr_, ex.getStream());
+              }
+              else {
+                matxFree(q_ptr_);
+              }
+              q_ptr_ = nullptr;
+            }
+            if (r_ptr_ != nullptr) {
+              if constexpr (is_cuda_executor_v<Executor>) {
+                matxFree(r_ptr_, ex.getStream());
+              }
+              else {
+                matxFree(r_ptr_);
+              }
+              r_ptr_ = nullptr;
+            }
+            if constexpr (is_matx_op<OpA>()) {
+              a_.PostRun(detail::NoShape{}, std::forward<Executor>(ex));
+            }
+          }
+          catch (...) {
+          }
+          materialized_ = false;
+          materialize_count_ = 0;
+        };
+
+        try {
+          detail::AllocateTempTensor(q_, std::forward<Executor>(ex), q_shape_, &q_ptr_);
+          detail::AllocateTempTensor(r_, std::forward<Executor>(ex), r_shape_, &r_ptr_);
+          qr_econ_impl(q_, r_, a_, std::forward<Executor>(ex));
+        }
+        catch (...) {
+          cleanup();
+          throw;
+        }
+        materialized_ = true;
+        materialize_count_ = 1;
+      }
+
+      template <typename Executor>
+      void Release(Executor &&ex) const
+      {
+        if (!materialized_) {
+          return;
+        }
+        if (materialize_count_ > 1) {
+          materialize_count_--;
+          return;
+        }
+
+        if constexpr (is_matx_op<OpA>()) {
+          a_.PostRun(detail::NoShape{}, std::forward<Executor>(ex));
+        }
+
+        if (q_ptr_ != nullptr) {
+          if constexpr (is_cuda_executor_v<Executor>) {
+            matxFree(q_ptr_, ex.getStream());
+          }
+          else {
+            matxFree(q_ptr_);
+          }
+          q_ptr_ = nullptr;
+        }
+
+        if (r_ptr_ != nullptr) {
+          if constexpr (is_cuda_executor_v<Executor>) {
+            matxFree(r_ptr_, ex.getStream());
+          }
+          else {
+            matxFree(r_ptr_);
+          }
+          r_ptr_ = nullptr;
+        }
+
+        materialized_ = false;
+        materialize_count_ = 0;
+      }
+
+      template <int Component>
+      auto Tensor() const
+      {
+        if constexpr (Component == QR_ECON_Q) {
+          return q_;
+        }
+        else {
+          return r_;
+        }
+      }
+
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
+      template <int Component>
+      bool SupportsJITProjection() const
+      {
+        const bool q_layout_safe = a_.Size(RANK - 2) >= a_.Size(RANK - 1);
+        return (RANK >= 2) && (RANK <= 4) &&
+               dx_geqrf_helper_.IsSupported() &&
+               (Component == QR_ECON_R || (q_layout_safe && dx_ungqr_helper_.IsSupported()));
+      }
+
+      template <int Component>
+      int GetJITProjectionShmRequired() const
+      {
+        if constexpr (Component == QR_ECON_Q) {
+          return cuda::std::max(dx_geqrf_helper_.GetShmRequired(), dx_ungqr_helper_.GetShmRequired());
+        }
+        else {
+          return dx_geqrf_helper_.GetShmRequired();
+        }
+      }
+
+      template <int Component>
+      cuda::std::array<int, 2> GetJITProjectionBlockDimRange() const
+      {
+        auto range = dx_geqrf_helper_.GetBlockDimRange();
+        if constexpr (Component == QR_ECON_Q) {
+          return combine_capabilities<OperatorCapability::BLOCK_DIM>(range, dx_ungqr_helper_.GetBlockDimRange());
+        }
+        return range;
+      }
+
+      template <int Component>
+      bool GenerateJITProjectionLTOIR(std::set<std::string> &ltoir_symbols) const
+      {
+        bool ok = dx_geqrf_helper_.GenerateLTOIR(ltoir_symbols);
+        if constexpr (Component == QR_ECON_Q) {
+          ok = ok && dx_ungqr_helper_.GenerateLTOIR(ltoir_symbols);
+        }
+        return ok;
+      }
+
+      template <int Component>
+      std::string GetJITProjectionClassName() const
+      {
+        return std::string("JITEconQRProjectionOp_R") + std::to_string(RANK) + "_" +
+               dx_geqrf_helper_.GetSymbolName() + "_C" + std::to_string(Component) + "_" +
+               (Component == QR_ECON_Q ? dx_ungqr_helper_.GetSymbolName() : std::string("R"));
+      }
+
+      template <int Component>
+      std::string GetJITProjectionTypeName(const std::string &inner_op_jit_name) const
+      {
+        return GetJITProjectionClassName<Component>() + "<" + inner_op_jit_name + ", " + std::to_string(Component) + ">";
+      }
+
+      template <int Component>
+      JITCacheKey GetJITProjectionCacheKey() const
+      {
+        auto key = detail::MakeJITCacheKeyForType<EconQRState<OpA>>("JITEconQRProjection");
+        detail::HashJITCacheValue(key, Component);
+        detail::HashJITCacheValue(key, RANK);
+        if constexpr (Component == QR_ECON_Q) {
+          for (int i = 0; i < RANK; ++i) {
+            detail::HashJITCacheValue(key, q_shape_[i]);
+            detail::HashJITCacheValue(key, r_shape_[i]);
+          }
+          detail::HashJITCacheString(key, dx_geqrf_helper_.GetSymbolName());
+          detail::HashJITCacheString(key, dx_ungqr_helper_.GetSymbolName());
+        }
+        else {
+          for (int i = 0; i < RANK; ++i) {
+            detail::HashJITCacheValue(key, r_shape_[i]);
+          }
+          detail::HashJITCacheString(key, dx_geqrf_helper_.GetSymbolName());
+        }
+        return key;
+      }
+
+      template <int Component>
+      void AddJITProjectionClasses(std::unordered_map<std::string, std::string> &in) const
+      {
+        const std::string class_name = GetJITProjectionClassName<Component>();
+        if (in.find(class_name) != in.end()) {
+          return;
+        }
+
+        const std::string geqrf_func_name = std::string(SOLVER_DX_FUNC_PREFIX) + "_" + dx_geqrf_helper_.GetSymbolName();
+        std::string externs =
+          " extern \"C\" __device__ void " + geqrf_func_name + "(" + detail::type_to_string<value_type>() + "*, " + detail::type_to_string<value_type>() + "*);\n";
+        std::string projection_body;
+        if constexpr (Component == QR_ECON_Q) {
+          const std::string ungqr_func_name = std::string(SOLVER_DX_FUNC_PREFIX) + "_" + dx_ungqr_helper_.GetSymbolName();
+          externs +=
+            " extern \"C\" __device__ void " + ungqr_func_name + "(" + detail::type_to_string<value_type>() + "*, " + detail::type_to_string<value_type>() + "*);\n";
+          projection_body = dx_geqrf_helper_.GetQrProjectionFuncStr(geqrf_func_name, ungqr_func_name, QR_ECON_Q, QR_ECON_R, q_shape_[RANK - 1], r_shape_[RANK - 2]);
+        }
+        else {
+          projection_body = dx_geqrf_helper_.GetQrRProjectionFuncStr(geqrf_func_name, QR_ECON_R, r_shape_[RANK - 2]);
+        }
+        in[class_name] =
+          externs +
+          " template <typename OpA, int Component> struct " + class_name + "  {\n"
+          "  using value_type = typename OpA::value_type;\n"
+          "  using matxop = bool;\n"
+          "  typename detail::inner_storage_or_self_t<detail::base_type_t<OpA>> a_;\n"
+          "  template <typename CapType, typename... Is>\n"
+          "  __MATX_INLINE__ __MATX_DEVICE__ value_type operator()(Is... indices) const\n"
+          "  {\n"
+          "    " + projection_body + "\n"
+          "  }\n"
+          "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank()\n"
+          "  {\n"
+          "    return OpA::Rank();\n"
+          "  }\n"
+          "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const\n"
+          "  {\n"
+          "    const index_t m = a_.Size(OpA::Rank() - 2);\n"
+          "    const index_t n = a_.Size(OpA::Rank() - 1);\n"
+          "    const index_t k = m < n ? m : n;\n"
+          "    if constexpr (Component == " + std::to_string(QR_ECON_Q) + ") {\n"
+          "      if (dim == OpA::Rank() - 1) { return k; }\n"
+          "    }\n"
+          "    else if constexpr (Component == " + std::to_string(QR_ECON_R) + ") {\n"
+          "      if (dim == OpA::Rank() - 2) { return k; }\n"
+          "    }\n"
+          "    return a_.Size(dim);\n"
+          "  }\n"
+          "};\n";
+      }
+#endif
+  };
+
+  template<typename OpA>
   class EconQROp : public BaseOp<EconQROp<OpA>>
   {
     private:
-      typename detail::base_type_t<OpA> a_;
+      using state_type = EconQRState<OpA>;
+      std::shared_ptr<state_type> state_;
 
     public:
       using matxop = bool;
       using value_type = typename OpA::value_type;
       using matx_transform_op = bool;
       using qr_solver_xform_op = bool;
+      using tensor_type = detail::tensor_impl_t<value_type, OpA::Rank()>;
+
+      SolverProjectionOp<state_type, QR_ECON_Q, tensor_type> Q;
+      SolverProjectionOp<state_type, QR_ECON_R, tensor_type> R;
 
       __MATX_INLINE__ std::string str() const { return "qr_econ()"; }
-      __MATX_INLINE__ EconQROp(const OpA &a) : a_(a) { }    
+      __MATX_INLINE__ EconQROp(const OpA &a) :
+        state_(std::make_shared<state_type>(a)),
+        Q(state_, state_->QShape(), "qr_econ().Q"),
+        R(state_, state_->RShape(), "qr_econ().R")
+      {
+      }
 
       // This should never be called
       template <typename... Is>
@@ -223,14 +1115,14 @@ namespace detail {
       template <OperatorCapability Cap, typename InType>
       __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
         auto self_has_cap = capability_attributes<Cap>::default_value;
-        return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
+        return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(state_->Input(), in));
       }
 
       template <typename Out, typename Executor>
-      void Exec(Out &&out, Executor &&ex) {
+      void Exec(Out &&out, Executor &&ex) const {
         static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 2 outputs on qr_econ(). ie: (mtie(Q, R) = qr_econ(A))");     
 
-        qr_econ_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), a_, ex);
+        qr_econ_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), state_->Input(), ex);
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -239,10 +1131,18 @@ namespace detail {
       }
 
       template <typename ShapeType, typename Executor>
-      __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) noexcept
+      __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
       {
         if constexpr (is_matx_op<OpA>()) {
-          a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          state_->Input().PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
+      }
+
+      template <typename ShapeType, typename Executor>
+      __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
+      {
+        if constexpr (is_matx_op<OpA>()) {
+          state_->Input().PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
       }
 
@@ -250,7 +1150,7 @@ namespace detail {
       // is not allowed to be called in larger expressions
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
       {
-        return a_.Size(dim);
+        return state_->Input().Size(dim);
       }
 
   };
