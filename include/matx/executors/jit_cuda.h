@@ -94,20 +94,63 @@ namespace matx
 
     // Global cache for JIT launch parameters, keyed by JIT_CACHE_KEY when available,
     // with the original JIT_TYPE_QUERY string as a fallback.
+    struct JITLaunchParamsCacheKey {
+      JITCacheKey op_key;
+      int device_id = 0;
+      std::string sm_arch;
+
+      __MATX_INLINE__ __MATX_HOST__ bool operator==(const JITLaunchParamsCacheKey &rhs) const noexcept
+      {
+        return device_id == rhs.device_id && sm_arch == rhs.sm_arch && op_key == rhs.op_key;
+      }
+    };
+
+    struct JITLaunchParamsCacheKeyHash {
+      __MATX_INLINE__ __MATX_HOST__ std::size_t operator()(const JITLaunchParamsCacheKey &key) const noexcept
+      {
+        std::size_t h = JITCacheKeyHash{}(key.op_key);
+        h ^= static_cast<std::size_t>(key.device_id) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+        h ^= std::hash<std::string>{}(key.sm_arch) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+        return h;
+      }
+    };
+
     inline std::unordered_map<std::string, JITLaunchParams> jit_launch_params_cache;
-    inline std::unordered_map<JITCacheKey, JITLaunchParams, JITCacheKeyHash> jit_launch_params_cache_by_key;
+    inline std::unordered_map<JITLaunchParamsCacheKey, JITLaunchParams, JITLaunchParamsCacheKeyHash> jit_launch_params_cache_by_key;
     inline std::mutex jit_launch_params_mutex;
 
     static constexpr int JIT_LAUNCH_PARAMS_METADATA_VERSION = 6;
 
+    inline int GetJITLaunchParamsDevice()
+    {
+      int device = 0;
+      MATX_CUDA_CHECK(cudaGetDevice(&device));
+      return device;
+    }
+
+    inline std::string GetJITLaunchParamsDevicePrefix()
+    {
+      return "device_" + std::to_string(GetJITLaunchParamsDevice()) + "_sm_" + resolve_nvrtc_cuda_arch() + "_";
+    }
+
+    inline std::string GetJITLaunchParamsCacheKey(const std::string &kernel_op_type)
+    {
+      return GetJITLaunchParamsDevicePrefix() + kernel_op_type;
+    }
+
+    inline JITLaunchParamsCacheKey GetJITLaunchParamsCacheKey(const JITCacheKey &jit_cache_key)
+    {
+      return JITLaunchParamsCacheKey{jit_cache_key, GetJITLaunchParamsDevice(), resolve_nvrtc_cuda_arch()};
+    }
+
     inline std::string GetJITLaunchParamsMetadataFilename(const std::string &kernel_op_type)
     {
-      return GetCache().TypeStringToFilename(kernel_op_type) + ".launch";
+      return GetCache().TypeStringToFilename(GetJITLaunchParamsCacheKey(kernel_op_type)) + ".launch";
     }
 
     inline std::string GetJITLaunchParamsMetadataFilename(const JITCacheKey &jit_cache_key)
     {
-      return JITCacheKeyToFilename(jit_cache_key, "JITLaunch") + ".launch";
+      return GetJITLaunchParamsDevicePrefix() + JITCacheKeyToFilename(jit_cache_key, "JITLaunch") + ".launch";
     }
 
     inline std::string SerializeJITLaunchParams(const JITLaunchParams &params)
@@ -193,9 +236,10 @@ namespace matx
 
     inline bool LookupJITLaunchParams(const std::string &kernel_op_type, JITLaunchParams &params)
     {
+      const auto cache_key = GetJITLaunchParamsCacheKey(kernel_op_type);
       {
         std::lock_guard<std::mutex> lock(jit_launch_params_mutex);
-        auto it = jit_launch_params_cache.find(kernel_op_type);
+        auto it = jit_launch_params_cache.find(cache_key);
         if (it != jit_launch_params_cache.end()) {
           params = it->second;
           return true;
@@ -208,7 +252,7 @@ namespace matx
       }
 
       std::lock_guard<std::mutex> lock(jit_launch_params_mutex);
-      jit_launch_params_cache[kernel_op_type] = params;
+      jit_launch_params_cache[cache_key] = params;
       return true;
     }
 
@@ -217,10 +261,11 @@ namespace matx
       if (!jit_cache_key.valid) {
         return false;
       }
+      const auto cache_key = GetJITLaunchParamsCacheKey(jit_cache_key);
 
       {
         std::lock_guard<std::mutex> lock(jit_launch_params_mutex);
-        auto it = jit_launch_params_cache_by_key.find(jit_cache_key);
+        auto it = jit_launch_params_cache_by_key.find(cache_key);
         if (it != jit_launch_params_cache_by_key.end()) {
           params = it->second;
           return true;
@@ -233,15 +278,16 @@ namespace matx
       }
 
       std::lock_guard<std::mutex> lock(jit_launch_params_mutex);
-      jit_launch_params_cache_by_key[jit_cache_key] = params;
+      jit_launch_params_cache_by_key[cache_key] = params;
       return true;
     }
 
     inline void StoreJITLaunchParams(const std::string &kernel_op_type, const JITLaunchParams &params)
     {
+      const auto cache_key = GetJITLaunchParamsCacheKey(kernel_op_type);
       {
         std::lock_guard<std::mutex> lock(jit_launch_params_mutex);
-        jit_launch_params_cache[kernel_op_type] = params;
+        jit_launch_params_cache[cache_key] = params;
       }
 
       GetCache().StoreLTOIRMetadata(GetJITLaunchParamsMetadataFilename(kernel_op_type),
@@ -253,10 +299,11 @@ namespace matx
       if (!jit_cache_key.valid) {
         return;
       }
+      const auto cache_key = GetJITLaunchParamsCacheKey(jit_cache_key);
 
       {
         std::lock_guard<std::mutex> lock(jit_launch_params_mutex);
-        jit_launch_params_cache_by_key[jit_cache_key] = params;
+        jit_launch_params_cache_by_key[cache_key] = params;
       }
 
       GetCache().StoreLTOIRMetadata(GetJITLaunchParamsMetadataFilename(jit_cache_key),
