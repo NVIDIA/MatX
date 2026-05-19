@@ -94,9 +94,9 @@ namespace matx
 
     // Global cache for JIT launch parameters, keyed by JIT_CACHE_KEY when available,
     // with the original JIT_TYPE_QUERY string as a fallback.
-    static std::unordered_map<std::string, JITLaunchParams> jit_launch_params_cache;
-    static std::unordered_map<JITCacheKey, JITLaunchParams, JITCacheKeyHash> jit_launch_params_cache_by_key;
-    static std::mutex jit_launch_params_mutex;
+    inline std::unordered_map<std::string, JITLaunchParams> jit_launch_params_cache;
+    inline std::unordered_map<JITCacheKey, JITLaunchParams, JITCacheKeyHash> jit_launch_params_cache_by_key;
+    inline std::mutex jit_launch_params_mutex;
 
     static constexpr int JIT_LAUNCH_PARAMS_METADATA_VERSION = 6;
 
