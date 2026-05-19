@@ -169,14 +169,69 @@ namespace detail {
         };
 
         try {
-          detail::AllocateTempTensor(u_, std::forward<Executor>(ex), u_shape_, &u_ptr_);
           detail::AllocateTempTensor(s_, std::forward<Executor>(ex), s_shape_, &s_ptr_);
-          detail::AllocateTempTensor(vt_, std::forward<Executor>(ex), vt_shape_, &vt_ptr_);
-          if constexpr (is_cuda_executor_v<Executor>) {
-            svd_impl(u_, s_, vt_, a_, std::forward<Executor>(ex), jobz_);
+          if (jobz_ == SVDMode::NONE) {
+            a_value_type *u_dummy_ptr = nullptr;
+            a_value_type *vt_dummy_ptr = nullptr;
+            const auto free_dummy = [&]() noexcept {
+              try {
+                if (u_dummy_ptr != nullptr) {
+                  if constexpr (is_cuda_executor_v<Executor>) {
+                    matxFree(u_dummy_ptr, ex.getStream());
+                  }
+                  else {
+                    matxFree(u_dummy_ptr);
+                  }
+                  u_dummy_ptr = nullptr;
+                }
+                if (vt_dummy_ptr != nullptr) {
+                  if constexpr (is_cuda_executor_v<Executor>) {
+                    matxFree(vt_dummy_ptr, ex.getStream());
+                  }
+                  else {
+                    matxFree(vt_dummy_ptr);
+                  }
+                  vt_dummy_ptr = nullptr;
+                }
+              }
+              catch (...) {
+              }
+            };
+
+            try {
+              if constexpr (is_cuda_executor_v<Executor>) {
+                matxAlloc(reinterpret_cast<void **>(&u_dummy_ptr), sizeof(a_value_type), MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
+                matxAlloc(reinterpret_cast<void **>(&vt_dummy_ptr), sizeof(a_value_type), MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
+              }
+              else {
+                matxAlloc(reinterpret_cast<void **>(&u_dummy_ptr), sizeof(a_value_type), MATX_HOST_MALLOC_MEMORY);
+                matxAlloc(reinterpret_cast<void **>(&vt_dummy_ptr), sizeof(a_value_type), MATX_HOST_MALLOC_MEMORY);
+              }
+
+              auto u_dummy = make_tensor(u_dummy_ptr, u_shape_);
+              auto vt_dummy = make_tensor(vt_dummy_ptr, vt_shape_);
+              if constexpr (is_cuda_executor_v<Executor>) {
+                svd_impl(u_dummy, s_, vt_dummy, a_, std::forward<Executor>(ex), jobz_);
+              }
+              else {
+                svd_impl(u_dummy, s_, vt_dummy, a_, std::forward<Executor>(ex), jobz_, algo_);
+              }
+            }
+            catch (...) {
+              free_dummy();
+              throw;
+            }
+            free_dummy();
           }
           else {
-            svd_impl(u_, s_, vt_, a_, std::forward<Executor>(ex), jobz_, algo_);
+            detail::AllocateTempTensor(u_, std::forward<Executor>(ex), u_shape_, &u_ptr_);
+            detail::AllocateTempTensor(vt_, std::forward<Executor>(ex), vt_shape_, &vt_ptr_);
+            if constexpr (is_cuda_executor_v<Executor>) {
+              svd_impl(u_, s_, vt_, a_, std::forward<Executor>(ex), jobz_);
+            }
+            else {
+              svd_impl(u_, s_, vt_, a_, std::forward<Executor>(ex), jobz_, algo_);
+            }
           }
         }
         catch (...) {
@@ -300,7 +355,6 @@ namespace detail {
         }
       }
 
-      // TODO: Handle SVDMode::NONE case better to not require U & VT
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
         static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 4, "Must use mtie with 3 outputs on svd(). ie: (mtie(U, S, VT) = svd(A))");
