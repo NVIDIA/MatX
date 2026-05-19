@@ -587,6 +587,9 @@ std::string get_kernel_name_for_rank(bool stride, bool global_kernel, bool pass_
     return "matx::detail::matxOpT0KernelBlock";
   }
   else if constexpr (RANK == 1) {
+    if (!global_kernel && block_reduces_rank) {
+      return "matx::detail::matxOpT1KernelBlock";
+    }
     if (pass_through_threads && pass_through_inner_rank == 1) {
       return "matx::detail::matxOpT1KernelBlock1D";
     }
@@ -596,40 +599,40 @@ std::string get_kernel_name_for_rank(bool stride, bool global_kernel, bool pass_
     return "matx::detail::matxOpT1KernelBlock";
   }
   else if constexpr (RANK == 2) {
-    if (pass_through_threads) {
+    if (!global_kernel && block_reduces_rank) {
+      return "matx::detail::matxOpT2KernelBlockReduce";
+    } else if (pass_through_threads) {
       return pass_through_inner_rank == 1 ?
         "matx::detail::matxOpT2KernelBlock1D" :
         "matx::detail::matxOpT2KernelBlock2D";
     } else if (stride) {
       return global_kernel ? "matx::detail::matxOpT2StrideKernel" : "matx::detail::matxOpT2StrideKernelBlock";
-    } else if (!global_kernel && block_reduces_rank) {
-      return "matx::detail::matxOpT2KernelBlockReduce";
     } else {
       return global_kernel ? "matx::detail::matxOpT2Kernel" : "matx::detail::matxOpT2KernelBlock";
     }
   }
   else if constexpr (RANK == 3) {
-    if (pass_through_threads) {
+    if (!global_kernel && block_reduces_rank) {
+      return "matx::detail::matxOpT3KernelBlockReduce";
+    } else if (pass_through_threads) {
       return pass_through_inner_rank == 1 ?
         "matx::detail::matxOpT3KernelBlock1D" :
         "matx::detail::matxOpT3KernelBlock2D";
     } else if (stride) {
       return global_kernel ? "matx::detail::matxOpT3StrideKernel" : "matx::detail::matxOpT3StrideKernelBlock";
-    } else if (!global_kernel && block_reduces_rank) {
-      return "matx::detail::matxOpT3KernelBlockReduce";
     } else {
       return global_kernel ? "matx::detail::matxOpT3Kernel" : "matx::detail::matxOpT3KernelBlock";
     }
   }
   else if constexpr (RANK == 4) {
-    if (pass_through_threads) {
+    if (!global_kernel && block_reduces_rank) {
+      return "matx::detail::matxOpT4KernelBlockReduce";
+    } else if (pass_through_threads) {
       return pass_through_inner_rank == 1 ?
         "matx::detail::matxOpT4KernelBlock1D" :
         "matx::detail::matxOpT4KernelBlock2D";
     } else if (stride) {
       return global_kernel ? "matx::detail::matxOpT4StrideKernel" : "matx::detail::matxOpT4StrideKernelBlock";
-    } else if (!global_kernel && block_reduces_rank) {
-      return "matx::detail::matxOpT4KernelBlockReduce";
     } else {
       return global_kernel ? "matx::detail::matxOpT4Kernel" : "matx::detail::matxOpT4KernelBlock";
     }

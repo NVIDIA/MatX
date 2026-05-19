@@ -98,7 +98,7 @@ namespace matx
     static std::unordered_map<JITCacheKey, JITLaunchParams, JITCacheKeyHash> jit_launch_params_cache_by_key;
     static std::mutex jit_launch_params_mutex;
 
-    static constexpr int JIT_LAUNCH_PARAMS_METADATA_VERSION = 5;
+    static constexpr int JIT_LAUNCH_PARAMS_METADATA_VERSION = 6;
 
     inline std::string GetJITLaunchParamsMetadataFilename(const std::string &kernel_op_type)
     {
@@ -451,15 +451,15 @@ namespace matx
               block_reduces_rank = detail::get_operator_capability<detail::OperatorCapability::BLOCK_REDUCES_RANK>(op);
               if (global_kernel) {
                 MATX_LOG_DEBUG("Operator operates on a global level");
-              } else if (pass_through_threads) {
-                MATX_LOG_DEBUG("Operator uses pass-through threads with inner rank {}", pass_through_inner_rank);
               } else if (block_reduces_rank) {
                 MATX_LOG_DEBUG("Operator uses a reduced-rank block collective");
+              } else if (pass_through_threads) {
+                MATX_LOG_DEBUG("Operator uses pass-through threads with inner rank {}", pass_through_inner_rank);
               } else {
                 MATX_LOG_DEBUG("Operator operates on a block level");
               }
 
-              if (pass_through_threads) {
+              if (pass_through_threads && !block_reduces_rank) {
                 // For pass-through operators (e.g., MathDx), block dimensions are constrained by the operator.
                 auto block_dim_range = detail::get_operator_capability<detail::OperatorCapability::BLOCK_DIM>(op);
                 block_size = detail::SelectJITPassThroughBlockDim(block_dim_range);

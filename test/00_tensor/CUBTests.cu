@@ -990,6 +990,77 @@ TEST(TensorStats, CubBlockJITSumOfMatmulOutput)
   MATX_EXIT_HANDLER();
 }
 
+#if defined(MATX_EN_MATHDX)
+TEST(TensorStats, CubBlockJITReductionsOfSolverProjection)
+{
+  MATX_ENTER_HANDLER();
+
+  CUDAJITExecutor jit_exec{};
+  cudaExecutor cuda_exec{};
+  constexpr index_t n = 4;
+
+  tensor_t<float, 2> A({n, n});
+  tensor_t<float, 1> sum_jit({n});
+  tensor_t<float, 1> prod_jit({n});
+  tensor_t<float, 1> min_jit({n});
+  tensor_t<float, 1> max_jit({n});
+  tensor_t<float, 1> sum_ref({n});
+  tensor_t<float, 1> prod_ref({n});
+  tensor_t<float, 1> min_ref({n});
+  tensor_t<float, 1> max_ref({n});
+  tensor_t<float, 0> total_jit{{}};
+  tensor_t<float, 0> total_ref{{}};
+
+  for (index_t row = 0; row < n; row++) {
+    for (index_t col = 0; col < n; col++) {
+      A(row, col) = row == col ?
+        4.0f + static_cast<float>(row) :
+        0.125f * static_cast<float>((row + 1) * (col + 2));
+    }
+  }
+
+  auto jit_lu = lu(A);
+  auto sum_expr = sum(jit_lu.LU, {1});
+  auto prod_expr = prod(jit_lu.LU, {1});
+  auto min_expr = matx::min(jit_lu.LU, {1});
+  auto max_expr = matx::max(jit_lu.LU, {1});
+  auto total_expr = sum(jit_lu.LU);
+  if (!jit_supported(sum_expr) ||
+      !jit_supported(prod_expr) ||
+      !jit_supported(min_expr) ||
+      !jit_supported(max_expr) ||
+      !jit_supported(total_expr)) {
+    GTEST_SKIP();
+  }
+
+  (sum_jit = sum_expr).run(jit_exec);
+  (prod_jit = prod_expr).run(jit_exec);
+  (min_jit = min_expr).run(jit_exec);
+  (max_jit = max_expr).run(jit_exec);
+  (total_jit = total_expr).run(jit_exec);
+
+  auto ref_lu = lu(A);
+  (sum_ref = sum(ref_lu.LU, {1})).run(cuda_exec);
+  (prod_ref = prod(ref_lu.LU, {1})).run(cuda_exec);
+  (min_ref = matx::min(ref_lu.LU, {1})).run(cuda_exec);
+  (max_ref = matx::max(ref_lu.LU, {1})).run(cuda_exec);
+  (total_ref = sum(ref_lu.LU)).run(cuda_exec);
+
+  jit_exec.sync();
+  cuda_exec.sync();
+
+  for (index_t row = 0; row < n; row++) {
+    ASSERT_NEAR(sum_jit(row), sum_ref(row), 0.001f);
+    ASSERT_NEAR(prod_jit(row), prod_ref(row), 0.001f);
+    ASSERT_NEAR(min_jit(row), min_ref(row), 0.001f);
+    ASSERT_NEAR(max_jit(row), max_ref(row), 0.001f);
+  }
+  ASSERT_NEAR(total_jit(), total_ref(), 0.001f);
+
+  MATX_EXIT_HANDLER();
+}
+#endif
+
 TEST(TensorStats, CubBlockJITSortAbs2FFT)
 {
   MATX_ENTER_HANDLER();
