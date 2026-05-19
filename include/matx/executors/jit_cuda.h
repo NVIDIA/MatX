@@ -85,9 +85,17 @@ namespace matx
       bool pass_through_threads;         // Whether all threads must call operator() (bounds checking at tensor level)
     };
 
-    // Global cache for JIT launch parameters, keyed by operator type string from JIT_TYPE_QUERY
-    static std::unordered_map<std::string, JITLaunchParams> jit_launch_params_cache;
-    static std::mutex jit_launch_params_mutex;
+    inline std::string GetJITLaunchParamsCacheKey(const std::string &kernel_op_type)
+    {
+      int device = 0;
+      MATX_CUDA_CHECK(cudaGetDevice(&device));
+      return std::to_string(device) + ":" + kernel_op_type;
+    }
+
+    // Global cache for JIT launch parameters, keyed by CUDA device and operator type
+    // string from JIT_TYPE_QUERY.
+    inline std::unordered_map<std::string, JITLaunchParams> jit_launch_params_cache;
+    inline std::mutex jit_launch_params_mutex;
   }  // namespace detail
 
   /**
@@ -226,10 +234,13 @@ namespace matx
 
           bool global_kernel = detail::get_operator_capability<detail::OperatorCapability::GLOBAL_KERNEL>(op);
           bool pass_through_threads = detail::get_operator_capability<detail::OperatorCapability::PASS_THROUGH_THREADS>(op);
+          bool block_reduces_rank = detail::get_operator_capability<detail::OperatorCapability::BLOCK_REDUCES_RANK>(op);
           if (global_kernel) {
             MATX_LOG_DEBUG("Operator operates on a global level");
           } else if (pass_through_threads) {
             MATX_LOG_DEBUG("Operator uses pass-through threads (bounds checking at tensor level)");
+          } else if (block_reduces_rank) {
+            MATX_LOG_DEBUG("Operator uses a reduced-rank block collective");
           } else {
             MATX_LOG_DEBUG("Operator operates on a block level");
           }
@@ -237,13 +248,14 @@ namespace matx
           if constexpr (RANK <= 4) {
             // Get operator type string for cache lookup
             const auto kernel_op_type = detail::get_operator_capability<detail::OperatorCapability::JIT_TYPE_QUERY>(op);
+            const auto launch_params_cache_key = detail::GetJITLaunchParamsCacheKey(kernel_op_type);
 
             // Check if we have cached launch parameters for this operator type
             detail::JITLaunchParams cached_params;
             bool has_cached_params = false;
             {
               std::lock_guard<std::mutex> lock(detail::jit_launch_params_mutex);
-              auto it = detail::jit_launch_params_cache.find(kernel_op_type);
+              auto it = detail::jit_launch_params_cache.find(launch_params_cache_key);
               if (it != detail::jit_launch_params_cache.end()) {
                 cached_params = it->second;
                 has_cached_params = true;
@@ -274,7 +286,10 @@ namespace matx
               if (pass_through_threads) {
                 // For pass-through operators (e.g., cuBLASDx), block dimensions are fixed by the operator
                 auto block_dim_range = detail::get_operator_capability<detail::OperatorCapability::BLOCK_DIM>(op);
-                block_size = block_dim_range[1];  // Use the max block size
+                if (block_dim_range[0] == detail::capability_attributes<detail::OperatorCapability::BLOCK_DIM>::invalid) {
+                  MATX_THROW(matxInvalidParameter, "No valid JIT block dimension satisfies the fused operator requirements");
+                }
+                block_size = block_dim_range[0];
                 stride = detail::get_grid_dims_block_2d<RANK>(blocks, threads, sizes, block_size);
 
                 // EPT is 1 for 2D block operators - the operator handles elements internally
@@ -297,6 +312,8 @@ namespace matx
 
                 if (global_kernel) {
                   stride = detail::get_grid_dims<RANK>(blocks, threads, sizes, static_cast<int>(best_ept), 256);
+                } else if (block_reduces_rank) {
+                  stride = detail::get_grid_dims_block_reduce<RANK>(blocks, threads, sizes, groups_per_block, block_size);
                 } else {
                   stride = detail::get_grid_dims_block<RANK>(blocks, threads, sizes, static_cast<int>(best_ept), groups_per_block, block_size, true);
                 }
@@ -316,6 +333,8 @@ namespace matx
 
                 if (global_kernel) {
                   stride = detail::get_grid_dims<RANK>(blocks, threads, sizes, static_cast<int>(best_ept), 256);
+                } else if (block_reduces_rank) {
+                  stride = detail::get_grid_dims_block_reduce<RANK>(blocks, threads, sizes, groups_per_block, block_size);
                 } else {
                   stride = detail::get_grid_dims_block<RANK>(blocks, threads, sizes, static_cast<int>(best_ept), groups_per_block, block_size, true);
                 }
@@ -336,26 +355,27 @@ namespace matx
 
               {
                 std::lock_guard<std::mutex> lock(detail::jit_launch_params_mutex);
-                detail::jit_launch_params_cache[kernel_op_type] = params_to_cache;
+                detail::jit_launch_params_cache[launch_params_cache_key] = params_to_cache;
               }
             }
 
             MATX_LOG_DEBUG("Shm size {}, Stride {}, estimated EPT {}, blocks {}x{}x{} threads {}x{}x{}, pass_through_threads {}",
                 shm_size, stride, static_cast<int>(best_ept), blocks.x, blocks.y, blocks.z, threads.x, threads.y, threads.z, pass_through_threads);
             const int osize = RANK == 0 ? 1 : static_cast<int>(op.Size(RANK - 1));
-            detail::nvrtc_compile_and_run("output.cu", op, sizes, blocks, threads, best_ept, stride, shm_size, osize, global_kernel, pass_through_threads);
+            detail::nvrtc_compile_and_run("output.cu", op, sizes, blocks, threads, best_ept, stride, shm_size, osize, global_kernel, stream_, pass_through_threads, block_reduces_rank);
           }
           else {
             // ND kernel support for ranks > 4 (JIT path)
             // Get operator type string for cache lookup
             const auto kernel_op_type = detail::get_operator_capability<detail::OperatorCapability::JIT_TYPE_QUERY>(op);
+            const auto launch_params_cache_key = detail::GetJITLaunchParamsCacheKey(kernel_op_type);
 
             // Check if we have cached launch parameters for this operator type
             detail::JITLaunchParams cached_params;
             bool has_cached_params = false;
             {
               std::lock_guard<std::mutex> lock(detail::jit_launch_params_mutex);
-              auto it = detail::jit_launch_params_cache.find(kernel_op_type);
+              auto it = detail::jit_launch_params_cache.find(launch_params_cache_key);
               if (it != detail::jit_launch_params_cache.end()) {
                 cached_params = it->second;
                 has_cached_params = true;
@@ -395,7 +415,7 @@ namespace matx
               params_to_cache.pass_through_threads = pass_through_threads;
               {
                 std::lock_guard<std::mutex> lock(detail::jit_launch_params_mutex);
-                detail::jit_launch_params_cache[kernel_op_type] = params_to_cache;
+                detail::jit_launch_params_cache[launch_params_cache_key] = params_to_cache;
               }
             }
 
@@ -407,7 +427,7 @@ namespace matx
                 stride, blocks.x, blocks.y, blocks.z, threads.x, threads.y, threads.z, dims);
 
             // Use ND kernel through JIT compilation
-            detail::nvrtc_compile_and_run("output.cu", op, sizes, blocks, threads, best_ept, stride, 0, osize, true);
+            detail::nvrtc_compile_and_run("output.cu", op, sizes, blocks, threads, best_ept, stride, 0, osize, true, stream_);
           }
 
 #else

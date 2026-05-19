@@ -339,6 +339,7 @@ endif()
 
 # Enable JIT compilation support
 if (MATX_EN_JIT OR MATX_EN_MATHDX)
+    include(GNUInstallDirs)
     message(STATUS "Enabling JIT compilation support via NVRTC")
     target_compile_definitions(matx INTERFACE MATX_EN_JIT)
     
@@ -349,6 +350,17 @@ if (MATX_EN_JIT OR MATX_EN_MATHDX)
     string(REGEX REPLACE "-virtual$" "" NVRTC_CUDA_ARCH "${NVRTC_CUDA_ARCH}")
     target_compile_definitions(matx INTERFACE NVRTC_CUDA_ARCH="${NVRTC_CUDA_ARCH}")
     target_compile_definitions(matx INTERFACE NVRTC_CXX_STANDARD="${CMAKE_CXX_STANDARD}")
+    target_compile_definitions(matx INTERFACE "$<BUILD_INTERFACE:MATX_NVRTC_BUILD_DIR_DEFAULT=\"${CMAKE_BINARY_DIR}\">")
+    set(MATX_NVRTC_CCCL_BUILD_INCLUDE_DIRS
+        "${CCCL_SOURCE_DIR}/thrust"
+        "${CCCL_SOURCE_DIR}/libcudacxx/include"
+        "${CCCL_SOURCE_DIR}/cub")
+    list(JOIN MATX_NVRTC_CCCL_BUILD_INCLUDE_DIRS "|" MATX_NVRTC_CCCL_BUILD_INCLUDE_DIRS_DEFAULT)
+    set(MATX_NVRTC_CCCL_INSTALL_INCLUDE_DIRS_DEFAULT
+        "$<JOIN:$<TARGET_PROPERTY:CCCL::CCCL,INTERFACE_INCLUDE_DIRECTORIES>,|>")
+    target_compile_definitions(matx INTERFACE
+        "$<BUILD_INTERFACE:MATX_NVRTC_CCCL_INCLUDE_DIRS_DEFAULT=\"${MATX_NVRTC_CCCL_BUILD_INCLUDE_DIRS_DEFAULT}\">"
+        "$<INSTALL_INTERFACE:MATX_NVRTC_CCCL_INCLUDE_DIRS_DEFAULT=\"${MATX_NVRTC_CCCL_INSTALL_INCLUDE_DIRS_DEFAULT}\">")
     
     # Link NVRTC library
     target_link_libraries(matx INTERFACE CUDA::nvrtc)

@@ -57,6 +57,8 @@ namespace detail {
       mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, OpA::Rank()> tmp_out_;
       mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr;
       mutable bool prerun_done_ = false; 
+      mutable ElementsPerThread current_ept_ = ElementsPerThread::ONE;
+      mutable int current_groups_per_block_ = 1;
 
     public:
       using matxop = bool;
@@ -74,19 +76,98 @@ namespace detail {
 
       __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
-      __MATX_INLINE__ std::string get_capability_str(int EPT) const {
-        return std::string("template <> struct jit_sort_params_t<0>  {\n") + 
-               "  constexpr static int ttl_items = " + std::to_string(a_.Size(OpA::Rank() - 1) / EPT) + ";\n"
-               "};\n";         
+#ifdef MATX_EN_JIT
+      struct JIT_Storage {
+        typename detail::inner_storage_or_self_t<detail::base_type_t<OpA>> a_;
+      };
+
+      JIT_Storage ToJITStorage() const {
+        return JIT_Storage{detail::to_jit_storage(a_)};
       }
+
+      __MATX_INLINE__ index_t CriticalDimSize() const {
+        if constexpr (OpA::Rank() == 0) {
+          return 0;
+        }
+        else {
+          return a_.Size(OpA::Rank() - 1);
+        }
+      }
+
+      __MATX_INLINE__ int MaxJitElementsPerThread() const {
+        return CubJitMaxPowerOfTwoCollectiveEPT<value_type>(CriticalDimSize());
+      }
+
+      __MATX_INLINE__ int BlockThreadsForEPT(int ept) const {
+        return CubJitPowerOfTwoCollectiveBlockThreads(CriticalDimSize(), ept);
+      }
+
+      __MATX_INLINE__ bool BlockSizeFitsAtMaxEPT() const {
+        return CubJitPowerOfTwoCollectiveFitsInBlock<value_type>(CriticalDimSize());
+      }
+
+      __MATX_INLINE__ int CurrentBlockThreads() const {
+        const int ept = static_cast<int>(current_ept_);
+        return BlockThreadsForEPT(ept);
+      }
+
+      __MATX_INLINE__ int BatchGroupSize() const {
+        if constexpr (OpA::Rank() <= 1) {
+          return 1;
+        }
+        else {
+          return static_cast<int>(a_.Size(OpA::Rank() - 2));
+        }
+      }
+
+      __MATX_INLINE__ int MaxGroupsPerBlock() const {
+        return 1;
+      }
+
+      __MATX_INLINE__ std::string get_jit_class_name() const {
+        std::string symbol_name = std::string("JITSortOp_") + (dir_ == SORT_DIR_ASC ? "A" : "D") + "_R" + std::to_string(OpA::Rank());
+        for (int r = 0; r < OpA::Rank(); r++) {
+          symbol_name += "_" + std::to_string(out_dims_[r]);
+        }
+        return symbol_name;
+      }
+
+      __MATX_INLINE__ auto get_jit_op_str() const {
+        const std::string class_name = get_jit_class_name();
+        const std::string direction = dir_ == SORT_DIR_ASC ? "BlockSortDirection::ASCENDING" : "BlockSortDirection::DESCENDING";
+        return cuda::std::make_tuple(
+          class_name,
+          std::string("template <typename OpA> struct " + class_name + "  {\n") +
+          "  using input_type = typename OpA::value_type;\n" +
+          "  using value_type = input_type;\n" +
+          "  using matxop = bool;\n" +
+          "  constexpr static int Rank_ = " + std::to_string(OpA::Rank()) + ";\n" +
+          "  constexpr static cuda::std::array<index_t, Rank_> out_dims_ = { " + detail::array_to_string(out_dims_) + " };\n" +
+          "  typename detail::inner_storage_or_self_t<detail::base_type_t<OpA>> a_;\n" +
+          "  template <typename CapType, typename... Is>\n" +
+          "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(Is... indices) const\n" +
+          "  {\n" +
+          "    return BlockSort<CapType, " + direction + ">::Run(a_, indices...);\n" +
+          "  }\n" +
+          "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() { return Rank_; }\n" +
+          "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const { return out_dims_[dim]; }\n" +
+          "};\n"
+        );
+      }
+#endif
 
       template <typename CapType, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const {
-// #if defined(__CUDA_ARCH__) && defined(__CUDACC_RTC__)
-//         return BlockSort<CapType>::Run(a_, indices...);
-// #else
+#if defined(__CUDA_ARCH__) && defined(__CUDACC_RTC__)
+        if (dir_ == SORT_DIR_ASC) {
+          return BlockSort<CapType, BlockSortDirection::ASCENDING>::Run(a_, indices...);
+        }
+        else {
+          return BlockSort<CapType, BlockSortDirection::DESCENDING>::Run(a_, indices...);
+        }
+#else
         return tmp_out_.template operator()<CapType>(indices...);
-//#endif
+#endif
       }
 
       template <typename... Is>
@@ -97,60 +178,108 @@ namespace detail {
       template <OperatorCapability Cap, typename InType>
       __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {      
         if constexpr (Cap == OperatorCapability::BLOCK_DIM) {
-// #if defined(MATX_EN_JIT) && defined(__CUDACC__)
-//           return combine_capabilities<Cap>(static_cast<int>(a_.Size(OpA::Rank() - 1) / static_cast<int>(in.ept)), detail::get_operator_capability<Cap>(a_, in));
-// #else
+#if defined(MATX_EN_JIT) && defined(__CUDACC__)
+          const int block_threads = CurrentBlockThreads();
+          const auto my_cap = cuda::std::array<int, 2>{block_threads, block_threads};
+          return combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(a_, in));
+#else
           return combine_capabilities<Cap>(capability_attributes<Cap>::default_value, detail::get_operator_capability<Cap>(a_, in));
-//#endif
+#endif
         }
         else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
-          // For JIT_CLASS_QUERY, enforce that InType is std::unordered_map<string, string>
+#ifdef MATX_EN_JIT
           static_assert(std::is_same_v<InType, std::unordered_map<std::string, std::string>>, 
                         "JIT_CLASS_QUERY capability requires std::unordered_map<std::string, std::string> as input type");
-          
-          // Get the capability string and add to map
-          auto self_cap = get_capability_str(static_cast<int>(ElementsPerThread::ONE));
-          // For sort, we need to handle the capability string differently
-          // since it's not a tuple. Add it with a generated key.
-          std::string key = "JITSortOp_" + std::to_string(a_.Rank());
+          const auto [key, value] = get_jit_op_str();
           if (in.find(key) == in.end()) {
-            in[key] = self_cap;
+            in[key] = value;
           }
-          
-          // Also handle child operators
           detail::get_operator_capability<Cap>(a_, in);
-          
-          // Always return true for now
           return true;
+#else
+          return false;
+#endif
         }
         else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-          static_assert(std::is_same_v<InType, EPTQueryInput>, "ELEMENTS_PER_THREAD capability requires EPTQueryInput as input type");
-// #if defined(MATX_EN_JIT) && defined(__CUDACC__)
-//           if (in.jit) {
-//             const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::THIRTY_TWO};
-//             return combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(a_, in));                
-//           }
-//           else {
-//             return combine_capabilities<Cap>(capability_attributes<Cap>::default_value, detail::get_operator_capability<Cap>(a_, in));
-//           }
-// #else
+          static_assert(std::is_same_v<remove_cvref_t<InType>, EPTQueryInput>, "ELEMENTS_PER_THREAD capability requires EPTQueryInput as input type");
+#if defined(MATX_EN_JIT) && defined(__CUDACC__)
+          if (in.jit) {
+            const auto max_ept = static_cast<ElementsPerThread>(MaxJitElementsPerThread());
+            const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, max_ept};
+            return my_cap;
+          }
+#endif
           return combine_capabilities<Cap>(capability_attributes<Cap>::default_value, detail::get_operator_capability<Cap>(a_, in));
-//#endif
-        }            
+        }
         else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
           bool supported = true;
-// #if defined(MATX_EN_JIT) && defined(__CUDACC__)
-//           const auto sort_size = a_.Size(OpA::Rank() - 1);     
-//           if (OpA::Rank() == 0 || 
-//               sort_size > 4096 || 
-//              (sort_size & (sort_size - 1)) != 0) {
-//             supported = false;
-//           } 
-// #else
+#if defined(MATX_EN_JIT) && defined(__CUDACC__)
+          supported = OpA::Rank() > 0 && !is_complex_v<value_type> &&
+                      BlockSizeFitsAtMaxEPT();
+#else
           supported = false;
-//#endif
+#endif
           return combine_capabilities<Cap>(supported, detail::get_operator_capability<Cap>(a_, in));      
-        }        
+        }
+        else if constexpr (Cap == OperatorCapability::SET_ELEMENTS_PER_THREAD) {
+#ifdef MATX_EN_JIT
+          current_ept_ = in.ept;
+#endif
+          return combine_capabilities<Cap>(capability_attributes<Cap>::default_value, detail::get_operator_capability<Cap>(a_, in));
+        }
+        else if constexpr (Cap == OperatorCapability::GROUPS_PER_BLOCK) {
+#if defined(MATX_EN_JIT) && defined(__CUDACC__)
+          const int groups = MaxGroupsPerBlock();
+          const auto my_cap = cuda::std::array<int, 2>{1, groups};
+          return combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(a_, in));
+#else
+          return combine_capabilities<Cap>(capability_attributes<Cap>::default_value, detail::get_operator_capability<Cap>(a_, in));
+#endif
+        }
+        else if constexpr (Cap == OperatorCapability::SET_GROUPS_PER_BLOCK) {
+#ifdef MATX_EN_JIT
+          current_groups_per_block_ = in.groups_per_block;
+#endif
+          return combine_capabilities<Cap>(capability_attributes<Cap>::default_value, detail::get_operator_capability<Cap>(a_, in));
+        }
+        else if constexpr (Cap == OperatorCapability::GLOBAL_KERNEL) {
+#ifdef MATX_EN_JIT
+          return false;
+#else
+          return capability_attributes<Cap>::default_value;
+#endif
+        }
+        else if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
+          return combine_capabilities<Cap>(capability_attributes<Cap>::default_value, detail::get_operator_capability<Cap>(a_, in));
+        }
+        else if constexpr (Cap == OperatorCapability::MAX_EPT_VEC_LOAD) {
+#if defined(MATX_EN_JIT) && defined(__CUDACC__)
+          return MaxJitElementsPerThread();
+#else
+          return combine_capabilities<Cap>(capability_attributes<Cap>::default_value, detail::get_operator_capability<Cap>(a_, in));
+#endif
+        }
+        else if constexpr (Cap == OperatorCapability::STATIC_SHM_SIZE) {
+#if defined(MATX_EN_JIT) && defined(__CUDACC__)
+          const int block_threads = CurrentBlockThreads();
+          const int self_shm = block_threads > 0 ?
+            GetCubBlockShmRequired<value_type>(CubBlockAlgorithm::SORT,
+                                               current_ept_,
+                                               block_threads) :
+            capability_attributes<Cap>::default_value;
+          return combine_capabilities<Cap>(self_shm, detail::get_operator_capability<Cap>(a_, in));
+#else
+          return combine_capabilities<Cap>(capability_attributes<Cap>::default_value, detail::get_operator_capability<Cap>(a_, in));
+#endif
+        }
+        else if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+#ifdef MATX_EN_JIT
+          const auto inner_op_jit_name = detail::get_operator_capability<Cap>(a_, in);
+          return get_jit_class_name() + "<" + inner_op_jit_name + ">";
+#else
+          return "";
+#endif
+        }
         else {
           auto self_has_cap = capability_attributes<Cap>::default_value;
           return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
@@ -203,7 +332,9 @@ namespace detail {
         }
 
         matxFree(ptr);
-      }      
+        ptr = nullptr;
+        prerun_done_ = false;
+      }
   };
 }
 
