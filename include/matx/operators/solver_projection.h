@@ -66,6 +66,30 @@ __MATX_INLINE__ cuda::std::array<index_t, RANK - 1> SolverVectorShapeFromMatrixS
   return vec_shape;
 }
 
+template <typename State>
+struct SolverProjectionLifetimeRegistry {
+  struct LifetimeEntry {
+    std::shared_ptr<State> owner;
+    std::shared_ptr<std::mutex> execution_mutex;
+    size_t count = 0;
+    // Balances shared input PreRun/PostRun for multiple projections from the
+    // same solver state in one JIT expression.
+    size_t jit_prerun_count = 0;
+  };
+
+  static std::mutex &LifetimeMutex()
+  {
+    static std::mutex mutex;
+    return mutex;
+  }
+
+  static std::unordered_map<State *, LifetimeEntry> &LifetimeRegistry()
+  {
+    static std::unordered_map<State *, LifetimeEntry> registry;
+    return registry;
+  }
+};
+
 template <typename State, int Component, typename TensorType>
 class SolverProjectionStorage : public BaseOp<SolverProjectionStorage<State, Component, TensorType>>
 {
@@ -75,25 +99,17 @@ class SolverProjectionStorage : public BaseOp<SolverProjectionStorage<State, Com
     mutable TensorType tensor_;
     const char *name_;
 
-    struct LifetimeEntry {
-      std::shared_ptr<State> owner;
-      std::shared_ptr<std::mutex> execution_mutex;
-      size_t count = 0;
-      // Balances shared input PreRun/PostRun for multiple projections from the
-      // same solver state in one JIT expression.
-      size_t jit_prerun_count = 0;
-    };
+    using lifetime_registry = SolverProjectionLifetimeRegistry<State>;
+    using LifetimeEntry = typename lifetime_registry::LifetimeEntry;
 
     static std::mutex &LifetimeMutex()
     {
-      static std::mutex mutex;
-      return mutex;
+      return lifetime_registry::LifetimeMutex();
     }
 
     static std::unordered_map<State *, LifetimeEntry> &LifetimeRegistry()
     {
-      static std::unordered_map<State *, LifetimeEntry> registry;
-      return registry;
+      return lifetime_registry::LifetimeRegistry();
     }
 
     static void RetainState(const std::shared_ptr<State> &owner)

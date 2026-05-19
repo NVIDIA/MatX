@@ -96,17 +96,20 @@ namespace detail {
         const int cc = major * 100 + minor * 10;
 
         const index_t n = vectors_shape_[RANK - 1];
+        // cuSolverDx HEEV is the dense Hermitian/symmetric eigensolver. HTEV is
+        // the tridiagonal eigensolver and expects diagonal/off-diagonal storage.
+        const auto eig_function = CUSOLVERDX_FUNCTION_HEEV;
         dx_heev_values_helper_.set_m(n);
         dx_heev_values_helper_.set_n(n);
         dx_heev_values_helper_.set_cc(cc);
-        dx_heev_values_helper_.set_function(CUSOLVERDX_FUNCTION_HEEV);
+        dx_heev_values_helper_.set_function(eig_function);
         dx_heev_values_helper_.set_fill_mode(uplo_);
         dx_heev_values_helper_.set_job(CUSOLVERDX_JOB_NO_VECTORS);
 
         dx_heev_vectors_helper_.set_m(n);
         dx_heev_vectors_helper_.set_n(n);
         dx_heev_vectors_helper_.set_cc(cc);
-        dx_heev_vectors_helper_.set_function(CUSOLVERDX_FUNCTION_HEEV);
+        dx_heev_vectors_helper_.set_function(eig_function);
         dx_heev_vectors_helper_.set_fill_mode(uplo_);
         dx_heev_vectors_helper_.set_job(CUSOLVERDX_JOB_OVERWRITE_VECTORS);
 #endif
@@ -308,11 +311,18 @@ namespace detail {
           detail::HashJITCacheValue(key, static_cast<int>(jobz_));
         }
         detail::HashJITCacheValue(key, static_cast<int>(uplo_));
-        for (int i = 0; i < RANK; ++i) {
-          detail::HashJITCacheValue(key, vectors_shape_[i]);
+        if constexpr (Component == EIG_VALUES) {
+          for (int i = 0; i < RANK - 1; ++i) {
+            detail::HashJITCacheValue(key, values_shape_[i]);
+          }
+          detail::HashJITCacheString(key, dx_heev_values_helper_.GetSymbolName());
         }
-        detail::HashJITCacheString(key, dx_heev_values_helper_.GetSymbolName());
-        detail::HashJITCacheString(key, dx_heev_vectors_helper_.GetSymbolName());
+        else {
+          for (int i = 0; i < RANK; ++i) {
+            detail::HashJITCacheValue(key, vectors_shape_[i]);
+          }
+          detail::HashJITCacheString(key, dx_heev_vectors_helper_.GetSymbolName());
+        }
         return key;
       }
 

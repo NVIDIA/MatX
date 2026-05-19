@@ -152,7 +152,8 @@ namespace detail {
       __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
         if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
-          auto result = combine_capabilities<Cap>(dx_potrf_helper_.GetShmRequired(), detail::get_operator_capability<Cap>(a_, in));
+          const int shm_required = dx_potrf_helper_.IsSupported() ? dx_potrf_helper_.GetShmRequired() : 0;
+          auto result = combine_capabilities<Cap>(shm_required, detail::get_operator_capability<Cap>(a_, in));
           MATX_LOG_DEBUG("cuSolverDx POTRF DYN_SHM_SIZE: {}", result);
           return result;
         }

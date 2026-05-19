@@ -275,37 +275,43 @@ private:
     trait_workspace_size_ = 0;
     trait_block_dim_ = {0, 0, 0};
 
-    if constexpr (!is_supported_value_type) {
-      return false;
+    try {
+      if constexpr (!is_supported_value_type) {
+        return false;
+      }
+      else {
+        if (m_ <= 0 || n_ <= 0) {
+          return false;
+        }
+
+        auto handle = GeneratePlan();
+        long long int shared_memory_size = 0;
+        if (cusolverdxGetTraitInt64(handle.get(), CUSOLVERDX_TRAIT_SHARED_MEMORY_SIZE, &shared_memory_size) != COMMONDX_SUCCESS) {
+          return false;
+        }
+
+        long long int workspace_size = 0;
+        if (cusolverdxGetTraitInt64(handle.get(), CUSOLVERDX_TRAIT_WORKSPACE_SIZE, &workspace_size) != COMMONDX_SUCCESS) {
+          return false;
+        }
+
+        cuda::std::array<long long int, 3> block_dim = {0, 0, 0};
+        if (cusolverdxGetTraitInt64s(handle.get(), CUSOLVERDX_TRAIT_BLOCK_DIM, 3, block_dim.data()) != COMMONDX_SUCCESS) {
+          return false;
+        }
+
+        trait_shared_memory_size_ = shared_memory_size;
+        trait_workspace_size_ = workspace_size;
+        trait_block_dim_ = cuda::std::array<int, 3>{static_cast<int>(block_dim[0]),
+                                                    static_cast<int>(block_dim[1]),
+                                                    static_cast<int>(block_dim[2])};
+        traits_supported_ = true;
+        return true;
+      }
     }
-    else {
-      if (m_ <= 0 || n_ <= 0) {
-        return false;
-      }
-
-      auto handle = GeneratePlan();
-      long long int shared_memory_size = 0;
-      if (cusolverdxGetTraitInt64(handle.get(), CUSOLVERDX_TRAIT_SHARED_MEMORY_SIZE, &shared_memory_size) != COMMONDX_SUCCESS) {
-        return false;
-      }
-
-      long long int workspace_size = 0;
-      if (cusolverdxGetTraitInt64(handle.get(), CUSOLVERDX_TRAIT_WORKSPACE_SIZE, &workspace_size) != COMMONDX_SUCCESS) {
-        return false;
-      }
-
-      cuda::std::array<long long int, 3> block_dim = {0, 0, 0};
-      if (cusolverdxGetTraitInt64s(handle.get(), CUSOLVERDX_TRAIT_BLOCK_DIM, 3, block_dim.data()) != COMMONDX_SUCCESS) {
-        return false;
-      }
-
-      trait_shared_memory_size_ = shared_memory_size;
-      trait_workspace_size_ = workspace_size;
-      trait_block_dim_ = cuda::std::array<int, 3>{static_cast<int>(block_dim[0]),
-                                                  static_cast<int>(block_dim[1]),
-                                                  static_cast<int>(block_dim[2])};
-      traits_supported_ = true;
-      return true;
+    catch (...) {
+      traits_supported_ = false;
+      return false;
     }
   }
 
