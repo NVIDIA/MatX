@@ -382,9 +382,6 @@ class SolverProjectionStorage : public BaseOp<SolverProjectionStorage<State, Com
           std::lock_guard<std::mutex> lock(*execution_mutex);
           state_->Release(std::forward<Executor>(ex));
         }
-        else {
-          state_->Release(std::forward<Executor>(ex));
-        }
       }
     }
 

@@ -282,11 +282,20 @@ namespace detail {
         auto key = detail::MakeJITCacheKeyForType<QRState<OpA>>("JITQRProjection");
         detail::HashJITCacheValue(key, Component);
         detail::HashJITCacheValue(key, RANK);
-        for (int i = 0; i < RANK; ++i) {
-          detail::HashJITCacheValue(key, r_shape_[i]);
+        if constexpr (Component == QR_Q) {
+          for (int i = 0; i < RANK; ++i) {
+            detail::HashJITCacheValue(key, q_shape_[i]);
+            detail::HashJITCacheValue(key, r_shape_[i]);
+          }
+          detail::HashJITCacheString(key, dx_geqrf_helper_.GetSymbolName());
+          detail::HashJITCacheString(key, dx_ungqr_helper_.GetSymbolName());
         }
-        detail::HashJITCacheString(key, dx_geqrf_helper_.GetSymbolName());
-        detail::HashJITCacheString(key, dx_ungqr_helper_.GetSymbolName());
+        else {
+          for (int i = 0; i < RANK; ++i) {
+            detail::HashJITCacheValue(key, r_shape_[i]);
+          }
+          detail::HashJITCacheString(key, dx_geqrf_helper_.GetSymbolName());
+        }
         return key;
       }
 
