@@ -364,7 +364,7 @@ namespace matx
               ffts_per_block_candidate = 1;
             }
             
-            cuda::std::array<int, 2> groups_per_block = {ffts_per_block_candidate, ffts_per_block_candidate};
+            cuda::std::array<int, 2> groups_per_block = {1, ffts_per_block_candidate};
             auto result = combine_capabilities<Cap>(groups_per_block, detail::get_operator_capability<Cap>(a_, in));
             MATX_LOG_DEBUG("GROUPS_PER_BLOCK: [{},{}]", result[0], result[1]);
             return result;

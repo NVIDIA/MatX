@@ -1,18 +1,9 @@
-#=============================================================================
-# Copyright (c) 2021-2024, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#=============================================================================
+# =============================================================================
+# cmake-format: off
+# SPDX-FileCopyrightText: Copyright (c) 2021-2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
+# cmake-format: on
+# =============================================================================
 include_guard(GLOBAL)
 
 #[=======================================================================[.rst:
@@ -58,31 +49,20 @@ Result Variables
 function(rapids_cpm_gtest)
   list(APPEND CMAKE_MESSAGE_CONTEXT "rapids.cpm.gtest")
 
-  set(to_install OFF)
-  if(INSTALL_EXPORT_SET IN_LIST ARGN)
-    set(to_install ON)
-  endif()
-
   set(build_shared ON)
   if(BUILD_STATIC IN_LIST ARGN)
     set(build_shared OFF)
     set(CPM_DOWNLOAD_GTest ON) # Since we need static we build from source
   endif()
 
-  include("${rapids-cmake-dir}/cpm/detail/package_details.cmake")
-  rapids_cpm_package_details(GTest version repository tag shallow exclude)
-
-  include("${rapids-cmake-dir}/cpm/detail/generate_patch_command.cmake")
-  rapids_cpm_generate_patch_command(GTest ${version} patch_command)
+  include("${rapids-cmake-dir}/cpm/detail/package_info.cmake")
+  rapids_cpm_package_info(GTest ${ARGN} VERSION_VAR version FIND_VAR find_args CPM_VAR
+                          cpm_find_info TO_INSTALL_VAR to_install)
 
   include("${rapids-cmake-dir}/cpm/find.cmake")
-  rapids_cpm_find(GTest ${version} ${ARGN}
+  rapids_cpm_find(GTest ${version} ${find_args}
                   GLOBAL_TARGETS GTest::gtest GTest::gmock GTest::gtest_main GTest::gmock_main
-                  CPM_ARGS FIND_PACKAGE_ARGUMENTS "EXACT"
-                  GIT_REPOSITORY ${repository}
-                  GIT_TAG ${tag}
-                  GIT_SHALLOW ${shallow} ${patch_command}
-                  EXCLUDE_FROM_ALL ${exclude}
+                  CPM_ARGS FIND_PACKAGE_ARGUMENTS "EXACT" ${cpm_find_info}
                   OPTIONS "INSTALL_GTEST ${to_install}" "CMAKE_POSITION_INDEPENDENT_CODE ON"
                           "BUILD_SHARED_LIBS ${build_shared}")
 

@@ -1,3 +1,338 @@
+# rapids-cmake 26.04.00 (8 Apr 2026)
+
+### 🚨 Breaking Changes
+* Update CCCL to 3.3.0 pre-release by @bdice in https://github.com/rapidsai/rapids-cmake/pull/981
+### 🐛 Bug Fixes
+* FINAL_CODEBLOCK can see targets that should be global by @robertmaynard in https://github.com/rapidsai/rapids-cmake/pull/993
+### 🚀 New Features
+* Add URL option to fetch packages from GitHub tarballs by @bdice in https://github.com/rapidsai/rapids-cmake/pull/968
+* CMake 3.30+ means `CMAKE_PROJECT_INCLUDE` can be a list by @robertmaynard in https://github.com/rapidsai/rapids-cmake/pull/984
+* Update cuco version to fetch the cuda fancy iterators by @PointKernel in https://github.com/rapidsai/rapids-cmake/pull/987
+### 🛠️ Improvements
+* Forward-merge release/26.02 into main by @bdice in https://github.com/rapidsai/rapids-cmake/pull/974
+* Drop Python 3.10 support by @gforsyth in https://github.com/rapidsai/rapids-cmake/pull/975
+* Use verify-hardcoded-version pre-commit hook by @KyleFromNVIDIA in https://github.com/rapidsai/rapids-cmake/pull/977
+* Don't hard-code branch names by @KyleFromNVIDIA in https://github.com/rapidsai/rapids-cmake/pull/978
+* Update CCCL to 3.2.1 pre-release by @bdice in https://github.com/rapidsai/rapids-cmake/pull/979
+* Add support for Python 3.14 by @gforsyth in https://github.com/rapidsai/rapids-cmake/pull/982
+
+
+**Full Changelog**: https://github.com/rapidsai/rapids-cmake/compare/v26.04.00a...release/26.04
+
+# rapids-cmake 26.02.00 (4 Feb 2026)
+
+### 🚨 Breaking Changes
+* Default to static linking of libcudart by @bdice in https://github.com/rapidsai/rapids-cmake/pull/949
+* Update to CCCL v3.2.0 by @bdice in https://github.com/rapidsai/rapids-cmake/pull/955
+### 🐛 Bug Fixes
+* Update to a newer CCCL 3.2.x prerelease with a fix for environment queries by @bdice in https://github.com/rapidsai/rapids-cmake/pull/967
+### 🚀 New Features
+* Add support for finding CMake prefixes exported by Python packages by @vyasr in https://github.com/rapidsai/rapids-cmake/pull/951
+### 🛠️ Improvements
+* Use strict priority in CI conda tests by @bdice in https://github.com/rapidsai/rapids-cmake/pull/942
+* Use strict priority in CI conda tests by @bdice in https://github.com/rapidsai/rapids-cmake/pull/947
+* Upgrade to nvCOMP 5.1.0.21 by @bdice in https://github.com/rapidsai/rapids-cmake/pull/946
+* Enable merge barriers by @KyleFromNVIDIA in https://github.com/rapidsai/rapids-cmake/pull/948
+* feat(SABI): use stable abi naming when requested by @gforsyth in https://github.com/rapidsai/rapids-cmake/pull/954
+* Bump cuco version to fetch HLL fix by @PointKernel in https://github.com/rapidsai/rapids-cmake/pull/952
+* Clarify docs for `rapids_cuda_init_architectures()` by @KyleFromNVIDIA in https://github.com/rapidsai/rapids-cmake/pull/956
+* Add CUDA 13.1 support by @bdice in https://github.com/rapidsai/rapids-cmake/pull/953
+* Bump cuco version to fetch new HLL add_if API and bug fixes by @PointKernel in https://github.com/rapidsai/rapids-cmake/pull/958
+* build and test against CUDA 13.1.0 by @jameslamb in https://github.com/rapidsai/rapids-cmake/pull/960
+* Update to a newer CCCL 3.2.x prerelease with a fix for mdspan by @bdice in https://github.com/rapidsai/rapids-cmake/pull/959
+* Update to a newer CCCL 3.2.x prelease  by @nirandaperera in https://github.com/rapidsai/rapids-cmake/pull/961
+* Use main shared-workflows branch by @jameslamb in https://github.com/rapidsai/rapids-cmake/pull/962
+* Cherry-pick 25.12 changelog to main by @AyodeAwe in https://github.com/rapidsai/rapids-cmake/pull/963
+* Fix update-version.sh to not modify cmake_minimum_required by @AyodeAwe in https://github.com/rapidsai/rapids-cmake/pull/964
+* fix(build): build package on merge to `release/*` branch by @gforsyth in https://github.com/rapidsai/rapids-cmake/pull/971
+* Update CCCL to final v3.2.0 release by @bdice in https://github.com/rapidsai/rapids-cmake/pull/970
+
+
+**Full Changelog**: https://github.com/rapidsai/rapids-cmake/compare/v26.02.00a...release/26.02
+
+# rapids-cmake 25.12.00 (10 Dec 2025)
+
+### 🚨 Breaking Changes
+* Remove deprecated support for fmt and spdlog by @bdice in https://github.com/rapidsai/rapids-cmake/pull/914
+* Remove deprecated support for CUDA 11 by @bdice in https://github.com/rapidsai/rapids-cmake/pull/913
+* Remove spdlog and fmt and move to rapids-logger 0.2.1 by @vyasr in https://github.com/rapidsai/rapids-cmake/pull/918
+* Require CUDA 12.2+ by @jakirkham in https://github.com/rapidsai/rapids-cmake/pull/934
+### 🐛 Bug Fixes
+* Fix `RAPIDS_BRANCH` file by @KyleFromNVIDIA in https://github.com/rapidsai/rapids-cmake/pull/910
+* Temporarily restore spdlog and fmt by @vyasr in https://github.com/rapidsai/rapids-cmake/pull/917
+* Update rapids-logger to 0.2.2 by @vyasr in https://github.com/rapidsai/rapids-cmake/pull/920
+* Can't use Genex in `GLOBAL_TARGETS` by @robertmaynard in https://github.com/rapidsai/rapids-cmake/pull/921
+* Update rapids-logger to 0.2.3 by @vyasr in https://github.com/rapidsai/rapids-cmake/pull/923
+* refactored update-version.sh to handle new branching strategy by @rockhowse in https://github.com/rapidsai/rapids-cmake/pull/936
+### 🚀 New Features
+* Adding `ENABLE_UNSTABLE` option for `rapids_cpm_cccl` by @nirandaperera in https://github.com/rapidsai/rapids-cmake/pull/919
+### 🛠️ Improvements
+* Update nvbench by @bdice in https://github.com/rapidsai/rapids-cmake/pull/895
+* Update to CCCL v3.1.0 by @bdice in https://github.com/rapidsai/rapids-cmake/pull/906
+* Upgrade to CPM 0.42.0 by @vyasr in https://github.com/rapidsai/rapids-cmake/pull/916
+* Forward-merge branch-25.10 into branch-25.12 by @bdice in https://github.com/rapidsai/rapids-cmake/pull/927
+* Update CCCL to final v3.1.0 release tag by @bdice in https://github.com/rapidsai/rapids-cmake/pull/928
+* Use main in RAPIDS_BRANCH by @bdice in https://github.com/rapidsai/rapids-cmake/pull/930
+* Use main branch by @bdice in https://github.com/rapidsai/rapids-cmake/pull/931
+* Use main shared-workflows branch by @bdice in https://github.com/rapidsai/rapids-cmake/pull/932
+* Use SPDX for all copyright headers by @KyleFromNVIDIA in https://github.com/rapidsai/rapids-cmake/pull/933
+* Bump cuco version to fetch stream-ordered allocator by @PointKernel in https://github.com/rapidsai/rapids-cmake/pull/929
+* Bump cuco version to bypass equal check for multiset/multimap by @PointKernel in https://github.com/rapidsai/rapids-cmake/pull/935
+* Some more SPDX fixes by @KyleFromNVIDIA in https://github.com/rapidsai/rapids-cmake/pull/937
+* Update CCCL to get backports for XGBoost compatibility by @bdice in https://github.com/rapidsai/rapids-cmake/pull/944
+
+## New Contributors
+* @nirandaperera made their first contribution in https://github.com/rapidsai/rapids-cmake/pull/919
+* @rockhowse made their first contribution in https://github.com/rapidsai/rapids-cmake/pull/936
+
+**Full Changelog**: https://github.com/rapidsai/rapids-cmake/compare/v25.12.00a...release/25.12
+
+# rapids-cmake 25.10.00 (8 Oct 2025)
+
+## 🚨 Breaking Changes
+
+- Upgrade to nvCOMP 5.0.0.6 ([#896](https://github.com/rapidsai/rapids-cmake/pull/896)) [@vuule](https://github.com/vuule)
+
+## 🐛 Bug Fixes
+
+- Fix generation of `RAPIDS_BRANCH` ([#909](https://github.com/rapidsai/rapids-cmake/pull/909)) [@KyleFromNVIDIA](https://github.com/KyleFromNVIDIA)
+- change Architectures to avoid compute_100/120 code gen bug ([#900](https://github.com/rapidsai/rapids-cmake/pull/900)) [@robertmaynard](https://github.com/robertmaynard)
+- set_architectures + NATIVE works even without a GPU ([#899](https://github.com/rapidsai/rapids-cmake/pull/899)) [@robertmaynard](https://github.com/robertmaynard)
+- set_architectures correctly limits CUDA 12.8 to sm_120 ([#898](https://github.com/rapidsai/rapids-cmake/pull/898)) [@robertmaynard](https://github.com/robertmaynard)
+- rapids_export handles PROJECT_VERSION CMake 4.1+ change in behavior ([#893](https://github.com/rapidsai/rapids-cmake/pull/893)) [@robertmaynard](https://github.com/robertmaynard)
+- Fix detect architectures to support gcc 14 ([#892](https://github.com/rapidsai/rapids-cmake/pull/892)) [@ChuckHastings](https://github.com/ChuckHastings)
+- Update RAPIDS.cmake to match new logic in other projects ([#884](https://github.com/rapidsai/rapids-cmake/pull/884)) [@robertmaynard](https://github.com/robertmaynard)
+- Update RAPIDS_BRANCH to 25.10 ([#883](https://github.com/rapidsai/rapids-cmake/pull/883)) [@robertmaynard](https://github.com/robertmaynard)
+- Expand versions.json to have src_dir representation ([#882](https://github.com/rapidsai/rapids-cmake/pull/882)) [@robertmaynard](https://github.com/robertmaynard)
+
+## 🚀 New Features
+
+- Update cuco version to fetch signed comparison warning fix ([#905](https://github.com/rapidsai/rapids-cmake/pull/905)) [@PointKernel](https://github.com/PointKernel)
+- Updated dependencies.yaml to support CUDA 13 ([#901](https://github.com/rapidsai/rapids-cmake/pull/901)) [@robertmaynard](https://github.com/robertmaynard)
+- Use family arch flags whenever possible ([#897](https://github.com/rapidsai/rapids-cmake/pull/897)) [@robertmaynard](https://github.com/robertmaynard)
+- Upgrade to nvCOMP 5.0.0.6 ([#896](https://github.com/rapidsai/rapids-cmake/pull/896)) [@vuule](https://github.com/vuule)
+- Update set_architectures to support CUDA 13 ([#891](https://github.com/rapidsai/rapids-cmake/pull/891)) [@robertmaynard](https://github.com/robertmaynard)
+- rapids-cmake Expose `rapids_cuda_enable_fatbin_compression` to have better CUDA 12/13 compression API ([#890](https://github.com/rapidsai/rapids-cmake/pull/890)) [@robertmaynard](https://github.com/robertmaynard)
+- CUDA 13 builds will properly pull nvcomp  4.2.0.11 ([#889](https://github.com/rapidsai/rapids-cmake/pull/889)) [@robertmaynard](https://github.com/robertmaynard)
+- Properly store `source_subdir` values from `rapids_cpm_find` calls ([#885](https://github.com/rapidsai/rapids-cmake/pull/885)) [@robertmaynard](https://github.com/robertmaynard)
+
+## 🛠️ Improvements
+
+- Configure repo for automatic release notes generation ([#907](https://github.com/rapidsai/rapids-cmake/pull/907)) [@AyodeAwe](https://github.com/AyodeAwe)
+- Use branch-25.10 again ([#904](https://github.com/rapidsai/rapids-cmake/pull/904)) [@jameslamb](https://github.com/jameslamb)
+- Update rapids-dependency-file-generator ([#903](https://github.com/rapidsai/rapids-cmake/pull/903)) [@KyleFromNVIDIA](https://github.com/KyleFromNVIDIA)
+- Update cuco version to fetch the new roaring bitmap ([#902](https://github.com/rapidsai/rapids-cmake/pull/902)) [@PointKernel](https://github.com/PointKernel)
+- Bump cuco version to fetch a bug fix for device retrieve APIs ([#887](https://github.com/rapidsai/rapids-cmake/pull/887)) [@PointKernel](https://github.com/PointKernel)
+- chore: update docker version tags ([#873](https://github.com/rapidsai/rapids-cmake/pull/873)) [@gforsyth](https://github.com/gforsyth)
+
+# rapids-cmake 25.08.00 (6 Aug 2025)
+
+## 🚨 Breaking Changes
+
+- rapids_cpm_cccl: Remove support for CCCL &lt; 2.8 ([#859](https://github.com/rapidsai/rapids-cmake/pull/859)) [@robertmaynard](https://github.com/robertmaynard)
+- Remove CUDA 11 support ([#855](https://github.com/rapidsai/rapids-cmake/pull/855)) [@KyleFromNVIDIA](https://github.com/KyleFromNVIDIA)
+- Update to CCCL 3.0 ([#854](https://github.com/rapidsai/rapids-cmake/pull/854)) [@vyasr](https://github.com/vyasr)
+- Require cpp subdirectory for RMM ([#832](https://github.com/rapidsai/rapids-cmake/pull/832)) [@bdice](https://github.com/bdice)
+
+## 🐛 Bug Fixes
+
+- CCCL: disable PDL ([#876](https://github.com/rapidsai/rapids-cmake/pull/876)) [@bdice](https://github.com/bdice)
+- Use RMM main (new branching strategy) to fix downstream fetching issues ([#862](https://github.com/rapidsai/rapids-cmake/pull/862)) [@bdice](https://github.com/bdice)
+- rapids_cpm_cccl: Update to new location of cccl-config ([#858](https://github.com/rapidsai/rapids-cmake/pull/858)) [@robertmaynard](https://github.com/robertmaynard)
+- Remove CCCL patches that aren&#39;t used anymore ([#857](https://github.com/rapidsai/rapids-cmake/pull/857)) [@robertmaynard](https://github.com/robertmaynard)
+- Fetch the atomic fix in CCCL 3.0 ([#856](https://github.com/rapidsai/rapids-cmake/pull/856)) [@PointKernel](https://github.com/PointKernel)
+
+## 📖 Documentation
+
+- add docs on CI workflow inputs ([#868](https://github.com/rapidsai/rapids-cmake/pull/868)) [@jameslamb](https://github.com/jameslamb)
+
+## 🚀 New Features
+
+- Update CCCL version tag for PDL disable ([#879](https://github.com/rapidsai/rapids-cmake/pull/879)) [@davidwendt](https://github.com/davidwendt)
+- Use `RAPIDS_BRANCH` file to handle the new branching strategy ([#870](https://github.com/rapidsai/rapids-cmake/pull/870)) [@robertmaynard](https://github.com/robertmaynard)
+- rapids-cmake: Add support for a version suffix to mean using main ([#864](https://github.com/rapidsai/rapids-cmake/pull/864)) [@robertmaynard](https://github.com/robertmaynard)
+- rapids_cpm_cccl: Remove support for CCCL &lt; 2.8 ([#859](https://github.com/rapidsai/rapids-cmake/pull/859)) [@robertmaynard](https://github.com/robertmaynard)
+- Update to CCCL 3.0 ([#831](https://github.com/rapidsai/rapids-cmake/pull/831)) [@bdice](https://github.com/bdice)
+
+## 🛠️ Improvements
+
+- Update to CCCL v3.0.2 ([#878](https://github.com/rapidsai/rapids-cmake/pull/878)) [@bdice](https://github.com/bdice)
+- fix(docker): use versioned `-latest` tag for all `rapidsai` images ([#871](https://github.com/rapidsai/rapids-cmake/pull/871)) [@gforsyth](https://github.com/gforsyth)
+- Revert &quot;Use RMM main (new branching strategy)&quot; ([#869](https://github.com/rapidsai/rapids-cmake/pull/869)) [@robertmaynard](https://github.com/robertmaynard)
+- Rename `*.hpp.in` to `*.h.in` to signify that they are C headers ([#867](https://github.com/rapidsai/rapids-cmake/pull/867)) [@KyleFromNVIDIA](https://github.com/KyleFromNVIDIA)
+- refactor(shellcheck): enable for all files ([#866](https://github.com/rapidsai/rapids-cmake/pull/866)) [@gforsyth](https://github.com/gforsyth)
+- Remove nvidia and dask channels ([#865](https://github.com/rapidsai/rapids-cmake/pull/865)) [@vyasr](https://github.com/vyasr)
+- Upgrade cuCollections to fetch the new storage for better runtime performance ([#861](https://github.com/rapidsai/rapids-cmake/pull/861)) [@PointKernel](https://github.com/PointKernel)
+- Remove CUDA 11 support ([#855](https://github.com/rapidsai/rapids-cmake/pull/855)) [@KyleFromNVIDIA](https://github.com/KyleFromNVIDIA)
+- Update to CCCL 3.0 ([#854](https://github.com/rapidsai/rapids-cmake/pull/854)) [@vyasr](https://github.com/vyasr)
+- Deprecate fmt and spdlog ([#853](https://github.com/rapidsai/rapids-cmake/pull/853)) [@vyasr](https://github.com/vyasr)
+- Forward-merge branch-25.06 into branch-25.08 ([#848](https://github.com/rapidsai/rapids-cmake/pull/848)) [@gforsyth](https://github.com/gforsyth)
+- Update to NVTX 3.2.0. ([#844](https://github.com/rapidsai/rapids-cmake/pull/844)) [@bdice](https://github.com/bdice)
+- Forward-merge branch-25.06 into branch-25.08 ([#839](https://github.com/rapidsai/rapids-cmake/pull/839)) [@gforsyth](https://github.com/gforsyth)
+- Temporarily use patched CCCL ([#833](https://github.com/rapidsai/rapids-cmake/pull/833)) [@bdice](https://github.com/bdice)
+- Require cpp subdirectory for RMM ([#832](https://github.com/rapidsai/rapids-cmake/pull/832)) [@bdice](https://github.com/bdice)
+
+# rapids-cmake 25.06.00 (5 Jun 2025)
+
+## 🚨 Breaking Changes
+
+- Make `RAPIDS.cmake` inlineable without requiring updates ([#825](https://github.com/rapidsai/rapids-cmake/pull/825)) [@KyleFromNVIDIA](https://github.com/KyleFromNVIDIA)
+- Make `RAPIDS.cmake` inlineable without requiring updates ([#822](https://github.com/rapidsai/rapids-cmake/pull/822)) [@KyleFromNVIDIA](https://github.com/KyleFromNVIDIA)
+- Add build patch functionality ([#801](https://github.com/rapidsai/rapids-cmake/pull/801)) [@KyleFromNVIDIA](https://github.com/KyleFromNVIDIA)
+
+## 🐛 Bug Fixes
+
+- Get newer CCCL 2.8 with fix for atomics. ([#840](https://github.com/rapidsai/rapids-cmake/pull/840)) [@bdice](https://github.com/bdice)
+- Unset CUDAARCHS in test ([#835](https://github.com/rapidsai/rapids-cmake/pull/835)) [@KyleFromNVIDIA](https://github.com/KyleFromNVIDIA)
+- Revert &quot;Make `RAPIDS.cmake` inlineable without requiring updates&quot; ([#824](https://github.com/rapidsai/rapids-cmake/pull/824)) [@bdice](https://github.com/bdice)
+- Add `include_guard(GLOBAL)` to download_with_retry.cmake ([#818](https://github.com/rapidsai/rapids-cmake/pull/818)) [@KyleFromNVIDIA](https://github.com/KyleFromNVIDIA)
+- Fix issue with how project pins are determined ([#815](https://github.com/rapidsai/rapids-cmake/pull/815)) [@KyleFromNVIDIA](https://github.com/KyleFromNVIDIA)
+- Disable git_shallow for nvtx3 and bs_thread_pool ([#811](https://github.com/rapidsai/rapids-cmake/pull/811)) [@KyleFromNVIDIA](https://github.com/KyleFromNVIDIA)
+- Fix NVTX3 export ([#804](https://github.com/rapidsai/rapids-cmake/pull/804)) [@KyleFromNVIDIA](https://github.com/KyleFromNVIDIA)
+
+## 🚀 New Features
+
+- Upgrade nvbench for latest throttling control updates ([#830](https://github.com/rapidsai/rapids-cmake/pull/830)) [@PointKernel](https://github.com/PointKernel)
+- Add build patch functionality ([#801](https://github.com/rapidsai/rapids-cmake/pull/801)) [@KyleFromNVIDIA](https://github.com/KyleFromNVIDIA)
+
+## 🛠️ Improvements
+
+- explicitly provide &#39;script&#39; to CI workflows ([#849](https://github.com/rapidsai/rapids-cmake/pull/849)) [@jameslamb](https://github.com/jameslamb)
+- Finish CUDA 12.9 migration and use branch-25.06 workflows ([#847](https://github.com/rapidsai/rapids-cmake/pull/847)) [@bdice](https://github.com/bdice)
+- Update to clang 20 ([#846](https://github.com/rapidsai/rapids-cmake/pull/846)) [@bdice](https://github.com/bdice)
+- Update to CCCL 2.8.4. ([#845](https://github.com/rapidsai/rapids-cmake/pull/845)) [@bdice](https://github.com/bdice)
+- Bump cuco version to fetch multiple CCCL upgrade fixes ([#843](https://github.com/rapidsai/rapids-cmake/pull/843)) [@PointKernel](https://github.com/PointKernel)
+- Build and test with CUDA 12.9.0 ([#842](https://github.com/rapidsai/rapids-cmake/pull/842)) [@bdice](https://github.com/bdice)
+- Upgrade cuco version to include murmurhash performance fix ([#838](https://github.com/rapidsai/rapids-cmake/pull/838)) [@PointKernel](https://github.com/PointKernel)
+- feat: add Python 3.13 support ([#834](https://github.com/rapidsai/rapids-cmake/pull/834)) [@gforsyth](https://github.com/gforsyth)
+- Update cuCollections to avoid CCCL deprecation warnings ([#828](https://github.com/rapidsai/rapids-cmake/pull/828)) [@miscco](https://github.com/miscco)
+- Use cpp subdirectory for RMM. ([#827](https://github.com/rapidsai/rapids-cmake/pull/827)) [@bdice](https://github.com/bdice)
+- Make `RAPIDS.cmake` inlineable without requiring updates ([#825](https://github.com/rapidsai/rapids-cmake/pull/825)) [@KyleFromNVIDIA](https://github.com/KyleFromNVIDIA)
+- Remove hard-coded RAPIDS versions ([#823](https://github.com/rapidsai/rapids-cmake/pull/823)) [@KyleFromNVIDIA](https://github.com/KyleFromNVIDIA)
+- Make `RAPIDS.cmake` inlineable without requiring updates ([#822](https://github.com/rapidsai/rapids-cmake/pull/822)) [@KyleFromNVIDIA](https://github.com/KyleFromNVIDIA)
+- Format all CMake code ([#821](https://github.com/rapidsai/rapids-cmake/pull/821)) [@bdice](https://github.com/bdice)
+- In conda-build produced binaries, use paths relative to `$PREFIX` ([#817](https://github.com/rapidsai/rapids-cmake/pull/817)) [@jakirkham](https://github.com/jakirkham)
+- Remove CMP0135 policy checks. ([#816](https://github.com/rapidsai/rapids-cmake/pull/816)) [@bdice](https://github.com/bdice)
+- Use hashes instead of tags ([#812](https://github.com/rapidsai/rapids-cmake/pull/812)) [@KyleFromNVIDIA](https://github.com/KyleFromNVIDIA)
+- refactor(conda): remove unused conda package and associated CI resources ([#810](https://github.com/rapidsai/rapids-cmake/pull/810)) [@gforsyth](https://github.com/gforsyth)
+- Allow retrying downloads on network failures ([#809](https://github.com/rapidsai/rapids-cmake/pull/809)) [@pentschev](https://github.com/pentschev)
+- Define `-DCUB_DISABLE_NAMESPACE_MAGIC` and `-DCUB_IGNORE_NAMESPACE_MAGIC_ERROR` in `rapids_cpm_cccl` ([#807](https://github.com/rapidsai/rapids-cmake/pull/807)) [@trxcllnt](https://github.com/trxcllnt)
+- Update to CCCL 2.8.3 ([#793](https://github.com/rapidsai/rapids-cmake/pull/793)) [@bdice](https://github.com/bdice)
+
+# rapids-cmake 25.04.00 (9 Apr 2025)
+
+## 🚨 Breaking Changes
+
+- Backport build patch functionality ([#805](https://github.com/rapidsai/rapids-cmake/pull/805)) [@KyleFromNVIDIA](https://github.com/KyleFromNVIDIA)
+- Update gtest version ([#795](https://github.com/rapidsai/rapids-cmake/pull/795)) [@vyasr](https://github.com/vyasr)
+- Remove now superfluous fmt patch ([#790](https://github.com/rapidsai/rapids-cmake/pull/790)) [@vyasr](https://github.com/vyasr)
+- Use CTest dynamic resource spec generation ([#786](https://github.com/rapidsai/rapids-cmake/pull/786)) [@KyleFromNVIDIA](https://github.com/KyleFromNVIDIA)
+- Switch to using rapids-logger as a library ([#765](https://github.com/rapidsai/rapids-cmake/pull/765)) [@vyasr](https://github.com/vyasr)
+- Require CMake 3.30.4, and latest CPM ([#753](https://github.com/rapidsai/rapids-cmake/pull/753)) [@robertmaynard](https://github.com/robertmaynard)
+
+## 🐛 Bug Fixes
+
+- Set correct compiler feature for `generate_ctest_json` ([#802](https://github.com/rapidsai/rapids-cmake/pull/802)) [@KyleFromNVIDIA](https://github.com/KyleFromNVIDIA)
+- Also download fmt when building nvbench statically ([#792](https://github.com/rapidsai/rapids-cmake/pull/792)) [@vyasr](https://github.com/vyasr)
+- Rollback to CPM 0.40.0 ([#789](https://github.com/rapidsai/rapids-cmake/pull/789)) [@robertmaynard](https://github.com/robertmaynard)
+- Sanitize patch inputs so that quotes are properly escaped ([#787](https://github.com/rapidsai/rapids-cmake/pull/787)) [@robertmaynard](https://github.com/robertmaynard)
+- Fix tests broken by rapids-logger changes ([#775](https://github.com/rapidsai/rapids-cmake/pull/775)) [@vyasr](https://github.com/vyasr)
+
+## 🚀 New Features
+
+- Backport build patch functionality ([#805](https://github.com/rapidsai/rapids-cmake/pull/805)) [@KyleFromNVIDIA](https://github.com/KyleFromNVIDIA)
+- Add support for components in Cython `rapids_cython_create_modules` ([#783](https://github.com/rapidsai/rapids-cmake/pull/783)) [@pentschev](https://github.com/pentschev)
+- rapids_cpm_package_override: Always load overrides ([#778](https://github.com/rapidsai/rapids-cmake/pull/778)) [@robertmaynard](https://github.com/robertmaynard)
+- Require CMake 3.30.4, and latest CPM ([#753](https://github.com/rapidsai/rapids-cmake/pull/753)) [@robertmaynard](https://github.com/robertmaynard)
+
+## 🛠️ Improvements
+
+- Update gtest version ([#795](https://github.com/rapidsai/rapids-cmake/pull/795)) [@vyasr](https://github.com/vyasr)
+- Remove now superfluous fmt patch ([#790](https://github.com/rapidsai/rapids-cmake/pull/790)) [@vyasr](https://github.com/vyasr)
+- Use CTest dynamic resource spec generation ([#786](https://github.com/rapidsai/rapids-cmake/pull/786)) [@KyleFromNVIDIA](https://github.com/KyleFromNVIDIA)
+- Use conda-build instead of conda-mambabuild ([#784](https://github.com/rapidsai/rapids-cmake/pull/784)) [@bdice](https://github.com/bdice)
+- Set `-Wno-deprecated-gpu-targets` when compiling for RAPIDS architectures ([#776](https://github.com/rapidsai/rapids-cmake/pull/776)) [@bdice](https://github.com/bdice)
+- Add shellcheck to pre-commit and fix warnings ([#772](https://github.com/rapidsai/rapids-cmake/pull/772)) [@gforsyth](https://github.com/gforsyth)
+- Update `cuCollection` to not rely on `thrust::identity` ([#771](https://github.com/rapidsai/rapids-cmake/pull/771)) [@miscco](https://github.com/miscco)
+- Use rapids-generate-version for package versions ([#770](https://github.com/rapidsai/rapids-cmake/pull/770)) [@bdice](https://github.com/bdice)
+- Use shared-workflows branch-25.04 ([#768](https://github.com/rapidsai/rapids-cmake/pull/768)) [@bdice](https://github.com/bdice)
+- add telemetry ([#767](https://github.com/rapidsai/rapids-cmake/pull/767)) [@msarahan](https://github.com/msarahan)
+- Add build_type input field for `test.yaml` ([#766](https://github.com/rapidsai/rapids-cmake/pull/766)) [@gforsyth](https://github.com/gforsyth)
+- Switch to using rapids-logger as a library ([#765](https://github.com/rapidsai/rapids-cmake/pull/765)) [@vyasr](https://github.com/vyasr)
+- Add `verify-codeowners` hook ([#762](https://github.com/rapidsai/rapids-cmake/pull/762)) [@KyleFromNVIDIA](https://github.com/KyleFromNVIDIA)
+- Forward-merge branch-25.02 to branch-25.04 ([#760](https://github.com/rapidsai/rapids-cmake/pull/760)) [@bdice](https://github.com/bdice)
+- Migrate to NVKS for amd64 CI runners ([#758](https://github.com/rapidsai/rapids-cmake/pull/758)) [@bdice](https://github.com/bdice)
+
+# rapids-cmake 25.02.00 (13 Feb 2025)
+
+## 🚨 Breaking Changes
+
+- Update to CCCL 2.7.0-rc2. ([#710](https://github.com/rapidsai/rapids-cmake/pull/710)) [@bdice](https://github.com/bdice)
+
+## 🐛 Bug Fixes
+
+- Sanitize patch input to protect against CMake Language limitations ([#773](https://github.com/rapidsai/rapids-cmake/pull/773)) [@robertmaynard](https://github.com/robertmaynard)
+- Backport cccl PR 3578 to v2.7 to unblock CUDA 12.8 builds ([#756](https://github.com/rapidsai/rapids-cmake/pull/756)) [@robertmaynard](https://github.com/robertmaynard)
+- Use sysroot 2.17 on CUDA &lt; 11.8. ([#745](https://github.com/rapidsai/rapids-cmake/pull/745)) [@bdice](https://github.com/bdice)
+- rapids_cpm_cccl use proper CCCL version value to compute install rules ([#742](https://github.com/rapidsai/rapids-cmake/pull/742)) [@robertmaynard](https://github.com/robertmaynard)
+- Correct nvbench + conda test to explicitly pull spdlog ([#733](https://github.com/rapidsai/rapids-cmake/pull/733)) [@robertmaynard](https://github.com/robertmaynard)
+
+## 📖 Documentation
+
+- fix signature in rapids_export() docs ([#732](https://github.com/rapidsai/rapids-cmake/pull/732)) [@jameslamb](https://github.com/jameslamb)
+
+## 🚀 New Features
+
+- Add support for new architectures in CUDA 12.8 ([#746](https://github.com/rapidsai/rapids-cmake/pull/746)) [@robertmaynard](https://github.com/robertmaynard)
+- Update logger hash ([#738](https://github.com/rapidsai/rapids-cmake/pull/738)) [@vyasr](https://github.com/vyasr)
+- Add rapids-logger ([#737](https://github.com/rapidsai/rapids-cmake/pull/737)) [@vyasr](https://github.com/vyasr)
+- Fea/support embedded patch content ([#728](https://github.com/rapidsai/rapids-cmake/pull/728)) [@robertmaynard](https://github.com/robertmaynard)
+- Update to CCCL 2.7.0-rc2. ([#710](https://github.com/rapidsai/rapids-cmake/pull/710)) [@bdice](https://github.com/bdice)
+
+## 🛠️ Improvements
+
+- Revert CUDA 12.8 shared workflow branch changes ([#759](https://github.com/rapidsai/rapids-cmake/pull/759)) [@vyasr](https://github.com/vyasr)
+- Build and test with CUDA 12.8.0 ([#754](https://github.com/rapidsai/rapids-cmake/pull/754)) [@bdice](https://github.com/bdice)
+- Allow sysroot 2.28 in CUDA 11 jobs. ([#749](https://github.com/rapidsai/rapids-cmake/pull/749)) [@bdice](https://github.com/bdice)
+- Fetch cuco filter alignment fix to unblock RAPIDS CI ([#744](https://github.com/rapidsai/rapids-cmake/pull/744)) [@PointKernel](https://github.com/PointKernel)
+- Use CCCL v2.7.0 final tag. ([#743](https://github.com/rapidsai/rapids-cmake/pull/743)) [@bdice](https://github.com/bdice)
+- Use GCC 13 in CUDA 12 conda builds. ([#741](https://github.com/rapidsai/rapids-cmake/pull/741)) [@bdice](https://github.com/bdice)
+- Add new global targets for rmm ([#739](https://github.com/rapidsai/rapids-cmake/pull/739)) [@vyasr](https://github.com/vyasr)
+- remove setup.cfg, use pyproject.toml ([#736](https://github.com/rapidsai/rapids-cmake/pull/736)) [@jameslamb](https://github.com/jameslamb)
+- Bump cuco by one commit to include `cuco::arrow_filter_policy` updates ([#735](https://github.com/rapidsai/rapids-cmake/pull/735)) [@mhaseeb123](https://github.com/mhaseeb123)
+- Require Cython to be found ([#734](https://github.com/rapidsai/rapids-cmake/pull/734)) [@vyasr](https://github.com/vyasr)
+- Update version references in workflow ([#729](https://github.com/rapidsai/rapids-cmake/pull/729)) [@AyodeAwe](https://github.com/AyodeAwe)
+- Bump cuco version to fetch various fixes and new features ([#723](https://github.com/rapidsai/rapids-cmake/pull/723)) [@PointKernel](https://github.com/PointKernel)
+- Add breaking change workflow trigger ([#719](https://github.com/rapidsai/rapids-cmake/pull/719)) [@AyodeAwe](https://github.com/AyodeAwe)
+
+# rapids-cmake 24.12.00 (11 Dec 2024)
+
+## 🐛 Bug Fixes
+
+- Fix failures in cpm_generate_pins-nested tests ([#724](https://github.com/rapidsai/rapids-cmake/pull/724)) [@vyasr](https://github.com/vyasr)
+- Search for the normalized package name when patching ([#715](https://github.com/rapidsai/rapids-cmake/pull/715)) [@vyasr](https://github.com/vyasr)
+- rapids_export_write_language no longer generates cmake dev warnings ([#712](https://github.com/rapidsai/rapids-cmake/pull/712)) [@robertmaynard](https://github.com/robertmaynard)
+- Update rapids-cmake to support cccl 2.8 new install rules ([#711](https://github.com/rapidsai/rapids-cmake/pull/711)) [@robertmaynard](https://github.com/robertmaynard)
+- gtest_discover_tests doesn&#39;t crash rapids_test_install_relocatable ([#697](https://github.com/rapidsai/rapids-cmake/pull/697)) [@robertmaynard](https://github.com/robertmaynard)
+
+## 📖 Documentation
+
+- Fix docs warning about get_html_theme_path. ([#705](https://github.com/rapidsai/rapids-cmake/pull/705)) [@bdice](https://github.com/bdice)
+
+## 🚀 New Features
+
+- Verifies that current_json_dir placeholder works with normalized package names ([#716](https://github.com/rapidsai/rapids-cmake/pull/716)) [@robertmaynard](https://github.com/robertmaynard)
+- Allow for cpm override via file and direct calls to rapids_cpm_package_override ([#714](https://github.com/rapidsai/rapids-cmake/pull/714)) [@robertmaynard](https://github.com/robertmaynard)
+- Upgrade nvcomp to 4.1.0.6 ([#709](https://github.com/rapidsai/rapids-cmake/pull/709)) [@bdice](https://github.com/bdice)
+- Warn when override of a default package uses the incorrect case ([#708](https://github.com/rapidsai/rapids-cmake/pull/708)) [@robertmaynard](https://github.com/robertmaynard)
+- Allow CCCL 2.7 to be used in a rapids-cmake override ([#706](https://github.com/rapidsai/rapids-cmake/pull/706)) [@robertmaynard](https://github.com/robertmaynard)
+- version.json patch command supports required field ([#700](https://github.com/rapidsai/rapids-cmake/pull/700)) [@robertmaynard](https://github.com/robertmaynard)
+- Bump cuco version to fetch the Hyperloglog renaming ([#698](https://github.com/rapidsai/rapids-cmake/pull/698)) [@PointKernel](https://github.com/PointKernel)
+
+## 🛠️ Improvements
+
+- Bump cuco version to fetch the new multiset retrieve ([#707](https://github.com/rapidsai/rapids-cmake/pull/707)) [@PointKernel](https://github.com/PointKernel)
+
 # rapids-cmake 24.10.00 (9 Oct 2024)
 
 ## 🚨 Breaking Changes

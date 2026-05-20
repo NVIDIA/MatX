@@ -1,0 +1,48 @@
+name: build
+
+on:
+  push:
+    branches:
+      - "main"
+      - "release/*"
+    tags:
+      - v[0-9][0-9].[0-9][0-9].[0-9][0-9]
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: |
+          branch: git branch the workflow run targets.
+          Required even when 'sha' is provided because it is also used for organizing artifacts.
+        required: true
+        type: string
+      date:
+        description: "date: Date (YYYY-MM-DD) this run is for. Used to organize artifacts produced by nightly builds"
+        required: true
+        type: string
+      sha:
+        description: "sha: full git commit SHA to check out"
+        required: true
+        type: string
+      build_type:
+        description: "build_type: one of [branch, nightly, pull-request]"
+        type: string
+        default: nightly
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  docs-build:
+    if: github.ref_type == 'branch'
+    secrets: inherit
+    uses: rapidsai/shared-workflows/.github/workflows/custom-job.yaml@release/26.04
+    with:
+      arch: "amd64"
+      branch: ${{ inputs.branch }}
+      build_type: ${{ inputs.build_type || 'branch' }}
+      container_image: "rapidsai/ci-conda:26.04-latest"
+      date: ${{ inputs.date }}
+      node_type: "cpu4"
+      script: "ci/build_docs.sh"
+      sha: ${{ inputs.sha }}

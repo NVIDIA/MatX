@@ -194,6 +194,18 @@ TEST(GridDimTests, ComputesBlock2DGridDims)
   ExpectDim3(threads, 128, 1, 1);
 }
 
+TEST(GridDimTests, ComputesBlockReduceGridDims)
+{
+  dim3 blocks{};
+  dim3 threads{};
+
+  bool stride = detail::get_grid_dims_block_reduce<2>(
+      blocks, threads, cuda::std::array<index_t, 2>{7, 3}, 4, 64);
+  EXPECT_FALSE(stride);
+  ExpectDim3(blocks, 6, 1, 1);
+  ExpectDim3(threads, 64, 4, 1);
+}
+
 TEST(GridDimTests, RejectsInvalidBlockGridDims)
 {
 #ifndef NDEBUG
@@ -211,4 +223,13 @@ TEST(GridDimTests, RejectsInvalidBlockGridDims)
     detail::get_grid_dims_block_2d<3>(blocks, threads, cuda::std::array<index_t, 3>{70000, 8, 16}, 32);
   };
   EXPECT_THROW(oversized_batch_dim(), matx::detail::matxException);
+
+  auto oversized_block_reduce_grid = []() {
+    dim3 blocks{};
+    dim3 threads{};
+    constexpr index_t too_many_outputs = static_cast<index_t>(2147483647) + 1;
+    detail::get_grid_dims_block_reduce<1>(
+        blocks, threads, cuda::std::array<index_t, 1>{too_many_outputs}, 1, 1);
+  };
+  EXPECT_THROW(oversized_block_reduce_grid(), matx::detail::matxException);
 }

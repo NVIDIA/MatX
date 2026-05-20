@@ -1,18 +1,9 @@
-#=============================================================================
-# Copyright (c) 2021-2024, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#=============================================================================
+# =============================================================================
+# cmake-format: off
+# SPDX-FileCopyrightText: Copyright (c) 2021-2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
+# cmake-format: on
+# =============================================================================
 include_guard(GLOBAL)
 
 #[=======================================================================[.rst:
@@ -64,19 +55,16 @@ Result Variables
 function(rapids_cpm_nvbench)
   list(APPEND CMAKE_MESSAGE_CONTEXT "rapids.cpm.nvbench")
 
-  set(to_install OFF)
-  if(INSTALL_EXPORT_SET IN_LIST ARGN)
-    set(to_install ON)
-  endif()
-
   set(build_shared ON)
   if(BUILD_STATIC IN_LIST ARGN)
     set(build_shared OFF)
     set(CPM_DOWNLOAD_nvbench ON) # Since we need static we build from source
+    set(CPM_DOWNLOAD_fmt ON) # Make sure we don't link to a preexisting shared fmt
   endif()
 
-  include("${rapids-cmake-dir}/cpm/detail/package_details.cmake")
-  rapids_cpm_package_details(nvbench version repository tag shallow exclude)
+  include("${rapids-cmake-dir}/cpm/detail/package_info.cmake")
+  rapids_cpm_package_info(nvbench ${ARGN} VERSION_VAR version FIND_VAR find_args CPM_VAR
+                          cpm_find_info TO_INSTALL_VAR to_install)
 
   # CUDA::nvml is an optional package and might not be installed ( aka conda )
   find_package(CUDAToolkit REQUIRED)
@@ -85,17 +73,10 @@ function(rapids_cpm_nvbench)
     set(nvbench_with_nvml "ON")
   endif()
 
-  include("${rapids-cmake-dir}/cpm/detail/generate_patch_command.cmake")
-  rapids_cpm_generate_patch_command(nvbench ${version} patch_command)
-
   include("${rapids-cmake-dir}/cpm/find.cmake")
-  rapids_cpm_find(nvbench ${version} ${ARGN}
+  rapids_cpm_find(nvbench ${version} ${find_args}
                   GLOBAL_TARGETS nvbench::nvbench nvbench::main
-                  CPM_ARGS
-                  GIT_REPOSITORY ${repository}
-                  GIT_TAG ${tag}
-                  GIT_SHALLOW ${shallow} ${patch_command}
-                  EXCLUDE_FROM_ALL ${exclude}
+                  CPM_ARGS ${cpm_find_info}
                   OPTIONS "NVBench_ENABLE_NVML ${nvbench_with_nvml}"
                           "NVBench_ENABLE_CUPTI OFF"
                           "NVBench_ENABLE_EXAMPLES OFF"
@@ -105,6 +86,11 @@ function(rapids_cpm_nvbench)
 
   include("${rapids-cmake-dir}/cpm/detail/display_patch_status.cmake")
   rapids_cpm_display_patch_status(nvbench)
+
+  if(nvbench_ADDED AND TARGET nvbench)
+    # nvcc incorrectly sees some loops in fmt as unreachable.
+    target_compile_options(nvbench PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--diag-suppress 128>)
+  endif()
 
   # Propagate up variables that CPMFindPackage provide
   set(nvbench_SOURCE_DIR "${nvbench_SOURCE_DIR}" PARENT_SCOPE)

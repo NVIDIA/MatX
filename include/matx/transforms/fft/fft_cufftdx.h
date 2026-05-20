@@ -158,6 +158,10 @@ namespace matx {
         symbol_name += std::to_string(static_cast<int>(direction_));
         symbol_name += "_CC";
         symbol_name += std::to_string(cc_);
+        symbol_name += "_E";
+        symbol_name += std::to_string(static_cast<int>(current_elements_per_thread_));
+        symbol_name += "_FPB";
+        symbol_name += std::to_string(ffts_per_block_);
 
         // Add CUDA version to the symbol name
 #if defined(CUDA_VERSION)
@@ -433,4 +437,3 @@ namespace matx {
 
   } // namespace detail
 } // namespace matx
-

@@ -141,9 +141,12 @@ The script determines image dimensions in this order:
 |------|-------------|
 | `--sarbp FILE` | Path to `.sarbp` file for reading dimensions (width/height and pixel size) |
 | `--size HxW` | Image dimensions (overrides `.sarbp` header) |
-| `--dynamic-range DB` | Display range in dB below peak (default: 70) |
+| `--percentile LO,HI` | Percentile-based contrast stretch on the dB image (default: `5,95`) |
+| `--dynamic-range DB` | Use a fixed dB-below-peak floor instead of the percentile stretch |
 | `--save FILE` | Save to file instead of displaying |
 | `--cmap NAME` | Matplotlib colormap (default: gray) |
+
+By default the viewer applies a percentile-based contrast stretch: it computes the 5th and 95th percentiles of the dB-scaled image and uses those as the colormap's vmin/vmax. This prevents a small number of bright scatterers (specular returns from buildings, corner reflectors, etc.) from dominating the dynamic range and washing the rest of the scene to black. A fixed dB-below-peak floor (`--dynamic-range`) is available as an override, but the percentile stretch is generally the more useful default for inspecting these images.
 
 Below is the image generated for the 8192 x 8192 reconstruction using `python view_sarbp_image.py /path/to/file.raw --save image.png`.
 The scene is Hartsfield-Jackson Atlanta International Airport. The terminals are the vertical structures and the runways around the

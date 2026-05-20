@@ -1,18 +1,9 @@
-#=============================================================================
-# Copyright (c) 2022-2024, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#=============================================================================
+# =============================================================================
+# cmake-format: off
+# SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
+# cmake-format: on
+# =============================================================================
 include_guard(GLOBAL)
 
 #[=======================================================================[.rst:
@@ -47,14 +38,15 @@ Result Targets
 ^^^^^^^^^^^^^^
   benchmark::benchmark targets will be created
 
+Result Variables
+^^^^^^^^^^^^^^^^
+  :cmake:variable:`benchmark_SOURCE_DIR` is set to the path to the source directory of GBench.
+  :cmake:variable:`benchmark_BINARY_DIR` is set to the path to the build directory of  GBench.
+  :cmake:variable:`benchmark_ADDED`      is set to a true value if GBench has not been added before.
+  :cmake:variable:`benchmark_VERSION`    is set to the version of GBench specified by the versions.json.
 #]=======================================================================]
 function(rapids_cpm_gbench)
   list(APPEND CMAKE_MESSAGE_CONTEXT "rapids.cpm.gbench")
-
-  set(to_install OFF)
-  if(INSTALL_EXPORT_SET IN_LIST ARGN)
-    set(to_install ON)
-  endif()
 
   set(build_shared ON)
   if(BUILD_STATIC IN_LIST ARGN)
@@ -62,23 +54,17 @@ function(rapids_cpm_gbench)
     set(CPM_DOWNLOAD_benchmark ON) # Since we need static we build from source
   endif()
 
-  include("${rapids-cmake-dir}/cpm/detail/package_details.cmake")
-  rapids_cpm_package_details(benchmark version repository tag shallow exclude)
-
-  include("${rapids-cmake-dir}/cpm/detail/generate_patch_command.cmake")
-  rapids_cpm_generate_patch_command(benchmark ${version} patch_command)
+  include("${rapids-cmake-dir}/cpm/detail/package_info.cmake")
+  rapids_cpm_package_info(benchmark ${ARGN} VERSION_VAR version FIND_VAR find_args CPM_VAR
+                          cpm_find_info TO_INSTALL_VAR to_install)
 
   include("${rapids-cmake-dir}/cmake/install_lib_dir.cmake")
   rapids_cmake_install_lib_dir(lib_dir)
 
   include("${rapids-cmake-dir}/cpm/find.cmake")
-  rapids_cpm_find(benchmark ${version} ${ARGN}
+  rapids_cpm_find(benchmark ${version} ${find_args}
                   GLOBAL_TARGETS benchmark::benchmark benchmark::benchmark_main
-                  CPM_ARGS
-                  GIT_REPOSITORY ${repository}
-                  GIT_TAG ${tag}
-                  GIT_SHALLOW ${shallow} ${patch_command}
-                  EXCLUDE_FROM_ALL ${exclude}
+                  CPM_ARGS ${cpm_find_info}
                   OPTIONS "BENCHMARK_ENABLE_GTEST_TESTS OFF" "BENCHMARK_ENABLE_TESTING OFF"
                           "BENCHMARK_ENABLE_INSTALL ${to_install}"
                           "CMAKE_INSTALL_LIBDIR ${lib_dir}" "BUILD_SHARED_LIBS ${build_shared}")
@@ -89,4 +75,10 @@ function(rapids_cpm_gbench)
   if(NOT TARGET benchmark::benchmark AND TARGET benchmark)
     add_library(benchmark::benchmark ALIAS benchmark)
   endif()
+
+  # Propagate up variables that CPMFindPackage provide
+  set(benchmark_SOURCE_DIR "${benchmark_SOURCE_DIR}" PARENT_SCOPE)
+  set(benchmark_BINARY_DIR "${benchmark_BINARY_DIR}" PARENT_SCOPE)
+  set(benchmark_ADDED "${benchmark_ADDED}" PARENT_SCOPE)
+  set(benchmark_VERSION ${version} PARENT_SCOPE)
 endfunction()

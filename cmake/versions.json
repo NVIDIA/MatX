@@ -10,7 +10,7 @@
       "version" : "0.0",
       "git_shallow" : false,
       "git_url" : "https://github.com/NVIDIA/nvbench.git",
-      "git_tag" : "46ab283"
+      "git_tag" : "dc59f98ecd4a75b322be5f71b7ecf6b6c7c65a6f"
     }
   }
 }

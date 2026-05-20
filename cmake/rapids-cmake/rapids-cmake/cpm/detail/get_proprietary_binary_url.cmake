@@ -1,18 +1,9 @@
-#=============================================================================
-# Copyright (c) 2023-2024, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#=============================================================================
+# =============================================================================
+# cmake-format: off
+# SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
+# cmake-format: on
+# =============================================================================
 include_guard(GLOBAL)
 
 #[=======================================================================[.rst:
@@ -56,12 +47,9 @@ function(rapids_cpm_get_proprietary_binary_url package_name version url_var)
     return()
   endif()
 
-  if(NOT DEFINED rapids-cmake-version)
-    include("${rapids-cmake-dir}/rapids-version.cmake")
-  endif()
-
   # Determine the CUDA Toolkit version so that we properly evaluate the placeholders in
   # `proprietary_binary`
+  include("${rapids-cmake-dir}/rapids-version.cmake")
   if(proprietary_binary MATCHES "{cuda-toolkit-version")
     find_package(CUDAToolkit REQUIRED)
     set(cuda-toolkit-version ${CUDAToolkit_VERSION_MAJOR}.${CUDAToolkit_VERSION_MINOR})

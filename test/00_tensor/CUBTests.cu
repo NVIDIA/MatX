@@ -38,6 +38,50 @@
 
 using namespace matx;
 
+#ifdef MATX_EN_JIT
+struct EmptyLastDimJitOp {
+  using matxop = bool;
+  using value_type = float;
+
+  static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
+  {
+    return 2;
+  }
+
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
+  {
+    return dim == 0 ? 2 : 0;
+  }
+
+  __MATX_INLINE__ std::string str() const
+  {
+    return "EmptyLastDimJitOp";
+  }
+
+  template <typename CapType, typename... Is>
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ value_type operator()(Is...) const
+  {
+    return value_type{};
+  }
+
+  template <detail::OperatorCapability Cap, typename InType>
+  __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const
+  {
+    if constexpr (Cap == detail::OperatorCapability::SUPPORTS_JIT) {
+      return true;
+    }
+    else if constexpr (Cap == detail::OperatorCapability::JIT_TYPE_QUERY) {
+      return std::string{"EmptyLastDimJitOp"};
+    }
+    else if constexpr (Cap == detail::OperatorCapability::JIT_CLASS_QUERY) {
+      return true;
+    }
+    else {
+      return detail::capability_attributes<Cap>::default_value;
+    }
+  }
+};
+#endif
 
 template <typename T> struct CUBTestsData {
   using GTestType = cuda::std::tuple_element_t<0, T>;
@@ -322,6 +366,694 @@ TEST(TensorStats, InternalCubPlansRejectInvalidOperations)
   EXPECT_THROW(create_single_plan(), detail::matxException);
   EXPECT_THROW(create_dual_plan(), detail::matxException);
 }
+
+#ifdef MATX_EN_JIT
+TEST(TensorStats, CubBlockJIT)
+{
+  MATX_ENTER_HANDLER();
+
+  CUDAJITExecutor exec{};
+  constexpr index_t rows = 2;
+  constexpr index_t batches = 4;
+  constexpr index_t cols = 16;
+  constexpr index_t ndiv_cols = 17;
+
+  tensor_t<float, 3> in({rows, batches, cols});
+  tensor_t<float, 3> ndiv_in({rows, batches, ndiv_cols});
+  tensor_t<float, 2> reduce_out({rows, batches});
+  tensor_t<float, 2> prod_out({rows, batches});
+  tensor_t<float, 2> min_out({rows, batches});
+  tensor_t<float, 2> max_out({rows, batches});
+  tensor_t<float, 2> ndiv_reduce_out({rows, batches});
+  tensor_t<float, 2> ndiv_prod_out({rows, batches});
+  tensor_t<float, 2> ndiv_min_out({rows, batches});
+  tensor_t<float, 2> ndiv_max_out({rows, batches});
+  tensor_t<float, 2> shift_in({rows, batches});
+  tensor_t<float, 2> mixed_out({rows, batches});
+  tensor_t<float, 3> scan_out({rows, batches, cols});
+  tensor_t<float, 3> sort_out({rows, batches, cols});
+  tensor_t<float, 3> sort_desc_out({rows, batches, cols});
+  tensor_t<index_t, 3> argsort_out({rows, batches, cols});
+  tensor_t<index_t, 3> argsort_desc_out({rows, batches, cols});
+  tensor_t<float, 0> scalar_sum{{}};
+  tensor_t<float, 0> scalar_prod{{}};
+  tensor_t<float, 1> vector_in({cols});
+
+  for (index_t i = 0; i < rows; i++) {
+    for (index_t j = 0; j < batches; j++) {
+      shift_in(i, j) = static_cast<float>(100 * i + 10 * j);
+      for (index_t k = 0; k < cols; k++) {
+        in(i, j, k) = static_cast<float>((k % 5) + 1 + j);
+      }
+      for (index_t k = 0; k < ndiv_cols; k++) {
+        ndiv_in(i, j, k) = 1.0f + static_cast<float>((i + j + k) % 5) * 0.125f;
+      }
+    }
+  }
+  for (index_t k = 0; k < cols; k++) {
+    vector_in(k) = static_cast<float>((k % 7) + 1);
+  }
+
+  (reduce_out = sum(in, {2})).run(exec);
+  (prod_out = prod(in, {2})).run(exec);
+  (min_out = min(in, {2})).run(exec);
+  (max_out = max(in, {2})).run(exec);
+  (ndiv_reduce_out = sum(ndiv_in, {2})).run(exec);
+  (ndiv_prod_out = prod(ndiv_in, {2})).run(exec);
+  (ndiv_min_out = min(ndiv_in, {2})).run(exec);
+  (ndiv_max_out = max(ndiv_in, {2})).run(exec);
+  (mixed_out = sum(in, {2}) + fftshift1D(shift_in) + 5.0f).run(exec);
+  auto scan_op = cumsum(in);
+  auto scan_ept_query = detail::EPTQueryInput{true};
+  const auto scan_ept_bounds =
+      detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(scan_op, scan_ept_query);
+  EXPECT_GT(static_cast<int>(scan_ept_bounds[1]), 1);
+  (scan_out = scan_op).run(exec);
+  (sort_out = matx::sort(in, SORT_DIR_ASC)).run(exec);
+  (sort_desc_out = matx::sort(in, SORT_DIR_DESC)).run(exec);
+  (argsort_out = argsort(in, SORT_DIR_ASC)).run(exec);
+  (argsort_desc_out = argsort(in, SORT_DIR_DESC)).run(exec);
+  (scalar_sum = sum(vector_in)).run(exec);
+  (scalar_prod = prod(vector_in)).run(exec);
+  exec.sync();
+
+  EXPECT_FALSE(jit_supported(cumsum(ndiv_in)));
+  EXPECT_FALSE(jit_supported(matx::sort(ndiv_in, SORT_DIR_ASC)));
+  EXPECT_FALSE(jit_supported(argsort(ndiv_in, SORT_DIR_ASC)));
+
+  float expected_scalar_sum = 0.0f;
+  float expected_scalar_prod = 1.0f;
+  for (index_t k = 0; k < cols; k++) {
+    expected_scalar_sum += vector_in(k);
+    expected_scalar_prod *= vector_in(k);
+  }
+  ASSERT_NEAR(scalar_sum(), expected_scalar_sum, 0.001f);
+  const auto scalar_prod_tol = cuda::std::max(0.001f, expected_scalar_prod * 1e-5f);
+  ASSERT_NEAR(scalar_prod(), expected_scalar_prod, scalar_prod_tol);
+
+  for (index_t i = 0; i < rows; i++) {
+    for (index_t j = 0; j < batches; j++) {
+      float expected_sum = 0.0f;
+      float expected_prod = 1.0f;
+      float expected_min = in(i, j, 0);
+      float expected_max = in(i, j, 0);
+      float running = 0.0f;
+      for (index_t k = 0; k < cols; k++) {
+        expected_sum += in(i, j, k);
+        expected_prod *= in(i, j, k);
+        expected_min = cuda::std::min(expected_min, in(i, j, k));
+        expected_max = cuda::std::max(expected_max, in(i, j, k));
+        running += in(i, j, k);
+        ASSERT_NEAR(scan_out(i, j, k), running, 0.001f);
+        if (k > 0) {
+          ASSERT_LE(sort_out(i, j, k - 1), sort_out(i, j, k));
+          ASSERT_GE(sort_desc_out(i, j, k - 1), sort_desc_out(i, j, k));
+          ASSERT_LE(in(i, j, argsort_out(i, j, k - 1)), in(i, j, argsort_out(i, j, k)));
+          ASSERT_GE(in(i, j, argsort_desc_out(i, j, k - 1)), in(i, j, argsort_desc_out(i, j, k)));
+        }
+        ASSERT_GE(argsort_out(i, j, k), static_cast<index_t>(0));
+        ASSERT_LT(argsort_out(i, j, k), cols);
+        ASSERT_GE(argsort_desc_out(i, j, k), static_cast<index_t>(0));
+        ASSERT_LT(argsort_desc_out(i, j, k), cols);
+      }
+      ASSERT_NEAR(reduce_out(i, j), expected_sum, 0.001f);
+      const auto prod_tol = cuda::std::max(0.001f, expected_prod * 1e-5f);
+      ASSERT_NEAR(prod_out(i, j), expected_prod, prod_tol);
+      ASSERT_NEAR(min_out(i, j), expected_min, 0.001f);
+      ASSERT_NEAR(max_out(i, j), expected_max, 0.001f);
+      const index_t shifted_j = (j + (batches + 1) / 2) % batches;
+      ASSERT_NEAR(mixed_out(i, j), expected_sum + shift_in(i, shifted_j) + 5.0f, 0.001f);
+
+      float ndiv_expected_sum = 0.0f;
+      float ndiv_expected_prod = 1.0f;
+      float ndiv_expected_min = ndiv_in(i, j, 0);
+      float ndiv_expected_max = ndiv_in(i, j, 0);
+      for (index_t k = 0; k < ndiv_cols; k++) {
+        ndiv_expected_sum += ndiv_in(i, j, k);
+        ndiv_expected_prod *= ndiv_in(i, j, k);
+        ndiv_expected_min = cuda::std::min(ndiv_expected_min, ndiv_in(i, j, k));
+        ndiv_expected_max = cuda::std::max(ndiv_expected_max, ndiv_in(i, j, k));
+      }
+      ASSERT_NEAR(ndiv_reduce_out(i, j), ndiv_expected_sum, 0.001f);
+      const auto ndiv_prod_tol = cuda::std::max(0.001f, ndiv_expected_prod * 1e-5f);
+      ASSERT_NEAR(ndiv_prod_out(i, j), ndiv_expected_prod, ndiv_prod_tol);
+      ASSERT_NEAR(ndiv_min_out(i, j), ndiv_expected_min, 0.001f);
+      ASSERT_NEAR(ndiv_max_out(i, j), ndiv_expected_max, 0.001f);
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(TensorStats, CubBlockJITRankPreservingMultiDimBatches)
+{
+  MATX_ENTER_HANDLER();
+
+  CUDAJITExecutor exec{};
+  constexpr index_t outer = 2;
+  constexpr index_t batches = 4;
+  constexpr index_t cols = 16;
+  constexpr index_t t4_mid = 3;
+
+  tensor_t<float, 3> in({outer, batches, cols});
+  tensor_t<float, 3> scan_out({outer, batches, cols});
+  tensor_t<float, 3> sort_out({outer, batches, cols});
+  tensor_t<index_t, 3> argsort_out({outer, batches, cols});
+  tensor_t<float, 4> t4_in({outer, t4_mid, batches, cols});
+  tensor_t<float, 4> t4_scan_out({outer, t4_mid, batches, cols});
+
+  for (index_t i = 0; i < outer; i++) {
+    for (index_t j = 0; j < batches; j++) {
+      const float base = static_cast<float>(1000 * i + 100 * j);
+      for (index_t k = 0; k < cols; k++) {
+        in(i, j, k) = base + static_cast<float>(cols - k);
+        scan_out(i, j, k) = -1.0f;
+        sort_out(i, j, k) = -1.0f;
+        argsort_out(i, j, k) = -1;
+      }
+    }
+  }
+
+  for (index_t i = 0; i < outer; i++) {
+    for (index_t j = 0; j < t4_mid; j++) {
+      for (index_t k = 0; k < batches; k++) {
+        const float base = static_cast<float>(1000 * i + 100 * j + 10 * k);
+        for (index_t l = 0; l < cols; l++) {
+          t4_in(i, j, k, l) = base + static_cast<float>(l + 1);
+          t4_scan_out(i, j, k, l) = -1.0f;
+        }
+      }
+    }
+  }
+
+  auto scan_op = cumsum(in);
+  auto sort_op = matx::sort(in, SORT_DIR_ASC);
+  auto argsort_op = argsort(in, SORT_DIR_ASC);
+  auto t4_scan_op = cumsum(t4_in);
+  ASSERT_TRUE(jit_supported(scan_op));
+  ASSERT_TRUE(jit_supported(sort_op));
+  ASSERT_TRUE(jit_supported(argsort_op));
+  ASSERT_TRUE(jit_supported(t4_scan_op));
+
+  (scan_out = scan_op).run(exec);
+  (sort_out = sort_op).run(exec);
+  (argsort_out = argsort_op).run(exec);
+  (t4_scan_out = t4_scan_op).run(exec);
+  exec.sync();
+
+  for (index_t i = 0; i < outer; i++) {
+    for (index_t j = 0; j < batches; j++) {
+      const float base = static_cast<float>(1000 * i + 100 * j);
+      float running = 0.0f;
+      for (index_t k = 0; k < cols; k++) {
+        running += base + static_cast<float>(cols - k);
+        ASSERT_NEAR(scan_out(i, j, k), running, 0.001f);
+        ASSERT_NEAR(sort_out(i, j, k), base + static_cast<float>(k + 1), 0.001f);
+        ASSERT_EQ(argsort_out(i, j, k), cols - 1 - k);
+      }
+    }
+  }
+
+  for (index_t i = 0; i < outer; i++) {
+    for (index_t j = 0; j < t4_mid; j++) {
+      for (index_t k = 0; k < batches; k++) {
+        const float base = static_cast<float>(1000 * i + 100 * j + 10 * k);
+        float running = 0.0f;
+        for (index_t l = 0; l < cols; l++) {
+          running += base + static_cast<float>(l + 1);
+          ASSERT_NEAR(t4_scan_out(i, j, k, l), running, 0.001f);
+        }
+      }
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(TensorStats, CubBlockJITRejectsEmptyCriticalDim)
+{
+  MATX_ENTER_HANDLER();
+
+  EmptyLastDimJitOp empty{};
+
+  auto sum_op = sum<EmptyLastDimJitOp, 1>(empty);
+  auto prod_op = prod<EmptyLastDimJitOp, 1>(empty);
+  auto min_op = matx::min<EmptyLastDimJitOp, 1>(empty);
+  auto max_op = matx::max<EmptyLastDimJitOp, 1>(empty);
+  auto cumsum_op = cumsum(empty);
+  auto sort_op = matx::sort(empty, SORT_DIR_ASC);
+  auto argsort_op = argsort(empty, SORT_DIR_ASC);
+
+  EXPECT_FALSE(jit_supported(sum_op));
+  EXPECT_FALSE(jit_supported(prod_op));
+  EXPECT_FALSE(jit_supported(min_op));
+  EXPECT_FALSE(jit_supported(max_op));
+  EXPECT_FALSE(jit_supported(cumsum_op));
+  EXPECT_FALSE(jit_supported(sort_op));
+  EXPECT_FALSE(jit_supported(argsort_op));
+
+  EXPECT_EQ(detail::get_operator_capability<detail::OperatorCapability::STATIC_SHM_SIZE>(sum_op), 0);
+  EXPECT_EQ(detail::get_operator_capability<detail::OperatorCapability::STATIC_SHM_SIZE>(prod_op), 0);
+  EXPECT_EQ(detail::get_operator_capability<detail::OperatorCapability::STATIC_SHM_SIZE>(min_op), 0);
+  EXPECT_EQ(detail::get_operator_capability<detail::OperatorCapability::STATIC_SHM_SIZE>(max_op), 0);
+  EXPECT_EQ(detail::get_operator_capability<detail::OperatorCapability::STATIC_SHM_SIZE>(cumsum_op), 0);
+  EXPECT_EQ(detail::get_operator_capability<detail::OperatorCapability::STATIC_SHM_SIZE>(sort_op), 0);
+  EXPECT_EQ(detail::get_operator_capability<detail::OperatorCapability::STATIC_SHM_SIZE>(argsort_op), 0);
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(TensorStats, CubBlockJITRejectsComplexArgsortKeys)
+{
+  MATX_ENTER_HANDLER();
+
+  tensor_t<cuda::std::complex<float>, 2> complex_in({2, 8});
+
+  auto argsort_op = argsort(complex_in, SORT_DIR_ASC);
+  EXPECT_FALSE(jit_supported(argsort_op));
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(TensorStats, CubBlockJITComplexSumProdCumsumAndRejectsOrderedReductions)
+{
+  MATX_ENTER_HANDLER();
+
+  CUDAJITExecutor exec{};
+  constexpr index_t rows = 2;
+  constexpr index_t cols = 8;
+  tensor_t<cuda::std::complex<float>, 2> complex_in({rows, cols});
+  tensor_t<cuda::std::complex<float>, 1> sum_out({rows});
+  tensor_t<cuda::std::complex<float>, 1> prod_out({rows});
+  tensor_t<cuda::std::complex<float>, 2> cumsum_out({rows, cols});
+
+  for (index_t row = 0; row < rows; row++) {
+    for (index_t col = 0; col < cols; col++) {
+      complex_in(row, col) = cuda::std::complex<float>{
+        1.0f + 0.125f * static_cast<float>(col),
+        0.25f * static_cast<float>(row + 1)};
+    }
+  }
+
+  auto sum_op = sum(complex_in, {1});
+  auto prod_op = prod(complex_in, {1});
+  auto cumsum_op = cumsum(complex_in);
+  auto min_op = matx::min(complex_in, {1});
+  auto max_op = matx::max(complex_in, {1});
+
+  ASSERT_TRUE(jit_supported(sum_op));
+  ASSERT_TRUE(jit_supported(prod_op));
+  ASSERT_TRUE(jit_supported(cumsum_op));
+  EXPECT_FALSE(jit_supported(min_op));
+  EXPECT_FALSE(jit_supported(max_op));
+
+  (sum_out = sum_op).run(exec);
+  (prod_out = prod_op).run(exec);
+  (cumsum_out = cumsum_op).run(exec);
+  exec.sync();
+
+  for (index_t row = 0; row < rows; row++) {
+    cuda::std::complex<float> expected_sum{0.0f, 0.0f};
+    cuda::std::complex<float> expected_prod{1.0f, 0.0f};
+    cuda::std::complex<float> running{0.0f, 0.0f};
+    for (index_t col = 0; col < cols; col++) {
+      const auto value = complex_in(row, col);
+      expected_sum += value;
+      expected_prod *= value;
+      running += value;
+      ASSERT_NEAR(cumsum_out(row, col).real(), running.real(), 0.001f);
+      ASSERT_NEAR(cumsum_out(row, col).imag(), running.imag(), 0.001f);
+    }
+    ASSERT_NEAR(sum_out(row).real(), expected_sum.real(), 0.001f);
+    ASSERT_NEAR(sum_out(row).imag(), expected_sum.imag(), 0.001f);
+    ASSERT_NEAR(prod_out(row).real(), expected_prod.real(), 0.001f);
+    ASSERT_NEAR(prod_out(row).imag(), expected_prod.imag(), 0.001f);
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(TensorStats, CubBlockJITRejectsNonPowerOfTwoCollectiveDim)
+{
+  MATX_ENTER_HANDLER();
+
+  tensor_t<float, 2> nonpow_in({2, 12});
+
+  auto cumsum_op = cumsum(nonpow_in);
+  auto sort_op = matx::sort(nonpow_in, SORT_DIR_ASC);
+  auto argsort_op = argsort(nonpow_in, SORT_DIR_ASC);
+  EXPECT_FALSE(jit_supported(cumsum_op));
+  EXPECT_FALSE(jit_supported(sort_op));
+  EXPECT_FALSE(jit_supported(argsort_op));
+  EXPECT_EQ(detail::get_operator_capability<detail::OperatorCapability::STATIC_SHM_SIZE>(cumsum_op), 0);
+  EXPECT_EQ(detail::get_operator_capability<detail::OperatorCapability::STATIC_SHM_SIZE>(sort_op), 0);
+  EXPECT_EQ(detail::get_operator_capability<detail::OperatorCapability::STATIC_SHM_SIZE>(argsort_op), 0);
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(TensorStats, CubBlockJITMultiDimReductions)
+{
+  MATX_ENTER_HANDLER();
+
+  CUDAJITExecutor exec{};
+  constexpr index_t rows = 4;
+  constexpr index_t cols = 8;
+  constexpr index_t batches = 3;
+  constexpr index_t mid = 5;
+  constexpr index_t inner = 6;
+
+  tensor_t<float, 2> full_in({rows, cols});
+  tensor_t<float, 0> full_sum{{}};
+  tensor_t<float, 0> full_prod{{}};
+  tensor_t<float, 0> full_min{{}};
+  tensor_t<float, 0> full_max{{}};
+  tensor_t<float, 3> trailing_in({batches, mid, inner});
+  tensor_t<float, 1> trailing_sum({batches});
+
+  for (index_t i = 0; i < rows; i++) {
+    for (index_t j = 0; j < cols; j++) {
+      full_in(i, j) = 1.0f + 0.01f * static_cast<float>((i * cols + j) % 11);
+    }
+  }
+
+  for (index_t b = 0; b < batches; b++) {
+    for (index_t i = 0; i < mid; i++) {
+      for (index_t j = 0; j < inner; j++) {
+        trailing_in(b, i, j) = static_cast<float>(b + i + j + 1);
+      }
+    }
+  }
+
+  auto sum_op = sum(full_in);
+  auto prod_op = prod(full_in);
+  auto min_op = matx::min(full_in);
+  auto max_op = matx::max(full_in);
+  auto trailing_op = sum(trailing_in, {1, 2});
+
+  ASSERT_TRUE(jit_supported(sum_op));
+  ASSERT_TRUE(jit_supported(prod_op));
+  ASSERT_TRUE(jit_supported(min_op));
+  ASSERT_TRUE(jit_supported(max_op));
+  ASSERT_TRUE(jit_supported(trailing_op));
+
+  (full_sum = sum_op).run(exec);
+  (full_prod = prod_op).run(exec);
+  (full_min = min_op).run(exec);
+  (full_max = max_op).run(exec);
+  (trailing_sum = trailing_op).run(exec);
+  exec.sync();
+
+  float expected_sum = 0.0f;
+  float expected_prod = 1.0f;
+  float expected_min = full_in(0, 0);
+  float expected_max = full_in(0, 0);
+  for (index_t i = 0; i < rows; i++) {
+    for (index_t j = 0; j < cols; j++) {
+      const float value = full_in(i, j);
+      expected_sum += value;
+      expected_prod *= value;
+      expected_min = cuda::std::min(expected_min, value);
+      expected_max = cuda::std::max(expected_max, value);
+    }
+  }
+
+  ASSERT_NEAR(full_sum(), expected_sum, 0.001f);
+  ASSERT_NEAR(full_prod(), expected_prod, cuda::std::max(0.001f, expected_prod * 1e-5f));
+  ASSERT_NEAR(full_min(), expected_min, 0.001f);
+  ASSERT_NEAR(full_max(), expected_max, 0.001f);
+
+  for (index_t b = 0; b < batches; b++) {
+    float expected_trailing_sum = 0.0f;
+    for (index_t i = 0; i < mid; i++) {
+      for (index_t j = 0; j < inner; j++) {
+        expected_trailing_sum += trailing_in(b, i, j);
+      }
+    }
+    ASSERT_NEAR(trailing_sum(b), expected_trailing_sum, 0.001f);
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(TensorStats, CubBlockJITWithOperatorInput)
+{
+  MATX_ENTER_HANDLER();
+
+  CUDAJITExecutor exec{};
+  constexpr index_t rows = 3;
+  constexpr index_t cols = 16;
+
+  const float starts[rows] = {1.0f, 2.0f, -3.0f};
+  const float stops[rows] = {16.0f, 17.0f, 12.0f};
+  tensor_t<float, 1> shift_in({rows});
+  tensor_t<float, 1> out({rows});
+
+  for (index_t i = 0; i < rows; i++) {
+    shift_in(i) = static_cast<float>(10 * i);
+  }
+
+  auto generated = linspace(starts, stops, cols, 1);
+  auto expr = sum(generated, {1}) + fftshift1D(shift_in) + 5.0f;
+  if (!jit_supported(expr)) {
+    GTEST_SKIP();
+  }
+
+  (out = expr).run(exec);
+  exec.sync();
+
+  for (index_t i = 0; i < rows; i++) {
+    const index_t shifted_i = (i + (rows + 1) / 2) % rows;
+    const float expected_sum = static_cast<float>(cols) * (starts[i] + stops[i]) * 0.5f;
+    ASSERT_NEAR(out(i), expected_sum + shift_in(shifted_i) + 5.0f, 0.001f);
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(TensorStats, CubBlockJITUnaryOverReduction)
+{
+  MATX_ENTER_HANDLER();
+
+  CUDAJITExecutor exec{};
+  constexpr index_t rows = 3;
+  constexpr index_t cols = 16;
+
+  tensor_t<float, 2> in({rows, cols});
+  tensor_t<float, 1> out({rows});
+
+  for (index_t i = 0; i < rows; i++) {
+    for (index_t j = 0; j < cols; j++) {
+      in(i, j) = -1.0f * static_cast<float>(i + j + 1);
+    }
+  }
+
+  auto expr = abs(sum(in, {1}));
+  ASSERT_TRUE(jit_supported(expr));
+
+  (out = expr).run(exec);
+  exec.sync();
+
+  for (index_t i = 0; i < rows; i++) {
+    float expected_sum = 0.0f;
+    for (index_t j = 0; j < cols; j++) {
+      expected_sum += in(i, j);
+    }
+    ASSERT_NEAR(out(i), cuda::std::abs(expected_sum), 0.001f);
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(TensorStats, CubBlockJITRepeatedRunReusesExpression)
+{
+  MATX_ENTER_HANDLER();
+
+  CUDAJITExecutor exec{};
+  constexpr index_t rows = 2;
+  constexpr index_t cols = 16;
+
+  tensor_t<float, 2> in({rows, cols});
+  tensor_t<float, 1> reduce_out({rows});
+  tensor_t<float, 2> scan_out({rows, cols});
+
+  auto reduce_expr = sum(in, {1});
+  auto scan_expr = cumsum(in);
+  ASSERT_TRUE(jit_supported(reduce_expr));
+  ASSERT_TRUE(jit_supported(scan_expr));
+
+  for (index_t pass = 0; pass < 2; pass++) {
+    for (index_t i = 0; i < rows; i++) {
+      for (index_t j = 0; j < cols; j++) {
+        in(i, j) = static_cast<float>((pass + 1) * (10 * i + j + 1));
+      }
+    }
+
+    (reduce_out = reduce_expr).run(exec);
+    (scan_out = scan_expr).run(exec);
+    exec.sync();
+
+    for (index_t i = 0; i < rows; i++) {
+      float running = 0.0f;
+      for (index_t j = 0; j < cols; j++) {
+        running += in(i, j);
+        ASSERT_NEAR(scan_out(i, j), running, 0.001f);
+      }
+      ASSERT_NEAR(reduce_out(i), running, 0.001f);
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(TensorStats, CubBlockJITWithFFT)
+{
+  MATX_ENTER_HANDLER();
+
+  CUDAJITExecutor jit_exec{};
+  cudaExecutor cuda_exec{};
+  constexpr index_t batches = 2;
+  constexpr index_t cols = 16;
+
+  tensor_t<cuda::std::complex<float>, 2> in({batches, cols});
+  tensor_t<cuda::std::complex<float>, 1> jit_out({batches});
+  tensor_t<cuda::std::complex<float>, 1> ref_out({batches});
+
+  for (index_t i = 0; i < batches; i++) {
+    for (index_t j = 0; j < cols; j++) {
+      in(i, j) = cuda::std::complex<float>{static_cast<float>(i + j), static_cast<float>(j % 3)};
+    }
+  }
+
+  auto expr = sum(fft(in), {1});
+  if (!jit_supported(expr)) {
+    GTEST_SKIP();
+  }
+
+  (jit_out = expr).run(jit_exec);
+  (ref_out = sum(fft(in), {1})).run(cuda_exec);
+  jit_exec.sync();
+  cuda_exec.sync();
+
+  for (index_t i = 0; i < batches; i++) {
+    ASSERT_NEAR(jit_out(i).real(), ref_out(i).real(), 0.01f);
+    ASSERT_NEAR(jit_out(i).imag(), ref_out(i).imag(), 0.01f);
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(TensorStats, CubBlockJITSumOfMatmulOutput)
+{
+  MATX_ENTER_HANDLER();
+
+  CUDAJITExecutor exec{};
+  constexpr index_t m = 4;
+  constexpr index_t k = 4;
+  constexpr index_t n = 4;
+
+  tensor_t<float, 2> lhs({m, k});
+  tensor_t<float, 2> rhs({k, n});
+  tensor_t<float, 0> out{{}};
+
+  for (index_t row = 0; row < m; row++) {
+    for (index_t col = 0; col < k; col++) {
+      lhs(row, col) = 1.0f + static_cast<float>(row) + 0.25f * static_cast<float>(col);
+    }
+  }
+  for (index_t row = 0; row < k; row++) {
+    for (index_t col = 0; col < n; col++) {
+      rhs(row, col) = 0.5f + 0.5f * static_cast<float>(row) + static_cast<float>(col);
+    }
+  }
+
+  auto expr = sum(matmul(lhs, rhs));
+  if (!jit_supported(expr)) {
+    GTEST_SKIP();
+  }
+
+  (out = expr).run(exec);
+  exec.sync();
+
+  float expected = 0.0f;
+  for (index_t row = 0; row < m; row++) {
+    for (index_t col = 0; col < n; col++) {
+      float value = 0.0f;
+      for (index_t inner = 0; inner < k; inner++) {
+        value += lhs(row, inner) * rhs(inner, col);
+      }
+      expected += value;
+    }
+  }
+  ASSERT_NEAR(out(), expected, 0.001f);
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(TensorStats, CubBlockJITSortAbs2FFT)
+{
+  MATX_ENTER_HANDLER();
+
+  CUDAJITExecutor jit_exec{};
+  cudaExecutor cuda_exec{};
+  constexpr index_t fft_size = 16;
+  tensor_t<cuda::std::complex<float>, 1> in({fft_size});
+  tensor_t<float, 1> out({fft_size});
+  tensor_t<float, 1> ref({fft_size});
+
+  for (index_t i = 0; i < fft_size; i++) {
+    const float sign = (i % 2) == 0 ? 1.0f : -1.0f;
+    in(i) = cuda::std::complex<float>{sign, 0.0f};
+  }
+
+  auto expr = matx::sort(abs2(fft(in)), SORT_DIR_ASC);
+  if (!jit_supported(expr)) {
+    GTEST_SKIP();
+  }
+
+  (out = expr).run(jit_exec);
+  (ref = matx::sort(abs2(fft(in)), SORT_DIR_ASC)).run(cuda_exec);
+  jit_exec.sync();
+  cuda_exec.sync();
+
+  for (index_t i = 0; i < fft_size; i++) {
+    ASSERT_NEAR(out(i), ref(i), 0.01f);
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(TensorStats, CubBlockJITMaxAbs2FFT)
+{
+  MATX_ENTER_HANDLER();
+
+  CUDAJITExecutor jit_exec{};
+  cudaExecutor cuda_exec{};
+  constexpr index_t fft_size = 16;
+  tensor_t<cuda::std::complex<float>, 1> in({fft_size});
+  tensor_t<float, 0> out{{}};
+  tensor_t<float, 0> ref{{}};
+
+  for (index_t i = 0; i < fft_size; i++) {
+    const float sign = (i % 2) == 0 ? 1.0f : -1.0f;
+    in(i) = cuda::std::complex<float>{sign, 0.0f};
+  }
+
+  auto expr = matx::max(abs2(fft(in)));
+  if (!jit_supported(expr)) {
+    GTEST_SKIP();
+  }
+
+  (out = expr).run(jit_exec);
+  (ref = matx::max(abs2(fft(in)))).run(cuda_exec);
+  jit_exec.sync();
+  cuda_exec.sync();
+
+  ASSERT_NEAR(out(), ref(), 0.01f);
+
+  MATX_EXIT_HANDLER();
+}
+#endif
 
 TEST(TensorStats, NoMatchesFindAndUniqueHost)
 {

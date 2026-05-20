@@ -35,6 +35,7 @@
 #include "gtest/gtest.h"
 
 #include <cuda/std/tuple>
+#include <cmath>
 
 using namespace matx;
 
@@ -85,6 +86,17 @@ void ExpectProviderForSizes(const cuda::std::array<index_t, RANK> &sizes, bool i
   ExpectAllSupportedEPTs(provider, RANK <= 4);
 }
 
+#ifdef MATX_EN_JIT
+__global__ void DelayedFillForJitStreamTest(float *ptr, int n, float value, unsigned long long cycles)
+{
+  const unsigned long long start = clock64();
+  while (clock64() - start < cycles) {}
+  for (int i = threadIdx.x; i < n; i += blockDim.x) {
+    ptr[i] = value;
+  }
+}
+#endif
+
 } // namespace
 
 TEST(CudaExecutorCommonTests, BaseConstructorsKeepStreamAndRejectUnprofiledTiming)
@@ -118,6 +130,55 @@ TEST(CudaExecutorCommonTests, ProfiledBaseRecordsElapsedTimeWhenDeviceIsAvailabl
     EXPECT_TRUE(exec.get_time_ms() >= 0.0f);
   }
   MATX_CUDA_CHECK(cudaStreamDestroy(stream));
+}
+
+TEST(CudaExecutorCommonTests, CUDAJITExecutorLaunchesOnProvidedStream)
+{
+#ifndef MATX_EN_JIT
+  GTEST_SKIP() << "MATX_EN_JIT required for CUDAJITExecutor stream coverage";
+#else
+  if (!HasCudaDevice()) {
+    GTEST_SKIP() << "CUDA device required for CUDAJITExecutor stream coverage";
+  }
+
+  cudaStream_t stream{};
+  MATX_CUDA_CHECK(cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking));
+
+  CUDAJITExecutor exec{stream};
+  constexpr index_t n = 1 << 20;
+  tensor_t<float, 1> in({n});
+  tensor_t<float, 1> out({n});
+
+  MATX_CUDA_CHECK(cudaMemsetAsync(in.Data(), 0, n * sizeof(float), stream));
+  MATX_CUDA_CHECK(cudaMemsetAsync(out.Data(), 0, n * sizeof(float), stream));
+  MATX_CUDA_CHECK(cudaStreamSynchronize(stream));
+
+  auto expr = in + 1.0f;
+  if (!jit_supported(expr)) {
+    MATX_CUDA_CHECK(cudaStreamDestroy(stream));
+    GTEST_SKIP() << "Expression not JIT supported";
+  }
+
+  (out = expr).run(exec);
+  exec.sync();
+
+  MATX_CUDA_CHECK(cudaMemsetAsync(in.Data(), 0, n * sizeof(float), stream));
+  MATX_CUDA_CHECK(cudaMemsetAsync(out.Data(), 0, n * sizeof(float), stream));
+  MATX_CUDA_CHECK(cudaStreamSynchronize(stream));
+
+  DelayedFillForJitStreamTest<<<1, 256, 0, stream>>>(in.Data(), static_cast<int>(n), 2.0f, 200000000ULL);
+  (out = expr).run(exec);
+  MATX_CUDA_CHECK(cudaDeviceSynchronize());
+
+  out.PrefetchHost(0);
+  MATX_CUDA_CHECK(cudaDeviceSynchronize());
+
+  for (index_t i = 0; i < n; i += 65537) {
+    EXPECT_NEAR(out(i), 3.0f, 0.001f) << "stream ordering mismatch at " << i;
+  }
+
+  MATX_CUDA_CHECK(cudaStreamDestroy(stream));
+#endif
 }
 
 TEST(CudaExecutorCommonTests, KernelProviderReturnsRankSpecificPointers)

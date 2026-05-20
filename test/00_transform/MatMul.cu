@@ -85,11 +85,32 @@ class MatMulTestFloatNonComplexTypes : public MatMulTest<TensorType> {
 template <typename TensorType>
 class MatMulTestComplexHalfPlanarTypes : public MatMulTest<TensorType> {
 };
+template <typename TensorType>
+class MatMulTestComplexNonHalfCUDA : public MatMulTest<TensorType> {
+};
+template <typename TensorType>
+class MatMulTestFloatNonComplexNonHalfCUDA : public MatMulTest<TensorType> {
+};
 
 TYPED_TEST_SUITE(MatMulTestFloatTypes, MatXTypesFloatAllExecs);
 TYPED_TEST_SUITE(MatMulTestFloatNonHalfTypes, MatXFloatNonHalfTypesAllExecs);
 TYPED_TEST_SUITE(MatMulTestFloatNonComplexTypes, MatXTypesFloatNonComplexAllExecs);
 TYPED_TEST_SUITE(MatMulTestComplexHalfPlanarTypes, MatXComplexHalfPlanarTypesAllExecs);
+TYPED_TEST_SUITE(MatMulTestComplexNonHalfCUDA, MatXComplexNonHalfTypesCUDAExec);
+TYPED_TEST_SUITE(MatMulTestFloatNonComplexNonHalfCUDA, MatXFloatNonComplexNonHalfTypesCUDAExec);
+
+template <typename T>
+T MatMulHermitianTestValue(index_t i, index_t j, index_t batch = 0)
+{
+  const float r = static_cast<float>((batch + 1) * 13 + i * 3 - j * 2);
+  const float im = static_cast<float>((batch + 1) * 5 - i + j * 4);
+  if constexpr (is_cuda_complex_v<T>) {
+    return T{r / 17.0f, im / 19.0f};
+  }
+  else {
+    return static_cast<T>(r / 17.0f);
+  }
+}
 
 template <typename T>
 struct float_to_complex
@@ -216,6 +237,196 @@ TYPED_TEST(MatMulTestFloatTypes, SmallRectBTranspose)
     (c = matmul(a, bt)).run(this->exec);
     // example-end matmul-test-3
     MATX_TEST_ASSERT_COMPARE(this->pb, c, "c", this->thresh);\
+  }
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(MatMulTestComplexNonHalfCUDA, SmallRectAHermitian)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  if constexpr (!detail::CheckMatMulSupport<ExecType, TestType>()) {
+    GTEST_SKIP();
+  } else {
+    constexpr index_t m = 5;
+    constexpr index_t k = 3;
+    constexpr index_t n = 4;
+    tensor_t<TestType, 2> a{{m, k}};
+    tensor_t<TestType, 2> b{{m, n}};
+    tensor_t<TestType, 2> c_hermitian{{k, n}};
+    tensor_t<TestType, 2> c_conj_transpose{{k, n}};
+    tensor_t<TestType, 2> c_conj_hermitian{{k, n}};
+
+    for (index_t i = 0; i < m; i++) {
+      for (index_t j = 0; j < k; j++) {
+        a(i, j) = MatMulHermitianTestValue<TestType>(i, j);
+      }
+    }
+
+    for (index_t i = 0; i < m; i++) {
+      for (index_t j = 0; j < n; j++) {
+        b(i, j) = MatMulHermitianTestValue<TestType>(i, j + k);
+      }
+    }
+
+    (c_hermitian = matmul(hermitianT(a), b)).run(this->exec);
+    (c_conj_transpose = matmul(conj(transpose_matrix(a)), b)).run(this->exec);
+    (c_conj_hermitian = matmul(conj(hermitianT(a)), b)).run(this->exec);
+    this->exec.sync();
+
+    for (index_t i = 0; i < k; i++) {
+      for (index_t j = 0; j < n; j++) {
+        TestType expected{};
+        TestType expected_conj_hermitian{};
+        for (index_t p = 0; p < m; p++) {
+          expected += detail::scalar_internal_conj(a(p, i)) * b(p, j);
+          expected_conj_hermitian += a(p, i) * b(p, j);
+        }
+        EXPECT_TRUE(MatXUtils::MatXTypeCompare(c_hermitian(i, j), expected, this->thresh));
+        EXPECT_TRUE(MatXUtils::MatXTypeCompare(c_conj_transpose(i, j), expected, this->thresh));
+        EXPECT_TRUE(MatXUtils::MatXTypeCompare(c_conj_hermitian(i, j),
+                                               expected_conj_hermitian,
+                                               this->thresh));
+      }
+    }
+  }
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(MatMulTestComplexNonHalfCUDA, SmallRectBHermitian)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  if constexpr (!detail::CheckMatMulSupport<ExecType, TestType>()) {
+    GTEST_SKIP();
+  } else {
+    constexpr index_t m = 4;
+    constexpr index_t k = 5;
+    constexpr index_t n = 3;
+    tensor_t<TestType, 2> a{{m, k}};
+    tensor_t<TestType, 2> b{{n, k}};
+    tensor_t<TestType, 2> c_hermitian{{m, n}};
+    tensor_t<TestType, 2> c_conj_transpose{{m, n}};
+
+    for (index_t i = 0; i < m; i++) {
+      for (index_t j = 0; j < k; j++) {
+        a(i, j) = MatMulHermitianTestValue<TestType>(i, j);
+      }
+    }
+
+    for (index_t i = 0; i < n; i++) {
+      for (index_t j = 0; j < k; j++) {
+        b(i, j) = MatMulHermitianTestValue<TestType>(i + m, j);
+      }
+    }
+
+    (c_hermitian = matmul(a, hermitianT(b))).run(this->exec);
+    (c_conj_transpose = matmul(a, conj(transpose_matrix(b)))).run(this->exec);
+    this->exec.sync();
+
+    for (index_t i = 0; i < m; i++) {
+      for (index_t j = 0; j < n; j++) {
+        TestType expected{};
+        for (index_t p = 0; p < k; p++) {
+          expected += a(i, p) * detail::scalar_internal_conj(b(j, p));
+        }
+        EXPECT_TRUE(MatXUtils::MatXTypeCompare(c_hermitian(i, j), expected, this->thresh));
+        EXPECT_TRUE(MatXUtils::MatXTypeCompare(c_conj_transpose(i, j), expected, this->thresh));
+      }
+    }
+  }
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(MatMulTestComplexNonHalfCUDA, BatchedAHermitian)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  if constexpr (!detail::CheckMatMulSupport<ExecType, TestType>()) {
+    GTEST_SKIP();
+  } else {
+    constexpr index_t batches = 2;
+    constexpr index_t m = 4;
+    constexpr index_t k = 3;
+    constexpr index_t n = 5;
+    tensor_t<TestType, 3> a{{batches, m, k}};
+    tensor_t<TestType, 3> b{{batches, m, n}};
+    tensor_t<TestType, 3> c{{batches, k, n}};
+
+    for (index_t batch = 0; batch < batches; batch++) {
+      for (index_t i = 0; i < m; i++) {
+        for (index_t j = 0; j < k; j++) {
+          a(batch, i, j) = MatMulHermitianTestValue<TestType>(i, j, batch);
+        }
+      }
+
+      for (index_t i = 0; i < m; i++) {
+        for (index_t j = 0; j < n; j++) {
+          b(batch, i, j) = MatMulHermitianTestValue<TestType>(i, j + k, batch);
+        }
+      }
+    }
+
+    (c = matmul(hermitianT(a), b)).run(this->exec);
+    this->exec.sync();
+
+    for (index_t batch = 0; batch < batches; batch++) {
+      for (index_t i = 0; i < k; i++) {
+        for (index_t j = 0; j < n; j++) {
+          TestType expected{};
+          for (index_t p = 0; p < m; p++) {
+            expected += detail::scalar_internal_conj(a(batch, p, i)) * b(batch, p, j);
+          }
+          EXPECT_TRUE(MatXUtils::MatXTypeCompare(c(batch, i, j), expected, this->thresh));
+        }
+      }
+    }
+  }
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(MatMulTestFloatNonComplexNonHalfCUDA, SmallRectRealHermitian)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  if constexpr (!detail::CheckMatMulSupport<ExecType, TestType>()) {
+    GTEST_SKIP();
+  } else {
+    constexpr index_t m = 5;
+    constexpr index_t k = 3;
+    constexpr index_t n = 4;
+    tensor_t<TestType, 2> a{{m, k}};
+    tensor_t<TestType, 2> b{{m, n}};
+    tensor_t<TestType, 2> c{{k, n}};
+
+    for (index_t i = 0; i < m; i++) {
+      for (index_t j = 0; j < k; j++) {
+        a(i, j) = MatMulHermitianTestValue<TestType>(i, j);
+      }
+    }
+
+    for (index_t i = 0; i < m; i++) {
+      for (index_t j = 0; j < n; j++) {
+        b(i, j) = MatMulHermitianTestValue<TestType>(i, j + k);
+      }
+    }
+
+    (c = matmul(hermitianT(a), b)).run(this->exec);
+    this->exec.sync();
+
+    for (index_t i = 0; i < k; i++) {
+      for (index_t j = 0; j < n; j++) {
+        TestType expected{};
+        for (index_t p = 0; p < m; p++) {
+          expected += a(p, i) * b(p, j);
+        }
+        EXPECT_TRUE(MatXUtils::MatXTypeCompare(c(i, j), expected, this->thresh));
+      }
+    }
   }
   MATX_EXIT_HANDLER();
 }
@@ -1196,3 +1407,91 @@ TYPED_TEST(MatMulTestFloatTypes, OuterProduct)
   }
   MATX_EXIT_HANDLER();
 }
+
+#if defined(MATX_EN_JIT) && defined(MATX_EN_MATHDX)
+namespace {
+
+constexpr index_t kCuBLASDxPassThroughDim = 4;
+
+template <typename TensorType>
+void FillOnes2D(TensorType &t)
+{
+  for (index_t row = 0; row < kCuBLASDxPassThroughDim; ++row) {
+    for (index_t col = 0; col < kCuBLASDxPassThroughDim; ++col) {
+      t(row, col) = 1.0f;
+    }
+  }
+}
+
+} // namespace
+
+TEST(MatMulJIT, CuBLASDxUnaryFusion)
+{
+  MATX_ENTER_HANDLER();
+  auto a = make_tensor<float>({kCuBLASDxPassThroughDim, kCuBLASDxPassThroughDim});
+  auto b = make_tensor<float>({kCuBLASDxPassThroughDim, kCuBLASDxPassThroughDim});
+  auto c = make_tensor<float>({kCuBLASDxPassThroughDim, kCuBLASDxPassThroughDim});
+  FillOnes2D(a);
+  FillOnes2D(b);
+
+  CUDAJITExecutor exec{};
+  (c = sqrt(matmul(a, b))).run(exec);
+  exec.sync();
+  ASSERT_EQ(cudaGetLastError(), cudaSuccess);
+
+  for (index_t row = 0; row < kCuBLASDxPassThroughDim; ++row) {
+    for (index_t col = 0; col < kCuBLASDxPassThroughDim; ++col) {
+      ASSERT_NEAR(c(row, col), 2.0f, 1e-4f);
+    }
+  }
+  MATX_EXIT_HANDLER();
+}
+
+TEST(MatMulJIT, CuBLASDxBinaryFusion)
+{
+  MATX_ENTER_HANDLER();
+  auto a = make_tensor<float>({kCuBLASDxPassThroughDim, kCuBLASDxPassThroughDim});
+  auto b = make_tensor<float>({kCuBLASDxPassThroughDim, kCuBLASDxPassThroughDim});
+  auto c = make_tensor<float>({kCuBLASDxPassThroughDim, kCuBLASDxPassThroughDim});
+  FillOnes2D(a);
+  FillOnes2D(b);
+
+  CUDAJITExecutor exec{};
+  (c = matmul(a, b) + 1.0f).run(exec);
+  exec.sync();
+  ASSERT_EQ(cudaGetLastError(), cudaSuccess);
+
+  for (index_t row = 0; row < kCuBLASDxPassThroughDim; ++row) {
+    for (index_t col = 0; col < kCuBLASDxPassThroughDim; ++col) {
+      ASSERT_NEAR(c(row, col), 5.0f, 1e-4f);
+    }
+  }
+  MATX_EXIT_HANDLER();
+}
+
+TEST(MatMulJIT, CuBLASDxCastFusion)
+{
+  MATX_ENTER_HANDLER();
+  auto a = make_tensor<float>({kCuBLASDxPassThroughDim, kCuBLASDxPassThroughDim});
+  auto b = make_tensor<float>({kCuBLASDxPassThroughDim, kCuBLASDxPassThroughDim});
+  auto c = make_tensor<double>({kCuBLASDxPassThroughDim, kCuBLASDxPassThroughDim});
+  auto z = make_tensor<cuda::std::complex<float>>({kCuBLASDxPassThroughDim, kCuBLASDxPassThroughDim});
+  FillOnes2D(a);
+  FillOnes2D(b);
+
+  CUDAJITExecutor exec{};
+  (c = as_type<double>(matmul(a, b))).run(exec);
+  (z = as_complex_float(matmul(a, b), matmul(a, b))).run(exec);
+  exec.sync();
+  ASSERT_EQ(cudaGetLastError(), cudaSuccess);
+
+  for (index_t row = 0; row < kCuBLASDxPassThroughDim; ++row) {
+    for (index_t col = 0; col < kCuBLASDxPassThroughDim; ++col) {
+      ASSERT_NEAR(c(row, col), 4.0, 1e-6);
+      ASSERT_NEAR(z(row, col).real(), 4.0f, 1e-4f);
+      ASSERT_NEAR(z(row, col).imag(), 4.0f, 1e-4f);
+    }
+  }
+  MATX_EXIT_HANDLER();
+}
+#endif

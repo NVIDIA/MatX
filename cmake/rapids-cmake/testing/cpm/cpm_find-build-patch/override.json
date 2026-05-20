@@ -1,0 +1,17 @@
+{
+  "packages": {
+    "test_pkg": {
+      "version": "1.0",
+      "git_url": "a_url",
+      "git_tag": "a_tag",
+      "patches": [
+        {
+          "file": "${current_json_dir}/example.diff",
+          "issue": "explain",
+          "fixed_in": "",
+          "build": true
+        }
+      ]
+    }
+  }
+}

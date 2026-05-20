@@ -117,8 +117,6 @@ namespace matx
     default:
       return "Unknown";
     };
-
-    return "Unknown";
   }
 
   namespace detail {

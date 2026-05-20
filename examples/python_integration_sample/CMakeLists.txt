@@ -14,10 +14,7 @@ if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
   set(CMAKE_CUDA_ARCHITECTURES 70 CACHE STRING "Select compile target CUDA Compute Capabilities")
 endif()
 
-if(NOT DEFINED MATX_FETCH_REMOTE)
-  message(WARNING "MATX_FETCH_REMOTE not defined.  Defaulting to OFF, will use local MatX repo")
-  set(MATX_FETCH_REMOTE OFF CACHE BOOL "Set MatX repo fetch location")
-endif()
+option(MATX_FETCH_REMOTE "Fetch MatX from GitHub instead of using the local repository" OFF)
 
 project(SAMPLE_MATX_PYTHON LANGUAGES CUDA CXX)
 find_package(CUDAToolkit 12.2 REQUIRED)

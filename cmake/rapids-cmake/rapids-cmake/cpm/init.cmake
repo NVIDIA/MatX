@@ -1,18 +1,9 @@
-#=============================================================================
-# Copyright (c) 2021-2024, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#=============================================================================
+# =============================================================================
+# cmake-format: off
+# SPDX-FileCopyrightText: Copyright (c) 2021-2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
+# cmake-format: on
+# =============================================================================
 include_guard(GLOBAL)
 
 #[=======================================================================[.rst:
@@ -41,7 +32,7 @@ in the build tree of the calling project
   ```
   This is an advanced option that allows projects to specify a custom default ``versions.json`` file that will
   be used instead of the one packaged inside rapids-cmake. Since this allows you to specify a new default
-  ``versions.json`` it must contain information for all the built-in rapids-cmake packages ( cccl, fmt, rmm, etc )
+  ``versions.json`` it must contain information for all the built-in rapids-cmake packages ( cccl, GTest, rmm, etc )
   that are used by your project.
 
   Using a built-in rapids-cmake package without an explicit entry in the custom default version file is undefined behavior.
@@ -78,8 +69,9 @@ in the build tree of the calling project
   .. versionadded:: v24.06.00
 
   If the variable :cmake:variable:`RAPIDS_CMAKE_CPM_OVERRIDE_VERSION_FILE` is specified it will be used
-  in all calls to ``rapids_cpm_init``. Any existing explicit `OVERRIDE` files will be ignored, and
-  all other calls will be treated as if this file was specified as the override.
+  in all calls to ``rapids_cpm_init`` no matter the arguments. Any existing
+  ``rapids_cpm_init(OVERRIDE`` files will be ignored, and all other calls will be treated as if this file was specified
+  as the override.
 
 .. versionadded:: v24.04.00
   ```
@@ -118,7 +110,10 @@ function(rapids_cpm_init)
     rapids_cpm_load_preset_versions()
   endif()
 
-  if(_RAPIDS_OVERRIDE OR RAPIDS_CMAKE_CPM_OVERRIDE_VERSION_FILE)
+  if(RAPIDS_CMAKE_CPM_OVERRIDE_VERSION_FILE)
+    include("${rapids-cmake-dir}/cpm/package_override.cmake")
+    rapids_cpm_package_override("${RAPIDS_CMAKE_CPM_OVERRIDE_VERSION_FILE}")
+  elseif(_RAPIDS_OVERRIDE)
     include("${rapids-cmake-dir}/cpm/package_override.cmake")
     rapids_cpm_package_override("${_RAPIDS_OVERRIDE}")
   endif()

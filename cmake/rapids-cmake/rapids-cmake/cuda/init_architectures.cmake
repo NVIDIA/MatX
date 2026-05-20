@@ -1,18 +1,9 @@
-#=============================================================================
-# Copyright (c) 2021-2024, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#=============================================================================
+# =============================================================================
+# cmake-format: off
+# SPDX-FileCopyrightText: Copyright (c) 2021-2026, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
+# cmake-format: on
+# =============================================================================
 include_guard(GLOBAL)
 
 #[=======================================================================[.rst:
@@ -28,8 +19,9 @@ to include support for `RAPIDS` and `NATIVE` to make CUDA architecture compilati
 
     rapids_cuda_init_architectures(<project_name>)
 
-Used before enabling the CUDA language either via :cmake:command:`project() <cmake:command:project>` to establish the
-CUDA architectures to be compiled for. Parses the :cmake:envvar:`ENV{CUDAARCHS} <cmake:envvar:CUDAARCHS>`, and
+Used before enabling the CUDA language either via :cmake:command:`project() <cmake:command:project>` or
+:cmake:command:`enable_language() <cmake:command:enable_language>` to establish the CUDA architectures
+to be compiled for. Parses the :cmake:envvar:`ENV{CUDAARCHS} <cmake:envvar:CUDAARCHS>`, and
 :cmake:variable:`CMAKE_CUDA_ARCHITECTURES <cmake:variable:CMAKE_CUDA_ARCHITECTURES>` for special values
 `RAPIDS`, and `NATIVE`.
 
@@ -52,7 +44,7 @@ Example on how to properly use :cmake:command:`rapids_cuda_init_architectures`:
   cmake_minimum_required(...)
 
   if(NOT EXISTS ${CMAKE_CURRENT_BINARY_DIR}/EXAMPLE_RAPIDS.cmake)
-    file(DOWNLOAD https://raw.githubusercontent.com/rapidsai/rapids-cmake/branch-<VERSION_MAJOR>.<VERSION_MINOR>/RAPIDS.cmake
+    file(DOWNLOAD https://raw.githubusercontent.com/rapidsai/rapids-cmake/main/RAPIDS.cmake
       ${CMAKE_CURRENT_BINARY_DIR}/EXAMPLE_RAPIDS.cmake)
   endif()
   include(${CMAKE_CURRENT_BINARY_DIR}/EXAMPLE_RAPIDS.cmake)
@@ -101,12 +93,9 @@ function(rapids_cuda_init_architectures project_name)
     # Setup to call to set CMAKE_CUDA_ARCHITECTURES values to occur right after the project call
     # https://cmake.org/cmake/help/latest/command/project.html#code-injection
     #
-    # If an existing file was specified for loading post `project` we will chain include them
-    if(DEFINED CMAKE_PROJECT_${project_name}_INCLUDE)
-      set(_RAPIDS_PREVIOUS_CMAKE_PROJECT_INCLUDE "${CMAKE_PROJECT_${project_name}_INCLUDE}"
-          PARENT_SCOPE)
-    endif()
-    set(CMAKE_PROJECT_${project_name}_INCLUDE "${load_file}" PARENT_SCOPE)
+    list(APPEND CMAKE_PROJECT_${project_name}_INCLUDE "${load_file}")
+    set(CMAKE_PROJECT_${project_name}_INCLUDE "${CMAKE_PROJECT_${project_name}_INCLUDE}"
+        PARENT_SCOPE)
   endif()
 
 endfunction()

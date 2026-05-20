@@ -731,6 +731,76 @@ NVBENCH_BENCH_TYPES(fltflt_bench_fma, NVBENCH_TYPE_AXES(precision_types))
   .add_int64_axis("Iterations", {250});
 
 //==============================================================================
+// Fused Multiply-Add (Approx) Benchmark
+//
+// fltflt_fma_approx() drops the second-order a.lo*b.lo cross term. For
+// non-fltflt types this kernel is identical to iterative_fma_kernel, so
+// the float/double rows act as a baseline for the fltflt fast-path row.
+//==============================================================================
+template <typename T>
+__global__ void iterative_fma_approx_kernel(T* __restrict__ result, int64_t size, int32_t iterations)
+{
+  int64_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx < size) {
+    T acc[ILP_FACTOR];
+    const T val_a = static_cast<T>(1.001);
+    const T val_b = static_cast<T>(1.002);
+    #pragma unroll
+    for (int ilp = 0; ilp < ILP_FACTOR; ilp++) {
+      acc[ilp] = val_b;
+    }
+
+    #pragma unroll ITER_UNROLL_FACTOR
+    for (int32_t i = 0; i < iterations; i++) {
+      #pragma unroll
+      for (int ilp = 0; ilp < ILP_FACTOR; ilp++) {
+        if constexpr (std::is_same_v<T, fltflt>) {
+          acc[ilp] = fltflt_fma_approx(val_a, acc[ilp], val_b);
+        } else {
+          acc[ilp] = val_a * acc[ilp] + val_b;
+        }
+      }
+    }
+
+    T result_val = acc[0];
+    #pragma unroll
+    for (int ilp = 1; ilp < ILP_FACTOR; ilp++) {
+      result_val = result_val + acc[ilp];
+    }
+    result[idx] = result_val;
+  }
+}
+
+template <typename PrecisionType>
+void fltflt_bench_fma_approx(nvbench::state &state, nvbench::type_list<PrecisionType>)
+{
+  const index_t size = static_cast<index_t>(state.get_int64("Array Size"));
+  const int32_t iterations = static_cast<int32_t>(state.get_int64("Iterations"));
+  cudaExecutor exec{0};
+
+  auto result = make_tensor<PrecisionType>({size});
+
+  state.add_element_count(size, "NumElements");
+  state.add_global_memory_writes<PrecisionType>(size);
+
+  constexpr int block_size = 256;
+  int grid_size = static_cast<int>((size + block_size - 1) / block_size);
+
+  warmup_gpu_once();
+  exec.sync();
+
+  state.exec([&](nvbench::launch &launch) {
+    iterative_fma_approx_kernel<<<grid_size, block_size, 0, (cudaStream_t)launch.get_stream()>>>(
+      result.Data(), size, iterations);
+  });
+  add_gops_per_sec_summary(state, /*ops_per_op=*/2.0);  // FMA = 1 mul + 1 add
+}
+
+NVBENCH_BENCH_TYPES(fltflt_bench_fma_approx, NVBENCH_TYPE_AXES(precision_types))
+  .add_int64_power_of_two_axis("Array Size", nvbench::range(24, 24, 1))
+  .add_int64_axis("Iterations", {250});
+
+//==============================================================================
 // Multiply-Add (MADD) Benchmark - Separate Multiply and Add Operations
 //==============================================================================
 template <typename T>

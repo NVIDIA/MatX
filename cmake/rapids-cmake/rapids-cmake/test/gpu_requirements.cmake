@@ -1,18 +1,9 @@
-#=============================================================================
-# Copyright (c) 2022-2023, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#=============================================================================
+# =============================================================================
+# cmake-format: off
+# SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
+# cmake-format: on
+# =============================================================================
 include_guard(GLOBAL)
 
 #[=======================================================================[.rst:
@@ -77,7 +68,7 @@ function(rapids_test_gpu_requirements test_name)
     set(percent ${_RAPIDS_TEST_PERCENT})
   endif()
 
-  # verify that gpu and percent are withing the allowed bounds
+  # verify that gpu and percent are within the allowed bounds
   if(NOT gpus GREATER_EQUAL 0)
     message(FATAL_ERROR "rapids_test_gpu_requirements requires a numeric GPUS value [0-N].")
   endif()
@@ -87,6 +78,7 @@ function(rapids_test_gpu_requirements test_name)
 
   if(gpus AND percent)
     set_property(TEST ${test_name} PROPERTY RESOURCE_GROUPS "${gpus},gpus:${percent}")
+    set_property(TEST ${test_name} PROPERTY FIXTURES_REQUIRED resource_spec)
   endif()
 
 endfunction()

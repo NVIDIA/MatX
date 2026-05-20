@@ -39,6 +39,7 @@ Usage:
     python view_sarbp_image.py output.raw
     python view_sarbp_image.py output.raw --sarbp input.sarbp
     python view_sarbp_image.py output.raw --size 2048x2048
+    python view_sarbp_image.py output.raw --percentile 2,98
     python view_sarbp_image.py output.raw --dynamic-range 50
     python view_sarbp_image.py output.raw --save output.png
 """
@@ -97,8 +98,15 @@ def main():
                         help="Image dimensions as HEIGHTxWIDTH (e.g. 2048x2048). "
                              "Overrides .sarbp header. If neither --sarbp nor --size is "
                              "given, assumes a square image based on file size.")
-    parser.add_argument("--dynamic-range", type=float, default=70,
-                        help="Display dynamic range in dB below peak (default: 70)")
+    parser.add_argument("--percentile", default="5,95",
+                        help="Percentile-based contrast stretch as LO,HI (default: 5,95). "
+                             "Sets vmin/vmax to those percentiles of the dB image, which "
+                             "gives much better contrast than a fixed dynamic range when "
+                             "a few bright scatterers dominate the scene. Typical values: "
+                             "1,99, 2,98, 5,95.")
+    parser.add_argument("--dynamic-range", type=float, default=None,
+                        help="Use a fixed dB-below-peak floor instead of percentile stretch. "
+                             "When given, overrides --percentile.")
     parser.add_argument("--save", default=None,
                         help="Save image to file (e.g. output.png) instead of displaying")
     parser.add_argument("--cmap", default="gray",
@@ -152,8 +160,31 @@ def main():
     mag = np.abs(img)
     mag_db = 20.0 * np.log10(mag + 1e-12)
     mag_db -= mag_db.max()
-    vmax = 0.0
-    vmin = -args.dynamic_range
+
+    # Pick the clip range. Default is a percentile-based stretch (matches the
+    # contrast-stretch convention used by most SAR display tools).
+    # --dynamic-range falls back to a fixed dB-below-peak floor.
+    if args.dynamic_range is not None:
+        vmax = 0.0
+        vmin = -args.dynamic_range
+    else:
+        parts = args.percentile.split(",")
+        if len(parts) != 2:
+            print(f"ERROR: --percentile must be LO,HI (e.g. 5,95), got '{args.percentile}'",
+                  file=sys.stderr)
+            sys.exit(1)
+        try:
+            lo_p, hi_p = float(parts[0]), float(parts[1])
+        except ValueError:
+            print(f"ERROR: --percentile must be numeric LO,HI, got '{args.percentile}'",
+                  file=sys.stderr)
+            sys.exit(1)
+        if not (0.0 <= lo_p < hi_p <= 100.0):
+            print(f"ERROR: --percentile LO,HI must satisfy 0 <= LO < HI <= 100, "
+                  f"got {lo_p},{hi_p}", file=sys.stderr)
+            sys.exit(1)
+        vmin, vmax = np.percentile(mag_db, [lo_p, hi_p])
+        print(f"Percentile stretch: {lo_p}th={vmin:.2f} dB, {hi_p}th={vmax:.2f} dB")
 
     # Import matplotlib only when needed so the script can be used without
     # a display if only --save is used.
