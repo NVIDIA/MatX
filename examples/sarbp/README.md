@@ -104,7 +104,8 @@ real/imag, row-major), written to `output_image.raw` in this example.
 | `-o OUTPUT` | Output file path (default: input with `.raw` extension) |
 | `-u N` | Range upsample factor via zero-padding (default: 1) |
 | `-w {hamming,none}` | Window for range compression (default: hamming) |
-| `-b N` | Pulses per processing block to limit GPU memory (default: all) |
+| `-b {auto,all,0,N}` | Pulses per processing block. `auto` uses the GPU L2 cache size to choose a block size; `all` and `0` use all pulses (default: auto) |
+| `--image-tiles N` | Process the image as N x N tiles during backprojection (default: 1) |
 | `--precision {double,float,fltflt,mixed}` | Backprojection compute precision (default: mixed) |
 | `--warmup` | Warmup GPU kernels and FFT plans before timed run |
 

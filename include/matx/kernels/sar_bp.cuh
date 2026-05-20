@@ -46,7 +46,7 @@
 #include "matx/kernels/fltflt.h"
 #include "matx/kernels/tensor_accessor.h"
 
-#define PULSE_BLOCK_SIZE 512
+#define PULSE_BLOCK_SIZE 256
 
 namespace matx {
 
@@ -409,6 +409,26 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
         }
     };
 
+    // Explicitly use FMA instructions for pixel accumulations
+    const auto accumulate_contribution =
+        [](loose_complex_compute_t accum_in, loose_complex_compute_t sample, loose_complex_compute_t ref_phase) -> loose_complex_compute_t {
+            const loose_compute_t sr = sample.real();
+            const loose_compute_t si = sample.imag();
+            const loose_compute_t pr = ref_phase.real();
+            const loose_compute_t pi = ref_phase.imag();
+            if constexpr (cuda::std::is_same_v<loose_compute_t, float>) {
+                return loose_complex_compute_t{
+                    __fmaf_rn(sr, pr, __fmaf_rn(-si, pi, accum_in.real())),
+                    __fmaf_rn(sr, pi, __fmaf_rn( si, pr, accum_in.imag()))
+                };
+            } else {
+                return loose_complex_compute_t{
+                    fma(sr, pr, fma(-si, pi, accum_in.real())),
+                    fma(sr, pi, fma( si, pr, accum_in.imag()))
+                };
+            }
+        };
+
     [[maybe_unused]] const int tid = threadIdx.x + threadIdx.y * blockDim.x;
 
     loose_complex_compute_t accum{};
@@ -562,7 +582,7 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
                 static_assert(ComputeType != SarBpComputeType::FloatFloat || PhaseLUT == true, "SarBp: FloatFloat compute type requires PhaseLUT optimization");
                 const loose_complex_compute_t ref_phase = get_reference_phase(diffR, bin_floor_int, w);
 
-                accum += sample * ref_phase;
+                accum = accumulate_contribution(accum, sample, ref_phase);
             }
         } // pulse
     } // pulse block
