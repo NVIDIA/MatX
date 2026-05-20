@@ -85,6 +85,7 @@ typedef enum { SORT_DIR_ASC, SORT_DIR_DESC } SortDirection_t;
  */
 typedef enum {
   MAT_INVERSE_ALGO_LU,
+  MAT_INVERSE_ALGO_POSV,
 } MatInverseAlgo_t;
 
 /**

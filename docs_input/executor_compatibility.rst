@@ -126,7 +126,7 @@ fused JIT expression; non-JIT CUDA execution through cudaExecutor remains availa
    "imag", "|yes|", "|yes|", "|yes|", "Element-wise expression."
    "index", "|yes|", "|yes|", "|yes|", "Index generator expression."
    "interp1", "|partial|", "|yes|", "|partial|", "Linear interpolation is expression-friendly. Spline interpolation uses CUDA-only transform support."
-   "inv", "|no|", "|yes|", "|yes|", "CUDA solver transform. CUDAJITExecutor support uses cuSolverDx through MathDx for supported rank 2-4 square float, double, complex-float, and complex-double matrices."
+   "inv", "|no|", "|yes|", "|yes|", "CUDA solver transform. CUDAJITExecutor support uses cuSolverDx through MathDx for supported rank 2-4 square float, double, complex-float, and complex-double matrices. ``MAT_INVERSE_ALGO_POSV`` is available only on the MathDx JIT path and requires Hermitian positive-definite inputs."
    "isclose", "|yes|", "|yes|", "|yes|", "Element-wise comparison expression."
    "isinf", "|yes|", "|yes|", "|yes|", "Element-wise predicate expression."
    "isnan", "|yes|", "|yes|", "|yes|", "Element-wise predicate expression."

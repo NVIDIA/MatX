@@ -85,6 +85,7 @@ private:
         return 1;
       case CUSOLVERDX_FUNCTION_GESV_NO_PIVOT:
       case CUSOLVERDX_FUNCTION_GESV_PARTIAL_PIVOT:
+      case CUSOLVERDX_FUNCTION_POSV:
       case CUSOLVERDX_FUNCTION_GELS:
       case CUSOLVERDX_FUNCTION_UNGQR:
       case CUSOLVERDX_FUNCTION_UNGLQ:
@@ -242,6 +243,10 @@ private:
       case CUSOLVERDX_FUNCTION_GESV_PARTIAL_PIVOT: {
         const auto elems = static_cast<long long int>(n_) * static_cast<long long int>(n_);
         return 2 * elems * elem_size + (static_cast<long long int>(n_) + 1) * static_cast<long long int>(sizeof(int));
+      }
+      case CUSOLVERDX_FUNCTION_POSV: {
+        const auto elems = static_cast<long long int>(n_) * static_cast<long long int>(n_);
+        return 2 * elems * elem_size + static_cast<long long int>(sizeof(int));
       }
       default:
         return static_cast<long long int>(m_) * static_cast<long long int>(n_) * elem_size +
@@ -451,7 +456,10 @@ public:
   cuda::std::array<int, 2> GetBlockDimRange() const
   {
     const int block_dim = GetBlockDim()[0];
-    return cuda::std::array<int, 2>{block_dim, block_dim};
+    if (function_ == CUSOLVERDX_FUNCTION_HEEV || function_ == CUSOLVERDX_FUNCTION_HTEV) {
+      return cuda::std::array<int, 2>{block_dim, block_dim};
+    }
+    return cuda::std::array<int, 2>{32, 1024};
   }
 
   long long int GetWorkspaceSize(cusolverdxDescriptor handle) const
@@ -616,6 +624,66 @@ public:
     )";
     result += solver_func_name;
     result += R"((smem_a, ipiv, smem_b, info);
+      __syncthreads();
+
+      const index_t out_row = idx[Rank() - 2];
+      const index_t out_col = idx[Rank() - 1];
+      if (out_row < n && out_col < n) {
+        return smem_b[out_row * n + out_col];
+      }
+      return value_type{};
+    )";
+    return result;
+  }
+
+  std::string GetPosvInverseFuncStr(const std::string &solver_func_name) const
+  {
+    std::string result = R"(
+      using value_type = )";
+    result += detail::type_to_string<InputType>();
+    result += R"(;
+      static_assert(OpA::Rank() >= 2 && OpA::Rank() <= 4, "cuSolverDx JIT supports matrix operator ranks 2 through 4");
+      static constexpr index_t n = )";
+    result += std::to_string(static_cast<int>(n_));
+    result += R"(;
+      static constexpr index_t elems = n * n;
+      extern __shared__ __align__(16) char smem[];
+      value_type* smem_a = reinterpret_cast<value_type*>(smem);
+      value_type* smem_b = reinterpret_cast<value_type*>(smem + elems * sizeof(value_type));
+      int* info = reinterpret_cast<int*>(smem + (2 * elems * sizeof(value_type)));
+      const int tid = threadIdx.x + threadIdx.y * blockDim.x + threadIdx.z * blockDim.x * blockDim.y;
+      const int total_threads = blockDim.x * blockDim.y * blockDim.z;
+      cuda::std::array<index_t, Rank()> idx = { static_cast<index_t>(indices)... };
+
+      for (index_t base = 0; base < elems; base += total_threads) {
+        const index_t linear = base + tid;
+        const bool valid = linear < elems;
+        const index_t load_linear = valid ? linear : index_t{0};
+        const index_t row = load_linear / n;
+        const index_t col = load_linear % n;
+        value_type a_value{};
+        if constexpr (Rank() == 2) {
+          a_value = a_.template operator()<CapType>(row, col);
+        }
+        else if constexpr (Rank() == 3) {
+          a_value = a_.template operator()<CapType>(idx[0], row, col);
+        }
+        else if constexpr (Rank() == 4) {
+          a_value = a_.template operator()<CapType>(idx[0], idx[1], row, col);
+        }
+        if (valid) {
+          smem_a[linear] = a_value;
+          smem_b[linear] = row == col ? value_type{1} : value_type{0};
+        }
+      }
+
+      if (tid == 0) {
+        *info = 0;
+      }
+      __syncthreads();
+    )";
+    result += solver_func_name;
+    result += R"((smem_a, smem_b, info);
       __syncthreads();
 
       const index_t out_row = idx[Rank() - 2];

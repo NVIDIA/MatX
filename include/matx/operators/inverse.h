@@ -44,8 +44,8 @@ namespace matx
 {
 
 namespace detail {
-  template<typename OpA>
-  class InvOp : public BaseOp<InvOp<OpA>>
+  template<typename OpA, MatInverseAlgo_t ALGO = MAT_INVERSE_ALGO_LU>
+  class InvOp : public BaseOp<InvOp<OpA, ALGO>>
   {
     private:
       typename detail::base_type_t<OpA> a_;
@@ -53,7 +53,7 @@ namespace detail {
       mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr;
       mutable bool prerun_done_ = false; 
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
-      mutable cuSolverDxHelper<typename OpA::value_type> dx_gesv_helper_;
+      mutable cuSolverDxHelper<typename OpA::value_type> dx_solver_helper_;
 #endif
 
     public:
@@ -76,12 +76,18 @@ namespace detail {
 
         if constexpr (OpA::Rank() >= 2) {
           const index_t n = a_.Size(OpA::Rank() - 1);
-          dx_gesv_helper_.set_m(n);
-          dx_gesv_helper_.set_n(n);
-          dx_gesv_helper_.set_k(n);
+          dx_solver_helper_.set_m(n);
+          dx_solver_helper_.set_n(n);
+          dx_solver_helper_.set_k(n);
         }
-        dx_gesv_helper_.set_cc(cc);
-        dx_gesv_helper_.set_function(CUSOLVERDX_FUNCTION_GESV_PARTIAL_PIVOT);
+        dx_solver_helper_.set_cc(cc);
+        if constexpr (ALGO == MAT_INVERSE_ALGO_POSV) {
+          dx_solver_helper_.set_function(CUSOLVERDX_FUNCTION_POSV);
+          dx_solver_helper_.set_fill_mode(SolverFillMode::LOWER);
+        }
+        else {
+          dx_solver_helper_.set_function(CUSOLVERDX_FUNCTION_GESV_PARTIAL_PIVOT);
+        }
 #endif
       };
 
@@ -109,7 +115,7 @@ namespace detail {
 
       __MATX_INLINE__ std::string get_jit_class_name() const {
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
-        return std::string("JITInvOp_R") + std::to_string(Rank()) + "_" + dx_gesv_helper_.GetSymbolName();
+        return std::string("JITInvOp_R") + std::to_string(Rank()) + "_" + dx_solver_helper_.GetSymbolName();
 #else
         return "JITInvOp";
 #endif
@@ -118,11 +124,19 @@ namespace detail {
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
       __MATX_INLINE__ auto get_jit_op_str() const {
         const std::string class_name = get_jit_class_name();
-        const std::string solver_func_name = std::string(SOLVER_DX_FUNC_PREFIX) + "_" + dx_gesv_helper_.GetSymbolName();
+        const std::string solver_func_name = std::string(SOLVER_DX_FUNC_PREFIX) + "_" + dx_solver_helper_.GetSymbolName();
+        const std::string extern_decl =
+          ALGO == MAT_INVERSE_ALGO_POSV ?
+            std::string(" extern \"C\" __device__ void " + solver_func_name + "(" + detail::type_to_string<value_type>() + "*, " + detail::type_to_string<value_type>() + "*, int*);\n") :
+            std::string(" extern \"C\" __device__ void " + solver_func_name + "(" + detail::type_to_string<value_type>() + "*, int*, " + detail::type_to_string<value_type>() + "*, int*);\n");
+        const std::string inverse_func =
+          ALGO == MAT_INVERSE_ALGO_POSV ?
+            dx_solver_helper_.GetPosvInverseFuncStr(solver_func_name) :
+            dx_solver_helper_.GetGesvInverseFuncStr(solver_func_name);
         return cuda::std::make_tuple(
           class_name,
           std::string(
-            " extern \"C\" __device__ void " + solver_func_name + "(" + detail::type_to_string<value_type>() + "*, int*, " + detail::type_to_string<value_type>() + "*, int*);\n" +
+            extern_decl +
             " template <typename OpA> struct " + class_name + "  {\n" +
             "  using value_type = typename OpA::value_type;\n" +
             "  using matxop = bool;\n" +
@@ -130,7 +144,7 @@ namespace detail {
             "  template <typename CapType, typename... Is>\n" +
             "  __MATX_INLINE__ __MATX_DEVICE__ value_type operator()(Is... indices) const\n" +
             "  {\n" +
-            "    " + dx_gesv_helper_.GetGesvInverseFuncStr(solver_func_name) + "\n" +
+            "    " + inverse_func + "\n" +
             "  }\n" +
             "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank()\n" +
             "  {\n" +
@@ -150,13 +164,13 @@ namespace detail {
       __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
         if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
-          const int shm_required = dx_gesv_helper_.IsSupported() ? dx_gesv_helper_.GetShmRequired() : 0;
+          const int shm_required = dx_solver_helper_.IsSupported() ? dx_solver_helper_.GetShmRequired() : 0;
           return combine_capabilities<Cap>(shm_required, detail::get_operator_capability<Cap>(a_, in));
         }
         else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
           const bool supported = (OpA::Rank() >= 2) && (OpA::Rank() <= 4) &&
                                  (a_.Size(OpA::Rank() - 2) == a_.Size(OpA::Rank() - 1)) &&
-                                 dx_gesv_helper_.IsSupported();
+                                 dx_solver_helper_.IsSupported();
           return combine_capabilities<Cap>(supported, detail::get_operator_capability<Cap>(a_, in));
         }
         else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
@@ -185,10 +199,10 @@ namespace detail {
           return 2;
         }
         else if constexpr (Cap == OperatorCapability::BLOCK_DIM) {
-          return combine_capabilities<Cap>(dx_gesv_helper_.GetBlockDimRange(), detail::get_operator_capability<Cap>(a_, in));
+          return combine_capabilities<Cap>(dx_solver_helper_.GetBlockDimRange(), detail::get_operator_capability<Cap>(a_, in));
         }
         else if constexpr (Cap == OperatorCapability::GENERATE_LTOIR) {
-          return combine_capabilities<Cap>(dx_gesv_helper_.GenerateLTOIR(in.ltoir_symbols),
+          return combine_capabilities<Cap>(dx_solver_helper_.GenerateLTOIR(in.ltoir_symbols),
                                            detail::get_operator_capability<Cap>(a_, in));
         }
         else if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
@@ -201,7 +215,8 @@ namespace detail {
         }
         else if constexpr (Cap == OperatorCapability::JIT_CACHE_KEY) {
 #ifdef MATX_EN_JIT
-          auto key = detail::MakeJITCacheKeyForType<InvOp<OpA>>("JITInv");
+          auto key = detail::MakeJITCacheKeyForType<InvOp<OpA, ALGO>>("JITInv");
+          detail::HashJITCacheValue(key, static_cast<int>(ALGO));
           detail::HashJITCacheValue(key, Rank());
           for (int i = 0; i < Rank(); ++i) {
             detail::HashJITCacheValue(key, Size(i));
@@ -210,7 +225,7 @@ namespace detail {
             const index_t n = a_.Size(OpA::Rank() - 1);
             detail::HashJITCacheValue(key, n);
           }
-          detail::HashJITCacheString(key, dx_gesv_helper_.GetSymbolName());
+          detail::HashJITCacheString(key, dx_solver_helper_.GetSymbolName());
           return combine_capabilities<Cap>(key, detail::get_operator_capability<Cap>(a_, in));
 #else
           return detail::MakeInvalidJITCacheKey();
@@ -240,7 +255,12 @@ namespace detail {
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
         static_assert(is_cuda_executor_v<Executor>, "inv() only supports the CUDA executor currently");
-        inv_impl(cuda::std::get<0>(out), a_, ex);
+        if constexpr (ALGO == MAT_INVERSE_ALGO_LU) {
+          inv_impl(cuda::std::get<0>(out), a_, ex);
+        }
+        else {
+          MATX_THROW(matxInvalidParameter, "MAT_INVERSE_ALGO_POSV is currently supported by CUDAJITExecutor with MathDx only");
+        }
       }
 
       template <typename ShapeType, typename Executor>
@@ -298,11 +318,18 @@ namespace detail {
  * for `N <= 32` and `getri/getrf` functions otherwise.
  * 
  * If rank > 2, operations are batched.
+ *
+ * The CUDAJITExecutor MathDx path also supports `MAT_INVERSE_ALGO_POSV`,
+ * which uses cuSolverDx POSV to invert Hermitian positive-definite matrices by
+ * solving `A * X = I`. The caller is responsible for only using POSV with
+ * positive-definite inputs; normal CUDA executor paths currently support the LU
+ * algorithm only.
  * 
  * @tparam OpA
  *   Data type of input a tensor or operator
  * @tparam ALGO
- *   Algorithm to use for matrix inversion. Currently only suport MAT_INVERSE_ALGO_LU
+ *   Algorithm to use for matrix inversion. `MAT_INVERSE_ALGO_LU` supports normal CUDA execution and MathDx JIT.
+ *   `MAT_INVERSE_ALGO_POSV` supports MathDx JIT for Hermitian positive-definite inputs.
  * 
  * @param a
  *   Input tensor or operator of shape `... x n x n`
@@ -313,7 +340,12 @@ namespace detail {
  */
 template<typename OpA, MatInverseAlgo_t ALGO = MAT_INVERSE_ALGO_LU>
 __MATX_INLINE__ auto inv(const OpA &a) {
-  return detail::InvOp(a);
+  return detail::InvOp<OpA, ALGO>(a);
+}
+
+template<MatInverseAlgo_t ALGO, typename OpA>
+__MATX_INLINE__ auto inv(const OpA &a) {
+  return detail::InvOp<OpA, ALGO>(a);
 }
 
 }
