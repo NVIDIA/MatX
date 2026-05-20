@@ -334,6 +334,8 @@ TYPED_TEST(EigenProjectionSolverTestFloatTypes, ProjectionNoVectorModeRejectsVec
   }
 
   auto op = eig(Bv, EigenMode::NO_VECTOR);
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.Vectors));
+  EXPECT_EQ(detail::get_operator_capability<detail::OperatorCapability::DYN_SHM_SIZE>(op.Vectors), 0);
   (Values = op.Values).run(exec);
   exec.sync();
 

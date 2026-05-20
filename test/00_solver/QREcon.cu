@@ -152,6 +152,7 @@ TEST(QREconSolverJITRegression, CuSolverDxWideQProjectionRejectsJIT)
   auto op = qr_econ(A);
 
   EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.Q));
+  EXPECT_EQ(detail::get_operator_capability<detail::OperatorCapability::DYN_SHM_SIZE>(op.Q), 0);
 
   MATX_EXIT_HANDLER();
 }

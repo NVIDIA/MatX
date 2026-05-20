@@ -250,6 +250,9 @@ namespace detail {
       template <int Component>
       int GetJITProjectionShmRequired() const
       {
+        if (!SupportsJITProjection<Component>()) {
+          return 0;
+        }
         if constexpr (Component == QR_Q) {
           return cuda::std::max(dx_geqrf_helper_.GetShmRequired(), dx_ungqr_helper_.GetShmRequired());
         }
@@ -622,6 +625,9 @@ namespace detail {
       template <int Component>
       int GetJITProjectionShmRequired() const
       {
+        if (!SupportsJITProjection<Component>()) {
+          return 0;
+        }
         return dx_geqrf_helper_.GetShmRequired();
       }
 
@@ -989,6 +995,9 @@ namespace detail {
       template <int Component>
       int GetJITProjectionShmRequired() const
       {
+        if (!SupportsJITProjection<Component>()) {
+          return 0;
+        }
         if constexpr (Component == QR_ECON_Q) {
           return cuda::std::max(dx_geqrf_helper_.GetShmRequired(), dx_ungqr_helper_.GetShmRequired());
         }

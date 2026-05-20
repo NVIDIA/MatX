@@ -247,6 +247,9 @@ namespace detail {
       template <int Component>
       int GetJITProjectionShmRequired() const
       {
+        if (!SupportsJITProjection<Component>()) {
+          return 0;
+        }
         return dx_lu_helper_.GetShmRequired();
       }
 

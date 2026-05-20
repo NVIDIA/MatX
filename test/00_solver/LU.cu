@@ -133,6 +133,22 @@ TYPED_TEST(LUSolverJITTestFloatTypes, CuSolverDxSingleMatrixProjectionJIT)
   MATX_EXIT_HANDLER();
 }
 
+TEST(LUSolverJITRegression, CuSolverDxUnsupportedProjectionReportsNoShm)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = float;
+
+  auto A = make_tensor<TestType>({1, 1, 1, 2, 2});
+  auto op = lu(A);
+
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.LU));
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.Piv));
+  EXPECT_EQ(detail::get_operator_capability<detail::OperatorCapability::DYN_SHM_SIZE>(op.LU), 0);
+  EXPECT_EQ(detail::get_operator_capability<detail::OperatorCapability::DYN_SHM_SIZE>(op.Piv), 0);
+
+  MATX_EXIT_HANDLER();
+}
+
 TEST(LUSolverJITRegression, CuSolverDxMultipleSizesInOneJITExpression)
 {
   MATX_ENTER_HANDLER();

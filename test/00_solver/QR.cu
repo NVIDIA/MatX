@@ -243,6 +243,7 @@ TEST(QRSolverJITRegression, CuSolverDxRectangularRProjectionJIT)
   auto ref = qr(A);
   EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.Q));
   EXPECT_TRUE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.R));
+  EXPECT_EQ(detail::get_operator_capability<detail::OperatorCapability::DYN_SHM_SIZE>(op.Q), 0);
 
   CUDAJITExecutor jit_exec{};
   cudaExecutor cuda_exec{};
@@ -252,6 +253,22 @@ TEST(QRSolverJITRegression, CuSolverDxRectangularRProjectionJIT)
   cuda_exec.sync();
 
   ASSERT_NEAR(mdiff(), TestType(0), TestType(0.001));
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(QRSolverJITRegression, CuSolverDxUnsupportedQRSolverProjectionReportsNoShm)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = float;
+
+  auto A = make_tensor<TestType>({1, 1, 1, 2, 2});
+  auto op = qr_solver(A);
+
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.Out));
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.Tau));
+  EXPECT_EQ(detail::get_operator_capability<detail::OperatorCapability::DYN_SHM_SIZE>(op.Out), 0);
+  EXPECT_EQ(detail::get_operator_capability<detail::OperatorCapability::DYN_SHM_SIZE>(op.Tau), 0);
 
   MATX_EXIT_HANDLER();
 }

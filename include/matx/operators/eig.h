@@ -257,6 +257,9 @@ namespace detail {
       template <int Component>
       int GetJITProjectionShmRequired() const
       {
+        if (!SupportsJITProjection<Component>()) {
+          return 0;
+        }
         if constexpr (Component == EIG_VECTORS) {
           return dx_heev_vectors_helper_.GetShmRequired();
         }
