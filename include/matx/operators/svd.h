@@ -435,7 +435,9 @@ namespace detail {
  * 
  * @return 
  *   Operator that produces *U*, *S*, and *VT* tensors. Regardless of jobz, all 3 tensors
- *   must be correctly setup for the operation and used with `mtie()`. `k = min(m, n)`
+ *   must be correctly setup for the operation and used with `mtie()`. `S` is computed
+ *   for all `SVDMode` values, including `SVDMode::NONE`; `U` and `VT` are unavailable
+ *   when `SVDMode::NONE` is selected. `k = min(m, n)`
  *   - **U** - The unitary matrix containing the left singular vectors. A tensor of
  *             shape `... x m x k` for `SVDMode::REDUCED` and `... x m x m` otherwise.
  *   - **S** - A tensor of shape `... x k` containing the singular values in
