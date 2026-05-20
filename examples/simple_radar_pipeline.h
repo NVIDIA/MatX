@@ -240,10 +240,6 @@ public:
                            {1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1},
                            {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}});
 
-    // Pre-process CFAR convolution
-    (normT = conv2d(ones({numChannels, numPulsesRnd, numCompressedSamples}),
-           cfarMaskView, matxConvCorrMode_t::MATX_C_MODE_FULL)).run(exec);
-
     cancelMask.PrefetchDevice(stream);
     ba.PrefetchDevice(stream);
     normT.PrefetchDevice(stream);
@@ -397,6 +393,8 @@ public:
    */
   void CFARDetections()
   {
+    ComputeCFARNorm();
+
     (xPow = abs2(tpcView)).run(exec);
 
     // Estimate the background average power in each cell
@@ -477,9 +475,22 @@ public:
    * 
    * @return tensor_t view 
    */
-  auto GetnormT() { return normT; }
+  auto GetnormT()
+  {
+    ComputeCFARNorm();
+    return normT;
+  }
 
 private:
+  void ComputeCFARNorm()
+  {
+    if (!cfarNormReady) {
+      (normT = conv2d(ones({numChannels, numPulsesRnd, numCompressedSamples}),
+             cfarMaskView, matxConvCorrMode_t::MATX_C_MODE_FULL)).run(exec);
+      cfarNormReady = true;
+    }
+  }
+
   index_t numPulses;
   index_t numSamples;
   index_t waveformLength;
@@ -505,4 +516,5 @@ private:
 
   cudaStream_t stream;
   cudaExecutor exec;
+  bool cfarNormReady = false;
 };
