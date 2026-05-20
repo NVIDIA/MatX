@@ -255,11 +255,10 @@ namespace detail {
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
         static_assert(is_cuda_executor_v<Executor>, "inv() only supports the CUDA executor currently");
+        static_assert(ALGO == MAT_INVERSE_ALGO_LU || is_cuda_jit_executor_v<Executor>,
+                      "MAT_INVERSE_ALGO_POSV requires CUDAJITExecutor with MathDx");
         if constexpr (ALGO == MAT_INVERSE_ALGO_LU) {
           inv_impl(cuda::std::get<0>(out), a_, ex);
-        }
-        else {
-          MATX_THROW(matxInvalidParameter, "MAT_INVERSE_ALGO_POSV is currently supported by CUDAJITExecutor with MathDx only");
         }
       }
 
@@ -274,6 +273,8 @@ namespace detail {
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
       {
+        static_assert(ALGO == MAT_INVERSE_ALGO_LU || is_cuda_jit_executor_v<Executor>,
+                      "MAT_INVERSE_ALGO_POSV requires CUDAJITExecutor with MathDx");
         if (prerun_done_) {
           return;
         }
