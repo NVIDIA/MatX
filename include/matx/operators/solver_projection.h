@@ -184,16 +184,26 @@ class SolverProjectionStorage : public BaseOp<SolverProjectionStorage<State, Com
           it->second.jit_prerun_count++;
           return;
         }
+        it->second.jit_prerun_count = 1;
       }
 
-      state->Input().PreRun(detail::NoShape{}, std::forward<Executor>(ex));
+      try {
+        state->Input().PreRun(detail::NoShape{}, ex);
+      }
+      catch (...) {
+        try {
+          state->Input().PostRun(detail::NoShape{}, ex);
+        }
+        catch (...) {
+        }
 
-      std::lock_guard<std::mutex> lifetime_lock(LifetimeMutex());
-      auto it = LifetimeRegistry().find(state);
-      MATX_ASSERT_STR(it != LifetimeRegistry().end(),
-                      matxInvalidParameter,
-                      "Solver projection state lifetime entry is missing");
-      it->second.jit_prerun_count = 1;
+        std::lock_guard<std::mutex> lifetime_lock(LifetimeMutex());
+        auto it = LifetimeRegistry().find(state);
+        if (it != LifetimeRegistry().end()) {
+          it->second.jit_prerun_count = 0;
+        }
+        throw;
+      }
     }
 
     template <typename Executor>

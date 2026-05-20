@@ -171,6 +171,21 @@ namespace detail {
         try {
           detail::AllocateTempTensor(s_, std::forward<Executor>(ex), s_shape_, &s_ptr_);
           if (jobz_ == SVDMode::NONE) {
+            auto u_dummy_shape = u_shape_;
+            auto vt_dummy_shape = vt_shape_;
+            u_dummy_shape[RANK - 2] = 1;
+            u_dummy_shape[RANK - 1] = 1;
+            vt_dummy_shape[RANK - 2] = 1;
+            vt_dummy_shape[RANK - 1] = 1;
+            index_t u_dummy_size = 1;
+            index_t vt_dummy_size = 1;
+            for (int i = 0; i < RANK; i++) {
+              u_dummy_size *= u_dummy_shape[i];
+              vt_dummy_size *= vt_dummy_shape[i];
+            }
+            const size_t u_dummy_bytes = sizeof(a_value_type) * static_cast<size_t>(u_dummy_size);
+            const size_t vt_dummy_bytes = sizeof(a_value_type) * static_cast<size_t>(vt_dummy_size);
+
             a_value_type *u_dummy_ptr = nullptr;
             a_value_type *vt_dummy_ptr = nullptr;
             const auto free_dummy = [&]() noexcept {
@@ -200,16 +215,16 @@ namespace detail {
 
             try {
               if constexpr (is_cuda_executor_v<Executor>) {
-                matxAlloc(reinterpret_cast<void **>(&u_dummy_ptr), sizeof(a_value_type), MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
-                matxAlloc(reinterpret_cast<void **>(&vt_dummy_ptr), sizeof(a_value_type), MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
+                matxAlloc(reinterpret_cast<void **>(&u_dummy_ptr), u_dummy_bytes, MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
+                matxAlloc(reinterpret_cast<void **>(&vt_dummy_ptr), vt_dummy_bytes, MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
               }
               else {
-                matxAlloc(reinterpret_cast<void **>(&u_dummy_ptr), sizeof(a_value_type), MATX_HOST_MALLOC_MEMORY);
-                matxAlloc(reinterpret_cast<void **>(&vt_dummy_ptr), sizeof(a_value_type), MATX_HOST_MALLOC_MEMORY);
+                matxAlloc(reinterpret_cast<void **>(&u_dummy_ptr), u_dummy_bytes, MATX_HOST_MALLOC_MEMORY);
+                matxAlloc(reinterpret_cast<void **>(&vt_dummy_ptr), vt_dummy_bytes, MATX_HOST_MALLOC_MEMORY);
               }
 
-              auto u_dummy = make_tensor(u_dummy_ptr, u_shape_);
-              auto vt_dummy = make_tensor(vt_dummy_ptr, vt_shape_);
+              auto u_dummy = make_tensor(u_dummy_ptr, u_dummy_shape);
+              auto vt_dummy = make_tensor(vt_dummy_ptr, vt_dummy_shape);
               if constexpr (is_cuda_executor_v<Executor>) {
                 svd_impl(u_dummy, s_, vt_dummy, a_, std::forward<Executor>(ex), jobz_);
               }

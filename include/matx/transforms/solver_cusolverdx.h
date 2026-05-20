@@ -450,10 +450,8 @@ public:
 
   cuda::std::array<int, 2> GetBlockDimRange() const
   {
-    // cuSolverDx SMEM operators loop internally over the matrix work, so any
-    // warp-multiple block size in this range is valid. The exact trait block
-    // dimension is a descriptor recommendation, not the launch minimum.
-    return cuda::std::array<int, 2>{32, 1024};
+    const int block_dim = GetBlockDim()[0];
+    return cuda::std::array<int, 2>{block_dim, block_dim};
   }
 
   long long int GetWorkspaceSize(cusolverdxDescriptor handle) const

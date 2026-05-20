@@ -130,7 +130,7 @@ TYPED_TEST(InvSolverJITTestFloatTypes, CuSolverDxRuntimeQueries)
 
   const auto block_dim = detail::get_operator_capability<detail::OperatorCapability::BLOCK_DIM>(op);
   EXPECT_EQ(block_dim[0], 32);
-  EXPECT_EQ(block_dim[1], 1024);
+  EXPECT_EQ(block_dim[1], 32);
 }
 
 TYPED_TEST(InvSolverJITTestFloatTypes, CuSolverDxMatchesCudaPath)
@@ -255,14 +255,12 @@ TYPED_TEST(InvSolverJITTestFloatTypes, CuSolverDxRejectsUnsupportedRank)
   EXPECT_THROW({ (O = op).run(exec); }, matx::detail::matxException);
 }
 
-TYPED_TEST(InvSolverJITTestFloatTypes, CuSolverDxFusedMatmulInverseMatchesCudaPath)
+TYPED_TEST(InvSolverJITTestFloatTypes, CuSolverDxFusedMatmulInverseRejectsIncompatibleBlockDim)
 {
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
   auto H_jit = make_tensor<TestType>({4, 3});
-  auto H_cuda = make_tensor<TestType>({4, 3});
   auto O_jit = make_tensor<TestType>({3, 3});
-  auto O_cuda = make_tensor<TestType>({3, 3});
 
   for (index_t i = 0; i < 4; i++) {
     for (index_t j = 0; j < 3; j++) {
@@ -271,27 +269,16 @@ TYPED_TEST(InvSolverJITTestFloatTypes, CuSolverDxFusedMatmulInverseMatchesCudaPa
                                           0.03 * static_cast<double>(i - j));
     }
   }
-  (H_cuda = H_jit).run(cudaExecutor{});
 
   auto op = inv(matmul(permute(H_jit, {1, 0}), H_jit));
   EXPECT_TRUE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op));
 
   const auto block_dim = detail::get_operator_capability<detail::OperatorCapability::BLOCK_DIM>(op);
-  EXPECT_EQ(block_dim[0], 64);
-  EXPECT_EQ(block_dim[1], 64);
+  EXPECT_EQ(block_dim[0], detail::capability_attributes<detail::OperatorCapability::BLOCK_DIM>::invalid);
+  EXPECT_EQ(block_dim[1], detail::capability_attributes<detail::OperatorCapability::BLOCK_DIM>::invalid);
 
   CUDAJITExecutor jit_exec{};
-  cudaExecutor cuda_exec{};
-  (O_jit = op).run(jit_exec);
-  (O_cuda = inv(matmul(permute(H_cuda, {1, 0}), H_cuda))).run(cuda_exec);
-  jit_exec.sync();
-  cuda_exec.sync();
-
-  for (index_t i = 0; i < 3; i++) {
-    for (index_t j = 0; j < 3; j++) {
-      ASSERT_NEAR(InvJITAbsDiff(O_jit(i, j), O_cuda(i, j)), 0.0, 1e-3);
-    }
-  }
+  EXPECT_THROW({ (O_jit = op).run(jit_exec); }, matx::detail::matxException);
 }
 #endif
 
