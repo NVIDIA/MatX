@@ -138,12 +138,13 @@ class SolverProjectionStorage : public BaseOp<SolverProjectionStorage<State, Com
 
       std::lock_guard<std::mutex> lock(LifetimeMutex());
       auto it = LifetimeRegistry().find(state);
-      if (it != LifetimeRegistry().end()) {
-        if (!it->second.execution_mutex) {
-          it->second.execution_mutex = std::make_shared<std::mutex>();
-        }
-        it->second.count++;
+      MATX_ASSERT_STR(it != LifetimeRegistry().end(),
+                      matxInvalidParameter,
+                      "Solver projection state lifetime entry is missing");
+      if (!it->second.execution_mutex) {
+        it->second.execution_mutex = std::make_shared<std::mutex>();
       }
+      it->second.count++;
     }
 
     static std::shared_ptr<std::mutex> GetExecutionMutex(State *state) noexcept

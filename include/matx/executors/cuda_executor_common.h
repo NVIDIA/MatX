@@ -484,11 +484,9 @@ namespace detail
     int shm_size = detail::get_operator_capability<detail::OperatorCapability::DYN_SHM_SIZE>(op);
     if (use_jit) {
       const auto block_dim_range = detail::get_operator_capability<detail::OperatorCapability::BLOCK_DIM>(op);
-      if (block_dim_range[0] == detail::capability_attributes<detail::OperatorCapability::BLOCK_DIM>::invalid) {
-        MATX_THROW(matxInvalidParameter, "No valid JIT block dimension satisfies the fused operator requirements");
-      }
+      detail::ValidateJITBlockDimRange(block_dim_range);
       const bool global_kernel = detail::get_operator_capability<detail::OperatorCapability::GLOBAL_KERNEL>(op);
-      block_size = global_kernel ? 256 : block_dim_range[0];
+      block_size = global_kernel ? 256 : block_dim_range[1];
     }
     //printf("Fallback to minimum EPT %d with shm_size %d\n", static_cast<int>(min_ept), shm_size);
     return cuda::std::make_tuple(min_ept, shm_size, block_size, groups_per_block);

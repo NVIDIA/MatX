@@ -56,6 +56,13 @@ namespace detail {
     QR_ECON_R = 5
   };
 
+  __MATX_INLINE__ bool IsValidSolverJITBlockDimRange(const cuda::std::array<int, 2> &range)
+  {
+    constexpr int invalid = capability_attributes<OperatorCapability::BLOCK_DIM>::invalid;
+    return range[0] != invalid && range[1] != invalid &&
+           range[0] > 0 && range[1] > 0 && range[1] >= range[0];
+  }
+
   template<typename OpA>
   class QRState
   {
@@ -226,9 +233,18 @@ namespace detail {
       bool SupportsJITProjection() const
       {
         const bool square = r_shape_[RANK - 2] == r_shape_[RANK - 1];
-        return (RANK >= 2) && (RANK <= 4) &&
-               dx_geqrf_helper_.IsSupported() &&
-               (Component == QR_R || (square && dx_ungqr_helper_.IsSupported()));
+        if constexpr (Component == QR_Q) {
+          if ((RANK < 2) || (RANK > 4) || !square ||
+              !dx_geqrf_helper_.IsSupported() || !dx_ungqr_helper_.IsSupported()) {
+            return false;
+          }
+          const auto range = combine_capabilities<OperatorCapability::BLOCK_DIM>(
+            dx_geqrf_helper_.GetBlockDimRange(), dx_ungqr_helper_.GetBlockDimRange());
+          return IsValidSolverJITBlockDimRange(range);
+        }
+        else {
+          return (RANK >= 2) && (RANK <= 4) && dx_geqrf_helper_.IsSupported();
+        }
       }
 
       template <int Component>
@@ -956,9 +972,18 @@ namespace detail {
       bool SupportsJITProjection() const
       {
         const bool q_layout_safe = a_.Size(RANK - 2) >= a_.Size(RANK - 1);
-        return (RANK >= 2) && (RANK <= 4) &&
-               dx_geqrf_helper_.IsSupported() &&
-               (Component == QR_ECON_R || (q_layout_safe && dx_ungqr_helper_.IsSupported()));
+        if constexpr (Component == QR_ECON_Q) {
+          if ((RANK < 2) || (RANK > 4) || !q_layout_safe ||
+              !dx_geqrf_helper_.IsSupported() || !dx_ungqr_helper_.IsSupported()) {
+            return false;
+          }
+          const auto range = combine_capabilities<OperatorCapability::BLOCK_DIM>(
+            dx_geqrf_helper_.GetBlockDimRange(), dx_ungqr_helper_.GetBlockDimRange());
+          return IsValidSolverJITBlockDimRange(range);
+        }
+        else {
+          return (RANK >= 2) && (RANK <= 4) && dx_geqrf_helper_.IsSupported();
+        }
       }
 
       template <int Component>
