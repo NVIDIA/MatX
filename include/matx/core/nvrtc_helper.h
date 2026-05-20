@@ -911,7 +911,7 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name,
     MATX_LOG_DEBUG("Compiling kernel with NVRTC for type: {}", full_kernel_op_type);
 
     const auto all_jit_classes_string = get_all_jit_classes_string(op);
-    auto capstr = generate_capability_params_string(op, ept, false, osize, threads.x,
+    auto capstr = generate_capability_params_string(op, ept, true, osize, threads.x,
                                                     pass_through_threads, pass_through_inner_rank);
     
     // Read jit_includes.h content
