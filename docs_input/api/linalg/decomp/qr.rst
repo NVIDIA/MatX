@@ -33,6 +33,18 @@ Examples
    :end-before: example-end qr-test-1
    :dedent:
 
+Projection Examples
+~~~~~~~~~~~~~~~~~~~
+
+Lazy ``Q`` and ``R`` projections can be used directly with other operators. This example is included from the
+``ProjectionAPI`` unit test in ``QR2.cu``.
+
+.. literalinclude:: ../../../../test/00_solver/QR2.cu
+   :language: cpp
+   :start-after: example-begin qr-projection-test-1
+   :end-before: example-end qr-projection-test-1
+   :dedent:
+
 .. doxygenfunction:: qr_econ
 
 .. note::
@@ -49,6 +61,18 @@ Examples
    :end-before: example-end qr-econ-test-1
    :dedent:
 
+Projection Examples
+~~~~~~~~~~~~~~~~~~~
+
+The economic ``Q`` and ``R`` projections have shapes ``... x m x k`` and ``... x k x n``, so they can be multiplied
+to reconstruct the original input. This example is included from the ``ProjectionAPI`` unit test in ``QREcon.cu``.
+
+.. literalinclude:: ../../../../test/00_solver/QREcon.cu
+   :language: cpp
+   :start-after: example-begin qr-econ-projection-test-1
+   :end-before: example-end qr-econ-projection-test-1
+   :dedent:
+
 .. doxygenfunction:: qr_solver
 
 .. note::
@@ -62,4 +86,16 @@ Examples
    :language: cpp
    :start-after: example-begin qr_solver-test-1
    :end-before: example-end qr_solver-test-1
+   :dedent:
+
+Projection Examples
+~~~~~~~~~~~~~~~~~~~
+
+``qr_solver`` exposes the raw ``Out`` factor storage and ``Tau`` Householder coefficients. This example is included
+from the ``CuSolverDxSingleMatrixQRSolverProjectionJIT`` unit test.
+
+.. literalinclude:: ../../../../test/00_solver/QR.cu
+   :language: cpp
+   :start-after: example-begin qr-solver-projection-test-1
+   :end-before: example-end qr-solver-projection-test-1
    :dedent:

@@ -373,17 +373,17 @@ TYPED_TEST(QRSolverJITTestFloatTypes, CuSolverDxSingleMatrixQRSolverProjectionJI
   pb.template InitAndRunTVGenerator<TestType>("00_solver", "qr", "run", {rows, cols});
   pb.NumpyToTensorView(A, "A");
 
-  auto op = qr_solver(A);
-
-  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op));
-  EXPECT_TRUE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.Out));
-  EXPECT_TRUE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.Tau));
-
   cudaExecutor cuda_exec{};
   CUDAJITExecutor exec{};
   (mtie(RefOut, RefTau) = qr_solver(A)).run(cuda_exec);
   (RefCombined = RefOut + clone<2>(RefTau, {rows, matxKeepDim})).run(cuda_exec);
+  // example-begin qr-solver-projection-test-1
+  auto op = qr_solver(A);
   (Combined = op.Out + clone<2>(op.Tau, {rows, matxKeepDim})).run(exec);
+  // example-end qr-solver-projection-test-1
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op));
+  EXPECT_TRUE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.Out));
+  EXPECT_TRUE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op.Tau));
   (mdiff = max(abs(Combined - RefCombined))).run(cuda_exec);
   cuda_exec.sync();
 

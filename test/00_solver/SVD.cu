@@ -200,8 +200,10 @@ TYPED_TEST(SVDProjectionSolverTestNonHalfTypes, ProjectionAPI)
 
   (A = random<TestType>(A.Shape(), NORMAL)).run(this->exec);
 
+  // example-begin svd-projection-test-1
   auto op = svd(A, SVDMode::REDUCED);
   (UDVT = matmul(matmul(op.U, diag(as_type<TestType>(op.S))), op.VT)).run(this->exec);
+  // example-end svd-projection-test-1
   (mdiff = max(abs(A - UDVT))).run(this->exec);
   this->exec.sync();
 

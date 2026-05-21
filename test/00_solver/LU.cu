@@ -211,12 +211,14 @@ TEST(LUSolverJITRegression, CuSolverDxPivotProjectionUsedInFusedExpression)
   A(2, 1) = TestType{6};
   A(2, 2) = TestType{5};
 
-  auto op = lu(A);
   CUDAJITExecutor jit_exec{};
   cudaExecutor cuda_exec{};
   (mtie(RefLU, RefPiv) = lu(A)).run(cuda_exec);
   (RefCombined = TestType{1.0e-6f} * RefLU + clone<2>(as_type<TestType>(RefPiv), {rows, matxKeepDim})).run(cuda_exec);
+  // example-begin lu-projection-test-1
+  auto op = lu(A);
   (Combined = TestType{1.0e-6f} * op.LU + clone<2>(as_type<TestType>(op.Piv), {rows, matxKeepDim})).run(jit_exec);
+  // example-end lu-projection-test-1
   (mdiff = max(abs(Combined - RefCombined))).run(cuda_exec);
   cuda_exec.sync();
 

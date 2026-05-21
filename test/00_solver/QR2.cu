@@ -141,8 +141,10 @@ TYPED_TEST(QR2SolverTestNonHalfTypes, ProjectionAPI)
 
   (A = random<TestType>(A.Shape(), NORMAL)).run(exec);
 
+  // example-begin qr-projection-test-1
   auto op = qr(A);
   (QR = matmul(op.Q, op.R)).run(exec);
+  // example-end qr-projection-test-1
   (mdiff = max(abs(A - QR))).run(exec);
   exec.sync();
 

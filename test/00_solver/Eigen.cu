@@ -304,8 +304,10 @@ TYPED_TEST(EigenProjectionSolverTestFloatTypes, ProjectionAPI)
     }
   }
 
+  // example-begin eig-projection-test-1
   auto op = eig(Bv);
   (residual = matmul(Bv, op.Vectors) - matmul(op.Vectors, diag(as_type<TestType>(op.Values)))).run(exec);
+  // example-end eig-projection-test-1
   (mdiff = max(abs(residual))).run(exec);
   exec.sync();
 

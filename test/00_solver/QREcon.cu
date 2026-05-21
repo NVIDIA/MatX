@@ -343,8 +343,10 @@ TYPED_TEST(QREconSolverTestNonHalfTypes, ProjectionAPI)
 
   (A = random<TestType>(A.Shape(), NORMAL)).run(exec);
 
+  // example-begin qr-econ-projection-test-1
   auto op = qr_econ(A);
   (QR = matmul(op.Q, op.R)).run(exec);
+  // example-end qr-econ-projection-test-1
   (mdiff = max(abs(A - QR))).run(exec);
   exec.sync();
 

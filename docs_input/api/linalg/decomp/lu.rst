@@ -23,3 +23,15 @@ Examples
    :start-after: example-begin lu-test-1
    :end-before: example-end lu-test-1
    :dedent:
+
+Projection Examples
+~~~~~~~~~~~~~~~~~~~
+
+Lazy projections let ``LU`` and ``Piv`` participate in a larger expression. This example is included from the
+``CuSolverDxPivotProjectionUsedInFusedExpression`` unit test.
+
+.. literalinclude:: ../../../../test/00_solver/LU.cu
+   :language: cpp
+   :start-after: example-begin lu-projection-test-1
+   :end-before: example-end lu-projection-test-1
+   :dedent:

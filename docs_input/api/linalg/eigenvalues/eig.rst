@@ -32,3 +32,15 @@ Examples
    :start-after: example-begin eig-test-1
    :end-before: example-end eig-test-1
    :dedent:
+
+Projection Examples
+~~~~~~~~~~~~~~~~~~~
+
+The ``Vectors`` and ``Values`` projections can be used directly in expressions. This example checks the
+``A * V == V * diag(lambda)`` relationship and is included from the ``ProjectionAPI`` unit test.
+
+.. literalinclude:: ../../../../test/00_solver/Eigen.cu
+   :language: cpp
+   :start-after: example-begin eig-projection-test-1
+   :end-before: example-end eig-projection-test-1
+   :dedent:
