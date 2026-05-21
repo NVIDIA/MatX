@@ -80,6 +80,47 @@ namespace detail {
       mutable cuSolverDxHelper<a_value_type> dx_heev_vectors_helper_;
 #endif
 
+      template <typename T, typename Executor>
+      void FreeTempBuffer(T *&ptr, Executor &&ex) const
+      {
+        if (ptr == nullptr) {
+          return;
+        }
+
+        if constexpr (is_cuda_executor_v<Executor>) {
+          matxFree(ptr, ex.getStream());
+        }
+        else {
+          matxFree(ptr);
+        }
+        ptr = nullptr;
+      }
+
+      template <typename Executor>
+      void ReleaseMaterializedResources(Executor &&ex) const
+      {
+        FreeTempBuffer(vectors_ptr_, ex);
+        FreeTempBuffer(values_ptr_, ex);
+        materialized_ = false;
+        materialize_count_ = 0;
+
+        if constexpr (is_matx_op<OpA>()) {
+          a_.PostRun(detail::NoShape{}, std::forward<Executor>(ex));
+        }
+      }
+
+      template <typename Executor>
+      void CleanupMaterializeFailure(Executor &&ex) const noexcept
+      {
+        try {
+          ReleaseMaterializedResources(std::forward<Executor>(ex));
+        }
+        catch (...) {
+          materialized_ = false;
+          materialize_count_ = 0;
+        }
+      }
+
     public:
       using input_type = OpA;
 
@@ -138,43 +179,13 @@ namespace detail {
           a_.PreRun(detail::NoShape{}, std::forward<Executor>(ex));
         }
 
-        const auto cleanup = [&]() noexcept {
-          try {
-            if (vectors_ptr_ != nullptr) {
-              if constexpr (is_cuda_executor_v<Executor>) {
-                matxFree(vectors_ptr_, ex.getStream());
-              }
-              else {
-                matxFree(vectors_ptr_);
-              }
-              vectors_ptr_ = nullptr;
-            }
-            if (values_ptr_ != nullptr) {
-              if constexpr (is_cuda_executor_v<Executor>) {
-                matxFree(values_ptr_, ex.getStream());
-              }
-              else {
-                matxFree(values_ptr_);
-              }
-              values_ptr_ = nullptr;
-            }
-            if constexpr (is_matx_op<OpA>()) {
-              a_.PostRun(detail::NoShape{}, std::forward<Executor>(ex));
-            }
-          }
-          catch (...) {
-          }
-          materialized_ = false;
-          materialize_count_ = 0;
-        };
-
         try {
           detail::AllocateTempTensor(vectors_, std::forward<Executor>(ex), vectors_shape_, &vectors_ptr_);
           detail::AllocateTempTensor(values_, std::forward<Executor>(ex), values_shape_, &values_ptr_);
           eig_impl(vectors_, values_, a_, std::forward<Executor>(ex), jobz_, uplo_);
         }
         catch (...) {
-          cleanup();
+          CleanupMaterializeFailure(std::forward<Executor>(ex));
           throw;
         }
         materialized_ = true;
@@ -192,32 +203,7 @@ namespace detail {
           return;
         }
 
-        if constexpr (is_matx_op<OpA>()) {
-          a_.PostRun(detail::NoShape{}, std::forward<Executor>(ex));
-        }
-
-        if (vectors_ptr_ != nullptr) {
-          if constexpr (is_cuda_executor_v<Executor>) {
-            matxFree(vectors_ptr_, ex.getStream());
-          }
-          else {
-            matxFree(vectors_ptr_);
-          }
-          vectors_ptr_ = nullptr;
-        }
-
-        if (values_ptr_ != nullptr) {
-          if constexpr (is_cuda_executor_v<Executor>) {
-            matxFree(values_ptr_, ex.getStream());
-          }
-          else {
-            matxFree(values_ptr_);
-          }
-          values_ptr_ = nullptr;
-        }
-
-        materialized_ = false;
-        materialize_count_ = 0;
+        ReleaseMaterializedResources(std::forward<Executor>(ex));
       }
 
       template <int Component>

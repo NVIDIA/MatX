@@ -74,6 +74,48 @@ namespace detail {
       mutable bool materialized_ = false;
       mutable int materialize_count_ = 0;
 
+      template <typename T, typename Executor>
+      void FreeTempBuffer(T *&ptr, Executor &&ex) const
+      {
+        if (ptr == nullptr) {
+          return;
+        }
+
+        if constexpr (is_cuda_executor_v<Executor>) {
+          matxFree(ptr, ex.getStream());
+        }
+        else {
+          matxFree(ptr);
+        }
+        ptr = nullptr;
+      }
+
+      template <typename Executor>
+      void ReleaseMaterializedResources(Executor &&ex) const
+      {
+        FreeTempBuffer(u_ptr_, ex);
+        FreeTempBuffer(s_ptr_, ex);
+        FreeTempBuffer(vt_ptr_, ex);
+        materialized_ = false;
+        materialize_count_ = 0;
+
+        if constexpr (is_matx_op<OpA>()) {
+          a_.PostRun(detail::NoShape{}, std::forward<Executor>(ex));
+        }
+      }
+
+      template <typename Executor>
+      void CleanupMaterializeFailure(Executor &&ex) const noexcept
+      {
+        try {
+          ReleaseMaterializedResources(std::forward<Executor>(ex));
+        }
+        catch (...) {
+          materialized_ = false;
+          materialize_count_ = 0;
+        }
+      }
+
     public:
       using input_type = OpA;
 
@@ -128,45 +170,6 @@ namespace detail {
         if constexpr (is_matx_op<OpA>()) {
           a_.PreRun(detail::NoShape{}, std::forward<Executor>(ex));
         }
-
-        const auto cleanup = [&]() noexcept {
-          try {
-            if (u_ptr_ != nullptr) {
-              if constexpr (is_cuda_executor_v<Executor>) {
-                matxFree(u_ptr_, ex.getStream());
-              }
-              else {
-                matxFree(u_ptr_);
-              }
-              u_ptr_ = nullptr;
-            }
-            if (s_ptr_ != nullptr) {
-              if constexpr (is_cuda_executor_v<Executor>) {
-                matxFree(s_ptr_, ex.getStream());
-              }
-              else {
-                matxFree(s_ptr_);
-              }
-              s_ptr_ = nullptr;
-            }
-            if (vt_ptr_ != nullptr) {
-              if constexpr (is_cuda_executor_v<Executor>) {
-                matxFree(vt_ptr_, ex.getStream());
-              }
-              else {
-                matxFree(vt_ptr_);
-              }
-              vt_ptr_ = nullptr;
-            }
-            if constexpr (is_matx_op<OpA>()) {
-              a_.PostRun(detail::NoShape{}, std::forward<Executor>(ex));
-            }
-          }
-          catch (...) {
-          }
-          materialized_ = false;
-          materialize_count_ = 0;
-        };
 
         try {
           detail::AllocateTempTensor(s_, std::forward<Executor>(ex), s_shape_, &s_ptr_);
@@ -250,7 +253,7 @@ namespace detail {
           }
         }
         catch (...) {
-          cleanup();
+          CleanupMaterializeFailure(std::forward<Executor>(ex));
           throw;
         }
         materialized_ = true;
@@ -268,42 +271,7 @@ namespace detail {
           return;
         }
 
-        if constexpr (is_matx_op<OpA>()) {
-          a_.PostRun(detail::NoShape{}, std::forward<Executor>(ex));
-        }
-
-        if (u_ptr_ != nullptr) {
-          if constexpr (is_cuda_executor_v<Executor>) {
-            matxFree(u_ptr_, ex.getStream());
-          }
-          else {
-            matxFree(u_ptr_);
-          }
-          u_ptr_ = nullptr;
-        }
-
-        if (s_ptr_ != nullptr) {
-          if constexpr (is_cuda_executor_v<Executor>) {
-            matxFree(s_ptr_, ex.getStream());
-          }
-          else {
-            matxFree(s_ptr_);
-          }
-          s_ptr_ = nullptr;
-        }
-
-        if (vt_ptr_ != nullptr) {
-          if constexpr (is_cuda_executor_v<Executor>) {
-            matxFree(vt_ptr_, ex.getStream());
-          }
-          else {
-            matxFree(vt_ptr_);
-          }
-          vt_ptr_ = nullptr;
-        }
-
-        materialized_ = false;
-        materialize_count_ = 0;
+        ReleaseMaterializedResources(std::forward<Executor>(ex));
       }
 
       template <int Component>
