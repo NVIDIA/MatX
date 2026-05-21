@@ -326,11 +326,11 @@ namespace detail {
  * positive-definite inputs; normal CUDA executor paths currently support the LU
  * algorithm only.
  * 
- * @tparam OpA
- *   Data type of input a tensor or operator
  * @tparam ALGO
  *   Algorithm to use for matrix inversion. `MAT_INVERSE_ALGO_LU` supports normal CUDA execution and MathDx JIT.
  *   `MAT_INVERSE_ALGO_POSV` supports MathDx JIT for Hermitian positive-definite inputs.
+ * @tparam OpA
+ *   Data type of input a tensor or operator
  * 
  * @param a
  *   Input tensor or operator of shape `... x n x n`
@@ -339,12 +339,7 @@ namespace detail {
  *   Operator that produces the inverse tensor of shape `... x n x n`.
  * 
  */
-template<typename OpA, MatInverseAlgo_t ALGO = MAT_INVERSE_ALGO_LU>
-__MATX_INLINE__ auto inv(const OpA &a) {
-  return detail::InvOp<OpA, ALGO>(a);
-}
-
-template<MatInverseAlgo_t ALGO, typename OpA>
+template<MatInverseAlgo_t ALGO = MAT_INVERSE_ALGO_LU, typename OpA>
 __MATX_INLINE__ auto inv(const OpA &a) {
   return detail::InvOp<OpA, ALGO>(a);
 }
