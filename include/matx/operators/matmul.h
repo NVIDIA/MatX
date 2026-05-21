@@ -34,6 +34,7 @@
 
 
 #include "matx/core/type_utils.h"
+#include "matx/core/utils.h"
 #include "matx/operators/base_operator.h"
 #include "matx/core/operator_options.h"
 #include "matx/core/log.h"
@@ -183,13 +184,7 @@ namespace matx
           // m = rows of output (from A's second-to-last dim)
           // n = cols of output (from B's last dim)
           // k = inner dimension (A's last dim = B's second-to-last dim)
-          int major = 0;
-          int minor = 0;
-          int device;
-          MATX_CUDA_CHECK(cudaGetDevice(&device));
-          MATX_CUDA_CHECK(cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device));
-          MATX_CUDA_CHECK(cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device));
-          int cc = major * 100 + minor * 10;  // Compute capability as __CUDA_ARCH__ digits (e.g., 890 for SM 8.9)
+          const int cc = GetComputeCapability();  // Compute capability as __CUDA_ARCH__ digits (e.g., 890 for SM 8.9)
           
           dx_gemm_helper_.set_m(a_.Size(OpA::Rank() - 2));
           dx_gemm_helper_.set_n(b_.Size(OpB::Rank() - 1));

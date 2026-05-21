@@ -34,6 +34,7 @@
 
 
 #include "matx/core/type_utils.h"
+#include "matx/core/utils.h"
 #include "matx/operators/base_operator.h"
 #include "matx/transforms/inverse.h"
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
@@ -66,13 +67,7 @@ namespace detail {
       __MATX_INLINE__ InvOp(const OpA &a) : a_(a) {
         MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
-        int major = 0;
-        int minor = 0;
-        int device = 0;
-        MATX_CUDA_CHECK(cudaGetDevice(&device));
-        MATX_CUDA_CHECK(cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device));
-        MATX_CUDA_CHECK(cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device));
-        const int cc = major * 100 + minor * 10;
+        const int cc = GetComputeCapability();
 
         if constexpr (OpA::Rank() >= 2) {
           const index_t n = a_.Size(OpA::Rank() - 1);

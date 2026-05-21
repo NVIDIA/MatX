@@ -34,6 +34,7 @@
 
 
 #include "matx/core/type_utils.h"
+#include "matx/core/utils.h"
 #include "matx/operators/base_operator.h"
 #include "matx/operators/solver_projection.h"
 #include "matx/transforms/eig/eig_cuda.h"
@@ -87,13 +88,7 @@ namespace detail {
         vectors_shape_ = SolverShapeFromInput<RANK>(a_);
         values_shape_ = SolverVectorShapeFromMatrixShape<RANK>(vectors_shape_);
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
-        int major = 0;
-        int minor = 0;
-        int device = 0;
-        MATX_CUDA_CHECK(cudaGetDevice(&device));
-        MATX_CUDA_CHECK(cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device));
-        MATX_CUDA_CHECK(cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device));
-        const int cc = major * 100 + minor * 10;
+        const int cc = GetComputeCapability();
 
         const index_t n = vectors_shape_[RANK - 1];
         // cuSolverDx HEEV is the dense Hermitian/symmetric eigensolver. HTEV is

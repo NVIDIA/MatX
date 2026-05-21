@@ -34,6 +34,7 @@
 
 
 #include "matx/core/type_utils.h"
+#include "matx/core/utils.h"
 #include "matx/operators/base_operator.h"
 #include "matx/operators/solver_projection.h"
 #include "matx/transforms/qr/qr_cuda.h"
@@ -94,13 +95,7 @@ namespace detail {
         r_shape_ = q_shape_;
         q_shape_[RANK - 1] = q_shape_[RANK - 2];
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
-        int major = 0;
-        int minor = 0;
-        int device = 0;
-        MATX_CUDA_CHECK(cudaGetDevice(&device));
-        MATX_CUDA_CHECK(cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device));
-        MATX_CUDA_CHECK(cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device));
-        const int cc = major * 100 + minor * 10;
+        const int cc = GetComputeCapability();
 
         const index_t m = r_shape_[RANK - 2];
         const index_t n = r_shape_[RANK - 1];
@@ -490,13 +485,7 @@ namespace detail {
         out_shape_ = SolverShapeFromInput<RANK>(a_);
         tau_shape_ = SolverVectorShapeFromMatrixShape<RANK>(out_shape_);
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
-        int major = 0;
-        int minor = 0;
-        int device = 0;
-        MATX_CUDA_CHECK(cudaGetDevice(&device));
-        MATX_CUDA_CHECK(cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device));
-        MATX_CUDA_CHECK(cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device));
-        const int cc = major * 100 + minor * 10;
+        const int cc = GetComputeCapability();
 
         dx_geqrf_helper_.set_m(out_shape_[RANK - 2]);
         dx_geqrf_helper_.set_n(out_shape_[RANK - 1]);
@@ -842,13 +831,7 @@ namespace detail {
         q_shape_[RANK - 1] = k;
         r_shape_[RANK - 2] = k;
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
-        int major = 0;
-        int minor = 0;
-        int device = 0;
-        MATX_CUDA_CHECK(cudaGetDevice(&device));
-        MATX_CUDA_CHECK(cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device));
-        MATX_CUDA_CHECK(cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device));
-        const int cc = major * 100 + minor * 10;
+        const int cc = GetComputeCapability();
 
         dx_geqrf_helper_.set_m(a_.Size(RANK - 2));
         dx_geqrf_helper_.set_n(a_.Size(RANK - 1));

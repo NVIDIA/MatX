@@ -34,6 +34,7 @@
 
 
 #include "matx/core/type_utils.h"
+#include "matx/core/utils.h"
 #include "matx/operators/base_operator.h"
 #include "matx/core/operator_options.h"
 #include "matx/transforms/chol/chol_cuda.h"
@@ -70,13 +71,7 @@ namespace detail {
       __MATX_INLINE__ CholOp(const OpA &a, SolverFillMode uplo) : a_(a), uplo_(uplo) {
         MATX_LOG_TRACE("{} constructor: uplo={}", str(), static_cast<int>(uplo));
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
-        int major = 0;
-        int minor = 0;
-        int device = 0;
-        MATX_CUDA_CHECK(cudaGetDevice(&device));
-        MATX_CUDA_CHECK(cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device));
-        MATX_CUDA_CHECK(cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device));
-        const int cc = major * 100 + minor * 10;
+        const int cc = GetComputeCapability();
 
         if constexpr (OpA::Rank() >= 2) {
           dx_potrf_helper_.set_m(a_.Size(OpA::Rank() - 1));
