@@ -226,6 +226,7 @@ struct BpRunCtx {
   bool is_fx_domain;
   bool is_int16_mode;
   bool apply_window;
+  bool taylor_fast_add_third_order;
   int sgn;
   bool do_warmup;
   std::string output_file;
@@ -316,9 +317,13 @@ static int run_bp_device(PosTensor blk_positions, RtmTensor blk_rtm,
 
         auto cur_image = matx::slice(image, {y0, x0}, {y1, x1});
         auto cur_voxel_locations = matx::slice(voxel_locations, {y0, x0}, {y1, x1});
-        (cur_image = matx::experimental::sar_bp(
-            cur_image, cur_profiles, cur_positions, cur_voxel_locations, cur_rtm, ctx.params))
-            .run(ctx.exec);
+        auto bp = matx::experimental::sar_bp(
+            cur_image, cur_profiles, cur_positions, cur_voxel_locations, cur_rtm, ctx.params);
+        if (ctx.taylor_fast_add_third_order) {
+          (cur_image = bp.template props<matx::PropSarBpTaylorFastAddThirdOrder>()).run(ctx.exec);
+        } else {
+          (cur_image = bp).run(ctx.exec);
+        }
       }
     }
   };
@@ -388,11 +393,12 @@ static int run_bp_device(PosTensor blk_positions, RtmTensor blk_rtm,
     std::cout << " done" << std::endl;
   }
 
-  // Pre-allocate pinned host buffer for image output
+  // Pre-allocate pinned host buffer for image output.
   const size_t num_pixels =
       static_cast<size_t>(ctx.image_height) * static_cast<size_t>(ctx.image_width);
+  const size_t image_bytes = num_pixels * sizeof(complex_t);
   complex_t *h_image = nullptr;
-  MATX_CUDA_CHECK(cudaHostAlloc(&h_image, num_pixels * sizeof(complex_t), cudaHostAllocDefault));
+  MATX_CUDA_CHECK(cudaHostAlloc(&h_image, image_bytes, cudaHostAllocDefault));
 
   std::cout << "Running backprojection (" << ctx.output_range_bins << " range bins, del_r="
             << ctx.del_r << " m)..." << std::endl;
@@ -533,8 +539,8 @@ static int run_bp_device(PosTensor blk_positions, RtmTensor blk_rtm,
     }
   }
 
-  // Copy result to pinned host buffer (included in timed region)
-  MATX_CUDA_CHECK(cudaMemcpyAsync(h_image, image.Data(), num_pixels * sizeof(complex_t),
+  // Copy result to host buffer (included in timed region)
+  MATX_CUDA_CHECK(cudaMemcpyAsync(h_image, image.Data(), image_bytes,
              cudaMemcpyDeviceToHost, ctx.stream));
 
   MATX_CUDA_CHECK(cudaEventRecord(ev_stop, ctx.stream));
@@ -582,7 +588,7 @@ static int run_bp_device(PosTensor blk_positions, RtmTensor blk_rtm,
     return 1;
   }
   out.write(reinterpret_cast<const char *>(h_image),
-            static_cast<std::streamsize>(num_pixels * sizeof(complex_t)));
+            static_cast<std::streamsize>(image_bytes));
   out.close();
 
   std::cout << "Wrote " << ctx.image_height << " x " << ctx.image_width
@@ -674,8 +680,10 @@ int main(int argc, char **argv) {
         << "  -b, --block-size <N|0|auto|all>\n"
         << "                          Pulses per block; 0/all use all pulses, auto uses an L2-cache heuristic (default: auto)\n"
         << "  --image-tiles <N>      Process image as N x N tiles (default: 1)\n"
+        << "  --taylor-fast-third-order\n"
+        << "                          Add the third-order term for --precision taylor_fast\n"
         << "  --warmup               Warmup GPU kernels and FFT plans before timed run\n"
-        << "  --precision <type>     Compute precision: double, float, fltflt, mixed (default: mixed)\n"
+        << "  --precision <type>     Compute precision: double, float, fltflt, mixed, taylor_fast (default: mixed)\n"
         << "  -h, --help             Print this help message and exit\n";
   };
 
@@ -691,6 +699,7 @@ int main(int argc, char **argv) {
   std::string block_size_arg = "auto";
   index_t image_tiles = 1;
   bool do_warmup = false;
+  bool taylor_fast_add_third_order = false;
   std::string precision_type = "mixed";
 
   auto needs_value = [&](int i) -> bool {
@@ -728,6 +737,8 @@ int main(int argc, char **argv) {
       }
     } else if (std::strcmp(argv[i], "--warmup") == 0) {
       do_warmup = true;
+    } else if (std::strcmp(argv[i], "--taylor-fast-third-order") == 0) {
+      taylor_fast_add_third_order = true;
     } else if (std::strcmp(argv[i], "--precision") == 0) {
       if (!needs_value(i)) return 1;
       precision_type = argv[++i];
@@ -765,6 +776,12 @@ int main(int argc, char **argv) {
     output_file = (dot != std::string::npos ? input_file.substr(0, dot) : input_file) + ".raw";
   }
 
+  if (taylor_fast_add_third_order && precision_type != "taylor_fast") {
+    std::cerr << "ERROR: --taylor-fast-third-order requires --precision taylor_fast" << std::endl;
+    print_usage();
+    return 1;
+  }
+
   // -------------------------------------------------------------------
   // Read .sarbp file header
   // -------------------------------------------------------------------
@@ -783,6 +800,15 @@ int main(int argc, char **argv) {
   const bool is_fx_domain   = (hdr.flags & 0x1) != 0;
   const bool is_int16_mode  = (hdr.flags & 0x2) != 0;
   const int sgn             = hdr.sgn;
+
+  if (num_pulses <= 0 || num_range_bins <= 0 ||
+      image_width <= 0 || image_height <= 0) {
+    std::cerr << "ERROR: invalid .sarbp dimensions: pulses=" << num_pulses
+              << ", samples=" << num_range_bins
+              << ", image=" << image_height << " x " << image_width
+              << std::endl;
+    return 1;
+  }
 
   if (image_tiles > image_width || image_tiles > image_height) {
     std::cerr << "ERROR: --image-tiles " << image_tiles
@@ -904,7 +930,9 @@ int main(int argc, char **argv) {
   // incompatible types and is undefined behaviour under strict aliasing.
   // unsigned char* may alias any object type, and std::memcpy of
   // trivially-copyable types is the standards-blessed way to bit-cast.
-  if (precision_type == "fltflt") {
+  const bool use_fltflt_platform_inputs =
+      precision_type == "fltflt";
+  if (use_fltflt_platform_inputs) {
     auto *pos_bytes = reinterpret_cast<unsigned char *>(h_positions);
     for (size_t i = 0; i < static_cast<size_t>(num_pulses) * 3; i++) {
       unsigned char *slot = pos_bytes + i * sizeof(double);
@@ -985,12 +1013,16 @@ int main(int argc, char **argv) {
     params.compute_type = SarBpComputeType::FloatFloat;
   } else if (precision_type == "mixed") {
     params.compute_type = SarBpComputeType::Mixed;
+  } else if (precision_type == "taylor_fast") {
+    params.compute_type = SarBpComputeType::TaylorFast;
   } else {
     std::cerr << "ERROR: unknown precision type '" << precision_type
-              << "' (use double, float, fltflt, or mixed)" << std::endl;
+              << "' (use double, float, fltflt, mixed, or taylor_fast)" << std::endl;
     return 1;
   }
-  params.features = SarBpFeature::PhaseLUTOptimization;
+  if (params.compute_type != SarBpComputeType::Double) {
+    params.features = SarBpFeature::PhaseLUTOptimization;
+  }
   params.center_frequency = (sgn >= 0) ? -hdr.center_frequency : hdr.center_frequency;
   params.del_r = del_r;
 
@@ -1034,7 +1066,11 @@ int main(int argc, char **argv) {
               << static_cast<double>(phase_lut_bytes) / (1024.0 * 1024.0)
               << " MiB" << std::endl;
   }
-  std::cout << "BP precision     : " << precision_type << std::endl;
+  std::cout << "BP precision     : " << precision_type;
+  if (precision_type == "taylor_fast") {
+    std::cout << (taylor_fast_add_third_order ? " (third order)" : " (second order)");
+  }
+  std::cout << std::endl;
   std::cout << "Image tiles      : " << image_tiles << " x " << image_tiles
             << std::endl;
 
@@ -1047,11 +1083,11 @@ int main(int argc, char **argv) {
 
   // Bundle non-tensor state for run_bp_device(). The platform-positions and
   // range-to-mcp tensors are allocated below with a type that matches
-  // `precision_type`: `tensor<double3>` / `tensor<double>` for the standard
-  // paths, or `tensor<fltflt>` / `tensor<fltflt>` when
-  // `precision_type == "fltflt"`. In the fltflt case we already converted
-  // the pinned host buffers in-place from double to fltflt right after the
-  // file read above (same byte layout, no extra storage). The kernel
+  // `use_fltflt_platform_inputs`: `tensor<double3>` / `tensor<double>` for the
+  // standard paths, or `tensor<fltflt>` / `tensor<fltflt>` for the FloatFloat
+  // path. In the fltflt case we already converted the pinned host buffers
+  // in-place from double to fltflt right after the file read above (same byte
+  // layout, no extra storage). The kernel
   // template (`SarBp<...>`) already handles both rank-1 (vector-of-double3
   // / -fltflt3-style) and rank-2 (matrix of [pulses, 3]) layouts for
   // platform_positions, so run_bp_device() branches internally only on the
@@ -1073,6 +1109,7 @@ int main(int argc, char **argv) {
       .is_fx_domain          = is_fx_domain,
       .is_int16_mode         = is_int16_mode,
       .apply_window          = apply_window,
+      .taylor_fast_add_third_order = taylor_fast_add_third_order,
       .sgn                   = sgn,
       .do_warmup             = do_warmup,
       .output_file           = output_file,
@@ -1086,7 +1123,7 @@ int main(int argc, char **argv) {
   };
 
   int dev_status;
-  if (precision_type == "fltflt") {
+  if (use_fltflt_platform_inputs) {
     auto blk_positions = make_tensor<matx::fltflt>({block_size, 3}, matx::MATX_DEVICE_MEMORY);
     auto blk_rtm       = make_tensor<matx::fltflt>({block_size},    matx::MATX_DEVICE_MEMORY);
     dev_status = run_bp_device(blk_positions, blk_rtm, voxel_locations, ctx);
@@ -1098,8 +1135,8 @@ int main(int argc, char **argv) {
   if (dev_status != 0) return dev_status;
 
 
-  MATX_CUDA_CHECK(cudaFreeHost(h_positions));
-  MATX_CUDA_CHECK(cudaFreeHost(h_range_to_mcp));
+  if (h_positions) MATX_CUDA_CHECK(cudaFreeHost(h_positions));
+  if (h_range_to_mcp) MATX_CUDA_CHECK(cudaFreeHost(h_range_to_mcp));
   if (h_range_profiles) MATX_CUDA_CHECK(cudaFreeHost(h_range_profiles));
   if (h_range_profiles_i16) MATX_CUDA_CHECK(cudaFreeHost(h_range_profiles_i16));
   if (h_ampsf) MATX_CUDA_CHECK(cudaFreeHost(h_ampsf));
