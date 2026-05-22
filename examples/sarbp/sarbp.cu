@@ -86,6 +86,8 @@
 #include "matx.h"
 #include <cuda/std/complex>
 #include <cuda/cmath>
+#include <algorithm>
+#include <charconv>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -99,6 +101,110 @@
 using namespace matx;
 
 using complex_t = cuda::std::complex<float>;
+
+// Use up to this fraction of L2 for range profiles and phase lookup table
+static constexpr double SARBP_AUTO_L2_TARGET_MULTIPLIER = 0.8;
+static constexpr index_t SARBP_AUTO_BLOCK_GRANULARITY = 256;
+static constexpr index_t SARBP_AUTO_MIN_BLOCK_SIZE = 256;
+
+enum class BlockSizeMode {
+  Auto,
+  All,
+  Manual
+};
+
+struct BlockSizeSelection {
+  BlockSizeMode mode{BlockSizeMode::Auto};
+  index_t manual_size{0};
+};
+
+static bool parse_index_arg(const std::string &arg, index_t &value, index_t min_value)
+{
+  index_t parsed{};
+  const auto *begin = arg.data();
+  const auto *end = arg.data() + arg.size();
+  const auto [ptr, ec] = std::from_chars(begin, end, parsed);
+  if (arg.empty() || ec != std::errc{} || ptr != end || parsed < min_value) {
+    return false;
+  }
+
+  value = parsed;
+  return true;
+}
+
+static bool parse_block_size_arg(const std::string &arg, BlockSizeSelection &selection)
+{
+  if (arg == "auto") {
+    selection = BlockSizeSelection{BlockSizeMode::Auto, 0};
+    return true;
+  }
+  if (arg == "all") {
+    selection = BlockSizeSelection{BlockSizeMode::All, 0};
+    return true;
+  }
+
+  index_t parsed{};
+  if (!parse_index_arg(arg, parsed, 0)) {
+    return false;
+  }
+
+  if (parsed == 0) {
+    // Preserve the old "-b 0" behavior as an alias for all pulses.
+    selection = BlockSizeSelection{BlockSizeMode::All, 0};
+  } else {
+    selection = BlockSizeSelection{BlockSizeMode::Manual, parsed};
+  }
+  return true;
+}
+
+static index_t round_down_to_multiple(index_t value, index_t multiple)
+{
+  if (multiple <= 1) {
+    return value;
+  }
+  return (value / multiple) * multiple;
+}
+
+static size_t get_phase_lut_bytes(index_t output_range_bins, const SarBpParams &params)
+{
+  if (!has_feature(params.features, SarBpFeature::PhaseLUTOptimization)) {
+    return 0;
+  }
+
+  const size_t elem_size = (params.compute_type == SarBpComputeType::Double)
+      ? sizeof(cuda::std::complex<double>)
+      : sizeof(cuda::std::complex<float>);
+  return static_cast<size_t>(output_range_bins) * elem_size;
+}
+
+static index_t choose_auto_block_size(index_t num_pulses, index_t output_range_bins,
+                                      const SarBpParams &params,
+                                      const cudaDeviceProp &device_prop)
+{
+  const size_t profile_bytes_per_pulse =
+      static_cast<size_t>(output_range_bins) * sizeof(complex_t);
+  if (num_pulses <= 0 || profile_bytes_per_pulse == 0 ||
+      device_prop.l2CacheSize <= 0) {
+    return num_pulses;
+  }
+
+  const size_t phase_lut_bytes = get_phase_lut_bytes(output_range_bins, params);
+  const double l2_target_bytes =
+      static_cast<double>(device_prop.l2CacheSize) * SARBP_AUTO_L2_TARGET_MULTIPLIER;
+  double profile_budget_bytes = l2_target_bytes - static_cast<double>(phase_lut_bytes);
+  const double min_profile_budget =
+      static_cast<double>(profile_bytes_per_pulse) *
+      static_cast<double>(SARBP_AUTO_MIN_BLOCK_SIZE);
+  if (profile_budget_bytes < min_profile_budget) {
+    profile_budget_bytes = min_profile_budget;
+  }
+
+  index_t block_size =
+      static_cast<index_t>(profile_budget_bytes / static_cast<double>(profile_bytes_per_pulse));
+  block_size = round_down_to_multiple(block_size, SARBP_AUTO_BLOCK_GRANULARITY);
+  block_size = std::max(block_size, SARBP_AUTO_MIN_BLOCK_SIZE);
+  return std::min(block_size, num_pulses);
+}
 
 // Aggregate of non-tensor state needed by run_bp_device(). Kept separate from
 // the tensor and host-buffer parameters because most members are scalar
@@ -116,6 +222,7 @@ struct BpRunCtx {
   index_t ifft_shift;
   index_t image_width;
   index_t image_height;
+  index_t image_tiles;
   bool is_fx_domain;
   bool is_int16_mode;
   bool apply_window;
@@ -199,6 +306,23 @@ static int run_bp_device(PosTensor blk_positions, RtmTensor blk_rtm,
   auto image = make_tensor<complex_t>({ctx.image_height, ctx.image_width}, matx::MATX_DEVICE_MEMORY);
   (image = matx::zeros<complex_t>({ctx.image_height, ctx.image_width})).run(ctx.exec);
 
+  auto run_bp_tiles = [&](auto &cur_profiles, auto &cur_positions, auto &cur_rtm) {
+    for (index_t tile_y = 0; tile_y < ctx.image_tiles; tile_y++) {
+      const index_t y0 = (ctx.image_height * tile_y) / ctx.image_tiles;
+      const index_t y1 = (ctx.image_height * (tile_y + 1)) / ctx.image_tiles;
+      for (index_t tile_x = 0; tile_x < ctx.image_tiles; tile_x++) {
+        const index_t x0 = (ctx.image_width * tile_x) / ctx.image_tiles;
+        const index_t x1 = (ctx.image_width * (tile_x + 1)) / ctx.image_tiles;
+
+        auto cur_image = matx::slice(image, {y0, x0}, {y1, x1});
+        auto cur_voxel_locations = matx::slice(voxel_locations, {y0, x0}, {y1, x1});
+        (cur_image = matx::experimental::sar_bp(
+            cur_image, cur_profiles, cur_positions, cur_voxel_locations, cur_rtm, ctx.params))
+            .run(ctx.exec);
+      }
+    }
+  };
+
   // Warmup: run kernels with correct tensor sizes to initialize FFT plans,
   // load kernels, etc. so that the timed run reflects steady-state performance.
   if (ctx.do_warmup) {
@@ -246,10 +370,7 @@ static int run_bp_device(PosTensor blk_positions, RtmTensor blk_rtm,
         (cur_profiles = matx::fftshift1D(cur_compressed)).run(ctx.exec);
       }
 
-      (image = matx::experimental::sar_bp(
-          matx::zeros<complex_t>({ctx.image_height, ctx.image_width}),
-          cur_profiles, cur_positions, voxel_locations, cur_rtm, ctx.params))
-          .run(ctx.exec);
+      run_bp_tiles(cur_profiles, cur_positions, cur_rtm);
     };
 
     // Warmup with primary block size
@@ -404,10 +525,7 @@ static int run_bp_device(PosTensor blk_positions, RtmTensor blk_rtm,
 
     // Backprojection - accumulates this block's pulses into image
     MATX_CUDA_CHECK(cudaEventRecord(ev_bp_start[blk], ctx.stream));
-    (image = matx::experimental::sar_bp(image, cur_profiles,
-                                         cur_positions, voxel_locations,
-                                         cur_rtm, ctx.params))
-        .run(ctx.exec);
+    run_bp_tiles(cur_profiles, cur_positions, cur_rtm);
     MATX_CUDA_CHECK(cudaEventRecord(ev_bp_stop[blk], ctx.stream));
 
     if (ctx.num_blocks > 1) {
@@ -553,7 +671,9 @@ int main(int argc, char **argv) {
         << "  -o, --output <file>    Output file (default: input path with .raw extension)\n"
         << "  -u, --upsample <N>     Range upsample factor via zero-padding (default: 1)\n"
         << "  -w, --window <type>    Window for range compression: hamming, none (default: hamming)\n"
-        << "  -b, --block-size <N>   Pulses per block for reduced GPU memory (default: all)\n"
+        << "  -b, --block-size <N|0|auto|all>\n"
+        << "                          Pulses per block; 0/all use all pulses, auto uses an L2-cache heuristic (default: auto)\n"
+        << "  --image-tiles <N>      Process image as N x N tiles (default: 1)\n"
         << "  --warmup               Warmup GPU kernels and FFT plans before timed run\n"
         << "  --precision <type>     Compute precision: double, float, fltflt, mixed (default: mixed)\n"
         << "  -h, --help             Print this help message and exit\n";
@@ -568,7 +688,8 @@ int main(int argc, char **argv) {
   std::string output_file;
   int upsample_factor = 1;
   std::string window_type = "hamming";
-  int block_size_arg = 0;  // 0 = all pulses in one block
+  std::string block_size_arg = "auto";
+  index_t image_tiles = 1;
   bool do_warmup = false;
   std::string precision_type = "mixed";
 
@@ -596,7 +717,15 @@ int main(int argc, char **argv) {
       output_file = argv[++i];
     } else if (std::strcmp(argv[i], "-b") == 0 || std::strcmp(argv[i], "--block-size") == 0) {
       if (!needs_value(i)) return 1;
-      block_size_arg = std::atoi(argv[++i]);
+      block_size_arg = argv[++i];
+    } else if (std::strcmp(argv[i], "--image-tiles") == 0) {
+      if (!needs_value(i)) return 1;
+      if (!parse_index_arg(argv[++i], image_tiles, 1)) {
+        std::cerr << "ERROR: invalid image tile count '" << argv[i]
+                  << "' (use a positive integer)" << std::endl;
+        print_usage();
+        return 1;
+      }
     } else if (std::strcmp(argv[i], "--warmup") == 0) {
       do_warmup = true;
     } else if (std::strcmp(argv[i], "--precision") == 0) {
@@ -619,6 +748,14 @@ int main(int argc, char **argv) {
 
   if (input_file.empty()) {
     std::cerr << "ERROR: missing required <input.sarbp> argument" << std::endl;
+    print_usage();
+    return 1;
+  }
+
+  BlockSizeSelection block_size_selection;
+  if (!parse_block_size_arg(block_size_arg, block_size_selection)) {
+    std::cerr << "ERROR: invalid block size '" << block_size_arg
+              << "' (use a positive integer, 0, auto, or all)" << std::endl;
     print_usage();
     return 1;
   }
@@ -646,6 +783,13 @@ int main(int argc, char **argv) {
   const bool is_fx_domain   = (hdr.flags & 0x1) != 0;
   const bool is_int16_mode  = (hdr.flags & 0x2) != 0;
   const int sgn             = hdr.sgn;
+
+  if (image_tiles > image_width || image_tiles > image_height) {
+    std::cerr << "ERROR: --image-tiles " << image_tiles
+              << " exceeds image dimensions " << image_height << " x "
+              << image_width << std::endl;
+    return 1;
+  }
 
   std::cout << "Input file       : " << input_file << std::endl;
   std::cout << "Pulses           : " << num_pulses << std::endl;
@@ -853,14 +997,46 @@ int main(int argc, char **argv) {
   // -------------------------------------------------------------------
   // Block processing: range compression (if FX) + backprojection
   // -------------------------------------------------------------------
-  const index_t block_size = (block_size_arg > 0)
-      ? std::min(static_cast<index_t>(block_size_arg), num_pulses)
-      : num_pulses;
+  size_t l2_cache_bytes = 0;
+  const size_t profile_bytes_per_pulse =
+      static_cast<size_t>(output_range_bins) * sizeof(complex_t);
+  const size_t phase_lut_bytes = get_phase_lut_bytes(output_range_bins, params);
+
+  index_t block_size = num_pulses;
+  if (block_size_selection.mode == BlockSizeMode::Auto) {
+    int device = 0;
+    cudaDeviceProp device_prop{};
+    MATX_CUDA_CHECK(cudaGetDevice(&device));
+    MATX_CUDA_CHECK(cudaGetDeviceProperties(&device_prop, device));
+    l2_cache_bytes = static_cast<size_t>(device_prop.l2CacheSize);
+    block_size = choose_auto_block_size(num_pulses, output_range_bins, params, device_prop);
+  } else if (block_size_selection.mode == BlockSizeMode::Manual) {
+    block_size = std::min(block_size_selection.manual_size, num_pulses);
+  }
   const index_t num_blocks = (num_pulses + block_size - 1) / block_size;
 
-  std::cout << "Block size       : " << block_size << " pulses (" << num_blocks
-            << " block" << (num_blocks > 1 ? "s" : "") << ")" << std::endl;
+  std::cout << "Block size       : " << block_size << " pulses ";
+  if (block_size_selection.mode == BlockSizeMode::Auto) {
+    std::cout << "(auto, ";
+  } else if (block_size_selection.mode == BlockSizeMode::All) {
+    std::cout << "(all, ";
+  } else {
+    std::cout << "(manual, ";
+  }
+  std::cout << num_blocks << " block" << (num_blocks > 1 ? "s" : "") << ")" << std::endl;
+  if (block_size_selection.mode == BlockSizeMode::Auto) {
+    std::cout << "  Auto heuristic : L2 "
+              << static_cast<double>(l2_cache_bytes) / (1024.0 * 1024.0)
+              << " MiB, target " << SARBP_AUTO_L2_TARGET_MULTIPLIER
+              << "x L2, profiles "
+              << static_cast<double>(profile_bytes_per_pulse) / 1024.0
+              << " KiB/pulse, phase LUT "
+              << static_cast<double>(phase_lut_bytes) / (1024.0 * 1024.0)
+              << " MiB" << std::endl;
+  }
   std::cout << "BP precision     : " << precision_type << std::endl;
+  std::cout << "Image tiles      : " << image_tiles << " x " << image_tiles
+            << std::endl;
 
   cudaStream_t stream;
   MATX_CUDA_CHECK(cudaStreamCreate(&stream));
@@ -893,6 +1069,7 @@ int main(int argc, char **argv) {
       .ifft_shift            = ifft_shift,
       .image_width           = image_width,
       .image_height          = image_height,
+      .image_tiles           = image_tiles,
       .is_fx_domain          = is_fx_domain,
       .is_int16_mode         = is_int16_mode,
       .apply_window          = apply_window,
