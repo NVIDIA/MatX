@@ -311,6 +311,22 @@ namespace matx
             return "";
 #endif
           }
+          else if constexpr (Cap == OperatorCapability::JIT_CACHE_KEY) {
+#ifdef MATX_EN_JIT
+            auto key = detail::MakeJITCacheKeyForType<self_type>("JITPermute");
+            const int actual_rank = jit_rank();
+            detail::HashJITCacheValue(key, actual_rank);
+            for (int i = 0; i < actual_rank; ++i) {
+              detail::HashJITCacheValue(key, dims_[i]);
+            }
+            for (int i = 0; i < actual_rank; ++i) {
+              detail::HashJITCacheValue(key, Size(i));
+            }
+            return combine_capabilities<Cap>(key, detail::get_operator_capability<Cap>(op_, in));
+#else
+            return detail::MakeInvalidJITCacheKey();
+#endif
+          }
           else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
 #ifdef MATX_EN_JIT
             return combine_capabilities<Cap>(true, detail::get_operator_capability<Cap>(op_, in));

@@ -241,19 +241,25 @@ public:
     if (jobz == 'S') {
       MATX_ASSERT_STR((u.Size(RANK-1) == k) && (u.Size(RANK-2) == params.m), matxInvalidSize, "U must be ... x m x min(m,n)");
       MATX_ASSERT_STR((vt.Size(RANK-1) == params.n) && (vt.Size(RANK-2) == k), matxInvalidSize, "VT must be ... x min(m,n) x n");
-    } else {
+    } else if (jobz != 'N') {
       MATX_ASSERT_STR((u.Size(RANK-1) == params.m) && (u.Size(RANK-2) == u.Size(RANK-1)), matxInvalidSize, "U must be ... x m x m");
       MATX_ASSERT_STR((vt.Size(RANK-1) == params.n) && (vt.Size(RANK-2) == vt.Size(RANK-1)), matxInvalidSize, "VT must be ... x n x n");
     }
     MATX_ASSERT_STR(s.Size(RANK-2) == k, matxInvalidSize, "S must be ... x min(m,n)");
 
     SetBatchPointers<BatchType::MATRIX>(a, this->batch_a_ptrs);
-    SetBatchPointers<BatchType::MATRIX>(u, this->batch_u_ptrs);
-    SetBatchPointers<BatchType::MATRIX>(vt, this->batch_vt_ptrs);
+    if (jobz == 'N') {
+      this->batch_u_ptrs.assign(this->batch_a_ptrs.size(), nullptr);
+      this->batch_vt_ptrs.assign(this->batch_a_ptrs.size(), nullptr);
+    }
+    else {
+      SetBatchPointers<BatchType::MATRIX>(u, this->batch_u_ptrs);
+      SetBatchPointers<BatchType::MATRIX>(vt, this->batch_vt_ptrs);
+    }
     SetBatchPointers<BatchType::VECTOR>(s, this->batch_s_ptrs);
 
     lapack_int_t info;
-    lapack_int_t ldvt = vt.Size(RANK-2);
+    lapack_int_t ldvt = jobz == 'N' ? 1 : vt.Size(RANK-2);
     if (params.algo == SVDHostAlgo::QR) {
       for (size_t i = 0; i < this->batch_a_ptrs.size(); i++) {
         gesvd_dispatch(&jobz, &jobz, &params.m, &params.n,
@@ -474,4 +480,3 @@ void svd_impl([[maybe_unused]] UTensor &&u,
 }
 
 } // end namespace matx
-

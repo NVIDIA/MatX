@@ -85,6 +85,7 @@ typedef enum { SORT_DIR_ASC, SORT_DIR_DESC } SortDirection_t;
  */
 typedef enum {
   MAT_INVERSE_ALGO_LU,
+  MAT_INVERSE_ALGO_POSV,
 } MatInverseAlgo_t;
 
 /**
@@ -110,12 +111,13 @@ enum class EigenMode {
  * @enum SVDMode
  *   Modes for computing columns of *U* and rows of *VT* in Singular Value Decomposition (SVD).
  *   Corresponds to the LAPACK/cuSolver parameters jobu and jobvt. The same option is used
- *   for both jobu and jobvt in MatX.
+ *   for both jobu and jobvt in MatX. Singular values are computed for every mode; these
+ *   options only control whether singular vectors are computed.
  */
 enum class SVDMode {
   ALL,     /**< Compute all columns of *U* and all rows of *VT* (Equivalent to jobu = jobvt = 'A') */
-  REDUCED, /**< Compute only the first `min(m,n` columns of *U* and rows of *VT* (Equivalent to jobu = jobvt = 'S') */
-  NONE     /**< Compute no columns of *U* or rows of *VT* (Equivalent to jobu = jobvt = 'N') */
+  REDUCED, /**< Compute only the first `min(m,n)` columns of *U* and rows of *VT* (Equivalent to jobu = jobvt = 'S') */
+  NONE     /**< Compute singular values only; compute no columns of *U* or rows of *VT* (Equivalent to jobu = jobvt = 'N') */
 };
 
 /**

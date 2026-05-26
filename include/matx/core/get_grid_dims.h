@@ -377,5 +377,61 @@ inline bool get_grid_dims_block_2d(dim3 &blocks, dim3 &threads,
   // No stride needed for now - could be extended for very large batches
   return false;
 }
+
+// For 1D block operators where all threads in a block cooperate on the last
+// dimension and blockIdx is used purely for batching.
+template <int RANK>
+inline bool get_grid_dims_block_1d(dim3 &blocks, dim3 &threads,
+                                    const cuda::std::array<index_t, RANK> &sizes,
+                                    int block_dim) {
+  threads.x = block_dim;
+  threads.y = 1;
+  threads.z = 1;
+
+  blocks.x = 1;
+  blocks.y = 1;
+  blocks.z = 1;
+
+  if constexpr (RANK == 1) {
+    blocks.x = 1;
+  }
+  else if constexpr (RANK == 2) {
+    blocks.x = static_cast<int>(sizes[0]);
+  }
+  else if constexpr (RANK == 3) {
+    blocks.x = static_cast<int>(sizes[1]);
+    blocks.y = static_cast<int>(sizes[0]);
+  }
+  else if constexpr (RANK == 4) {
+    blocks.x = static_cast<int>(sizes[2]);
+    blocks.y = static_cast<int>(sizes[1]);
+    blocks.z = static_cast<int>(sizes[0]);
+  }
+  else if constexpr (RANK > 4) {
+    MATX_THROW(matxNotSupported, "Block1D grid dims not supported for rank > 4");
+    return true;
+  }
+
+  if constexpr (RANK >= 1 && RANK <= 4) {
+    constexpr int kMaxGridDim = 65535;
+    if (blocks.x > kMaxGridDim || blocks.y > kMaxGridDim || blocks.z > kMaxGridDim) {
+      MATX_THROW(matxInvalidParameter, "Block1D grid dims exceed CUDA limit (65535)");
+    }
+  }
+
+  MATX_LOG_DEBUG("Block1D: Blocks {}x{}x{} Threads {}x{}x{}", blocks.x, blocks.y, blocks.z, threads.x, threads.y, threads.z);
+  return false;
+}
+
+template <int RANK>
+inline bool get_grid_dims_block_pass_through(dim3 &blocks, dim3 &threads,
+                                             const cuda::std::array<index_t, RANK> &sizes,
+                                             int block_dim,
+                                             int inner_rank) {
+  if (inner_rank == 1) {
+    return get_grid_dims_block_1d<RANK>(blocks, threads, sizes, block_dim);
+  }
+  return get_grid_dims_block_2d<RANK>(blocks, threads, sizes, block_dim);
+}
 } // end namespace detail
 } // end namespace matx
