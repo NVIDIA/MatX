@@ -444,8 +444,9 @@ namespace matx {
       FFTType fft_type_ = FFTType::C2C;
       FFTDirection direction_ = FFTDirection::FORWARD;
       int cc_ = 0;
-      cuFFTDxHelper<InputType> fft_x_helper_;
-      cuFFTDxHelper<InputType> fft_y_helper_;
+      mutable cuFFTDxHelper<InputType> fft_x_helper_;
+      mutable cuFFTDxHelper<InputType> fft_y_helper_;
+      mutable bool helpers_configured_ = false;
 
       static ElementsPerThread IntToElementsPerThread(int ept) {
         switch (ept) {
@@ -459,7 +460,11 @@ namespace matx {
         }
       }
 
-      void Configure1DHelpers() {
+      void Configure1DHelpers() const {
+        if (helpers_configured_) {
+          return;
+        }
+
         if (fft_size_x_ <= 0 || fft_size_y_ <= 0 || cc_ <= 0) {
           return;
         }
@@ -479,6 +484,7 @@ namespace matx {
         fft_y_helper_.set_cc(cc_);
         fft_y_helper_.set_contiguous_input(false);
         fft_y_helper_.set_method(cuFFTDxMethod::SHARED);
+        helpers_configured_ = true;
       }
 
     public:
@@ -490,11 +496,11 @@ namespace matx {
       FFTDirection get_direction() const { return direction_; }
       int get_cc() const { return cc_; }
 
-      void set_fft_size_x(index_t size) { fft_size_x_ = size; Configure1DHelpers(); }
-      void set_fft_size_y(index_t size) { fft_size_y_ = size; Configure1DHelpers(); }
-      void set_fft_type(FFTType type) { fft_type_ = type; Configure1DHelpers(); }
-      void set_direction(FFTDirection dir) { direction_ = dir; Configure1DHelpers(); }
-      void set_cc(int cc) { cc_ = cc; Configure1DHelpers(); }
+      void set_fft_size_x(index_t size) { fft_size_x_ = size; helpers_configured_ = false; }
+      void set_fft_size_y(index_t size) { fft_size_y_ = size; helpers_configured_ = false; }
+      void set_fft_type(FFTType type) { fft_type_ = type; helpers_configured_ = false; }
+      void set_direction(FFTDirection dir) { direction_ = dir; helpers_configured_ = false; }
+      void set_cc(int cc) { cc_ = cc; helpers_configured_ = false; }
 
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
       std::string GetSymbolName() const {
@@ -545,10 +551,12 @@ namespace matx {
       }
 
       bool IsSupported() const {
+        Configure1DHelpers();
         return fft_x_helper_.IsSupported() && fft_y_helper_.IsSupported();
       }
 
       int GetShmRequired() const {
+        Configure1DHelpers();
         const auto data_size = static_cast<int64_t>(fft_size_x_) *
                                static_cast<int64_t>(fft_size_y_) *
                                static_cast<int64_t>(sizeof(InputType));
@@ -562,6 +570,7 @@ namespace matx {
       }
 
       int GetBlockDim() const {
+        Configure1DHelpers();
         const auto block_x = fft_x_helper_.GetBlockDim();
         const auto block_y = fft_y_helper_.GetBlockDim();
         if (block_x != block_y) {
@@ -586,15 +595,18 @@ namespace matx {
       }
 
       bool GenerateLTOIR(std::set<std::string> &ltoir_symbols) {
+        Configure1DHelpers();
         return fft_x_helper_.GenerateLTOIR(ltoir_symbols) &&
                fft_y_helper_.GenerateLTOIR(ltoir_symbols);
       }
 
       std::string GetXFuncName() {
+        Configure1DHelpers();
         return std::string(FFT_DX_FUNC_PREFIX) + "_" + fft_x_helper_.GetSymbolName();
       }
 
       std::string GetYFuncName() {
+        Configure1DHelpers();
         return std::string(FFT_DX_FUNC_PREFIX) + "_" + fft_y_helper_.GetSymbolName();
       }
 
