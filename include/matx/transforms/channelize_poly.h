@@ -911,10 +911,29 @@ inline void channelize_poly_impl(OutType out, const InType &in, const FilterType
     batch_count *= in.Size(i);
   }
 
+  std::vector<complex_accum_t> twiddles(static_cast<size_t>(num_channels * num_channels));
+  for (index_t channel = 0; channel < num_channels; channel++) {
+    for (index_t branch = 0; branch < num_channels; branch++) {
+      twiddles[static_cast<size_t>(channel * num_channels + branch)] =
+          detail::cpoly::HostTwiddle<complex_accum_t>(channel, branch, num_channels);
+    }
+  }
+
+  const index_t num_thread_buffers = std::max<index_t>(1, exec.GetNumThreads());
+  std::vector<filtering_accum_t> filtered_storage(
+      static_cast<size_t>(num_thread_buffers * num_channels));
+
   const auto compute_output = [&](index_t batch, index_t t) {
     const auto in_batch_idx = detail::BlockToIdx(in, batch, 1);
     const auto out_batch_idx = detail::BlockToIdx(out, batch, 2);
-    std::vector<filtering_accum_t> filtered(static_cast<size_t>(num_channels));
+    index_t thread_index = 0;
+#ifdef MATX_EN_OMP
+    if (num_thread_buffers > 1) {
+      thread_index = static_cast<index_t>(omp_get_thread_num());
+    }
+#endif
+    auto *filtered = filtered_storage.data() +
+        static_cast<size_t>(thread_index * num_channels);
 
     for (index_t branch = 0; branch < num_channels; branch++) {
       filtering_accum_t accum{};
@@ -987,7 +1006,7 @@ inline void channelize_poly_impl(OutType out, const InType &in, const FilterType
       for (index_t branch = 0; branch < num_channels; branch++) {
         dft += detail::cpoly::HostAsComplex<complex_accum_t>(
             filtered[static_cast<size_t>(branch)]) *
-            detail::cpoly::HostTwiddle<complex_accum_t>(channel, branch, num_channels);
+            twiddles[static_cast<size_t>(channel * num_channels + branch)];
       }
       detail::cpoly::HostWriteOutput(out, out_batch_idx, t, channel, dft);
     }

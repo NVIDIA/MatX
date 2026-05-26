@@ -250,6 +250,52 @@ TEST(ChannelizePolyHostExecutor, AccumAndOutputProperties)
   MATX_EXIT_HANDLER();
 }
 
+TEST(ChannelizePolyHostExecutor, SelectThreadsMatchesSingleThreaded)
+{
+  MATX_ENTER_HANDLER();
+
+  matx::SingleThreadedHostExecutor single_exec{};
+  HostExecParams params{4};
+  matx::SelectThreadsHostExecutor threaded_exec{params};
+
+  const index_t a_len = 96;
+  const index_t f_len = 21;
+  const index_t num_channels = 4;
+  const index_t decimation_factor = 3;
+  const index_t b_len_per_channel = (a_len + decimation_factor - 1) / decimation_factor;
+
+  auto a = make_tensor<float>({a_len});
+  auto f = make_tensor<float>({f_len});
+  auto b_single = make_tensor<cuda::std::complex<float>>({b_len_per_channel, num_channels});
+  auto b_threaded = make_tensor<cuda::std::complex<float>>({b_len_per_channel, num_channels});
+
+  for (index_t i = 0; i < a_len; i++) {
+    a(i) = static_cast<float>((i % 9) - 4) * 0.25f +
+        static_cast<float>(i % 5) * 0.03125f;
+  }
+
+  for (index_t i = 0; i < f_len; i++) {
+    f(i) = static_cast<float>((i % 7) - 3) * 0.125f +
+        static_cast<float>(i + 1) * 0.01f;
+  }
+
+  (b_single = channelize_poly(a, f, num_channels, decimation_factor)).run(single_exec);
+  single_exec.sync();
+  (b_threaded = channelize_poly(a, f, num_channels, decimation_factor)).run(threaded_exec);
+  threaded_exec.sync();
+
+  for (index_t t = 0; t < b_len_per_channel; t++) {
+    for (index_t channel = 0; channel < num_channels; channel++) {
+      ASSERT_NEAR(static_cast<double>(b_single(t, channel).real()),
+                  static_cast<double>(b_threaded(t, channel).real()), 1e-5);
+      ASSERT_NEAR(static_cast<double>(b_single(t, channel).imag()),
+                  static_cast<double>(b_threaded(t, channel).imag()), 1e-5);
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
 // Simple tests use random input and filter values
 TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, Simple)
 {
