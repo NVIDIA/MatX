@@ -919,6 +919,88 @@ TYPED_TEST(FFTTestComplexTypes, FFT2D16R2C)
   MATX_EXIT_HANDLER();
 }
 
+#if defined(MATX_EN_JIT) && defined(MATX_EN_MATHDX)
+TEST(FFTJIT, CuFFTDx2DFFT2Fusion)
+{
+  MATX_ENTER_HANDLER();
+
+  using complex_type = cuda::std::complex<float>;
+  constexpr index_t fft_dim = 4;
+
+  auto in = make_tensor<complex_type>({fft_dim, fft_dim});
+  auto jit_out = make_tensor<complex_type>({fft_dim, fft_dim});
+  auto ref_out = make_tensor<complex_type>({fft_dim, fft_dim});
+
+  for (index_t row = 0; row < fft_dim; row++) {
+    for (index_t col = 0; col < fft_dim; col++) {
+      in(row, col) = complex_type{static_cast<float>(row + 2 * col),
+                                  static_cast<float>((row + col) % 3)};
+    }
+  }
+
+  auto expr = fft2(in) + complex_type{1.0f, -1.0f};
+  if (!jit_supported(expr)) {
+    GTEST_SKIP();
+  }
+
+  CUDAJITExecutor jit_exec{};
+  cudaExecutor cuda_exec{};
+  (jit_out = expr).run(jit_exec);
+  (ref_out = fft2(in) + complex_type{1.0f, -1.0f}).run(cuda_exec);
+  jit_exec.sync();
+  cuda_exec.sync();
+
+  for (index_t row = 0; row < fft_dim; row++) {
+    for (index_t col = 0; col < fft_dim; col++) {
+      ASSERT_NEAR(jit_out(row, col).real(), ref_out(row, col).real(), 0.01f);
+      ASSERT_NEAR(jit_out(row, col).imag(), ref_out(row, col).imag(), 0.01f);
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(FFTJIT, CuFFTDx2DIFFT2Fusion)
+{
+  MATX_ENTER_HANDLER();
+
+  using complex_type = cuda::std::complex<float>;
+  constexpr index_t fft_dim = 4;
+
+  auto in = make_tensor<complex_type>({fft_dim, fft_dim});
+  auto jit_out = make_tensor<complex_type>({fft_dim, fft_dim});
+  auto ref_out = make_tensor<complex_type>({fft_dim, fft_dim});
+
+  for (index_t row = 0; row < fft_dim; row++) {
+    for (index_t col = 0; col < fft_dim; col++) {
+      in(row, col) = complex_type{static_cast<float>(row - col),
+                                  static_cast<float>(1 + row + col)};
+    }
+  }
+
+  auto expr = ifft2(in, FFTNorm::BACKWARD) * complex_type{0.5f, 0.0f};
+  if (!jit_supported(expr)) {
+    GTEST_SKIP();
+  }
+
+  CUDAJITExecutor jit_exec{};
+  cudaExecutor cuda_exec{};
+  (jit_out = expr).run(jit_exec);
+  (ref_out = ifft2(in, FFTNorm::BACKWARD) * complex_type{0.5f, 0.0f}).run(cuda_exec);
+  jit_exec.sync();
+  cuda_exec.sync();
+
+  for (index_t row = 0; row < fft_dim; row++) {
+    for (index_t col = 0; col < fft_dim; col++) {
+      ASSERT_NEAR(jit_out(row, col).real(), ref_out(row, col).real(), 0.01f);
+      ASSERT_NEAR(jit_out(row, col).imag(), ref_out(row, col).imag(), 0.01f);
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+#endif
+
 TYPED_TEST(FFTTestComplexTypes, FFT2D16x32R2C)
 {
   MATX_ENTER_HANDLER();

@@ -38,6 +38,7 @@
 #include "matx/core/operator_options.h"
 #include "matx/core/capabilities.h"
 #include "matx/core/log.h"
+#include <algorithm>
 #include <libcufftdx.h>
 
 #define LIBMATHDX_CHECK(ans)                                                                                           \
@@ -431,6 +432,273 @@ namespace matx {
         )";
 
           return result;
+      }
+#endif
+  };
+
+  template <typename InputType>
+  class cuFFTDx2DHelper {
+    private:
+      index_t fft_size_x_ = 0;
+      index_t fft_size_y_ = 0;
+      FFTType fft_type_ = FFTType::C2C;
+      FFTDirection direction_ = FFTDirection::FORWARD;
+      int cc_ = 0;
+      cuFFTDxHelper<InputType> fft_x_helper_;
+      cuFFTDxHelper<InputType> fft_y_helper_;
+
+      static ElementsPerThread IntToElementsPerThread(int ept) {
+        switch (ept) {
+          case 1: return ElementsPerThread::ONE;
+          case 2: return ElementsPerThread::TWO;
+          case 4: return ElementsPerThread::FOUR;
+          case 8: return ElementsPerThread::EIGHT;
+          case 16: return ElementsPerThread::SIXTEEN;
+          case 32: return ElementsPerThread::THIRTY_TWO;
+          default: return ElementsPerThread::INVALID;
+        }
+      }
+
+      void Configure1DHelpers() {
+        fft_x_helper_.set_fft_size(fft_size_x_);
+        fft_x_helper_.set_fft_type(fft_type_);
+        fft_x_helper_.set_direction(direction_);
+        fft_x_helper_.set_ffts_per_block(static_cast<int>(fft_size_y_));
+        fft_x_helper_.set_cc(cc_);
+        fft_x_helper_.set_contiguous_input(false);
+        fft_x_helper_.set_method(cuFFTDxMethod::SHARED);
+
+        fft_y_helper_.set_fft_size(fft_size_y_);
+        fft_y_helper_.set_fft_type(fft_type_);
+        fft_y_helper_.set_direction(direction_);
+        fft_y_helper_.set_ffts_per_block(static_cast<int>(fft_size_x_));
+        fft_y_helper_.set_cc(cc_);
+        fft_y_helper_.set_contiguous_input(false);
+        fft_y_helper_.set_method(cuFFTDxMethod::SHARED);
+      }
+
+    public:
+      cuFFTDx2DHelper() = default;
+
+      index_t get_fft_size_x() const { return fft_size_x_; }
+      index_t get_fft_size_y() const { return fft_size_y_; }
+      FFTType get_fft_type() const { return fft_type_; }
+      FFTDirection get_direction() const { return direction_; }
+      int get_cc() const { return cc_; }
+
+      void set_fft_size_x(index_t size) { fft_size_x_ = size; Configure1DHelpers(); }
+      void set_fft_size_y(index_t size) { fft_size_y_ = size; Configure1DHelpers(); }
+      void set_fft_type(FFTType type) { fft_type_ = type; Configure1DHelpers(); }
+      void set_direction(FFTDirection dir) { direction_ = dir; Configure1DHelpers(); }
+      void set_cc(int cc) { cc_ = cc; Configure1DHelpers(); }
+
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
+      std::string GetSymbolName() const {
+        std::string symbol_name;
+        symbol_name += std::to_string(fft_size_x_);
+        symbol_name += "_";
+        symbol_name += std::to_string(fft_size_y_);
+        symbol_name += "_T";
+        symbol_name += std::to_string(static_cast<int>(fft_type_));
+        symbol_name += "_D";
+        symbol_name += std::to_string(static_cast<int>(direction_));
+        symbol_name += "_CC";
+        symbol_name += std::to_string(cc_);
+
+#if defined(CUDA_VERSION)
+        symbol_name += "_CUDA";
+        symbol_name += std::to_string(CUDART_VERSION);
+#else
+        symbol_name += "_CUDAUNKNOWN";
+#endif
+
+        return symbol_name;
+      }
+
+      template <typename OpType>
+      bool CheckJITSizeAndTypeRequirements() const {
+        using OpInputType = typename OpType::value_type;
+
+        if (fft_type_ != FFTType::C2C) {
+          return false;
+        }
+
+        if ((fft_size_x_ & (fft_size_x_ - 1)) != 0 || fft_size_x_ == 0 ||
+            (fft_size_y_ & (fft_size_y_ - 1)) != 0 || fft_size_y_ == 0) {
+          return false;
+        }
+
+        // The single-kernel JIT path uses one CUDA block for a complete 2D tile.
+        if (fft_size_x_ != fft_size_y_ || (fft_size_x_ * fft_size_y_) > 1024) {
+          return false;
+        }
+
+        if constexpr (is_complex_half_v<OpInputType> || !is_complex_v<OpInputType>) {
+          return false;
+        }
+
+        return true;
+      }
+
+      bool IsSupported() const {
+        return fft_x_helper_.IsSupported() && fft_y_helper_.IsSupported();
+      }
+
+      int GetShmRequired() const {
+        const auto data_size = static_cast<int64_t>(fft_size_x_) *
+                               static_cast<int64_t>(fft_size_y_) *
+                               static_cast<int64_t>(sizeof(InputType));
+        const auto x_shm = static_cast<int64_t>(fft_x_helper_.GetShmRequired());
+        const auto y_shm = static_cast<int64_t>(fft_y_helper_.GetShmRequired());
+        const auto extra_shm = std::max<int64_t>(0, std::max(x_shm, y_shm) - data_size);
+        const auto total = data_size * 2 + extra_shm;
+        MATX_LOG_DEBUG("cuFFTDx 2D shared memory: data={}, scratch={}, extra={}, total={}",
+                       data_size, data_size, extra_shm, total);
+        return static_cast<int>(total);
+      }
+
+      int GetBlockDim() const {
+        const auto block_x = fft_x_helper_.GetBlockDim();
+        const auto block_y = fft_y_helper_.GetBlockDim();
+        if (block_x != block_y) {
+          MATX_LOG_DEBUG("cuFFTDx 2D block dims differ: x={}, y={}", block_x, block_y);
+          return -1;
+        }
+
+        return block_x;
+      }
+
+      int GetFFTsPerBlock() const {
+        return static_cast<int>(fft_size_y_);
+      }
+
+      ElementsPerThread GetElementsPerThread() const {
+        const auto block_dim = GetBlockDim();
+        if (block_dim <= 0 || fft_size_x_ % block_dim != 0) {
+          return ElementsPerThread::INVALID;
+        }
+
+        return IntToElementsPerThread(static_cast<int>(fft_size_x_ / block_dim));
+      }
+
+      bool GenerateLTOIR(std::set<std::string> &ltoir_symbols) {
+        return fft_x_helper_.GenerateLTOIR(ltoir_symbols) &&
+               fft_y_helper_.GenerateLTOIR(ltoir_symbols);
+      }
+
+      std::string GetXFuncName() {
+        return std::string(FFT_DX_FUNC_PREFIX) + "_" + fft_x_helper_.GetSymbolName();
+      }
+
+      std::string GetYFuncName() {
+        return std::string(FFT_DX_FUNC_PREFIX) + "_" + fft_y_helper_.GetSymbolName();
+      }
+
+      std::string GetFuncStr(const std::string &fft_x_func_name,
+                             const std::string &fft_y_func_name,
+                             int fft_norm,
+                             int actual_rank) {
+        const int fft_forward = (direction_ == FFTDirection::FORWARD) ? 1 : 0;
+
+        std::string result = R"(
+          using input_type = )";
+        result += detail::type_to_string<InputType>();
+        result += R"(;
+          using input_type_converted = typename detail::convert_matx_type_t<input_type>;
+          using precision = typename detail::inner_precision<input_type>::type;
+          using ScalarCap = typename CapType::scalar_cap;
+          [[maybe_unused]] static constexpr int fft_size_x = )";
+        result += std::to_string(static_cast<int>(fft_size_x_));
+        result += R"(;
+          [[maybe_unused]] static constexpr int fft_size_y = )";
+        result += std::to_string(static_cast<int>(fft_size_y_));
+        result += R"(;
+          [[maybe_unused]] static constexpr int fft_forward = )";
+        result += std::to_string(fft_forward);
+        result += R"(;
+          [[maybe_unused]] static constexpr int fft_norm = )";
+        result += std::to_string(fft_norm);
+        result += R"(;
+          [[maybe_unused]] static constexpr int fft_rank = )";
+        result += std::to_string(actual_rank);
+        result += R"(;
+          [[maybe_unused]] static constexpr int fft_elements = fft_size_x * fft_size_y;
+
+          extern __shared__ __align__(16) unsigned char fft2_smem_raw[];
+          auto *fft_data = reinterpret_cast<input_type_converted *>(fft2_smem_raw);
+          auto *fft_scratch = fft_data + fft_elements;
+
+          const int tid = threadIdx.x + threadIdx.y * blockDim.x + threadIdx.z * blockDim.x * blockDim.y;
+          const int total_threads = blockDim.x * blockDim.y * blockDim.z;
+          cuda::std::array<index_t, fft_rank> fft_indices{static_cast<index_t>(indices)...};
+
+          for (int elem = tid; elem < fft_elements; elem += total_threads) {
+            const int row = elem / fft_size_x;
+            const int col = elem - row * fft_size_x;
+            fft_indices[fft_rank - 2] = row;
+            fft_indices[fft_rank - 1] = col;
+            fft_data[elem] = static_cast<input_type_converted>(
+              cuda::std::apply([&](auto... args) {
+                return a_.template operator()<ScalarCap>(args...);
+              }, fft_indices));
+          }
+
+          __syncthreads();
+          )";
+        result += fft_x_func_name;
+        result += R"((reinterpret_cast<input_type_converted *>(fft_data));
+          __syncthreads();
+
+          for (int elem = tid; elem < fft_elements; elem += total_threads) {
+            const int row = elem / fft_size_x;
+            const int col = elem - row * fft_size_x;
+            fft_scratch[col * fft_size_y + row] = fft_data[row * fft_size_x + col];
+          }
+
+          __syncthreads();
+          )";
+        result += fft_y_func_name;
+        result += R"((reinterpret_cast<input_type_converted *>(fft_scratch));
+          __syncthreads();
+
+            static constexpr int fft_output_ept = static_cast<int>(CapType::ept);
+            const int out_row = static_cast<int>(cuda::std::get<fft_rank - 2>(cuda::std::make_tuple(indices...)));
+            const int out_col_base = static_cast<int>(cuda::std::get<fft_rank - 1>(cuda::std::make_tuple(indices...))) * fft_output_ept;
+
+            if constexpr (CapType::ept == ElementsPerThread::ONE) {
+              input_type_converted result = fft_scratch[out_col_base * fft_size_y + out_row];
+              if constexpr (fft_norm == 2) {
+                result = result * static_cast<precision>(1.f) / static_cast<precision>(cuda::std::sqrt(static_cast<precision>(fft_elements)));
+              }
+              else if constexpr ((fft_norm == 1 && fft_forward) || (fft_norm == 0 && !fft_forward)) {
+                result = result * static_cast<precision>(1.f) / static_cast<precision>(fft_elements);
+              }
+
+              return static_cast<input_type>(result);
+            }
+            else {
+              Vector<input_type, fft_output_ept> result_vec;
+              #pragma unroll
+              for (int i = 0; i < fft_output_ept; i++) {
+                const int out_col = out_col_base + i;
+                input_type_converted result = input_type_converted{};
+                if (out_col < fft_size_x) {
+                  result = fft_scratch[out_col * fft_size_y + out_row];
+                  if constexpr (fft_norm == 2) {
+                    result = result * static_cast<precision>(1.f) / static_cast<precision>(cuda::std::sqrt(static_cast<precision>(fft_elements)));
+                  }
+                  else if constexpr ((fft_norm == 1 && fft_forward) || (fft_norm == 0 && !fft_forward)) {
+                    result = result * static_cast<precision>(1.f) / static_cast<precision>(fft_elements);
+                  }
+                }
+                result_vec.data[i] = static_cast<input_type>(result);
+              }
+
+              return result_vec;
+            }
+          )";
+
+        return result;
       }
 #endif
   };

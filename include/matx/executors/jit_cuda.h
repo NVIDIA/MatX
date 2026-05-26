@@ -510,15 +510,20 @@ namespace matx
                 // For pass-through operators (e.g., MathDx), block dimensions are constrained by the operator.
                 auto block_dim_range = detail::get_operator_capability<detail::OperatorCapability::BLOCK_DIM>(op);
                 block_size = detail::SelectJITPassThroughBlockDim(block_dim_range);
-                stride = detail::get_grid_dims_block_pass_through<RANK>(blocks, threads, sizes, block_size, pass_through_inner_rank);
+                auto group_range = detail::get_operator_capability<detail::OperatorCapability::GROUPS_PER_BLOCK>(op);
+                groups_per_block = group_range[0];
+                if (groups_per_block == detail::capability_attributes<detail::OperatorCapability::GROUPS_PER_BLOCK>::invalid) {
+                  MATX_THROW(matxInvalidParameter, "No valid JIT groups-per-block value satisfies the fused operator requirements");
+                }
+                stride = detail::get_grid_dims_block_pass_through<RANK>(
+                  blocks, threads, sizes, block_size, pass_through_inner_rank, groups_per_block);
 
-                // EPT is 1 for 2D block operators - the operator handles elements internally
-                best_ept = detail::ElementsPerThread::ONE;
+                // Block-level operators can still return vectorized output lanes.
+                best_ept = jit_ept_bounds[1];
                 shm_size = detail::get_operator_capability<detail::OperatorCapability::DYN_SHM_SIZE>(op);
-                groups_per_block = 1;
 
-                MATX_LOG_DEBUG("Block2D: EPT {}, Shm size {}, Block size {}",
-                               static_cast<int>(best_ept), shm_size, block_size);
+                MATX_LOG_DEBUG("Block2D: EPT {}, Shm size {}, Block size {}, Groups per block {}",
+                               static_cast<int>(best_ept), shm_size, block_size, groups_per_block);
               } else if constexpr (is_dynamic_rank_op_v<Op>) {
                 // Dynamic tensor expressions: pre-compiled kernels don't exist for this Op type,
                 // so we cannot query register pressure. Use conservative defaults.
