@@ -460,6 +460,10 @@ namespace matx {
       }
 
       void Configure1DHelpers() {
+        if (fft_size_x_ <= 0 || fft_size_y_ <= 0 || cc_ <= 0) {
+          return;
+        }
+
         fft_x_helper_.set_fft_size(fft_size_x_);
         fft_x_helper_.set_fft_type(fft_type_);
         fft_x_helper_.set_direction(direction_);

@@ -1028,6 +1028,10 @@ namespace matx
             MATX_LOG_DEBUG("cuFFTDx 2D PASS_THROUGH_THREADS: true");
             return true;
           }
+          else if constexpr (Cap == OperatorCapability::PASS_THROUGH_INNER_RANK) {
+            MATX_LOG_DEBUG("cuFFTDx 2D PASS_THROUGH_INNER_RANK: 2");
+            return 2;
+          }
           else if constexpr (Cap == OperatorCapability::GROUPS_PER_BLOCK) {
             const int ffts_per_block = dx_fft2_helper_.GetFFTsPerBlock();
             const auto my_cap = cuda::std::array<int, 2>{ffts_per_block, ffts_per_block};

@@ -518,8 +518,11 @@ namespace matx
                 stride = detail::get_grid_dims_block_pass_through<RANK>(
                   blocks, threads, sizes, block_size, pass_through_inner_rank, groups_per_block);
 
-                // Block-level operators can still return vectorized output lanes.
-                best_ept = jit_ept_bounds[1];
+                // Pass-through operators do not run the normal SET_ELEMENTS_PER_THREAD query path.
+                // Use the lower bound so existing operators with a default [ONE, MAX] range keep
+                // the historical EPT=ONE behavior. Operators that require vector lanes, such as
+                // FFT2, advertise a fixed [N, N] range.
+                best_ept = jit_ept_bounds[0];
                 shm_size = detail::get_operator_capability<detail::OperatorCapability::DYN_SHM_SIZE>(op);
 
                 MATX_LOG_DEBUG("Block2D: EPT {}, Shm size {}, Block size {}, Groups per block {}",

@@ -920,25 +920,69 @@ TYPED_TEST(FFTTestComplexTypes, FFT2D16R2C)
 }
 
 #if defined(MATX_EN_JIT) && defined(MATX_EN_MATHDX)
+namespace {
+using FFT2JITComplex = cuda::std::complex<float>;
+
+void FillFFT2JITInput2D(auto &in, index_t fft_dim)
+{
+  for (index_t row = 0; row < fft_dim; row++) {
+    for (index_t col = 0; col < fft_dim; col++) {
+      in(row, col) = FFT2JITComplex{
+        static_cast<float>((row + 1) * (col + 2) % 17),
+        static_cast<float>((2 * row + col) % 11)};
+    }
+  }
+}
+
+void FillFFT2JITInput3D(auto &in, index_t batches, index_t fft_dim)
+{
+  for (index_t batch = 0; batch < batches; batch++) {
+    for (index_t row = 0; row < fft_dim; row++) {
+      for (index_t col = 0; col < fft_dim; col++) {
+        in(batch, row, col) = FFT2JITComplex{
+          static_cast<float>((batch + 1) * (row + 2) + col),
+          static_cast<float>((batch + row + 2 * col) % 13)};
+      }
+    }
+  }
+}
+
+void AssertFFT2JITClose2D(auto &jit_out, auto &ref_out, index_t fft_dim, float tol)
+{
+  for (index_t row = 0; row < fft_dim; row++) {
+    for (index_t col = 0; col < fft_dim; col++) {
+      ASSERT_NEAR(jit_out(row, col).real(), ref_out(row, col).real(), tol);
+      ASSERT_NEAR(jit_out(row, col).imag(), ref_out(row, col).imag(), tol);
+    }
+  }
+}
+
+void AssertFFT2JITClose3D(auto &jit_out, auto &ref_out, index_t batches, index_t fft_dim, float tol)
+{
+  for (index_t batch = 0; batch < batches; batch++) {
+    for (index_t row = 0; row < fft_dim; row++) {
+      for (index_t col = 0; col < fft_dim; col++) {
+        ASSERT_NEAR(jit_out(batch, row, col).real(), ref_out(batch, row, col).real(), tol);
+        ASSERT_NEAR(jit_out(batch, row, col).imag(), ref_out(batch, row, col).imag(), tol);
+      }
+    }
+  }
+}
+} // namespace
+
 TEST(FFTJIT, CuFFTDx2DFFT2Fusion)
 {
   MATX_ENTER_HANDLER();
 
-  using complex_type = cuda::std::complex<float>;
   constexpr index_t fft_dim = 4;
 
-  auto in = make_tensor<complex_type>({fft_dim, fft_dim});
-  auto jit_out = make_tensor<complex_type>({fft_dim, fft_dim});
-  auto ref_out = make_tensor<complex_type>({fft_dim, fft_dim});
+  auto in = make_tensor<FFT2JITComplex>({fft_dim, fft_dim});
+  auto jit_out = make_tensor<FFT2JITComplex>({fft_dim, fft_dim});
+  auto ref_out = make_tensor<FFT2JITComplex>({fft_dim, fft_dim});
 
-  for (index_t row = 0; row < fft_dim; row++) {
-    for (index_t col = 0; col < fft_dim; col++) {
-      in(row, col) = complex_type{static_cast<float>(row + 2 * col),
-                                  static_cast<float>((row + col) % 3)};
-    }
-  }
+  FillFFT2JITInput2D(in, fft_dim);
 
-  auto expr = fft2(in) + complex_type{1.0f, -1.0f};
+  auto expr = fft2(in) + FFT2JITComplex{1.0f, -1.0f};
   if (!jit_supported(expr)) {
     GTEST_SKIP();
   }
@@ -946,16 +990,11 @@ TEST(FFTJIT, CuFFTDx2DFFT2Fusion)
   CUDAJITExecutor jit_exec{};
   cudaExecutor cuda_exec{};
   (jit_out = expr).run(jit_exec);
-  (ref_out = fft2(in) + complex_type{1.0f, -1.0f}).run(cuda_exec);
+  (ref_out = fft2(in) + FFT2JITComplex{1.0f, -1.0f}).run(cuda_exec);
   jit_exec.sync();
   cuda_exec.sync();
 
-  for (index_t row = 0; row < fft_dim; row++) {
-    for (index_t col = 0; col < fft_dim; col++) {
-      ASSERT_NEAR(jit_out(row, col).real(), ref_out(row, col).real(), 0.01f);
-      ASSERT_NEAR(jit_out(row, col).imag(), ref_out(row, col).imag(), 0.01f);
-    }
-  }
+  AssertFFT2JITClose2D(jit_out, ref_out, fft_dim, 0.01f);
 
   MATX_EXIT_HANDLER();
 }
@@ -964,21 +1003,15 @@ TEST(FFTJIT, CuFFTDx2DIFFT2Fusion)
 {
   MATX_ENTER_HANDLER();
 
-  using complex_type = cuda::std::complex<float>;
   constexpr index_t fft_dim = 4;
 
-  auto in = make_tensor<complex_type>({fft_dim, fft_dim});
-  auto jit_out = make_tensor<complex_type>({fft_dim, fft_dim});
-  auto ref_out = make_tensor<complex_type>({fft_dim, fft_dim});
+  auto in = make_tensor<FFT2JITComplex>({fft_dim, fft_dim});
+  auto jit_out = make_tensor<FFT2JITComplex>({fft_dim, fft_dim});
+  auto ref_out = make_tensor<FFT2JITComplex>({fft_dim, fft_dim});
 
-  for (index_t row = 0; row < fft_dim; row++) {
-    for (index_t col = 0; col < fft_dim; col++) {
-      in(row, col) = complex_type{static_cast<float>(row - col),
-                                  static_cast<float>(1 + row + col)};
-    }
-  }
+  FillFFT2JITInput2D(in, fft_dim);
 
-  auto expr = ifft2(in, FFTNorm::BACKWARD) * complex_type{0.5f, 0.0f};
+  auto expr = ifft2(in, FFTNorm::BACKWARD) * FFT2JITComplex{0.5f, 0.0f};
   if (!jit_supported(expr)) {
     GTEST_SKIP();
   }
@@ -986,16 +1019,70 @@ TEST(FFTJIT, CuFFTDx2DIFFT2Fusion)
   CUDAJITExecutor jit_exec{};
   cudaExecutor cuda_exec{};
   (jit_out = expr).run(jit_exec);
-  (ref_out = ifft2(in, FFTNorm::BACKWARD) * complex_type{0.5f, 0.0f}).run(cuda_exec);
+  (ref_out = ifft2(in, FFTNorm::BACKWARD) * FFT2JITComplex{0.5f, 0.0f}).run(cuda_exec);
   jit_exec.sync();
   cuda_exec.sync();
 
-  for (index_t row = 0; row < fft_dim; row++) {
-    for (index_t col = 0; col < fft_dim; col++) {
-      ASSERT_NEAR(jit_out(row, col).real(), ref_out(row, col).real(), 0.01f);
-      ASSERT_NEAR(jit_out(row, col).imag(), ref_out(row, col).imag(), 0.01f);
-    }
+  AssertFFT2JITClose2D(jit_out, ref_out, fft_dim, 0.01f);
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(FFTJIT, CuFFTDx2DFFT2OrthoBoundary)
+{
+  MATX_ENTER_HANDLER();
+
+  constexpr index_t fft_dim = 32;
+
+  auto in = make_tensor<FFT2JITComplex>({fft_dim, fft_dim});
+  auto jit_out = make_tensor<FFT2JITComplex>({fft_dim, fft_dim});
+  auto ref_out = make_tensor<FFT2JITComplex>({fft_dim, fft_dim});
+
+  FillFFT2JITInput2D(in, fft_dim);
+
+  auto expr = fft2(in, FFTNorm::ORTHO) - FFT2JITComplex{0.25f, 0.75f};
+  if (!jit_supported(expr)) {
+    GTEST_SKIP();
   }
+
+  CUDAJITExecutor jit_exec{};
+  cudaExecutor cuda_exec{};
+  (jit_out = expr).run(jit_exec);
+  (ref_out = fft2(in, FFTNorm::ORTHO) - FFT2JITComplex{0.25f, 0.75f}).run(cuda_exec);
+  jit_exec.sync();
+  cuda_exec.sync();
+
+  AssertFFT2JITClose2D(jit_out, ref_out, fft_dim, 0.05f);
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(FFTJIT, CuFFTDx2DFFT2BatchedForwardNorm)
+{
+  MATX_ENTER_HANDLER();
+
+  constexpr index_t batches = 3;
+  constexpr index_t fft_dim = 8;
+
+  auto in = make_tensor<FFT2JITComplex>({batches, fft_dim, fft_dim});
+  auto jit_out = make_tensor<FFT2JITComplex>({batches, fft_dim, fft_dim});
+  auto ref_out = make_tensor<FFT2JITComplex>({batches, fft_dim, fft_dim});
+
+  FillFFT2JITInput3D(in, batches, fft_dim);
+
+  auto expr = fft2(in, FFTNorm::FORWARD) + FFT2JITComplex{0.125f, -0.5f};
+  if (!jit_supported(expr)) {
+    GTEST_SKIP();
+  }
+
+  CUDAJITExecutor jit_exec{};
+  cudaExecutor cuda_exec{};
+  (jit_out = expr).run(jit_exec);
+  (ref_out = fft2(in, FFTNorm::FORWARD) + FFT2JITComplex{0.125f, -0.5f}).run(cuda_exec);
+  jit_exec.sync();
+  cuda_exec.sync();
+
+  AssertFFT2JITClose3D(jit_out, ref_out, batches, fft_dim, 0.01f);
 
   MATX_EXIT_HANDLER();
 }
