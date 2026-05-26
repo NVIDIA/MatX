@@ -177,7 +177,6 @@ namespace matx
 
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
-          MATX_ASSERT_STR(!(is_host_executor_v<Executor> && method_ == MATX_C_METHOD_DIRECT), matxNotSupported, "direct conv1d() only supports the CUDA executor currently");
           MATX_STATIC_ASSERT_STR((Rank() == cuda::std::tuple_element_t<0, remove_cvref_t<Out>>::Rank()), 
                 matxInvalidParameter, "conv1d: inputs and outputs must have same rank to use conv1d with axis parameter");
           if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
@@ -405,13 +404,11 @@ namespace detail {
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
-        static_assert(is_cuda_executor_v<Executor>, "conv2d() only supports the CUDA executor currently");
-
         if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
-          conv2d_impl(permute(cuda::std::get<0>(out), perm_), a_, b_, mode_, ex.getStream());
+          conv2d_impl(permute(cuda::std::get<0>(out), perm_), a_, b_, mode_, ex);
         }
         else {
-          conv2d_impl(cuda::std::get<0>(out), a_, b_, mode_, ex.getStream());
+          conv2d_impl(cuda::std::get<0>(out), a_, b_, mode_, ex);
         }
       }
 
