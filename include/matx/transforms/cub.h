@@ -49,6 +49,7 @@
 #include "matx/core/operator_utils.h"
 #include "matx/core/type_utils_both.h"
 #include "matx/transforms/cccl_iterators.h"
+#include "matx/transforms/host_algorithms.h"
 
 
 namespace matx {
@@ -2260,7 +2261,7 @@ void argsort_impl(OutputTensor &idx_out, const InputOperator &a,
 template <typename OutputTensor, typename InputOperator, ThreadsMode MODE>
 void argsort_impl(OutputTensor &idx_out, const InputOperator &a,
           const SortDirection_t dir,
-          [[maybe_unused]] const HostExecutor<MODE> &exec)
+          const HostExecutor<MODE> &exec)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
@@ -2271,25 +2272,23 @@ void argsort_impl(OutputTensor &idx_out, const InputOperator &a,
 
   if constexpr (RANK == 1) {
     if (dir == SORT_DIR_ASC) {
-      std::sort(
-          lout, lout + idx_out.Size(0),
-          [&a](index_t i, index_t j) { return a(i) < a(j); });
+      detail::host_sort(exec, lout, lout + idx_out.Size(0),
+                        [&a](index_t i, index_t j) { return a(i) < a(j); });
     }
     else {
-      std::sort(
-          lout, lout + idx_out.Size(0),
-          [&a](index_t i, index_t j) { return a(i) > a(j); });
+      detail::host_sort(exec, lout, lout + idx_out.Size(0),
+                        [&a](index_t i, index_t j) { return a(i) > a(j); });
     }
   }
   else if constexpr (RANK == 2) {
     for (index_t b = 0; b < lout.Size(0); b++) {
       if (dir == SORT_DIR_ASC) {
-        std::sort( lout + b*a.Size(1), lout + (b+1)*a.Size(1),
-                  [&a, b](index_t i, index_t j) { return a(b,i) < a(b,j); });
+        detail::host_sort(exec, lout + b*a.Size(1), lout + (b+1)*a.Size(1),
+                          [&a, b](index_t i, index_t j) { return a(b,i) < a(b,j); });
       }
       else {
-        std::sort( lout + b*a.Size(1), lout + (b+1)*a.Size(1),
-                  [&a, b](index_t i, index_t j) { return a(b,i) > a(b,j); });
+        detail::host_sort(exec, lout + b*a.Size(1), lout + (b+1)*a.Size(1),
+                          [&a, b](index_t i, index_t j) { return a(b,i) > a(b,j); });
       }
     }
   }
@@ -2301,7 +2300,7 @@ void argsort_impl(OutputTensor &idx_out, const InputOperator &a,
 template <typename OutputTensor, typename InputOperator, ThreadsMode MODE>
 void sort_impl(OutputTensor &a_out, const InputOperator &a,
           const SortDirection_t dir,
-          [[maybe_unused]] const HostExecutor<MODE> &exec)
+          const HostExecutor<MODE> &exec)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
@@ -2312,33 +2311,37 @@ void sort_impl(OutputTensor &a_out, const InputOperator &a,
 
   if constexpr (InputOperator::Rank() == 1) {
     if (dir == SORT_DIR_ASC) {
-      std::partial_sort_copy( lin,
-                              lin  + a.Size(0),
-                              lout,
-                              lout + a_out.Size(0));
+      detail::host_sort_copy(exec,
+                             lin,
+                             lin  + a.Size(0),
+                             lout,
+                             lout + a_out.Size(0));
     }
     else {
-      std::partial_sort_copy( lin,
-                              lin  + a.Size(0),
-                              lout,
-                              lout + a_out.Size(0),
-                              std::greater<typename InputOperator::value_type>());
+      detail::host_sort_copy(exec,
+                             lin,
+                             lin  + a.Size(0),
+                             lout,
+                             lout + a_out.Size(0),
+                             std::greater<typename InputOperator::value_type>());
     }
   }
   else {
     for (index_t b = 0; b < lout.Size(0); b++) {
       if (dir == SORT_DIR_ASC) {
-        std::partial_sort_copy( lin  + b*a.Size(1),
-                                lin  + (b+1)*a.Size(1),
-                                lout + b*a.Size(1),
-                                lout + (b+1)*a.Size(1));
+        detail::host_sort_copy(exec,
+                               lin  + b*a.Size(1),
+                               lin  + (b+1)*a.Size(1),
+                               lout + b*a.Size(1),
+                               lout + (b+1)*a.Size(1));
       }
       else {
-        std::partial_sort_copy( lin  + b*a.Size(1),
-                                lin  + (b+1)*a.Size(1),
-                                lout + b*a.Size(1),
-                                lout + (b+1)*a.Size(1),
-                                std::greater<typename InputOperator::value_type>());
+        detail::host_sort_copy(exec,
+                               lin  + b*a.Size(1),
+                               lin  + (b+1)*a.Size(1),
+                               lout + b*a.Size(1),
+                               lout + (b+1)*a.Size(1),
+                               std::greater<typename InputOperator::value_type>());
       }
     }
   }
@@ -2399,7 +2402,7 @@ void cumsum_impl(OutputTensor &a_out, const InputOperator &a,
 
 template <typename OutputTensor, typename InputOperator, ThreadsMode MODE>
 void cumsum_impl(OutputTensor &a_out, const InputOperator &a,
-            [[maybe_unused]] const HostExecutor<MODE> &exec)
+            const HostExecutor<MODE> &exec)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
@@ -2409,15 +2412,17 @@ void cumsum_impl(OutputTensor &a_out, const InputOperator &a,
   auto lout = matx::RandomOperatorOutputIterator{out_base};
 
   if constexpr (OutputTensor::Rank() == 1) {
-    std::partial_sum( lin,
-                      lin  + a.Size(0),
-                      lout);
+    detail::host_inclusive_scan(exec,
+                                lin,
+                                lin  + a.Size(0),
+                                lout);
   }
   else if constexpr (InputOperator::Rank() == 2) {
     for (index_t b = 0; b < a.Size(0); b++) {
-      std::partial_sum( lin  + b     * a.Size(1),
-                        lin  + (b+1) * a.Size(1),
-                        lout + b     * a.Size(1));
+      detail::host_inclusive_scan(exec,
+                                  lin  + b     * a.Size(1),
+                                  lin  + (b+1) * a.Size(1),
+                                  lout + b     * a.Size(1));
     }
   }
   else {
@@ -2834,7 +2839,7 @@ void unique_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperato
  *   Single thread executor
  */
 template <typename CountTensor, typename OutputTensor, typename InputOperator, ThreadsMode MODE>
-void unique_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperator &a, [[maybe_unused]] const HostExecutor<MODE> &exec)
+void unique_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperator &a, const HostExecutor<MODE> &exec)
 {
 #ifdef __CUDACC__
   static_assert(CountTensor::Rank() == 0, "Num found output tensor rank must be 0");
@@ -2845,8 +2850,8 @@ void unique_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperato
     return;
   }
 
-  std::partial_sort_copy(cbegin(a), cend(a), begin(a_out), end(a_out));
-  auto last = std::unique(begin(a_out), end(a_out));
+  detail::host_sort_copy(exec, cbegin(a), cend(a), begin(a_out), end(a_out));
+  auto last = detail::host_unique(exec, begin(a_out), end(a_out));
   num_found() = static_cast<int>(last - begin(a_out));
 #endif
 }
