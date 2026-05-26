@@ -832,13 +832,7 @@ namespace matx
             }
           }
 
-          int major = 0;
-          int minor = 0;
-          int device;
-          cudaGetDevice(&device);
-          cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device);
-          cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device);
-          int cc = major * 100 + minor * 10;
+          const int cc = GetComputeCapability();
 
           dx_fft2_helper_.set_fft_size_y(out_dims_[Rank() - 2]);
           dx_fft2_helper_.set_fft_size_x(out_dims_[Rank() - 1]);
@@ -858,6 +852,8 @@ namespace matx
           symbol_name += std::to_string(static_cast<int>(Type));
           symbol_name += "_D";
           symbol_name += Direction == detail::FFTDirection::FORWARD ? std::string("F") : std::string("B");
+          symbol_name += "_SM";
+          symbol_name += std::to_string(dx_fft2_helper_.get_cc());
           return symbol_name;
         }
 
