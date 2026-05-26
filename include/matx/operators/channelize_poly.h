@@ -117,14 +117,20 @@ namespace detail {
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
-        static_assert(is_cuda_executor_v<Executor>, "channelize_poly() only supports the CUDA executor currently");
+        static_assert(is_cuda_executor_v<Executor> || is_host_executor_v<Executor>,
+          "channelize_poly() only supports CUDA and host executors");
 
         // The accumulator type should always be real (it will be promoted to complex when necessary), so the
         // default accumulator type is the output's inner type. The outputs of channelize_poly are always complex
         // due to the IFFT, but the filtering that is applied prior to the IFFT can be either real or complex.
         using accum_type = get_property_or<PropAccum, typename inner_op_type_t<value_type>::type, CurrentProps...>::type;
-        channelize_poly_impl<decltype(cuda::std::get<0>(out)), decltype(a_), FilterType, accum_type>(
-          cuda::std::get<0>(out), a_, f_, num_channels_, decimation_factor_, ex.getStream());
+        if constexpr (is_cuda_executor_v<Executor>) {
+          channelize_poly_impl<decltype(cuda::std::get<0>(out)), decltype(a_), FilterType, accum_type>(
+            cuda::std::get<0>(out), a_, f_, num_channels_, decimation_factor_, ex.getStream());
+        } else {
+          channelize_poly_impl<decltype(cuda::std::get<0>(out)), decltype(a_), FilterType, accum_type>(
+            cuda::std::get<0>(out), a_, f_, num_channels_, decimation_factor_, ex);
+        }
       }
 
       template <typename ShapeType, typename Executor>
