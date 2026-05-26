@@ -36,7 +36,107 @@
 #include "utilities.h"
 #include "gtest/gtest.h"
 
+#include <cmath>
+#include <numeric>
+#include <vector>
+
 using namespace matx;
+
+namespace {
+
+template <typename T>
+T MakeResampleTestValue(double real, double imag = 0.0)
+{
+  if constexpr (is_complex_v<T>) {
+    using inner_t = typename inner_op_type_t<T>::type;
+    return T{static_cast<inner_t>(real), static_cast<inner_t>(imag)};
+  }
+  else {
+    return static_cast<T>(real);
+  }
+}
+
+template <typename T>
+double ResampleAbsDiff(const T &a, const T &b)
+{
+  if constexpr (is_complex_v<T>) {
+    return static_cast<double>(cuda::std::abs(a - b));
+  }
+  else {
+    return std::abs(static_cast<double>(a - b));
+  }
+}
+
+template <typename T>
+std::vector<T> ReferenceResamplePoly(const std::vector<T> &in,
+                                     const std::vector<T> &filter,
+                                     index_t up, index_t down)
+{
+  const index_t g = std::gcd(up, down);
+  up /= g;
+  down /= g;
+
+  const index_t out_len =
+    static_cast<index_t>((in.size() * up + down - 1) / down);
+  std::vector<T> out(static_cast<size_t>(out_len), T{});
+
+  if (up == 1 && down == 1) {
+    return in;
+  }
+
+  const bool is_even_filter = (filter.size() % 2) == 0;
+  const index_t logical_filter_len =
+    static_cast<index_t>(filter.size()) + (is_even_filter ? 1 : 0);
+  const index_t filter_center = (logical_filter_len - 1) / 2;
+
+  for (index_t out_ind = 0; out_ind < out_len; out_ind++) {
+    T accum {};
+    const index_t up_ind = out_ind * down;
+    for (index_t in_ind = 0; in_ind < static_cast<index_t>(in.size()); in_ind++) {
+      const index_t h_ind = filter_center + up_ind - in_ind * up;
+      if (h_ind < 0 || h_ind >= logical_filter_len) {
+        continue;
+      }
+
+      if (is_even_filter && h_ind == 0) {
+        continue;
+      }
+
+      const index_t filter_ind = is_even_filter ? h_ind - 1 : h_ind;
+      accum += in[static_cast<size_t>(in_ind)] *
+        filter[static_cast<size_t>(filter_ind)];
+    }
+
+    out[static_cast<size_t>(out_ind)] =
+      accum * MakeResampleTestValue<T>(static_cast<double>(up));
+  }
+
+  return out;
+}
+
+template <typename T>
+void FillResampleInputs(std::vector<T> &in, std::vector<T> &filter)
+{
+  for (size_t i = 0; i < in.size(); i++) {
+    const double real = (static_cast<int>(i * 5 % 17) - 8) / 4.0;
+    const double imag = (static_cast<int>(i * 3 % 11) - 5) / 7.0;
+    in[i] = MakeResampleTestValue<T>(real, imag);
+  }
+
+  for (size_t i = 0; i < filter.size(); i++) {
+    const double real = (static_cast<int>(i * 7 % 13) - 6) / 9.0;
+    const double imag = (static_cast<int>(i * 2 % 9) - 4) / 8.0;
+    filter[i] = MakeResampleTestValue<T>(real, imag);
+  }
+}
+
+template <typename T>
+void AssertNearResampleValue(const T &actual, const T &expected, double thresh)
+{
+  ASSERT_NEAR(ResampleAbsDiff(actual, expected), 0.0, thresh);
+}
+
+} // namespace
 
 template <typename T>
 class ResamplePolyTest : public ::testing::Test {
@@ -78,6 +178,126 @@ class ResamplePolyTestFloatTypes
 
 TYPED_TEST_SUITE(ResamplePolyTestNonHalfFloatTypes, MatXFloatNonHalfTypesCUDAExec);
 TYPED_TEST_SUITE(ResamplePolyTestFloatTypes, MatXFloatTypesCUDAExec);
+
+template <typename T>
+class ResamplePolyHostTest : public ::testing::Test {};
+
+using ResamplePolyHostTypes = ::testing::Types<float, double, cuda::std::complex<float>>;
+TYPED_TEST_SUITE(ResamplePolyHostTest, ResamplePolyHostTypes);
+
+TYPED_TEST(ResamplePolyHostTest, SmallSignalsMatchReference)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = TypeParam;
+
+  SingleThreadedHostExecutor exec{};
+  struct {
+    index_t a_len;
+    index_t f_len;
+    index_t up;
+    index_t down;
+  } test_cases[] = {
+    {7, 5, 3, 2},
+    {8, 4, 2, 5},
+    {6, 1, 4, 1},
+    {9, 3, 1, 3},
+    {7, 4, 6, 4}
+  };
+
+  for (const auto &tc : test_cases) {
+    std::vector<TestType> input(static_cast<size_t>(tc.a_len));
+    std::vector<TestType> filter(static_cast<size_t>(tc.f_len));
+    FillResampleInputs(input, filter);
+    const auto expected = ReferenceResamplePoly(input, filter, tc.up, tc.down);
+
+    auto a = make_tensor<TestType>({tc.a_len}, MATX_HOST_MALLOC_MEMORY);
+    auto f = make_tensor<TestType>({tc.f_len}, MATX_HOST_MALLOC_MEMORY);
+    auto b = make_tensor<TestType>({static_cast<index_t>(expected.size())},
+      MATX_HOST_MALLOC_MEMORY);
+
+    for (index_t i = 0; i < tc.a_len; i++) {
+      a(i) = input[static_cast<size_t>(i)];
+    }
+    for (index_t i = 0; i < tc.f_len; i++) {
+      f(i) = filter[static_cast<size_t>(i)];
+    }
+
+    (b = resample_poly(shift<0>(shift<0>(a, 1), -1),
+                       shift<0>(shift<0>(f, 1), -1),
+                       tc.up, tc.down)).run(exec);
+
+    for (index_t i = 0; i < b.Size(0); i++) {
+      AssertNearResampleValue(b(i), expected[static_cast<size_t>(i)], 1.0e-5);
+    }
+
+    if (tc.a_len == 7 && tc.f_len == 5) {
+      (b = resample_poly(shift<0>(shift<0>(a, 1), -1),
+                         shift<0>(shift<0>(f, 1), -1),
+                         tc.up, tc.down) + MakeResampleTestValue<TestType>(0.0)).run(exec);
+
+      for (index_t i = 0; i < b.Size(0); i++) {
+        AssertNearResampleValue(b(i), expected[static_cast<size_t>(i)], 1.0e-5);
+      }
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(ResamplePolyHostTest, BatchedSignalsMatchReference)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = TypeParam;
+
+  SingleThreadedHostExecutor exec{};
+  constexpr index_t batches = 3;
+  constexpr index_t a_len = 8;
+  constexpr index_t f_len = 4;
+  constexpr index_t up = 3;
+  constexpr index_t down = 2;
+
+  std::vector<TestType> filter(static_cast<size_t>(f_len));
+  std::vector<TestType> seed(static_cast<size_t>(a_len));
+  FillResampleInputs(seed, filter);
+  const auto expected_shape = ReferenceResamplePoly(seed, filter, up, down);
+  const index_t b_len = static_cast<index_t>(expected_shape.size());
+
+  auto a = make_tensor<TestType>({batches, a_len}, MATX_HOST_MALLOC_MEMORY);
+  auto f = make_tensor<TestType>({f_len}, MATX_HOST_MALLOC_MEMORY);
+  auto b = make_tensor<TestType>({batches, b_len}, MATX_HOST_MALLOC_MEMORY);
+
+  for (index_t i = 0; i < f_len; i++) {
+    f(i) = filter[static_cast<size_t>(i)];
+  }
+
+  std::vector<std::vector<TestType>> expected;
+  for (index_t batch = 0; batch < batches; batch++) {
+    std::vector<TestType> input(static_cast<size_t>(a_len));
+    for (index_t i = 0; i < a_len; i++) {
+      const double real = static_cast<double>(batch + 1) * 0.25 +
+        (static_cast<int>(i * 5 % 17) - 8) / 5.0;
+      const double imag = static_cast<double>(batch - 1) * 0.5 +
+        (static_cast<int>(i * 3 % 11) - 5) / 6.0;
+      input[static_cast<size_t>(i)] = MakeResampleTestValue<TestType>(real, imag);
+      a(batch, i) = input[static_cast<size_t>(i)];
+    }
+
+    expected.push_back(ReferenceResamplePoly(input, filter, up, down));
+  }
+
+  (b = resample_poly(shift<1>(shift<1>(a, 2), -2),
+                     shift<0>(shift<0>(f, 1), -1),
+                     up, down)).run(exec);
+
+  for (index_t batch = 0; batch < batches; batch++) {
+    for (index_t i = 0; i < b_len; i++) {
+      AssertNearResampleValue(b(batch, i),
+        expected[static_cast<size_t>(batch)][static_cast<size_t>(i)], 1.0e-5);
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
 
 // SimpleOddLength tests use random input and filter values and
 // odd-length filters.

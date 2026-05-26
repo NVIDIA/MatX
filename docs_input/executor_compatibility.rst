@@ -172,7 +172,7 @@ fused JIT expression; non-JIT CUDA execution through cudaExecutor remains availa
    "reduce", "|no|", "|yes|", "|no|", "Generic custom reduction currently uses CUDA reduction support."
    "remap", "|yes|", "|yes|", "|yes|", "View/reindex expression."
    "repmat", "|yes|", "|yes|", "|yes|", "View/expression composition."
-   "resample_poly", "|no|", "|yes|", "|no|", "CUDA-only resampling transform."
+   "resample_poly", "|yes|", "|yes|", "|no|", "Polyphase resampling transform for host and CUDA executors."
    "reshape", "|yes|", "|yes|", "|yes|", "View expression."
    "reverse", "|yes|", "|yes|", "|yes|", "View/reindex expression."
    "round", "|yes|", "|yes|", "|yes|", "Element-wise expression."

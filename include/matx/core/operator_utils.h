@@ -96,7 +96,9 @@ namespace matx {
   namespace detail {
     // Used inside of transforms to allocate temporary output
     template <typename TensorType, typename Executor, typename ShapeType>
-    __MATX_HOST__ __MATX_INLINE__ void AllocateTempTensor(TensorType &tensor, Executor &&ex, ShapeType &&shape, typename TensorType::value_type **ptr) {
+    __MATX_HOST__ __MATX_INLINE__ void AllocateTempTensor(TensorType &tensor, Executor &&ex,
+        ShapeType &&shape, typename TensorType::value_type **ptr,
+        matxMemorySpace_t host_memory_space = MATX_HOST_MEMORY) {
 
       const auto ttl_size = cuda::std::accumulate(shape.begin(), shape.end(), static_cast<index_t>(1),
                                   cuda::std::multiplies<index_t>()) * sizeof(typename TensorType::value_type);      
@@ -106,7 +108,7 @@ namespace matx {
         make_tensor(tensor, *ptr, shape);
       }
       else {
-        matxAlloc((void**)ptr, ttl_size, MATX_HOST_MEMORY);
+        matxAlloc((void**)ptr, ttl_size, host_memory_space);
         make_tensor(tensor, *ptr, shape);
       }
     }

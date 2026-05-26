@@ -112,9 +112,11 @@ namespace detail {
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
-        static_assert(is_cuda_executor_v<Executor>, "resample_poly() only supports the CUDA executor currently");
+        static_assert(is_cuda_executor_v<Executor> || is_host_executor_v<Executor>,
+          "resample_poly() only supports CUDA and host executors");
 
-        resample_poly_impl(cuda::std::get<0>(out), a_, f_, up_, down_, ex.getStream());
+        resample_poly_impl(cuda::std::get<0>(out), a_, f_, up_, down_,
+          std::forward<Executor>(ex));
       }
 
       template <typename ShapeType, typename Executor>
@@ -137,7 +139,13 @@ namespace detail {
 
         InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));         
 
-        detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
+        if constexpr (is_host_executor_v<Executor>) {
+          detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr,
+            MATX_HOST_MALLOC_MEMORY);
+        }
+        else {
+          detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
+        }
 
         prerun_done_ = true;
         Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
