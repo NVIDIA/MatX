@@ -223,6 +223,71 @@ inline void matxDirectConv1DInternal(OutputType &o, const InType &i,
 #endif
 }
 
+template <typename OutputType, typename InType, typename FilterType, typename Executor>
+  requires is_host_executor_v<Executor>
+inline void matxDirectConv1DInternal(OutputType &o, const InType &i,
+                                     const FilterType &filter, matxConvCorrMode_t mode,
+                                     [[maybe_unused]] const Executor &exec)
+{
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+
+  MATX_STATIC_ASSERT(OutputType::Rank() == InType::Rank(), matxInvalidDim);
+  MATX_STATIC_ASSERT(OutputType::Rank() == FilterType::Rank(), matxInvalidDim);
+
+  constexpr int Rank = OutputType::Rank();
+  const index_t signal_len = i.Size(Rank - 1);
+  const index_t filter_len = filter.Size(Rank - 1);
+  [[maybe_unused]] const index_t full_len = signal_len + filter_len - 1;
+
+  MATX_ASSERT_STR(mode != MATX_C_MODE_FULL || o.Size(Rank - 1) == full_len,
+      matxInvalidSize, "Output size for FULL convolution incorrect");
+  MATX_ASSERT_STR(mode != MATX_C_MODE_SAME || o.Size(Rank - 1) == signal_len,
+      matxInvalidSize, "Output size for SAME convolution incorrect");
+  MATX_ASSERT_STR(mode != MATX_C_MODE_VALID || o.Size(Rank - 1) == signal_len - filter_len + 1,
+      matxInvalidSize, "Output size for VALID convolution incorrect");
+
+  index_t start = 0;
+  if (mode == MATX_C_MODE_SAME) {
+    start = (filter_len & 1) ? (filter_len - 1) / 2 : filter_len / 2 - 1;
+  }
+  else if (mode == MATX_C_MODE_VALID) {
+    start = filter_len - 1;
+  }
+
+  const index_t total = static_cast<index_t>(TotalSize(o));
+
+#ifdef MATX_EN_OMP
+#pragma omp parallel for num_threads(exec.GetNumThreads()) if(exec.GetNumThreads() > 1)
+#endif
+  for (index_t abs = 0; abs < total; abs++) {
+    auto odims = GetIdxFromAbs(o, abs);
+    const index_t full_idx = odims[Rank - 1] + start;
+
+    typename OutputType::value_type sum{0};
+    for (index_t f = 0; f < filter_len; f++) {
+      const index_t sig_idx = full_idx - f;
+      if (sig_idx >= 0 && sig_idx < signal_len) {
+        auto idims = odims;
+        auto fdims = odims;
+        idims[Rank - 1] = sig_idx;
+        fdims[Rank - 1] = f;
+
+        const auto ival = cuda::std::apply([&](auto &&...args) {
+          return i.operator()(args...);
+        }, idims);
+        const auto fval = cuda::std::apply([&](auto &&...args) {
+          return filter.operator()(args...);
+        }, fdims);
+        sum = detail::madd(ival, fval, sum);
+      }
+    }
+
+    cuda::std::apply([&](auto &&...args) {
+      o.operator()(args...) = sum;
+    }, odims);
+  }
+}
+
 
 template <typename OutputType, typename In1Type, typename In2Type>
 void matxDirectConv2DInternal(OutputType &o, In1Type &in1,
@@ -255,6 +320,82 @@ void matxDirectConv2DInternal(OutputType &o, In1Type &in1,
 
   Conv2D<OutputType, In1Type, In2Type, BLOCK_X, BLOCK_Y, FILTER_SHARED_X, FILTER_SHARED_Y, FILTER_REG_X, FILTER_REG_Y, ILPY><<<blocks, threads, 0, stream>>>(o, in1, in2, mode, num_batch);
 #endif
+}
+
+template <typename OutputType, typename In1Type, typename In2Type, typename Executor>
+  requires is_host_executor_v<Executor>
+void matxDirectConv2DInternal(OutputType &o, const In1Type &in1,
+                              const In2Type &in2, matxConvCorrMode_t mode,
+                              [[maybe_unused]] const Executor &exec)
+{
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+
+  MATX_STATIC_ASSERT(OutputType::Rank() == In1Type::Rank(), matxInvalidDim);
+  MATX_STATIC_ASSERT(OutputType::Rank() == In2Type::Rank(), matxInvalidDim);
+  MATX_STATIC_ASSERT(OutputType::Rank() >= 2, matxInvalidDim);
+
+  constexpr int Rank = OutputType::Rank();
+
+  const index_t i1N = in1.Size(Rank - 2);
+  const index_t i1M = in1.Size(Rank - 1);
+  const index_t i2N = in2.Size(Rank - 2);
+  const index_t i2M = in2.Size(Rank - 1);
+
+  index_t dy = 0;
+  index_t dx = 0;
+  if (mode == MATX_C_MODE_SAME) {
+    dy = i2N / 2;
+    dx = i2M / 2;
+  }
+  else if (mode == MATX_C_MODE_FULL) {
+    dy = i2N - 1;
+    dx = i2M - 1;
+  }
+
+  const index_t total = static_cast<index_t>(TotalSize(o));
+
+#ifdef MATX_EN_OMP
+#pragma omp parallel for num_threads(exec.GetNumThreads()) if(exec.GetNumThreads() > 1)
+#endif
+  for (index_t abs = 0; abs < total; abs++) {
+    auto odims = GetIdxFromAbs(o, abs);
+    const index_t oy = odims[Rank - 2];
+    const index_t ox = odims[Rank - 1];
+
+    typename OutputType::value_type sum{0};
+    for (index_t fy = 0; fy < i2N; fy++) {
+      const index_t iy = oy + fy - dy;
+      if (iy < 0 || iy >= i1N) {
+        continue;
+      }
+
+      for (index_t fx = 0; fx < i2M; fx++) {
+        const index_t ix = ox + fx - dx;
+        if (ix < 0 || ix >= i1M) {
+          continue;
+        }
+
+        auto i1dims = odims;
+        auto i2dims = odims;
+        i1dims[Rank - 2] = iy;
+        i1dims[Rank - 1] = ix;
+        i2dims[Rank - 2] = i2N - 1 - fy;
+        i2dims[Rank - 1] = i2M - 1 - fx;
+
+        const auto i1val = cuda::std::apply([&](auto &&...args) {
+          return in1.operator()(args...);
+        }, i1dims);
+        const auto i2val = cuda::std::apply([&](auto &&...args) {
+          return in2.operator()(args...);
+        }, i2dims);
+        sum = detail::madd(i1val, i2val, sum);
+      }
+    }
+
+    cuda::std::apply([&](auto &&...args) {
+      o.operator()(args...) = sum;
+    }, odims);
+  }
 }
 } // end namespace detail
 
@@ -401,42 +542,55 @@ inline void conv1d_impl(OutputType o, const In1Type &i1, const In2Type &i2,
  * @param in1 First input operator
  * @param in2 Second input operator
  * @param mode Convolution mode
- * @param stream CUDA stream
+ * @param exec Executor
  */
-template <typename OutputType, typename In1Type, typename In2Type>
+template <typename OutputType, typename In1Type, typename In2Type, typename Executor>
 inline void conv2d_impl(OutputType o, const In1Type in1, const In2Type in2,
-                   matxConvCorrMode_t mode, cudaStream_t stream = 0)
+                   matxConvCorrMode_t mode, const Executor &exec)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   constexpr int Rank1 = In1Type::Rank();
   constexpr int Rank2 = In2Type::Rank();
 
   if constexpr (In1Type::Rank() == In2Type::Rank()) {
-     index_t size1 = in1.Size(Rank1-1) * in1.Size(Rank1-2);
-     index_t size2 = in2.Size(Rank2-1) * in2.Size(Rank2-2);
-     // smaller size is the filter, set it as second input
-     if(size1 >= size2) {
-       detail::matxDirectConv2DInternal(o, in1, in2, mode, stream);
-     } else {  // swap in1/in2
-       detail::matxDirectConv2DInternal(o, in2, in1, mode, stream);
-     }
+    auto run_direct = [&](const auto &signal, const auto &filter) {
+      if constexpr (is_cuda_executor_v<Executor>) {
+        detail::matxDirectConv2DInternal(o, signal, filter, mode, exec.getStream());
+      }
+      else if constexpr (is_host_executor_v<Executor>) {
+        detail::matxDirectConv2DInternal(o, signal, filter, mode, exec);
+      }
+      else {
+        static_assert(is_cuda_executor_v<Executor> || is_host_executor_v<Executor>,
+                      "conv2d() only supports CUDA and host executors currently");
+      }
+    };
+
+    index_t size1 = in1.Size(Rank1-1) * in1.Size(Rank1-2);
+    index_t size2 = in2.Size(Rank2-1) * in2.Size(Rank2-2);
+    // smaller size is the filter, set it as second input
+    if(size1 >= size2) {
+      run_direct(in1, in2);
+    } else {  // swap in1/in2
+      run_direct(in2, in1);
+    }
   // These branches clone the inputs to match in rank
-  } else if constexpr (In1Type::Rank() <In2Type::Rank()) {
-      // in1 is smaller so clone it to match in2
-      auto shape = in2.Shape();
-      int d = Rank2 - Rank1;
-      for(int i = 0; i < Rank1; i++) {
-        shape[i+d] = matxKeepDim;
-      }
-      conv2d_impl(o, clone<Rank2>(in1, shape), in2, mode, stream);
+  } else if constexpr (In1Type::Rank() < In2Type::Rank()) {
+    // in1 is smaller so clone it to match in2
+    auto shape = in2.Shape();
+    int d = Rank2 - Rank1;
+    for(int i = 0; i < Rank1; i++) {
+      shape[i+d] = matxKeepDim;
+    }
+    conv2d_impl(o, clone<Rank2>(in1, shape), in2, mode, exec);
   } else {
-      // in1 is smaller so clone it to match in2
-      auto shape = in1.Shape();
-      int d = Rank1 - Rank2;
-      for(int i = 0; i < Rank2; i++) {
-        shape[i+d] = matxKeepDim;
-      }
-      conv2d_impl(o, in1, clone<Rank1>(in2, shape), mode, stream);
+    // in1 is smaller so clone it to match in2
+    auto shape = in1.Shape();
+    int d = Rank1 - Rank2;
+    for(int i = 0; i < Rank2; i++) {
+      shape[i+d] = matxKeepDim;
+    }
+    conv2d_impl(o, in1, clone<Rank1>(in2, shape), mode, exec);
   }
 }
 
