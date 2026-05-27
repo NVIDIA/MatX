@@ -70,7 +70,9 @@ enum class SarBpComputeType {
               reference point. This mode prioritizes throughput and requires \p PhaseLUTOptimization.
               The \p PropSarBpTaylorFastAddThirdOrder property can be used to add a third-order term to the Taylor approximation.
               On systems with reduced double-precision throughput, TaylorFast is typically the fastest compute type using either
-              second order or third order Taylor approximation. */
+              second order or third order Taylor approximation. TaylorFast will divide by reference range values to certain image
+              pixels and thus does not support geometries where the antenna phase center is located at any of the image pixels
+              (i.e., at range 0 from some pixel). In such cases, the user should choose a different compute type.*/
   Float /**< Uses single precision for all intermediate calculations. This mode is fast, but typically does not provide
               sufficient precision for cases where the ranges exceed several kilometers. It is not suited for spaceborne SAR geometries. */
 };
@@ -322,7 +324,9 @@ namespace experimental {
 * the same coordinate system and units as the platform positions. See \p VoxLocType documentation for details on supported rank and data types.
 * @param range_to_mcp Range to motion compensation point is the distance (range) from each platform position to the motion compensation point.
 * See \p RangeToMcpType documentation for details on supported rank and data types.
-* @param params SAR backprojection parameters. See \p SarBpParams documentation for details on supported parameters.
+* @param params SAR backprojection parameters. See \p SarBpParams documentation for details on supported parameters. Note that the \p TaylorFast
+* compute type does not support geometries where the antenna phase center is located at any of the image pixels (i.e., at range 0 from some pixel).
+* In such cases, the user should choose another compute type to avoid potential divide-by-zero errors at run-time.
 */
 template <typename ImageType, typename RangeProfilesType, typename PlatPosType, typename VoxLocType, typename RangeToMcpType>
 inline auto sar_bp(const ImageType &initial_image, const RangeProfilesType &range_profiles,
