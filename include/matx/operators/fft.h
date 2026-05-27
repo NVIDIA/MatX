@@ -857,6 +857,8 @@ namespace matx
           symbol_name += Direction == detail::FFTDirection::FORWARD ? std::string("F") : std::string("B");
           symbol_name += "_SM";
           symbol_name += std::to_string(dx_fft2_helper_.get_cc());
+          symbol_name += "_N";
+          symbol_name += std::to_string(static_cast<int>(norm_));
           return symbol_name;
         }
 
@@ -1065,6 +1067,27 @@ namespace matx
             auto result = get_jit_class_name() + "<" + inner_op_jit_name + ">";
             MATX_LOG_DEBUG("cuFFTDx 2D JIT_TYPE_QUERY: {}", result);
             return result;
+          }
+          else if constexpr (Cap == OperatorCapability::JIT_CACHE_KEY) {
+#ifdef MATX_EN_JIT
+            auto key = detail::MakeJITCacheKeyForType<self_type>("JITFFT2");
+            const int actual_rank = jit_rank();
+            detail::HashJITCacheValue(key, actual_rank);
+            for (int i = 0; i < actual_rank; ++i) {
+              detail::HashJITCacheValue(key, out_dims_[i]);
+            }
+            detail::HashJITCacheValue(key, dx_fft2_helper_.get_fft_size_y());
+            detail::HashJITCacheValue(key, dx_fft2_helper_.get_fft_size_x());
+            detail::HashJITCacheValue(key, dx_fft2_helper_.get_cc());
+            detail::HashJITCacheValue(key, static_cast<int>(Type));
+            detail::HashJITCacheValue(key, static_cast<int>(Direction));
+            detail::HashJITCacheValue(key, static_cast<int>(norm_));
+            detail::HashJITCacheString(key, dx_fft2_helper_.GetXFuncName());
+            detail::HashJITCacheString(key, dx_fft2_helper_.GetYFuncName());
+            return combine_capabilities<Cap>(key, detail::get_operator_capability<Cap>(a_, in));
+#else
+            return detail::MakeInvalidJITCacheKey();
+#endif
           }
           else {
             auto self_has_cap = capability_attributes<Cap>::default_value;
