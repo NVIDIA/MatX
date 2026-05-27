@@ -447,12 +447,15 @@ namespace matx {
       int tid = threadIdx.x + threadIdx.y * blockDim.x + threadIdx.z * blockDim.x * blockDim.y;\n\
       constexpr int ept = static_cast<int>(CurrentCapabilities::ept);\n\
       matx::index_t size1_vectors = (size1 + ept - 1) / ept;\n\
+      if (size1_vectors == 0) return;\n\
       matx::index_t idx = tid % size1_vectors;\n\
       matx::index_t idy = tid / size1_vectors;\n\
-      if constexpr (cuda::std::is_pointer_v<Op>) {\n\
-        (*op).template operator()<CurrentCapabilities>(idy, idx);\n\
-      } else {\n\
-        op.template operator()<CurrentCapabilities>(idy, idx);\n\
+      if (idy < size0 && idx * static_cast<matx::index_t>(ept) < size1) {\n\
+        if constexpr (cuda::std::is_pointer_v<Op>) {\n\
+          (*op).template operator()<CurrentCapabilities>(idy, idx);\n\
+        } else {\n\
+          op.template operator()<CurrentCapabilities>(idy, idx);\n\
+        }\n\
       }\n\
     }\n\
     \n\
@@ -461,13 +464,16 @@ namespace matx {
       int tid = threadIdx.x + threadIdx.y * blockDim.x + threadIdx.z * blockDim.x * blockDim.y;\n\
       constexpr int ept = static_cast<int>(CurrentCapabilities::ept);\n\
       matx::index_t size2_vectors = (size2 + ept - 1) / ept;\n\
+      if (size2_vectors == 0) return;\n\
       matx::index_t idx = tid % size2_vectors;\n\
       matx::index_t idy = tid / size2_vectors;\n\
       matx::index_t idz = blockIdx.x;\n\
-      if constexpr (cuda::std::is_pointer_v<Op>) {\n\
-        (*op).template operator()<CurrentCapabilities>(idz, idy, idx);\n\
-      } else {\n\
-        op.template operator()<CurrentCapabilities>(idz, idy, idx);\n\
+      if (idz < size0 && idy < size1 && idx * static_cast<matx::index_t>(ept) < size2) {\n\
+        if constexpr (cuda::std::is_pointer_v<Op>) {\n\
+          (*op).template operator()<CurrentCapabilities>(idz, idy, idx);\n\
+        } else {\n\
+          op.template operator()<CurrentCapabilities>(idz, idy, idx);\n\
+        }\n\
       }\n\
     }\n\
     \n\
@@ -476,14 +482,17 @@ namespace matx {
       int tid = threadIdx.x + threadIdx.y * blockDim.x + threadIdx.z * blockDim.x * blockDim.y;\n\
       constexpr int ept = static_cast<int>(CurrentCapabilities::ept);\n\
       matx::index_t size3_vectors = (size3 + ept - 1) / ept;\n\
+      if (size3_vectors == 0) return;\n\
       matx::index_t idx = tid % size3_vectors;\n\
       matx::index_t idy = tid / size3_vectors;\n\
       matx::index_t idz = blockIdx.x;\n\
       matx::index_t idw = blockIdx.y;\n\
-      if constexpr (cuda::std::is_pointer_v<Op>) {\n\
-        (*op).template operator()<CurrentCapabilities>(idw, idz, idy, idx);\n\
-      } else {\n\
-        op.template operator()<CurrentCapabilities>(idw, idz, idy, idx);\n\
+      if (idw < size0 && idz < size1 && idy < size2 && idx * static_cast<matx::index_t>(ept) < size3) {\n\
+        if constexpr (cuda::std::is_pointer_v<Op>) {\n\
+          (*op).template operator()<CurrentCapabilities>(idw, idz, idy, idx);\n\
+        } else {\n\
+          op.template operator()<CurrentCapabilities>(idw, idz, idy, idx);\n\
+        }\n\
       }\n\
     }\n\
   }\n\

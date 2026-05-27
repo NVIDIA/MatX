@@ -845,6 +845,9 @@ namespace matx
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
         __MATX_INLINE__ std::string get_jit_class_name() const {
           std::string symbol_name = "JITFFT2Op_";
+          symbol_name += "R";
+          symbol_name += std::to_string(jit_rank());
+          symbol_name += "_";
           symbol_name += std::to_string(dx_fft2_helper_.get_fft_size_y());
           symbol_name += "_";
           symbol_name += std::to_string(dx_fft2_helper_.get_fft_size_x());
