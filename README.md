@@ -113,6 +113,15 @@ source into the directory structure of your project. Using this method, you can 
 add_subdirectory(path/to/matx)
 ```
 
+Subproject builds do not generate MatX package config files or install rules by
+default. If your parent project needs to install MatX for redistribution, enable
+that behavior before adding the subdirectory:
+
+```cmake
+set(MATX_GENERATE_CONFIG ON)
+add_subdirectory(path/to/matx)
+```
+
 An example of using this method can be found in the [examples/cmake_sample_project](examples/cmake_sample_project) directory.
 
 #### 2. MatX Installed to the System

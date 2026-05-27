@@ -162,7 +162,7 @@ Additional Build Options
 ========================
 
 There are several additional build options to control MatX options and enable additional features.
-By default, all of these options are OFF.
+Unless otherwise noted, these options are OFF by default.
 
 .. list-table::
   :widths: 60 40
@@ -208,6 +208,9 @@ By default, all of these options are OFF.
     - ``-DMATX_EN_PYBIND11=ON``
   * - Disable Exceptions
     - ``-DMATX_DISABLE_EXCEPTIONS=ON``
+  * - Generate CMake package config files and install rules. This defaults to ON for top-level MatX builds
+      and OFF when MatX is added as a subproject.
+    - ``-DMATX_GENERATE_CONFIG=ON``
 
 
 NVTX Flags

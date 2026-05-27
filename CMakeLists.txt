@@ -7,13 +7,6 @@ if(POLICY CMP0144)
 endif()
 set(MATX_VERSION 1.0.0)
 
-# Used for config file generation
-if(NOT DEFINED PROJECT_NAME)
-  set(NOT_SUBPROJECT ON)
-else()
-  set(NOT_SUBPROJECT OFF)
-endif()
-
 # Use the vendored rapids-cmake copy for GPU architecture discovery unless a parent
 # project already provided it. The user can optionally override GPU_ARCH to specify
 # their own.
@@ -51,6 +44,17 @@ project(MATX
         DESCRIPTION "A modern and efficient header-only C++ library for numerical computing on GPU"
         VERSION ${MATX_VERSION}
         HOMEPAGE_URL "https://github.com/NVIDIA/MatX")
+
+if (NOT DEFINED MATX_GENERATE_CONFIG)
+    set(MATX_GENERATE_CONFIG ${PROJECT_IS_TOP_LEVEL})
+endif()
+set(MATX_GENERATE_CONFIG ${MATX_GENERATE_CONFIG} CACHE BOOL
+    "Generate MatX CMake package config files and install rules")
+set(MATX_INSTALL_INCLUDEDIR include)
+if (MATX_GENERATE_CONFIG)
+    include(GNUInstallDirs)
+    set(MATX_INSTALL_INCLUDEDIR ${CMAKE_INSTALL_INCLUDEDIR})
+endif()
 
 if (NOT CMAKE_CUDA_ARCHITECTURES)
     set(CMAKE_CUDA_ARCHITECTURES "70;80")
@@ -139,10 +143,12 @@ rapids_find_package(
 # Create our transitive target to pass build properties to external users and our own build environment
 add_library(matx INTERFACE)
 add_library(matx::matx ALIAS matx)
-target_include_directories(matx INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-                                         "$<INSTALL_INTERFACE:include>")
-target_include_directories(matx INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/matx/kernels>"
-"$<INSTALL_INTERFACE:include/matx/kernels>")
+target_include_directories(matx INTERFACE
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+    "$<INSTALL_INTERFACE:${MATX_INSTALL_INCLUDEDIR}>")
+target_include_directories(matx INTERFACE
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/matx/kernels>"
+    "$<INSTALL_INTERFACE:${MATX_INSTALL_INCLUDEDIR}/matx/kernels>")
 
                            
 target_compile_features(matx INTERFACE cxx_std_20 $<BUILD_INTERFACE:cuda_std_20>)
@@ -454,15 +460,15 @@ target_link_libraries(matx INTERFACE
 
 target_link_libraries(matx INTERFACE CUDA::nvtx3)
 
-# Build config files if the user isn't adding this as a subdirectory. At this point our transitive target
-# should have all build properties needed based on the options passed in
-if (NOT_SUBPROJECT)
-    include(GNUInstallDirs)
+# Build config files if requested. At this point our transitive target should
+# have all build properties needed based on the options passed in.
+if (MATX_GENERATE_CONFIG)
     include(CMakePackageConfigHelpers)
 
     install(TARGETS matx EXPORT matx-exports)
-    install(DIRECTORY include/ DESTINATION include)
-    install(FILES ${CMAKE_BINARY_DIR}/include/matx/version_config.h DESTINATION include)
+    install(DIRECTORY include/ DESTINATION ${MATX_INSTALL_INCLUDEDIR})
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/include/matx/version_config.h
+            DESTINATION ${MATX_INSTALL_INCLUDEDIR}/matx)
 
     set(doc_string
     [=[
