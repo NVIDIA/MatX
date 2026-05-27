@@ -70,7 +70,7 @@ fused JIT expression; non-JIT CUDA execution through cudaExecutor remains availa
    "cart2sph", "|yes|", "|yes|", "|yes|", "Element-wise coordinate conversion expression."
    "ceil", "|yes|", "|yes|", "|yes|", "Element-wise expression."
    "cgsolve", "|no|", "|yes|", "|no|", "CUDA iterative solver path."
-   "channelize_poly", "|no|", "|yes|", "|no|", "CUDA-only polyphase channelizer."
+   "channelize_poly", "|yes|", "|yes|", "|no|", "Polyphase channelizer; host path directly computes the per-branch FIR and DFT stages."
    "chirp", "|yes|", "|yes|", "|yes|", "Generator expression."
    "chol", "|yes|", "|yes|", "|yes|", "Host support requires the CPU solver backend. CUDAJITExecutor support uses cuSolverDx through MathDx for supported rank 2-4 square float, double, complex-float, and complex-double matrices."
    "clone", "|yes|", "|yes|", "|yes|", "View expression."

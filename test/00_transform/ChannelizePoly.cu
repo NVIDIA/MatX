@@ -81,6 +81,11 @@ class ChannelizePolyTestFloatTypes
     : public ChannelizePolyTest<TensorType> {
 };
 
+template <typename TensorType>
+class ChannelizePolyTestHostTypes
+    : public ChannelizePolyTest<TensorType> {
+};
+
 namespace test_types {
     template<typename T>
     struct inner_type {
@@ -115,6 +120,181 @@ namespace test_types {
 
 TYPED_TEST_SUITE(ChannelizePolyTestNonHalfFloatTypes, MatXFloatNonHalfTypesCUDAExec);
 TYPED_TEST_SUITE(ChannelizePolyTestDoubleType, MatXDoubleOnlyTypeCUDAExec);
+using ChannelizePolyHostExecTypes = Types<
+  cuda::std::tuple<float, matx::SingleThreadedHostExecutor>,
+  cuda::std::tuple<double, matx::SingleThreadedHostExecutor>,
+  cuda::std::tuple<cuda::std::complex<float>, matx::SingleThreadedHostExecutor>>;
+TYPED_TEST_SUITE(ChannelizePolyTestHostTypes, ChannelizePolyHostExecTypes);
+
+TYPED_TEST(ChannelizePolyTestHostTypes, HostSimpleOversampledAndBatched)
+{
+  MATX_ENTER_HANDLER();
+
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using InnerType = typename test_types::inner_type<TestType>::type;
+  using ComplexType = typename test_types::complex_type<TestType>::type;
+
+  const auto scale = []() {
+    if constexpr (is_complex_v<TestType>) {
+      return TestType{static_cast<InnerType>(2.0), static_cast<InnerType>(0.0)};
+    } else {
+      return static_cast<TestType>(2.0);
+    }
+  }();
+  const auto inv_scale = []() {
+    if constexpr (is_complex_v<TestType>) {
+      return TestType{static_cast<InnerType>(0.5), static_cast<InnerType>(0.0)};
+    } else {
+      return static_cast<TestType>(0.5);
+    }
+  }();
+
+  struct {
+    index_t a_len;
+    index_t f_len;
+    index_t num_channels;
+    index_t decimation_factor;
+  } test_cases[] = {
+    { 96, 23, 4, 4 },
+    { 97, 25, 5, 3 },
+  };
+
+  for (size_t i = 0; i < sizeof(test_cases)/sizeof(test_cases[0]); i++) {
+    const index_t a_len = test_cases[i].a_len;
+    const index_t f_len = test_cases[i].f_len;
+    const index_t num_channels = test_cases[i].num_channels;
+    const index_t decimation_factor = test_cases[i].decimation_factor;
+    const index_t b_len_per_channel = (a_len + decimation_factor - 1) / decimation_factor;
+
+    this->pb->template InitAndRunTVGenerator<TestType>(
+      "00_transforms", "channelize_poly_operators", "channelize_oversampled",
+      {a_len, f_len, num_channels, decimation_factor});
+
+    auto a = make_tensor<TestType>({a_len});
+    auto f = make_tensor<TestType>({f_len});
+    auto b = make_tensor<ComplexType>({b_len_per_channel, num_channels});
+
+    this->pb->NumpyToTensorView(a, "a");
+    this->pb->NumpyToTensorView(f, "filter_random");
+
+    (b = channelize_poly(a, f, num_channels, decimation_factor)).run(this->exec);
+    this->exec.sync();
+    MATX_TEST_ASSERT_COMPARE(this->pb, b, "b_random", this->thresh);
+
+    (b = channelize_poly(scale * a, f, num_channels, decimation_factor)).run(this->exec);
+    (b = b * inv_scale).run(this->exec);
+    this->exec.sync();
+    MATX_TEST_ASSERT_COMPARE(this->pb, b, "b_random", this->thresh);
+
+    auto bp = make_tensor<ComplexType>({num_channels, b_len_per_channel});
+    auto b_permuted = permute(bp, {1, 0});
+    (b_permuted = channelize_poly(a, f, num_channels, decimation_factor)).run(this->exec);
+    this->exec.sync();
+    MATX_TEST_ASSERT_COMPARE(this->pb, b_permuted, "b_random", this->thresh);
+  }
+
+  {
+    const index_t a_len = 48;
+    const index_t f_len = 11;
+    const index_t num_channels = 4;
+    const index_t decimation_factor = 2;
+    const index_t b_len_per_channel = (a_len + decimation_factor - 1) / decimation_factor;
+    this->pb->template InitAndRunTVGenerator<TestType>(
+      "00_transforms", "channelize_poly_operators", "channelize_oversampled",
+      {a_len, f_len, num_channels, decimation_factor, 2, 3});
+
+    auto a = make_tensor<TestType>({2, 3, a_len});
+    auto f = make_tensor<TestType>({f_len});
+    auto b = make_tensor<ComplexType>({2, 3, b_len_per_channel, num_channels});
+
+    this->pb->NumpyToTensorView(a, "a");
+    this->pb->NumpyToTensorView(f, "filter_random");
+    (b = channelize_poly(a, f, num_channels, decimation_factor)).run(this->exec);
+    this->exec.sync();
+    MATX_TEST_ASSERT_COMPARE(this->pb, b, "b_random", this->thresh);
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(ChannelizePolyHostExecutor, AccumAndOutputProperties)
+{
+  MATX_ENTER_HANDLER();
+
+  auto pb = std::make_unique<detail::MatXPybind>();
+  matx::SingleThreadedHostExecutor exec{};
+
+  const index_t a_len = 96;
+  const index_t f_len = 21;
+  const index_t num_channels = 4;
+  const index_t decimation_factor = 3;
+  const index_t b_len_per_channel = (a_len + decimation_factor - 1) / decimation_factor;
+  pb->template InitAndRunTVGenerator<float>(
+    "00_transforms", "channelize_poly_operators", "channelize_oversampled",
+    {a_len, f_len, num_channels, decimation_factor});
+
+  auto a = make_tensor<float>({a_len});
+  auto f = make_tensor<float>({f_len});
+  auto b = make_tensor<cuda::std::complex<double>>({b_len_per_channel, num_channels});
+
+  pb->NumpyToTensorView(a, "a");
+  pb->NumpyToTensorView(f, "filter_random");
+
+  auto chan_poly = channelize_poly(a, f, num_channels, decimation_factor)
+    .props<PropAccum<double>, PropOutput<cuda::std::complex<double>>>();
+  (b = chan_poly).run(exec);
+  exec.sync();
+
+  MATX_TEST_ASSERT_COMPARE(pb, b, "b_random", 1e-5);
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(ChannelizePolyHostExecutor, SelectThreadsMatchesSingleThreaded)
+{
+  MATX_ENTER_HANDLER();
+
+  matx::SingleThreadedHostExecutor single_exec{};
+  HostExecParams params{4};
+  matx::SelectThreadsHostExecutor threaded_exec{params};
+
+  const index_t a_len = 96;
+  const index_t f_len = 21;
+  const index_t num_channels = 4;
+  const index_t decimation_factor = 3;
+  const index_t b_len_per_channel = (a_len + decimation_factor - 1) / decimation_factor;
+
+  auto a = make_tensor<float>({a_len});
+  auto f = make_tensor<float>({f_len});
+  auto b_single = make_tensor<cuda::std::complex<float>>({b_len_per_channel, num_channels});
+  auto b_threaded = make_tensor<cuda::std::complex<float>>({b_len_per_channel, num_channels});
+
+  for (index_t i = 0; i < a_len; i++) {
+    a(i) = static_cast<float>((i % 9) - 4) * 0.25f +
+        static_cast<float>(i % 5) * 0.03125f;
+  }
+
+  for (index_t i = 0; i < f_len; i++) {
+    f(i) = static_cast<float>((i % 7) - 3) * 0.125f +
+        static_cast<float>(i + 1) * 0.01f;
+  }
+
+  (b_single = channelize_poly(a, f, num_channels, decimation_factor)).run(single_exec);
+  single_exec.sync();
+  (b_threaded = channelize_poly(a, f, num_channels, decimation_factor)).run(threaded_exec);
+  threaded_exec.sync();
+
+  for (index_t t = 0; t < b_len_per_channel; t++) {
+    for (index_t channel = 0; channel < num_channels; channel++) {
+      ASSERT_NEAR(static_cast<double>(b_single(t, channel).real()),
+                  static_cast<double>(b_threaded(t, channel).real()), 1e-5);
+      ASSERT_NEAR(static_cast<double>(b_single(t, channel).imag()),
+                  static_cast<double>(b_threaded(t, channel).imag()), 1e-5);
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
 
 // Simple tests use random input and filter values
 TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, Simple)

@@ -32,14 +32,18 @@
 
 #pragma once
 
+#include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <type_traits>
 #include <numeric>
+#include <vector>
 
 #include "matx/core/error.h"
 #include "matx/core/nvtx.h"
 #include "matx/core/tensor.h"
+#include "matx/executors/host.h"
 #include "matx/kernels/channelize_poly.cuh"
 #include "matx/operators/fft.h"
 #include "matx/operators/slice.h"
@@ -209,6 +213,119 @@ inline bool ShouldUseSmemTiled(
   // be included (FilterInSmem is decided separately).
   return SmemTiledSizeBytes(o, in, filter, decimation_factor, ctile)
       <= SmemTiledMaxBytes;
+}
+
+template <typename AccumT, typename FilterT>
+__MATX_HOST__ __MATX_INLINE__ auto HostChannelizeCastFilter(FilterT v)
+{
+  if constexpr (is_complex_v<FilterT>) {
+    return static_cast<AccumT>(v);
+  } else if constexpr (is_complex_v<AccumT>) {
+    using accum_scalar_t = typename inner_op_type_t<AccumT>::type;
+    return static_cast<accum_scalar_t>(v);
+  } else {
+    return static_cast<AccumT>(v);
+  }
+}
+
+template <typename AccumT, typename InputT>
+__MATX_HOST__ __MATX_INLINE__ auto HostChannelizeCastInput(InputT v)
+{
+  if constexpr (is_complex_v<InputT>) {
+    return static_cast<AccumT>(v);
+  } else if constexpr (is_complex_v<AccumT>) {
+    using accum_scalar_t = typename inner_op_type_t<AccumT>::type;
+    return static_cast<accum_scalar_t>(v);
+  } else {
+    return static_cast<AccumT>(v);
+  }
+}
+
+template <typename AccumT, typename FilterValT, typename InputValT>
+__MATX_HOST__ __MATX_INLINE__ void HostChannelizeCmac(
+    AccumT &accum, FilterValT hv, InputValT iv)
+{
+  if constexpr (is_complex_v<AccumT> && is_complex_v<FilterValT> && is_complex_v<InputValT>) {
+    auto h_re = hv.real(), h_im = hv.imag();
+    auto i_re = iv.real(), i_im = iv.imag();
+    auto a_re = accum.real(), a_im = accum.imag();
+    a_re = h_re * i_re + a_re;
+    a_re = -(h_im * i_im) + a_re;
+    a_im = h_re * i_im + a_im;
+    a_im = h_im * i_re + a_im;
+    accum = {a_re, a_im};
+  } else if constexpr (is_complex_v<AccumT> && !is_complex_v<FilterValT> && is_complex_v<InputValT>) {
+    auto a_re = accum.real(), a_im = accum.imag();
+    a_re = hv * iv.real() + a_re;
+    a_im = hv * iv.imag() + a_im;
+    accum = {a_re, a_im};
+  } else if constexpr (is_complex_v<AccumT> && is_complex_v<FilterValT> && !is_complex_v<InputValT>) {
+    auto a_re = accum.real(), a_im = accum.imag();
+    a_re = hv.real() * iv + a_re;
+    a_im = hv.imag() * iv + a_im;
+    accum = {a_re, a_im};
+  } else {
+    accum += hv * iv;
+  }
+}
+
+template <typename Op, typename Arr, size_t... Is>
+__MATX_HOST__ __MATX_INLINE__ decltype(auto) HostReadSignalImpl(
+    const Op &op, const Arr &batch_idx, index_t sample_idx,
+    cuda::std::index_sequence<Is...>)
+{
+  return op(batch_idx[Is]..., sample_idx);
+}
+
+template <typename Op, typename Arr>
+__MATX_HOST__ __MATX_INLINE__ decltype(auto) HostReadSignal(
+    const Op &op, const Arr &batch_idx, index_t sample_idx)
+{
+  return HostReadSignalImpl(
+      op, batch_idx, sample_idx,
+      cuda::std::make_index_sequence<static_cast<size_t>(Op::Rank() - 1)>{});
+}
+
+template <typename OutType, typename Arr, typename ValueT, size_t... Is>
+__MATX_HOST__ __MATX_INLINE__ void HostWriteOutputImpl(
+    OutType &out, const Arr &batch_idx, index_t output_idx, index_t channel,
+    const ValueT &value, cuda::std::index_sequence<Is...>)
+{
+  out(batch_idx[Is]..., output_idx, channel) =
+      static_cast<typename OutType::value_type>(value);
+}
+
+template <typename OutType, typename Arr, typename ValueT>
+__MATX_HOST__ __MATX_INLINE__ void HostWriteOutput(
+    OutType &out, const Arr &batch_idx, index_t output_idx, index_t channel,
+    const ValueT &value)
+{
+  HostWriteOutputImpl(
+      out, batch_idx, output_idx, channel, value,
+      cuda::std::make_index_sequence<static_cast<size_t>(OutType::Rank() - 2)>{});
+}
+
+template <typename ComplexAccumT, typename ValueT>
+__MATX_HOST__ __MATX_INLINE__ ComplexAccumT HostAsComplex(ValueT v)
+{
+  using scalar_t = typename inner_op_type_t<ComplexAccumT>::type;
+  if constexpr (is_complex_v<ValueT>) {
+    return static_cast<ComplexAccumT>(v);
+  } else {
+    return ComplexAccumT{static_cast<scalar_t>(v), static_cast<scalar_t>(0)};
+  }
+}
+
+template <typename ComplexAccumT>
+__MATX_HOST__ __MATX_INLINE__ ComplexAccumT HostTwiddle(index_t channel, index_t branch, index_t num_channels)
+{
+  using scalar_t = typename inner_op_type_t<ComplexAccumT>::type;
+  constexpr double pi = 3.141592653589793238462643383279502884;
+  const double arg = 2.0 * pi * static_cast<double>(channel) *
+      static_cast<double>(branch) / static_cast<double>(num_channels);
+  return ComplexAccumT{
+      static_cast<scalar_t>(std::cos(arg)),
+      static_cast<scalar_t>(std::sin(arg))};
 }
 
 template <int CTILE, typename OutType, typename InType, typename FilterType, typename AccumType>
@@ -727,6 +844,186 @@ inline void channelize_poly_impl(OutType out, const InType &in, const FilterType
       // Specify FORWARD here to prevent any normalization after the ifft. We do not
       // want any extra scaling on the output values.
       (out = ifft(out, num_channels, FFTNorm::FORWARD)).run(stream);
+    }
+  }
+}
+
+/**
+ * @brief Host implementation of the 1D polyphase channelizer.
+ *
+ * This is a feature-parity implementation for CPU executors. It directly
+ * computes the per-branch FIR values and then applies the unnormalized,
+ * positive-sign DFT used by the CUDA channelizer.
+ */
+template <typename OutType, typename InType, typename FilterType, typename AccumType, ThreadsMode MODE>
+inline void channelize_poly_impl(OutType out, const InType &in, const FilterType &f,
+                   index_t num_channels, index_t decimation_factor,
+                   [[maybe_unused]] const HostExecutor<MODE> &exec) {
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  using OutputOp = std::remove_cv_t<std::remove_reference_t<OutType>>;
+  using InputOp = std::remove_cv_t<std::remove_reference_t<InType>>;
+  using FilterOp = std::remove_cv_t<std::remove_reference_t<FilterType>>;
+  using input_t = typename InputOp::value_type;
+  using filter_t = typename FilterOp::value_type;
+  using output_t = typename OutputOp::value_type;
+  using filtering_accum_t = cuda::std::conditional_t<
+      is_complex_v<input_t> || is_complex_v<filter_t>,
+      typename detail::scalar_to_complex<AccumType>::ctype,
+      AccumType>;
+  using complex_accum_t = typename detail::scalar_to_complex<AccumType>::ctype;
+
+  static_assert(!is_complex_v<AccumType>,
+    "channelize_poly: accumulator type must be real; it will be treated as complex when necessary");
+
+  constexpr int IN_RANK = InputOp::Rank();
+  constexpr int OUT_RANK = OutputOp::Rank();
+
+  MATX_STATIC_ASSERT_STR(OUT_RANK == IN_RANK+1, matxInvalidDim,
+    "channelize_poly: output rank should be 1 higher than input");
+  MATX_STATIC_ASSERT_STR(is_complex_v<output_t> || is_complex_half_v<output_t>,
+    matxInvalidType, "channelize_poly: output type must be complex");
+  MATX_STATIC_ASSERT_STR(FilterType::Rank() == 1, matxInvalidDim,
+    "channelize_poly: currently only support 1D filters");
+
+  MATX_ASSERT_STR(num_channels > 0, matxInvalidParameter,
+    "channelize_poly: num_channels must be positive");
+  MATX_ASSERT_STR(decimation_factor > 0, matxInvalidParameter,
+    "channelize_poly: decimation_factor must be positive");
+  MATX_ASSERT_STR(decimation_factor <= num_channels, matxInvalidParameter,
+    "channelize_poly: decimation_factor must be <= num_channels");
+
+  for (int i = 0; i < IN_RANK-1; i++) {
+    MATX_ASSERT_STR(out.Size(i) == in.Size(i), matxInvalidDim,
+      "channelize_poly: input/output must have matched batch sizes");
+  }
+
+  const index_t input_len = in.Size(IN_RANK-1);
+  const index_t num_elem_per_channel = (input_len + decimation_factor - 1) / decimation_factor;
+  MATX_ASSERT_STR(out.Size(OUT_RANK-1) == num_channels, matxInvalidDim,
+    "channelize_poly: output size OUT_RANK-1 mismatch");
+  MATX_ASSERT_STR(out.Size(OUT_RANK-2) == num_elem_per_channel, matxInvalidDim,
+    "channelize_poly: output size OUT_RANK-2 mismatch");
+
+  const index_t filter_full_len = f.Size(FilterOp::Rank()-1);
+  const index_t filter_phase_len = (filter_full_len + num_channels - 1) / num_channels;
+  index_t batch_count = 1;
+  for (int i = 0; i < IN_RANK-1; i++) {
+    batch_count *= in.Size(i);
+  }
+
+  std::vector<complex_accum_t> twiddles(static_cast<size_t>(num_channels * num_channels));
+  for (index_t channel = 0; channel < num_channels; channel++) {
+    for (index_t branch = 0; branch < num_channels; branch++) {
+      twiddles[static_cast<size_t>(channel * num_channels + branch)] =
+          detail::cpoly::HostTwiddle<complex_accum_t>(channel, branch, num_channels);
+    }
+  }
+
+  const index_t num_thread_buffers = std::max<index_t>(1, exec.GetNumThreads());
+  std::vector<filtering_accum_t> filtered_storage(
+      static_cast<size_t>(num_thread_buffers * num_channels));
+
+  const auto compute_output = [&](index_t batch, index_t t) {
+    const auto in_batch_idx = detail::BlockToIdx(in, batch, 1);
+    const auto out_batch_idx = detail::BlockToIdx(out, batch, 2);
+    index_t thread_index = 0;
+#ifdef MATX_EN_OMP
+    if (num_thread_buffers > 1) {
+      thread_index = static_cast<index_t>(omp_get_thread_num());
+    }
+#endif
+    auto *filtered = filtered_storage.data() +
+        static_cast<size_t>(thread_index * num_channels);
+
+    for (index_t branch = 0; branch < num_channels; branch++) {
+      filtering_accum_t accum{};
+      index_t h_ind = branch;
+      index_t sample_idx = 0;
+      index_t niter = 0;
+
+      if (decimation_factor == num_channels) {
+        const index_t s = num_channels - 1 - branch;
+        sample_idx = s + t * num_channels;
+        index_t h_skip = 0;
+        if (sample_idx >= input_len) {
+          h_skip = 1;
+          sample_idx -= num_channels;
+        }
+
+        index_t available_taps = filter_phase_len;
+        if (filter_phase_len > 0 &&
+            ((filter_phase_len - 1) * num_channels + branch) >= filter_full_len) {
+          available_taps--;
+        }
+
+        if (available_taps > h_skip && (t + 1) > h_skip) {
+          niter = std::min(available_taps - h_skip, t + 1 - h_skip);
+          h_ind = branch + h_skip * num_channels;
+        }
+      } else {
+        const index_t r_remapped = (branch + num_channels - decimation_factor) % num_channels;
+        const index_t s = num_channels - 1 - r_remapped;
+        const index_t last_arrived = t * decimation_factor + decimation_factor - 1;
+        if (last_arrived >= s) {
+          const index_t A = last_arrived - s;
+          sample_idx = last_arrived - (A % num_channels);
+          const index_t causal_count = A / num_channels + 1;
+          const index_t phase = (branch + t * decimation_factor) % num_channels;
+          index_t h_skip = 0;
+          if (sample_idx >= input_len) {
+            h_skip = 1;
+            sample_idx -= num_channels;
+          }
+
+          index_t available_taps = filter_phase_len;
+          if (filter_phase_len > 0 &&
+              ((filter_phase_len - 1) * num_channels + phase) >= filter_full_len) {
+            available_taps--;
+          }
+
+          if (available_taps > h_skip && causal_count > h_skip) {
+            niter = std::min(available_taps - h_skip, causal_count - h_skip);
+            h_ind = phase + h_skip * num_channels;
+          }
+        }
+      }
+
+      for (index_t i = 0; i < niter; i++) {
+        const input_t in_val = detail::cpoly::HostReadSignal(in, in_batch_idx, sample_idx);
+        const filter_t h_val = f(h_ind);
+        detail::cpoly::HostChannelizeCmac(accum,
+          detail::cpoly::HostChannelizeCastFilter<filtering_accum_t>(h_val),
+          detail::cpoly::HostChannelizeCastInput<filtering_accum_t>(in_val));
+        h_ind += num_channels;
+        sample_idx -= num_channels;
+      }
+
+      filtered[static_cast<size_t>(branch)] = accum;
+    }
+
+    for (index_t channel = 0; channel < num_channels; channel++) {
+      complex_accum_t dft{};
+      for (index_t branch = 0; branch < num_channels; branch++) {
+        dft += detail::cpoly::HostAsComplex<complex_accum_t>(
+            filtered[static_cast<size_t>(branch)]) *
+            twiddles[static_cast<size_t>(channel * num_channels + branch)];
+      }
+      detail::cpoly::HostWriteOutput(out, out_batch_idx, t, channel, dft);
+    }
+  };
+
+  const index_t total_outputs = batch_count * num_elem_per_channel;
+#ifdef MATX_EN_OMP
+  if (exec.GetNumThreads() > 1) {
+    #pragma omp parallel for num_threads(exec.GetNumThreads())
+    for (index_t i = 0; i < total_outputs; i++) {
+      compute_output(i / num_elem_per_channel, i % num_elem_per_channel);
+    }
+  } else
+#endif
+  {
+    for (index_t i = 0; i < total_outputs; i++) {
+      compute_output(i / num_elem_per_channel, i % num_elem_per_channel);
     }
   }
 }
