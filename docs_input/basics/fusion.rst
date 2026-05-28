@@ -61,7 +61,8 @@ CUDA JIT Kernel Fusion
 
 MatX supports CUDA JIT kernel fusion that compiles the entire expression into a single kernel. Currently this is enabled
 for all standard MatX element-wise operators, FFT operations via cuFFTDx, GEMM operations via cuBLASDx, and selected
-solver operations via cuSolverDx. To enable fusion with MathDx, the following option must be enabled:
+solver operations via cuSolverDx. cuFFTDx supports 1D FFT fusion and single-block complex-to-complex 2D ``fft2``/``ifft2``
+fusion for supported power-of-two square transforms. To enable fusion with MathDx, the following option must be enabled:
 ``-DMATX_EN_MATHDX=ON``. MathDx support also enables the NVRTC-based JIT support used by ``CUDAJITExecutor``.
 Once enabled, the ``CUDAJITExecutor`` can be used to perform JIT compilation in supported situations. If the expression
 cannot be JIT compiled, the ``CUDAJITExecutor`` may throw an error.
@@ -129,9 +130,9 @@ MathDx Compatibility
        cuSolverDx ``inv`` when their block-dimension ranges intersect.
    * - cuFFTDx
      - Yes
-     - Enabled via ``-DMATX_EN_MATHDX=ON`` for compatible FFT fusion paths. cuFFTDx has stricter launch-shape
-       requirements than the generic element-wise JIT path, and does not generally compose with cuBLASDx/cuSolverDx
-       operations that require a different block/grid model.
+     - Enabled via ``-DMATX_EN_MATHDX=ON`` for compatible 1D FFT fusion paths and supported single-block 2D C2C FFT
+       fusion paths. cuFFTDx has stricter launch-shape requirements than the generic element-wise JIT path, and does not
+       generally compose with cuBLASDx/cuSolverDx operations that require a different block/grid model.
    * - cuSolverDx
      - Partial
      - Enabled via ``-DMATX_EN_MATHDX=ON`` for ``chol``, ``inv``, and selected projection outputs from

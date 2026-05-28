@@ -5,6 +5,10 @@ fft2
 
 Perform a 2D FFT. Batching is supported for any tensor with a rank higher than 2.
 
+FFT kernel fusion is supported by cuFFTDx for complex-to-complex power-of-two square
+transforms that fit in a single CUDA block when ``-DMATX_EN_MATHDX=ON`` is enabled.
+Unsupported 2D FFT sizes and real-valued 2D FFTs use the existing cuFFT execution path.
+
 .. versionadded:: 0.6.0
 
 .. doxygenfunction:: fft2(const OpA &a, FFTNorm norm = FFTNorm::BACKWARD)
@@ -31,4 +35,4 @@ Examples
   :language: cpp
   :start-after: example-begin fft2-2
   :end-before: example-end fft2-2
-  :dedent:  
+  :dedent:
