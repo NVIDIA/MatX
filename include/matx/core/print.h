@@ -30,7 +30,9 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
+#include <array>
 #include <cinttypes>
+#include <utility>
 #include <matx/core/type_utils.h>
 
 namespace matx {
@@ -38,8 +40,9 @@ namespace matx {
     /**
      * Print a value
      *
-     * Type-agnostic function to print a value to stdout
+     * Type-agnostic function to print a value
      *
+     * @param fp
      * @param val
      */
     template <typename T>
@@ -190,10 +193,177 @@ namespace matx {
     }
 
 
+
+    template <typename Op>
+    using PrintIndexArray = std::array<index_t, static_cast<size_t>(Op::Rank())>;
+
+    inline void PrintSpaces(FILE* fp, int count)
+    {
+      for (int i = 0; i < count; i++) {
+        fprintf(fp, " ");
+      }
+    }
+
+    template <typename Op, size_t... Is>
+    __MATX_HOST__ void PrintValAtImpl(FILE* fp, const Op &op, const PrintIndexArray<Op> &idx,
+                                      std::index_sequence<Is...>)
+    {
+      PrintVal(fp, op.operator()(idx[Is]...));
+    }
+
+    template <typename Op>
+    __MATX_HOST__ void PrintValAt(FILE* fp, const Op &op, const PrintIndexArray<Op> &idx)
+    {
+      PrintValAtImpl(fp, op, idx, std::make_index_sequence<static_cast<size_t>(Op::Rank())>{});
+    }
+
+    template <typename Op, typename... Args>
+    __MATX_HOST__ PrintIndexArray<Op> GetPrintExtents(const Op &op, Args... dims)
+    {
+      PrintIndexArray<Op> extents{static_cast<index_t>(dims)...};
+      for (int dim = 0; dim < Op::Rank(); dim++) {
+        if (extents[static_cast<size_t>(dim)] == 0) {
+          extents[static_cast<size_t>(dim)] = op.Size(dim);
+        }
+      }
+      return extents;
+    }
+
+    template <typename Op>
+    __MATX_HOST__ void PrintDefaultMatrix(FILE* fp, const Op &op, const PrintIndexArray<Op> &extents,
+                                          PrintIndexArray<Op> &idx)
+    {
+      constexpr int rank = Op::Rank();
+      for (index_t row = 0; row < extents[rank - 2]; row++) {
+        idx[rank - 2] = row;
+        fprintf(fp, "%06" MATX_INDEX_T_FMT ": ", row);
+        for (index_t col = 0; col < extents[rank - 1]; col++) {
+          idx[rank - 1] = col;
+          PrintValAt(fp, op, idx);
+        }
+        fprintf(fp, "\n");
+      }
+    }
+
+    template <typename Op>
+    __MATX_HOST__ void PrintDefaultSliceHeader(FILE* fp, const PrintIndexArray<Op> &idx)
+    {
+      constexpr int rank = Op::Rank();
+      fprintf(fp, "[");
+      for (int dim = 0; dim < rank - 2; dim++) {
+        fprintf(fp, "%06" MATX_INDEX_T_FMT ",", idx[static_cast<size_t>(dim)]);
+      }
+      fprintf(fp, ":,:]\n");
+    }
+
+    template <int Dim, typename Op>
+    __MATX_HOST__ void PrintDefaultSlices(FILE* fp, const Op &op, const PrintIndexArray<Op> &extents,
+                                          PrintIndexArray<Op> &idx)
+    {
+      constexpr int rank = Op::Rank();
+      if constexpr (Dim == rank - 2) {
+        PrintDefaultSliceHeader<Op>(fp, idx);
+        PrintDefaultMatrix(fp, op, extents, idx);
+        fprintf(fp, "\n");
+      }
+      else {
+        for (index_t i = 0; i < extents[Dim]; i++) {
+          idx[Dim] = i;
+          PrintDefaultSlices<Dim + 1>(fp, op, extents, idx);
+        }
+      }
+    }
+
+    template <typename Op>
+    __MATX_HOST__ void PrintMlabMatrix(FILE* fp, const Op &op, const PrintIndexArray<Op> &extents,
+                                       PrintIndexArray<Op> &idx, int indent)
+    {
+      constexpr int rank = Op::Rank();
+      for (index_t row = 0; row < extents[rank - 2]; row++) {
+        idx[rank - 2] = row;
+        PrintSpaces(fp, indent);
+        if (row == 0) {
+          fprintf(fp, "[");
+        }
+        else {
+          fprintf(fp, " ");
+        }
+
+        for (index_t col = 0; col < extents[rank - 1]; col++) {
+          idx[rank - 1] = col;
+          PrintValAt(fp, op, idx);
+          if (col != extents[rank - 1] - 1) {
+            fprintf(fp, ", ");
+          }
+        }
+
+        if (row == extents[rank - 2] - 1) {
+          fprintf(fp, "]");
+        }
+        else {
+          fprintf(fp, "; ...\n");
+        }
+      }
+    }
+
+    template <int Dim, typename Op>
+    __MATX_HOST__ void PrintMlabCat(FILE* fp, const Op &op, const PrintIndexArray<Op> &extents,
+                                    PrintIndexArray<Op> &idx)
+    {
+      constexpr int rank = Op::Rank();
+      constexpr int indent = Dim * 7;
+      PrintSpaces(fp, indent);
+      fprintf(fp, "cat(%d, ...\n", rank - Dim);
+      for (index_t i = 0; i < extents[Dim]; i++) {
+        idx[Dim] = i;
+        if constexpr (Dim == rank - 3) {
+          PrintMlabMatrix(fp, op, extents, idx, indent + 7);
+        }
+        else {
+          PrintMlabCat<Dim + 1>(fp, op, extents, idx);
+        }
+
+        if (i == extents[Dim] - 1) {
+          fprintf(fp, ")");
+        }
+        else {
+          fprintf(fp, ", ...\n");
+        }
+      }
+    }
+
+    template <int Dim, typename Op>
+    __MATX_HOST__ void PrintPythonRecursive(FILE* fp, const Op &op, const PrintIndexArray<Op> &extents,
+                                            PrintIndexArray<Op> &idx)
+    {
+      constexpr int rank = Op::Rank();
+      fprintf(fp, "[");
+      if constexpr (Dim == rank - 1) {
+        for (index_t i = 0; i < extents[Dim]; i++) {
+          idx[Dim] = i;
+          PrintValAt(fp, op, idx);
+          if (i != extents[Dim] - 1) {
+            fprintf(fp, ", ");
+          }
+        }
+      }
+      else {
+        for (index_t i = 0; i < extents[Dim]; i++) {
+          idx[Dim] = i;
+          if (i != 0) {
+            fprintf(fp, ",\n");
+            PrintSpaces(fp, Dim + 1);
+          }
+          PrintPythonRecursive<Dim + 1>(fp, op, extents, idx);
+        }
+      }
+      fprintf(fp, "]");
+    }
+
     /**
      * Print a tensor
      *
-     * Type-agnostic function to print a tensor to stdout
+     * Type-agnostic function to print a tensor
      *
      */
     template <typename Op, typename ... Args>
@@ -202,15 +372,15 @@ namespace matx {
       MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
       MATX_STATIC_ASSERT(Op::Rank() == sizeof...(Args), "Number of dimensions to print must match tensor rank");
-      MATX_STATIC_ASSERT(Op::Rank() <= 4, "Printing is only supported on tensors of rank 4 or lower currently");
 
       if constexpr (sizeof...(Args) == 0) {
         PrintVal(fp, op.operator()());
         fprintf(fp, "\n");
       }
       else if constexpr (sizeof...(Args) == 1) {
-        auto& k =detail:: pp_get<0>(dims...);
-        for (index_t _k = 0; _k < ((k == 0) ? op.Size(0) : k); _k++) {
+        auto& k = detail::pp_get<0>(dims...);
+        const index_t k_extent = (k == 0) ? op.Size(0) : static_cast<index_t>(k);
+        for (index_t _k = 0; _k < k_extent; _k++) {
           if ((PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) || (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON)) {
             if (_k == 0) {
               fprintf(fp, "[");
@@ -224,7 +394,7 @@ namespace matx {
           }
 
           PrintVal(fp, op.operator()(_k));
-          if (_k == (op.Size(0)-1)) {
+          if (_k == (k_extent - 1)) {
             if ((PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) || (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON)) {
               fprintf(fp, "]");
             }
@@ -240,13 +410,15 @@ namespace matx {
       else if constexpr (sizeof...(Args) == 2) {
         auto& k = detail::pp_get<0>(dims...);
         auto& l = detail::pp_get<1>(dims...);
-        for (index_t _k = 0; _k < ((k == 0) ? op.Size(0) : k); _k++) {
+        const index_t k_extent = (k == 0) ? op.Size(0) : static_cast<index_t>(k);
+        const index_t l_extent = (l == 0) ? op.Size(1) : static_cast<index_t>(l);
+        for (index_t _k = 0; _k < k_extent; _k++) {
           if (_k == 0) {
             if ((PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) || (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON)) {
               fprintf(fp, "[");
             }
           }
-          for (index_t _l = 0; _l < ((l == 0) ? op.Size(1) : l); _l++) {
+          for (index_t _l = 0; _l < l_extent; _l++) {
             if (_l == 0) {
               if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_DEFAULT) {
                 fprintf(fp, "%06" MATX_INDEX_T_FMT ": ", _k);
@@ -268,8 +440,8 @@ namespace matx {
 
             PrintVal(fp, op.operator()(_k, _l));
 
-            if (_l == (op.Size(1)-1)) {
-              if (_k == (op.Size(0)-1)) {
+            if (_l == (l_extent - 1)) {
+              if (_k == (k_extent - 1)) {
                 if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) {
                   fprintf(fp, "]");
                 }
@@ -296,222 +468,19 @@ namespace matx {
           fprintf(fp, "\n");
         }
       }
-      else if constexpr (sizeof...(Args) == 3) {
-        auto& j = detail::pp_get<0>(dims...);
-        auto& k = detail::pp_get<1>(dims...);
-        auto& l = detail::pp_get<2>(dims...);
-        for (index_t _j = 0; _j < ((j == 0) ? op.Size(0) : j); _j++) {
-          if (_j == 0) {
-            if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) {
-              fprintf(fp, "cat(3, ...\n");
-            }
-            else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) {
-              fprintf(fp, "[");
-            }
-          }
-          if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_DEFAULT) {
-            fprintf(fp, "[%06" MATX_INDEX_T_FMT ",:,:]\n", _j);
-          }
-          for (index_t _k = 0; _k < ((k == 0) ? op.Size(1) : k); _k++) {
-            if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) {
-              fprintf(fp, "       ");
-            }
-            if (_k == 0) {
-              if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) {
-                fprintf(fp, "[");
-              }
-              else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) {
-                if (_j == 0) {
-                  fprintf(fp, "[");
-                }
-                else {
-                  fprintf(fp, " [");
-                }
-              }
-            }
-            else {
-              if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) {
-                fprintf(fp, " ");
-              }
-            }
-            for (index_t _l = 0; _l < ((l == 0) ? op.Size(2) : l); _l++) {
-              if (_l == 0) {
-                if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_DEFAULT) {
-                  fprintf(fp, "%06" MATX_INDEX_T_FMT ": ", _k);
-                }
-                else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) {
-                  if (_k == 0) {
-                    fprintf(fp, "[");
-                  }
-                  else {
-                    fprintf(fp, "  [");
-                  }
-                }
-              }
-
-              PrintVal(fp, op.operator()(_j, _k, _l));
-
-              if (_l == (op.Size(2)-1)) {
-                if (_k == (op.Size(1)-1)) {
-                  if (_j == (op.Size(0)-1)) {
-                    if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) {
-                      fprintf(fp, "])\n");
-                    }
-                    else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) {
-                      fprintf(fp, "]]]");
-                    }
-                  }
-                  else {
-                    if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) {
-                      fprintf(fp, "], ...");
-                    }
-                    else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) {
-                      fprintf(fp, "]],");
-                    }
-                  }
-                }
-                else {
-                  if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) {
-                    fprintf(fp, "; ...");
-                  }
-                  else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) {
-                    fprintf(fp, "],");
-                  }
-                }
-              }
-              else {
-                if ((PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) || (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON)) {
-                  fprintf(fp, ", ");
-                }
-              }
-            }
-            fprintf(fp, "\n");
-          }
-          if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_DEFAULT) {
-            fprintf(fp, "\n");
-          }
+      else {
+        auto extents = GetPrintExtents(op, dims...);
+        PrintIndexArray<Op> idx{};
+        if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_DEFAULT) {
+          PrintDefaultSlices<0>(fp, op, extents, idx);
         }
-      }
-      else if constexpr (sizeof...(Args) == 4) {
-        auto& i = detail::pp_get<0>(dims...);
-        auto& j = detail::pp_get<1>(dims...);
-        auto& k = detail::pp_get<2>(dims...);
-        auto& l = detail::pp_get<3>(dims...);
-        for (index_t _i = 0; _i < ((i == 0) ? op.Size(0) : i); _i++) {
-          if (_i == 0) {
-            if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) {
-              fprintf(fp, "cat(4, ...\n");
-            }
-            else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) {
-              fprintf(fp, "[");
-            }
-          }
-          for (index_t _j = 0; _j < ((j == 0) ? op.Size(1) : j); _j++) {
-            if (_j == 0) {
-              if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) {
-                fprintf(fp, "       cat(3, ...\n");
-              }
-              else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) {
-                if (_i == 0) {
-                  fprintf(fp, "[");
-                }
-                else {
-                  fprintf(fp, " [");
-                }
-              }
-            }
-            if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_DEFAULT) {
-              fprintf(fp, "[%06" MATX_INDEX_T_FMT ",%06" MATX_INDEX_T_FMT ",:,:]\n", _i, _j);
-            }
-            for (index_t _k = 0; _k < ((k == 0) ? op.Size(2) : k); _k++) {
-              if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) {
-                fprintf(fp, "              ");
-              }
-              if (_k == 0) {
-                if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) {
-                  fprintf(fp, "[");
-                }
-                else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) {
-                  if (_j == 0) {
-                    fprintf(fp, "[");
-                  }
-                  else {
-                    fprintf(fp, "  [");
-                  }
-                }
-              }
-              else {
-                if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) {
-                  fprintf(fp, " ");
-                }
-              }
-              for (index_t _l = 0; _l < ((l == 0) ? op.Size(3) : l); _l++) {
-                if (_l == 0) {
-                  if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_DEFAULT) {
-                    fprintf(fp, "%06" MATX_INDEX_T_FMT ": ", _k);
-                  }
-                  else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) {
-                    if (_k == 0) {
-                      fprintf(fp, "[");
-                    }
-                    else {
-                      fprintf(fp, "   [");
-                    }
-                  }
-                }
-
-                PrintVal(fp, op.operator()(_i, _j, _k, _l));
-
-                if (_l == (op.Size(3)-1)) {
-                  if (_k == (op.Size(2)-1)) {
-                    if (_j == (op.Size(1)-1)) {
-                      if (_i == (op.Size(0)-1)) {
-                        if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) {
-                          fprintf(fp, "]))\n");
-                        }
-                        else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) {
-                          fprintf(fp, "]]]]");
-                        }
-                      }
-                      else {
-                        if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) {
-                          fprintf(fp, "]), ...");
-                        }
-                        else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) {
-                          fprintf(fp, "]]],");
-                        }
-                      }
-                    }
-                    else {
-                      if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) {
-                        fprintf(fp, "], ...");
-                      }
-                      else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) {
-                        fprintf(fp, "]],");
-                      }
-                    }
-                  }
-                  else {
-                    if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) {
-                      fprintf(fp, "; ...");
-                    }
-                    else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) {
-                      fprintf(fp, "],");
-                    }
-                  }
-                }
-                else {
-                  if ((PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) || (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON)) {
-                    fprintf(fp, ", ");
-                  }
-                }
-              }
-              fprintf(fp, "\n");
-            }
-            if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_DEFAULT) {
-              fprintf(fp, "\n");
-            }
-          }
+        else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_MLAB) {
+          PrintMlabCat<0>(fp, op, extents, idx);
+          fprintf(fp, "\n\n");
+        }
+        else if (PRINT_FORMAT_TYPE == MATX_PRINT_FORMAT_PYTHON) {
+          PrintPythonRecursive<0>(fp, op, extents, idx);
+          fprintf(fp, "\n");
         }
       }
     }
