@@ -218,6 +218,11 @@ public:
 
   __MATX_INLINE__ T *Data() const { return ldata_; }
 
+  __MATX_INLINE__ bool IsInitialized() const noexcept
+  {
+    return Data() != nullptr;
+  }
+
   __MATX_INLINE__ index_t TotalSize() const {
     index_t total = 1;
     for (int i = 0; i < rank_; ++i) {

@@ -40,6 +40,7 @@ MATX_IGNORE_WARNING_PUSH_GCC("-Wnull-dereference")
 #include <pybind11/embed.h>
 #include <pybind11/numpy.h>
 MATX_IGNORE_WARNING_POP_GCC
+#include <algorithm>
 #include <optional>
 #include <filesystem>
 
@@ -379,22 +380,53 @@ public:
   }
 
   template <typename TensorType>
+  static constexpr bool has_is_initialized_v = requires(const TensorType &ten) {
+    ten.IsInitialized();
+  };
+
+  template <typename TensorType>
   void NumpyToTensorView(TensorType &ten,
-                         const std::string fname)
+                         const std::string fname,
+                         bool exact_shape = false)
   {
     auto resobj = res_dict[fname.c_str()];
-    NumpyToTensorView(ten, resobj);
+    NumpyToTensorView(ten, resobj, exact_shape);
   }
 
   template <typename TensorType>
-  void NumpyToTensorView(TensorType ten,
-                         const pybind11::object &np_ten)
+  void NumpyToTensorView(TensorType &&ten,
+                         const pybind11::object &np_ten,
+                         bool exact_shape = false)
   {
-    using T = typename TensorType::value_type;
-    constexpr int RANK = TensorType::Rank();
+    using Tensor = remove_cvref_t<TensorType>;
+    using T = typename Tensor::value_type;
+    constexpr int RANK = Tensor::Rank();
 
     using ntype = matx_convert_complex_type<T>;
     auto ften = pybind11::array_t<ntype>(np_ten);
+    auto info = ften.request();
+
+    MATX_ASSERT_STR(info.ndim == RANK, matxInvalidDim,
+                    "Numpy array rank does not match tensor rank");
+
+    if constexpr (has_is_initialized_v<Tensor>) {
+      if (!ten.IsInitialized()) {
+        cuda::std::array<matx::index_t, RANK> shape;
+        std::copy_n(info.shape.begin(), RANK, std::begin(shape));
+        // The copy below writes from host code, so use the default
+        // host-accessible allocation path.
+        make_tensor(ten, shape);
+      }
+    }
+
+    // File IO requires exact shapes. Some generated test vectors intentionally
+    // copy a smaller tensor from a larger NumPy array, so keep that path bounded.
+    for (int d = 0; d < RANK; d++) {
+      const auto np_size = static_cast<index_t>(info.shape[d]);
+      const bool valid_size = exact_shape ? ten.Size(d) == np_size : ten.Size(d) <= np_size;
+      MATX_ASSERT_STR(valid_size, matxInvalidSize,
+                      "Numpy array dimension size is incompatible with tensor size");
+    }
 
     if constexpr (RANK == 0) {
       ten() = ConvertComplex(ften.at());

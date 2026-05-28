@@ -75,6 +75,21 @@ TYPED_TEST(FileIoTestsNonComplexFloatTypes, SmallCSVRead)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(FileIoTestsNonComplexFloatTypes, SmallCSVReadUninitialized)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  tensor_t<TestType, 2> t;
+
+  io::read_csv(t, this->small_csv, ",");
+
+  ASSERT_EQ(t.Size(0), 10);
+  ASSERT_EQ(t.Size(1), 2);
+  MATX_TEST_ASSERT_COMPARE(this->pb, t, this->small_csv.c_str(), 0.01);
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(FileIoTestsNonComplexFloatTypes, CSVReadFileNotFound)
 {
   MATX_ENTER_HANDLER();
@@ -141,6 +156,21 @@ TYPED_TEST(FileIoTestsNonComplexFloatTypes, MATRead)
   // Read "myvar" from mat file
   io::read_mat(t, "../test/00_io/test.mat", "myvar");
   // example-end read_mat-test-1
+  ASSERT_NEAR(t(0,0), 1.456, 0.001);
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(FileIoTestsNonComplexFloatTypes, MATReadUninitialized)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  tensor_t<TestType, 2> t;
+
+  io::read_mat(t, "../test/00_io/test.mat", "myvar");
+
+  ASSERT_EQ(t.Size(0), 1);
+  ASSERT_EQ(t.Size(1), 10);
   ASSERT_NEAR(t(0,0), 1.456, 0.001);
 
   MATX_EXIT_HANDLER();
@@ -334,6 +364,37 @@ TYPED_TEST(FileIoTestsNonComplexFloatTypes, NPYRead)
   ASSERT_NEAR(t(1, 0), 4.5, 0.001);
   ASSERT_NEAR(t(1, 1), 5.5, 0.001);
   ASSERT_NEAR(t(1, 2), 6.5, 0.001);
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(FileIoTestsNonComplexFloatTypes, NPYReadUninitialized)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+
+  tensor_t<TestType, 2> t;
+
+  io::read_npy(t, "../test/00_io/test.npy");
+
+  ASSERT_EQ(t.Size(0), 2);
+  ASSERT_EQ(t.Size(1), 3);
+  ASSERT_NEAR(t(0, 0), 1.5, 0.001);
+  ASSERT_NEAR(t(1, 2), 6.5, 0.001);
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(FileIoTestsNonComplexFloatTypes, NPYReadInitializedShapeMismatch)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+
+  auto t = make_tensor<TestType>({1, 3});
+
+  ASSERT_THROW({
+    io::read_npy(t, "../test/00_io/test.npy");
+  }, matx::detail::matxException);
 
   MATX_EXIT_HANDLER();
 }

@@ -1558,6 +1558,16 @@ MATX_IGNORE_WARNING_POP_GCC
     }
 
     /**
+     * @brief Check whether this tensor has an assigned data pointer.
+     *
+     * @return true if the tensor has storage or a non-owning data pointer
+     */
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ bool IsInitialized() const noexcept
+    {
+      return Data() != nullptr;
+    }
+
+    /**
      * @brief Set data pointer
      *
      * @param data Pointer to new data pointer
