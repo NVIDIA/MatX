@@ -106,7 +106,8 @@ real/imag, row-major), written to `output_image.raw` in this example.
 | `-w {hamming,none}` | Window for range compression (default: hamming) |
 | `-b {auto,all,0,N}` | Pulses per processing block. `auto` uses the GPU L2 cache size to choose a block size; `all` and `0` use all pulses (default: auto) |
 | `--image-tiles N` | Process the image as N x N tiles during backprojection (default: 1) |
-| `--precision {double,float,fltflt,mixed}` | Backprojection compute precision (default: mixed) |
+| `--taylor-fast-third-order` | Add the third-order range term when using `--precision taylor_fast` |
+| `--precision {double,float,fltflt,mixed,taylor_fast}` | Backprojection compute precision (default: mixed) |
 | `--warmup` | Warmup GPU kernels and FFT plans before timed run |
 
 The `--precision` flag controls the arithmetic used by the `sar_bp` operator. For spaceborne SAR, `float` does not provide enough precision to store fractional wavelengths at the range-to-MCP magnitudes (hundreds of km), so pure `float` is not sufficient to produce focused images. The available modes are:
@@ -114,6 +115,7 @@ The `--precision` flag controls the arithmetic used by the `sar_bp` operator. Fo
 - `double` -- full double-precision arithmetic. Most accurate.
 - `mixed` -- double-precision for range computation, single-precision elsewhere. Default. Close to `double` in image quality with slightly higher throughput on GPUs with reduced double-precision throughput. Other than `float`, this is the fastest option on hardware with full-throughput double-precision (e.g., A100, H100/H200, B200).
 - `fltflt` -- float-float evaluation using two `float` values for the high-precision range math. Significantly higher throughput on GPUs where `double` throughput is reduced (e.g., RTX PROs, Jetson Orin/Thor, gaming GPUs).
+- `taylor_fast` -- local Taylor approximation of the pulse-to-pixel range about a centered per-thread-block reference point. Highest-throughput experimental mode for spaceborne SAR geometries where moderate approximation error is acceptable.
 - `float` -- single-precision throughout. Fastest but not accurate enough for most spaceborne data.
 
 ## 6. View the Result

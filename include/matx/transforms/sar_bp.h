@@ -44,7 +44,7 @@
 
 namespace matx {
 
-template <typename OutImageType, typename InitialImageType, typename RangeProfilesType, typename PlatPosType, typename VoxLocType, typename RangeToMcpType>
+template <bool TaylorFastAddThirdOrder = false, typename OutImageType, typename InitialImageType, typename RangeProfilesType, typename PlatPosType, typename VoxLocType, typename RangeToMcpType>
 inline void sar_bp_impl(OutImageType &out, const InitialImageType &initial_image, const RangeProfilesType &range_profiles, const PlatPosType &platform_positions,
   const VoxLocType &voxel_locations, const RangeToMcpType &range_to_mcp, const SarBpParams &params, cudaStream_t stream = 0) {
 #ifdef __CUDACC__
@@ -58,11 +58,12 @@ inline void sar_bp_impl(OutImageType &out, const InitialImageType &initial_image
   MATX_STATIC_ASSERT_STR(RangeProfilesType::Rank() == 2, matxInvalidDim, "sar_bp: range profiles must be a 2D tensor");
 
   const bool phase_lut_optimization = has_feature(params.features, SarBpFeature::PhaseLUTOptimization);
-  if (params.compute_type == SarBpComputeType::FloatFloat && ! phase_lut_optimization) {
-    // We currently require that phase LUT optimization be enabled for the FloatFloat compute type
+  if ((params.compute_type == SarBpComputeType::FloatFloat ||
+       params.compute_type == SarBpComputeType::TaylorFast) && ! phase_lut_optimization) {
+    // We currently require that phase LUT optimization be enabled for these compute types
     // because we do not yet have float-float based sin/cos implementations. Thus, we would fall back
-    // to double-precision sincos() computations, which defeats the purpose of the FloatFloat compute type.
-    MATX_THROW(matxInvalidParameter, "sar_bp: FloatFloat compute type requires phase LUT optimization");
+    // to double-precision sincos() computations for FloatFloat and TaylorFast is defined as a LUT-backed mode.
+    MATX_THROW(matxInvalidParameter, "sar_bp: FloatFloat and TaylorFast compute types require phase LUT optimization");
   }
 
   const index_t num_pulses = range_profiles.Size(0);
@@ -83,12 +84,12 @@ inline void sar_bp_impl(OutImageType &out, const InitialImageType &initial_image
                "the kernel indexes range bins via a 32-bit integer");
   }
 
-  // The Float, Mixed, and FloatFloat compute types all use loose_compute_t =
+  // The Float, Mixed, FloatFloat, and TaylorFast compute types all use loose_compute_t =
   // float, which makes the per-pulse `bin_offset = 0.5 * (num_range_bins - 1)`
   // an fp32 value. fp32 can exactly represent all integers in [-2^24, 2^24];
   // above that, the gaps grow (2.0 at 2^24+, 4.0 at 2^25+, ...), so
   // bin_offset would lose precision and bin_floor_int would be off by up to
-  // ~1 bin for every pixel. (Float and FloatFloat additionally use floorf()
+  // ~1 bin for every pixel. (Float, FloatFloat, and TaylorFast additionally use floorf()
   // on an fp32 bin value, which is constrained by the same limit.) We
   // therefore cap num_range_bins at 2^24 for those paths.
   //
@@ -100,7 +101,7 @@ inline void sar_bp_impl(OutImageType &out, const InitialImageType &initial_image
   if (fp32_bin_path && range_profiles.Size(1) > FP32_MAX_RANGE_BINS) {
     MATX_THROW(matxInvalidParameter,
                "sar_bp: num_range_bins exceeds the maximum supported value of 2^24 "
-               "(16,777,216) for Float/Mixed/FloatFloat compute types -- fp32 mantissa "
+               "(16,777,216) for Float/Mixed/FloatFloat/TaylorFast compute types -- fp32 mantissa "
                "cannot exactly represent bin indices above 2^24. Use the Double "
                "compute type for larger range-bin counts.");
   }
@@ -177,6 +178,11 @@ inline void sar_bp_impl(OutImageType &out, const InitialImageType &initial_image
         SarBpFillPhaseLUT<double, float><<<lut_grid, lut_block, 0, stream>>>(phase_lut, params.center_frequency, params.del_r, range_profiles.Size(1));
         SarBp<SarBpComputeType::FloatFloat, OutImageType, InitialImageType, RangeProfilesType, PlatPosType, VoxLocType, RangeToMcpType, PhaseLUT, IsUnitStride><<<grid, block, 0, stream>>>(
           out, initial_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, static_cast<fltflt>(dr_inv), phase_correction_partial, phase_lut);
+      } else if (params.compute_type == SarBpComputeType::TaylorFast) {
+        cuda::std::complex<float> *phase_lut = static_cast<cuda::std::complex<float> *>(workspace);
+        SarBpFillPhaseLUT<double, float><<<lut_grid, lut_block, 0, stream>>>(phase_lut, params.center_frequency, params.del_r, range_profiles.Size(1));
+        SarBp<SarBpComputeType::TaylorFast, OutImageType, InitialImageType, RangeProfilesType, PlatPosType, VoxLocType, RangeToMcpType, PhaseLUT, IsUnitStride, TaylorFastAddThirdOrder><<<grid, block, 0, stream>>>(
+          out, initial_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, dr_inv, phase_correction_partial, phase_lut);
       } else {
         cuda::std::complex<float> *phase_lut = static_cast<cuda::std::complex<float> *>(workspace);
         SarBpFillPhaseLUT<float, float><<<lut_grid, lut_block, 0, stream>>>(phase_lut, static_cast<float>(params.center_frequency), static_cast<float>(params.del_r), range_profiles.Size(1));
@@ -193,10 +199,11 @@ inline void sar_bp_impl(OutImageType &out, const InitialImageType &initial_image
       } else if (params.compute_type == SarBpComputeType::Mixed) {
         SarBp<SarBpComputeType::Mixed, OutImageType, InitialImageType, RangeProfilesType, PlatPosType, VoxLocType, RangeToMcpType, PhaseLUT, IsUnitStride><<<grid, block, 0, stream>>>(
           out, initial_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, dr_inv, phase_correction_partial, nullptr);
-      } else if (params.compute_type == SarBpComputeType::FloatFloat) {
-        // We currently require that phase LUT optimization be enabled for the FloatFloat compute type. See comment
+      } else if (params.compute_type == SarBpComputeType::FloatFloat ||
+                 params.compute_type == SarBpComputeType::TaylorFast) {
+        // We currently require that phase LUT optimization be enabled for these compute types. See comment
         // in run-time check higher in this function.
-        MATX_THROW(matxInvalidParameter, "sar_bp: FloatFloat compute type requires phase LUT optimization");
+        MATX_THROW(matxInvalidParameter, "sar_bp: FloatFloat and TaylorFast compute types require phase LUT optimization");
       } else {
         SarBp<SarBpComputeType::Float, OutImageType, InitialImageType, RangeProfilesType, PlatPosType, VoxLocType, RangeToMcpType, PhaseLUT, IsUnitStride><<<grid, block, 0, stream>>>(
           out, initial_image, range_profiles, platform_positions, voxel_locations, range_to_mcp,
