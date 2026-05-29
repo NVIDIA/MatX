@@ -16,6 +16,31 @@ from the internet. Alternatively, the option ``CPM_USE_LOCAL_PACKAGES`` can be u
 or offline environment. Choosing local versions of packages uses the typical ``find_packages`` CMake search methods. Please see 
 the CPM documentation or the documentation for each package for more information.
 
+Conan Package Support
+---------------------
+MatX also includes a local Conan package recipe at the repository root. To use MatX from a consumer project via Conan, clone the
+MatX repository and create the package locally from the repository root:
+
+.. code-block:: shell
+
+    conan create .
+
+That command registers the local ``matx/1.0.0`` package in your Conan cache. Because the package recipe is part of the MatX repository,
+this package must be created locally before a consumer project can require it.
+
+A consumer project can then require MatX in its Conan recipe and use CMake to locate the package:
+
+.. code-block:: python
+
+    self.requires("matx/1.0.0")
+
+.. code-block:: cmake
+
+    find_package(matx CONFIG REQUIRED)
+    target_link_libraries(MyProject PRIVATE matx::matx)
+
+The example project in ``test_package/`` demonstrates a Conan test package that builds a sample CMake application using ``CMakeDeps`` and
+``VirtualRunEnv`` and links against the locally-created MatX Conan package.
 
 System Requirements
 -------------------
