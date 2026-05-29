@@ -36,6 +36,81 @@ class inv:
         }
 
 
+class solve:
+    def __init__(self, dtype: str, size: List[int]):
+        self.size = size
+        self.dtype = dtype
+        np.random.seed(1234)
+
+    def _make_a(self, shape):
+        n = shape[-1]
+        A = matx_common.randn_ndarray(shape, self.dtype)
+        A = A + n * np.eye(n, dtype=A.dtype)
+        return A
+
+    def run_vector(self):
+        n = self.size[-1]
+        A = self._make_a((n, n))
+        B = matx_common.randn_ndarray((n,), self.dtype)
+        X = np.linalg.solve(A, B)
+
+        return {
+            'A': A,
+            'B': B,
+            'X': X,
+        }
+
+    def run_vector_expression(self):
+        n = self.size[-1]
+        A = self._make_a((n, n))
+        B = matx_common.randn_ndarray((n,), self.dtype)
+        C = matx_common.randn_ndarray((n,), self.dtype)
+        X = np.linalg.solve(A, B) * C
+
+        return {
+            'A': A,
+            'B': B,
+            'C': C,
+            'X': X,
+        }
+
+    def run_matrix(self):
+        n, nrhs = self.size[-2:]
+        A = self._make_a((n, n))
+        B = matx_common.randn_ndarray((n, nrhs), self.dtype)
+        X = np.linalg.solve(A, B)
+
+        return {
+            'A': A,
+            'B': B,
+            'X': X,
+        }
+
+    def run_batched_vector(self):
+        batch_size, n = self.size[-2:]
+        A = self._make_a((batch_size, n, n))
+        B = matx_common.randn_ndarray((batch_size, n), self.dtype)
+        X = np.linalg.solve(A, B[..., np.newaxis])[..., 0]
+
+        return {
+            'A': A,
+            'B': B,
+            'X': X,
+        }
+
+    def run_batched_matrix(self):
+        batch_size, n, nrhs = self.size[-3:]
+        A = self._make_a((batch_size, n, n))
+        B = matx_common.randn_ndarray((batch_size, n, nrhs), self.dtype)
+        X = np.linalg.solve(A, B)
+
+        return {
+            'A': A,
+            'B': B,
+            'X': X,
+        }
+
+
 class cholesky:
     def __init__(self, dtype: str, size: List[int]):
         self.size = size

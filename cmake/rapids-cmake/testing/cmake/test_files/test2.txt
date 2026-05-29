@@ -1,0 +1,1 @@
+This is a different test file for rapids-cmake download tests.

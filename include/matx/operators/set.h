@@ -148,6 +148,20 @@ public:
     is_dynamic_tensor_v<T> || is_dynamic_tensor_v<Op> ||
     is_dynamic_rank_op_v<T> || is_dynamic_rank_op_v<Op>>;
 
+  template <typename Candidate>
+  static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr bool ContainsBlockReduction()
+  {
+    if constexpr (requires { typename Candidate::matx_jit_contains_block_reduction; }) {
+      return Candidate::matx_jit_contains_block_reduction::value;
+    }
+    else {
+      return requires { typename Candidate::matx_jit_block_reduction; };
+    }
+  }
+
+  using matx_jit_contains_block_reduction =
+      cuda::std::bool_constant<ContainsBlockReduction<Op>()>;
+
   __MATX_INLINE__ const std::string str() const {
     return get_type_str(out_) + "=" + get_type_str(op_);
   }
@@ -230,14 +244,24 @@ public:
       return in_val;
     }
     else {
+      using ScalarCap = CapabilityParams<ElementsPerThread::ONE, CapType::jit>;
       const auto in_val = detail::get_value<CapType>(static_cast<const decltype(op_)&>(op_), indices...);
       using out_type = decltype(out_.template operator()<CapType>(indices...));
 
 #if MATX_CHECK_NARROWING_CONVERSIONS
       CheckNarrowingAssignment<decltype(in_val)>();
 #endif
-      
-      if constexpr (!is_vector_v<decltype(in_val)> && is_vector_v<out_type>) {
+
+      if constexpr (ContainsBlockReduction<Op>() && CapType::jit) {
+#if defined(__CUDA_ARCH__)
+        if (threadIdx.x == 0) {
+#endif
+          out_.template operator()<ScalarCap>(indices...) = in_val;
+#if defined(__CUDA_ARCH__)
+        }
+#endif
+      }
+      else if constexpr (!is_vector_v<decltype(in_val)> && is_vector_v<out_type>) {
         Vector<remove_cvref_t<decltype(in_val)>, static_cast<size_t>(CapType::ept)> vec{in_val};
         out_.template operator()<CapType>(indices...) = vec;
       }
@@ -271,6 +295,17 @@ public:
        std::string("template <typename T, typename Op> struct " + func_name + "  {\n") +
            "  using value_type = typename T::value_type;\n" +
            "  using matxop = bool;\n" +
+          "   template <typename Candidate>\n" +
+          "   static __MATX_INLINE__ constexpr bool ContainsBlockReduction()\n" +
+          "   {\n" +
+          "     if constexpr (requires { typename Candidate::matx_jit_contains_block_reduction; }) {\n" +
+          "       return Candidate::matx_jit_contains_block_reduction::value;\n" +
+          "     }\n" +
+          "     else {\n" +
+          "       return requires { typename Candidate::matx_jit_block_reduction; };\n" +
+          "     }\n" +
+          "   }\n" +
+          "   using matx_jit_contains_block_reduction = cuda::std::bool_constant<ContainsBlockReduction<Op>()>;\n" +
           "   mutable typename detail::inner_storage_or_self_t<detail::base_type_t<T>> out_;\n" +
           "   mutable typename detail::inner_storage_or_self_t<detail::base_type_t<Op>> op_;\n" +
            "  template <typename CapType, typename... Is>\n" +
@@ -278,9 +313,18 @@ public:
                 "remove_cvref_t<decltype(detail::get_value<CapType>(op_, indices...))>\n" +
           "  {\n" +
           "    using in_val_type = remove_cvref_t<decltype(detail::get_value<CapType>(op_, indices...))>;\n" +
+          "    if constexpr (requires { typename Op::matx_jit_block_reduction; }) {\n" +
+          "      return op_.template Store<CapType>(out_, indices...);\n" +
+          "    }\n" +
           "    auto in_val = detail::get_value<CapType>(op_, indices...);\n" +
           "    using out_type = decltype(out_.template operator()<CapType>(indices...));\n" +
-          "    if constexpr (!is_vector_v<in_val_type> && is_vector_v<out_type>) {\n" +
+          "    if constexpr (ContainsBlockReduction<Op>()) {\n" +
+          "      using ScalarCap = CapabilityParams<ElementsPerThread::ONE, CapType::jit>;\n" +
+          "      if (threadIdx.x == 0) {\n" +
+          "        out_.template operator()<ScalarCap>(indices...) = in_val;\n" +
+          "      }\n" +
+          "    }\n" +
+          "    else if constexpr (!is_vector_v<in_val_type> && is_vector_v<out_type>) {\n" +
           "      Vector<remove_cvref_t<in_val_type>, static_cast<size_t>(CapType::ept)> vec{in_val};\n" +
           "      out_.template operator()<CapType>(indices...) = vec;\n" +
           "    }\n" +
@@ -374,20 +418,38 @@ public:
 #else
       return false;
 #endif
-    }
-    else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-      // Only force scalar EPT for planar-complex outputs. Non-planar SetOp
-      // should retain normal vectorization negotiation with operands.
-      const auto my_cap = is_planar_complex_v<typename T::value_type>
+        }
+        else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+          if constexpr (ContainsBlockReduction<Op>()) {
+            if constexpr (std::is_same_v<remove_cvref_t<InType>, EPTQueryInput>) {
+              if (!in.jit) {
+                return cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE,
+                                                              ElementsPerThread::ONE};
+              }
+            }
+            return detail::get_operator_capability<Cap>(op_, in);
+          }
+          // Only force scalar EPT for planar-complex outputs. Non-planar SetOp
+          // should retain normal vectorization negotiation with operands.
+          const auto my_cap = is_planar_complex_v<typename T::value_type>
           ? cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE,
                                                    ElementsPerThread::ONE}
           : capability_attributes<Cap>::default_value;
-      return combine_capabilities<Cap>(
-          my_cap, detail::get_operator_capability<Cap>(out_, in),
-          detail::get_operator_capability<Cap>(op_, in));
-    }
-    else {
-      auto self_has_cap = capability_attributes<Cap>::default_value;
+          return combine_capabilities<Cap>(
+              my_cap, detail::get_operator_capability<Cap>(out_, in),
+              detail::get_operator_capability<Cap>(op_, in));
+        }
+        else if constexpr (Cap == OperatorCapability::MAX_EPT_VEC_LOAD) {
+          if constexpr (ContainsBlockReduction<Op>()) {
+            return detail::get_operator_capability<Cap>(op_, in);
+          }
+          auto self_has_cap = capability_attributes<Cap>::default_value;
+          return combine_capabilities<Cap>(
+              self_has_cap, detail::get_operator_capability<Cap>(out_, in),
+              detail::get_operator_capability<Cap>(op_, in));
+        }
+        else {
+          auto self_has_cap = capability_attributes<Cap>::default_value;
 
       return combine_capabilities<Cap>(self_has_cap, 
                                       detail::get_operator_capability<Cap>(out_, in),
@@ -400,7 +462,7 @@ public:
   // InnerPreRun on it to call any nested PreRun calls, then output directly into the LHS
   // tensor.
   template <typename ShapeType, typename Executor>
-  void TransformExec(ShapeType &&shape, Executor &&ex) const noexcept {
+  void TransformExec(ShapeType &&shape, Executor &&ex) const {
     op_.InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
     op_.Exec(cuda::std::make_tuple(out_), std::forward<Executor>(ex));
     op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));

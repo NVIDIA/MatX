@@ -1,18 +1,9 @@
-#=============================================================================
-# Copyright (c) 2020-2024, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#=============================================================================
+# =============================================================================
+# cmake-format: off
+# SPDX-FileCopyrightText: Copyright (c) 2020-2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
+# cmake-format: on
+# =============================================================================
 include_guard(GLOBAL)
 
 #[=======================================================================[.rst:
@@ -76,13 +67,17 @@ consistency. List all targets used by your project in `GLOBAL_TARGET`.
   Record a :cmake:command:`find_dependency(<PackageName> ...) <cmake:module:CMakeFindDependencyMacro>` call needs to occur as part of
   our install directory export set.
 
+``BUILD_PATCH_ONLY``
+  Do not require the package to be downloaded even if a patch command is present. This is to enable patches that only affect
+  the build process and not runtime functionality.
+
 ``CPM_ARGS``
   Required placeholder to be provided before any extra arguments that need to
   be passed down to :cmake:command:`CPMFindPackage`.
 
   .. note::
-    A ``PATCH_COMMAND`` will always trigger usage of :cmake:command:`CPMAddPackage` instead of :cmake:command:`CPMFindPackage`. *This is true even
-    if the patch command is empty.*
+    A ``PATCH_COMMAND`` will always trigger usage of :cmake:command:`CPMAddPackage` instead of :cmake:command:`CPMFindPackage`,
+    unless ``BUILD_PATCH_ONLY`` is specified. *This is true even if the patch command is empty.*
 
 Result Variables
 ^^^^^^^^^^^^^^^^
@@ -147,8 +142,8 @@ modified version is used.
 # cmake-lint: disable=R0912,R0915
 function(rapids_cpm_find name version)
   list(APPEND CMAKE_MESSAGE_CONTEXT "rapids.cpm.find")
-  set(options CPM_ARGS)
-  set(one_value BUILD_EXPORT_SET INSTALL_EXPORT_SET)
+  set(options CPM_ARGS BUILD_PATCH_ONLY)
+  set(one_value BUILD_EXPORT_SET INSTALL_EXPORT_SET SOURCE_SUBDIR)
   set(multi_value COMPONENTS GLOBAL_TARGETS)
   cmake_parse_arguments(_RAPIDS "${options}" "${one_value}" "${multi_value}" ${ARGN})
 
@@ -156,13 +151,15 @@ function(rapids_cpm_find name version)
     message(FATAL_ERROR "rapids_cpm_find requires you to specify CPM_ARGS before any CPM arguments")
   endif()
 
-  set(has_patch FALSE)
-  foreach(unparsed_arg IN LISTS _RAPIDS_UNPARSED_ARGUMENTS)
-    if(unparsed_arg MATCHES "PATCH_COMMAND")
-      set(has_patch TRUE)
-      break()
-    endif()
-  endforeach()
+  set(has_non_build_patch FALSE)
+  if(NOT _RAPIDS_BUILD_PATCH_ONLY)
+    foreach(unparsed_arg IN LISTS _RAPIDS_UNPARSED_ARGUMENTS)
+      if(unparsed_arg STREQUAL "PATCH_COMMAND")
+        set(has_non_build_patch TRUE)
+        break()
+      endif()
+    endforeach()
+  endif()
 
   set(package_needs_to_be_added TRUE)
   if(_RAPIDS_GLOBAL_TARGETS)
@@ -181,11 +178,25 @@ function(rapids_cpm_find name version)
          "COMPONENTS ${_RAPIDS_COMPONENTS}")
   endif()
 
+  if(_RAPIDS_SOURCE_SUBDIR)
+    # We have seen issues with some versions of CMake ( 4.0.Y ) not properly recording the
+    # SOURCE_SUBDIR in the stored information return by FetchContent_GetProperties
+    list(APPEND _RAPIDS_UNPARSED_ARGUMENTS "SOURCE_SUBDIR" "${_RAPIDS_SOURCE_SUBDIR}")
+    # Store this in a property that `pinning_write_file` can query
+    set_property(GLOBAL PROPERTY rapids_cmake_${name}_SOURCE_SUBDIR "${_RAPIDS_SOURCE_SUBDIR}")
+  endif()
+
   if(package_needs_to_be_added)
-    # Any patch command triggers CPMAddPackage.
-    if(CPM_${name}_SOURCE OR has_patch)
+    # Any non-build patch command triggers CPMAddPackage.
+    if(CPM_${name}_SOURCE OR has_non_build_patch)
+      message(DEBUG
+              "rapids.cpm.rapids_find: CPMAddPackage(NAME ${name} VERSION ${version} ${_RAPIDS_UNPARSED_ARGUMENTS})"
+      )
       CPMAddPackage(NAME ${name} VERSION ${version} ${_RAPIDS_UNPARSED_ARGUMENTS})
     else()
+      message(DEBUG
+              "rapids.cpm.rapids_find CPMFindPackage(NAME ${name} VERSION ${version} ${_RAPIDS_UNPARSED_ARGUMENTS})"
+      )
       CPMFindPackage(NAME ${name} VERSION ${version} ${_RAPIDS_UNPARSED_ARGUMENTS})
     endif()
   else()

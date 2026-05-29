@@ -127,6 +127,8 @@ struct alignas(8) fltflt {
 #endif
     }
     __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ constexpr explicit fltflt(float x) : hi(x), lo(0.0f) {}
+    // This constructor stores the components as supplied and assumes callers pass
+    // normalized components when they require the float-float invariants.
     __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ constexpr explicit fltflt(float hi_, float lo_) : hi(hi_), lo(lo_) {}
     __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ constexpr explicit operator double() const {
         return static_cast<double>(hi) + static_cast<double>(lo);
@@ -381,12 +383,14 @@ static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_fma(fltflt a,
 
     // fltflt_mul() renormalizes at this point using fltflt_fast_two_sum(p.hi, p.lo), but
     // we skip that step, add the c hi component, add the p.lo component, renormalize,
-    // and finally add the c.lo component.
+    // and finally add the c.lo component and the low-low product term. The low-low term
+    // can become significant when a*b cancels with c.
 
     fltflt s = fltflt_two_sum(p.hi, c.hi);
     s.lo = detail::fadd_rn(s.lo, p.lo);
     s = fltflt_fast_two_sum(s.hi, s.lo);
     s.lo = detail::fadd_rn(s.lo, c.lo);
+    s.lo = detail::fmaf_rn(a.lo, b.lo, s.lo);
 
     // Single final normalization
     s = fltflt_fast_two_sum(s.hi, s.lo);
@@ -403,10 +407,11 @@ static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_fma(fltflt a,
     p.lo = detail::fmaf_rn(a.lo, b.hi, p.lo);
 
     // fltflt_mul() renormalizes at this point using fltflt_fast_two_sum(p.hi, p.lo), but
-    // we skip that step, add c, and then add the p.lo component.
+    // we skip that step, add c, and then add the p.lo component and the low-low product term.
 
     fltflt s = fltflt_two_sum(p.hi, c);
     s.lo = detail::fadd_rn(s.lo, p.lo);
+    s.lo = detail::fmaf_rn(a.lo, b.lo, s.lo);
 
     // Single final normalization
     s = fltflt_fast_two_sum(s.hi, s.lo);
@@ -467,13 +472,79 @@ static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_fma(float a, 
     return fltflt_fma(b, a, c);
 }
 
+// A version of fltflt_fma() where a and b are floats. This is more efficient than
+// using fltflt_fma(fltflt{ a, 0.0f }, fltflt{ b, 0.0f }, c).
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_fma(float a, float b, fltflt c) {
+    fltflt p = fltflt_two_prod_fma(a, b);
+
+    fltflt s = fltflt_two_sum(p.hi, c.hi);
+    s.lo = detail::fadd_rn(s.lo, p.lo);
+    s = fltflt_fast_two_sum(s.hi, s.lo);
+    s.lo = detail::fadd_rn(s.lo, c.lo);
+
+    s = fltflt_fast_two_sum(s.hi, s.lo);
+
+    return s;
+}
+
+// fltflt_fma_approx() computes a * b + c but omits the low-low product term
+// a.lo*b.lo. It still includes the first-order cross terms a.hi*b.lo and
+// a.lo*b.hi. This matches the previous fast FMA behavior and is useful in hot
+// paths where the second-order low-low term is known to be below the error
+// budget.
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_fma_approx(fltflt a, fltflt b, fltflt c) {
+    fltflt p = fltflt_two_prod_fma(a.hi, b.hi);
+    p.lo = detail::fmaf_rn(a.hi, b.lo, p.lo);
+    p.lo = detail::fmaf_rn(a.lo, b.hi, p.lo);
+
+    fltflt s = fltflt_two_sum(p.hi, c.hi);
+    s.lo = detail::fadd_rn(s.lo, p.lo);
+    s = fltflt_fast_two_sum(s.hi, s.lo);
+    s.lo = detail::fadd_rn(s.lo, c.lo);
+    s = fltflt_fast_two_sum(s.hi, s.lo);
+
+    return s;
+}
+
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_fma_approx(fltflt a, fltflt b, float c) {
+    fltflt p = fltflt_two_prod_fma(a.hi, b.hi);
+    p.lo = detail::fmaf_rn(a.hi, b.lo, p.lo);
+    p.lo = detail::fmaf_rn(a.lo, b.hi, p.lo);
+
+    fltflt s = fltflt_two_sum(p.hi, c);
+    s.lo = detail::fadd_rn(s.lo, p.lo);
+    s = fltflt_fast_two_sum(s.hi, s.lo);
+
+    return s;
+}
+
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_fma_approx(float a, fltflt b, fltflt c) {
+    return fltflt_fma(a, b, c);
+}
+
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_fma_approx(fltflt a, float b, fltflt c) {
+    return fltflt_fma(a, b, c);
+}
+
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_fma_approx(fltflt a, float b, float c) {
+    return fltflt_fma(a, b, c);
+}
+
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_fma_approx(float a, fltflt b, float c) {
+    return fltflt_fma(a, b, c);
+}
+
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_fma_approx(float a, float b, fltflt c) {
+    return fltflt_fma(a, b, c);
+}
+
 // fltflt_div() is the df64_div() function given by Thall, which he attributes to Karp.
 // This function implements Algorithm 6 from Thall's paper. For the initial approximation,
 // we use the __fdividef() intrinsic on the device.
 static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_div(fltflt a, fltflt b) {
     const float xn = (b.hi == 0.0f) ? 0.0f : detail::fdividef_rn(1.0f, b.hi);
     const float yn = detail::fmul_rn(a.hi, xn);
-    const fltflt diff = fltflt_sub(a, fltflt_mul(b, yn));
+    const fltflt diff = fltflt_fma(-yn, b, a);
     const fltflt prod = fltflt_two_prod_fma(xn, diff.hi);
     return fltflt_add(prod, yn);
 }
@@ -483,7 +554,7 @@ static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_div(fltflt a,
 static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_div(fltflt a, float b) {
     const float xn = (b == 0.0f) ? 0.0f : detail::fdividef_rn(1.0f, b);
     const float yn = detail::fmul_rn(a.hi, xn);
-    const fltflt diff = fltflt_sub(a, fltflt_two_prod_fma(b, yn));
+    const fltflt diff = fltflt_fma(-yn, b, a);
     const fltflt prod = fltflt_two_prod_fma(xn, diff.hi);
     return fltflt_add(prod, yn);
 }
@@ -493,7 +564,7 @@ static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_div(fltflt a,
 static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_div(float a, fltflt b) {
     const float xn = (b.hi == 0.0f) ? 0.0f : detail::fdividef_rn(1.0f, b.hi);
     const float yn = detail::fmul_rn(a, xn);
-    const fltflt diff = fltflt_sub(a, fltflt_mul(b, yn));
+    const fltflt diff = fltflt_fma(-yn, b, a);
     const fltflt prod = fltflt_two_prod_fma(xn, diff.hi);
     return fltflt_add(prod, yn);
 }

@@ -47,6 +47,9 @@
 #include "matx/core/error.h"
 #include "matx/core/nvtx.h"
 #include "matx/core/tensor.h"
+#include "matx/operators/hermitian.h"
+#include "matx/operators/transpose.h"
+#include "matx/operators/unary_operators.h"
 #include "matx/transforms/matmul/matmul_common.h"
 
 namespace matx {
@@ -140,10 +143,70 @@ struct MatMulCUDAParams_t {
   MatXDataType_t dtype;
   cublasOperation_t opA;
   cublasOperation_t opB;
+  MemOrder_t orderA = MEM_ORDER_ROW_MAJOR;
+  MemOrder_t orderB = MEM_ORDER_ROW_MAJOR;
+  MemOrder_t orderC = MEM_ORDER_ROW_MAJOR;
   bool a_planar = false;
   bool b_planar = false;
   bool c_planar = false;
 };
+
+static __MATX_INLINE__ index_t GemmOpRows(cublasOperation_t op, index_t rows,
+                                          index_t cols)
+{
+  return op == CUBLAS_OP_N ? rows : cols;
+}
+
+static __MATX_INLINE__ index_t GemmOpCols(cublasOperation_t op, index_t rows,
+                                          index_t cols)
+{
+  return op == CUBLAS_OP_N ? cols : rows;
+}
+
+template <typename Op>
+struct is_hermitian_trans_op : std::false_type {
+};
+
+template <typename T, int DIM>
+struct is_hermitian_trans_op<HermitianTransOp<T, DIM>> : std::true_type {
+};
+
+template <typename Op>
+inline constexpr bool is_hermitian_trans_op_v =
+    is_hermitian_trans_op<remove_cvref_t<Op>>::value;
+
+template <typename Op>
+struct is_conj_tensor_view_unary_op : std::false_type {
+};
+
+// cuBLASLt can express conjugation of a tensor view by passing the transposed
+// view with CUBLAS_OP_C. Keep this narrow so nested expressions such as
+// conj(hermitianT(A)) are evaluated as written by the generic copy path.
+template <typename I1, typename T>
+struct is_conj_tensor_view_unary_op<matxUnaryOp<I1, ConjOp<T>>>
+    : std::bool_constant<is_tensor_view_v<remove_cvref_t<I1>>> {
+};
+
+template <typename Op>
+inline constexpr bool is_conj_tensor_view_unary_op_v =
+    is_conj_tensor_view_unary_op<remove_cvref_t<Op>>::value;
+
+template <typename T>
+static constexpr cublasOperation_t MatMulConjTransposeOp()
+{
+  if constexpr (is_complex_v<T> && !is_complex_half_v<T>) {
+    return CUBLAS_OP_C;
+  }
+  else {
+    return CUBLAS_OP_T;
+  }
+}
+
+template <typename T>
+static constexpr bool CanUseCublasLtConjTransposeOp()
+{
+  return !is_complex_half_v<T>;
+}
 
 template <typename TensorTypeC, typename TensorTypeA, typename TensorTypeB,
           MatMulCUDAProvider_t PROV = PROVIDER_TYPE_CUBLASLT>
@@ -188,14 +251,13 @@ public:
    *
    */
   MatMulCUDAHandle_t(TensorTypeC &c, const TensorTypeA &a,
-                     const TensorTypeB &b)
+                     const TensorTypeB &b,
+                     cublasOperation_t opA = CUBLAS_OP_N,
+                     cublasOperation_t opB = CUBLAS_OP_N)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
     static_assert(RANK >= 2);
-    MATX_ASSERT(a.Size(TensorTypeA::Rank() - 1) == b.Size(TensorTypeB::Rank() - 2), matxInvalidSize);
-    MATX_ASSERT(c.Size(RANK - 1) == b.Size(TensorTypeB::Rank() - 1), matxInvalidSize);
-    MATX_ASSERT(c.Size(RANK - 2) == a.Size(TensorTypeA::Rank() - 2), matxInvalidSize);
 
     // Ensure batch dimensions are equal
     for (int i = 0; i < RANK - 2; i++) {
@@ -208,7 +270,17 @@ public:
     }
 
     // This must come before the things below to properly set class parameters
-    params_ = GetGemmParams(c, a, b);
+    params_ = GetGemmParams(c, a, b, opA, opB);
+
+    MATX_ASSERT(GemmOpCols(params_.opA, params_.a_rows, params_.a_cols) ==
+                    GemmOpRows(params_.opB, params_.b_rows, params_.b_cols),
+                matxInvalidSize);
+    MATX_ASSERT(c.Size(RANK - 1) ==
+                    GemmOpCols(params_.opB, params_.b_rows, params_.b_cols),
+                matxInvalidSize);
+    MATX_ASSERT(c.Size(RANK - 2) ==
+                    GemmOpRows(params_.opA, params_.a_rows, params_.a_cols),
+                matxInvalidSize);
 
     if constexpr (PROV == PROVIDER_TYPE_CUBLASLT) {
       // The recommended cublas workspace size is 4 MiB for pre-Hopper and 32 MiB for Hopper+:
@@ -265,7 +337,9 @@ public:
   }
 
   static detail::MatMulCUDAParams_t GetGemmParams(TensorTypeC &c, const TensorTypeA &a,
-                     const TensorTypeB &b)
+                     const TensorTypeB &b,
+                     cublasOperation_t requestedOpA = CUBLAS_OP_N,
+                     cublasOperation_t requestedOpB = CUBLAS_OP_N)
   {
     /* If a user passes in a tensor where the last two dimensions are transposed we retain
        the original size parameters, but tell the underlying libraries that the tensors are
@@ -282,6 +356,12 @@ public:
     params.a_planar = is_planar_complex_v<typename TensorTypeA::value_type>;
     params.b_planar = is_planar_complex_v<typename TensorTypeB::value_type>;
     params.c_planar = is_planar_complex_v<typename TensorTypeC::value_type>;
+    params.a_rows = a.Size(TensorTypeA::Rank() - 2);
+    params.a_cols = a.Size(TensorTypeA::Rank() - 1);
+    params.b_rows = b.Size(TensorTypeB::Rank() - 2);
+    params.b_cols = b.Size(TensorTypeB::Rank() - 1);
+    params.c_rows = c.Size(RANK - 2);
+    params.c_cols = c.Size(RANK - 1);
 
     // Batches
     params.batch = 1;
@@ -361,12 +441,11 @@ public:
       else if constexpr (PROV == PROVIDER_TYPE_CUTLASS) {
         params.opA = CUBLAS_OP_N;
         params.opB = CUBLAS_OP_N;
-        params.m = static_cast<int>(b.Size(TensorTypeB::Rank() - 1));
-        params.n = static_cast<int>(a.Size(TensorTypeA::Rank() - 2));
-        params.k =
-            static_cast<int>(a.Size(TensorTypeA::Rank() - 2)); // Gemm Problem dimensions
-        params.lda = static_cast<int>(b.Stride(TensorTypeB::Rank() - 1));
-        params.ldb = static_cast<int>(a.Stride(TensorTypeA::Rank() - 1));
+        params.m = params.a_rows;
+        params.n = params.b_cols;
+        params.k = params.a_cols; // Gemm Problem dimensions
+        params.lda = static_cast<int>(a.Stride(TensorTypeA::Rank() - 2));
+        params.ldb = static_cast<int>(b.Stride(TensorTypeB::Rank() - 2));
         params.ldc = static_cast<int>(c.Stride(RANK - 1));
       }
     }
@@ -374,23 +453,26 @@ public:
       if constexpr (PROV == PROVIDER_TYPE_CUBLASLT) {
         if constexpr (is_complex_half_v<typename TensorTypeA::value_type>) {
           // For half complex we always copy to a new tensor so it is always cublas op N
-          params.opA = CUBLAS_OP_N;
+          params.orderA = MEM_ORDER_ROW_MAJOR;
         } else if ( a.Stride(TensorTypeA::Rank()-1) > 1 // last stride > 1
                   || (a.Stride(TensorTypeA::Rank()-1) == 1 && a.Stride(TensorTypeA::Rank()-2) == 1 && a.Size(TensorTypeA::Rank()-1) != 1)) { // last strides both equal 1 and size > 1
-          params.opA = CUBLAS_OP_T;
+          params.orderA = MEM_ORDER_COL_MAJOR;
         } else { // otherwise row major
-          params.opA = CUBLAS_OP_N;
+          params.orderA = MEM_ORDER_ROW_MAJOR;
         }
 
         if constexpr (is_complex_half_v<typename TensorTypeB::value_type>) {
           // For half complex we always copy to a new tensor so it is always cublas op N
-          params.opB = CUBLAS_OP_N;
+          params.orderB = MEM_ORDER_ROW_MAJOR;
         } else if ( b.Stride(TensorTypeB::Rank()-1) > 1 // last stride > 1
                   || (b.Stride(TensorTypeB::Rank()-1) == 1 && b.Stride(TensorTypeB::Rank()-2) == 1 && b.Size(TensorTypeB::Rank()-1) != 1)) { // last strides both equal 1 and size > 1
-          params.opB = CUBLAS_OP_T;
+          params.orderB = MEM_ORDER_COL_MAJOR;
         } else { // otherwise row major
-          params.opB = CUBLAS_OP_N;
+          params.orderB = MEM_ORDER_ROW_MAJOR;
         }
+
+        params.opA = requestedOpA;
+        params.opB = requestedOpB;
 
         params.a_rows = a.Size(TensorTypeA::Rank() - 2);
         params.a_cols = a.Size(TensorTypeA::Rank() - 1);
@@ -400,7 +482,7 @@ public:
         // set lda/ldb according to transpose modes. If we pass in a cloned tensor the second stride will be
         // 0, which cuBLAS doesn't like even though it's unused. Set it to something that it would be if the
         // matrix had more than 1 row.
-        if (params.opB == CUBLAS_OP_T) {
+        if (params.orderB == MEM_ORDER_COL_MAJOR) {
           params.ldb = b.Stride(TensorTypeB::Rank() - 1);
         }
         else {
@@ -408,7 +490,7 @@ public:
           params.ldb = (params.ldb == 0) ? b.Size(TensorTypeB::Rank() - 1) : params.ldb;
         }
 
-        if (params.opA == CUBLAS_OP_T) {
+        if (params.orderA == MEM_ORDER_COL_MAJOR) {
           params.lda = a.Stride(TensorTypeA::Rank() - 1);
         }
         else {
@@ -425,8 +507,11 @@ public:
           params.ldb = b.Size(TensorTypeB::Rank()-1);
         }
 
-        params.c_rows = params.a_rows;
-        params.c_cols = params.b_cols;
+        params.m = GemmOpRows(params.opA, params.a_rows, params.a_cols);
+        params.k = GemmOpCols(params.opA, params.a_rows, params.a_cols);
+        params.n = GemmOpCols(params.opB, params.b_rows, params.b_cols);
+        params.c_rows = params.m;
+        params.c_cols = params.n;
         params.ldc = c.Stride(RANK - 2);
 
         // For complex half paths we launch as planar row-major. Use compact
@@ -440,10 +525,15 @@ public:
       else if constexpr (PROV == PROVIDER_TYPE_CUTLASS) {
         params.opA = CUBLAS_OP_N;
         params.opB = CUBLAS_OP_N;
-        params.m = static_cast<int>(a.Size(TensorTypeA::Rank() - 2));
-        params.n = static_cast<int>(b.Size(TensorTypeB::Rank() - 1));
-        params.k =
-            static_cast<int>(a.Size(TensorTypeA::Rank() - 1)); // Gemm Problem dimensions
+        params.a_rows = a.Size(TensorTypeA::Rank() - 2);
+        params.a_cols = a.Size(TensorTypeA::Rank() - 1);
+        params.b_rows = b.Size(TensorTypeB::Rank() - 2);
+        params.b_cols = b.Size(TensorTypeB::Rank() - 1);
+        params.c_rows = c.Size(RANK - 2);
+        params.c_cols = c.Size(RANK - 1);
+        params.m = params.a_rows;
+        params.n = params.b_cols;
+        params.k = params.a_cols; // Gemm Problem dimensions
         params.lda = static_cast<int>(a.Stride(TensorTypeA::Rank() - 2));
         params.ldb = static_cast<int>(b.Stride(TensorTypeB::Rank() - 2));
         params.ldc = static_cast<int>(c.Stride(RANK - 2));
@@ -572,17 +662,16 @@ private:
     cublasLtOrder_t rowOrder = CUBLASLT_ORDER_ROW;
     cublasLtOrder_t colOrder = CUBLASLT_ORDER_COL;
 
-    auto op = CUBLAS_OP_N;
     // A operation
     ret = cublasLtMatmulDescSetAttribute(
-                    operationDesc, CUBLASLT_MATMUL_DESC_TRANSA, &op,
-                    sizeof(op));
+                    operationDesc, CUBLASLT_MATMUL_DESC_TRANSA, &params_.opA,
+                    sizeof(params_.opA));
     MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
 
     // B operation
     ret = cublasLtMatmulDescSetAttribute(
-                    operationDesc, CUBLASLT_MATMUL_DESC_TRANSB, &op,
-                    sizeof(op));
+                    operationDesc, CUBLASLT_MATMUL_DESC_TRANSB, &params_.opB,
+                    sizeof(params_.opB));
     MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
 
     // Update this later when we're more flexible on compute type
@@ -623,7 +712,7 @@ private:
     MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
 
     // Matrix data order
-    if (params_.opA == CUBLAS_OP_T) {
+    if (params_.orderA == MEM_ORDER_COL_MAJOR) {
       ret = cublasLtMatrixLayoutSetAttribute(
                       Adesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &colOrder,
                       sizeof(colOrder));
@@ -635,7 +724,7 @@ private:
     }
     MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
 
-    if (params_.opB == CUBLAS_OP_T) {
+    if (params_.orderB == MEM_ORDER_COL_MAJOR) {
       ret = cublasLtMatrixLayoutSetAttribute(
                       Bdesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &colOrder,
                       sizeof(colOrder));
@@ -647,9 +736,16 @@ private:
     }
     MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
 
-    ret = cublasLtMatrixLayoutSetAttribute(
-                    Cdesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &rowOrder,
-                    sizeof(rowOrder));
+    if (params_.orderC == MEM_ORDER_COL_MAJOR) {
+      ret = cublasLtMatrixLayoutSetAttribute(
+                      Cdesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &colOrder,
+                      sizeof(colOrder));
+    }
+    else {
+      ret = cublasLtMatrixLayoutSetAttribute(
+                      Cdesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &rowOrder,
+                      sizeof(rowOrder));
+    }
     MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
 
     ret = cublasLtMatrixLayoutSetAttribute(
@@ -1126,6 +1222,11 @@ struct MatMulCUDAParamsKeyHash {
     return std::hash<uint64_t>()(k.m) + std::hash<uint64_t>()(k.n) +
            std::hash<uint64_t>()(k.k) + std::hash<uint64_t>()(k.batch) +
            std::hash<uint64_t>()(k.prov) +
+           std::hash<uint64_t>()(k.opA) +
+           std::hash<uint64_t>()(k.opB) +
+           std::hash<uint64_t>()(k.orderA) +
+           std::hash<uint64_t>()(k.orderB) +
+           std::hash<uint64_t>()(k.orderC) +
            std::hash<uint64_t>()(static_cast<uint64_t>(k.a_planar)) +
            std::hash<uint64_t>()(static_cast<uint64_t>(k.b_planar)) +
            std::hash<uint64_t>()(static_cast<uint64_t>(k.c_planar)) +
@@ -1150,6 +1251,8 @@ struct MatMulCUDAParamsKeyEq {
            l.ldb == t.ldb && l.ldc == t.ldc && l.batch == t.batch &&
            l.prov == t.prov && l.dtype == t.dtype && l.opA == t.opA &&
            l.opB == t.opB && l.rank == t.rank &&
+           l.orderA == t.orderA && l.orderB == t.orderB &&
+           l.orderC == t.orderC &&
            l.a_planar == t.a_planar &&
            l.b_planar == t.b_planar &&
            l.c_planar == t.c_planar;
@@ -1179,6 +1282,81 @@ __MATX_INLINE__ auto getCublasSupportedTensor( const Op &in, cudaStream_t stream
 
   return GetSupportedTensor(in, support_func, MATX_ASYNC_DEVICE_MEMORY, stream);
 }
+
+namespace detail {
+
+template <typename TensorType, typename Op>
+__MATX_INLINE__ void CopyCublasInputIfNeeded(TensorType &tensor, const Op &op,
+                                             cudaStream_t stream)
+{
+  if constexpr (!is_matx_transform_op<Op>()) {
+    if (!tensor.isSameView(op)) {
+      (tensor = op).run(stream);
+    }
+  }
+}
+
+template <typename ValueType, MatMulCUDAProvider_t PROV, typename Op,
+          typename Func>
+__MATX_INLINE__ void WithMatmulOperand(const Op &op, cudaStream_t stream,
+                                       Func &&func)
+{
+  using OpType = remove_cvref_t<Op>;
+  constexpr bool can_use_metadata_op =
+      PROV == PROVIDER_TYPE_CUBLASLT &&
+      std::is_same_v<typename OpType::value_type, ValueType> &&
+      CanUseCublasLtConjTransposeOp<ValueType>();
+
+  if constexpr (can_use_metadata_op && is_hermitian_trans_op_v<OpType>) {
+    const auto &input = op.Input();
+    auto tensor = getCublasSupportedTensor(input, stream);
+    CopyCublasInputIfNeeded(tensor, input, stream);
+    func(tensor, MatMulConjTransposeOp<ValueType>());
+  }
+  else if constexpr (can_use_metadata_op && is_conj_tensor_view_unary_op_v<OpType>) {
+    const auto &input = op.Input();
+    auto transposed = transpose_matrix(input);
+    auto tensor = getCublasSupportedTensor(transposed, stream);
+    CopyCublasInputIfNeeded(tensor, transposed, stream);
+    func(tensor, MatMulConjTransposeOp<ValueType>());
+  }
+  else {
+    auto tensor = getCublasSupportedTensor(op, stream);
+    CopyCublasInputIfNeeded(tensor, op, stream);
+    func(tensor, CUBLAS_OP_N);
+  }
+}
+
+template <typename TensorTypeC, typename TensorTypeA, typename TensorTypeB,
+          MatMulCUDAProvider_t PROV = PROVIDER_TYPE_CUBLASLT>
+void MatMulCUDAExecPrepared(TensorTypeC &c, const TensorTypeA &a,
+                            const TensorTypeB &b, const cudaExecutor &exec,
+                            cudaStream_t stream, float alpha, float beta,
+                            cublasOperation_t opA, cublasOperation_t opB)
+{
+  auto params =
+    detail::MatMulCUDAHandle_t<TensorTypeC, TensorTypeA, TensorTypeB, PROV>::
+      GetGemmParams(c, a, b, opA, opB);
+  params.stream = stream;
+
+  using cache_val_type =
+      detail::MatMulCUDAHandle_t<TensorTypeC, TensorTypeA, TensorTypeB, PROV>;
+  auto cache_id = detail::GetCacheIdFromType<detail::gemm_cuda_cache_t>();
+  MATX_LOG_DEBUG("MatMul transform: cache_id={}", cache_id);
+  detail::GetCache().LookupAndExec<detail::gemm_cuda_cache_t>(
+    cache_id,
+    params,
+    [&]() {
+      return std::make_shared<cache_val_type>(c, a, b, opA, opB);
+    },
+    [&](std::shared_ptr<cache_val_type> cache_type) {
+      cache_type->Exec(c, a, b, stream, alpha, beta);
+    },
+    exec
+  );
+}
+
+} // end namespace detail
 
 /**
  * Run a GEMM without a plan
@@ -1236,22 +1414,8 @@ void matmul_impl(TensorTypeC C, const TensorTypeA A,
       "Combination of A/B/C types are not supported");
 
   // CublasLt does not support operators and certain transpose modes.
-  // Grab a suppported tensor here and copy in if necessary.
+  // Grab a suppported C tensor here and copy in if necessary.
   auto c = getCublasSupportedTensor(C, stream);
-  auto a = getCublasSupportedTensor(A_, stream);
-  auto b = getCublasSupportedTensor(B_, stream);
-
-  typedef decltype(c) ctype;
-  typedef decltype(a) atype;
-  typedef decltype(b) btype;
-
-  if(!is_matx_transform_op<TensorTypeA>() && !a.isSameView(A_)) {
-    (a = A_).run(stream);
-  }
-
-  if(!is_matx_transform_op<TensorTypeB>() && !b.isSameView(B_)) {
-    (b = B_).run(stream);
-  }
 
   if(beta != 0 && !c.isSameView(C)) {
     (c = C).run(stream);
@@ -1262,31 +1426,28 @@ void matmul_impl(TensorTypeC C, const TensorTypeA A,
   // Use the identity CT = BT * AT to do the transpose through the gemm automatically.  Note we only want to do this transpose if
   // the rightmost stride is !=1 or this function will be an infinite recursion.
   if ( c.Stride(c.Rank()-2) == 1 && c.Stride(c.Rank()-1) > 1 ) {  // column major check
+    auto a = getCublasSupportedTensor(A_, stream);
+    auto b = getCublasSupportedTensor(B_, stream);
+    detail::CopyCublasInputIfNeeded(a, A_, stream);
+    detail::CopyCublasInputIfNeeded(b, B_, stream);
+
     // Column major
     matmul_impl(transpose_matrix(c), transpose_matrix(b), transpose_matrix(a), exec, alpha, beta);
   } else
 #endif
   {
-    // Get parameters required by these tensors
-    auto params =
-      detail::MatMulCUDAHandle_t<ctype, atype, btype, PROV>::GetGemmParams(c, a, b);
-    params.stream = stream;
-
-    using cache_val_type = detail::MatMulCUDAHandle_t<ctype, atype, btype, PROV>;
-    auto cache_id = detail::GetCacheIdFromType<detail::gemm_cuda_cache_t>();
-    MATX_LOG_DEBUG("MatMul transform: cache_id={}", cache_id);
-    detail::GetCache().LookupAndExec<detail::gemm_cuda_cache_t>(
-      cache_id,
-      params,
-      [&]() {
-        return std::make_shared<cache_val_type>(c, a, b);
-      },
-      [&](std::shared_ptr<cache_val_type> cache_type) {
-        cache_type->Exec(c, a, b, stream, alpha, beta);
-      },
-      exec
-    );
-   }
+    detail::WithMatmulOperand<typename TensorTypeC::value_type, PROV>(
+      A_, stream,
+      [&](const auto &a, cublasOperation_t opA) {
+        detail::WithMatmulOperand<typename TensorTypeC::value_type, PROV>(
+          B_, stream,
+          [&](const auto &b, cublasOperation_t opB) {
+            detail::MatMulCUDAExecPrepared<decltype(c), remove_cvref_t<decltype(a)>,
+                                           remove_cvref_t<decltype(b)>, PROV>(
+                c, a, b, exec, stream, alpha, beta, opA, opB);
+          });
+      });
+  }
 
   // if c and C are not the same then we need to copy results out.
   if(!c.isSameView(C)) {

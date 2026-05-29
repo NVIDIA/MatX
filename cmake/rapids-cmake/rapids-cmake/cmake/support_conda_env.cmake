@@ -1,18 +1,9 @@
-#=============================================================================
-# Copyright (c) 2021-2024, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#=============================================================================
+# =============================================================================
+# cmake-format: off
+# SPDX-FileCopyrightText: Copyright (c) 2021-2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
+# cmake-format: on
+# =============================================================================
 include_guard(GLOBAL)
 
 #[=======================================================================[.rst:
@@ -40,6 +31,14 @@ the behavior of conda when it builds projects.
 
 The `target_name` target will add the required compile flags to ensure debug builds
 are generated with `-O0` instead of the conda env default of `-O2`.
+
+.. versionadded:: v25.06.00
+
+The flag `-ffile-prefix-map` is now passed to remap absolute paths starting
+with `$ENV{PREFIX}` to paths relative to it in binaries generated via
+compilation. This ensures paths baked into binaries are relative to the
+environment prefix. This prevents Conda from rewriting these paths when the
+package is installed.
 
 Also offers the ability to modify :cmake:variable:`CMAKE_PREFIX_PATH <cmake:variable:CMAKE_PREFIX_PATH>` to
 include the following paths based on the current conda environment:
@@ -163,6 +162,14 @@ function(rapids_cmake_support_conda_env target)
         target_link_options(${target} INTERFACE
                             "$<HOST_LINK:SHELL:LINKER:-rpath-link=$ENV{BUILD_PREFIX}/lib>")
       endif()
+
+      # For built binaries (like libraries), remap environment absolute paths (`$PREFIX/<path>`) to
+      # paths relative to the environment `$PREFIX` (`<path>`).
+      target_compile_options(${target}
+                             INTERFACE "$<$<COMPILE_LANGUAGE:C>:-ffile-prefix-map=$ENV{PREFIX}/=''>"
+                                       "$<$<COMPILE_LANGUAGE:CXX>:-ffile-prefix-map=$ENV{PREFIX}/=''>"
+                                       "$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-ffile-prefix-map=$ENV{PREFIX}/=''>"
+      )
 
       if(modify_prefix_path)
         message(VERBOSE "Conda build detected")

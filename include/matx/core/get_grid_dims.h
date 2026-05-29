@@ -36,6 +36,7 @@
 #include "matx/core/error.h"
 #include <cuda/std/array>
 #include <cuda/std/functional>
+#include <cuda/std/limits>
 #include <cuda/std/__numeric/accumulate.h>
 
 namespace matx {
@@ -186,7 +187,7 @@ inline bool get_grid_dims_block(dim3 &blocks, dim3 &threads, const cuda::std::ar
   blocks.y = 1;
   blocks.z = 1;    
 
-  if (RANK > 1) {
+  if constexpr (RANK > 1) {
     MATX_ASSERT_STR_EXP(sizes[sizes.size() - 2] % groups_per_block, 0, matxInvalidParameter, "Second to last dimension must be divisible by groups_per_block");
   }
 
@@ -298,6 +299,38 @@ inline bool get_grid_dims_block(dim3 &blocks, dim3 &threads, const cuda::std::ar
 
   MATX_LOG_DEBUG("Blocks {}x{}x{} Threads {}x{}x{} groups_per_block={}", blocks.x, blocks.y, blocks.z, threads.x, threads.y, threads.z, groups_per_block);
   return stride;
+}
+
+template <int RANK>
+inline bool get_grid_dims_block_reduce(dim3 &blocks, dim3 &threads, const cuda::std::array<index_t, RANK> &sizes,
+                                       int groups_per_block, int block_size)
+{
+  threads.x = block_size;
+  threads.y = groups_per_block;
+  threads.z = 1;
+
+  index_t total_outputs = 1;
+  if constexpr (RANK > 0) {
+    for (int r = 0; r < RANK; r++) {
+      total_outputs *= sizes[r];
+    }
+  }
+
+  const index_t raw_blocks = (total_outputs + groups_per_block - 1) / groups_per_block;
+  if (raw_blocks > static_cast<index_t>(cuda::std::numeric_limits<int>::max())) {
+    MATX_THROW(matxInvalidParameter, "Block-reduction launch: batch size exceeds CUDA maximum gridDim.x");
+  }
+  blocks.x = static_cast<unsigned int>(raw_blocks);
+  blocks.y = 1;
+  blocks.z = 1;
+
+  if (static_cast<int64_t>(threads.x) * static_cast<int64_t>(threads.y) > 1024) {
+    MATX_THROW(matxInvalidParameter, "Block-reduction launch exceeds CUDA maximum threads per block");
+  }
+
+  MATX_LOG_DEBUG("BlockReduce: Blocks {}x{}x{} Threads {}x{}x{} groups_per_block={}",
+                 blocks.x, blocks.y, blocks.z, threads.x, threads.y, threads.z, groups_per_block);
+  return false;
 }
 
 // For 2D block operators (e.g., cuBLASDx GEMM) where all threads in a block cooperate 

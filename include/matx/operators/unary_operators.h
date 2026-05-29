@@ -72,6 +72,26 @@ namespace matx
     using dynamic_tensor_expr = cuda::std::bool_constant<
       is_dynamic_tensor_v<I1> || is_dynamic_rank_op_v<I1>>;
 
+    template <typename Candidate>
+    static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr bool ContainsBlockReduction()
+    {
+      if constexpr (requires { typename Candidate::matx_jit_contains_block_reduction; }) {
+        return Candidate::matx_jit_contains_block_reduction::value;
+      }
+      else {
+        return requires { typename Candidate::matx_jit_block_reduction; };
+      }
+    }
+
+    using matx_jit_contains_block_reduction =
+        cuda::std::bool_constant<ContainsBlockReduction<I1>()>;
+
+    template <typename Candidate>
+    static __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr bool IsDirectBlockReduction()
+    {
+      return requires { typename Candidate::matx_jit_block_reduction; };
+    }
+
 #ifdef MATX_EN_JIT
     struct JIT_Storage {
       typename detail::inner_storage_or_self_t<detail::base_type_t<I1>> in1_;
@@ -85,6 +105,10 @@ namespace matx
 
     __MATX_INLINE__ const std::string str() const {
       return op_.str() + "(" + get_type_str(in1_) + ")";
+    }
+
+    __MATX_INLINE__ const auto& Input() const noexcept {
+      return in1_;
     }
 
     __MATX_INLINE__ matxUnaryOp(const I1 &in1, const Op &op) : in1_(in1), op_(op) {
@@ -107,7 +131,11 @@ namespace matx
       requires (cuda::std::conjunction_v<cuda::std::is_integral<Is>...>)
     __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
     {
-      auto i1 = get_value<CapType>(in1_, indices...);
+      using ScalarCap = CapabilityParams<ElementsPerThread::ONE, CapType::jit>;
+      using I1Cap = cuda::std::conditional_t<matx_jit_contains_block_reduction::value &&
+                                              (!ContainsBlockReduction<I1>() && !IsDirectBlockReduction<I1>()),
+                                              ScalarCap, CapType>;
+      auto i1 = get_value<I1Cap>(in1_, indices...);
       return op_.template operator()<CapType>(i1);
     }
 
@@ -138,6 +166,22 @@ namespace matx
         std::string("template <typename I1, typename Op> struct " + func_name + " {\n") +
             "  using value_type = typename Op::value_type;\n" +
             "  using matxop = bool;\n" +
+            "  template <typename Candidate>\n"
+            "  static __MATX_INLINE__ constexpr bool ContainsBlockReduction()\n"
+            "  {\n"
+            "    if constexpr (requires { typename Candidate::matx_jit_contains_block_reduction; }) {\n"
+            "      return Candidate::matx_jit_contains_block_reduction::value;\n"
+            "    }\n"
+            "    else {\n"
+            "      return requires { typename Candidate::matx_jit_block_reduction; };\n"
+            "    }\n"
+            "  }\n"
+            "  template <typename Candidate>\n"
+            "  static __MATX_INLINE__ constexpr bool IsDirectBlockReduction()\n"
+            "  {\n"
+            "    return requires { typename Candidate::matx_jit_block_reduction; };\n"
+            "  }\n"
+            "  using matx_jit_contains_block_reduction = cuda::std::bool_constant<ContainsBlockReduction<I1>()>;\n" +
             "  constexpr static cuda::std::array<index_t, " + std::to_string(actual_rank) + "> out_dims_ = { " +
             dims_str + " };\n" +
             "  typename detail::inner_storage_or_self_t<detail::base_type_t<I1>> in1_;\n" +
@@ -145,11 +189,16 @@ namespace matx
             "  template <typename CapType, typename... Is>\n" +
             "  __MATX_INLINE__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) const\n" +
             "  {\n" +
+            "    using ScalarCap = CapabilityParams<ElementsPerThread::ONE, CapType::jit>;\n" +
+            "    using I1Cap = cuda::std::conditional_t<matx_jit_contains_block_reduction::value && (!ContainsBlockReduction<I1>() && !IsDirectBlockReduction<I1>()), ScalarCap, CapType>;\n" +
             (actual_rank > 0 ?
-            "    if ((threadIdx.x * static_cast<int>(CapType::ept)) > Size(Rank() - 1)) {\n"
-            "      return detail::GetJitSentinelValue<CapType, value_type>();\n"
+            "    if constexpr (!matx_jit_contains_block_reduction::value && !CapType::pass_through_threads) {\n"
+            "      if ((threadIdx.x * static_cast<int>(CapType::ept)) > Size(Rank() - 1)) {\n"
+            "        using I1Value = remove_cvref_t<decltype(get_value<I1Cap>(in1_, indices...))>;\n"
+            "        return op_.template operator()<CapType>(I1Value{});\n"
+            "      }\n"
             "    }\n" : "") +
-            "    auto i1 = get_value<CapType>(in1_, indices...);\n" +
+            "    auto i1 = get_value<I1Cap>(in1_, indices...);\n" +
             "    return op_.template operator()<CapType>(i1);\n" +
             "  }\n" +
             "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank()\n" +
@@ -183,7 +232,7 @@ namespace matx
         return false;
 #endif
       }
-      else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+	      else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
 #ifdef MATX_EN_JIT
         const auto [key, value] = get_jit_op_str();
         if (in.find(key) == in.end()) {
@@ -193,11 +242,21 @@ namespace matx
         detail::get_operator_capability<Cap>(op_, in);
         return true;
 #else
-        return false;
+	        return false;
 #endif
-      }
-      else if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
-        return detail::get_operator_capability<Cap>(in1_, in);
+	      }
+	      else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD ||
+	                         Cap == OperatorCapability::MAX_EPT_VEC_LOAD) {
+	        if constexpr (matx_jit_contains_block_reduction::value) {
+	          return detail::get_operator_capability<Cap>(in1_, in);
+	        }
+	        else {
+	          auto self_has_cap = capability_attributes<Cap>::default_value;
+	          return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(in1_, in));
+	        }
+	      }
+	      else if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
+	        return detail::get_operator_capability<Cap>(in1_, in);
       }
       else {
         auto self_has_cap = capability_attributes<Cap>::default_value;

@@ -34,6 +34,12 @@ TYPED_TEST(OperatorTestsFloatNonComplexNonHalfAllExecs, R2COp)
   auto T1 = make_tensor<ComplexType>({N1});
   auto T2 = make_tensor<ComplexType>({N2});
 
+  if constexpr (is_cuda_jit_executor_v<ExecType>) {
+    if (!jit_supported(r2c(fft(t1), N1)) || !jit_supported(r2c(fft(t2), N2))) {
+      GTEST_SKIP();
+    }
+  }
+
   for (int i = 0; i < N1; i++) { t1(i) = static_cast<TestType>(i+1); }
   for (int i = 0; i < N2; i++) { t2(i) = static_cast<TestType>(i+1); }
   exec.sync();

@@ -1,23 +1,14 @@
-#=============================================================================
-# Copyright (c) 2021-2024, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#=============================================================================
+# =============================================================================
+# cmake-format: off
+# SPDX-FileCopyrightText: Copyright (c) 2021-2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
+# cmake-format: on
+# =============================================================================
 include(${rapids-cmake-dir}/cpm/init.cmake)
 
 # Need to write out multiple default files
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/defaultsA.json
-  [=[
+     [=[
 {
   "packages": {
     "nvbench": {
@@ -30,7 +21,7 @@ file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/defaultsA.json
   ]=])
 
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/defaultsB.json
-  [=[
+     [=[
 {
   "packages": {
     "nvbench": {
@@ -48,7 +39,7 @@ file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/defaultsB.json
   ]=])
 
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/defaultsC.json
-  [=[
+     [=[
 {
   "packages": {
     "GTest": {
@@ -68,7 +59,7 @@ rapids_cpm_init(CUSTOM_DEFAULT_VERSION_FILE "${CMAKE_CURRENT_BINARY_DIR}/default
 foreach(proj IN ITEMS rmm nvbench GTest)
   # Verify that multiple custom defaults work
   include("${rapids-cmake-dir}/cpm/detail/package_details.cmake")
-  rapids_cpm_package_details(${proj} version repository tag shallow exclude)
+  rapids_cpm_package_details_internal(${proj} version repository tag src_subdir shallow exclude)
   if(NOT version STREQUAL "${proj}_version")
     message(FATAL_ERROR "${proj} default version field was removed.")
   endif()
@@ -79,7 +70,8 @@ foreach(proj IN ITEMS rmm nvbench GTest)
     message(FATAL_ERROR "${proj} default tag field was removed.")
   endif()
   if(CPM_DOWNLOAD_ALL)
-    message(FATAL_ERROR "CPM_DOWNLOAD_ALL should be false since since we just specified a defaults version file'")
+    message(FATAL_ERROR "CPM_DOWNLOAD_ALL should be false since since we just specified a defaults version file'"
+    )
   endif()
   unset(CPM_DOWNLOAD_ALL)
 endforeach()

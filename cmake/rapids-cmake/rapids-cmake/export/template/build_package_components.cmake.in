@@ -1,0 +1,15 @@
+#=============================================================================
+# find_dependency Search for @name@
+#
+# Make sure we search for a build-dir config module for the project
+set(possible_package_dir "@possible_dir@")
+if(possible_package_dir AND NOT DEFINED @name@_DIR)
+  set(@name@_DIR "${possible_package_dir}")
+endif()
+
+find_dependency(@name@ COMPONENTS @components@)
+
+if(possible_package_dir)
+  unset(possible_package_dir)
+endif()
+#=============================================================================

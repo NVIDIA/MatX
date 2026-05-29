@@ -1,18 +1,9 @@
-#=============================================================================
-# Copyright (c) 2023-2024, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#=============================================================================
+# =============================================================================
+# cmake-format: off
+# SPDX-FileCopyrightText: Copyright (c) 2023-2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
+# cmake-format: on
+# =============================================================================
 include_guard(GLOBAL)
 
 #[=======================================================================[.rst:
@@ -37,7 +28,11 @@ file will automatically call `thrust_create_target(CCCL::Thrust FROM_OPTIONS)`.
 
   rapids_cpm_cccl( [BUILD_EXPORT_SET <export-name>]
                    [INSTALL_EXPORT_SET <export-name>]
+                   [ENABLE_UNSTABLE]
                    [<CPM_ARGS> ...])
+
+``ENABLE_UNSTABLE``
+  Enable unstable features in CCCL.
 
 .. |PKG_NAME| replace:: CCCL
 .. include:: common_package_args.txt
@@ -49,6 +44,7 @@ Result Targets
   CCCL::libcudacxx target will be created
   CCCL::CUB target will be created
   libcudacxx::libcudacxx target will be created
+  CCCL::cudax target will be created (if ENABLE_UNSTABLE is specified)
 
 Result Variables
 ^^^^^^^^^^^^^^^^
@@ -62,94 +58,55 @@ Result Variables
 function(rapids_cpm_cccl)
   list(APPEND CMAKE_MESSAGE_CONTEXT "rapids.cpm.cccl")
 
-  include("${rapids-cmake-dir}/cpm/detail/package_details.cmake")
-  rapids_cpm_package_details(CCCL version repository tag shallow exclude)
+  set(options ENABLE_UNSTABLE)
+  set(one_value)
+  set(multi_value)
+  cmake_parse_arguments(_RAPIDS "${options}" "${one_value}" "${multi_value}" ${ARGN})
 
-  set(to_install OFF)
-  if(INSTALL_EXPORT_SET IN_LIST ARGN AND NOT exclude)
-    set(to_install ON)
+  include("${rapids-cmake-dir}/cpm/detail/package_info.cmake")
+  rapids_cpm_package_info(CCCL ${_RAPIDS_UNPARSED_ARGUMENTS} VERSION_VAR version FIND_VAR find_args
+                          CPM_VAR cpm_find_info TO_INSTALL_VAR to_install)
+
+  if(_RAPIDS_ENABLE_UNSTABLE)
+    list(APPEND cpm_find_info OPTIONS "CCCL_ENABLE_UNSTABLE ON")
+  endif()
+
+  if(to_install)
     # Make sure we install CCCL into the `include/rapids` subdirectory instead of the default
     include(GNUInstallDirs)
-    set(CMAKE_INSTALL_INCLUDEDIR "${CMAKE_INSTALL_INCLUDEDIR}/rapids")
-    set(CMAKE_INSTALL_LIBDIR "${CMAKE_INSTALL_LIBDIR}/rapids")
-  endif()
-
-  include("${rapids-cmake-dir}/cpm/detail/generate_patch_command.cmake")
-  rapids_cpm_generate_patch_command(CCCL ${version} patch_command)
-
-  include("${rapids-cmake-dir}/cpm/find.cmake")
-  rapids_cpm_find(CCCL ${version} ${ARGN}
-                  GLOBAL_TARGETS CCCL CCCL::CCCL CCCL::CUB CCCL::libcudacxx
-                  CPM_ARGS FIND_PACKAGE_ARGUMENTS EXACT
-                  GIT_REPOSITORY ${repository}
-                  GIT_TAG ${tag}
-                  GIT_SHALLOW ${shallow} ${patch_command}
-                  EXCLUDE_FROM_ALL ${exclude}
-                  OPTIONS "CCCL_TOPLEVEL_PROJECT OFF" # Fixes
-                                                      # https://github.com/NVIDIA/cccl/pull/2597
-                          "CCCL_ENABLE_INSTALL_RULES ${to_install}")
-
-  # rapids_cpm_cccl can be called multiple times from the same scope such as from
-  # cudf/CMakeLists.txt and cudf's call to find_package(rmm). In these situations, subsequent
-  # invocations will still have `CCCL_SOURCE_DIR` set due to how `rapids_cpm_find` early termination
-  # sets up variables
-  #
-  # So to properly preserve any custom install location values from the first invocation we need a
-  # global property that we use to track that the cccl install rules have been called
-  get_property(rapids_cccl_install_rules_already_called GLOBAL
-               PROPERTY rapids_cmake_cccl_install_rules SET)
-  if(CCCL_SOURCE_DIR AND to_install AND NOT rapids_cccl_install_rules_already_called)
-
-    set_property(GLOBAL PROPERTY rapids_cmake_cccl_install_rules ON)
-    # CCCL < 2.8 does not currently correctly support installation of cub/thrust/libcudacxx in a
-    # subdirectory
-    if(version VERSION_LESS 2.8)
-      set(Thrust_SOURCE_DIR "${CCCL_SOURCE_DIR}/thrust")
-      set(CUB_SOURCE_DIR "${CCCL_SOURCE_DIR}/cub")
-      set(libcudacxx_SOURCE_DIR "${CCCL_SOURCE_DIR}/libcudacxx")
-
-      set(Thrust_BINARY_DIR "${CCCL_BINARY_DIR}")
-      set(CUB_BINARY_DIR "${CCCL_BINARY_DIR}")
-      set(libcudacxx_BINARY_DIR "${CCCL_BINARY_DIR}")
-
-      set(Thrust_ENABLE_INSTALL_RULES ON)
-      set(CUB_ENABLE_INSTALL_RULES ON)
-      set(libcudacxx_ENABLE_INSTALL_RULES ON)
-
-      include("${Thrust_SOURCE_DIR}/cmake/ThrustInstallRules.cmake")
-      include("${CUB_SOURCE_DIR}/cmake/CubInstallRules.cmake")
-
-      # libcudacxx's install rules require inserting an extra level of nesting for the include dir.
-      string(APPEND CMAKE_INSTALL_INCLUDEDIR "/libcudacxx")
-      include("${libcudacxx_SOURCE_DIR}/cmake/libcudacxxInstallRules.cmake")
-    else()
-      # CCCL 2.7 doesn't allow rapids-cmake to place libcudacxx headers into `include/libcudacxx` so
-      # we manually invoke `cccl_generate_install_rules`
-      set(CCCL_TOPLEVEL_PROJECT OFF) # Fixes https://github.com/NVIDIA/cccl/pull/2597
+    string(APPEND CMAKE_INSTALL_INCLUDEDIR "/rapids")
+    string(APPEND CMAKE_INSTALL_LIBDIR "/rapids")
+    # We don't specify `CCCL_ENABLE_INSTALL_RULES` as a `rapids_cpm_find` argument so that it isn't
+    # propagated to users of the build export file which would cause them to also install parts of
+    # CCCL by mistake ( and in a wrong directory )
+    get_property(rapids_cccl_install_rules_already_called GLOBAL
+                 PROPERTY rapids_cmake_cccl_install_rules SET)
+    if(NOT rapids_cccl_install_rules_already_called)
+      set(CCCL_ENABLE_INSTALL_RULES ON)
       set(CUB_ENABLE_INSTALL_RULES ON)
       set(Thrust_ENABLE_INSTALL_RULES ON)
       set(libcudacxx_ENABLE_INSTALL_RULES ON)
-      include("${CCCL_SOURCE_DIR}/cmake/install/cub.cmake")
-      include("${CCCL_SOURCE_DIR}/cmake/install/thrust.cmake")
-
-      # libcudacxx's install rules require inserting an extra level of nesting for the include dir.
-      string(APPEND CMAKE_INSTALL_INCLUDEDIR "/libcudacxx")
-      include("${CCCL_SOURCE_DIR}/cmake/install/libcudacxx.cmake")
+      set_property(GLOBAL PROPERTY rapids_cmake_cccl_install_rules ON)
     endif()
   endif()
+
+  # CCCL's install rules use ${CCCL_TOPLEVEL_PROJECT} as a positional argument. When CCCL is
+  # included via add_subdirectory (not as the top-level project), this variable is undefined,
+  # causing cmake_parse_arguments to misparse the function call. Explicitly set it to OFF.
+  set(CCCL_TOPLEVEL_PROJECT OFF)
+
+  include("${rapids-cmake-dir}/cpm/find.cmake")
+  rapids_cpm_find(CCCL ${version} ${find_args} GLOBAL_TARGETS CCCL CCCL::CCCL CCCL::CUB
+                                                              CCCL::libcudacxx CCCL::cudax
+                  CPM_ARGS FIND_PACKAGE_ARGUMENTS EXACT ${cpm_find_info})
 
   include("${rapids-cmake-dir}/cpm/detail/display_patch_status.cmake")
   rapids_cpm_display_patch_status(CCCL)
 
-  set(options)
-  set(one_value BUILD_EXPORT_SET INSTALL_EXPORT_SET)
-  set(multi_value)
-  cmake_parse_arguments(_RAPIDS "${options}" "${one_value}" "${multi_value}" ${ARGN})
-
   if(CCCL_SOURCE_DIR)
-    # Store where CMake can find the Thrust-config.cmake that comes part of Thrust source code
+    # Store where CMake can find the cccl-config.cmake
     include("${rapids-cmake-dir}/export/find_package_root.cmake")
-    rapids_export_find_package_root(BUILD CCCL "${CCCL_SOURCE_DIR}/cmake"
+    rapids_export_find_package_root(BUILD CCCL "${CCCL_SOURCE_DIR}/lib/cmake/cccl"
                                     EXPORT_SET ${_RAPIDS_BUILD_EXPORT_SET})
     rapids_export_find_package_root(INSTALL CCCL
                                     [=[${CMAKE_CURRENT_LIST_DIR}/../../rapids/cmake/cccl]=]
@@ -157,14 +114,18 @@ function(rapids_cpm_cccl)
   endif()
 
   if(TARGET CCCL::CCCL)
-    # Can be removed once we move to CCCL 2.3
-    #
+    target_compile_definitions(CCCL::CCCL INTERFACE CUB_DISABLE_NAMESPACE_MAGIC)
+    target_compile_definitions(CCCL::CCCL INTERFACE CUB_IGNORE_NAMESPACE_MAGIC_ERROR)
     target_compile_definitions(CCCL::CCCL INTERFACE THRUST_DISABLE_ABI_NAMESPACE)
     target_compile_definitions(CCCL::CCCL INTERFACE THRUST_IGNORE_ABI_NAMESPACE_ERROR)
+    target_compile_definitions(CCCL::CCCL INTERFACE CCCL_DISABLE_PDL)
     set(post_find_code
         [=[
+    target_compile_definitions(CCCL::CCCL INTERFACE CUB_DISABLE_NAMESPACE_MAGIC)
+    target_compile_definitions(CCCL::CCCL INTERFACE CUB_IGNORE_NAMESPACE_MAGIC_ERROR)
     target_compile_definitions(CCCL::CCCL INTERFACE THRUST_DISABLE_ABI_NAMESPACE)
     target_compile_definitions(CCCL::CCCL INTERFACE THRUST_IGNORE_ABI_NAMESPACE_ERROR)
+    target_compile_definitions(CCCL::CCCL INTERFACE CCCL_DISABLE_PDL)
     ]=])
     include("${rapids-cmake-dir}/export/detail/post_find_package_code.cmake")
     rapids_export_post_find_package_code(BUILD CCCL "${post_find_code}" EXPORT_SET

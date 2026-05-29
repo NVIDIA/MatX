@@ -34,10 +34,10 @@ function(find_and_configure_pybind11)
     # This ensures pybind11 headers and cmake config are installed with matx
     set(PYBIND11_INSTALL ON CACHE BOOL "Install pybind11 headers and cmake config")
     set(PYBIND11_FINDPYTHON ON CACHE BOOL "Use FindPython for pybind11")
-    
+
     CPMFindPackage(NAME pybind11
         GIT_REPOSITORY  https://github.com/pybind/pybind11.git
-        GIT_TAG         a5b9e50)
+        GIT_TAG         v3.0.3)
   
     if(pybind11_FOUND)
         set(pybind11_FOUND TRUE PARENT_SCOPE)    

@@ -123,8 +123,7 @@ namespace matx
 
                 bool stride = detail::get_grid_dims<Op::Rank()>(blocks, threads, sizes, static_cast<int>(EPT), max_tpb);
 
-                constexpr bool JIT = false;
-                using CapType = detail::CapabilityParams<EPT, JIT, USL>;
+                using CapType = detail::CapabilityParams<EPT, false, USL>;
                 
                 if constexpr (Op::Rank() == 0) {
                   kernel_handler([&]() {
@@ -215,15 +214,12 @@ namespace matx
               const auto ept_bounds = detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(op, ept_type);
               bool stride = detail::get_grid_dims<Op::Rank()>(blocks, threads, sizes, static_cast<int>(ept_bounds[1]), 1024);
               index_t dims = cuda::std::accumulate(cuda::std::begin(sizes) + 1, cuda::std::end(sizes), 1, cuda::std::multiplies<index_t>());
-              constexpr bool JIT = false;
               const bool usl = detail::get_operator_capability<detail::OperatorCapability::UNIT_STRIDE_LAST>(op);
               if (usl) {
-                constexpr bool USL = true;
-                using CapType = detail::CapabilityParams<detail::ElementsPerThread::ONE, JIT, USL>;
+                using CapType = detail::CapabilityParams<detail::ElementsPerThread::ONE, false, true>;
                 detail::matxOpTDKernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes, dims);
               } else {
-                constexpr bool USL = false;
-                using CapType = detail::CapabilityParams<detail::ElementsPerThread::ONE, JIT, USL>;
+                using CapType = detail::CapabilityParams<detail::ElementsPerThread::ONE, false, false>;
                 detail::matxOpTDKernel<CapType><<<blocks, threads, 0, stream_>>>(op, sizes, dims);
               }
             }

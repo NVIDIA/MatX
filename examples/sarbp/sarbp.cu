@@ -98,6 +98,382 @@
 
 using namespace matx;
 
+using complex_t = cuda::std::complex<float>;
+
+// Aggregate of non-tensor state needed by run_bp_device(). Kept separate from
+// the tensor and host-buffer parameters because most members are scalar
+// configuration values whose call-site reads cleanly as a brace-initializer.
+struct BpRunCtx {
+  cudaStream_t stream;
+  cudaExecutor &exec;
+  index_t block_size;
+  index_t num_pulses;
+  index_t num_blocks;
+  index_t output_range_bins;
+  index_t num_samples_raw;
+  index_t fft_size;
+  index_t num_range_bins;
+  index_t ifft_shift;
+  index_t image_width;
+  index_t image_height;
+  bool is_fx_domain;
+  bool is_int16_mode;
+  bool apply_window;
+  int sgn;
+  bool do_warmup;
+  std::string output_file;
+  double del_r;
+  SarBpParams params;
+  double3 *h_positions;
+  double *h_range_to_mcp;
+  complex_t *h_range_profiles;
+  int16_t *h_range_profiles_i16;
+  float *h_ampsf;
+};
+
+// Run all device-side work (allocate block buffers, optional warmup, the
+// main pulse-block BP loop, copy result out, print timings, write the
+// output file). Templated on the platform-positions and range-to-mcp
+// tensor types so callers can pass either tensor<double3> / tensor<double>
+// or tensor<fltflt> / tensor<fltflt> (rank-2 / rank-1 for the fltflt path).
+template <typename PosTensor, typename RtmTensor, typename VoxLocOp>
+static int run_bp_device(PosTensor blk_positions, RtmTensor blk_rtm,
+                         const VoxLocOp &voxel_locations, const BpRunCtx &ctx)
+{
+  using PosT = typename std::decay_t<decltype(blk_positions)>::value_type;
+  constexpr bool pos_is_fltflt = std::is_same_v<PosT, matx::fltflt>;
+
+  // The host buffers ctx.h_positions / ctx.h_range_to_mcp were declared with
+  // double element types and either hold doubles (standard paths) or
+  // fltflt-encoded bytes (after the in-place conversion done in main when
+  // precision is fltflt). Since the byte sizes are identical between the two
+  // representations, the cudaMemcpyAsync calls below are just byte copies
+  // regardless of which device tensor type is being filled.
+  static_assert(3 * sizeof(matx::fltflt) == sizeof(double3),
+                "fltflt[3] must match double3 byte size for the in-place conversion to work");
+  static_assert(sizeof(matx::fltflt) == sizeof(double),
+                "fltflt must match double byte size for the in-place conversion to work");
+
+  // Slice helper: 2D for fltflt path (shape [npulses, 3]) vs 1D for double3.
+  auto pos_slice = [&](index_t npulses) {
+    if constexpr (pos_is_fltflt) {
+      return matx::slice(blk_positions, {0, 0}, {npulses, 3});
+    } else {
+      return matx::slice(blk_positions, {0},    {npulses});
+    }
+  };
+
+  auto upload_positions = [&](auto &cur_positions, index_t p0, index_t npulses) {
+    MATX_CUDA_CHECK(cudaMemcpyAsync(
+        cur_positions.Data(),
+        reinterpret_cast<const uint8_t *>(ctx.h_positions) + p0 * sizeof(double3),
+        static_cast<size_t>(npulses) * sizeof(double3),
+        cudaMemcpyHostToDevice, ctx.stream));
+  };
+
+  auto upload_rtm = [&](auto &cur_rtm, index_t p0, index_t npulses) {
+    MATX_CUDA_CHECK(cudaMemcpyAsync(
+        cur_rtm.Data(),
+        reinterpret_cast<const uint8_t *>(ctx.h_range_to_mcp) + p0 * sizeof(double),
+        static_cast<size_t>(npulses) * sizeof(double),
+        cudaMemcpyHostToDevice, ctx.stream));
+  };
+
+  // Pre-allocate GPU block buffers (sized for largest block)
+  auto blk_profiles = make_tensor<complex_t>({ctx.block_size, ctx.output_range_bins}, matx::MATX_DEVICE_MEMORY);
+  auto blk_compressed = ctx.is_fx_domain
+      ? make_tensor<complex_t>({ctx.block_size, ctx.fft_size}, matx::MATX_DEVICE_MEMORY)
+      : make_tensor<complex_t>({1, 1});
+  auto blk_fx = ctx.is_fx_domain
+      ? make_tensor<complex_t>({ctx.block_size, ctx.num_samples_raw}, matx::MATX_DEVICE_MEMORY)
+      : make_tensor<complex_t>({1, 1});
+  // int16 interleaved I/Q samples and per-pulse scale (int16 mode only)
+  auto blk_fx_i16 = (ctx.is_int16_mode && ctx.is_fx_domain)
+      ? make_tensor<int16_t>({ctx.block_size, ctx.num_samples_raw * 2}, matx::MATX_DEVICE_MEMORY)
+      : make_tensor<int16_t>({1, 1});
+  auto blk_ampsf = ctx.is_int16_mode
+      ? make_tensor<float>({ctx.block_size}, matx::MATX_DEVICE_MEMORY)
+      : make_tensor<float>({1});
+
+  // Image tensor --zeroed before first block
+  auto image = make_tensor<complex_t>({ctx.image_height, ctx.image_width}, matx::MATX_DEVICE_MEMORY);
+  (image = matx::zeros<complex_t>({ctx.image_height, ctx.image_width})).run(ctx.exec);
+
+  // Warmup: run kernels with correct tensor sizes to initialize FFT plans,
+  // load kernels, etc. so that the timed run reflects steady-state performance.
+  if (ctx.do_warmup) {
+    std::cout << "Warming up kernels..." << std::flush;
+
+    auto warmup_block = [&](index_t npulses) {
+      auto cur_profiles  = matx::slice(blk_profiles,  {0, 0}, {npulses, ctx.output_range_bins});
+      auto cur_positions = pos_slice(npulses);
+      auto cur_rtm       = matx::slice(blk_rtm,       {0},    {npulses});
+
+      (cur_profiles = matx::zeros<complex_t>({npulses, ctx.output_range_bins})).run(ctx.exec);
+      // Generic zero-init via cudaMemset -- both layouts are 24 bytes/pulse
+      // for positions (double3 == 3 * fltflt) and 8 bytes/pulse for rtm.
+      MATX_CUDA_CHECK(cudaMemsetAsync(cur_positions.Data(), 0,
+                      static_cast<size_t>(npulses) * sizeof(double3), ctx.stream));
+      MATX_CUDA_CHECK(cudaMemsetAsync(cur_rtm.Data(), 0,
+                      static_cast<size_t>(npulses) * sizeof(double), ctx.stream));
+
+      if (ctx.is_fx_domain) {
+        auto cur_fx = matx::slice(blk_fx, {0, 0}, {npulses, ctx.num_samples_raw});
+        if (ctx.is_int16_mode) {
+          // Warmup int16 -> complex<float> conversion kernel
+          auto cur_fx_i16 = matx::slice(blk_fx_i16, {0, 0}, {npulses, ctx.num_samples_raw * 2});
+          auto cur_ampsf = matx::slice(blk_ampsf, {0}, {npulses});
+          (cur_fx_i16 = static_cast<int16_t>(0)).run(ctx.exec);
+          (cur_ampsf = 1.0f).run(ctx.exec);
+          auto i_vals = matx::slice(cur_fx_i16, {0, 0},
+                                    {npulses, ctx.num_samples_raw * 2}, {1, 2});
+          auto q_vals = matx::slice(cur_fx_i16, {0, 1},
+                                    {npulses, ctx.num_samples_raw * 2}, {1, 2});
+          auto ampsf_b = matx::clone<2>(cur_ampsf, {matxKeepDim, ctx.num_samples_raw});
+          (cur_fx = matx::as_complex_float(
+              matx::as_float(i_vals) * ampsf_b,
+              matx::as_float(q_vals) * ampsf_b)).run(ctx.exec);
+        }
+        if (ctx.apply_window) {
+          (cur_fx = cur_fx * matx::hamming<1>({npulses, ctx.num_samples_raw})).run(ctx.exec);
+        }
+        auto cur_compressed = matx::slice(blk_compressed, {0, 0}, {npulses, ctx.fft_size});
+        if (ctx.sgn == -1) {
+          (cur_compressed = matx::ifft(cur_profiles)).run(ctx.exec);
+        } else {
+          (cur_compressed = matx::fft(cur_profiles)).run(ctx.exec);
+        }
+        (cur_profiles = matx::fftshift1D(cur_compressed)).run(ctx.exec);
+      }
+
+      (image = matx::experimental::sar_bp(
+          matx::zeros<complex_t>({ctx.image_height, ctx.image_width}),
+          cur_profiles, cur_positions, voxel_locations, cur_rtm, ctx.params))
+          .run(ctx.exec);
+    };
+
+    // Warmup with primary block size
+    warmup_block(ctx.block_size);
+
+    // Warmup with final block size if it differs (different FFT plan)
+    const index_t last_block_size = ctx.num_pulses - (ctx.num_blocks - 1) * ctx.block_size;
+    if (ctx.num_blocks > 1 && last_block_size != ctx.block_size) {
+      warmup_block(last_block_size);
+    }
+
+    // Re-zero image after warmup
+    (image = matx::zeros<complex_t>({ctx.image_height, ctx.image_width})).run(ctx.exec);
+    ctx.exec.sync();
+    std::cout << " done" << std::endl;
+  }
+
+  // Pre-allocate pinned host buffer for image output
+  const size_t num_pixels =
+      static_cast<size_t>(ctx.image_height) * static_cast<size_t>(ctx.image_width);
+  complex_t *h_image = nullptr;
+  MATX_CUDA_CHECK(cudaHostAlloc(&h_image, num_pixels * sizeof(complex_t), cudaHostAllocDefault));
+
+  std::cout << "Running backprojection (" << ctx.output_range_bins << " range bins, del_r="
+            << ctx.del_r << " m)..." << std::endl;
+
+  cudaEvent_t ev_start, ev_stop;
+  MATX_CUDA_CHECK(cudaEventCreate(&ev_start));
+  MATX_CUDA_CHECK(cudaEventCreate(&ev_stop));
+
+  std::vector<cudaEvent_t> ev_bp_start(ctx.num_blocks);
+  std::vector<cudaEvent_t> ev_bp_stop(ctx.num_blocks);
+  for (index_t blk = 0; blk < ctx.num_blocks; blk++) {
+    MATX_CUDA_CHECK(cudaEventCreate(&ev_bp_start[blk]));
+    MATX_CUDA_CHECK(cudaEventCreate(&ev_bp_stop[blk]));
+  }
+
+  cudaProfilerStart();
+  MATX_CUDA_CHECK(cudaEventRecord(ev_start, ctx.stream));
+
+  for (index_t blk = 0; blk < ctx.num_blocks; blk++) {
+    const index_t p0 = blk * ctx.block_size;
+    const index_t p1 = std::min(p0 + ctx.block_size, ctx.num_pulses);
+    const index_t npulses = p1 - p0;
+
+    // Views into pre-allocated buffers (handle last block being smaller)
+    auto cur_profiles  = matx::slice(blk_profiles,  {0, 0}, {npulses, ctx.output_range_bins});
+    auto cur_positions = pos_slice(npulses);
+    auto cur_rtm       = matx::slice(blk_rtm,       {0},    {npulses});
+
+    // Upload platform positions and range_to_mcp for this block
+    upload_positions(cur_positions, p0, npulses);
+    upload_rtm(cur_rtm, p0, npulses);
+
+    if (ctx.is_fx_domain) {
+      auto cur_fx = matx::slice(blk_fx, {0, 0}, {npulses, ctx.num_samples_raw});
+
+      if (ctx.is_int16_mode) {
+        // Upload int16 I/Q pairs and per-pulse scale
+        auto cur_fx_i16 = matx::slice(blk_fx_i16, {0, 0}, {npulses, ctx.num_samples_raw * 2});
+        auto cur_ampsf = matx::slice(blk_ampsf, {0}, {npulses});
+        MATX_CUDA_CHECK(cudaMemcpyAsync(cur_fx_i16.Data(),
+                        ctx.h_range_profiles_i16 + p0 * ctx.num_samples_raw * 2,
+                        static_cast<size_t>(npulses) * static_cast<size_t>(ctx.num_samples_raw) * 2 * sizeof(int16_t),
+                        cudaMemcpyHostToDevice, ctx.stream));
+        MATX_CUDA_CHECK(cudaMemcpyAsync(cur_ampsf.Data(),
+                        ctx.h_ampsf + p0,
+                        static_cast<size_t>(npulses) * sizeof(float),
+                        cudaMemcpyHostToDevice, ctx.stream));
+
+        // Strided views: even indices = I, odd indices = Q
+        auto i_vals = matx::slice(cur_fx_i16, {0, 0},
+                                  {npulses, ctx.num_samples_raw * 2}, {1, 2});
+        auto q_vals = matx::slice(cur_fx_i16, {0, 1},
+                                  {npulses, ctx.num_samples_raw * 2}, {1, 2});
+        // Broadcast ampsf across range samples
+        auto ampsf_b = matx::clone<2>(cur_ampsf, {matxKeepDim, ctx.num_samples_raw});
+
+        // Convert int16 -> float, scale by AmpSF, combine to complex<float>
+        if (ctx.apply_window) {
+          auto win = matx::hamming<1>({npulses, ctx.num_samples_raw});
+          (cur_fx = matx::as_complex_float(
+              matx::as_float(i_vals) * ampsf_b * win,
+              matx::as_float(q_vals) * ampsf_b * win)).run(ctx.exec);
+        } else {
+          (cur_fx = matx::as_complex_float(
+              matx::as_float(i_vals) * ampsf_b,
+              matx::as_float(q_vals) * ampsf_b)).run(ctx.exec);
+        }
+      } else {
+        // Upload complex64 samples directly
+        MATX_CUDA_CHECK(cudaMemcpyAsync(cur_fx.Data(),
+                        ctx.h_range_profiles + p0 * ctx.num_samples_raw,
+                        static_cast<size_t>(npulses) * static_cast<size_t>(ctx.num_samples_raw) * sizeof(complex_t),
+                        cudaMemcpyHostToDevice, ctx.stream));
+
+        if (ctx.apply_window) {
+          (cur_fx = cur_fx * matx::hamming<1>({npulses, ctx.num_samples_raw})).run(ctx.exec);
+          MATX_CUDA_CHECK(cudaGetLastError());
+        }
+      }
+
+      // Zero only the padding region (middle of each row after ifftshift)
+      const index_t pad_size = ctx.fft_size - ctx.num_samples_raw;
+      if (pad_size > 0) {
+        MATX_CUDA_CHECK(cudaMemset2DAsync(
+            cur_profiles.Data() + (ctx.num_samples_raw - ctx.ifft_shift),
+            static_cast<size_t>(ctx.fft_size) * sizeof(complex_t),
+            0,
+            static_cast<size_t>(pad_size) * sizeof(complex_t),
+            static_cast<size_t>(npulses),
+            ctx.stream));
+      }
+
+      // Second half of spectrum (indices shift..N-1) -> start of padded row
+      MATX_CUDA_CHECK(cudaMemcpy2DAsync(
+          cur_profiles.Data(),
+          static_cast<size_t>(ctx.fft_size) * sizeof(complex_t),
+          cur_fx.Data() + ctx.ifft_shift,
+          static_cast<size_t>(ctx.num_samples_raw) * sizeof(complex_t),
+          static_cast<size_t>(ctx.num_samples_raw - ctx.ifft_shift) * sizeof(complex_t),
+          static_cast<size_t>(npulses),
+          cudaMemcpyDeviceToDevice, ctx.stream));
+
+      // First half of spectrum (indices 0..shift-1) -> end of padded row
+      MATX_CUDA_CHECK(cudaMemcpy2DAsync(
+          cur_profiles.Data() + (ctx.fft_size - ctx.ifft_shift),
+          static_cast<size_t>(ctx.fft_size) * sizeof(complex_t),
+          cur_fx.Data(),
+          static_cast<size_t>(ctx.num_samples_raw) * sizeof(complex_t),
+          static_cast<size_t>(ctx.ifft_shift) * sizeof(complex_t),
+          static_cast<size_t>(npulses),
+          cudaMemcpyDeviceToDevice, ctx.stream));
+
+      // IFFT (SGN=-1) or FFT (SGN=+1) for range compression
+      auto cur_compressed = matx::slice(blk_compressed, {0, 0}, {npulses, ctx.fft_size});
+      if (ctx.sgn == -1) {
+        (cur_compressed = matx::ifft(cur_profiles)).run(ctx.exec);
+      } else {
+        (cur_compressed = matx::fft(cur_profiles)).run(ctx.exec);
+      }
+
+      // fftshift to centre the zero-range bin (write result back to cur_profiles)
+      (cur_profiles = matx::fftshift1D(cur_compressed)).run(ctx.exec);
+    } else {
+      // Pre-compressed: simple copy
+      MATX_CUDA_CHECK(cudaMemcpyAsync(cur_profiles.Data(),
+                      ctx.h_range_profiles + p0 * ctx.num_range_bins,
+                      static_cast<size_t>(npulses) * static_cast<size_t>(ctx.num_range_bins) * sizeof(complex_t),
+                      cudaMemcpyHostToDevice, ctx.stream));
+    }
+
+    // Backprojection - accumulates this block's pulses into image
+    MATX_CUDA_CHECK(cudaEventRecord(ev_bp_start[blk], ctx.stream));
+    (image = matx::experimental::sar_bp(image, cur_profiles,
+                                         cur_positions, voxel_locations,
+                                         cur_rtm, ctx.params))
+        .run(ctx.exec);
+    MATX_CUDA_CHECK(cudaEventRecord(ev_bp_stop[blk], ctx.stream));
+
+    if (ctx.num_blocks > 1) {
+      std::cout << "\r  Block " << (blk + 1) << " / " << ctx.num_blocks << std::flush;
+    }
+  }
+
+  // Copy result to pinned host buffer (included in timed region)
+  MATX_CUDA_CHECK(cudaMemcpyAsync(h_image, image.Data(), num_pixels * sizeof(complex_t),
+             cudaMemcpyDeviceToHost, ctx.stream));
+
+  MATX_CUDA_CHECK(cudaEventRecord(ev_stop, ctx.stream));
+
+  ctx.exec.sync();
+  cudaProfilerStop();
+
+  float elapsed_ms = 0;
+  MATX_CUDA_CHECK(cudaEventElapsedTime(&elapsed_ms, ev_start, ev_stop));
+  if (ctx.num_blocks > 1) std::cout << std::endl;
+
+  float bp_elapsed_ms = 0;
+  for (index_t blk = 0; blk < ctx.num_blocks; blk++) {
+    float blk_ms = 0;
+    MATX_CUDA_CHECK(cudaEventElapsedTime(&blk_ms, ev_bp_start[blk], ev_bp_stop[blk]));
+    bp_elapsed_ms += blk_ms;
+  }
+
+  const double total_backprojections =
+      static_cast<double>(ctx.image_width) *
+      static_cast<double>(ctx.image_height) *
+      static_cast<double>(ctx.num_pulses);
+  const double bp_gbp_per_sec = total_backprojections / (bp_elapsed_ms * 1e6);
+
+  std::cout << "Full reconstruction completed in " << elapsed_ms / 1000.0f << " s (incl. data transfers and iffts, if applied)"
+            << std::endl;
+  std::cout << "  Giga Backprojections: " << total_backprojections / 1e9
+            << " (num_pixels * num_pulses)" << std::endl;
+  std::cout << "BP kernels only      : " << bp_elapsed_ms / 1000.0f << " s (summed over "
+            << ctx.num_blocks << " block" << (ctx.num_blocks > 1 ? "s" : "") << ")" << std::endl;
+  std::cout << "  Rate                : " << bp_gbp_per_sec << " Gbp/s" << std::endl;
+
+  MATX_CUDA_CHECK(cudaEventDestroy(ev_start));
+  MATX_CUDA_CHECK(cudaEventDestroy(ev_stop));
+  for (index_t blk = 0; blk < ctx.num_blocks; blk++) {
+    MATX_CUDA_CHECK(cudaEventDestroy(ev_bp_start[blk]));
+    MATX_CUDA_CHECK(cudaEventDestroy(ev_bp_stop[blk]));
+  }
+
+  // Write raw binary file
+  std::ofstream out(ctx.output_file, std::ios::binary);
+  if (!out.is_open()) {
+    std::cerr << "ERROR: cannot open " << ctx.output_file << " for writing" << std::endl;
+    MATX_CUDA_CHECK(cudaFreeHost(h_image));
+    return 1;
+  }
+  out.write(reinterpret_cast<const char *>(h_image),
+            static_cast<std::streamsize>(num_pixels * sizeof(complex_t)));
+  out.close();
+
+  std::cout << "Wrote " << ctx.image_height << " x " << ctx.image_width
+            << " complex<float> image to " << ctx.output_file << std::endl;
+
+  MATX_CUDA_CHECK(cudaFreeHost(h_image));
+  return 0;
+}
+
 // ---------------------------------------------------------------------------
 // .sarbp file header (matches Python writer)
 // ---------------------------------------------------------------------------
@@ -253,7 +629,7 @@ int main(int argc, char **argv) {
   }
 
   // -------------------------------------------------------------------
-  // 1. Read .sarbp file header
+  // Read .sarbp file header
   // -------------------------------------------------------------------
   std::ifstream fin(input_file, std::ios::binary);
   if (!fin.is_open()) {
@@ -301,9 +677,9 @@ int main(int argc, char **argv) {
   MATX_ENTER_HANDLER();
 
   // -------------------------------------------------------------------
-  // 2. Read per-pulse data (platform positions, range_to_mcp, samples)
+  // Read per-pulse data (platform positions, range_to_mcp, samples)
   // -------------------------------------------------------------------
-  using complex_t = cuda::std::complex<float>;
+  // complex_t is declared at file scope so the run_bp_device helper can use it.
 
   double3 *h_positions = nullptr;
   double *h_range_to_mcp = nullptr;
@@ -375,8 +751,36 @@ int main(int argc, char **argv) {
   fin.close();
   std::cout << "Loaded " << num_pulses << " pulses from .sarbp file" << std::endl;
 
+  // If the user selected the fltflt precision, convert the platform positions
+  // and range_to_mcp values in-place from double to fltflt. Both types are
+  // 8 bytes per scalar (double = 8 bytes, fltflt = 2 * 4 bytes); see the
+  // static_asserts in run_bp_device(). We perform the type-punning via
+  // unsigned char* + std::memcpy rather than reinterpret_cast through
+  // double*/fltflt*, because the latter would alias the same storage as two
+  // incompatible types and is undefined behaviour under strict aliasing.
+  // unsigned char* may alias any object type, and std::memcpy of
+  // trivially-copyable types is the standards-blessed way to bit-cast.
+  if (precision_type == "fltflt") {
+    auto *pos_bytes = reinterpret_cast<unsigned char *>(h_positions);
+    for (size_t i = 0; i < static_cast<size_t>(num_pulses) * 3; i++) {
+      unsigned char *slot = pos_bytes + i * sizeof(double);
+      double d;
+      std::memcpy(&d, slot, sizeof(double));      // read double
+      const matx::fltflt ff(d);
+      std::memcpy(slot, &ff, sizeof(matx::fltflt)); // overwrite as fltflt
+    }
+    auto *rtm_bytes = reinterpret_cast<unsigned char *>(h_range_to_mcp);
+    for (size_t i = 0; i < static_cast<size_t>(num_pulses); i++) {
+      unsigned char *slot = rtm_bytes + i * sizeof(double);
+      double d;
+      std::memcpy(&d, slot, sizeof(double));
+      const matx::fltflt ff(d);
+      std::memcpy(slot, &ff, sizeof(matx::fltflt));
+    }
+  }
+
   // -------------------------------------------------------------------
-  // 3. Compute range compression / upsampling parameters
+  // Compute range compression / upsampling parameters
   // -------------------------------------------------------------------
   const index_t num_samples_raw = hdr.num_samples_raw > 0
       ? static_cast<index_t>(hdr.num_samples_raw) : num_range_bins;
@@ -404,7 +808,7 @@ int main(int argc, char **argv) {
   }
 
   // -------------------------------------------------------------------
-  // 4. Construct voxel grid
+  // Construct voxel grid
   // -------------------------------------------------------------------
   const auto voxel_end_x = hdr.voxel_start_x + hdr.voxel_stride_x * static_cast<double>(image_width - 1);
   const auto voxel_end_y = hdr.voxel_start_y + hdr.voxel_stride_y * static_cast<double>(image_height - 1);
@@ -426,7 +830,7 @@ int main(int argc, char **argv) {
       matx::zeros<float>({image_height, image_width}));
 
   // -------------------------------------------------------------------
-  // 6. Configure sar_bp parameters
+  // Configure sar_bp parameters
   // -------------------------------------------------------------------
   SarBpParams params;
   if (precision_type == "double") {
@@ -447,7 +851,7 @@ int main(int argc, char **argv) {
   params.del_r = del_r;
 
   // -------------------------------------------------------------------
-  // 7. Block processing: range compression (if FX) + backprojection
+  // Block processing: range compression (if FX) + backprojection
   // -------------------------------------------------------------------
   const index_t block_size = (block_size_arg > 0)
       ? std::min(static_cast<index_t>(block_size_arg), num_pulses)
@@ -462,313 +866,66 @@ int main(int argc, char **argv) {
   MATX_CUDA_CHECK(cudaStreamCreate(&stream));
   cudaExecutor exec{stream};
 
-  // Pre-allocate GPU block buffers (sized for largest block)
-  auto blk_profiles = make_tensor<complex_t>({block_size, output_range_bins}, matx::MATX_DEVICE_MEMORY);
-  auto blk_positions = make_tensor<double3>({block_size}, matx::MATX_DEVICE_MEMORY);
-  auto blk_rtm = make_tensor<double>({block_size}, matx::MATX_DEVICE_MEMORY);
-  auto blk_compressed = is_fx_domain
-      ? make_tensor<complex_t>({block_size, fft_size}, matx::MATX_DEVICE_MEMORY)
-      : make_tensor<complex_t>({1, 1});
-  auto blk_fx = is_fx_domain
-      ? make_tensor<complex_t>({block_size, num_samples_raw}, matx::MATX_DEVICE_MEMORY)
-      : make_tensor<complex_t>({1, 1});
-  // int16 interleaved I/Q samples and per-pulse scale (int16 mode only)
-  auto blk_fx_i16 = (is_int16_mode && is_fx_domain)
-      ? make_tensor<int16_t>({block_size, num_samples_raw * 2}, matx::MATX_DEVICE_MEMORY)
-      : make_tensor<int16_t>({1, 1});
-  auto blk_ampsf = is_int16_mode
-      ? make_tensor<float>({block_size}, matx::MATX_DEVICE_MEMORY)
-      : make_tensor<float>({1});
   const bool apply_window = is_fx_domain && window_type != "none";
-
-  // Image tensor --zeroed before first block
-  auto image = make_tensor<complex_t>({image_height, image_width}, matx::MATX_DEVICE_MEMORY);
-  (image = matx::zeros<complex_t>({image_height, image_width})).run(exec);
-
   const index_t ifft_shift = num_samples_raw / 2;
 
-  // Warmup: run kernels with correct tensor sizes to initialize FFT plans,
-  // load kernels, etc. so that the timed run reflects steady-state performance.
-  if (do_warmup) {
-    std::cout << "Warming up kernels..." << std::flush;
+  // Bundle non-tensor state for run_bp_device(). The platform-positions and
+  // range-to-mcp tensors are allocated below with a type that matches
+  // `precision_type`: `tensor<double3>` / `tensor<double>` for the standard
+  // paths, or `tensor<fltflt>` / `tensor<fltflt>` when
+  // `precision_type == "fltflt"`. In the fltflt case we already converted
+  // the pinned host buffers in-place from double to fltflt right after the
+  // file read above (same byte layout, no extra storage). The kernel
+  // template (`SarBp<...>`) already handles both rank-1 (vector-of-double3
+  // / -fltflt3-style) and rank-2 (matrix of [pulses, 3]) layouts for
+  // platform_positions, so run_bp_device() branches internally only on the
+  // slice and cudaMemcpyAsync source casts.
+  const BpRunCtx ctx{
+      .stream                = stream,
+      .exec                  = exec,
+      .block_size            = block_size,
+      .num_pulses            = num_pulses,
+      .num_blocks            = num_blocks,
+      .output_range_bins     = output_range_bins,
+      .num_samples_raw       = num_samples_raw,
+      .fft_size              = fft_size,
+      .num_range_bins        = num_range_bins,
+      .ifft_shift            = ifft_shift,
+      .image_width           = image_width,
+      .image_height          = image_height,
+      .is_fx_domain          = is_fx_domain,
+      .is_int16_mode         = is_int16_mode,
+      .apply_window          = apply_window,
+      .sgn                   = sgn,
+      .do_warmup             = do_warmup,
+      .output_file           = output_file,
+      .del_r                 = del_r,
+      .params                = params,
+      .h_positions           = h_positions,
+      .h_range_to_mcp        = h_range_to_mcp,
+      .h_range_profiles      = h_range_profiles,
+      .h_range_profiles_i16  = h_range_profiles_i16,
+      .h_ampsf               = h_ampsf,
+  };
 
-    auto warmup_block = [&](index_t npulses) {
-      auto cur_profiles  = matx::slice(blk_profiles,  {0, 0}, {npulses, output_range_bins});
-      auto cur_positions = matx::slice(blk_positions,  {0},    {npulses});
-      auto cur_rtm       = matx::slice(blk_rtm,       {0},    {npulses});
-
-      (cur_profiles = matx::zeros<complex_t>({npulses, output_range_bins})).run(exec);
-      (cur_positions = double3{0.0, 0.0, 0.0}).run(exec);
-      (cur_rtm = matx::zeros<double>({npulses})).run(exec);
-
-      if (is_fx_domain) {
-        auto cur_fx = matx::slice(blk_fx, {0, 0}, {npulses, num_samples_raw});
-        if (is_int16_mode) {
-          // Warmup int16 -> complex<float> conversion kernel
-          auto cur_fx_i16 = matx::slice(blk_fx_i16, {0, 0}, {npulses, num_samples_raw * 2});
-          auto cur_ampsf = matx::slice(blk_ampsf, {0}, {npulses});
-          (cur_fx_i16 = static_cast<int16_t>(0)).run(exec);
-          (cur_ampsf = 1.0f).run(exec);
-          auto i_vals = matx::slice(cur_fx_i16, {0, 0},
-                                    {npulses, num_samples_raw * 2}, {1, 2});
-          auto q_vals = matx::slice(cur_fx_i16, {0, 1},
-                                    {npulses, num_samples_raw * 2}, {1, 2});
-          auto ampsf_b = matx::clone<2>(cur_ampsf, {matxKeepDim, num_samples_raw});
-          (cur_fx = matx::as_complex_float(
-              matx::as_float(i_vals) * ampsf_b,
-              matx::as_float(q_vals) * ampsf_b)).run(exec);
-        }
-        if (apply_window) {
-          (cur_fx = cur_fx * matx::hamming<1>({npulses, num_samples_raw})).run(exec);
-        }
-        auto cur_compressed = matx::slice(blk_compressed, {0, 0}, {npulses, fft_size});
-        if (sgn == -1) {
-          (cur_compressed = matx::ifft(cur_profiles)).run(exec);
-        } else {
-          (cur_compressed = matx::fft(cur_profiles)).run(exec);
-        }
-        (cur_profiles = matx::fftshift1D(cur_compressed)).run(exec);
-      }
-
-      (image = matx::experimental::sar_bp(
-          matx::zeros<complex_t>({image_height, image_width}),
-          cur_profiles, cur_positions, voxel_locations, cur_rtm, params))
-          .run(exec);
-    };
-
-    // Warmup with primary block size
-    warmup_block(block_size);
-
-    // Warmup with final block size if it differs (different FFT plan)
-    const index_t last_block_size = num_pulses - (num_blocks - 1) * block_size;
-    if (num_blocks > 1 && last_block_size != block_size) {
-      warmup_block(last_block_size);
-    }
-
-    // Re-zero image after warmup
-    (image = matx::zeros<complex_t>({image_height, image_width})).run(exec);
-    exec.sync();
-    std::cout << " done" << std::endl;
+  int dev_status;
+  if (precision_type == "fltflt") {
+    auto blk_positions = make_tensor<matx::fltflt>({block_size, 3}, matx::MATX_DEVICE_MEMORY);
+    auto blk_rtm       = make_tensor<matx::fltflt>({block_size},    matx::MATX_DEVICE_MEMORY);
+    dev_status = run_bp_device(blk_positions, blk_rtm, voxel_locations, ctx);
+  } else {
+    auto blk_positions = make_tensor<double3>({block_size}, matx::MATX_DEVICE_MEMORY);
+    auto blk_rtm       = make_tensor<double>({block_size},  matx::MATX_DEVICE_MEMORY);
+    dev_status = run_bp_device(blk_positions, blk_rtm, voxel_locations, ctx);
   }
+  if (dev_status != 0) return dev_status;
 
-  // Pre-allocate pinned host buffer for image output
-  const size_t num_pixels =
-      static_cast<size_t>(image_height) * static_cast<size_t>(image_width);
-  complex_t *h_image = nullptr;
-  MATX_CUDA_CHECK(cudaHostAlloc(&h_image, num_pixels * sizeof(complex_t), cudaHostAllocDefault));
-
-  std::cout << "Running backprojection (" << output_range_bins << " range bins, del_r="
-            << del_r << " m)..." << std::endl;
-
-  cudaEvent_t ev_start, ev_stop;
-  MATX_CUDA_CHECK(cudaEventCreate(&ev_start));
-  MATX_CUDA_CHECK(cudaEventCreate(&ev_stop));
-
-  std::vector<cudaEvent_t> ev_bp_start(num_blocks);
-  std::vector<cudaEvent_t> ev_bp_stop(num_blocks);
-  for (index_t blk = 0; blk < num_blocks; blk++) {
-    MATX_CUDA_CHECK(cudaEventCreate(&ev_bp_start[blk]));
-    MATX_CUDA_CHECK(cudaEventCreate(&ev_bp_stop[blk]));
-  }
-
-  cudaProfilerStart();
-  MATX_CUDA_CHECK(cudaEventRecord(ev_start, stream));
-
-  for (index_t blk = 0; blk < num_blocks; blk++) {
-    const index_t p0 = blk * block_size;
-    const index_t p1 = std::min(p0 + block_size, num_pulses);
-    const index_t npulses = p1 - p0;
-
-    // Views into pre-allocated buffers (handle last block being smaller)
-    auto cur_profiles  = matx::slice(blk_profiles,  {0, 0}, {npulses, output_range_bins});
-    auto cur_positions = matx::slice(blk_positions,  {0},    {npulses});
-    auto cur_rtm       = matx::slice(blk_rtm,       {0},    {npulses});
-
-    // Upload platform positions and range_to_mcp for this block
-    MATX_CUDA_CHECK(cudaMemcpyAsync(cur_positions.Data(),
-                    h_positions + p0,
-                    static_cast<size_t>(npulses) * sizeof(double3),
-                    cudaMemcpyHostToDevice, stream));
-    MATX_CUDA_CHECK(cudaMemcpyAsync(cur_rtm.Data(),
-                    h_range_to_mcp + p0,
-                    static_cast<size_t>(npulses) * sizeof(double),
-                    cudaMemcpyHostToDevice, stream));
-
-    if (is_fx_domain) {
-      auto cur_fx = matx::slice(blk_fx, {0, 0}, {npulses, num_samples_raw});
-
-      if (is_int16_mode) {
-        // Upload int16 I/Q pairs and per-pulse scale
-        auto cur_fx_i16 = matx::slice(blk_fx_i16, {0, 0}, {npulses, num_samples_raw * 2});
-        auto cur_ampsf = matx::slice(blk_ampsf, {0}, {npulses});
-        MATX_CUDA_CHECK(cudaMemcpyAsync(cur_fx_i16.Data(),
-                        h_range_profiles_i16 + p0 * num_samples_raw * 2,
-                        static_cast<size_t>(npulses) * static_cast<size_t>(num_samples_raw) * 2 * sizeof(int16_t),
-                        cudaMemcpyHostToDevice, stream));
-        MATX_CUDA_CHECK(cudaMemcpyAsync(cur_ampsf.Data(),
-                        h_ampsf + p0,
-                        static_cast<size_t>(npulses) * sizeof(float),
-                        cudaMemcpyHostToDevice, stream));
-
-        // Strided views: even indices = I, odd indices = Q
-        auto i_vals = matx::slice(cur_fx_i16, {0, 0},
-                                  {npulses, num_samples_raw * 2}, {1, 2});
-        auto q_vals = matx::slice(cur_fx_i16, {0, 1},
-                                  {npulses, num_samples_raw * 2}, {1, 2});
-        // Broadcast ampsf across range samples
-        auto ampsf_b = matx::clone<2>(cur_ampsf, {matxKeepDim, num_samples_raw});
-
-        // Convert int16 -> float, scale by AmpSF, combine to complex<float>
-        if (apply_window) {
-          auto win = matx::hamming<1>({npulses, num_samples_raw});
-          (cur_fx = matx::as_complex_float(
-              matx::as_float(i_vals) * ampsf_b * win,
-              matx::as_float(q_vals) * ampsf_b * win)).run(exec);
-        } else {
-          (cur_fx = matx::as_complex_float(
-              matx::as_float(i_vals) * ampsf_b,
-              matx::as_float(q_vals) * ampsf_b)).run(exec);
-        }
-      } else {
-        // Upload complex64 samples directly
-        MATX_CUDA_CHECK(cudaMemcpyAsync(cur_fx.Data(),
-                        h_range_profiles + p0 * num_samples_raw,
-                        static_cast<size_t>(npulses) * static_cast<size_t>(num_samples_raw) * sizeof(complex_t),
-                        cudaMemcpyHostToDevice, stream));
-
-        if (apply_window) {
-          (cur_fx = cur_fx * matx::hamming<1>({npulses, num_samples_raw})).run(exec);
-          MATX_CUDA_CHECK(cudaGetLastError());
-        }
-      }
-
-      // Zero only the padding region (middle of each row after ifftshift)
-      const index_t pad_size = fft_size - num_samples_raw;
-      if (pad_size > 0) {
-        MATX_CUDA_CHECK(cudaMemset2DAsync(
-            cur_profiles.Data() + (num_samples_raw - ifft_shift),
-            static_cast<size_t>(fft_size) * sizeof(complex_t),
-            0,
-            static_cast<size_t>(pad_size) * sizeof(complex_t),
-            static_cast<size_t>(npulses),
-            stream));
-      }
-
-      // Second half of spectrum (indices shift..N-1) -> start of padded row
-      MATX_CUDA_CHECK(cudaMemcpy2DAsync(
-          cur_profiles.Data(),
-          static_cast<size_t>(fft_size) * sizeof(complex_t),
-          cur_fx.Data() + ifft_shift,
-          static_cast<size_t>(num_samples_raw) * sizeof(complex_t),
-          static_cast<size_t>(num_samples_raw - ifft_shift) * sizeof(complex_t),
-          static_cast<size_t>(npulses),
-          cudaMemcpyDeviceToDevice, stream));
-
-      // First half of spectrum (indices 0..shift-1) -> end of padded row
-      MATX_CUDA_CHECK(cudaMemcpy2DAsync(
-          cur_profiles.Data() + (fft_size - ifft_shift),
-          static_cast<size_t>(fft_size) * sizeof(complex_t),
-          cur_fx.Data(),
-          static_cast<size_t>(num_samples_raw) * sizeof(complex_t),
-          static_cast<size_t>(ifft_shift) * sizeof(complex_t),
-          static_cast<size_t>(npulses),
-          cudaMemcpyDeviceToDevice, stream));
-
-      // IFFT (SGN=-1) or FFT (SGN=+1) for range compression
-      auto cur_compressed = matx::slice(blk_compressed, {0, 0}, {npulses, fft_size});
-      if (sgn == -1) {
-        (cur_compressed = matx::ifft(cur_profiles)).run(exec);
-      } else {
-        (cur_compressed = matx::fft(cur_profiles)).run(exec);
-      }
-
-      // fftshift to centre the zero-range bin (write result back to cur_profiles)
-      (cur_profiles = matx::fftshift1D(cur_compressed)).run(exec);
-    } else {
-      // Pre-compressed: simple copy
-      MATX_CUDA_CHECK(cudaMemcpyAsync(cur_profiles.Data(),
-                      h_range_profiles + p0 * num_range_bins,
-                      static_cast<size_t>(npulses) * static_cast<size_t>(num_range_bins) * sizeof(complex_t),
-                      cudaMemcpyHostToDevice, stream));
-    }
-
-    // Backprojection - accumulates this block's pulses into image
-    MATX_CUDA_CHECK(cudaEventRecord(ev_bp_start[blk], stream));
-    (image = matx::experimental::sar_bp(image, cur_profiles,
-                                         cur_positions, voxel_locations,
-                                         cur_rtm, params))
-        .run(exec);
-    MATX_CUDA_CHECK(cudaEventRecord(ev_bp_stop[blk], stream));
-
-    if (num_blocks > 1) {
-      std::cout << "\r  Block " << (blk + 1) << " / " << num_blocks << std::flush;
-    }
-  }
-
-  // Copy result to pinned host buffer (included in timed region)
-  MATX_CUDA_CHECK(cudaMemcpyAsync(h_image, image.Data(), num_pixels * sizeof(complex_t),
-             cudaMemcpyDeviceToHost, stream));
-
-  MATX_CUDA_CHECK(cudaEventRecord(ev_stop, stream));
-
-  exec.sync();
-  cudaProfilerStop();
-
-  float elapsed_ms = 0;
-  MATX_CUDA_CHECK(cudaEventElapsedTime(&elapsed_ms, ev_start, ev_stop));
-  if (num_blocks > 1) std::cout << std::endl;
-
-  float bp_elapsed_ms = 0;
-  for (index_t blk = 0; blk < num_blocks; blk++) {
-    float blk_ms = 0;
-    MATX_CUDA_CHECK(cudaEventElapsedTime(&blk_ms, ev_bp_start[blk], ev_bp_stop[blk]));
-    bp_elapsed_ms += blk_ms;
-  }
-
-  const double total_backprojections =
-      static_cast<double>(image_width) *
-      static_cast<double>(image_height) *
-      static_cast<double>(num_pulses);
-  const double bp_gbp_per_sec = total_backprojections / (bp_elapsed_ms * 1e6);
-
-  std::cout << "Full reconstruction completed in " << elapsed_ms / 1000.0f << " s (incl. data transfers and iffts, if applied)"
-            << std::endl;
-  std::cout << "  Giga Backprojections: " << total_backprojections / 1e9
-            << " (num_pixels * num_pulses)" << std::endl;
-  std::cout << "BP kernels only      : " << bp_elapsed_ms / 1000.0f << " s (summed over "
-            << num_blocks << " block" << (num_blocks > 1 ? "s" : "") << ")" << std::endl;
-  std::cout << "  Rate                : " << bp_gbp_per_sec << " Gbp/s" << std::endl;
-
-  MATX_CUDA_CHECK(cudaEventDestroy(ev_start));
-  MATX_CUDA_CHECK(cudaEventDestroy(ev_stop));
-  for (index_t blk = 0; blk < num_blocks; blk++) {
-    MATX_CUDA_CHECK(cudaEventDestroy(ev_bp_start[blk]));
-    MATX_CUDA_CHECK(cudaEventDestroy(ev_bp_stop[blk]));
-  }
-
-  // -------------------------------------------------------------------
-  // 8. Write raw binary file
-  // -------------------------------------------------------------------
-
-  std::ofstream out(output_file, std::ios::binary);
-  if (!out.is_open()) {
-    std::cerr << "ERROR: cannot open " << output_file << " for writing"
-              << std::endl;
-    return 1;
-  }
-  out.write(reinterpret_cast<const char *>(h_image),
-            static_cast<std::streamsize>(num_pixels * sizeof(complex_t)));
-  out.close();
-
-  std::cout << "Wrote " << image_height << " x " << image_width
-            << " complex<float> image to " << output_file << std::endl;
 
   MATX_CUDA_CHECK(cudaFreeHost(h_positions));
   MATX_CUDA_CHECK(cudaFreeHost(h_range_to_mcp));
   if (h_range_profiles) MATX_CUDA_CHECK(cudaFreeHost(h_range_profiles));
   if (h_range_profiles_i16) MATX_CUDA_CHECK(cudaFreeHost(h_range_profiles_i16));
   if (h_ampsf) MATX_CUDA_CHECK(cudaFreeHost(h_ampsf));
-  MATX_CUDA_CHECK(cudaFreeHost(h_image));
   matx::ClearCachesAndAllocations();
   MATX_CUDA_CHECK(cudaStreamDestroy(stream));
   MATX_EXIT_HANDLER();

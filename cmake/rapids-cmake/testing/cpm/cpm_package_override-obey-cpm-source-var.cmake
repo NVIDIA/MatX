@@ -1,18 +1,9 @@
-#=============================================================================
-# Copyright (c) 2021-2024, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#=============================================================================
+# =============================================================================
+# cmake-format: off
+# SPDX-FileCopyrightText: Copyright (c) 2021-2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
+# cmake-format: on
+# =============================================================================
 include(${rapids-cmake-dir}/cpm/init.cmake)
 include(${rapids-cmake-dir}/cpm/package_override.cmake)
 
@@ -20,7 +11,7 @@ rapids_cpm_init()
 
 # Need to write out an override file
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/override.json
-  [=[
+     [=[
 {
   "packages": {
     "rmm": {
@@ -46,11 +37,11 @@ rapids_cpm_package_override(${CMAKE_CURRENT_BINARY_DIR}/override.json)
 # Verify that the override doesn't exist due to `CPM_rmm_SOURCE`
 include("${rapids-cmake-dir}/cpm/detail/package_details.cmake")
 
-rapids_cpm_package_details(rmm version repository tag shallow exclude)
-if(repository MATCHES "new_rmm_url")
+rapids_cpm_package_details_internal(rmm version repository tag src_subdir shallow exclude)
+if(NOT repository MATCHES "new_rmm_url")
   message(FATAL_ERROR "custom url field should not be set, due to CPM_rmm_SOURCE")
 endif()
-if(shallow MATCHES "OFF")
+if(NOT shallow MATCHES "OFF")
   message(FATAL_ERROR "shallow field should not be set, due to CPM_rmm_SOURCE")
 endif()
 if(CPM_DOWNLOAD_ALL)
@@ -60,7 +51,18 @@ endif()
 unset(version)
 unset(repository)
 unset(tag)
-rapids_cpm_package_details(not_in_base version repository tag shallow exclude)
-if(version OR repository OR tag)
-  message(FATAL_ERROR "rapids_cpm_package_details should not return anything for package that doesn't exist")
+rapids_cpm_package_details_internal(not_in_base version repository tag src_subdir shallow exclude)
+if(NOT (version AND repository AND tag))
+  message(FATAL_ERROR "rapids_cpm_package_details should still have details for package that doesn't exist"
+  )
+endif()
+
+get_property(override_ignored GLOBAL PROPERTY rapids_cpm_rmm_override_ignored)
+if(NOT override_ignored)
+  message(FATAL_ERROR "rapids_cpm_package override for `not_in_base` isn't being ignored")
+endif()
+
+get_property(override_ignored GLOBAL PROPERTY rapids_cpm_not_in_base_override_ignored)
+if(NOT override_ignored)
+  message(FATAL_ERROR "rapids_cpm_package override for `not_in_base` isn't being ignored")
 endif()

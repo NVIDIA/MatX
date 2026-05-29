@@ -1,0 +1,9 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) @current_year@, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+#pragma once
+
+#define @_RAPIDS_PREFIX@_VERSION_MAJOR @_RAPIDS_WRITE_MAJOR@
+#define @_RAPIDS_PREFIX@_VERSION_MINOR @_RAPIDS_WRITE_MINOR@
+#define @_RAPIDS_PREFIX@_VERSION_PATCH @_RAPIDS_WRITE_PATCH@

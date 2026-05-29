@@ -51,7 +51,7 @@ namespace detail {
   struct LTOIRQueryInput {
     std::set<std::string> ltoir_symbols;
     ElementsPerThread ept;
-  };  
+  };
 
   // Enum for different operator capabilities
   enum class OperatorCapability {
@@ -61,6 +61,7 @@ namespace detail {
     SET_ELEMENTS_PER_THREAD,      // Set the elements per thread for the operator.
     JIT_CLASS_QUERY,  // Result is the concatenation of the capabilities of the operator and its children.
     DYN_SHM_SIZE,   // Result is the dynamic shared memory size required for the operator.
+    STATIC_SHM_SIZE, // Result is the static shared memory size required for the operator.
     BLOCK_DIM,      // Result is the block dimensions required for the operator.
     GENERATE_LTOIR, // Generate LTOIR code for the operator.
     JIT_TYPE_QUERY, // Result is the type of JIT code to generate for the operator.
@@ -72,6 +73,7 @@ namespace detail {
     ALIASED_MEMORY, // Whether the operator's input and output pointers alias
     GLOBAL_KERNEL, // Kernel operates entirely on a global level per chunk of data. False when at least one operator works on a block level
     PASS_THROUGH_THREADS, // All threads must call operator() on nested operators; bounds checking done at tensor level
+    BLOCK_REDUCES_RANK, // Block-level operator's critical dimension is not part of the output rank
     UNIT_STRIDE_LAST, // Whether all leaf tensors have stride[RANK-1] == 1
     // Add more capabilities as needed
   };
@@ -84,10 +86,11 @@ namespace detail {
             // The operator itself AND its children.
     MIN_QUERY,  // Result is the minimum of the capabilities of the operator and its children.
     MAX_QUERY,  // Result is the maximum of the capabilities of the operator and its children.
+    SUM_QUERY,  // Result is the sum of the capabilities of the operator and its children.
     STR_CAT_QUERY,  // Result is the concatenation of the capabilities of the operator and its children.
     RANGE_QUERY,  // Result is the range of the capabilities of the operator and its children.
   };
-  
+
 
 #if !defined(__CUDACC_RTC__)
   template <ElementsPerThread EPT, bool JIT, bool UNIT_STRIDE_LAST = false>
@@ -97,15 +100,17 @@ namespace detail {
     static constexpr bool unit_stride_last = UNIT_STRIDE_LAST;
     static constexpr int osize = 0;
     static constexpr int block_size = 0;
+    static constexpr bool pass_through_threads = false;
+    using scalar_cap = CapabilityParams<ElementsPerThread::ONE, JIT, UNIT_STRIDE_LAST>;
 
     // For JIT there will be other capabilties patched in with a string
   };
 
-  using DefaultCapabilities = CapabilityParams<ElementsPerThread::ONE, false, false>;  
-  
+  using DefaultCapabilities = CapabilityParams<ElementsPerThread::ONE, false, false>;
+
   // Concept to detect scoped enums
   template<typename T>
-  concept is_scoped_enum_c = cuda::std::is_enum_v<T> && 
+  concept is_scoped_enum_c = cuda::std::is_enum_v<T> &&
                              !cuda::std::is_convertible_v<T, cuda::std::underlying_type_t<T>>;
 
   // Legacy struct for backwards compatibility
@@ -139,7 +144,7 @@ namespace detail {
     static constexpr bool default_value = true;
     static constexpr bool or_identity = false;
     static constexpr bool and_identity = true;
-  };  
+  };
 
   template <>
   struct capability_attributes<OperatorCapability::ASYNC_LOADS_REQUESTED> {
@@ -148,8 +153,8 @@ namespace detail {
     static constexpr bool default_value = false;
     static constexpr bool or_identity = false;
     static constexpr bool and_identity = true;
-  }; 
-  
+  };
+
   template <>
   struct capability_attributes<OperatorCapability::GLOBAL_KERNEL> {
     using type = bool;
@@ -157,7 +162,7 @@ namespace detail {
     static constexpr bool default_value = true;
     static constexpr bool or_identity = false;
     static constexpr bool and_identity = true;
-  };   
+  };
 
   template <>
   struct capability_attributes<OperatorCapability::ALIASED_MEMORY> {
@@ -166,7 +171,7 @@ namespace detail {
     static constexpr bool default_value = false;
     static constexpr bool or_identity = false;
     static constexpr bool and_identity = true;
-  };    
+  };
 
   template <>
   struct capability_attributes<OperatorCapability::GROUPS_PER_BLOCK> {
@@ -176,7 +181,7 @@ namespace detail {
     static constexpr cuda::std::array<int, 2> default_value = {1, 32}; // Example: 1 element per thread by default
     static constexpr cuda::std::array<int, 2> min_identity = {32, 1};
     static constexpr cuda::std::array<int, 2> max_identity = {1, 32};
-  };    
+  };
 
   template <>
   struct capability_attributes<OperatorCapability::BLOCK_DIM> {
@@ -186,7 +191,7 @@ namespace detail {
     static constexpr cuda::std::array<int, 2> default_value = {1, 1024}; // Example: 1 element per thread by default
     static constexpr cuda::std::array<int, 2> min_identity = {1024, 1};
     static constexpr cuda::std::array<int, 2> max_identity = {1, 1024};
-  };  
+  };
 
   template <>
   struct capability_attributes<OperatorCapability::SET_ELEMENTS_PER_THREAD> {
@@ -195,7 +200,7 @@ namespace detail {
     static constexpr bool default_value = true;
     static constexpr bool or_identity = false;
     static constexpr bool and_identity = true;
-  };  
+  };
 
   template <>
   struct capability_attributes<OperatorCapability::SET_GROUPS_PER_BLOCK> {
@@ -204,7 +209,7 @@ namespace detail {
     static constexpr bool default_value = true;
     static constexpr bool or_identity = false;
     static constexpr bool and_identity = true;
-  };  
+  };
 
   template <>
   struct capability_attributes<OperatorCapability::ELEMENTS_PER_THREAD> {
@@ -223,7 +228,7 @@ namespace detail {
     static constexpr bool default_value = true;
     static constexpr bool or_identity = false;
     static constexpr bool and_identity = true;
-  };  
+  };
 
   template <>
   struct capability_attributes<OperatorCapability::JIT_TYPE_QUERY> {
@@ -231,7 +236,7 @@ namespace detail {
     using input_type = VoidCapabilityType;
     static inline const std::string default_value = "";
     static inline const std::string min_identity = "";
-  };    
+  };
 
   template <>
   struct capability_attributes<OperatorCapability::DYN_SHM_SIZE> {
@@ -240,7 +245,18 @@ namespace detail {
     static constexpr int default_value = 0;
     static constexpr int min_identity = cuda::std::numeric_limits<int>::max();
     static constexpr int max_identity = 0;
-  };    
+    static constexpr int sum_identity = 0;
+  };
+
+  template <>
+  struct capability_attributes<OperatorCapability::STATIC_SHM_SIZE> {
+    using type = int;
+    using input_type = VoidCapabilityType;
+    static constexpr int default_value = 0;
+    static constexpr int min_identity = cuda::std::numeric_limits<int>::max();
+    static constexpr int max_identity = 0;
+    static constexpr int sum_identity = 0;
+  };
 
   template <>
   struct capability_attributes<OperatorCapability::MAX_EPT_VEC_LOAD> {
@@ -249,6 +265,7 @@ namespace detail {
     static constexpr int default_value = 32;
     static constexpr int min_identity = 32;
     static constexpr int max_identity = 1;
+    static constexpr int sum_identity = 0;
   };
 
   template <>
@@ -256,6 +273,15 @@ namespace detail {
     using type = bool;
     using input_type = VoidCapabilityType;
     static constexpr bool default_value = false;  // Default: operators do their own bounds checking
+    static constexpr bool or_identity = false;
+    static constexpr bool and_identity = true;
+  };
+
+  template <>
+  struct capability_attributes<OperatorCapability::BLOCK_REDUCES_RANK> {
+    using type = bool;
+    using input_type = VoidCapabilityType;
+    static constexpr bool default_value = false;
     static constexpr bool or_identity = false;
     static constexpr bool and_identity = true;
   };
@@ -270,7 +296,7 @@ namespace detail {
     static constexpr bool default_value = true;
     static constexpr bool or_identity = false;
     static constexpr bool and_identity = true;
-  };    
+  };
 
 
   template <OperatorCapability Cap, typename OperatorType, typename InType>
@@ -292,7 +318,7 @@ namespace detail {
         return capability_attributes<Cap>::default_value;
       }
     }
-  }  
+  }
 
   // Helper to safely get capability from an operator.
   // OperandType is likely base_type_t<ActualOpType> or a raw scalar/functor type.
@@ -301,7 +327,7 @@ namespace detail {
   get_operator_capability(const OperatorType& op) {
     VoidCapabilityType void_type{};
     return get_operator_capability<Cap>(op, void_type);
-  }     
+  }
 
 
   // Helper function to get the query type associated with a capability
@@ -332,17 +358,21 @@ namespace detail {
         return CapabilityQueryType::STR_CAT_QUERY; // The expression should use the concatenation of the capabilities of its children.
       case OperatorCapability::DYN_SHM_SIZE:
         return CapabilityQueryType::MAX_QUERY; // The expression should use the maximum dynamic shared memory size of its children.
+      case OperatorCapability::STATIC_SHM_SIZE:
+        return CapabilityQueryType::SUM_QUERY; // Static shared memory declarations are additive in fused kernels.
       case OperatorCapability::BLOCK_DIM:
         return CapabilityQueryType::RANGE_QUERY; // The expression should use the minimum block size supported by all operators.
       case OperatorCapability::GENERATE_LTOIR:
         return CapabilityQueryType::AND_QUERY; // The expression should generate LTOIR code if all its children generate it.
       case OperatorCapability::PASS_THROUGH_THREADS:
         return CapabilityQueryType::OR_QUERY; // If ANY operator needs pass-through, all threads must call operator()
+      case OperatorCapability::BLOCK_REDUCES_RANK:
+        return CapabilityQueryType::OR_QUERY; // If ANY operator reduces rank, use the reduced-rank block kernel.
       case OperatorCapability::UNIT_STRIDE_LAST:
         return CapabilityQueryType::AND_QUERY; // All leaf tensors must have stride[RANK-1] == 1
       default:
         // Default to OR_QUERY or handle as an error/assertion if a capability isn't mapped.
-        return CapabilityQueryType::OR_QUERY; 
+        return CapabilityQueryType::OR_QUERY;
     }
   }
 
@@ -375,6 +405,8 @@ namespace detail {
           children_aggregated_val = capability_attributes<Cap>::min_identity;
         } else if (query_type == CapabilityQueryType::MAX_QUERY) {
           children_aggregated_val = capability_attributes<Cap>::max_identity;
+        } else if (query_type == CapabilityQueryType::SUM_QUERY) {
+          children_aggregated_val = capability_attributes<Cap>::sum_identity;
         } else {
           // Default identity for int if not MIN_QUERY or MAX_QUERY (e.g. if it was SUM_QUERY, identity would be 0)
           // This path needs clear definition if other query types are used for int.
@@ -391,7 +423,7 @@ namespace detail {
       if constexpr (std::is_same_v<CapType, bool>) {
           if (query_type == CapabilityQueryType::OR_QUERY) {
               children_aggregated_val = capability_attributes<Cap>::or_identity;
-              ((children_aggregated_val = children_aggregated_val || child_vals), ...);     
+              ((children_aggregated_val = children_aggregated_val || child_vals), ...);
           } else { // AND_QUERY
               children_aggregated_val = capability_attributes<Cap>::and_identity;
               ((children_aggregated_val = children_aggregated_val && child_vals), ...);
@@ -411,6 +443,9 @@ namespace detail {
               for (CapType val : values) {
                   children_aggregated_val = static_cast<CapType>(cuda::std::max(static_cast<int>(children_aggregated_val), static_cast<int>(val)));
               }
+          } else if (query_type == CapabilityQueryType::SUM_QUERY) {
+              children_aggregated_val = capability_attributes<Cap>::sum_identity;
+              ((children_aggregated_val += child_vals), ...);
           } else {
               // Not implemented for other query types.
               MATX_ASSERT_STR(false, matxInvalidParameter, "Not implemented for other query types.");
@@ -430,14 +465,14 @@ namespace detail {
             auto it = values.begin();
             children_aggregated_val = *it;
             ++it;
-            
+
             // Apply range intersection logic for remaining children
             for (; it != values.end(); ++it) {
               const auto& child_range = *it;
               // Minimum is the maximum of the two range's minimums
               // Maximum is the minimum of the two range's maximums
               // Check that the maximum (second element) is not smaller than the minimum on the other value
-              if (static_cast<int>(child_range[1]) < static_cast<int>(children_aggregated_val[0]) || 
+              if (static_cast<int>(child_range[1]) < static_cast<int>(children_aggregated_val[0]) ||
                   static_cast<int>(children_aggregated_val[1]) < static_cast<int>(child_range[0])) {
                 // If the max of the new range is less than the min of the current, clamp to empty/invalid range
                 children_aggregated_val[0] = capability_attributes<Cap>::invalid;
@@ -480,6 +515,8 @@ namespace detail {
             return static_cast<CapType>(cuda::std::min(static_cast<int>(self_val), static_cast<int>(children_aggregated_val)));
         } else if (query_type == CapabilityQueryType::MAX_QUERY) {
             return static_cast<CapType>(cuda::std::max(static_cast<int>(self_val), static_cast<int>(children_aggregated_val)));
+        } else if (query_type == CapabilityQueryType::SUM_QUERY) {
+            return static_cast<CapType>(self_val + children_aggregated_val);
         } else {
             MATX_ASSERT_STR(false, matxInvalidParameter, "Not implemented for other query types.");
             return self_val;
@@ -495,15 +532,15 @@ namespace detail {
         // Handle RANGE_QUERY for cuda::std::array<T, 2> types
         if (query_type == CapabilityQueryType::RANGE_QUERY) {
           CapType result = self_val;
-          // Apply range intersection logic: 
+          // Apply range intersection logic:
           // Minimum is the maximum of the two range's minimums
           // Maximum is the minimum of the two range's maximums
           // Check that the maximum (second element) is not smaller than the minimum on the other value
-          if (static_cast<int>(children_aggregated_val[1]) < static_cast<int>(self_val[0]) || 
+          if (static_cast<int>(children_aggregated_val[1]) < static_cast<int>(self_val[0]) ||
               static_cast<int>(self_val[1]) < static_cast<int>(children_aggregated_val[0])) {
             // If the max of the new range is less than the min of the current, clamp to empty/invalid range
             result[0] = capability_attributes<Cap>::invalid;
-            result[1] = capability_attributes<Cap>::invalid;  
+            result[1] = capability_attributes<Cap>::invalid;
           }
           else {
             result[0] = static_cast<typename CapType::value_type>(
@@ -531,7 +568,7 @@ namespace detail {
     return cuda::std::apply([&in](const auto&... ops) {
       return combine_capabilities<Cap>(detail::get_operator_capability<Cap>(ops, in)...);
     }, ops_tuple);
-  }     
+  }
 
 #endif
 
@@ -541,5 +578,5 @@ namespace detail {
   template <typename Op>
   __MATX_INLINE__ __MATX_HOST__ bool jit_supported(const Op &op) {
     return detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op);
-  }  
-} // namespace matx 
+  }
+} // namespace matx

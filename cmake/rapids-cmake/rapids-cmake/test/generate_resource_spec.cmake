@@ -1,18 +1,9 @@
-#=============================================================================
-# Copyright (c) 2022-2024, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#=============================================================================
+# =============================================================================
+# cmake-format: off
+# SPDX-FileCopyrightText: Copyright (c) 2022-2025, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
+# cmake-format: on
+# =============================================================================
 include_guard(GLOBAL)
 
 #[=======================================================================[.rst:
@@ -50,12 +41,14 @@ function(rapids_test_generate_resource_spec DESTINATION filepath)
   get_property(rapids_languages GLOBAL PROPERTY ENABLED_LANGUAGES)
   if("CXX" IN_LIST rapids_languages)
     set(rapids_lang CXX)
+    set(rapids_lang_lower cxx)
     # Even when the CUDA language is disabled we want to pass this since it is used by
     # find_package(CUDAToolkit) to find the location
     set(CMAKE_TRY_COMPILE_PLATFORM_VARIABLES CMAKE_CUDA_COMPILER)
   endif()
   if("CUDA" IN_LIST rapids_languages)
     set(rapids_lang CUDA)
+    set(rapids_lang_lower cuda)
   endif()
 
   if(NOT rapids_lang)
@@ -66,23 +59,26 @@ function(rapids_test_generate_resource_spec DESTINATION filepath)
   include(${CMAKE_CURRENT_FUNCTION_LIST_DIR}/detail/default_names.cmake)
   set(eval_exe ${PROJECT_BINARY_DIR}/rapids-cmake/${rapids_test_generate_exe_name})
 
-  if(NOT EXISTS "${eval_exe}")
+  if(NOT TARGET generate_ctest_json)
     find_package(CUDAToolkit QUIET)
-    file(MAKE_DIRECTORY "${PROJECT_BINARY_DIR}/rapids-cmake/")
 
-    try_compile(result "${PROJECT_BINARY_DIR}/rapids-cmake/generate_ctest_json-build"
-                "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/detail/generate_resource_spec"
-                generate_resource_spec
-                CMAKE_FLAGS "-DCUDAToolkit_ROOT=${CUDAToolkit_ROOT}" "-Doutput_file=${eval_exe}"
-                            "-Dlang=${rapids_lang}" "-Dcuda_toolkit=${CUDAToolkit_FOUND}"
-                OUTPUT_VARIABLE compile_output)
-
-    if(NOT result)
-      string(REPLACE "\n" "\n  " compile_output "${compile_output}")
-      message(FATAL_ERROR "rapids_test_generate_resource_spec failed to build detection executable.\nfailure details are:\n  ${compile_output}"
-      )
+    add_executable(generate_ctest_json
+                   ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/detail/generate_resource_spec.cpp)
+    if(CUDAToolkit_FOUND)
+      target_link_libraries(generate_ctest_json PRIVATE CUDA::cudart_static)
+      target_compile_definitions(generate_ctest_json PRIVATE HAVE_CUDA)
     endif()
+    set_property(SOURCE ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/detail/generate_resource_spec.cpp
+                 PROPERTY LANGUAGE ${rapids_lang})
+    set_target_properties(generate_ctest_json
+                          PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/rapids-cmake/"
+                                     OUTPUT_NAME ${rapids_test_generate_exe_name})
+    target_compile_features(generate_ctest_json PRIVATE ${rapids_lang_lower}_std_17)
+
+    add_test(NAME generate_resource_spec COMMAND generate_ctest_json "${filepath}")
+    set_tests_properties(generate_resource_spec
+                         PROPERTIES FIXTURES_SETUP resource_spec GENERATED_RESOURCE_SPEC_FILE
+                                    "${filepath}")
   endif()
-  execute_process(COMMAND ${eval_exe} OUTPUT_FILE "${filepath}" COMMAND_ERROR_IS_FATAL ANY)
 
 endfunction()
