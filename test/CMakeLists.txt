@@ -137,6 +137,10 @@ function(create_test_executable test_file)
             # GTest macro internals when comparing mixed integer/float types.
             $<$<COMPILE_LANGUAGE:CXX>:/wd4244>
             $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/wd4244>
+            # /wd4189: local variable initialized but not referenced. Triggered by
+            # constexpr/helper values in MatX and third-party CCCL/CUB headers.
+            $<$<COMPILE_LANGUAGE:CXX>:/wd4189>
+            $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/wd4189>
         )
 
         # cudart_static.lib pulls in LIBCMT (static CRT); suppress the LNK4098 warning
