@@ -80,6 +80,7 @@ fused JIT expression; non-JIT CUDA execution through cudaExecutor remains availa
    "conv2d", "|yes|", "|yes|", "|no|", "Direct convolution supports host and CUDA executors."
    "copy", "|yes|", "|yes|", "|no|", "Executor-dispatched assignment/copy transform; CUDAJITExecutor fuses expression evaluation instead of using this transform directly."
    "corr", "|yes|", "|yes|", "|no|", "Direct correlation supports host and CUDA executors. FFT correlation can use the CPU FFT backend when enabled."
+   "corrmap", "|yes|", "|yes|", "|yes|", "Per-element windowed correlation map (1-D or 2-D window). Inputs must be floating-point or complex floating-point; integer inputs are rejected by static_assert."
    "cos", "|yes|", "|yes|", "|yes|", "Element-wise expression."
    "cosh", "|yes|", "|yes|", "|yes|", "Element-wise expression."
    "cov", "|no|", "|yes|", "|no|", "CUDA-only covariance transform."
