@@ -4,11 +4,19 @@ Random Number Generation
 ########################
 
 MatX provides the capability to generate random numbers on the host and device using the ``random()`` and ``randomi()`` 
-operators. both host and device generation is supported through the cuRAND library.
+operators. Both host and device generation is supported through the cuRAND library.
+
+When ``random()`` or ``randomi()`` is assigned directly into a CUDA tensor, MatX uses a low-memory direct fill path that avoids allocating per-element RNG state:
+
+.. code-block:: cpp
+
+   (A = random<float>(A.Shape(), NORMAL, 1234)).run(exec);
+
+Generic expressions containing random operators continue to use generator state so repeated random accesses inside an expression produce fresh values.
  
  
 - ``random()`` only generates random distribution for *float* data types
-- ``randomi()`` only generates random disitrubtions for *integral* data types
+- ``randomi()`` only generates random distributions for *integral* data types
  
 Please see the documentation for each function for a full list of supported types
 

@@ -413,13 +413,12 @@ For more information about operation fusion, see :ref:`fusion`.
 
 Random numbers
 --------------
-MatX can generate random numbers using the cuRAND library as the backend. Random number generation consumes memory on the device, so the construction
-is slightly different than other types above:
+MatX can generate random numbers using the cuRAND library as the backend. Directly assigning a random operator into a tensor uses a low-memory fill path:
 
 .. code-block:: cpp
 
     auto t2 = make_tensor<float>({100, 50});
-    auto randOp = random<float>(t.Shape(), NORMAL);
+    auto randOp = random<float>(t2.Shape(), NORMAL);
 
 The code above creates a 100x50 2D tensor, followed by a random operator that produces normally-distributed numbers with the same shape as ``t2``.
 
@@ -431,6 +430,14 @@ will be generated for each element.
     (t2 = randOp*5 + randOp).run(stream);
 
 In the example above ``randOp`` is accessed twice. On each access a new random number is generated.
+
+For very large tensors, prefer the direct assignment form when possible:
+
+.. code-block:: cpp
+
+    (t2 = random<float>(t2.Shape(), NORMAL)).run(stream);
+
+Generic expressions that contain ``random()`` still use per-element generator state so each access can produce a fresh value.
 
 That's it!
 ----------

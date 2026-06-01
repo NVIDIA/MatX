@@ -219,6 +219,26 @@ public:
 
 namespace detail {
 
+#ifdef __CUDACC__
+  template <typename T, typename ScaleT>
+  __global__ void random_scale_kernel(T *data, index_t size, ScaleT alpha, ScaleT beta)
+  {
+    index_t idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    if (idx < size) {
+      data[idx] = alpha * data[idx] + beta;
+    }
+  }
+
+  template <typename RandomOp, typename Out>
+  __global__ void random_direct_fill_kernel(RandomOp op, Out out, index_t count, index_t offset)
+  {
+    index_t idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    if (idx < count) {
+      op.DirectAssignLinear(out, offset + idx);
+    }
+  }
+#endif
+
   template< typename T >
   struct randIntParams{
     T min_;
@@ -245,6 +265,18 @@ namespace detail {
       mutable bool init_ = false;
       mutable bool device_;
 
+      static constexpr bool is_float_random_v =
+        std::is_same_v<T, float> ||
+        std::is_same_v<T, double> ||
+        std::is_same_v<T, cuda::std::complex<float>> ||
+        std::is_same_v<T, cuda::std::complex<double>>;
+
+      static constexpr bool is_integral_random_v =
+        std::is_same_v<T, uint32_t> ||
+        std::is_same_v<T,  int32_t> ||
+        std::is_same_v<T, uint64_t> ||
+        std::is_same_v<T,  int64_t>;
+
       union{
         randFloatParams<inner_t> fParams_;
         randIntParams<inner_t>   iParams_;
@@ -254,10 +286,132 @@ namespace detail {
       mutable curandGenerator_t gen_;
       //T val;
 
+      __MATX_INLINE__ bool NeedsScale() const noexcept
+      {
+        if constexpr (is_float_random_v) {
+          return fParams_.alpha_ != static_cast<inner_t>(1) ||
+                 fParams_.beta_ != static_cast<inner_t>(0);
+        }
+        else {
+          return false;
+        }
+      }
+
+#ifdef __CUDACC__
+      template <typename DataT>
+      __MATX_INLINE__ void ScaleContiguous(DataT *data, index_t count, cudaStream_t stream) const
+      {
+        if constexpr (is_float_random_v) {
+          if (count > 0 && NeedsScale()) {
+            constexpr int threads = 256;
+            int blocks = static_cast<int>((count + threads - 1) / threads);
+            random_scale_kernel<<<blocks, threads, 0, stream>>>(data, count, fParams_.alpha_, fParams_.beta_);
+          }
+        }
+      }
+
+      template <typename Out>
+      __MATX_INLINE__ bool CanUseCurandGenerator(Out &out) const
+      {
+        if constexpr (RANK > 0 && is_float_random_v &&
+                      requires(Out &o) {
+                        o.IsContiguous();
+                        o.Data();
+                      }) {
+          return out.IsContiguous();
+        }
+        else {
+          return false;
+        }
+      }
+
+      template <typename Out>
+      __MATX_INLINE__ void LaunchStateFreeFill(Out &out, index_t count, index_t offset, cudaStream_t stream) const
+      {
+        if (count == 0) {
+          return;
+        }
+
+        constexpr int threads = 256;
+        int blocks = static_cast<int>((count + threads - 1) / threads);
+        random_direct_fill_kernel<<<blocks, threads, 0, stream>>>(*this, out, count, offset);
+      }
+
+      template <typename Out>
+      __MATX_INLINE__ void ExecCurandGenerator(Out &out, cudaStream_t stream) const
+      {
+        [[maybe_unused]] curandStatus_t ret;
+        curandGenerator_t gen;
+        ret = curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_PHILOX4_32_10);
+        MATX_ASSERT_STR_EXP(ret, CURAND_STATUS_SUCCESS, matxCudaError, "Failed to create random number generator");
+
+        ret = curandSetStream(gen, stream);
+        MATX_ASSERT_STR_EXP(ret, CURAND_STATUS_SUCCESS, matxCudaError, "Error setting random generator stream");
+
+        ret = curandSetPseudoRandomGeneratorSeed(gen, seed_);
+        MATX_ASSERT_STR_EXP(ret, CURAND_STATUS_SUCCESS, matxCudaError, "Error setting random seed");
+
+        index_t gen_count = total_size_;
+        const bool has_tail = fParams_.dist_ == NORMAL &&
+                              (std::is_same_v<T, float> || std::is_same_v<T, double>) &&
+                              ((gen_count % 2) != 0);
+        if (has_tail) {
+          gen_count--;
+        }
+
+        if (gen_count > 0) {
+          if constexpr (std::is_same_v<T, float>) {
+            if (fParams_.dist_ == UNIFORM) {
+              ret = curandGenerateUniform(gen, out.Data(), static_cast<size_t>(gen_count));
+            }
+            else {
+              ret = curandGenerateNormal(gen, out.Data(), static_cast<size_t>(gen_count), 0.0f, 1.0f);
+            }
+          }
+          else if constexpr (std::is_same_v<T, double>) {
+            if (fParams_.dist_ == UNIFORM) {
+              ret = curandGenerateUniformDouble(gen, out.Data(), static_cast<size_t>(gen_count));
+            }
+            else {
+              ret = curandGenerateNormalDouble(gen, out.Data(), static_cast<size_t>(gen_count), 0.0, 1.0);
+            }
+          }
+          else if constexpr (std::is_same_v<T, cuda::std::complex<float>>) {
+            auto *real_data = reinterpret_cast<float *>(out.Data());
+            if (fParams_.dist_ == UNIFORM) {
+              ret = curandGenerateUniform(gen, real_data, static_cast<size_t>(gen_count) * 2);
+            }
+            else {
+              ret = curandGenerateNormal(gen, real_data, static_cast<size_t>(gen_count) * 2, 0.0f, 1.0f);
+            }
+          }
+          else if constexpr (std::is_same_v<T, cuda::std::complex<double>>) {
+            auto *real_data = reinterpret_cast<double *>(out.Data());
+            if (fParams_.dist_ == UNIFORM) {
+              ret = curandGenerateUniformDouble(gen, real_data, static_cast<size_t>(gen_count) * 2);
+            }
+            else {
+              ret = curandGenerateNormalDouble(gen, real_data, static_cast<size_t>(gen_count) * 2, 0.0, 1.0);
+            }
+          }
+
+          MATX_ASSERT_STR_EXP(ret, CURAND_STATUS_SUCCESS, matxCudaError, "Error generating random values");
+          ScaleContiguous(out.Data(), gen_count, stream);
+        }
+
+        if (has_tail) {
+          LaunchStateFreeFill(out, 1, gen_count, stream);
+        }
+
+        ret = curandDestroyGenerator(gen);
+        MATX_ASSERT_STR_EXP(ret, CURAND_STATUS_SUCCESS, matxCudaError, "Failed to destroy random number generator");
+      }
+#endif
 
     public:
       using value_type = T;
       using matxop = bool;
+      using matx_direct_assign_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "random"; }
 
@@ -364,10 +518,16 @@ namespace detail {
       __MATX_INLINE__ void PostRun([[maybe_unused]] ST &&shape, [[maybe_unused]] Executor &&ex) const noexcept
       {
         if constexpr (is_cuda_executor_v<Executor>) {
-          matxFree(states_);
+          if (init_) {
+            matxFree(states_);
+            init_ = false;
+          }
         }
         else if constexpr (is_host_executor_v<Executor>) {
-          curandDestroyGenerator(gen_);
+          if (init_) {
+            curandDestroyGenerator(gen_);
+            init_ = false;
+          }
           //matxFree(val);
         }
       }
@@ -525,6 +685,96 @@ namespace detail {
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { return RANK; }
+
+      template <typename Out>
+      __MATX_INLINE__ __MATX_HOST__ bool CanDirectFill(const Out &out) const noexcept
+      {
+        using out_t = remove_cvref_t<Out>;
+        if constexpr (!std::is_same_v<typename out_t::value_type, T> || out_t::Rank() != RANK) {
+          return false;
+        }
+        else {
+          MATX_LOOP_UNROLL
+          for (int i = 0; i < RANK; i++) {
+            if (out.Size(i) != shape_[i]) {
+              return false;
+            }
+          }
+
+          return true;
+        }
+      }
+
+      __MATX_INLINE__ __MATX_DEVICE__ T DirectValue(index_t linear) const
+      {
+        curandStatePhilox4_32_10_t state;
+        curand_init(seed_, static_cast<unsigned long long>(linear), 0, &state);
+
+        T val{};
+        if constexpr (is_float_random_v) {
+          get_random(val, &state, fParams_.dist_);
+          val = fParams_.alpha_ * val + fParams_.beta_;
+        }
+        else if constexpr (is_integral_random_v) {
+          using rand_scale_t =
+            cuda::std::conditional_t<(sizeof(T) > sizeof(uint32_t)), double, float>;
+          get_randomi(val, &state, static_cast<rand_scale_t>(iParams_.min_),
+                      static_cast<rand_scale_t>(iParams_.max_));
+        }
+
+        return val;
+      }
+
+      template <typename Out>
+      __MATX_INLINE__ __MATX_DEVICE__ void DirectAssignLinear(Out out, index_t linear) const
+      {
+        const auto val = DirectValue(linear);
+        using out_t = remove_cvref_t<Out>;
+
+        if constexpr (out_t::Rank() == 0) {
+          out.template operator()<DefaultCapabilities>() = val;
+        }
+        else {
+          cuda::std::array<index_t, out_t::Rank()> idx;
+          index_t rem = linear;
+          MATX_LOOP_UNROLL
+          for (int dim = out_t::Rank() - 1; dim >= 0; dim--) {
+            const index_t dim_size = out.Size(dim);
+            idx[dim] = rem % dim_size;
+            rem /= dim_size;
+          }
+
+          cuda::std::apply([&](auto... args) {
+            out.template operator()<DefaultCapabilities>(args...) = val;
+          }, idx);
+        }
+      }
+
+      template <typename OutTuple, typename Executor>
+      __MATX_INLINE__ void Exec(OutTuple &&out, Executor &&ex) const
+      {
+        if constexpr (is_cuda_executor_v<Executor>) {
+#ifdef __CUDACC__
+          auto &o = cuda::std::get<0>(out);
+          MATX_ASSERT_STR(CanDirectFill(o), matxInvalidSize,
+                          "Random direct fill requires identical input and output shapes and value types");
+
+          if (total_size_ == 0) {
+            return;
+          }
+
+          if (CanUseCurandGenerator(o)) {
+            ExecCurandGenerator(o, ex.getStream());
+          }
+          else {
+            LaunchStateFreeFill(o, total_size_, 0, ex.getStream());
+          }
+#endif
+        }
+        else {
+          MATX_THROW(matxInvalidExecutor, "Random direct fill currently requires a CUDA executor");
+        }
+      }
     };
   }
 
