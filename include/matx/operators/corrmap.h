@@ -237,11 +237,11 @@ namespace matx
           return cuda::std::make_tuple(
             func_name,
             std::format(
-              "template <typename OpA, typename OpB> struct {} {{\n"
+              "template <typename OpA, typename OpB> struct {0} {{\n"
               "  using matxop = bool;\n"
               "  static constexpr int32_t out_rank = OpA::Rank();\n"
-              "  static constexpr int WindowRank = {};\n"
-              "  static constexpr int Mode = {};  // 0=NONE, 1=MAGNITUDE, 2=ZNCC\n"
+              "  static constexpr int WindowRank = {1};\n"
+              "  static constexpr int Mode = {2};  // NONE={3}, MAGNITUDE={4}, ZNCC={5}\n"
               "  using inner_a_ = typename inner_op_type_t<typename OpA::value_type>::type;\n"
               "  using inner_b_ = typename inner_op_type_t<typename OpB::value_type>::type;\n"
               "  static constexpr bool any_complex_ =\n"
@@ -286,8 +286,8 @@ namespace matx
               "      }}\n"
               "\n"
               "      constexpr bool is_cplx = is_complex_v<value_type>;\n"
-              "      constexpr bool need_energies = (Mode == 1);  // MAGNITUDE\n"
-              "      constexpr bool use_welford   = (Mode == 2);  // ZNCC\n"
+              "      constexpr bool need_energies = (Mode == {4});  // MAGNITUDE\n"
+              "      constexpr bool use_welford   = (Mode == {5});  // ZNCC\n"
               "\n"
               "      [[maybe_unused]] value_type sum_ab{{}};\n"
               "      [[maybe_unused]] inner_type sum_aa{{0}};\n"
@@ -371,9 +371,9 @@ namespace matx
               "\n"
               "      if (n_valid == 0) return value_type{{}};\n"
               "\n"
-              "      if constexpr (Mode == 0) {{  // NONE\n"
+              "      if constexpr (Mode == {3}) {{  // NONE\n"
               "        return sum_ab;\n"
-              "      }} else if constexpr (Mode == 1) {{  // MAGNITUDE\n"
+              "      }} else if constexpr (Mode == {4}) {{  // MAGNITUDE\n"
               "        const inner_type denom = scalar_sqrt(sum_aa * sum_bb);\n"
               "        if (denom == inner_type{{0}}) return value_type{{}};\n"
               "        if constexpr (is_cplx) {{\n"
@@ -398,7 +398,12 @@ namespace matx
               "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return out_rank; }}\n"
               "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const {{ return out_dims_[dim]; }}\n"
               "}};\n",
-              func_name, WindowRank, static_cast<int>(Mode))
+              func_name,
+              WindowRank,
+              static_cast<int>(Mode),
+              static_cast<int>(CorrMapNormalize::NONE),
+              static_cast<int>(CorrMapNormalize::MAGNITUDE),
+              static_cast<int>(CorrMapNormalize::ZNCC))
           );
         }
 #endif
