@@ -11,7 +11,10 @@ namespace as its API is subject to change.
 .. doxygenfunction:: sar_bp(const ImageType &initial_image, const RangeProfilesType &range_profiles, const PlatPosType &platform_positions, const VoxLocType &voxel_locations, const RangeToMcpType &range_to_mcp, const SarBpParams &params)
 .. doxygenenum:: matx::SarBpComputeType
 .. doxygenenum:: matx::SarBpFeature
+.. doxygenenum:: matx::SarBpPixelZMode
 .. doxygenstruct:: matx::PropSarBpTaylorFastAddThirdOrder
+.. doxygenstruct:: matx::PropSarBpPixelZIsZero
+.. doxygenstruct:: matx::PropSarBpPixelZIsFixed
 .. doxygenstruct:: matx::SarBpParams
    :members:
 
@@ -366,6 +369,35 @@ a thread block, the third-order term becomes more important. The third-order
 property uses a separate kernel instantiation, which avoids a run-time order
 dispatch inside the backprojection kernel.
 
+Pixel Height (Z) Assumptions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+SAR images are frequently formed on a flat focal plane, so every output pixel
+shares the same height (z) coordinate -- very often ``z = 0`` (a ground plane at
+the reference height). When that holds, the per-pulse, per-pixel range
+computation carries a redundant pixel-z term that can be elided. MatX exposes
+this as two opt-in, compile-time properties:
+
+- ``PropSarBpPixelZIsZero`` asserts that every pixel has ``z = 0``. The kernel
+  drops the pixel-z term from the per-pulse range computation.
+- ``PropSarBpPixelZIsFixed`` asserts that every pixel shares one (arbitrary,
+  possibly non-zero) z value. On the shared-cache compute paths the uniform
+  per-pulse z contribution is hoisted out of the per-pixel inner loop.
+
+Both are *compile-time assumptions that are not validated at run time*; set one
+only when it actually holds for the supplied ``voxel_locations``. With neither
+property set (the default), each pixel may have a distinct z coordinate, which is
+the correct choice for terrain- or DEM-based focusing. If both are set,
+``PropSarBpPixelZIsZero`` (the stronger assumption) takes precedence. Callers who
+set neither are unaffected: the default kernel is unchanged, and only the
+variants you opt into are additionally instantiated.
+
+Whether ``z`` is literally ``0``/constant depends on the coordinate frame of
+``voxel_locations``. A flat focal plane expressed in a scene-local East-North-Up
+frame (height along z) satisfies these assumptions, whereas a grid expressed in
+ECEF generally does not, since even a flat plane then has all three coordinates
+varying per pixel.
+
 Examples
 ~~~~~~~~
 
@@ -387,3 +419,19 @@ third-order term to a ``TaylorFast`` launch:
 
 The property only affects ``SarBpComputeType::TaylorFast``. Other compute types
 continue to use their ordinary kernel instantiations.
+
+When the image is formed on the ``z = 0`` plane, the ``PropSarBpPixelZIsZero``
+property lets the kernel skip the pixel-z term in the per-pulse range
+computation. Like ``PropSarBpTaylorFastAddThirdOrder``, it is a compile-time
+property applied to the operator, independent of the compute type selected
+through ``SarBpParams``:
+
+.. literalinclude:: ../../../../test/00_transform/SarBp.cu
+   :language: cpp
+   :start-after: example-begin sar-bp-3
+   :end-before: example-end sar-bp-3
+   :dedent:
+
+``PropSarBpPixelZIsFixed`` is the analogous property for a constant, non-zero
+focal-plane height. These assumptions are not validated at run time, so set them
+only when the supplied voxel z coordinates actually satisfy them.

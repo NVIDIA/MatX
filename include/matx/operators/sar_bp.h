@@ -78,6 +78,26 @@ enum class SarBpComputeType {
 };
 
 /**
+ * @brief Compile-time assumption about the pixel z (height) coordinates.
+ *
+ * Many SAR imaging geometries place every output pixel on a single horizontal
+ * focal plane, so the pixel z coordinate is either identically 0 or some other
+ * value that is the same for all pixels. When the caller asserts one of these
+ * cases (via PropSarBpPixelZIsZero / PropSarBpPixelZIsFixed), the kernel can
+ * specialize the per-pulse range computation. This is a compile-time
+ * assumption: the kernel does NOT validate it at run time, so the caller is
+ * responsible for only setting it when it actually holds.
+ */
+enum class SarBpPixelZMode {
+  Variable, /**< No assumption: each pixel may have a distinct z coordinate (default). */
+  Zero,     /**< Every pixel z coordinate is 0. The z difference term collapses to
+                 the antenna z, dropping the pixel-z load/subtraction. */
+  Fixed     /**< Every pixel z coordinate is identical (to an arbitrary value). The
+                 per-pulse z contribution is uniform across pixels and can be hoisted
+                 out of the per-pixel inner loop on the shared-cache compute paths. */
+};
+
+/**
  * @brief Features that can be enabled or disabled for the SAR BP kernel.
  */
 enum class SarBpFeature : uint32_t {
@@ -100,6 +120,29 @@ enum class SarBpFeature : uint32_t {
  * ranges where the second-order approximation may not be accurate enough.
  */
 struct PropSarBpTaylorFastAddThirdOrder {};
+
+/**
+ * @brief Asserts that every output pixel has a z (height) coordinate of 0.
+ *
+ * Selects SarBpPixelZMode::Zero, which lets the kernel drop the pixel-z term
+ * from the per-pulse range computation. This is a compile-time assumption that
+ * is NOT validated at run time; it must only be set when it actually holds for
+ * the supplied voxel locations. If PropSarBpPixelZIsFixed is also set, this
+ * property (Zero, the stronger assumption) takes precedence and the Fixed
+ * property has no effect.
+ */
+struct PropSarBpPixelZIsZero {};
+
+/**
+ * @brief Asserts that every output pixel shares one (arbitrary) z coordinate.
+ *
+ * Selects SarBpPixelZMode::Fixed. On the shared-cache compute paths the per-pulse
+ * z contribution is uniform across pixels and can be hoisted out of the
+ * per-pixel inner loop. This is a compile-time assumption that is NOT validated
+ * at run time. PropSarBpPixelZIsZero (z == 0) is a stronger special case and
+ * takes precedence if both are set.
+ */
+struct PropSarBpPixelZIsFixed {};
 
 // Enable bitmask operations for SarBpFeature
 constexpr SarBpFeature operator|(SarBpFeature lhs, SarBpFeature rhs) noexcept {
@@ -203,7 +246,13 @@ namespace detail {
 
         constexpr bool TaylorFastAddThirdOrder =
           has_property_tag<PropSarBpTaylorFastAddThirdOrder, CurrentProps...>;
-        sar_bp_impl<TaylorFastAddThirdOrder>(
+        // Zero (z == 0) is the stronger assumption and takes precedence over
+        // Fixed (z == const) when both props are present.
+        constexpr SarBpPixelZMode PixelZMode =
+          has_property_tag<PropSarBpPixelZIsZero, CurrentProps...> ? SarBpPixelZMode::Zero :
+          (has_property_tag<PropSarBpPixelZIsFixed, CurrentProps...> ? SarBpPixelZMode::Fixed :
+           SarBpPixelZMode::Variable);
+        sar_bp_impl<TaylorFastAddThirdOrder, PixelZMode>(
           cuda::std::get<0>(out), initial_image_, range_profiles_, platform_positions_,
           voxel_locations_, range_to_mcp_, params_, ex.getStream());
       }
