@@ -42,6 +42,15 @@ A consumer project can then require MatX in its Conan recipe and use CMake to lo
 The example project in ``test_package/`` demonstrates a Conan test package that builds a sample CMake application using ``CMakeDeps`` and
 ``VirtualRunEnv`` and links against the locally-created MatX Conan package.
 
+.. note:: Network Dependency During Conan Create
+
+    During ``conan create .``, the package recipe's ``package()`` method runs CMake's configure phase,
+    which automatically fetches CCCL (CUDA C++ Core Libraries) from GitHub via CPM. This means **internet
+    access is required** even when using Conan for offline or air-gapped environments.
+    
+    For offline deployments, pre-populate the CPM cache on an internet-enabled system before transferring
+    to the offline environment (see :ref:`Conan in Offline Environments` below).
+
 System Requirements
 -------------------
 MatX requires **CUDA 12.2.1** or higher, and **g++ 9.3+**, **clang 17+**, or **nvc++ 24.5** for the host compiler. See the CUDA toolkit documentation
@@ -403,3 +412,58 @@ and building on the offline system.
 
     
 - Build your MatX project per your standard process, CPM will automatically use the cache
+
+.. _conan-offline:
+
+Conan in Offline Environments
+==============================
+
+When using Conan to deploy MatX in offline or air-gapped environments, follow these steps to pre-cache dependencies:
+
+**On an internet-enabled system:**
+
+1. Clone the MatX repository and prepare the CPM cache as described in the previous section
+
+2. Create the MatX Conan package with the pre-populated cache:
+
+   .. code-block:: shell
+
+      export CPM_SOURCE_CACHE=$HOME_ONLINE/matx_cpm_cache
+      conan create .
+
+   This ensures CCCL and other dependencies are cached during the package creation process.
+
+3. Export the Conan package to a portable format for transfer:
+
+   .. code-block:: shell
+
+      conan cache clean "*" --build=missing
+      # Optionally, package the Conan cache directory
+      tar -czvf matx_conan_cache.tar.gz ~/.conan2/p/
+
+4. Transfer both the CPM cache and Conan cache to your offline system:
+
+   .. code-block:: shell
+
+      tar -czvf matx_offline_package.tar.gz $HOME_ONLINE/matx_cpm_cache matx_conan_cache.tar.gz MatX/
+
+**On the offline system:**
+
+1. Extract both caches:
+
+   .. code-block:: shell
+
+      tar -xzvf matx_offline_package.tar.gz -C $HOME_OFFLINE/
+      
+2. Set environment variables before using Conan:
+
+   .. code-block:: shell
+
+      export CPM_SOURCE_CACHE=$HOME_OFFLINE/matx_cpm_cache
+      export CONAN_USER_HOME=$HOME_OFFLINE/.conan2
+
+3. Your consumer project can now require MatX without network access:
+
+   .. code-block:: shell
+
+      conan install . --lockfile-partial
