@@ -767,6 +767,15 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
                         float pz2_lo = dz2hi.lo;
                         pz2_lo = detail::fmaf_rn(detail::fadd_rn(dz.hi, dz.hi), dz.lo, pz2_lo);
                         pz2_lo = detail::fmaf_rn(dz.lo, dz.lo, pz2_lo);
+                        // Renormalize dz^2 into a canonical fltflt. fast_two_sum's
+                        // |a| >= |b| precondition (a = dz.hi^2, b = the
+                        // O(ulp(dz.hi^2)) remainder) holds whenever |dz.hi| is not
+                        // tiny. It can fail only if the platform sits within
+                        // ~ulp(antenna_z) of the pixel-z plane (sub-mm at km
+                        // altitudes, not physical for SAR), where cancellation makes
+                        // dz non-canonical. Even then it is typically benign; the hi word
+                        // is still correctly rounded and dz^2 is negligible versus
+                        // dx^2 + dy^2 for physically meaningful SAR geometries.
                         sh_mem.ant_pos[ip][2] = fltflt_fast_two_sum(dz2hi.hi, pz2_lo);
                     } else {
                         sh_mem.ant_pos[ip][2] = apz;
