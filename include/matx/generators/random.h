@@ -394,6 +394,13 @@ namespace detail {
           gen_count--;
         }
 
+        if constexpr (std::is_same_v<T, float> || std::is_same_v<T, double>) {
+          if (fParams_.dist_ == NORMAL) {
+            MATX_ASSERT_STR((gen_count % 2) == 0, matxInvalidSize,
+                            "cuRAND normal generation requires an even count");
+          }
+        }
+
         if (gen_count > 0) {
           if constexpr (std::is_same_v<T, float>) {
             if (fParams_.dist_ == UNIFORM) {

@@ -595,6 +595,41 @@ TEST(OperatorTests, RandomDirectComplexUniform)
   MATX_EXIT_HANDLER();
 }
 
+TEST(OperatorTests, RandomDirectComplexNormalBetaRealOnly)
+{
+  MATX_ENTER_HANDLER();
+  cudaExecutor exec{};
+
+  auto check_complex = [&]<typename TestType>() {
+    using InnerType = typename inner_op_type_t<TestType>::type;
+    constexpr index_t count = 4096;
+    constexpr uint64_t seed = 9013;
+    constexpr InnerType beta = static_cast<InnerType>(5);
+    auto a = make_tensor<TestType>({count});
+    auto b = make_tensor<TestType>({count});
+
+    (a = random<TestType>({count}, NORMAL, seed, static_cast<InnerType>(1), beta)).run(exec);
+    (b = random<TestType>({count}, NORMAL, seed, static_cast<InnerType>(1), beta)).run(exec);
+    exec.sync();
+
+    double real_sum = 0;
+    double imag_sum = 0;
+    for (index_t i = 0; i < count; i++) {
+      real_sum += static_cast<double>(a(i).real());
+      imag_sum += static_cast<double>(a(i).imag());
+      EXPECT_TRUE(MatXUtils::MatXTypeCompare(a(i), b(i)));
+    }
+
+    EXPECT_NEAR(real_sum / static_cast<double>(count), static_cast<double>(beta), 0.2);
+    EXPECT_NEAR(imag_sum / static_cast<double>(count), 0.0, 0.2);
+  };
+
+  check_complex.template operator()<cuda::std::complex<float>>();
+  check_complex.template operator()<cuda::std::complex<double>>();
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(BasicGeneratorTestsIntegral, RandomiDirectSeeded)
 {
   MATX_ENTER_HANDLER();

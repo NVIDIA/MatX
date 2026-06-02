@@ -14,6 +14,8 @@ When ``random()`` or ``randomi()`` is assigned directly into a CUDA tensor, MatX
 
 The direct CUDA fill path is reproducible for the same seed, tensor shape, layout, type, and distribution. Contiguous floating-point tensors use a cuRAND bulk-generation path, while non-contiguous views, rank-0 tensors, integer tensors, and some tail cases use a local Philox fill path, so fixed-seed values are not guaranteed to match across those layouts or paths.
 
+For complex ``random()`` output, ``alpha`` scales both real and imaginary components, while scalar ``beta`` shifts only the real component.
+
 Generic expressions containing random operators continue to use generator state so repeated random accesses inside an expression produce fresh values.
  
  
