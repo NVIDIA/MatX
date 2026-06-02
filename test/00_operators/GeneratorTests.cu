@@ -702,15 +702,19 @@ TYPED_TEST(BasicGeneratorTestsFloatNonComplexNonHalf, RandomExpressionStillWorks
   ExecType exec{};
 
   constexpr index_t count = 100;
+  constexpr uint64_t seed = 2468;
   auto out = make_tensor<TestType>({count});
-  auto rand_op = random<TestType>({count}, UNIFORM, 2468);
+  auto materialized = make_tensor<TestType>({count});
+  auto rand_op = random<TestType>({count}, UNIFORM, seed);
 
+  (materialized = random<TestType>({count}, UNIFORM, seed)).run(exec);
   (out = rand_op + rand_op).run(exec);
   exec.sync();
 
   for (index_t i = 0; i < count; i++) {
     ASSERT_LE(out(i), static_cast<TestType>(2));
     ASSERT_LE(static_cast<TestType>(0), out(i));
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(out(i), static_cast<TestType>(2) * materialized(i)));
   }
 
   MATX_EXIT_HANDLER();

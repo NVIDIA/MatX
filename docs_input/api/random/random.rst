@@ -16,7 +16,7 @@ The direct CUDA fill path is reproducible for the same seed, tensor shape, layou
 
 For complex ``random()`` output, ``alpha`` scales both real and imaginary components, while scalar ``beta`` shifts only the real component.
 
-Generic expressions containing random operators continue to use generator state so repeated random accesses inside an expression produce fresh values.
+Generic CUDA expressions containing random operators materialize one temporary value buffer per random operator during ``PreRun`` instead of allocating per-element RNG state. Repeated accesses to the same random operator inside one expression read the same materialized values; use separate random operators and seeds for independent draws.
  
  
 - ``random()`` only generates random distribution for *float* data types
