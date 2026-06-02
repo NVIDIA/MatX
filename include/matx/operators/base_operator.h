@@ -217,13 +217,8 @@ namespace matx
                 tp->TransformExec(tp->Shape(), ex);
               }
               else {
-                if (detail::check_aliased_memory(tp->get_lhs(), tp->get_rhs(), true)) {
-                  MATX_THROW(matxInvalidParameter, "Possible aliased memory detected: LHS and RHS memory ranges overlap");
-                }
-
-                tp->PreRun(tp->Shape(), ex);
-                ex.Exec(*tp);
-                tp->PostRun(tp->Shape(), ex);
+                MATX_THROW(matxInvalidSize,
+                           "Random direct assignment requires identical input and output shapes and value types");
               }
             }
             else if constexpr (is_tensor_view_v<typename T::tensor_type> && is_tensor_view_v<typename T::op_type> && is_cuda_executor_v<Ex>) {

@@ -644,6 +644,21 @@ TYPED_TEST(BasicGeneratorTestsFloatNonComplexNonHalf, RandomDirectRank0)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(BasicGeneratorTestsFloatNonComplexNonHalf, RandomDirectShapeMismatchThrows)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  ExecType exec{};
+
+  auto out = make_tensor<TestType>({10});
+  auto rand_op = random<TestType>({5}, UNIFORM, 1357);
+
+  EXPECT_THROW({ (out = rand_op).run(exec); }, matx::detail::matxException);
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(BasicGeneratorTestsFloatNonComplexNonHalf, RandomExpressionStillWorks)
 {
   MATX_ENTER_HANDLER();
