@@ -340,15 +340,50 @@ namespace detail {
       template <typename Out>
       __MATX_INLINE__ void ExecCurandGenerator(Out &out, cudaStream_t stream) const
       {
+        struct CurandGeneratorGuard {
+          curandGenerator_t gen = nullptr;
+
+          ~CurandGeneratorGuard()
+          {
+            if (gen != nullptr) {
+              static_cast<void>(curandDestroyGenerator(gen));
+            }
+          }
+
+          CurandGeneratorGuard() = default;
+          CurandGeneratorGuard(const CurandGeneratorGuard &) = delete;
+          CurandGeneratorGuard &operator=(const CurandGeneratorGuard &) = delete;
+
+          curandGenerator_t *Handle()
+          {
+            return &gen;
+          }
+
+          curandGenerator_t Get() const
+          {
+            return gen;
+          }
+
+          curandStatus_t Destroy()
+          {
+            curandStatus_t ret = CURAND_STATUS_SUCCESS;
+            if (gen != nullptr) {
+              ret = curandDestroyGenerator(gen);
+              gen = nullptr;
+            }
+            return ret;
+          }
+        };
+
         [[maybe_unused]] curandStatus_t ret;
-        curandGenerator_t gen;
-        ret = curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_PHILOX4_32_10);
+        CurandGeneratorGuard gen;
+        ret = curandCreateGenerator(gen.Handle(), CURAND_RNG_PSEUDO_PHILOX4_32_10);
         MATX_ASSERT_STR_EXP(ret, CURAND_STATUS_SUCCESS, matxCudaError, "Failed to create random number generator");
 
-        ret = curandSetStream(gen, stream);
+        ret = curandSetStream(gen.Get(), stream);
         MATX_ASSERT_STR_EXP(ret, CURAND_STATUS_SUCCESS, matxCudaError, "Error setting random generator stream");
 
-        ret = curandSetPseudoRandomGeneratorSeed(gen, seed_);
+        ret = curandSetPseudoRandomGeneratorSeed(gen.Get(), seed_);
         MATX_ASSERT_STR_EXP(ret, CURAND_STATUS_SUCCESS, matxCudaError, "Error setting random seed");
 
         index_t gen_count = total_size_;
@@ -362,36 +397,36 @@ namespace detail {
         if (gen_count > 0) {
           if constexpr (std::is_same_v<T, float>) {
             if (fParams_.dist_ == UNIFORM) {
-              ret = curandGenerateUniform(gen, out.Data(), static_cast<size_t>(gen_count));
+              ret = curandGenerateUniform(gen.Get(), out.Data(), static_cast<size_t>(gen_count));
             }
             else {
-              ret = curandGenerateNormal(gen, out.Data(), static_cast<size_t>(gen_count), 0.0f, 1.0f);
+              ret = curandGenerateNormal(gen.Get(), out.Data(), static_cast<size_t>(gen_count), 0.0f, 1.0f);
             }
           }
           else if constexpr (std::is_same_v<T, double>) {
             if (fParams_.dist_ == UNIFORM) {
-              ret = curandGenerateUniformDouble(gen, out.Data(), static_cast<size_t>(gen_count));
+              ret = curandGenerateUniformDouble(gen.Get(), out.Data(), static_cast<size_t>(gen_count));
             }
             else {
-              ret = curandGenerateNormalDouble(gen, out.Data(), static_cast<size_t>(gen_count), 0.0, 1.0);
+              ret = curandGenerateNormalDouble(gen.Get(), out.Data(), static_cast<size_t>(gen_count), 0.0, 1.0);
             }
           }
           else if constexpr (std::is_same_v<T, cuda::std::complex<float>>) {
             auto *real_data = reinterpret_cast<float *>(out.Data());
             if (fParams_.dist_ == UNIFORM) {
-              ret = curandGenerateUniform(gen, real_data, static_cast<size_t>(gen_count) * 2);
+              ret = curandGenerateUniform(gen.Get(), real_data, static_cast<size_t>(gen_count) * 2);
             }
             else {
-              ret = curandGenerateNormal(gen, real_data, static_cast<size_t>(gen_count) * 2, 0.0f, 1.0f);
+              ret = curandGenerateNormal(gen.Get(), real_data, static_cast<size_t>(gen_count) * 2, 0.0f, 1.0f);
             }
           }
           else if constexpr (std::is_same_v<T, cuda::std::complex<double>>) {
             auto *real_data = reinterpret_cast<double *>(out.Data());
             if (fParams_.dist_ == UNIFORM) {
-              ret = curandGenerateUniformDouble(gen, real_data, static_cast<size_t>(gen_count) * 2);
+              ret = curandGenerateUniformDouble(gen.Get(), real_data, static_cast<size_t>(gen_count) * 2);
             }
             else {
-              ret = curandGenerateNormalDouble(gen, real_data, static_cast<size_t>(gen_count) * 2, 0.0, 1.0);
+              ret = curandGenerateNormalDouble(gen.Get(), real_data, static_cast<size_t>(gen_count) * 2, 0.0, 1.0);
             }
           }
 
@@ -403,7 +438,7 @@ namespace detail {
           LaunchStateFreeFill(out, 1, gen_count, stream);
         }
 
-        ret = curandDestroyGenerator(gen);
+        ret = gen.Destroy();
         MATX_ASSERT_STR_EXP(ret, CURAND_STATUS_SUCCESS, matxCudaError, "Failed to destroy random number generator");
       }
 #endif

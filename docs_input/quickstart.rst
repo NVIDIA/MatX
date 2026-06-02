@@ -437,7 +437,8 @@ For very large tensors, prefer the direct assignment form when possible:
 
     (t2 = random<float>(t2.Shape(), NORMAL)).run(stream);
 
-Generic expressions that contain ``random()`` still use per-element generator state so each access can produce a fresh value.
+Direct CUDA fills are reproducible for the same seed, tensor shape, layout, type, and distribution. Generic expressions that contain ``random()`` still use
+per-element generator state so each access can produce a fresh value.
 
 That's it!
 ----------
