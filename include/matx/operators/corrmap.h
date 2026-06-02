@@ -205,27 +205,33 @@ namespace matx
           is_dynamic_tensor_v<OpB> || is_dynamic_rank_op_v<OpB>>;
 
 #ifdef MATX_EN_JIT
-        // JIT storage: same operands the host operator() reads, plus the
-        // runtime window-size array.
+        // JIT storage: same operands the host operator() reads. The window
+        // sizes are baked into the generated type as a constexpr array (see
+        // get_jit_class_name / get_jit_op_str), so they are not stored here.
         struct JIT_Storage {
           typename detail::inner_storage_or_self_t<detail::base_type_t<OpA>> a_;
           typename detail::inner_storage_or_self_t<detail::base_type_t<OpB>> b_;
-          cuda::std::array<index_t, WindowRank> window_;
           cuda::std::array<index_t, out_rank> out_dims_;
         };
 
         JIT_Storage ToJITStorage() const {
           return JIT_Storage{detail::to_jit_storage(a_),
                              detail::to_jit_storage(b_),
-                             window_,
                              out_dims_};
         }
 
-        // The class name encodes WindowRank and Mode so each (rank, mode)
-        // combination gets its own NVRTC-cached class.
+        // The class name encodes WindowRank, Mode, and the window dimensions so
+        // each (rank, mode, window) combination gets its own NVRTC-cached class.
+        // Baking the window sizes into the type (rather than passing them as
+        // runtime storage) lets the generated window loops use compile-time
+        // bounds and unroll, matching how slice() bakes its sizes/dims/starts.
         __MATX_INLINE__ std::string get_jit_class_name() const {
-          return std::format("JITCorrMap_w{}_m{}", WindowRank,
-                             static_cast<int>(Mode));
+          std::string win_str;
+          for (int d = 0; d < WindowRank; d++) {
+            win_str += std::format("_{}", window_[d]);
+          }
+          return std::format("JITCorrMap_w{}_m{}{}", WindowRank,
+                             static_cast<int>(Mode), win_str);
         }
 
         // Emit the operator's struct definition for NVRTC compilation. The
@@ -255,7 +261,7 @@ namespace matx
               "\n"
               "  typename detail::inner_storage_or_self_t<detail::base_type_t<OpA>> a_;\n"
               "  typename detail::inner_storage_or_self_t<detail::base_type_t<OpB>> b_;\n"
-              "  cuda::std::array<index_t, WindowRank> window_;\n"
+              "  static constexpr cuda::std::array<index_t, WindowRank> window_ = {{ {6} }};\n"
               "  cuda::std::array<index_t, out_rank> out_dims_;\n"
               "\n"
               "  // Scalar sqrt: dispatches half precision through float to avoid\n"
@@ -270,7 +276,7 @@ namespace matx
               "  }}\n"
               "\n"
               "  template <typename CapType, typename... Is>\n"
-              "  __MATX_INLINE__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) const {{\n"
+              "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(Is... indices) const {{\n"
               "    if constexpr (CapType::ept != ElementsPerThread::ONE) {{\n"
               "      return Vector<value_type, static_cast<size_t>(CapType::ept)>();\n"
               "    }} else {{\n"
@@ -403,7 +409,8 @@ namespace matx
               static_cast<int>(Mode),
               static_cast<int>(CorrMapNormalize::NONE),
               static_cast<int>(CorrMapNormalize::MAGNITUDE),
-              static_cast<int>(CorrMapNormalize::ZNCC))
+              static_cast<int>(CorrMapNormalize::ZNCC),
+              detail::array_to_string(window_))
           );
         }
 #endif
@@ -434,7 +441,7 @@ namespace matx
         }
 
         template <typename CapType, typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
         {
           // corrmap only supports one element per thread. The ELEMENTS_PER_THREAD
           // capability below advertises this, and combine_capabilities() forces
