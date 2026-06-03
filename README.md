@@ -134,7 +134,7 @@ find_package(matx CONFIG REQUIRED)
 ```
 
 #### 3. MatX via Conan
-MatX includes a local Conan package recipe in the repository root with a package name of ``matx`` and version ``1.0.0``.
+MatX includes a local Conan package recipe in the repository root with a package name of ``matx`` and a package version placeholder ``<version>`` (for example ``1.0.0``).
 Because this recipe is local to the MatX repository, the repository must be cloned and the Conan package created locally before a consumer
 project can require it.
 
@@ -144,10 +144,10 @@ From the root of the MatX repository run:
 conan create .
 ```
 
-That command publishes ``matx/1.0.0`` to your local Conan cache. A consumer project can then use:
+That command publishes ``matx/<version>`` to your local Conan cache. A consumer project can then use:
 
 ```python
-self.requires("matx/1.0.0")
+self.requires("matx/<version>")  # e.g. "matx/1.0.0"
 ```
 
 and still rely on CMake to find MatX with:

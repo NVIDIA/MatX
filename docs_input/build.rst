@@ -25,14 +25,14 @@ MatX repository and create the package locally from the repository root:
 
     conan create .
 
-That command registers the local ``matx/1.0.0`` package in your Conan cache. Because the package recipe is part of the MatX repository,
+That command registers the local ``matx/<version>`` package in your Conan cache. Because the package recipe is part of the MatX repository,
 this package must be created locally before a consumer project can require it.
 
 A consumer project can then require MatX in its Conan recipe and use CMake to locate the package:
 
 .. code-block:: python
 
-    self.requires("matx/1.0.0")
+    self.requires("matx/<version>")  # e.g. "matx/1.0.0"
 
 .. code-block:: cmake
 
