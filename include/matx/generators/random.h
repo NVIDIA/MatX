@@ -45,17 +45,6 @@ namespace matx {
  */
 enum Distribution_t { UNIFORM, NORMAL };
 
-#ifdef __CUDACC__
-template <typename Gen>
-__global__ void curand_setup_kernel(Gen *states, uint64_t seed, index_t size)
-{
-  index_t idx = (index_t)blockIdx.x * blockDim.x + threadIdx.x;
-  if (idx < size)
-    curand_init(seed, idx, 0, &states[idx]);
-};
-#endif
-
-
 /**
  * @brief Get a random number
  *
@@ -165,56 +154,6 @@ __MATX_INLINE__ __MATX_DEVICE__ void get_random(cuda::std::complex<double> &val,
     val.real(r.x);
     val.imag(r.y);
   }
-};
-
-/**
- * Generates random numbers
- *
- * @tparam
- *   Type of random number
- *
- * Generate random numbers based on a size and seed. Uses the Philox 4x32
- * generator with 10 rounds.
- */
-template <typename T> class [[deprecated("Use random() operator instead of randomGenerator_t")]] randomGenerator_t {
-private:
-  index_t total_threads_;
-  bool init_;
-  curandStatePhilox4_32_10_t *states_;
-  uint64_t seed_;
-
-public:
-  randomGenerator_t() = delete;
-
-  /**
-   * Constructs a random number generator
-   *
-   * This call will allocate memory sufficiently large enough to store state of
-   * the RNG
-   *
-   * @param total_threads
-   *   Number of random values to generate
-   * @param seed
-   *   Seed for the RNG
-   */
-  __MATX_INLINE__ randomGenerator_t(index_t total_threads, uint64_t seed)
-      : total_threads_(total_threads)
-  {
-#ifdef __CUDACC__
-    matxAlloc((void **)&states_,
-              total_threads_ * sizeof(curandStatePhilox4_32_10_t),
-              MATX_DEVICE_MEMORY);
-
-    int threads = 128;
-    int blocks = static_cast<int>((total_threads_ + threads - 1) / threads);
-    curand_setup_kernel<<<blocks, threads>>>(states_, seed, total_threads);
-#endif
-  };
-
-  /**
-   * Destroy the RNG and free all memory
-   */
-  __MATX_INLINE__ ~randomGenerator_t() { matxFree(states_); }
 };
 
 namespace detail {
