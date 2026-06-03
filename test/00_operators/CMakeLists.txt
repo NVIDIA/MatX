@@ -18,6 +18,7 @@ set(OPERATOR_TEST_FILES
   complex_type_compatibility_test.cu
   concat_test.cu
   cross_test.cu
+  corrmap_test.cu
   fftshift_test.cu
   filter_test.cu
   find_peaks.cu
