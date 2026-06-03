@@ -36,6 +36,9 @@
 #include "matx/core/log.h"
 #include <cuda/std/complex>
 #include <curand_kernel.h>
+#include <iomanip>
+#include <limits>
+#include <sstream>
 #include <type_traits>
 
 namespace matx {
@@ -436,24 +439,11 @@ namespace detail {
 
 #ifdef MATX_EN_JIT
       struct JIT_Storage {
-        inner_t alpha_;
-        inner_t beta_;
       };
 
       __MATX_INLINE__ JIT_Storage ToJITStorage() const
       {
-        if constexpr (is_float_random_v) {
-          return JIT_Storage{
-            fParams_.alpha_,
-            fParams_.beta_
-          };
-        }
-        else {
-          return JIT_Storage{
-            inner_t{},
-            inner_t{}
-          };
-        }
+        return JIT_Storage{};
       }
 
       static __MATX_INLINE__ std::string JITNamePart(index_t value)
@@ -496,6 +486,70 @@ namespace detail {
         return out;
       }
 
+      static __MATX_INLINE__ std::string JITValueLiteral(inner_t value)
+      {
+        if constexpr (std::is_floating_point_v<inner_t>) {
+          std::ostringstream oss;
+          oss << std::setprecision(std::numeric_limits<inner_t>::max_digits10) << value;
+          auto out = oss.str();
+          if (out.find('.') == std::string::npos &&
+              out.find('e') == std::string::npos &&
+              out.find('E') == std::string::npos) {
+            out += ".0";
+          }
+          return out;
+        }
+        else {
+          return std::to_string(value);
+        }
+      }
+
+      static __MATX_INLINE__ std::string JITValueNamePart(inner_t value)
+      {
+        const auto literal = JITValueLiteral(value);
+        std::string out;
+        out.reserve(literal.size());
+
+        for (const auto c : literal) {
+          if ((c >= '0' && c <= '9') ||
+              (c >= 'a' && c <= 'z') ||
+              (c >= 'A' && c <= 'Z')) {
+            out += c;
+          }
+          else if (c == '-') {
+            out += "n";
+          }
+          else if (c == '+') {
+            out += "p";
+          }
+          else {
+            out += "_";
+          }
+        }
+
+        return out;
+      }
+
+      __MATX_INLINE__ inner_t JITAlpha() const
+      {
+        if constexpr (is_float_random_v) {
+          return fParams_.alpha_;
+        }
+        else {
+          return inner_t{};
+        }
+      }
+
+      __MATX_INLINE__ inner_t JITBeta() const
+      {
+        if constexpr (is_float_random_v) {
+          return fParams_.beta_;
+        }
+        else {
+          return inner_t{};
+        }
+      }
+
       __MATX_INLINE__ int JITDistribution() const
       {
         if constexpr (is_float_random_v) {
@@ -509,16 +563,21 @@ namespace detail {
       __MATX_INLINE__ std::string get_jit_class_name() const
       {
         const int dist = JITDistribution();
+        const auto alpha = JITAlpha();
+        const auto beta = JITBeta();
         return std::string("JITRandomOp_R") + std::to_string(RANK) + "_" +
                JITArrayNamePart("S", shape_) + "_" +
                JITArrayNamePart("T", strides_) + "_seed" +
-               std::to_string(seed_) + "_dist" + std::to_string(dist);
+               std::to_string(seed_) + "_dist" + std::to_string(dist) +
+               "_alpha" + JITValueNamePart(alpha) + "_beta" + JITValueNamePart(beta);
       }
 
       __MATX_INLINE__ auto get_jit_op_str() const
       {
         const std::string class_name = get_jit_class_name();
         const int dist = JITDistribution();
+        const auto alpha = JITAlpha();
+        const auto beta = JITBeta();
         return cuda::std::make_tuple(
           class_name,
           std::string("template <typename T> struct ") + class_name + " {\n"
@@ -530,8 +589,8 @@ namespace detail {
           "  static constexpr cuda::std::array<index_t, RANK> strides_ = " + JITArrayInit(strides_) + ";\n"
           "  static constexpr unsigned long long seed_ = " + std::to_string(seed_) + "ULL;\n"
           "  static constexpr int dist_ = " + std::to_string(dist) + ";\n"
-          "  inner_t alpha_;\n"
-          "  inner_t beta_;\n"
+          "  static constexpr inner_t alpha_ = static_cast<inner_t>(" + JITValueLiteral(alpha) + ");\n"
+          "  static constexpr inner_t beta_ = static_cast<inner_t>(" + JITValueLiteral(beta) + ");\n"
           "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() { return RANK; }\n"
           "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const { return shape_[dim]; }\n"
           "  template <typename Vec4>\n"
