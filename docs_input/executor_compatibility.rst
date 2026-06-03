@@ -165,7 +165,7 @@ fused JIT expression; non-JIT CUDA execution through cudaExecutor remains availa
    "qr_econ", "|no|", "|yes|", "|yes|", "CUDA solver transform. CUDAJITExecutor supports cuSolverDx-backed lazy projections for supported types and shapes; the Q projection is limited to non-wide matrices where m >= n."
    "qr_solver", "|yes|", "|yes|", "|yes|", "Host support requires the CPU solver backend. CUDAJITExecutor supports cuSolverDx-backed lazy projections for supported types and shapes."
    "r2c", "|yes|", "|yes|", "|yes|", "Real-to-complex view/cast expression."
-   "random", "|yes|", "|yes|", "|no|", "Direct CUDA tensor assignment uses a low-memory fill path reproducible for the same shape/layout/path; generic CUDA expressions materialize temporary random values and are not JIT-fused."
+   "random", "|yes|", "|yes|", "|partial|", "Direct CUDA tensor assignment uses a low-memory fill path reproducible for the same shape/layout/path. CUDAJITExecutor uses cuRANDDx through MathDx for floating-point and complex random expressions with at most 1024 elements; larger random tensors materialize temporary values on the non-JIT CUDA path."
    "randomi", "|yes|", "|yes|", "|no|", "Direct CUDA tensor assignment uses a low-memory fill path reproducible for the same shape/layout/path; generic CUDA expressions materialize temporary random integer values and are not JIT-fused."
    "range", "|yes|", "|yes|", "|yes|", "Generator expression."
    "rcollapse", "|yes|", "|yes|", "|yes|", "View expression."

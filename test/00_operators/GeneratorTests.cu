@@ -776,6 +776,96 @@ TEST(OperatorTests, RandomHostNormalScalesOnce)
   MATX_EXIT_HANDLER();
 }
 
+TEST(OperatorTests, RandomJITCapabilityLimits)
+{
+  MATX_ENTER_HANDLER();
+
+  auto small = random<float>({1024}, UNIFORM, 1111);
+  auto large = random<float>({1025}, UNIFORM, 1111);
+  auto ints = randomi<int32_t>({128}, 2222);
+
+#if defined(MATX_EN_MATHDX) && defined(MATX_EN_JIT)
+  EXPECT_TRUE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(small));
+#else
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(small));
+#endif
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(large));
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(ints));
+
+  MATX_EXIT_HANDLER();
+}
+
+#if defined(MATX_EN_MATHDX) && defined(MATX_EN_JIT)
+TEST(OperatorTests, RandomJITFusedUniform)
+{
+  MATX_ENTER_HANDLER();
+  CUDAJITExecutor exec{};
+
+  constexpr index_t count = 128;
+  constexpr uint64_t seed = 1122;
+  auto out = make_tensor<float>({count});
+
+  (out = random<float>({count}, UNIFORM, seed, 2.0f, -1.0f) + 3.0f).run(exec);
+  exec.sync();
+
+  int different_count = 0;
+  const float first = out(0);
+  for (index_t i = 0; i < count; i++) {
+    ASSERT_LE(2.0f, out(i));
+    ASSERT_LE(out(i), 4.0f);
+    different_count += MatXUtils::MatXTypeCompare(out(i), first) ? 0 : 1;
+  }
+  EXPECT_GT(different_count, 0);
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(OperatorTests, RandomJITRepeatedLeafUsesSameValue)
+{
+  MATX_ENTER_HANDLER();
+  CUDAJITExecutor exec{};
+
+  constexpr index_t count = 64;
+  constexpr uint64_t seed = 3344;
+  auto single = make_tensor<double>({count});
+  auto doubled = make_tensor<double>({count});
+  auto rand_op = random<double>({count}, UNIFORM, seed);
+
+  (single = rand_op + 0.0).run(exec);
+  (doubled = rand_op + rand_op).run(exec);
+  exec.sync();
+
+  for (index_t i = 0; i < count; i++) {
+    EXPECT_NEAR(doubled(i), 2.0 * single(i), 1e-12);
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(OperatorTests, RandomJITComplexUniformBetaRealOnly)
+{
+  MATX_ENTER_HANDLER();
+  CUDAJITExecutor exec{};
+
+  using TestType = cuda::std::complex<float>;
+  constexpr index_t count = 64;
+  constexpr uint64_t seed = 5566;
+  auto out = make_tensor<TestType>({count});
+
+  (out = random<TestType>({count}, UNIFORM, seed, 2.0f, -1.0f)).run(exec);
+  exec.sync();
+
+  for (index_t i = 0; i < count; i++) {
+    ASSERT_LE(-1.0f, out(i).real());
+    ASSERT_LE(out(i).real(), 1.0f);
+    ASSERT_LE(0.0f, out(i).imag());
+    ASSERT_LE(out(i).imag(), 2.0f);
+  }
+
+  MATX_EXIT_HANDLER();
+}
+#endif
+
 // fill() in a slot that requires an actual MatX operator (not a scalar).
 // zipvec is templated on operator types; passing a bare scalar here fails
 // to compile because float has no Rank() / value_type / operator(). fill()

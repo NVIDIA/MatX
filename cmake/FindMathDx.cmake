@@ -85,7 +85,7 @@ endif()
 set(cublasdx_CUTLASS_ROOT "${MATX_MATHDX_ROOT}/external/cutlass")
 set(cusolverdx_CUTLASS_ROOT "${MATX_MATHDX_ROOT}/external/cutlass")
 
-find_package(mathdx REQUIRED COMPONENTS cufftdx cublasdx cusolverdx CONFIG
+find_package(mathdx REQUIRED COMPONENTS cufftdx cublasdx cusolverdx curanddx CONFIG
   PATHS
     "${MATX_MATHDX_ROOT}/lib/cmake/mathdx"
     "/opt/nvidia/mathdx/${MathDx_VERSION}"

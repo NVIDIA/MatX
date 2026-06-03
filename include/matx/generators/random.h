@@ -244,6 +244,16 @@ namespace detail {
         }
       }
 
+      __MATX_INLINE__ __MATX_HOST__ bool CanUseJITRandom() const noexcept
+      {
+#if defined(MATX_EN_JIT) && defined(MATX_EN_MATHDX) && defined(__CUDACC__)
+        constexpr index_t max_block_elements = 1024;
+        return is_float_random_v && total_size_ > 0 && total_size_ <= max_block_elements;
+#else
+        return false;
+#endif
+      }
+
 #ifdef __CUDACC__
       template <typename Out>
       static constexpr bool CanUseCurandGeneratorType()
@@ -424,6 +434,124 @@ namespace detail {
       using matxop = bool;
       using matx_direct_assign_op = bool;
 
+#ifdef MATX_EN_JIT
+      struct JIT_Storage {
+        cuda::std::array<index_t, RANK> shape_;
+        cuda::std::array<index_t, RANK> strides_;
+        unsigned long long seed_;
+        int dist_;
+        inner_t alpha_;
+        inner_t beta_;
+      };
+
+      __MATX_INLINE__ JIT_Storage ToJITStorage() const
+      {
+        if constexpr (is_float_random_v) {
+          return JIT_Storage{
+            shape_,
+            strides_,
+            static_cast<unsigned long long>(seed_),
+            static_cast<int>(fParams_.dist_),
+            fParams_.alpha_,
+            fParams_.beta_
+          };
+        }
+        else {
+          return JIT_Storage{
+            shape_,
+            strides_,
+            static_cast<unsigned long long>(seed_),
+            0,
+            inner_t{},
+            inner_t{}
+          };
+        }
+      }
+
+      __MATX_INLINE__ std::string get_jit_class_name() const
+      {
+        return std::string("JITRandomOp_R") + std::to_string(RANK);
+      }
+
+      __MATX_INLINE__ auto get_jit_op_str() const
+      {
+        const std::string class_name = get_jit_class_name();
+        return cuda::std::make_tuple(
+          class_name,
+          std::string("template <typename T> struct ") + class_name + " {\n"
+          "  using value_type = T;\n"
+          "  using matxop = bool;\n"
+          "  using inner_t = typename matx::inner_op_type_t<T>::type;\n"
+          "  static constexpr int32_t RANK = " + std::to_string(RANK) + ";\n"
+          "  cuda::std::array<index_t, RANK> shape_;\n"
+          "  cuda::std::array<index_t, RANK> strides_;\n"
+          "  unsigned long long seed_;\n"
+          "  int dist_;\n"
+          "  inner_t alpha_;\n"
+          "  inner_t beta_;\n"
+          "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() { return RANK; }\n"
+          "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const { return shape_[dim]; }\n"
+          "  template <typename Vec4>\n"
+          "  static __MATX_INLINE__ __MATX_DEVICE__ inner_t SelectLane(const Vec4 &vals, unsigned int lane)\n"
+          "  {\n"
+          "    switch (lane) {\n"
+          "      case 0: return vals.x;\n"
+          "      case 1: return vals.y;\n"
+          "      case 2: return vals.z;\n"
+          "      default: return vals.w;\n"
+          "    }\n"
+          "  }\n"
+          "  __MATX_INLINE__ __MATX_DEVICE__ inner_t GenerateStandardScalar(index_t scalar_linear) const\n"
+          "  {\n"
+          "    using RNG = decltype(curanddx::Generator<curanddx::philox4_32>() +\n"
+          "                         curanddx::PhiloxRounds<10>() +\n"
+          "                         curanddx::SM<__CUDA_ARCH__>() +\n"
+          "                         curanddx::Thread());\n"
+          "    const unsigned long long group = static_cast<unsigned long long>(scalar_linear >> 2);\n"
+          "    const unsigned int lane = static_cast<unsigned int>(scalar_linear & 3);\n"
+          "    RNG rng(seed_, group % 65536ULL, group / 65536ULL);\n"
+          "    if (dist_ == 0) {\n"
+          "      curanddx::uniform<inner_t> dist(static_cast<inner_t>(0), static_cast<inner_t>(1));\n"
+          "      return SelectLane(dist.generate4(rng), lane);\n"
+          "    }\n"
+          "    curanddx::normal<inner_t, curanddx::box_muller> dist(static_cast<inner_t>(0), static_cast<inner_t>(1));\n"
+          "    return SelectLane(dist.generate4(rng), lane);\n"
+          "  }\n"
+          "  template <typename... Is>\n"
+          "  __MATX_INLINE__ __MATX_DEVICE__ index_t LinearIndex(Is... indices) const\n"
+          "  {\n"
+          "    static_assert(sizeof...(indices) == RANK, \"Incorrect number of indices for JIT random operator\");\n"
+          "    if constexpr (RANK == 0) {\n"
+          "      return 0;\n"
+          "    }\n"
+          "    else {\n"
+          "      cuda::std::array<index_t, RANK> idx{static_cast<index_t>(indices)...};\n"
+          "      index_t linear = 0;\n"
+          "      MATX_LOOP_UNROLL\n"
+          "      for (int i = 0; i < RANK; i++) {\n"
+          "        linear += idx[i] * strides_[i];\n"
+          "      }\n"
+          "      return linear;\n"
+          "    }\n"
+          "  }\n"
+          "  template <typename CapType, typename... Is>\n"
+          "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(Is... indices) const\n"
+          "  {\n"
+          "    const index_t linear = LinearIndex(indices...);\n"
+          "    if constexpr (matx::is_complex_v<T>) {\n"
+          "      const inner_t real = alpha_ * GenerateStandardScalar(linear * 2) + beta_;\n"
+          "      const inner_t imag = alpha_ * GenerateStandardScalar(linear * 2 + 1);\n"
+          "      return T{real, imag};\n"
+          "    }\n"
+          "    else {\n"
+          "      return alpha_ * GenerateStandardScalar(linear) + beta_;\n"
+          "    }\n"
+          "  }\n"
+          "};\n"
+        );
+      }
+#endif
+
       __MATX_INLINE__ std::string str() const { return "random"; }
 
       // Shapeless constructor to be allocated at run invocation
@@ -459,6 +587,56 @@ namespace detail {
           return cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
         } 
         else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+#ifdef MATX_EN_JIT
+          return CanUseJITRandom();
+#else
+          return false;
+#endif
+        }
+        else if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+#ifdef MATX_EN_JIT
+          if (CanUseJITRandom()) {
+            return get_jit_class_name() + "<" + type_to_string<T>() + ">";
+          }
+#endif
+          return std::string("");
+        }
+        else if constexpr (Cap == OperatorCapability::JIT_CACHE_KEY) {
+#ifdef MATX_EN_JIT
+          auto key = detail::MakeJITCacheKeyForType<RandomOp<T, ShapeType>>("JITRandom");
+          detail::HashJITCacheValue(key, RANK);
+          detail::HashJITCacheValue(key, total_size_);
+          detail::HashJITCacheValue(key, seed_);
+          for (int i = 0; i < RANK; ++i) {
+            detail::HashJITCacheValue(key, shape_[i]);
+          }
+          for (int i = 0; i < RANK; ++i) {
+            detail::HashJITCacheValue(key, strides_[i]);
+          }
+          if constexpr (is_float_random_v) {
+            detail::HashJITCacheValue(key, fParams_.dist_);
+            detail::HashJITCacheValue(key, fParams_.alpha_);
+            detail::HashJITCacheValue(key, fParams_.beta_);
+          }
+          else if constexpr (is_integral_random_v) {
+            detail::HashJITCacheValue(key, iParams_.min_);
+            detail::HashJITCacheValue(key, iParams_.max_);
+          }
+          return key;
+#else
+          return detail::MakeInvalidJITCacheKey();
+#endif
+        }
+        else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+#ifdef MATX_EN_JIT
+          if (CanUseJITRandom()) {
+            const auto [key, value] = get_jit_op_str();
+            if (in.find(key) == in.end()) {
+              in[key] = value;
+            }
+            return true;
+          }
+#endif
           return false;
         }  
         else {        

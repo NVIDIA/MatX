@@ -43,6 +43,9 @@
 //#include "matx/operators/scalar_internal.h"
 #include "matx/operators/scalar_ops.h"
 #include "matx/core/operator_utils.h"
+#ifdef MATX_EN_MATHDX
+#include <curanddx.hpp>
+#endif
 #if __has_include(<cub/block/block_load_to_shared.cuh>)
 #include <cub/block/block_load_to_shared.cuh>
 #endif

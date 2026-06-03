@@ -17,6 +17,8 @@ The direct CUDA fill path is reproducible for the same seed, tensor shape, layou
 For complex ``random()`` output, ``alpha`` scales both real and imaginary components, while scalar ``beta`` shifts only the real component.
 
 Generic CUDA expressions containing random operators materialize one temporary value buffer per random operator during ``PreRun`` instead of allocating per-element RNG state. Repeated accesses to the same random operator inside one expression read the same materialized values; use separate random operators and seeds for independent draws.
+
+When ``CUDAJITExecutor`` is used with ``-DMATX_EN_MATHDX=ON``, floating-point and complex ``random()`` operators can be fused into the generated kernel with cuRANDDx if the random output has at most 1024 elements. This JIT path avoids the temporary value buffer and generates values from Philox inside the fused kernel. Larger random tensors and ``randomi()`` are not JIT-fused; use a normal CUDA executor for those expressions.
  
  
 - ``random()`` only generates random distribution for *float* data types
