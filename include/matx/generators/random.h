@@ -436,10 +436,6 @@ namespace detail {
 
 #ifdef MATX_EN_JIT
       struct JIT_Storage {
-        cuda::std::array<index_t, RANK> shape_;
-        cuda::std::array<index_t, RANK> strides_;
-        unsigned long long seed_;
-        int dist_;
         inner_t alpha_;
         inner_t beta_;
       };
@@ -448,34 +444,81 @@ namespace detail {
       {
         if constexpr (is_float_random_v) {
           return JIT_Storage{
-            shape_,
-            strides_,
-            static_cast<unsigned long long>(seed_),
-            static_cast<int>(fParams_.dist_),
             fParams_.alpha_,
             fParams_.beta_
           };
         }
         else {
           return JIT_Storage{
-            shape_,
-            strides_,
-            static_cast<unsigned long long>(seed_),
-            0,
             inner_t{},
             inner_t{}
           };
         }
       }
 
+      static __MATX_INLINE__ std::string JITNamePart(index_t value)
+      {
+        auto str = std::to_string(value);
+        if (!str.empty() && str[0] == '-') {
+          str[0] = 'n';
+        }
+        return str;
+      }
+
+      static __MATX_INLINE__ std::string JITArrayNamePart(const char *prefix,
+                                                          const cuda::std::array<index_t, RANK> &arr)
+      {
+        std::string out = prefix;
+        if constexpr (RANK == 0) {
+          out += "scalar";
+        }
+        else {
+          for (int i = 0; i < RANK; i++) {
+            if (i > 0) {
+              out += "_";
+            }
+            out += JITNamePart(arr[i]);
+          }
+        }
+        return out;
+      }
+
+      static __MATX_INLINE__ std::string JITArrayInit(const cuda::std::array<index_t, RANK> &arr)
+      {
+        std::string out = "{ ";
+        for (int i = 0; i < RANK; i++) {
+          if (i > 0) {
+            out += ", ";
+          }
+          out += std::to_string(arr[i]);
+        }
+        out += " }";
+        return out;
+      }
+
+      __MATX_INLINE__ int JITDistribution() const
+      {
+        if constexpr (is_float_random_v) {
+          return static_cast<int>(fParams_.dist_);
+        }
+        else {
+          return 0;
+        }
+      }
+
       __MATX_INLINE__ std::string get_jit_class_name() const
       {
-        return std::string("JITRandomOp_R") + std::to_string(RANK);
+        const int dist = JITDistribution();
+        return std::string("JITRandomOp_R") + std::to_string(RANK) + "_" +
+               JITArrayNamePart("S", shape_) + "_" +
+               JITArrayNamePart("T", strides_) + "_seed" +
+               std::to_string(seed_) + "_dist" + std::to_string(dist);
       }
 
       __MATX_INLINE__ auto get_jit_op_str() const
       {
         const std::string class_name = get_jit_class_name();
+        const int dist = JITDistribution();
         return cuda::std::make_tuple(
           class_name,
           std::string("template <typename T> struct ") + class_name + " {\n"
@@ -483,10 +526,10 @@ namespace detail {
           "  using matxop = bool;\n"
           "  using inner_t = typename matx::inner_op_type_t<T>::type;\n"
           "  static constexpr int32_t RANK = " + std::to_string(RANK) + ";\n"
-          "  cuda::std::array<index_t, RANK> shape_;\n"
-          "  cuda::std::array<index_t, RANK> strides_;\n"
-          "  unsigned long long seed_;\n"
-          "  int dist_;\n"
+          "  static constexpr cuda::std::array<index_t, RANK> shape_ = " + JITArrayInit(shape_) + ";\n"
+          "  static constexpr cuda::std::array<index_t, RANK> strides_ = " + JITArrayInit(strides_) + ";\n"
+          "  static constexpr unsigned long long seed_ = " + std::to_string(seed_) + "ULL;\n"
+          "  static constexpr int dist_ = " + std::to_string(dist) + ";\n"
           "  inner_t alpha_;\n"
           "  inner_t beta_;\n"
           "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() { return RANK; }\n"
