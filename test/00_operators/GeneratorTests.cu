@@ -595,6 +595,30 @@ TEST(OperatorTests, RandomDirectComplexUniform)
   MATX_EXIT_HANDLER();
 }
 
+TEST(OperatorTests, RandomDirectScalarToComplex)
+{
+  MATX_ENTER_HANDLER();
+  cudaExecutor exec{};
+
+  constexpr index_t count = 257;
+  constexpr uint64_t seed = 9014;
+  auto a = make_tensor<cuda::std::complex<float>>({count});
+  auto b = make_tensor<cuda::std::complex<float>>({count});
+
+  (a = random<float>({count}, UNIFORM, seed, 2.0f, -1.0f)).run(exec);
+  (b = random<float>({count}, UNIFORM, seed, 2.0f, -1.0f)).run(exec);
+  exec.sync();
+
+  for (index_t i = 0; i < count; i++) {
+    ASSERT_LE(a(i).real(), 1.0f);
+    ASSERT_LE(-1.0f, a(i).real());
+    EXPECT_EQ(a(i).imag(), 0.0f);
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(a(i), b(i)));
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
 TEST(OperatorTests, RandomDirectComplexNormalBetaRealOnly)
 {
   MATX_ENTER_HANDLER();

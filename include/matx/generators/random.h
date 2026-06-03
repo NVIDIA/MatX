@@ -245,6 +245,22 @@ namespace detail {
       }
 
 #ifdef __CUDACC__
+      template <typename Out>
+      static constexpr bool CanUseCurandGeneratorType()
+      {
+        using out_t = remove_cvref_t<Out>;
+        if constexpr (RANK > 0 && is_float_random_v && requires { typename out_t::value_type; }) {
+          return std::is_same_v<typename out_t::value_type, T> &&
+                 requires(out_t &o) {
+                   o.IsContiguous();
+                   o.Data();
+                 };
+        }
+        else {
+          return false;
+        }
+      }
+
       template <typename DataT>
       __MATX_INLINE__ void ScaleContiguous(DataT *data, index_t count, cudaStream_t stream) const
       {
@@ -260,11 +276,7 @@ namespace detail {
       template <typename Out>
       __MATX_INLINE__ bool CanUseCurandGenerator(Out &out) const
       {
-        if constexpr (RANK > 0 && is_float_random_v &&
-                      requires(Out &o) {
-                        o.IsContiguous();
-                        o.Data();
-                      }) {
+        if constexpr (CanUseCurandGeneratorType<Out>()) {
           return out.IsContiguous();
         }
         else {
@@ -668,7 +680,7 @@ namespace detail {
       __MATX_INLINE__ __MATX_HOST__ bool CanDirectFill(const Out &out) const noexcept
       {
         using out_t = remove_cvref_t<Out>;
-        if constexpr (!std::is_same_v<typename out_t::value_type, T> || out_t::Rank() != RANK) {
+        if constexpr (!std::is_assignable_v<typename out_t::value_type &, T> || out_t::Rank() != RANK) {
           return false;
         }
         else {
@@ -735,14 +747,19 @@ namespace detail {
 #ifdef __CUDACC__
           auto &o = cuda::std::get<0>(out);
           MATX_ASSERT_STR(CanDirectFill(o), matxInvalidSize,
-                          "Random direct fill requires identical input and output shapes and value types");
+                          "Random direct fill requires identical input and output shapes and assignable value types");
 
           if (total_size_ == 0) {
             return;
           }
 
-          if (CanUseCurandGenerator(o)) {
-            GenerateCurandContiguous(o.Data(), total_size_, ex.getStream());
+          if constexpr (CanUseCurandGeneratorType<decltype(o)>()) {
+            if (CanUseCurandGenerator(o)) {
+              GenerateCurandContiguous(o.Data(), total_size_, ex.getStream());
+            }
+            else {
+              LaunchStateFreeFill(o, total_size_, 0, ex.getStream());
+            }
           }
           else {
             LaunchStateFreeFill(o, total_size_, 0, ex.getStream());
