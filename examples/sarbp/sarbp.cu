@@ -227,6 +227,7 @@ struct BpRunCtx {
   bool is_int16_mode;
   bool apply_window;
   bool taylor_fast_add_third_order;
+  SarBpPixelZMode pixel_z_mode;  // compile-time pixel-z assumption to apply
   int sgn;
   bool do_warmup;
   std::string output_file;
@@ -319,10 +320,25 @@ static int run_bp_device(PosTensor blk_positions, RtmTensor blk_rtm,
         auto cur_voxel_locations = matx::slice(voxel_locations, {y0, x0}, {y1, x1});
         auto bp = matx::experimental::sar_bp(
             cur_image, cur_profiles, cur_positions, cur_voxel_locations, cur_rtm, ctx.params);
+        // Cross product of the optional TaylorFast third-order term and the
+        // compile-time pixel-z assumption (variable / zero / fixed).
+        auto run_with_z = [&](auto bp_props) {
+          switch (ctx.pixel_z_mode) {
+            case SarBpPixelZMode::Zero:
+              (cur_image = bp_props.template props<matx::PropSarBpPixelZIsZero>()).run(ctx.exec);
+              break;
+            case SarBpPixelZMode::Fixed:
+              (cur_image = bp_props.template props<matx::PropSarBpPixelZIsFixed>()).run(ctx.exec);
+              break;
+            case SarBpPixelZMode::Variable:
+              (cur_image = bp_props).run(ctx.exec);
+              break;
+          }
+        };
         if (ctx.taylor_fast_add_third_order) {
-          (cur_image = bp.template props<matx::PropSarBpTaylorFastAddThirdOrder>()).run(ctx.exec);
+          run_with_z(bp.template props<matx::PropSarBpTaylorFastAddThirdOrder>());
         } else {
-          (cur_image = bp).run(ctx.exec);
+          run_with_z(bp);
         }
       }
     }
@@ -684,6 +700,7 @@ int main(int argc, char **argv) {
         << "                          Add the third-order term for --precision taylor_fast\n"
         << "  --warmup               Warmup GPU kernels and FFT plans before timed run\n"
         << "  --precision <type>     Compute precision: double, float, fltflt, mixed, taylor_fast (default: mixed)\n"
+        << "  --pixel-z <mode>       Compile-time pixel-z assumption: variable, zero, fixed (default: variable)\n"
         << "  -h, --help             Print this help message and exit\n";
   };
 
@@ -701,6 +718,8 @@ int main(int argc, char **argv) {
   bool do_warmup = false;
   bool taylor_fast_add_third_order = false;
   std::string precision_type = "mixed";
+  std::string pixel_z_arg = "variable";
+  SarBpPixelZMode pixel_z_mode = SarBpPixelZMode::Variable;
 
   auto needs_value = [&](int i) -> bool {
     if (i + 1 >= argc) {
@@ -742,6 +761,9 @@ int main(int argc, char **argv) {
     } else if (std::strcmp(argv[i], "--precision") == 0) {
       if (!needs_value(i)) return 1;
       precision_type = argv[++i];
+    } else if (std::strcmp(argv[i], "--pixel-z") == 0) {
+      if (!needs_value(i)) return 1;
+      pixel_z_arg = argv[++i];
     } else if (argv[i][0] == '-') {
       std::cerr << "ERROR: unknown option '" << argv[i] << "'" << std::endl;
       print_usage();
@@ -778,6 +800,19 @@ int main(int argc, char **argv) {
 
   if (taylor_fast_add_third_order && precision_type != "taylor_fast") {
     std::cerr << "ERROR: --taylor-fast-third-order requires --precision taylor_fast" << std::endl;
+    print_usage();
+    return 1;
+  }
+
+  if (pixel_z_arg == "variable") {
+    pixel_z_mode = SarBpPixelZMode::Variable;
+  } else if (pixel_z_arg == "zero") {
+    pixel_z_mode = SarBpPixelZMode::Zero;
+  } else if (pixel_z_arg == "fixed") {
+    pixel_z_mode = SarBpPixelZMode::Fixed;
+  } else {
+    std::cerr << "ERROR: invalid --pixel-z '" << pixel_z_arg
+              << "' (use variable, zero, or fixed)" << std::endl;
     print_usage();
     return 1;
   }
@@ -1110,6 +1145,7 @@ int main(int argc, char **argv) {
       .is_int16_mode         = is_int16_mode,
       .apply_window          = apply_window,
       .taylor_fast_add_third_order = taylor_fast_add_third_order,
+      .pixel_z_mode          = pixel_z_mode,
       .sgn                   = sgn,
       .do_warmup             = do_warmup,
       .output_file           = output_file,
