@@ -641,16 +641,16 @@ namespace detail {
           }
           else if (fParams_.dist_ == NORMAL) {
             if constexpr (std::is_same_v<T, float>) {
-              curandGenerateNormal(gen_, &val.data[0], static_cast<int>(CapType::ept), fParams_.beta_, fParams_.alpha_);
+              curandGenerateNormal(gen_, &val.data[0], static_cast<int>(CapType::ept), 0.0f, 1.0f);
             }
             else if constexpr (std::is_same_v<T, double>) {
-              curandGenerateNormalDouble(gen_, &val.data[0], static_cast<int>(CapType::ept), fParams_.beta_, fParams_.alpha_);
+              curandGenerateNormalDouble(gen_, &val.data[0], static_cast<int>(CapType::ept), 0.0, 1.0);
             }
             else if constexpr (std::is_same_v<T, cuda::std::complex<float>>) {
-              curandGenerateNormal(gen_, reinterpret_cast<float*>(&val.data[0]), static_cast<int>(CapType::ept) * 2, fParams_.beta_, fParams_.alpha_);
+              curandGenerateNormal(gen_, reinterpret_cast<float*>(&val.data[0]), static_cast<int>(CapType::ept) * 2, 0.0f, 1.0f);
             }
             else if constexpr (std::is_same_v<T, cuda::std::complex<double>>) {
-              curandGenerateNormalDouble(gen_, reinterpret_cast<double*>(&val.data[0]), static_cast<int>(CapType::ept) * 2, fParams_.beta_, fParams_.alpha_);
+              curandGenerateNormalDouble(gen_, reinterpret_cast<double*>(&val.data[0]), static_cast<int>(CapType::ept) * 2, 0.0, 1.0);
             }
 
             MATX_LOOP_UNROLL

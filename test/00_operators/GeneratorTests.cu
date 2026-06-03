@@ -35,6 +35,7 @@
 #include "test_types.h"
 #include "utilities.h"
 #include "gtest/gtest.h"
+#include <cmath>
 #include <type_traits>
 
 using namespace matx;
@@ -740,6 +741,37 @@ TYPED_TEST(BasicGeneratorTestsFloatNonComplexNonHalf, RandomExpressionStillWorks
     ASSERT_LE(static_cast<TestType>(0), out(i));
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(out(i), static_cast<TestType>(2) * materialized(i)));
   }
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(OperatorTests, RandomHostNormalScalesOnce)
+{
+  MATX_ENTER_HANDLER();
+  SingleThreadedHostExecutor exec{};
+
+  constexpr index_t count = 8192;
+  constexpr uint64_t seed = 13579;
+  constexpr float alpha = 2.0f;
+  constexpr float beta = 3.0f;
+  auto out = make_tensor<float>({count});
+
+  (out = random<float>({count}, NORMAL, seed, alpha, beta)).run(exec);
+  exec.sync();
+
+  double sum = 0.0;
+  double sum_sq = 0.0;
+  for (index_t i = 0; i < count; i++) {
+    const double v = static_cast<double>(out(i));
+    sum += v;
+    sum_sq += v * v;
+  }
+
+  const double mean = sum / static_cast<double>(count);
+  const double variance = (sum_sq / static_cast<double>(count)) - (mean * mean);
+
+  EXPECT_NEAR(mean, beta, 0.2);
+  EXPECT_NEAR(std::sqrt(variance), alpha, 0.2);
 
   MATX_EXIT_HANDLER();
 }
