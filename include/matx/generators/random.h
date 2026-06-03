@@ -499,19 +499,27 @@ namespace detail {
               matxAlloc((void **)&values_,
                         total_size_ * sizeof(T),
                         MATX_ASYNC_DEVICE_MEMORY, stream);
+              init_ = true;
 
-              if constexpr (RANK > 0 && is_float_random_v) {
-                GenerateCurandContiguous(values_, total_size_, stream);
+              try {
+                if constexpr (RANK > 0 && is_float_random_v) {
+                  GenerateCurandContiguous(values_, total_size_, stream);
+                }
+                else {
+                  LaunchMaterializeFill(values_, total_size_, 0, stream);
+                }
               }
-              else {
-                LaunchMaterializeFill(values_, total_size_, 0, stream);
+              catch (...) {
+                matxFree(values_, stream);
+                values_ = nullptr;
+                init_ = false;
+                throw;
               }
             }
             else {
               values_ = nullptr;
+              init_ = true;
             }
-
-            init_ = true;
           }
         }
 #endif
