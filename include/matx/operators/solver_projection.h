@@ -138,11 +138,14 @@ class SolverProjectionStorage : public BaseOp<SolverProjectionStorage<State, Com
 
       std::lock_guard<std::mutex> lock(LifetimeMutex());
       auto it = LifetimeRegistry().find(state);
-      MATX_ASSERT_STR(it != LifetimeRegistry().end(),
-                      matxInvalidParameter,
-                      "Solver projection state lifetime entry is missing");
-      if (!it->second.execution_mutex) {
-        it->second.execution_mutex = std::make_shared<std::mutex>();
+      if (it == LifetimeRegistry().end()) {
+        MATX_THROW(matxInvalidParameter,
+                   "Solver projection state lifetime entry is missing");
+      }
+
+      auto &execution_mutex = it->second.execution_mutex;
+      if (execution_mutex == nullptr) {
+        execution_mutex = std::make_shared<std::mutex>();
       }
       it->second.count++;
     }
@@ -170,17 +173,19 @@ class SolverProjectionStorage : public BaseOp<SolverProjectionStorage<State, Com
     static void JITPreRunInput(State *state, Executor &&ex)
     {
       auto execution_mutex = GetExecutionMutex(state);
-      MATX_ASSERT_STR(execution_mutex != nullptr,
-                      matxInvalidParameter,
-                      "Solver projection state lifetime entry is missing");
+      if (execution_mutex == nullptr) {
+        MATX_THROW(matxInvalidParameter,
+                   "Solver projection state lifetime entry is missing");
+      }
 
       std::lock_guard<std::mutex> execution_lock(*execution_mutex);
       {
         std::lock_guard<std::mutex> lifetime_lock(LifetimeMutex());
         auto it = LifetimeRegistry().find(state);
-        MATX_ASSERT_STR(it != LifetimeRegistry().end(),
-                        matxInvalidParameter,
-                        "Solver projection state lifetime entry is missing");
+        if (it == LifetimeRegistry().end()) {
+          MATX_THROW(matxInvalidParameter,
+                     "Solver projection state lifetime entry is missing");
+        }
         if (it->second.jit_prerun_count > 0) {
           it->second.jit_prerun_count++;
           return;
@@ -370,9 +375,10 @@ class SolverProjectionStorage : public BaseOp<SolverProjectionStorage<State, Com
       }
       else {
         auto execution_mutex = GetExecutionMutex(state_);
-        MATX_ASSERT_STR(execution_mutex != nullptr,
-                        matxInvalidParameter,
-                        "Solver projection state lifetime entry is missing");
+        if (execution_mutex == nullptr) {
+          MATX_THROW(matxInvalidParameter,
+                     "Solver projection state lifetime entry is missing");
+        }
         std::lock_guard<std::mutex> lock(*execution_mutex);
         state_->Materialize(std::forward<Executor>(ex));
         tensor_ = state_->template Tensor<Component>();
