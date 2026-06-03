@@ -496,25 +496,41 @@ namespace detail {
           if (!init_) {
             auto stream = ex.getStream();
             if (total_size_ > 0) {
+              struct ValuesGuard {
+                T *&values;
+                bool &init;
+                cudaStream_t stream;
+                bool armed = true;
+
+                ~ValuesGuard()
+                {
+                  if (armed) {
+                    matxFree(values, stream);
+                    values = nullptr;
+                    init = false;
+                  }
+                }
+
+                void Release()
+                {
+                  armed = false;
+                }
+              };
+
               matxAlloc((void **)&values_,
                         total_size_ * sizeof(T),
                         MATX_ASYNC_DEVICE_MEMORY, stream);
               init_ = true;
+              ValuesGuard guard{values_, init_, stream};
 
-              try {
-                if constexpr (RANK > 0 && is_float_random_v) {
-                  GenerateCurandContiguous(values_, total_size_, stream);
-                }
-                else {
-                  LaunchMaterializeFill(values_, total_size_, 0, stream);
-                }
+              if constexpr (RANK > 0 && is_float_random_v) {
+                GenerateCurandContiguous(values_, total_size_, stream);
               }
-              catch (...) {
-                matxFree(values_, stream);
-                values_ = nullptr;
-                init_ = false;
-                throw;
+              else {
+                LaunchMaterializeFill(values_, total_size_, 0, stream);
               }
+
+              guard.Release();
             }
             else {
               values_ = nullptr;
