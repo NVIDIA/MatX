@@ -233,10 +233,11 @@ namespace detail {
       template <OperatorCapability Cap>
       __MATX_INLINE__ __MATX_HOST__ auto get_capability() const {
         auto self_has_cap = capability_attributes<Cap>::default_value;
-        return combine_capabilities<Cap>(self_has_cap, 
+        return combine_capabilities<Cap>(self_has_cap,
                                            detail::get_operator_capability<Cap>(initial_image_),
                                            detail::get_operator_capability<Cap>(range_profiles_),
                                            detail::get_operator_capability<Cap>(platform_positions_),
+                                           detail::get_operator_capability<Cap>(voxel_locations_),
                                            detail::get_operator_capability<Cap>(range_to_mcp_));
       }
 
@@ -276,7 +277,15 @@ namespace detail {
         if constexpr (is_matx_op<PlatPosType>()) {
           platform_positions_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
-      }      
+
+        if constexpr (is_matx_op<VoxLocType>()) {
+          voxel_locations_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
+
+        if constexpr (is_matx_op<RangeToMcpType>()) {
+          range_to_mcp_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
+      }
 
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
@@ -303,8 +312,16 @@ namespace detail {
           platform_positions_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
 
+        if constexpr (is_matx_op<VoxLocType>()) {
+          voxel_locations_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
+
+        if constexpr (is_matx_op<RangeToMcpType>()) {
+          range_to_mcp_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
+
         matxFree(ptr);
-      }        
+      }
 
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
       {
