@@ -413,24 +413,33 @@ For more information about operation fusion, see :ref:`fusion`.
 
 Random numbers
 --------------
-MatX can generate random numbers using the cuRAND library as the backend. Random number generation consumes memory on the device, so the construction
-is slightly different than other types above:
+MatX can generate random numbers using the cuRAND library as the backend. Directly assigning a random operator into a tensor uses a low-memory fill path:
 
 .. code-block:: cpp
 
     auto t2 = make_tensor<float>({100, 50});
-    auto randOp = random<float>(t.Shape(), NORMAL);
+    auto randOp = random<float>(t2.Shape(), NORMAL);
 
 The code above creates a 100x50 2D tensor, followed by a random operator that produces normally-distributed numbers with the same shape as ``t2``.
 
-Using the random operator above uses the same assignment as with any operator, and when the values are fetched on the device a new random number
-will be generated for each element.
+Using the random operator above uses the same assignment as with any operator. For CUDA expressions, the random operator is materialized once per
+``run()`` into a temporary value buffer and expression evaluation reads from that buffer.
 
 .. code-block:: cpp
 
     (t2 = randOp*5 + randOp).run(stream);
 
-In the example above ``randOp`` is accessed twice. On each access a new random number is generated.
+In the example above ``randOp`` is accessed twice, and both accesses use the same materialized random values. Use separate ``random()`` operators
+with separate seeds when independent draws are required.
+
+For very large tensors, prefer the direct assignment form when possible:
+
+.. code-block:: cpp
+
+    (t2 = random<float>(t2.Shape(), NORMAL)).run(stream);
+
+Direct CUDA fills are reproducible for the same seed, tensor shape, layout, type, and distribution. Generic CUDA expressions that contain ``random()``
+materialize one value buffer per random operator instead of allocating per-element generator state.
 
 That's it!
 ----------

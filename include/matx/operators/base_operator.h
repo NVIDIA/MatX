@@ -165,6 +165,11 @@ namespace matx
           }
         }
 
+        template<typename U>
+        static constexpr bool is_matx_direct_assign_op() {
+          return requires { typename remove_cvref_t<U>::matx_direct_assign_op; };
+        }
+
       public:
         /**
          * @brief Launch work in an arbitrary executor
@@ -200,6 +205,21 @@ namespace matx
               }
 
               tp->TransformExec(tp->Shape(), ex);
+            }
+            else if constexpr (is_matx_direct_assign_op<typename T::op_type>() &&
+                               is_tensor_view_v<typename T::tensor_type> &&
+                               is_cuda_executor_v<Ex>) {
+              if (detail::check_aliased_memory(tp->get_lhs(), tp->get_rhs(), false)) {
+                MATX_THROW(matxInvalidParameter, "Possible aliased memory detected: LHS and RHS memory ranges overlap");
+              }
+
+              if (tp->get_rhs().CanDirectFill(tp->get_lhs())) {
+                tp->TransformExec(tp->Shape(), ex);
+              }
+              else {
+                MATX_THROW(matxInvalidSize,
+                           "Random direct assignment requires identical input and output shapes and assignable value types");
+              }
             }
             else if constexpr (is_tensor_view_v<typename T::tensor_type> && is_tensor_view_v<typename T::op_type> && is_cuda_executor_v<Ex>) {
               // If we are doing a tensor to tensor assignment we should prefer cudaMemcpyAsync instead of a kernel
