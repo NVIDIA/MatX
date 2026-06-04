@@ -423,7 +423,7 @@ public:
     // copy a smaller tensor from a larger NumPy array, so keep that path bounded.
     for (int d = 0; d < RANK; d++) {
       const auto np_size = static_cast<index_t>(info.shape[d]);
-      const bool valid_size = exact_shape ? ten.Size(d) == np_size : ten.Size(d) <= np_size;
+      [[maybe_unused]] const bool valid_size = exact_shape ? ten.Size(d) == np_size : ten.Size(d) <= np_size;
       MATX_ASSERT_STR(valid_size, matxInvalidSize,
                       "Numpy array dimension size is incompatible with tensor size");
     }

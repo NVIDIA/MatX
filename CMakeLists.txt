@@ -206,6 +206,10 @@ if (NOT ${IS_NVCPP} GREATER -1)
             -Wlogical-op
             -Wnull-dereference)
     endif()
+else()
+    # nvc++ diagnoses libcudacxx's if-consteval usage under all-warnings.
+    set(WARN_FLAGS ${WARN_FLAGS}
+        $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=--diag_suppress,if_consteval_in_nonconstexpr_function>)
 endif()
 
 if (CMAKE_CUDA_COMPILER_ID STREQUAL "Clang")
