@@ -84,6 +84,7 @@ endif()
 
 set(cublasdx_CUTLASS_ROOT "${MATX_MATHDX_ROOT}/external/cutlass")
 set(cusolverdx_CUTLASS_ROOT "${MATX_MATHDX_ROOT}/external/cutlass")
+set(curanddx_CUTLASS_ROOT "${MATX_MATHDX_ROOT}/external/cutlass")
 
 find_package(mathdx REQUIRED COMPONENTS cufftdx cublasdx cusolverdx curanddx CONFIG
   PATHS
