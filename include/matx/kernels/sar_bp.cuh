@@ -651,11 +651,12 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
     };
 
     const auto get_reference_phase_direct = [&phase_correction_partial](strict_compute_t range_delta) -> loose_complex_compute_t {
+        const strict_compute_t phase = static_cast<strict_compute_t>(phase_correction_partial * range_delta);
         strict_compute_t sinx, cosx;
         if constexpr (cuda::std::is_same_v<strict_compute_t, double>) {
-            ::sincos(phase_correction_partial * range_delta, &sinx, &cosx);
+            ::sincos(phase, &sinx, &cosx);
         } else {
-            ::sincosf(phase_correction_partial * range_delta, &sinx, &cosx);
+            ::sincosf(phase, &sinx, &cosx);
         }
         return loose_complex_compute_t{
             static_cast<loose_compute_t>(cosx), static_cast<loose_compute_t>(sinx)
