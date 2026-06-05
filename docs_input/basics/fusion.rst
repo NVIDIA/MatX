@@ -60,10 +60,11 @@ CUDA JIT Kernel Fusion
     CUDA JIT kernel fusion is considered an experimental feature. There may be bugs that don't occur with JIT disabled, and new features are being added over time.
 
 MatX supports CUDA JIT kernel fusion that compiles the entire expression into a single kernel. Currently this is enabled
-for all standard MatX element-wise operators, FFT operations via cuFFTDx, GEMM operations via cuBLASDx, and selected
-solver operations via cuSolverDx. cuFFTDx supports 1D FFT fusion and single-block complex-to-complex 2D ``fft2``/``ifft2``
-fusion for supported power-of-two square transforms. To enable fusion with MathDx, the following option must be enabled:
-``-DMATX_EN_MATHDX=ON``. MathDx support also enables the NVRTC-based JIT support used by ``CUDAJITExecutor``.
+for all standard MatX element-wise operators, small random generators via cuRANDDx, FFT operations via cuFFTDx, GEMM
+operations via cuBLASDx, and selected solver operations via cuSolverDx. cuFFTDx supports 1D FFT fusion and single-block
+complex-to-complex 2D ``fft2``/``ifft2`` fusion for supported power-of-two square transforms. To enable fusion with
+MathDx, the following option must be enabled: ``-DMATX_EN_MATHDX=ON``. MathDx support also enables the NVRTC-based JIT
+support used by ``CUDAJITExecutor``.
 Once enabled, the ``CUDAJITExecutor`` can be used to perform JIT compilation in supported situations. If the expression
 cannot be JIT compiled, the ``CUDAJITExecutor`` may throw an error.
 
@@ -145,8 +146,11 @@ MathDx Compatibility
        may be fused. ``svd`` is not JIT-fused because the runtime ``libcusolverdx`` code-generation API does not
        expose an SVD routine.
    * - cuRANDDx
-     - No
-     - Not supported yet by MatX CUDA JIT fusion.
+     - Partial
+     - Enabled via ``-DMATX_EN_MATHDX=ON`` for floating-point and complex ``random()`` expressions whose random
+       output has at most 1024 elements. The cuRANDDx path generates Philox values in the fused kernel and avoids the
+       temporary value buffer used by generic CUDA expressions. ``randomi()`` and larger random tensors are not
+       JIT-fused.
 
 Current Limitations
 ===================

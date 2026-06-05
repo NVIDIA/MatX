@@ -209,6 +209,8 @@ namespace matx
             else if constexpr (is_matx_direct_assign_op<typename T::op_type>() &&
                                is_tensor_view_v<typename T::tensor_type> &&
                                is_cuda_executor_v<Ex>) {
+              // Direct fill is limited to concrete tensor-view outputs; other writable
+              // expressions use the normal materialized random-expression path.
               if (detail::check_aliased_memory(tp->get_lhs(), tp->get_rhs(), false)) {
                 MATX_THROW(matxInvalidParameter, "Possible aliased memory detected: LHS and RHS memory ranges overlap");
               }

@@ -407,7 +407,7 @@ if (MATX_EN_MATHDX)
     endif()
     
     # Link mathdx components
-    target_link_libraries(matx INTERFACE mathdx::cufftdx mathdx::cublasdx_no_lto mathdx::cusolverdx)
+    target_link_libraries(matx INTERFACE mathdx::cufftdx mathdx::cublasdx_no_lto mathdx::cusolverdx mathdx::curanddx)
 endif()
 
 if (MATX_EN_CUDSS)
