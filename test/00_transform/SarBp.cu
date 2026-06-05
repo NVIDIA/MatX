@@ -35,6 +35,7 @@
 #include "test_types.h"
 #include "utilities.h"
 #include "gtest/gtest.h"
+#include "prerun_tester.h"
 #include <cuda/std/complex>
 
 using namespace matx;
@@ -832,6 +833,85 @@ TYPED_TEST(SarBpTestDoubleType, PixelZIsFixedNonZeroHeight)
         .props<matx::PropSarBpPixelZIsFixed>()).run(this->exec);
       this->exec.sync();
       validate(image_f32, re_thresh, im_thresh);
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+// Verify sar_bp forwards PreRun/PostRun to ALL of its operands by wrapping each
+// in a lifecycle probe.
+TYPED_TEST(SarBpTestNonComplexNonHalfFloatTypes, RangeToMcpOperatorInput)
+{
+  MATX_ENTER_HANDLER();
+
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using complex_t = cuda::std::complex<TestType>;
+  using apc_t = std::conditional_t<std::is_same_v<TestType, double>, double3, float3>;
+
+  const index_t num_range_bins = 64;
+  const index_t num_pulses = 64;
+  const index_t image_width = 64;
+  const index_t image_height = 64;
+
+  auto zero_image = matx::zeros<complex_t>({image_height, image_width});
+  const TestType min_x = -10.0;
+  const TestType max_x = 10.0;
+  auto pix_coords_x = matx::linspace<TestType>(min_x, max_x, image_width);
+  auto pix_coords_y = matx::linspace<TestType>(min_x, max_x, image_height);
+  auto pix_coords_yclone = matx::clone<2>(pix_coords_y, {matx::matxKeepDim, image_width});
+  auto pix_coords_xclone = matx::clone<2>(pix_coords_x, {image_height, matx::matxKeepDim});
+  auto voxel_locations = matx::zipvec(
+    pix_coords_xclone, pix_coords_yclone, matx::zeros<TestType>({image_height, image_width}));
+
+  auto range_profiles = matx::ones<complex_t>({num_pulses, num_range_bins});
+  auto platform_positions = matx::make_tensor<apc_t>({num_pulses});
+  auto range_to_mcp = matx::make_tensor<TestType>({num_pulses});
+  const TestType plat_dx = (max_x - min_x) / num_pulses;
+  const TestType plat_y = -1000.0;
+  const TestType plat_z = 1000.0;
+  for (index_t i = 0; i < num_pulses; i++) {
+    const TestType plat_x = min_x + static_cast<TestType>(i) * plat_dx;
+    platform_positions(i) = apc_t{plat_x, plat_y, plat_z};
+    range_to_mcp(i) = ::sqrt(plat_x*plat_x + plat_y*plat_y + plat_z*plat_z);
+  }
+
+  SarBpParams params;
+  if constexpr (std::is_same_v<TestType, double>) {
+    params.compute_type = SarBpComputeType::Double;
+  } else {
+    params.compute_type = SarBpComputeType::Float;
+  }
+  params.features = SarBpFeature::PhaseLUTOptimization;
+  params.center_frequency = 10.0e9;
+  params.del_r = (max_x - min_x) / num_range_bins;
+
+  // Reference from the raw operands.
+  auto image_ref = matx::make_tensor<complex_t>({image_height, image_width});
+  (image_ref = matx::experimental::sar_bp(zero_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, params)).run(this->exec);
+
+  // Wrap every operand in a lifecycle probe.
+  test::PreRunLifecycle s_img, s_rp, s_pp, s_vl, s_rtm;
+  auto image_test = matx::make_tensor<complex_t>({image_height, image_width});
+  (image_test = matx::experimental::sar_bp(
+      test::make_prerun_tester(zero_image, s_img),
+      test::make_prerun_tester(range_profiles, s_rp),
+      test::make_prerun_tester(platform_positions, s_pp),
+      test::make_prerun_tester(voxel_locations, s_vl),
+      test::make_prerun_tester(range_to_mcp, s_rtm), params)).run(this->exec);
+
+  this->exec.sync();
+
+  test::ExpectLifecycleClean(s_img, "initial_image");
+  test::ExpectLifecycleClean(s_rp,  "range_profiles");
+  test::ExpectLifecycleClean(s_pp,  "platform_positions");
+  test::ExpectLifecycleClean(s_vl,  "voxel_locations");
+  test::ExpectLifecycleClean(s_rtm, "range_to_mcp");
+
+  for (index_t i = 0; i < image_height; i++) {
+    for (index_t j = 0; j < image_width; j++) {
+      ASSERT_NEAR(image_test(i, j).real(), image_ref(i, j).real(), this->thresh) << "real mismatch at (" << i << "," << j << ")";
+      ASSERT_NEAR(image_test(i, j).imag(), image_ref(i, j).imag(), this->thresh) << "imag mismatch at (" << i << "," << j << ")";
     }
   }
 

@@ -2,6 +2,7 @@
 #include "matx.h"
 #include "test_types.h"
 #include "utilities.h"
+#include "prerun_tester.h"
 
 using namespace matx;
 using namespace matx::test;
@@ -256,6 +257,51 @@ TYPED_TEST(OperatorTestsNumericAllExecs, ShiftOp)
         ASSERT_TRUE(
             MatXUtils::MatXTypeCompare(t2r1s(i, j), t2r1((i + shift_amount) % rows, j)));
       }
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+// Verify shift forwards PreRun/PostRun to both the data operand and the
+// shift-amount operand by wrapping each in a lifecycle probe.
+TYPED_TEST(OperatorTestsNumericAllExecsWithoutJIT, ShiftOperatorAmount)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+
+  ExecType exec{};
+
+  constexpr index_t rows = 10;
+  constexpr index_t cols = 5;
+  tensor_t<TestType, 2> t({rows, cols});
+  for (index_t i = 0; i < rows; i++) {
+    for (index_t j = 0; j < cols; j++) {
+      t(i, j) = static_cast<detail::value_promote_t<TestType>>(i * cols + j);
+    }
+  }
+
+  auto shifts = make_tensor<int>({cols});
+  shifts.SetVals({1, 2, 3, 4, 5});  // per-column shift amounts
+
+  // Reference from the raw operands.
+  tensor_t<TestType, 2> out_ref({rows, cols});
+  (out_ref = shift<0>(t, shifts)).run(exec);
+
+  // Wrap both the data operand and the shift-amount operand in lifecycle probes.
+  PreRunLifecycle sd, ss;
+  tensor_t<TestType, 2> out_test({rows, cols});
+  (out_test = shift<0>(make_prerun_tester(t, sd), make_prerun_tester(shifts, ss))).run(exec);
+  exec.sync();
+
+  ExpectLifecycleClean(sd, "data");
+  ExpectLifecycleClean(ss, "shift");
+
+  for (index_t i = 0; i < rows; i++) {
+    for (index_t j = 0; j < cols; j++) {
+      ASSERT_TRUE(MatXUtils::MatXTypeCompare(out_test(i, j), out_ref(i, j)))
+          << "mismatch at (" << i << "," << j << ")";
     }
   }
 

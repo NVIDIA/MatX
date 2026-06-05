@@ -2,6 +2,7 @@
 #include "matx.h"
 #include "test_types.h"
 #include "utilities.h"
+#include "prerun_tester.h"
 
 using namespace matx;
 using namespace matx::test;
@@ -254,5 +255,57 @@ TEST(InterpTests, Interp)
     }
   }
 
+  MATX_EXIT_HANDLER();
+}
+
+// Verify that interp1 forwards PreRun/PostRun to ALL of its operands (sample
+// points, sample values, query points) by wrapping each one in a lifecycle
+// probe. A single invocation covers every forwarded operand.
+template <typename ExecType>
+static void InterpForwardingCheck(ExecType exec)
+{
+  using TestType = float;
+
+  auto x = make_tensor<TestType>({5});
+  x.SetVals({0.0, 1.0, 3.0, 3.5, 4.0});
+  auto v = make_tensor<TestType>({5});
+  v.SetVals({0.0, 2.0, 1.0, 3.0, 4.0});
+  auto xq = make_tensor<TestType>({6});
+  xq.SetVals({-1.0, 0.0, 0.25, 1.0, 1.5, 5.0});
+
+  // Reference computed from the raw operands.
+  auto out_ref = make_tensor<TestType>({xq.Size(0)});
+  (out_ref = interp1(x, v, xq, InterpMethod::LINEAR)).run(exec);
+
+  // Wrap every forwarded operand in a lifecycle probe.
+  PreRunLifecycle sx, sv, sxq;
+  auto out_test = make_tensor<TestType>({xq.Size(0)});
+  (out_test = interp1(make_prerun_tester(x, sx), make_prerun_tester(v, sv),
+                      make_prerun_tester(xq, sxq), InterpMethod::LINEAR))
+      .run(exec);
+  exec.sync();
+
+  // The forwarding contract is validated by the lifecycle counters: each
+  // operand's PreRun/PostRun must have been forwarded exactly once.
+  ExpectLifecycleClean(sx, "x");
+  ExpectLifecycleClean(sv, "v");
+  ExpectLifecycleClean(sxq, "xq");
+
+  // The probe forwards to the wrapped operand transparently, so out_test always
+  // equals out_ref regardless of forwarding; this only confirms the probe is
+  // transparent. The lifecycle counters above are what test the forwarding fix.
+  for (index_t i = 0; i < xq.Size(0); i++) {
+    ASSERT_NEAR(out_test(i), out_ref(i), 1e-4) << "mismatch at index " << i;
+  }
+}
+
+TEST(InterpTests, InterpOperatorInput)
+{
+  MATX_ENTER_HANDLER();
+  // Run on the CUDA executor only: interp1 requires CUDA for the SPLINE method,
+  // and the template instantiation for a host executor triggers the SPLINE
+  // static_assert even for LINEAR. The host executor is already exercised by the
+  // pre-existing InterpTests.Interp test.
+  InterpForwardingCheck(cudaExecutor{});
   MATX_EXIT_HANDLER();
 }
