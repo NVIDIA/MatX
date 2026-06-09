@@ -170,12 +170,12 @@ This section summarizes `sar_bp` throughput and image accuracy across the availa
 
 All results use the Umbra open-data collection referenced above, processed into two image sizes that span a "small" and a "large" spotlight frame:
 
-| Scene | Ground extent | Pixel (GSD) | Aperture | Pulses | Backprojections (Gbp) |
+| Scene | Ground extent | Pixel (GSD) | Aperture | Pulses | Giga backprojections (Gbp) |
 |------|---------------|-------------|----------|--------|------------------------|
 | 8192 x 8192 | ~5.73 km | 0.699 m | 1.0° | 11,566 | 776 |
 | 20800 x 20800 | ~8.22 km | 0.395 m | 2.0° | 23,178 | 10,028 |
 
-Both are X-band (9.6 GHz), ~770 km slant range, ~43° grazing. All runs use `--warmup` and `--pixel-z zero` (the image grid is planar at Z=0, so `zero` is exact here and is a few percent faster than `variable`). Throughput is reported with the optimal `--image-tiles` for each configuration and the default `-b auto`, which selects a 256-pulse block for this data on every GPU tested (see [Image Tiling](#image-tiling)). As the [Pulse-block size](#pulse-block-size) section shows, `-b` is itself a significant knob, so a manually tuned `(--image-tiles, -b)` pair can exceed these `-b auto` rates on some GPUs.
+A backprojection is the unit of computation required for a single pixel-pulse contribution. For the "small" scene, there are 8192 x 8192 x 11566 = 776.18 billion backprojections, or ~776 giga backprojections. Both scenarios are X-band (9.6 GHz), ~770 km slant range, ~43° grazing angle. All runs use `--warmup` and `--pixel-z zero` (the image grid is planar at Z=0, so `zero` is exact here and is a few percent faster than `variable`). Throughput is reported with the optimal `--image-tiles` for each configuration and the default `-b auto`, which selects a 256-pulse block for this data on every GPU tested (see [Image Tiling](#image-tiling)). As the [Pulse-block size](#pulse-block-size) section shows, `-b` is itself a significant knob, so a manually tuned `(--image-tiles, -b)` pair can exceed these `-b auto` rates on some GPUs.
 
 > **Note:** All compute types except `double` use the phase lookup-table (PhaseLUT) optimization, which precomputes the per-range-bin phase ramp once and then applies a per-pixel per-pulse correction. `double` runs without PhaseLUT as it operates as the reference for accuracy comparisons.
 
@@ -207,7 +207,7 @@ Observations:
 
 ### Throughput by compute type (optimal tiling, pixel-z zero)
 
-Each cell is the backprojection time and throughput for the full frame, written as `time s @ rate Gbp/s`. A † marks cells where image tiling (`--image-tiles` 2-4) was the optimal choice; all other cells use the default of 1 tile. Only memory-bound modes on smaller-L2 GPUs benefit -- see [Image Tiling](#image-tiling) for the per-configuration tile counts and speedups. `n/r` = not run (the slowest case, `double` at 20k on Thor, would take ~3.5 hours).
+Each cell is the backprojection time and throughput for the full frame, written as `time s @ rate Gbp/s` to indicate the duration in seconds and the sustained rate in Gbp/s. A † marks cells where image tiling (`--image-tiles` 2-4) was the optimal choice; all other cells use the default of 1 tile. Only memory-bound modes on smaller-L2 GPUs benefit -- see [Image Tiling](#image-tiling) for the per-configuration tile counts and speedups. `n/r` = not run (the slowest case, `double` at 20k on Thor, would take ~3.5 hours).
 
 <h4 align="center">8192 x 8192 pixels, 11,566 pulses</h4>
 
@@ -231,6 +231,10 @@ Each cell is the backprojection time and throughput for the full frame, written 
 | `taylor_fast` (3rd) | 12.78 s @ 784 Gbp/s | 20.91 s @ 479 Gbp/s † | 50.80 s @ 197 Gbp/s † | 186 s @ 53.8 Gbp/s † |
 | `float` | 13.34 s @ 751 Gbp/s | 21.57 s @ 465 Gbp/s | 53.45 s @ 188 Gbp/s † | 197 s @ 51.0 Gbp/s † |
 
+![Backprojection throughput by GPU and ComputeType](throughput_performance.png)
+
+*The throughput rate (Gbp/s) is largely independent of scene size because Gbp/s is a normalized metric. Thus, the two panels are very similar. Without image tiling, we would see performance reductions on some platforms for the larger scene (see [Image Tiling](#image-tiling)).*
+
 Observations:
 
 - The best compute type is GPU-dependent, split by `double`-throughput:
@@ -238,11 +242,11 @@ Observations:
   - On GPUs with reduced FP64 (e.g. RTX PRO 6000, DGX Spark, Thor), `double`/`mixed` are heavily throttled; `fltflt` recovers near-`double` accuracy using all-FP32 math (e.g. ~28x faster than `double` on the PRO 6000), and `taylor_fast` is fastest of all.
 - `taylor_fast` (2nd order) is the throughput leader on every GPU and is the right choice when its ~87-91 dB SER is acceptable. Note that although we see 10+ dB SER difference between `taylor_fast` and `fltflt`/`mixed`, the minimum and 1% correlation values are still very close to 1.
 
-Our recommendation is to use `taylor_fast` for maximum throughput, and `mixed` (on full-FP64 GPUs) or `fltflt` (where `double` is throttled) when near-reference accuracy is required. If the current optimized modes do not provide enough accuracy, then please file a MatX issue or reach out to the developers.
+Our recommendation is to use `taylor_fast` for maximum throughput, and `mixed` (on full-FP64 GPUs) or `fltflt` (elsewhere) when near-reference accuracy is required.
 
 ### Image tiling
 
-`--image-tiles N` processes the image as an N x N grid of sub-tiles, one backprojection launch per tile. Its value is purely a cache-locality effect. In backprojection the reused data is the per-pulse range profiles; each output pixel reads one sample per pulse indexed by its range to the platform. Neighboring pixels reuse overlapping range bins, and that reuse has to stay resident in L2 to be cheap. A larger scene sweeps a wider span of range bins before a given bin is reused, and once that working set exceeds L2 the misses fall through to DRAM and the (memory-bound) fast modes stall. Tiling shrinks each launch's range-bin working set back under L2, restoring the hit rate.
+`--image-tiles N` processes the image as an N x N grid of sub-tiles, one backprojection launch per tile. Its value is purely a cache-locality effect. In backprojection the reused data is the per-pulse range profiles; each output pixel reads two samples per pulse indexed by range to the platform. Neighboring pixels reuse overlapping range bins, and that reuse has to stay resident in L2 to be cheap. A larger scene sweeps a wider span of range bins before a given bin is reused, and once that working set exceeds L2 the misses fall through to DRAM and the (memory-bound) fast modes stall. Tiling shrinks each launch's range-bin working set back under L2, restoring the hit rate.
 
 This makes the benefit a function of L2 size vs. scene size:
 
