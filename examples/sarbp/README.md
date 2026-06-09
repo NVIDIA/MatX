@@ -231,9 +231,9 @@ Each cell is the backprojection time and throughput for the full frame, written 
 | `taylor_fast` (3rd) | 12.78 s @ 784 Gbp/s | 20.91 s @ 479 Gbp/s † | 50.80 s @ 197 Gbp/s † | 186 s @ 53.8 Gbp/s † |
 | `float` | 13.34 s @ 751 Gbp/s | 21.57 s @ 465 Gbp/s | 53.45 s @ 188 Gbp/s † | 197 s @ 51.0 Gbp/s † |
 
-![Backprojection throughput by GPU and ComputeType](throughput_performance.png)
+![8192 x 8192 backprojection throughput and run time by GPU and ComputeType](throughput_performance.png)
 
-*The throughput rate (Gbp/s) is largely independent of scene size because Gbp/s is a normalized metric. Thus, the two panels are very similar. Without image tiling, we would see performance reductions on some platforms for the larger scene (see [Image Tiling](#image-tiling)).*
+*Left: throughput (Gbp/s), a normalized metric that is largely independent of scene size. Right: wall-clock run time for the full 8192 x 8192 frame -- run time is work / throughput, so a larger frame takes proportionally longer. The run-time axis is clipped at 31 s so the fast modes stay legible; bars that exceed the cap are drawn full-height and labeled with their actual run time. On platforms other than the H200, the `fltflt` and `taylor_fast` modes are far faster (and far lower run time) than `double`/`mixed`.*
 
 Observations:
 
