@@ -237,10 +237,10 @@ Each cell is the backprojection time and throughput for the full frame, written 
 
 Observations:
 
-- The best compute type is GPU-dependent, split by `double`-throughput:
-  - On GPUs with full-rate FP64 (e.g. H200), `mixed` is both accurate and fast. `taylor_fast` is the fastest option at slightly reduced accuracy.
-  - On GPUs with reduced FP64 (e.g. RTX PRO 6000, DGX Spark, Thor), `double`/`mixed` are heavily throttled; `fltflt` recovers near-`double` accuracy using all-FP32 math (e.g. ~28x faster than `double` on the PRO 6000), and `taylor_fast` is fastest of all.
-- `taylor_fast` (2nd order) is the throughput leader on every GPU and is the right choice when its ~87-91 dB SER is acceptable. Note that although we see 10+ dB SER difference between `taylor_fast` and `fltflt`/`mixed`, the minimum and 1% correlation values are still very close to 1.
+- `taylor_fast` (2nd order) is the throughput leader on every GPU and is the right choice when its ~87-91 dB SER is acceptable. Note that although we see 10+ dB SER difference between `taylor_fast` and `fltflt`/`mixed`, the minimum and 1% correlation values are still very close to 1. `taylor_fast` uses FP32 for inner loop calculations, which makes it fast on all GPUs.
+- If higher accuracy is needed, the best compute type is GPU-dependent:
+  - On GPUs with full-rate FP64 (e.g. H200), `mixed` is both accurate and fast.
+  - On GPUs with reduced FP64 (e.g. RTX PRO 6000, DGX Spark, Thor), `fltflt` recovers near-`double` accuracy using all-FP32 math.
 
 Our recommendation is to use `taylor_fast` for maximum throughput, and `mixed` (on full-FP64 GPUs) or `fltflt` (elsewhere) when near-reference accuracy is required.
 
