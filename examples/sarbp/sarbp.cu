@@ -283,6 +283,11 @@ static int run_validation(const ImageTensor &image, const BpRunCtx &ctx)
     return 1;
   }
   const std::streamsize gold_bytes = gin.tellg();
+  if (gold_bytes < 0) {
+    std::cerr << "ERROR: could not determine the size of gold file " << ctx.gold_file
+              << std::endl;
+    return 1;
+  }
   if (static_cast<size_t>(gold_bytes) != image_bytes) {
     std::cerr << "ERROR: gold file " << ctx.gold_file << " is " << gold_bytes
               << " bytes but expected " << image_bytes << " (" << H << " x " << W
