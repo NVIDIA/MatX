@@ -205,31 +205,9 @@ Observations:
 - `taylor_fast` is the fastest mode at slightly reduced accuracy (87-91 dB SER, still > 0.99999 correlation). Its accuracy improves on the larger/wider-aperture frame because each patch of pixels that corresponds to a CUDA thread block covers a smaller spatial extent. The third-order term provides no measurable accuracy gain over second order here, and is slightly slower, so second order is the better default. The third-order Taylor term is useful for short-range imaging scenarios; see https://nvidia.github.io/MatX/api/signalimage/radar/sar_bp.html#taylorfast-range-approximation for details.
 - `mixed` and `fltflt` are both essentially reference-quality (~100+ dB SER, correlation > 0.9999995). It is the `PhaseLUT` optimization that caps these accuracy values. For example, `mixed` without `PhaseLUT` produces an SER of 127 dB, albeit at reduced performance. We do have options for optimized implementations at higher accuracy levels (> 100 dB), but it is unclear if they are needed. If you have a use case that requires higher accuracy than is provided by the current optimized variants, then please file a MatX issue with details or reach out to the developers.
 
-### Throughput by compute type (optimal tiling, pixel-z zero)
+### Throughput by compute type
 
-Each cell is the backprojection time and throughput for the full frame, written as `time s @ rate Gbp/s` to indicate the duration in seconds and the sustained rate in Gbp/s. A † marks cells where image tiling (`--image-tiles` 2-4) was the optimal choice; all other cells use the default of 1 tile. Only memory-bound modes on smaller-L2 GPUs benefit -- see [Image Tiling](#image-tiling) for the per-configuration tile counts and speedups. `n/r` = not run (the slowest case, `double` at 20k on Thor, would take ~3.5 hours).
-
-<h4 align="center">8192 x 8192 pixels, 11,566 pulses</h4>
-
-| ComputeType | RTX PRO 6000 | H200 | DGX Spark | Thor |
-|-------------|--------------|------|-----------|------|
-| `double` | 54.29 s @ 14.3 Gbp/s | 4.06 s @ 191 Gbp/s | 214 s @ 3.6 Gbp/s | 927 s @ 0.84 Gbp/s |
-| `mixed` | 16.50 s @ 47.0 Gbp/s | 2.20 s @ 353 Gbp/s | 64.62 s @ 12.0 Gbp/s | 271 s @ 2.9 Gbp/s |
-| `fltflt` | 1.93 s @ 403 Gbp/s | 3.22 s @ 241 Gbp/s | 7.65 s @ 101 Gbp/s | 30.04 s @ 25.8 Gbp/s |
-| `taylor_fast` (2nd) | 0.95 s @ 821 Gbp/s | 1.53 s @ 506 Gbp/s | 3.79 s @ 205 Gbp/s † | 14.07 s @ 55.2 Gbp/s |
-| `taylor_fast` (3rd) | 1.00 s @ 780 Gbp/s | 1.64 s @ 474 Gbp/s | 3.99 s @ 194 Gbp/s † | 14.78 s @ 52.5 Gbp/s |
-| `float` | 1.03 s @ 757 Gbp/s | 1.65 s @ 469 Gbp/s | 4.14 s @ 188 Gbp/s † | 15.42 s @ 50.3 Gbp/s |
-
-<h4 align="center">20800 x 20800 pixels, 23,178 pulses</h4>
-
-| ComputeType | RTX PRO 6000 | H200 | DGX Spark | Thor |
-|-------------|--------------|------|-----------|------|
-| `double` | 701 s @ 14.3 Gbp/s | 53.08 s @ 189 Gbp/s | 2761 s @ 3.6 Gbp/s | n/r |
-| `mixed` | 213 s @ 47.0 Gbp/s | 28.91 s @ 347 Gbp/s | 827 s @ 12.1 Gbp/s | 3505 s @ 2.9 Gbp/s |
-| `fltflt` | 25.31 s @ 396 Gbp/s | 41.73 s @ 240 Gbp/s | 103 s @ 97.1 Gbp/s | 390 s @ 25.7 Gbp/s |
-| `taylor_fast` (2nd) | 12.08 s @ 830 Gbp/s | 19.47 s @ 515 Gbp/s † | 48.46 s @ 207 Gbp/s † | 173 s @ 58.0 Gbp/s † |
-| `taylor_fast` (3rd) | 12.78 s @ 784 Gbp/s | 20.91 s @ 479 Gbp/s † | 50.80 s @ 197 Gbp/s † | 186 s @ 53.8 Gbp/s † |
-| `float` | 13.34 s @ 751 Gbp/s | 21.57 s @ 465 Gbp/s | 53.45 s @ 188 Gbp/s † | 197 s @ 51.0 Gbp/s † |
+The figure below summarizes throughput (Gbp/s) and full-frame run time across GPUs and ComputeTypes. The underlying per-configuration run times -- including the `--pixel-z variable` vs `zero` comparison -- are tabulated in the [Appendix](#appendix-per-configuration-run-times).
 
 ![8192 x 8192 backprojection throughput and run time by GPU and ComputeType](throughput_performance.png)
 
@@ -274,3 +252,29 @@ Because both compete for the same L2, the optimal block size depends on the tili
 - The current auto-blocking (`-b auto`) logic chooses a minimum of 256 pulses, but without image tiling 128 pulses would be more optimal on DGX Spark. The most optimal point in this sweep uses 4 x 4 image tiling and 256 pulses per pulse block.
 
 The automatic pulse blocking / image tiling logic in the `sarbp` example may change over time, but users can always manually sweep using `--image-tiles` and `-b`.
+
+## Appendix: Per-configuration run times
+
+Full-frame backprojection run times in seconds for every GPU and ComputeType, using the optimal `--image-tiles` per configuration and the default `-b auto` (see [Image Tiling](#image-tiling)). Each cell is `pixel-z variable / pixel-z zero`; `zero` is exact for this planar Z=0 grid and is the value plotted in the figure above. Throughput in Gbp/s can be recovered as (work) / (run time), where the work is 776.2 Gbp for the 8192 x 8192 frame and 10,027.7 Gbp for the 20800 x 20800 frame. `n/r` = not run (`double` at 20k on Thor would take ~3.5 hours).
+
+<h4 align="center">8192 x 8192 pixels, 11,566 pulses</h4>
+
+| ComputeType | RTX PRO 6000 | H200 | DGX Spark | Thor |
+|-------------|--------------|------|-----------|------|
+| `double` | 54.31 / 54.29 | 4.22 / 4.06 | 214 / 214 | 927 / 927 |
+| `mixed` | 17.48 / 16.50 | 2.24 / 2.20 | 68.52 / 64.62 | 287 / 271 |
+| `fltflt` | 2.13 / 1.93 | 3.50 / 3.22 | 8.45 / 7.65 | 33.08 / 30.04 |
+| `taylor_fast` (2nd) | 0.98 / 0.95 | 1.70 / 1.52 | 3.92 / 3.79 | 14.33 / 13.91 |
+| `taylor_fast` (3rd) | 1.03 / 1.00 | 1.70 / 1.62 | 4.14 / 3.99 | 15.14 / 14.76 |
+| `float` | 1.04 / 1.03 | 1.69 / 1.65 | 4.17 / 4.14 | 15.89 / 15.29 |
+
+<h4 align="center">20800 x 20800 pixels, 23,178 pulses</h4>
+
+| ComputeType | RTX PRO 6000 | H200 | DGX Spark | Thor |
+|-------------|--------------|------|-----------|------|
+| `double` | 701 / 701 | 54.48 / 52.33 | 2762 / 2761 | n/r |
+| `mixed` | 226 / 213 | 28.86 / 28.26 | 846 / 802 | 3699 / 3505 |
+| `fltflt` | 27.70 / 25.31 | 45.14 / 41.59 | 111 / 103 | 427 / 388 |
+| `taylor_fast` (2nd) | 12.47 / 12.08 | 21.52 / 19.47 | 49.82 / 48.46 | 178 / 173 |
+| `taylor_fast` (3rd) | 13.23 / 12.78 | 21.94 / 20.91 | 53.29 / 50.80 | 191 / 186 |
+| `float` | 13.48 / 13.34 | 21.90 / 21.41 | 53.36 / 53.45 | 205 / 197 |
