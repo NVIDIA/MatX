@@ -368,8 +368,13 @@ static int run_validation(const ImageTensor &image, const BpRunCtx &ctx)
       cmap_out.write(reinterpret_cast<const char *>(h_cmap),
                      static_cast<std::streamsize>(cmap_bytes));
       cmap_out.close();
-      std::cout << "Wrote " << H << " x " << W
-                << " float32 correlation map to " << ctx.cmap_file << std::endl;
+      if (!cmap_out) {
+        std::cerr << "ERROR: failed to write correlation map to " << ctx.cmap_file << std::endl;
+        rc = 1;
+      } else {
+        std::cout << "Wrote " << H << " x " << W
+                  << " float32 correlation map to " << ctx.cmap_file << std::endl;
+      }
     }
     MATX_CUDA_CHECK(cudaFreeHost(h_cmap));
   }
@@ -744,6 +749,11 @@ static int run_bp_device(PosTensor blk_positions, RtmTensor blk_rtm,
   out.write(reinterpret_cast<const char *>(h_image),
             static_cast<std::streamsize>(image_bytes));
   out.close();
+  if (!out) {
+    std::cerr << "ERROR: failed to write " << ctx.output_file << std::endl;
+    MATX_CUDA_CHECK(cudaFreeHost(h_image));
+    return 1;
+  }
 
   std::cout << "Wrote " << ctx.image_height << " x " << ctx.image_width
             << " complex<float> image to " << ctx.output_file << std::endl;
