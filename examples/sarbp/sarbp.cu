@@ -81,6 +81,15 @@
  *
  * Usage:
  *   sarbp <input.sarbp> [output_file] [-u upsample_factor] [-w window]
+ *
+ * Validation (optional):
+ *   --gold <gold.raw>   Compare the computed image against a golden image (same
+ *                       raw interleaved complex<float> row-major format this
+ *                       example writes). Reports correlation-map metrics
+ *                       (minimum and 1st-percentile coherence over a 3x3 window)
+ *                       and a signal-to-error ratio in dB.
+ *   --cmap <cmap.raw>   Write the correlation map (coherence magnitude, raw
+ *                       float32, row-major) to a file. Requires --gold.
  */
 
 #include "matx.h"
@@ -88,11 +97,14 @@
 #include <cuda/cmath>
 #include <algorithm>
 #include <charconv>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -231,6 +243,8 @@ struct BpRunCtx {
   int sgn;
   bool do_warmup;
   std::string output_file;
+  std::string gold_file;
+  std::string cmap_file;
   double del_r;
   SarBpParams params;
   double3 *h_positions;
@@ -239,6 +253,135 @@ struct BpRunCtx {
   int16_t *h_range_profiles_i16;
   float *h_ampsf;
 };
+
+// Compare the freshly computed image against a golden reference image and
+// report accuracy metrics. The gold uses the same raw interleaved complex<float>
+// row-major layout this example writes its output in.
+//
+// Two metrics are reported:
+//   1. Correlation-map coherence: a windowed (3x3) interferometric coherence
+//      magnitude in [0, 1] is formed with corrmap(). We report the minimum
+//      coherence over all pixels and the 1st-percentile coherence (the value
+//      below which only 1% of pixels fall).
+//   2. Signal-to-error ratio (dB): 10*log10(signal_energy / error_energy),
+//      where signal_energy = sum|gold|^2 and error_energy = sum|image-gold|^2.
+//
+// Templated on the image tensor type so it can take the device tensor that
+// run_bp_device() allocated locally.
+template <typename ImageTensor>
+static int run_validation(const ImageTensor &image, const BpRunCtx &ctx)
+{
+  const index_t H = ctx.image_height;
+  const index_t W = ctx.image_width;
+  const size_t num_pixels = static_cast<size_t>(H) * static_cast<size_t>(W);
+  const size_t image_bytes = num_pixels * sizeof(complex_t);
+
+  // Read the golden image (raw interleaved complex<float>, row-major).
+  std::ifstream gin(ctx.gold_file, std::ios::binary | std::ios::ate);
+  if (!gin.is_open()) {
+    std::cerr << "ERROR: cannot open gold file " << ctx.gold_file << std::endl;
+    return 1;
+  }
+  const std::streamsize gold_bytes = gin.tellg();
+  if (gold_bytes < 0) {
+    std::cerr << "ERROR: could not determine the size of gold file " << ctx.gold_file
+              << std::endl;
+    return 1;
+  }
+  if (static_cast<size_t>(gold_bytes) != image_bytes) {
+    std::cerr << "ERROR: gold file " << ctx.gold_file << " is " << gold_bytes
+              << " bytes but expected " << image_bytes << " (" << H << " x " << W
+              << " complex<float>)" << std::endl;
+    return 1;
+  }
+  gin.seekg(0);
+
+  complex_t *h_gold = nullptr;
+  MATX_CUDA_CHECK(cudaHostAlloc(&h_gold, image_bytes, cudaHostAllocDefault));
+  gin.read(reinterpret_cast<char *>(h_gold), gold_bytes);
+  if (!gin) {
+    std::cerr << "ERROR: failed to read gold file " << ctx.gold_file << std::endl;
+    MATX_CUDA_CHECK(cudaFreeHost(h_gold));
+    return 1;
+  }
+  gin.close();
+
+  auto gold = make_tensor<complex_t>({H, W}, matx::MATX_DEVICE_MEMORY);
+  MATX_CUDA_CHECK(cudaMemcpyAsync(gold.Data(), h_gold, image_bytes,
+                                  cudaMemcpyHostToDevice, ctx.stream));
+
+  // Correlation map: interferometric coherence magnitude over a 3x3 window.
+  const cuda::std::array<index_t, 2> corr_window{3, 3};
+  auto coh = make_tensor<float>({H, W}, matx::MATX_DEVICE_MEMORY);
+  (coh = matx::abs(matx::corrmap<CorrMapNormalize::MAGNITUDE>(image, gold, corr_window)))
+      .run(ctx.exec);
+
+  // Correlation metrics: minimum coherence and the 1st-percentile coherence.
+  auto min_corr = make_tensor<float>({});
+  auto p1_corr  = make_tensor<float>({});
+  (min_corr = matx::min(coh)).run(ctx.exec);
+  (p1_corr  = matx::percentile(coh, 1)).run(ctx.exec);
+
+  // Signal-to-error ratio. Accumulate energies in double precision to avoid
+  // catastrophic precision loss when summing over the full image.
+  auto sig_energy = make_tensor<double>({});
+  auto err_energy = make_tensor<double>({});
+  (sig_energy = matx::sum(matx::as_double(matx::abs2(gold)))).run(ctx.exec);
+  (err_energy = matx::sum(matx::as_double(matx::abs2(image - gold)))).run(ctx.exec);
+
+  ctx.exec.sync();
+
+  const double signal = sig_energy();
+  const double error  = err_energy();
+  const double ser_db = (error > 0.0)
+      ? 10.0 * std::log10(signal / error)
+      : std::numeric_limits<double>::infinity();
+
+  // The coherence values may sit extremely close to 1, so print enough significant
+  // digits to make the difference from 1 visible (the stream default of 6 would
+  // round 0.9999996 to "1"); float metrics carry ~7 useful digits.
+  std::cout << "Validation gold  : " << ctx.gold_file << std::endl;
+  const std::streamsize old_prec = std::cout.precision();
+  std::cout << std::setprecision(8)
+            << "  Min correlation: " << min_corr() << std::endl
+            << "  1% correlation : " << p1_corr() << std::endl;
+  std::cout << std::setprecision(6)
+            << "  Signal/error   : " << ser_db << " dB" << std::endl;
+  std::cout.precision(old_prec);
+
+  // Optionally write the correlation map (coherence magnitude, raw float32,
+  // row-major) to disk.
+  int rc = 0;
+  if (!ctx.cmap_file.empty()) {
+    const size_t cmap_bytes = num_pixels * sizeof(float);
+    float *h_cmap = nullptr;
+    MATX_CUDA_CHECK(cudaHostAlloc(&h_cmap, cmap_bytes, cudaHostAllocDefault));
+    MATX_CUDA_CHECK(cudaMemcpyAsync(h_cmap, coh.Data(), cmap_bytes,
+                                    cudaMemcpyDeviceToHost, ctx.stream));
+    ctx.exec.sync();
+
+    std::ofstream cmap_out(ctx.cmap_file, std::ios::binary);
+    if (!cmap_out.is_open()) {
+      std::cerr << "ERROR: cannot open " << ctx.cmap_file << " for writing" << std::endl;
+      rc = 1;
+    } else {
+      cmap_out.write(reinterpret_cast<const char *>(h_cmap),
+                     static_cast<std::streamsize>(cmap_bytes));
+      cmap_out.close();
+      if (!cmap_out) {
+        std::cerr << "ERROR: failed to write correlation map to " << ctx.cmap_file << std::endl;
+        rc = 1;
+      } else {
+        std::cout << "Wrote " << H << " x " << W
+                  << " float32 correlation map to " << ctx.cmap_file << std::endl;
+      }
+    }
+    MATX_CUDA_CHECK(cudaFreeHost(h_cmap));
+  }
+
+  MATX_CUDA_CHECK(cudaFreeHost(h_gold));
+  return rc;
+}
 
 // Run all device-side work (allocate block buffers, optional warmup, the
 // main pulse-block BP loop, copy result out, print timings, write the
@@ -606,9 +749,22 @@ static int run_bp_device(PosTensor blk_positions, RtmTensor blk_rtm,
   out.write(reinterpret_cast<const char *>(h_image),
             static_cast<std::streamsize>(image_bytes));
   out.close();
+  if (!out) {
+    std::cerr << "ERROR: failed to write " << ctx.output_file << std::endl;
+    MATX_CUDA_CHECK(cudaFreeHost(h_image));
+    return 1;
+  }
 
   std::cout << "Wrote " << ctx.image_height << " x " << ctx.image_width
             << " complex<float> image to " << ctx.output_file << std::endl;
+
+  if (!ctx.gold_file.empty()) {
+    const int val_status = run_validation(image, ctx);
+    if (val_status != 0) {
+      MATX_CUDA_CHECK(cudaFreeHost(h_image));
+      return val_status;
+    }
+  }
 
   MATX_CUDA_CHECK(cudaFreeHost(h_image));
   return 0;
@@ -691,6 +847,9 @@ int main(int argc, char **argv) {
         << "\n"
         << "  <input.sarbp>          .sarbp input file from cphd_to_sarbp_input.py\n"
         << "  -o, --output <file>    Output file (default: input path with .raw extension)\n"
+        << "  --gold <file>          Golden image (raw complex<float>) to validate against;\n"
+        << "                          reports correlation-map and signal-to-error metrics\n"
+        << "  --cmap <file>          Write the correlation map (raw float32) to a file (requires --gold)\n"
         << "  -u, --upsample <N>     Range upsample factor via zero-padding (default: 1)\n"
         << "  -w, --window <type>    Window for range compression: hamming, none (default: hamming)\n"
         << "  -b, --block-size <N|0|auto|all>\n"
@@ -711,6 +870,8 @@ int main(int argc, char **argv) {
 
   std::string input_file;
   std::string output_file;
+  std::string gold_file;
+  std::string cmap_file;
   int upsample_factor = 1;
   std::string window_type = "hamming";
   std::string block_size_arg = "auto";
@@ -743,6 +904,12 @@ int main(int argc, char **argv) {
     } else if (std::strcmp(argv[i], "-o") == 0 || std::strcmp(argv[i], "--output") == 0) {
       if (!needs_value(i)) return 1;
       output_file = argv[++i];
+    } else if (std::strcmp(argv[i], "--gold") == 0) {
+      if (!needs_value(i)) return 1;
+      gold_file = argv[++i];
+    } else if (std::strcmp(argv[i], "--cmap") == 0) {
+      if (!needs_value(i)) return 1;
+      cmap_file = argv[++i];
     } else if (std::strcmp(argv[i], "-b") == 0 || std::strcmp(argv[i], "--block-size") == 0) {
       if (!needs_value(i)) return 1;
       block_size_arg = argv[++i];
@@ -796,6 +963,13 @@ int main(int argc, char **argv) {
   if (output_file.empty()) {
     auto dot = input_file.rfind('.');
     output_file = (dot != std::string::npos ? input_file.substr(0, dot) : input_file) + ".raw";
+  }
+
+  if (!cmap_file.empty() && gold_file.empty()) {
+    std::cerr << "ERROR: --cmap requires --gold (the correlation map is computed "
+                 "against the golden image)" << std::endl;
+    print_usage();
+    return 1;
   }
 
   if (taylor_fast_add_third_order && precision_type != "taylor_fast") {
@@ -1106,6 +1280,7 @@ int main(int argc, char **argv) {
     std::cout << (taylor_fast_add_third_order ? " (third order)" : " (second order)");
   }
   std::cout << std::endl;
+  std::cout << "Pixel-z mode     : " << pixel_z_arg << std::endl;
   std::cout << "Image tiles      : " << image_tiles << " x " << image_tiles
             << std::endl;
 
@@ -1149,6 +1324,8 @@ int main(int argc, char **argv) {
       .sgn                   = sgn,
       .do_warmup             = do_warmup,
       .output_file           = output_file,
+      .gold_file             = gold_file,
+      .cmap_file             = cmap_file,
       .del_r                 = del_r,
       .params                = params,
       .h_positions           = h_positions,
