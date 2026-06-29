@@ -332,12 +332,17 @@ namespace matx
       {
         if(dim==axis_)
           return sizeof...(Ts);
-        else if (dim < axis_) {
-          return cuda::std::get<0>(ops_).Size(dim);
-        } else {
-          // remove axis_ dim from dim.
-          return cuda::std::get<0>(ops_).Size(dim-1);
+        // Map the requested output dimension to the operand dimension by dropping
+        // the stacked axis. For any valid query op_dim is already >= 0 (a dim > axis_
+        // implies dim >= 1, and the only legitimate dim==0 query is the axis itself,
+        // handled above). The clamp is therefore unreachable for valid input and
+        // exists solely to give the compiler a provable lower bound for
+        // -Werror=array-bounds.
+        int op_dim = (dim < axis_) ? dim : dim - 1;
+        if (op_dim < 0) {
+          op_dim = 0;
         }
+        return cuda::std::get<0>(ops_).Size(op_dim);
       }
 
       __MATX_INLINE__ __MATX_HOST__ int32_t DynRank() const {
@@ -351,6 +356,35 @@ namespace matx
       __MATX_INLINE__ __MATX_HOST__ int32_t jit_rank() const {
         if constexpr (is_dynamic_rank_op_v<self_type>) return DynRank();
         else return Rank();
+      }
+
+      // Forward PreRun/PostRun to every stacked operand. An operand may itself
+      // be a transform operator that allocates and fills temporary storage during
+      // PreRun, so its PreRun must be invoked before operator() reads from it.
+      template <typename ShapeType, typename Executor>
+      __MATX_INLINE__ void PreRun(ShapeType &&shape, Executor &&ex) const noexcept
+      {
+        cuda::std::apply([&](const auto&... ops) {
+          auto prerun_one = [&](const auto &op) {
+            if constexpr (is_matx_op<cuda::std::decay_t<decltype(op)>>()) {
+              op.PreRun(shape, ex);
+            }
+          };
+          (prerun_one(ops), ...);
+        }, ops_);
+      }
+
+      template <typename ShapeType, typename Executor>
+      __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) const noexcept
+      {
+        cuda::std::apply([&](const auto&... ops) {
+          auto postrun_one = [&](const auto &op) {
+            if constexpr (is_matx_op<cuda::std::decay_t<decltype(op)>>()) {
+              op.PostRun(shape, ex);
+            }
+          };
+          (postrun_one(ops), ...);
+        }, ops_);
       }
 
       ~StackOp() = default;
@@ -451,9 +485,8 @@ namespace matx
   template <typename... Ts>
     __MATX_INLINE__ __MATX_HOST__  auto stack(int axis, const Ts&... ts)
     {
-      auto first = detail::pp_get<0>(ts...);
-
-      MATX_ASSERT_STR(axis <= first.Rank(),matxInvalidDim, "stack must take an axis less than or equal to the the rank of the operators");
+      using first_type [[maybe_unused]] = cuda::std::tuple_element_t<0, cuda::std::tuple<Ts...>>;
+      MATX_ASSERT_STR(axis <= first_type::Rank(),matxInvalidDim, "stack must take an axis less than or equal to the the rank of the operators");
       return detail::StackOp<Ts...>{axis, ts...};
     }  
 } // end namespace matx
