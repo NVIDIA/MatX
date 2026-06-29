@@ -362,7 +362,7 @@ namespace matx
       // be a transform operator that allocates and fills temporary storage during
       // PreRun, so its PreRun must be invoked before operator() reads from it.
       template <typename ShapeType, typename Executor>
-      __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
+      __MATX_INLINE__ void PreRun(ShapeType &&shape, Executor &&ex) const noexcept
       {
         cuda::std::apply([&](const auto&... ops) {
           auto prerun_one = [&](const auto &op) {
@@ -375,7 +375,7 @@ namespace matx
       }
 
       template <typename ShapeType, typename Executor>
-      __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
+      __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) const noexcept
       {
         cuda::std::apply([&](const auto&... ops) {
           auto postrun_one = [&](const auto &op) {
