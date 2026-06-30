@@ -142,6 +142,32 @@ system. With the package installed you can use ``find_package`` as follows:
 find_package(matx CONFIG REQUIRED)
 ```
 
+#### 3. MatX via Conan
+MatX includes a local Conan package recipe in the repository root with a package name of ``matx`` and a package version placeholder ``<version>`` (for example ``1.0.0``).
+Because this recipe is local to the MatX repository, the repository must be cloned and the Conan package created locally before a consumer
+project can require it.
+
+From the root of the MatX repository run:
+
+```sh
+conan create .
+```
+
+That command publishes ``matx/<version>`` to your local Conan cache. A consumer project can then use:
+
+```python
+self.requires("matx/<version>")  # e.g. "matx/1.0.0"
+```
+
+and still rely on CMake to find MatX with:
+
+```cmake
+find_package(matx CONFIG REQUIRED)
+target_link_libraries(MyProject PRIVATE matx::matx)
+```
+
+The ``test_package/`` directory contains a sample consumer CMake project and Conan test recipe showing how to build and run an application against the locally-created MatX Conan package.
+
 #### MatX CMake Targets
 **Once either of the two methods above are done**, you can use the transitive target ``matx::matx`` in your library inside of ``target_link_libraries``, e.g:
 
