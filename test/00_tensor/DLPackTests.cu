@@ -33,8 +33,10 @@
 #include "assert.h"
 #include "matx.h"
 #include "test_types.h"
-#include "utilities.h"
 #include "gtest/gtest.h"
+
+#include <initializer_list>
+#include <limits>
 
 using namespace matx;
 
@@ -86,6 +88,32 @@ DLManagedTensor *MakeManagedTensorForOwningImportTest(int *deleter_calls, int64_
 }
 
 template <typename T>
+void SetManagedTensorShapeAndStrides(
+    DLManagedTensor *mt, std::initializer_list<int64_t> shape,
+    std::initializer_list<int64_t> strides) {
+  auto *ctx = static_cast<DLPackOwningImportContext<T> *>(mt->manager_ctx);
+
+  delete[] ctx->shape;
+  delete[] ctx->strides;
+  ctx->shape = new int64_t[shape.size()];
+  ctx->strides = strides.size() == 0 ? nullptr : new int64_t[strides.size()];
+
+  size_t idx = 0;
+  for (auto dim : shape) {
+    ctx->shape[idx++] = dim;
+  }
+
+  idx = 0;
+  for (auto stride : strides) {
+    ctx->strides[idx++] = stride;
+  }
+
+  mt->dl_tensor.ndim = static_cast<int32_t>(shape.size());
+  mt->dl_tensor.shape = ctx->shape;
+  mt->dl_tensor.strides = ctx->strides;
+}
+
+template <typename T>
 struct DLPackVersionedOwningImportContext {
   int *deleter_calls;
   T *data;
@@ -134,6 +162,32 @@ DLManagedTensorVersioned *MakeVersionedManagedTensorForOwningImportTest(
   mt->deleter = &DLPackVersionedOwningImportDeleter<T>;
 
   return mt;
+}
+
+template <typename T>
+void SetVersionedManagedTensorShapeAndStrides(
+    DLManagedTensorVersioned *mt, std::initializer_list<int64_t> shape,
+    std::initializer_list<int64_t> strides) {
+  auto *ctx = static_cast<DLPackVersionedOwningImportContext<T> *>(mt->manager_ctx);
+
+  delete[] ctx->shape;
+  delete[] ctx->strides;
+  ctx->shape = new int64_t[shape.size()];
+  ctx->strides = strides.size() == 0 ? nullptr : new int64_t[strides.size()];
+
+  size_t idx = 0;
+  for (auto dim : shape) {
+    ctx->shape[idx++] = dim;
+  }
+
+  idx = 0;
+  for (auto stride : strides) {
+    ctx->strides[idx++] = stride;
+  }
+
+  mt->dl_tensor.ndim = static_cast<int32_t>(shape.size());
+  mt->dl_tensor.shape = ctx->shape;
+  mt->dl_tensor.strides = ctx->strides;
 }
 
 template <typename TensorType>
@@ -255,7 +309,9 @@ TYPED_TEST(DLPackTestsFloatNonComplex, OwningImportByteOffset)
 
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   int deleter_calls = 0;
-  auto *dl = MakeManagedTensorForOwningImportTest<TestType>(&deleter_calls, 9);
+  auto *dl = MakeManagedTensorForOwningImportTest<TestType>(&deleter_calls, 10);
+  auto *ctx = static_cast<DLPackOwningImportContext<TestType> *>(dl->manager_ctx);
+  ctx->shape[0] = 9;
   dl->dl_tensor.byte_offset = sizeof(TestType);
 
   {
@@ -267,6 +323,137 @@ TYPED_TEST(DLPackTestsFloatNonComplex, OwningImportByteOffset)
         reinterpret_cast<TestType *>(reinterpret_cast<char *>(dl->dl_tensor.data) + sizeof(TestType));
     ASSERT_EQ(t.Data(), expected_ptr);
     ASSERT_EQ(t.Size(0), 9);
+  }
+
+  ASSERT_EQ(deleter_calls, 1);
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(DLPackTestsFloatNonComplex, OwningImportRejectsInvalidShapeMetadata)
+{
+  MATX_ENTER_HANDLER();
+
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+
+  {
+    int deleter_calls = 0;
+    auto *dl = MakeManagedTensorForOwningImportTest<TestType>(&deleter_calls, 4);
+    auto *ctx = static_cast<DLPackOwningImportContext<TestType> *>(dl->manager_ctx);
+    ctx->shape[0] = -1;
+
+    tensor_t<TestType, 1> t;
+    ASSERT_THROW({ make_tensor(t, dl); }, matx::detail::matxException);
+    ASSERT_EQ(deleter_calls, 1);
+  }
+
+  {
+    int deleter_calls = 0;
+    auto *dl = MakeManagedTensorForOwningImportTest<TestType>(&deleter_calls, 4);
+    auto *ctx = static_cast<DLPackOwningImportContext<TestType> *>(dl->manager_ctx);
+    ctx->shape[0] = 0;
+
+    tensor_t<TestType, 1> t;
+    ASSERT_THROW({ make_tensor(t, dl); }, matx::detail::matxException);
+    ASSERT_EQ(deleter_calls, 1);
+  }
+
+  {
+    int deleter_calls = 0;
+    auto *dl = MakeManagedTensorForOwningImportTest<TestType>(&deleter_calls, 4);
+    SetManagedTensorShapeAndStrides<TestType>(
+        dl, {std::numeric_limits<index_t>::max(), 2}, {2, 1});
+
+    tensor_t<TestType, 2> t;
+    ASSERT_THROW({ make_tensor(t, dl); }, matx::detail::matxException);
+    ASSERT_EQ(deleter_calls, 1);
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(DLPackTestsFloatNonComplex, OwningImportRejectsInvalidDataPointerMetadata)
+{
+  MATX_ENTER_HANDLER();
+
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+
+  {
+    int deleter_calls = 0;
+    auto *dl = MakeManagedTensorForOwningImportTest<TestType>(&deleter_calls, 4);
+    auto *ctx = static_cast<DLPackOwningImportContext<TestType> *>(dl->manager_ctx);
+    delete[] ctx->data;
+    ctx->data = nullptr;
+    dl->dl_tensor.data = nullptr;
+
+    tensor_t<TestType, 1> t;
+    ASSERT_THROW({ make_tensor(t, dl); }, matx::detail::matxException);
+    ASSERT_EQ(deleter_calls, 1);
+  }
+
+  {
+    int deleter_calls = 0;
+    auto *dl = MakeManagedTensorForOwningImportTest<TestType>(&deleter_calls, 4);
+    dl->dl_tensor.byte_offset = 1;
+
+    tensor_t<TestType, 1> t;
+    ASSERT_THROW({ make_tensor(t, dl); }, matx::detail::matxException);
+    ASSERT_EQ(deleter_calls, 1);
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(DLPackTestsFloatNonComplex, OwningImportRejectsInvalidStrideMetadata)
+{
+  MATX_ENTER_HANDLER();
+
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+
+  {
+    int deleter_calls = 0;
+    auto *dl = MakeVersionedManagedTensorForOwningImportTest<TestType>(&deleter_calls, 4);
+    auto *ctx = static_cast<DLPackVersionedOwningImportContext<TestType> *>(dl->manager_ctx);
+    ctx->strides[0] = -1;
+
+    tensor_t<TestType, 1> t;
+    ASSERT_THROW({ make_tensor(t, dl); }, matx::detail::matxException);
+    ASSERT_EQ(deleter_calls, 1);
+  }
+
+  {
+    int deleter_calls = 0;
+    auto *dl = MakeVersionedManagedTensorForOwningImportTest<TestType>(&deleter_calls, 4);
+    SetVersionedManagedTensorShapeAndStrides<TestType>(
+        dl, {2, 2}, {std::numeric_limits<index_t>::max(), 1});
+
+    tensor_t<TestType, 2> t;
+    ASSERT_THROW({ make_tensor(t, dl); }, matx::detail::matxException);
+    ASSERT_EQ(deleter_calls, 1);
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(DLPackTestsFloatNonComplex, OwningImportUsesStridedStorageSpan)
+{
+  MATX_ENTER_HANDLER();
+
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  int deleter_calls = 0;
+  auto *dl = MakeManagedTensorForOwningImportTest<TestType>(&deleter_calls, 7);
+  auto *ctx = static_cast<DLPackOwningImportContext<TestType> *>(dl->manager_ctx);
+  for (int i = 0; i < 7; i++) {
+    ctx->data[i] = static_cast<TestType>(i);
+  }
+  SetManagedTensorShapeAndStrides<TestType>(dl, {2, 3}, {4, 1});
+
+  {
+    tensor_t<TestType, 2> t;
+    make_tensor(t, dl);
+    ASSERT_EQ(deleter_calls, 0);
+    ASSERT_EQ(t.TotalSize(), 6);
+    ASSERT_EQ(t.GetStorage().size(), 7);
+    ASSERT_EQ(static_cast<double>(t(1, 2)), static_cast<double>(ctx->data[6]));
   }
 
   ASSERT_EQ(deleter_calls, 1);
@@ -312,9 +499,6 @@ TYPED_TEST(DLPackTestsFloatNonComplex, VersionedReadOnlyRequiresConstType)
 {
   MATX_ENTER_HANDLER();
 
-#ifdef NDEBUG
-  GTEST_SKIP() << "Read-only DLPack validation uses MATX_ASSERT and is disabled in release builds";
-#else
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   int mutable_deleter_calls = 0;
   int const_deleter_calls = 0;
@@ -335,7 +519,6 @@ TYPED_TEST(DLPackTestsFloatNonComplex, VersionedReadOnlyRequiresConstType)
     ASSERT_EQ(const_deleter_calls, 0);
   }
   ASSERT_EQ(const_deleter_calls, 1);
-#endif
 
   MATX_EXIT_HANDLER();
 }
@@ -397,9 +580,6 @@ TEST(DLPackVectorTests, ImportVectorLaneMismatchThrows)
 {
   MATX_ENTER_HANDLER();
 
-#ifdef NDEBUG
-  GTEST_SKIP() << "DLPack dtype validation uses MATX_ASSERT and is disabled in release builds";
-#else
   int deleter_calls = 0;
   auto *dl = MakeManagedTensorForOwningImportTest<float4>(&deleter_calls, 8);
   dl->dl_tensor.dtype.lanes = 2;
@@ -408,7 +588,6 @@ TEST(DLPackVectorTests, ImportVectorLaneMismatchThrows)
     ASSERT_THROW({ make_tensor(t, dl); }, matx::detail::matxException);
   }
   ASSERT_EQ(deleter_calls, 1);
-#endif
 
   MATX_EXIT_HANDLER();
 }
@@ -417,9 +596,6 @@ TEST(DLPackVectorTests, ImportVectorBaseTypeMismatchThrows)
 {
   MATX_ENTER_HANDLER();
 
-#ifdef NDEBUG
-  GTEST_SKIP() << "DLPack dtype validation uses MATX_ASSERT and is disabled in release builds";
-#else
   int deleter_calls = 0;
   auto *dl = MakeManagedTensorForOwningImportTest<float4>(&deleter_calls, 8);
   dl->dl_tensor.dtype.code = kDLInt;
@@ -428,7 +604,6 @@ TEST(DLPackVectorTests, ImportVectorBaseTypeMismatchThrows)
     ASSERT_THROW({ make_tensor(t, dl); }, matx::detail::matxException);
   }
   ASSERT_EQ(deleter_calls, 1);
-#endif
 
   MATX_EXIT_HANDLER();
 }
