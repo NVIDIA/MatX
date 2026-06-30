@@ -136,7 +136,7 @@ reference to the imported storage is released.
 
 MatX validates imported DLPack rank, dtype, shape, stride, and byte-offset
 metadata before creating the tensor view. Shape dimensions must be positive,
-strides must be non-negative, and the declared logical size and strided address
+strides must be positive, and the declared logical size and strided address
 span must fit in MatX index and host size ranges. DLPack does not include the
 actual backing allocation length, so the producer must still accurately describe
 the allocation it exports.

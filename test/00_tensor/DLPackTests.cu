@@ -423,6 +423,17 @@ TYPED_TEST(DLPackTestsFloatNonComplex, OwningImportRejectsInvalidStrideMetadata)
   {
     int deleter_calls = 0;
     auto *dl = MakeVersionedManagedTensorForOwningImportTest<TestType>(&deleter_calls, 4);
+    auto *ctx = static_cast<DLPackVersionedOwningImportContext<TestType> *>(dl->manager_ctx);
+    ctx->strides[0] = 0;
+
+    tensor_t<TestType, 1> t;
+    ASSERT_THROW({ make_tensor(t, dl); }, matx::detail::matxException);
+    ASSERT_EQ(deleter_calls, 1);
+  }
+
+  {
+    int deleter_calls = 0;
+    auto *dl = MakeVersionedManagedTensorForOwningImportTest<TestType>(&deleter_calls, 4);
     SetVersionedManagedTensorShapeAndStrides<TestType>(
         dl, {2, 2}, {std::numeric_limits<index_t>::max(), 1});
 

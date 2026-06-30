@@ -959,10 +959,10 @@ T *dlpack_data_pointer(const DLTensor &dt)
 
   validate_dlpack_condition(dt.data != nullptr, matxInvalidParameter,
                             "DLPack data cannot be null for MatX tensors");
-  validate_dlpack_condition(dt.byte_offset % sizeof(BaseT) == 0, matxInvalidType,
-                            "DLPack byte_offset must align with element type size");
   validate_dlpack_condition(dt.byte_offset <= static_cast<uint64_t>(std::numeric_limits<std::ptrdiff_t>::max()),
                             matxInvalidSize, "DLPack byte_offset is too large");
+  validate_dlpack_condition(dt.byte_offset % sizeof(BaseT) == 0, matxInvalidType,
+                            "DLPack byte_offset must align with element type size");
 
   auto *base = reinterpret_cast<uint8_t *>(dt.data);
   return reinterpret_cast<T *>(base + static_cast<std::ptrdiff_t>(dt.byte_offset));
@@ -1010,8 +1010,8 @@ size_t dlpack_shape_and_strides(const DLTensor &dt,
   if (dt.strides != nullptr) {
     for (int r = 0; r < TensorType::Rank(); r++) {
       const int64_t stride = dt.strides[r];
-      validate_dlpack_condition(stride >= 0, matxInvalidParameter,
-                                "DLPack negative strides are not supported by MatX import");
+      validate_dlpack_condition(stride > 0, matxInvalidParameter,
+                                "DLPack strides must be positive for MatX import");
       validate_dlpack_condition(static_cast<uint64_t>(stride) <= max_index, matxInvalidSize,
                                 "DLPack stride exceeds MatX index range");
       strides[r] = static_cast<index_t>(stride);
