@@ -134,6 +134,13 @@ example, to convert a libtorch tensor to a MatX tensor:
 MatX will invoke the producer-provided DLPack deleter when the last MatX
 reference to the imported storage is released.
 
+MatX validates imported DLPack rank, dtype, shape, stride, and byte-offset
+metadata before creating the tensor view. Shape dimensions must be positive,
+strides must be positive, and the declared logical size and strided address
+span must fit in MatX index and host size ranges. DLPack does not include the
+actual backing allocation length, so the producer must still accurately describe
+the allocation it exports.
+
 .. important::
 
   A `DLManagedTensorVersioned` or `DLManagedTensor` should only be consumed once.
@@ -214,4 +221,3 @@ can only be used on tensors and not other operators.
 The above example shows an existing function `foo` taking in a pointer from the MatX tensor `t1`. Since only a pointer is available, all 
 metadata available in the operator (shape, strides, etc) is not available inside of the function, and the user must ensure the correctness 
 of usage with the pointer.
-
