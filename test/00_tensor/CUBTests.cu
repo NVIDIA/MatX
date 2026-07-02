@@ -367,6 +367,72 @@ TEST(TensorStats, InternalCubPlansRejectInvalidOperations)
   EXPECT_THROW(create_dual_plan(), detail::matxException);
 }
 
+TEST(TensorStats, InternalCubCacheParamsIncludeOutputShape)
+{
+  float *in_ptr = nullptr;
+  int *out_ptr = nullptr;
+  auto in = make_tensor<float>(in_ptr, {8}, false);
+  auto out3 = make_tensor<int>(out_ptr, {3}, false);
+  auto out6 = make_tensor<int>(out_ptr, {6}, false);
+
+  using Plan = detail::matxCubPlan_t<decltype(out3), decltype(in), detail::CUB_OP_HIST_EVEN>;
+  auto params3 = Plan::GetCubParams(out3, in, 0);
+  auto params6 = Plan::GetCubParams(out6, in, 0);
+
+  EXPECT_FALSE(detail::CubParamsKeyEq{}(params3, params6));
+}
+
+#ifndef MATX_DISABLE_CUB_CACHE
+TEST(TensorStats, CubCacheReusesReductionPlanAcrossOutputs)
+{
+  MATX_ENTER_HANDLER();
+
+  cudaExecutor exec{};
+  auto in = ones<double>({3, 4, 5, 6});
+  auto out1 = make_tensor<double>({});
+  auto out2 = make_tensor<double>({});
+
+  (out1 = sum(in)).run(exec);
+  (out2 = sum(in)).run(exec);
+  exec.sync();
+
+  ASSERT_EQ(out1(), 360.0);
+  ASSERT_EQ(out2(), 360.0);
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(TensorStats, CubCacheSeparatesHistogramOutputShapes)
+{
+  MATX_ENTER_HANDLER();
+
+  cudaExecutor exec{};
+  constexpr int small_levels = 4;
+  constexpr int large_levels = 7;
+  tensor_t<float, 1> inv({8});
+  tensor_t<int, 1> small_out({small_levels - 1});
+  tensor_t<int, 1> large_out({large_levels - 1});
+
+  inv.SetVals({0.5f, 1.5f, 2.5f, 3.5f, 4.5f, 5.5f, 1.0f, 4.0f});
+
+  (small_out = hist(inv, 0.0f, 6.0f, small_levels)).run(exec);
+  (large_out = hist(inv, 0.0f, 6.0f, large_levels)).run(exec);
+  exec.sync();
+
+  cuda::std::array<int, small_levels - 1> small_sol = {3, 2, 3};
+  cuda::std::array<int, large_levels - 1> large_sol = {1, 2, 1, 1, 2, 1};
+
+  for (index_t i = 0; i < small_out.Lsize(); i++) {
+    ASSERT_EQ(small_out(i), small_sol[i]);
+  }
+  for (index_t i = 0; i < large_out.Lsize(); i++) {
+    ASSERT_EQ(large_out(i), large_sol[i]);
+  }
+
+  MATX_EXIT_HANDLER();
+}
+#endif
+
 #ifdef MATX_EN_JIT
 TEST(TensorStats, CubBlockJIT)
 {

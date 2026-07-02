@@ -35,6 +35,7 @@
 
 #include <functional>
 #include <cstdio>
+#include <new>
 #include <numeric>
 
 #ifdef __CUDACC__
@@ -79,6 +80,7 @@ typedef enum {
 struct CubParams_t {
   CUBOperation_t op;
   std::vector<index_t> size{10};
+  std::vector<index_t> out_size{10};
   index_t batches{0};
   MatXDataType_t dtype;
   cudaStream_t stream;
@@ -141,7 +143,7 @@ public:
    *
    */
   matxCubPlan_t(OutputTensor &a_out, const InputOperator &a, const CParams &cparams, const cudaStream_t stream = 0) :
-    cparams_(cparams)
+    stream_(stream), cparams_(cparams)
   {
 #ifdef __CUDACC__
     // Input/output tensors much match rank/dims
@@ -204,6 +206,9 @@ public:
     for (int r = 0; r < InputOperator::Rank(); r++) {
       params.size.push_back(a.Size(r));
     }
+    for (int r = 0; r < OutputTensor::Rank(); r++) {
+      params.out_size.push_back(a_out.Size(r));
+    }
 
     params.op = op;
     if constexpr (op == CUB_OP_RADIX_SORT) {
@@ -238,7 +243,13 @@ public:
    */
   ~matxCubPlan_t()
   {
-    matxFree(d_temp, cudaStreamDefault);
+    matxFree(d_temp, stream_);
+  }
+
+  void SetParams(const CParams &cparams)
+  {
+    cparams_.~CParams();
+    new (static_cast<void *>(&cparams_)) CParams(cparams);
   }
 
   template <typename Func>
@@ -1210,7 +1221,7 @@ class matxCubSingleArgPlan_t {
 
 public:
   matxCubSingleArgPlan_t(OutputTensor &a_out, TensorIndexType &aidx_out, const InputOperator &a, CUBOperation_t op, const CParams &cparams, const cudaStream_t stream = 0) :
-    cparams_(cparams)
+    stream_(stream), cparams_(cparams)
   {
 #ifdef __CUDACC__
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
@@ -1238,6 +1249,12 @@ public:
 
     for (int r = 0; r < InputOperator::Rank(); r++) {
       params.size.push_back(a.Size(r));
+    }
+    for (int r = 0; r < OutputTensor::Rank(); r++) {
+      params.out_size.push_back(a_out.Size(r));
+    }
+    for (int r = 0; r < TensorIndexType::Rank(); r++) {
+      params.out_size.push_back(aidx_out.Size(r));
     }
 
     params.op = op;
@@ -1336,7 +1353,13 @@ public:
    */
   ~matxCubSingleArgPlan_t()
   {
-    matxFree(d_temp, cudaStreamDefault);
+    matxFree(d_temp, stream_);
+  }
+
+  void SetParams(const CParams &cparams)
+  {
+    cparams_.~CParams();
+    new (static_cast<void *>(&cparams_)) CParams(cparams);
   }
 
 private:
@@ -1362,7 +1385,7 @@ public:
                        CUBOperation_t op,
                        const CParams &cparams,
                        const cudaStream_t stream = 0) :
-    cparams_(cparams)
+    stream_(stream), cparams_(cparams)
   {
 #ifdef __CUDACC__
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
@@ -1392,6 +1415,18 @@ public:
 
     for (int r = 0; r < InputOperator::Rank(); r++) {
       params.size.push_back(a.Size(r));
+    }
+    for (int r = 0; r < OutputTensor::Rank(); r++) {
+      params.out_size.push_back(a1_out.Size(r));
+    }
+    for (int r = 0; r < TensorIndexType::Rank(); r++) {
+      params.out_size.push_back(aidx1_out.Size(r));
+    }
+    for (int r = 0; r < OutputTensor::Rank(); r++) {
+      params.out_size.push_back(a2_out.Size(r));
+    }
+    for (int r = 0; r < TensorIndexType::Rank(); r++) {
+      params.out_size.push_back(aidx2_out.Size(r));
     }
 
     params.op = op;
@@ -1500,7 +1535,13 @@ public:
    */
   ~matxCubDualArgPlan_t()
   {
-    matxFree(d_temp, cudaStreamDefault);
+    matxFree(d_temp, stream_);
+  }
+
+  void SetParams(const CParams &cparams)
+  {
+    cparams_.~CParams();
+    new (static_cast<void *>(&cparams_)) CParams(cparams);
   }
 
 private:
@@ -1523,13 +1564,21 @@ struct CubParamsKeyHash {
   std::size_t operator()(const CubParams_t &k) const noexcept
   {
     uint64_t shash = 0;
+    auto hash_dim = [](uint64_t &seed, index_t dim) {
+      const uint64_t value = static_cast<uint64_t>(dim);
+      seed ^= std::hash<uint64_t>()(value + 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2));
+    };
     for (size_t r = 0; r < k.size.size(); r++) {
-      shash += std::hash<uint64_t>()(k.size[r]);
+      hash_dim(shash, k.size[r]);
+    }
+    for (size_t r = 0; r < k.out_size.size(); r++) {
+      hash_dim(shash, k.out_size[r]);
     }
 
     return (std::hash<uint64_t>()(k.batches)) +
            (std::hash<uint64_t>()((uint64_t)k.stream)) +
            (std::hash<uint64_t>()((uint64_t)k.op)) +
+           (std::hash<uint64_t>()((uint64_t)k.dtype)) +
            (std::hash<size_t>()(k.plan_type_hash)) +
            shash;
   }
@@ -1545,9 +1594,17 @@ struct CubParamsKeyEq {
     if (l.size.size() != t.size.size()) {
       return false;
     }
+    if (l.out_size.size() != t.out_size.size()) {
+      return false;
+    }
 
     for (size_t r = 0; r < l.size.size(); r++) {
       if (l.size[r] != t.size[r]) {
+        return false;
+      }
+    }
+    for (size_t r = 0; r < l.out_size.size(); r++) {
+      if (l.out_size[r] != t.out_size[r]) {
         return false;
       }
     }
@@ -1594,6 +1651,7 @@ void sort_impl_inner(OutputTensor &a_out, const InputOperator &a,
         return std::make_shared<cache_val_type>(a_out, a, p, stream);
       },
       [&](std::shared_ptr<cache_val_type> ctype) {
+        ctype->SetParams(p);
         ctype->ExecSort(a_out, a, dir, stream);
       },
       exec
@@ -1796,6 +1854,7 @@ void cub_reduce(OutputTensor &a_out, const InputOperator &a, typename InputOpera
       return std::make_shared<cache_val_type>(a_out, a, reduce_params, stream);
     },
     [&](std::shared_ptr<cache_val_type> ctype) {
+      ctype->SetParams(reduce_params);
       ctype->ExecReduce(a_out, a, stream);
     },
     exec
@@ -1850,6 +1909,7 @@ void cub_sum(OutputTensor &a_out, const InputOperator &a,
         return std::make_shared<cache_val_type>(a_out, a, detail::EmptyParams_t{}, stream);
       },
       [&](std::shared_ptr<cache_val_type> ctype) {
+        ctype->SetParams(detail::EmptyParams_t{});
         ctype->ExecSum(a_out, a, stream);
       },
       exec
@@ -1899,6 +1959,7 @@ void cub_min(OutputTensor &a_out, const InputOperator &a,
         return std::make_shared<cache_val_type>(a_out, a, detail::EmptyParams_t{}, stream);
       },
       [&](std::shared_ptr<cache_val_type> ctype) {
+        ctype->SetParams(detail::EmptyParams_t{});
         ctype->ExecMin(a_out, a, stream);
       },
       exec
@@ -1949,6 +2010,7 @@ void cub_max(OutputTensor &a_out, const InputOperator &a,
         return std::make_shared<cache_val_type>(a_out, a, detail::EmptyParams_t{}, stream);
       },
       [&](std::shared_ptr<cache_val_type> ctype) {
+        ctype->SetParams(detail::EmptyParams_t{});
         ctype->ExecMax(a_out, a, stream);
       },
       exec
@@ -2023,6 +2085,7 @@ void cub_argreduce(OutputTensor &a_out, TensorIndexType &aidx_out, const InputOp
                                                   stream);
         },
         [&](std::shared_ptr<cache_val_type> ctype) {
+          ctype->SetParams(reduce_params);
           ctype->ExecArgReduce(a_out_supported, aidx_out_supported, a_supported, stream);
         },
         exec
@@ -2103,6 +2166,7 @@ void cub_dualargreduce(OutputTensor &a1_out,
                                                   stream);
         },
         [&](std::shared_ptr<cache_val_type> ctype) {
+          ctype->SetParams(reduce_params);
           ctype->ExecDualArgReduce(a1_out, aidx1_out, a2_out, aidx2_out, a, stream);
         },
         exec
@@ -2388,6 +2452,7 @@ void cumsum_impl(OutputTensor &a_out, const InputOperator &a,
         return std::make_shared<cache_val_type>(a_out, a, detail::EmptyParams_t{}, stream);
       },
       [&](std::shared_ptr<cache_val_type> ctype) {
+        ctype->SetParams(detail::EmptyParams_t{});
         ctype->ExecPrefixScanEx(a_out, a, stream);
       },
       exec
@@ -2490,6 +2555,7 @@ void hist_impl(OutputTensor &a_out, const InputOperator &a,
         return std::make_shared<cache_val_type>(a_out, a, hp, stream);
       },
       [&](std::shared_ptr<cache_val_type> ctype) {
+        ctype->SetParams(hp);
         ctype->ExecHistEven(a_out, a, lower, upper, num_levels, stream);
       },
       exec
