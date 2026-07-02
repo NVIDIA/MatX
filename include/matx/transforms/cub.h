@@ -35,8 +35,8 @@
 
 #include <functional>
 #include <cstdio>
-#include <new>
 #include <numeric>
+#include <optional>
 
 #ifdef __CUDACC__
 #include <cub/cub.cuh>
@@ -158,13 +158,13 @@ public:
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
     if constexpr (op == CUB_OP_RADIX_SORT) {
-      ExecSort(a_out, a, cparams_.dir, stream);
+      ExecSort(a_out, a, Params().dir, stream);
     }
     else if constexpr (op == CUB_OP_INC_SUM) {
       ExecPrefixScanEx(a_out, a, stream);
     }
     else if constexpr (op == CUB_OP_HIST_EVEN) {
-      ExecHistEven(a_out, a, cparams_.lower_level, cparams_.upper_level, cparams_.num_levels, stream);
+      ExecHistEven(a_out, a, Params().lower_level, Params().upper_level, Params().num_levels, stream);
     }
     else if constexpr (op == CUB_OP_REDUCE) { // General reduce
       ExecReduce(a_out, a, stream);
@@ -248,8 +248,7 @@ public:
 
   void SetParams(const CParams &cparams)
   {
-    cparams_.~CParams();
-    new (static_cast<void *>(&cparams_)) CParams(cparams);
+    cparams_.emplace(cparams);
   }
 
   template <typename Func>
@@ -674,23 +673,23 @@ inline void ExecSort(OutputTensor &a_out,
       if constexpr(is_tensor_view_v<InputOperator>) {
         if( a.IsContiguous() && a_out.IsContiguous()) {
           const int seg_size = static_cast<int>(TotalSize(a) / TotalSize(out_base));
-          err = cub::DeviceSegmentedReduce::Reduce(d_temp, temp_storage_bytes, in_base.Data(), out_base.Data(), static_cast<cuda::std::int64_t>(TotalSize(out_base)), seg_size, cparams_.reduce_op,
-                                                  cparams_.init, stream);
+          err = cub::DeviceSegmentedReduce::Reduce(d_temp, temp_storage_bytes, in_base.Data(), out_base.Data(), static_cast<cuda::std::int64_t>(TotalSize(out_base)), seg_size, Params().reduce_op,
+                                                  Params().init, stream);
           MATX_ASSERT_STR_EXP(err, cudaSuccess, matxCudaError, "Error in cub::DeviceSegmentedReduce::Reduce");
           return;
         }
       }
 
       auto ft = [&](auto &&in, auto &&out, auto &&begin, auto &&end) {
-        return cub::DeviceSegmentedReduce::Reduce(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(out_base)), begin, end, cparams_.reduce_op,
-                                  cparams_.init, stream);
+        return cub::DeviceSegmentedReduce::Reduce(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(out_base)), begin, end, Params().reduce_op,
+                                  Params().init, stream);
       };
       err = ReduceInput(ft, out_base, in_base);
       MATX_ASSERT_STR_EXP(err, cudaSuccess, matxCudaError, "Error in cub::DeviceSegmentedReduce::Reduce");
 #else
       auto ft = [&](auto &&in, auto &&out, auto &&begin, auto &&end) {
-          return cub::DeviceSegmentedReduce::Reduce(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(out_base)), begin, end, cparams_.reduce_op,
-                                    cparams_.init, stream);
+          return cub::DeviceSegmentedReduce::Reduce(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(out_base)), begin, end, Params().reduce_op,
+                                    Params().init, stream);
       };
       [[maybe_unused]] auto rv = ReduceInput(ft, out_base, in_base);
       MATX_ASSERT_STR_EXP(rv, cudaSuccess, matxCudaError, "Error in cub::DeviceSegmentedReduce::Reduce");
@@ -698,8 +697,8 @@ inline void ExecSort(OutputTensor &a_out,
     }
     else {
       auto ft = [&](auto &&in, auto &&out, [[maybe_unused]] auto &&unused1, [[maybe_unused]] auto &&unused2) {
-        return cub::DeviceReduce::Reduce(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(in_base)), cparams_.reduce_op,
-                                    cparams_.init, stream);
+        return cub::DeviceReduce::Reduce(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(in_base)), Params().reduce_op,
+                                    Params().init, stream);
       };
       [[maybe_unused]] auto rv = ReduceInput(ft, out_base, in_base);
       MATX_ASSERT_STR_EXP(rv, cudaSuccess, matxCudaError, "Error in cub::DeviceReduce::Reduce");
@@ -934,9 +933,9 @@ inline void ExecSort(OutputTensor &a_out,
                               temp_storage_bytes,
                               a.Data(),
                               a_out.Data(),
-                              cparams_.num_found.Data(),
+                              Params().num_found.Data(),
                               static_cast<int>(TotalSize(a)),
-                              cparams_.op,
+                              Params().op,
                               stream);
       }
       else {
@@ -944,9 +943,9 @@ inline void ExecSort(OutputTensor &a_out,
                               temp_storage_bytes,
                               RandomOperatorIterator{base},
                               a_out.Data(),
-                              cparams_.num_found.Data(),
+                              Params().num_found.Data(),
                               static_cast<int>(TotalSize(a)),
-                              cparams_.op,
+                              Params().op,
                               stream);
       }
     }
@@ -955,9 +954,9 @@ inline void ExecSort(OutputTensor &a_out,
                             temp_storage_bytes,
                             RandomOperatorIterator{a},
                             a_out.Data(),
-                            cparams_.num_found.Data(),
+                            Params().num_found.Data(),
                             static_cast<int>(TotalSize(a)),
-                            cparams_.op,
+                            Params().op,
                             stream);
     }
 #endif
@@ -1005,16 +1004,16 @@ inline void ExecSort(OutputTensor &a_out,
 #ifdef __CUDACC__
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
-    if constexpr (!has_index_cmp_op_v<decltype(cparams_.op)>) {
+    if constexpr (!has_index_cmp_op_v<decltype(Params().op)>) {
       if constexpr (is_tensor_view_v<InputOperator>) {
         if (a.IsContiguous()) {
           cub::DeviceSelect::If(d_temp,
                                 temp_storage_bytes,
                                 detail::counting_iterator<index_t>(0),
                                 a_out.Data(),
-                                cparams_.num_found.Data(),
+                                Params().num_found.Data(),
                                 static_cast<int>(TotalSize(a)),
-                                IndexToSelectOp<decltype(a.Data()), decltype(cparams_.op)>{a.Data(), cparams_.op},
+                                IndexToSelectOp<decltype(a.Data()), decltype(Params().op)>{a.Data(), Params().op},
                                 stream);
         }
         else {
@@ -1023,10 +1022,10 @@ inline void ExecSort(OutputTensor &a_out,
                                 temp_storage_bytes,
                                 detail::counting_iterator<index_t>(0),
                                 a_out.Data(),
-                                cparams_.num_found.Data(),
+                                Params().num_found.Data(),
                                 static_cast<int>(TotalSize(a)),
-                                IndexToSelectOp<decltype(RandomOperatorIterator{base}), decltype(cparams_.op)>
-                                  {RandomOperatorIterator{base}, cparams_.op},
+                                IndexToSelectOp<decltype(RandomOperatorIterator{base}), decltype(Params().op)>
+                                  {RandomOperatorIterator{base}, Params().op},
                                 stream);
         }
       }
@@ -1036,10 +1035,10 @@ inline void ExecSort(OutputTensor &a_out,
                               temp_storage_bytes,
                               detail::counting_iterator<index_t>(0),
                               a_out.Data(),
-                              cparams_.num_found.Data(),
+                              Params().num_found.Data(),
                               static_cast<int>(TotalSize(a)),
-                              IndexToSelectOp<decltype(RandomOperatorIterator{base}), decltype(cparams_.op)>
-                                {RandomOperatorIterator{base}, cparams_.op},
+                              IndexToSelectOp<decltype(RandomOperatorIterator{base}), decltype(Params().op)>
+                                {RandomOperatorIterator{base}, Params().op},
                               stream);
       }
     }
@@ -1050,9 +1049,9 @@ inline void ExecSort(OutputTensor &a_out,
         temp_storage_bytes,
         detail::counting_iterator<index_t>(0),
         a_out.Data(),
-        cparams_.num_found.Data(),
+        Params().num_found.Data(),
         static_cast<int>(TotalSize(a)),
-        cparams_.op,
+        Params().op,
         stream);
     }
 
@@ -1089,7 +1088,7 @@ inline void ExecSort(OutputTensor &a_out,
                                 temp_storage_bytes,
                                 a.Data(),
                                 a_out.Data(),
-                                cparams_.num_found.Data(),
+                                Params().num_found.Data(),
                                 static_cast<int>(TotalSize(a)),
                                 stream);
         }
@@ -1098,7 +1097,7 @@ inline void ExecSort(OutputTensor &a_out,
                                 temp_storage_bytes,
                                 RandomOperatorIterator{base},
                                 a_out.Data(),
-                                cparams_.num_found.Data(),
+                                Params().num_found.Data(),
                                 static_cast<int>(TotalSize(a)),
                                 stream);
         }
@@ -1108,7 +1107,7 @@ inline void ExecSort(OutputTensor &a_out,
                             temp_storage_bytes,
                             RandomOperatorIterator{a},
                             a_out.Data(),
-                            cparams_.num_found.Data(),
+                            Params().num_found.Data(),
                             static_cast<int>(TotalSize(a)),
                             stream);
     }
@@ -1116,12 +1115,22 @@ inline void ExecSort(OutputTensor &a_out,
   }
 
 private:
+  const CParams &Params() const
+  {
+    return *cparams_;
+  }
+
+  CParams &Params()
+  {
+    return *cparams_;
+  }
+
   // Member variables
   cublasStatus_t ret = CUBLAS_STATUS_SUCCESS;
 
   CubParams_t params;
   cudaStream_t stream_;
-  CParams cparams_; ///< Parameters specific to the operation type
+  std::optional<CParams> cparams_; ///< Parameters specific to the operation type
   T1 *d_temp = nullptr;
   int *d_histogram = nullptr; // Used for hist()
   size_t temp_storage_bytes = 0;
@@ -1324,8 +1333,8 @@ public:
         BATCHES,
         r0_iter,
         r1_iter,
-        cparams_.reduce_op,
-        cparams_.init,
+        Params().reduce_op,
+        Params().init,
         stream);
     }
     else {
@@ -1337,8 +1346,8 @@ public:
         zipped_input,
         zipped_output,
         N,
-        cparams_.reduce_op,
-        cparams_.init,
+        Params().reduce_op,
+        Params().init,
         stream);
     }
 #endif
@@ -1358,16 +1367,25 @@ public:
 
   void SetParams(const CParams &cparams)
   {
-    cparams_.~CParams();
-    new (static_cast<void *>(&cparams_)) CParams(cparams);
+    cparams_.emplace(cparams);
   }
 
 private:
+  const CParams &Params() const
+  {
+    return *cparams_;
+  }
+
+  CParams &Params()
+  {
+    return *cparams_;
+  }
+
   // Member variables
   cublasStatus_t ret = CUBLAS_STATUS_SUCCESS;
 
   cudaStream_t stream_;
-  CParams cparams_; ///< Parameters specific to the operation type
+  std::optional<CParams> cparams_; ///< Parameters specific to the operation type
   uint8_t *d_temp = nullptr;
   size_t temp_storage_bytes = 0;
 };
@@ -1505,8 +1523,8 @@ public:
         BATCHES,
         r0_iter,
         r1_iter,
-        cparams_.reduce_op,
-        cparams_.init,
+        Params().reduce_op,
+        Params().init,
         stream);
     }
     else {
@@ -1518,8 +1536,8 @@ public:
         zipped_input,
         zipped_output,
         N,
-        cparams_.reduce_op,
-        cparams_.init,
+        Params().reduce_op,
+        Params().init,
         stream);
     }
 #endif
@@ -1540,16 +1558,25 @@ public:
 
   void SetParams(const CParams &cparams)
   {
-    cparams_.~CParams();
-    new (static_cast<void *>(&cparams_)) CParams(cparams);
+    cparams_.emplace(cparams);
   }
 
 private:
+  const CParams &Params() const
+  {
+    return *cparams_;
+  }
+
+  CParams &Params()
+  {
+    return *cparams_;
+  }
+
   // Member variables
   cublasStatus_t ret = CUBLAS_STATUS_SUCCESS;
 
   cudaStream_t stream_;
-  CParams cparams_; ///< Parameters specific to the operation type
+  std::optional<CParams> cparams_; ///< Parameters specific to the operation type
   uint8_t *d_temp = nullptr;
   size_t temp_storage_bytes = 0;
 };
