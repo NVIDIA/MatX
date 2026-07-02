@@ -36,7 +36,7 @@
 #include <functional>
 #include <cstdio>
 #include <numeric>
-#include <optional>
+#include <type_traits>
 
 #ifdef __CUDACC__
 #include <cub/cub.cuh>
@@ -100,7 +100,7 @@ struct SortParams_t {
 template <typename Op, typename I>
 struct ReduceParams_t {
   Op reduce_op;
-  I init;
+  std::decay_t<I> init;
 };
 
 template <typename SelectOp, typename CountTensor>
@@ -248,7 +248,7 @@ public:
 
   void SetParams(const CParams &cparams)
   {
-    cparams_.emplace(cparams);
+    cparams_ = cparams;
   }
 
   template <typename Func>
@@ -1117,12 +1117,12 @@ inline void ExecSort(OutputTensor &a_out,
 private:
   const CParams &Params() const
   {
-    return *cparams_;
+    return cparams_;
   }
 
   CParams &Params()
   {
-    return *cparams_;
+    return cparams_;
   }
 
   // Member variables
@@ -1130,7 +1130,7 @@ private:
 
   CubParams_t params;
   cudaStream_t stream_;
-  std::optional<CParams> cparams_; ///< Parameters specific to the operation type
+  CParams cparams_; ///< Parameters specific to the operation type
   T1 *d_temp = nullptr;
   int *d_histogram = nullptr; // Used for hist()
   size_t temp_storage_bytes = 0;
@@ -1367,25 +1367,25 @@ public:
 
   void SetParams(const CParams &cparams)
   {
-    cparams_.emplace(cparams);
+    cparams_ = cparams;
   }
 
 private:
   const CParams &Params() const
   {
-    return *cparams_;
+    return cparams_;
   }
 
   CParams &Params()
   {
-    return *cparams_;
+    return cparams_;
   }
 
   // Member variables
   cublasStatus_t ret = CUBLAS_STATUS_SUCCESS;
 
   cudaStream_t stream_;
-  std::optional<CParams> cparams_; ///< Parameters specific to the operation type
+  CParams cparams_; ///< Parameters specific to the operation type
   uint8_t *d_temp = nullptr;
   size_t temp_storage_bytes = 0;
 };
@@ -1558,25 +1558,25 @@ public:
 
   void SetParams(const CParams &cparams)
   {
-    cparams_.emplace(cparams);
+    cparams_ = cparams;
   }
 
 private:
   const CParams &Params() const
   {
-    return *cparams_;
+    return cparams_;
   }
 
   CParams &Params()
   {
-    return *cparams_;
+    return cparams_;
   }
 
   // Member variables
   cublasStatus_t ret = CUBLAS_STATUS_SUCCESS;
 
   cudaStream_t stream_;
-  std::optional<CParams> cparams_; ///< Parameters specific to the operation type
+  CParams cparams_; ///< Parameters specific to the operation type
   uint8_t *d_temp = nullptr;
   size_t temp_storage_bytes = 0;
 };
