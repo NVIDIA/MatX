@@ -61,7 +61,7 @@ For memory-bound workloads, eliminating launches and intermediate reads and writ
 
 JIT kernel fusion is experimental and intentionally rejects unsupported combinations rather than silently changing the execution model. See the [fusion guide](https://nvidia.github.io/MatX/basics/fusion.html) for the current support matrix, constraints, and compile-cache behavior.
 
-## Near handwritten CUDA. Then fuse it 1.61× faster.
+## Near handwritten CUDA. Then fuse it to go faster.
 
 The reproducible, commented [FFT benchmark example](examples/fft_benchmark.cu) always compares handwritten CUDA + cuFFT with MatX `cudaExecutor`. Enable MathDx to add the JIT case:
 
