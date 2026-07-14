@@ -1,77 +1,64 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="420" viewBox="0 0 1200 420" role="img" aria-labelledby="title desc">
-  <title id="title">MatX JIT fusion removes normalization and FFT intermediates and launches</title>
-  <desc id="desc">A staged signal pipeline runs input normalization, cuFFT, frequency calibration, magnitude, and decibel conversion with temporary memory traffic. MatX can lower the compatible pipeline into one generated kernel.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="500" viewBox="0 0 1200 500" role="img" aria-labelledby="title desc">
+  <title id="title">MatX JIT fusion performs the same pipeline with less work</title>
+  <desc id="desc">A staged normalization, FFT, and post-processing pipeline uses three launches and two temporary tensors. MatX JIT combines it into one generated kernel with no temporary tensors.</desc>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#0b1015"/>
       <stop offset="1" stop-color="#111a20"/>
     </linearGradient>
     <linearGradient id="fused" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#355c0b"/>
+      <stop offset="0" stop-color="#294b0c"/>
       <stop offset=".5" stop-color="#568c12"/>
-      <stop offset="1" stop-color="#355c0b"/>
+      <stop offset="1" stop-color="#294b0c"/>
     </linearGradient>
-    <marker id="arrowGray" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
-      <path d="M0 0 8 4 0 8z" fill="#71818d"/>
+    <marker id="arrowGray" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M0 0 8 4 0 8z" fill="#82929d"/>
     </marker>
-    <marker id="arrowGreen" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+    <marker id="arrowGreen" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto">
       <path d="M0 0 8 4 0 8z" fill="#a6ff4d"/>
     </marker>
-    <pattern id="ticks" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-      <line x1="0" y1="0" x2="0" y2="8" stroke="#97a5ae" stroke-opacity=".13" stroke-width="3"/>
-    </pattern>
   </defs>
 
-  <rect width="1200" height="420" rx="20" fill="url(#bg)"/>
-  <path d="M600 34v352" stroke="#34424d" stroke-dasharray="3 8"/>
+  <rect width="1200" height="500" rx="22" fill="url(#bg)"/>
 
   <g font-family="Inter,Segoe UI,Arial,sans-serif">
-    <text x="48" y="51" fill="#8f9da6" font-size="13" font-weight="700" letter-spacing="2.2">EAGER / STAGED</text>
-    <text x="48" y="82" fill="#e8eef2" font-size="23" font-weight="750">Three stages. Two temporaries.</text>
-    <text x="646" y="51" fill="#a6ff4d" font-size="13" font-weight="700" letter-spacing="2.2">MATX JIT EXPRESSION</text>
-    <text x="646" y="82" fill="#e8eef2" font-size="23" font-weight="750">One expression. One fused pass.</text>
+    <text x="55" y="55" fill="#8f9da6" font-size="16" font-weight="750" letter-spacing="2.5">STAGED EXECUTION</text>
+    <text x="1145" y="55" text-anchor="end" fill="#aab5bc" font-size="20" font-weight="700">3 launches  ·  2 temporaries  ·  extra memory traffic</text>
 
-    <g transform="translate(48 116)">
-      <rect width="125" height="62" rx="10" fill="#1b2630" stroke="#53626d"/>
-      <text x="62" y="29" text-anchor="middle" fill="#f1f5f7" font-size="13" font-weight="700">normalize</text>
-      <text x="62" y="47" text-anchor="middle" fill="#8796a1" font-size="10">CUDA KERNEL</text>
-      <path d="M128 31h11" stroke="#71818d" stroke-width="2" marker-end="url(#arrowGray)"/>
-      <rect x="145" width="115" height="62" rx="10" fill="#1b2630" stroke="#53626d"/>
-      <text x="202" y="29" text-anchor="middle" fill="#f1f5f7" font-size="13" font-weight="700">FFT</text>
-      <text x="202" y="47" text-anchor="middle" fill="#8796a1" font-size="10">CUFFT</text>
-      <path d="M263 31h11" stroke="#71818d" stroke-width="2" marker-end="url(#arrowGray)"/>
-      <rect x="280" width="180" height="62" rx="10" fill="#1b2630" stroke="#53626d"/>
-      <text x="370" y="29" text-anchor="middle" fill="#f1f5f7" font-size="13" font-weight="700">gain × |x| → dB</text>
-      <text x="370" y="47" text-anchor="middle" fill="#8796a1" font-size="10">CUDA KERNEL</text>
-      <path d="M463 31h9" stroke="#71818d" stroke-width="2" marker-end="url(#arrowGray)"/>
-      <rect x="478" width="51" height="62" rx="10" fill="#262328" stroke="#75636e"/>
-      <text x="503" y="29" text-anchor="middle" fill="#f1f5f7" font-size="13" font-weight="700">out</text>
-      <text x="503" y="47" text-anchor="middle" fill="#9b8993" font-size="9">STORE</text>
+    <g transform="translate(55 82)">
+      <rect width="250" height="86" rx="14" fill="#1b2630" stroke="#53626d" stroke-width="2"/>
+      <text x="125" y="39" text-anchor="middle" fill="#f1f5f7" font-size="23" font-weight="750">Normalize</text>
+      <text x="125" y="65" text-anchor="middle" fill="#93a1aa" font-size="15">CUDA kernel</text>
 
-      <text x="0" y="105" fill="#83919b" font-size="11" font-weight="700" letter-spacing="1.3">GLOBAL MEMORY TRAFFIC</text>
-      <rect y="121" width="529" height="44" rx="9" fill="#121a20" stroke="#394650"/>
-      <rect x="8" y="129" width="158" height="28" rx="5" fill="url(#ticks)" stroke="#4d5b65"/>
-      <rect x="185" y="129" width="158" height="28" rx="5" fill="url(#ticks)" stroke="#4d5b65"/>
-      <rect x="362" y="129" width="159" height="28" rx="5" fill="url(#ticks)" stroke="#4d5b65"/>
-      <text x="87" y="148" text-anchor="middle" fill="#a7b2b9" font-size="9">INPUT → NORMALIZED</text>
-      <text x="264" y="148" text-anchor="middle" fill="#a7b2b9" font-size="9">NORMALIZED → FFT TEMP</text>
-      <text x="441" y="148" text-anchor="middle" fill="#a7b2b9" font-size="9">FFT TEMP → OUTPUT</text>
-      <text y="201" fill="#8f9da6" font-size="13">Two temporary tensors cross global memory.</text>
+      <path d="M270 43h65" stroke="#82929d" stroke-width="3" marker-end="url(#arrowGray)"/>
+      <text x="302" y="76" text-anchor="middle" fill="#c28d99" font-size="14" font-weight="700">TEMP</text>
+
+      <rect x="360" width="250" height="86" rx="14" fill="#1b2630" stroke="#53626d" stroke-width="2"/>
+      <text x="485" y="39" text-anchor="middle" fill="#f1f5f7" font-size="23" font-weight="750">FFT</text>
+      <text x="485" y="65" text-anchor="middle" fill="#93a1aa" font-size="15">cuFFT</text>
+
+      <path d="M630 43h65" stroke="#82929d" stroke-width="3" marker-end="url(#arrowGray)"/>
+      <text x="662" y="76" text-anchor="middle" fill="#c28d99" font-size="14" font-weight="700">TEMP</text>
+
+      <rect x="720" width="370" height="86" rx="14" fill="#1b2630" stroke="#53626d" stroke-width="2"/>
+      <text x="905" y="39" text-anchor="middle" fill="#f1f5f7" font-size="23" font-weight="750">Calibrate + magnitude + dB</text>
+      <text x="905" y="65" text-anchor="middle" fill="#93a1aa" font-size="15">CUDA kernel</text>
     </g>
 
-    <g transform="translate(646 116)">
-      <rect width="506" height="62" rx="10" fill="url(#fused)" stroke="#8bd12b"/>
-      <circle cx="28" cy="31" r="6" fill="#b7ff66"/>
-      <text x="48" y="28" fill="#f8fff4" font-size="12" font-weight="750">20 · log10(|FFT(signal / (|signal| + ε)) · gain| + ε)</text>
-      <text x="48" y="47" fill="#d9f4c4" font-size="10" font-weight="700" letter-spacing="1.2">ONE GENERATED PIPELINE</text>
-      <text x="480" y="37" text-anchor="end" fill="#eaffd8" font-size="20" font-weight="800">→ out</text>
+    <path d="M55 211h1090" stroke="#33414b" stroke-width="2"/>
 
-      <text x="0" y="105" fill="#8eb867" font-size="11" font-weight="700" letter-spacing="1.3">GLOBAL MEMORY TRAFFIC</text>
-      <rect y="121" width="506" height="44" rx="9" fill="#101d13" stroke="#456520"/>
-      <rect x="8" y="129" width="490" height="28" rx="5" fill="#1e3219" stroke="#679a2b"/>
-      <path d="M27 135h445" stroke="#a6ff4d" stroke-width="2" marker-end="url(#arrowGreen)"/>
-      <text x="253" y="153" text-anchor="middle" fill="#eaffd8" font-size="11" font-weight="700" letter-spacing=".8">LOAD INPUTS  ·  COMPUTE ON CHIP  ·  STORE OUTPUT</text>
-      <text y="201" fill="#a9c88f" font-size="13">No intermediates. Less traffic. More useful work.</text>
+    <text x="55" y="267" fill="#a6ff4d" font-size="16" font-weight="750" letter-spacing="2.5">MATX JIT</text>
+    <text x="1145" y="267" text-anchor="end" fill="#d9f4c4" font-size="20" font-weight="700">1 launch  ·  no temporaries  ·  less memory traffic</text>
+
+    <g transform="translate(55 294)">
+      <rect width="1090" height="118" rx="16" fill="url(#fused)" stroke="#8bd12b" stroke-width="2"/>
+      <circle cx="48" cy="59" r="10" fill="#b7ff66"/>
+      <text x="82" y="50" fill="#f8fff4" font-size="25" font-weight="750">Normalize  +  FFT  +  calibrate  +  magnitude  +  dB</text>
+      <text x="82" y="80" fill="#d9f4c4" font-size="16" font-weight="750" letter-spacing="1.5">ONE GENERATED KERNEL</text>
+      <path d="M900 59h95" stroke="#a6ff4d" stroke-width="4" marker-end="url(#arrowGreen)"/>
+      <text x="1035" y="68" text-anchor="middle" fill="#f8fff4" font-size="27" font-weight="800">output</text>
     </g>
+
+    <text x="600" y="463" text-anchor="middle" fill="#e8eef2" font-size="25" font-weight="750">Same expression. Less work. More speed.</text>
   </g>
 </svg>
