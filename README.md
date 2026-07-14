@@ -194,6 +194,43 @@ Host transforms dispatch to optimized CPU libraries when their corresponding CMa
 
 All elementwise operators and reductions have host paths, as do FFT, BLAS, and LAPACK transforms when the relevant backend is configured. Most host functions support multithreading; reductions and a small set of transforms currently remain single-threaded. See [executor compatibility](https://nvidia.github.io/MatX/executor_compatibility.html) for the operation-by-operation breakdown.
 
+## Performance that scales down to one expression
+
+The [Black–Scholes example](examples/black_scholes.cu) uses `apply()` to turn an ordinary C++ lambda into one fused elementwise kernel:
+
+```cpp
+auto prices = matx::apply(
+  bs_lambda, strike, stock, volatility, rate, maturity);
+(output = prices).run(exec);
+```
+
+For 100 million independent FP32 option prices, the fused MatX expression is **5.62× faster than the equivalent eager CuPy expression** and **184.5× faster than NumPy/SciPy** on the same system.[^black-scholes-platform]
+
+| Implementation | Median time | Throughput | vs. NumPy |
+|---|---:|---:|---:|
+| NumPy 2.5.1 + SciPy 1.18.0 / CPU | 2965.66 ms | 33.7 M options/s | 1.0× |
+| CuPy 14.1.1 eager expression / GPU | 90.32 ms | 1.107 B options/s | 32.8× |
+| MatX `apply()` / GPU | **16.07 ms** | **6.223 B options/s** | **184.5×** |
+
+Input creation and transfers are excluded. NumPy and CuPy report the median of five trials after two warmups. The MatX result is the median of five runs of the existing example; each run averages 100 CUDA-event-timed `apply()` iterations. The companion [NumPy/CuPy benchmark](examples/black_scholes_benchmark.py) keeps the equation, FP32 dtype, array size, and timing boundaries reproducible.
+
+<details>
+<summary><strong>Reproduce the Black–Scholes comparison</strong></summary>
+
+```bash
+cmake -S . -B build -DMATX_BUILD_EXAMPLES=ON
+cmake --build build --target black_scholes -j
+./build/examples/black_scholes
+
+python -m pip install numpy scipy cupy-cuda13x
+python examples/black_scholes_benchmark.py \
+  --size 100000000 --warmups 2 --trials 5
+```
+
+</details>
+
+[^black-scholes-platform]: Measured on an NVIDIA GB10 with CUDA 13.0 and driver 580.159.03, paired with a 20-core Arm CPU (10 Cortex-X925 + 10 Cortex-A725 cores).
+
 ## Get running
 
 MatX is header-only. Add the repository to your project and link its interface target:
