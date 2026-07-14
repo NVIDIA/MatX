@@ -63,7 +63,7 @@ JIT kernel fusion is experimental and intentionally rejects unsupported combinat
 
 ## Near handwritten CUDA. Then fuse it 1.61× faster.
 
-The reproducible, commented [FFT benchmark example](examples/fft_benchmark.cu) runs the pipeline above three ways with identical inputs and output validation:
+The reproducible, commented [FFT benchmark example](examples/fft_benchmark.cu) always compares handwritten CUDA + cuFFT with MatX `cudaExecutor`. Enable MathDx to add the JIT case:
 
 1. Handwritten CUDA normalization and post-processing kernels around a batched cuFFT plan.
 2. One MatX expression with `cudaExecutor`, which uses cuFFT plus generated normalization and post-processing kernels.
@@ -121,13 +121,13 @@ To reproduce the comparison on your GPU:
 ```bash
 cmake -S . -B build \
   -DCMAKE_BUILD_TYPE=Release \
-  -DMATX_EN_MATHDX=ON \
-  -DMATX_BUILD_FFT_BENCHMARK=ON
+  -DMATX_BUILD_EXAMPLES=ON \
+  -DMATX_EN_MATHDX=ON
 cmake --build build --target fft_benchmark -j
-./build/fft_benchmark 256 4096 2000
+./build/examples/fft_benchmark 256 4096 2000
 ```
 
-If MatX is configured with `-DMATX_EN_NVPL=ON` or `-DMATX_EN_X86_FFTW=ON`, the example also compiles and reports the identical expression through the multithreaded `AllThreadsHostExecutor`. That optional CPU result is printed separately from the three GPU cases.
+`fft_benchmark` is built with the other examples whenever `MATX_BUILD_EXAMPLES=ON`. The JIT case is compiled only with `MATX_EN_MATHDX=ON`. If MatX is configured with `MATX_EN_NVPL=ON` or `MATX_EN_X86_FFTW=ON`, the example also compiles and reports the identical expression through the multithreaded `AllThreadsHostExecutor`. That optional CPU result is printed separately from the GPU cases.
 
 Performance depends on GPU, clocks, shape, and software versions; use the benchmark rather than assuming this ratio for every workload.
 

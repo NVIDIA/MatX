@@ -7,6 +7,7 @@ set(examples
     conv2d
     cgsolve
     eigenExample
+    fft_benchmark
     fft_conv
     interpolate
     resample

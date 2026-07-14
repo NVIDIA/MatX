@@ -7,7 +7,7 @@
 
 /**
  * @file fft_benchmark.cu
- * @brief Compare handwritten CUDA + cuFFT with MatX CUDA and JIT execution.
+ * @brief Compare handwritten CUDA + cuFFT with MatX execution paths.
  *
  * Every case computes the same batched signal-processing pipeline:
  *
@@ -16,8 +16,8 @@
  * Case 1 explicitly launches two CUDA kernels around cuFFT and materializes
  * both intermediate tensors. Case 2 expresses the complete pipeline in MatX
  * and runs it with cudaExecutor, which uses cuFFT and generated element-wise
- * kernels. Case 3 runs the identical MatX expression with CUDAJITExecutor so a
- * supported pipeline can be fused into one cuFFTDx-backed kernel.
+ * kernels. When MatX is built with MathDx, Case 3 runs the identical expression
+ * with CUDAJITExecutor so it can be fused into one cuFFTDx-backed kernel.
  * When MatX is built with NVPL or FFTW, Case 4 runs that same expression with
  * AllThreadsHostExecutor and reports the CPU result separately.
  *
@@ -26,7 +26,8 @@
  *
  *   ./fft_benchmark [batches] [fft_size] [iterations]
  *
- * JIT compilation is timed and reported separately from steady-state runtime.
+ * When enabled, JIT compilation is timed and reported separately from
+ * steady-state runtime.
  */
 
 #include <matx.h>
@@ -43,6 +44,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <vector>
 
 namespace {
@@ -109,17 +111,34 @@ __global__ void MagnitudeDbKernel(float *spectrum_db,
       20.0f * log10f(hypotf(value.x * gain, value.y * gain) + kEpsilon);
 }
 
-template <typename RawCuda, typename MatxCuda, typename MatxJit>
-std::array<double, 3> MeasureInterleavedMedianMs(
-    cudaStream_t stream, int iterations, RawCuda &&run_raw_cuda,
-    MatxCuda &&run_matx_cuda, MatxJit &&run_matx_jit)
+template <size_t I = 0, typename RunsTuple, typename Measure>
+void MeasureImplementation(size_t implementation, RunsTuple &runs,
+                           Measure &measure)
 {
+  if constexpr (I < std::tuple_size_v<RunsTuple>) {
+    if (implementation == I) {
+      measure(I, std::get<I>(runs));
+    }
+    else {
+      MeasureImplementation<I + 1>(implementation, runs, measure);
+    }
+  }
+}
+
+template <typename... Runs>
+std::array<double, sizeof...(Runs)> MeasureInterleavedMedianMs(
+    cudaStream_t stream, int iterations, Runs &&...run)
+{
+  // Accept two baseline cases or all three GPU cases without putting a disabled
+  // JIT implementation on the hot timing path.
+  constexpr size_t implementation_count = sizeof...(Runs);
+  auto implementations = std::tie(run...);
+
   // Warm every implementation before recording events. This removes plan/cache
   // setup and one-time allocations from the steady-state measurements.
   for (int i = 0; i < kWarmupIterations; i++) {
-    run_raw_cuda();
-    run_matx_cuda();
-    run_matx_jit();
+    std::apply([](auto &...implementation) { (implementation(), ...); },
+               implementations);
   }
   BENCH_CUDA_CHECK(cudaStreamSynchronize(stream));
 
@@ -128,7 +147,7 @@ std::array<double, 3> MeasureInterleavedMedianMs(
   BENCH_CUDA_CHECK(cudaEventCreate(&start));
   BENCH_CUDA_CHECK(cudaEventCreate(&stop));
 
-  std::array<std::vector<double>, 3> trials;
+  std::array<std::vector<double>, implementation_count> trials;
   for (auto &implementation_trials : trials) {
     implementation_trials.reserve(kTrials);
   }
@@ -151,29 +170,17 @@ std::array<double, 3> MeasureInterleavedMedianMs(
   // systematically favor the implementation measured first or last. Reporting
   // the median also reduces the effect of an occasional system interruption.
   for (int trial = 0; trial < kTrials; trial++) {
-    switch (trial % 3) {
-      case 0:
-        measure(0, run_raw_cuda);
-        measure(1, run_matx_cuda);
-        measure(2, run_matx_jit);
-        break;
-      case 1:
-        measure(1, run_matx_cuda);
-        measure(2, run_matx_jit);
-        measure(0, run_raw_cuda);
-        break;
-      default:
-        measure(2, run_matx_jit);
-        measure(0, run_raw_cuda);
-        measure(1, run_matx_cuda);
-        break;
+    for (size_t offset = 0; offset < implementation_count; offset++) {
+      const size_t implementation =
+          (static_cast<size_t>(trial) + offset) % implementation_count;
+      MeasureImplementation(implementation, implementations, measure);
     }
   }
 
   BENCH_CUDA_CHECK(cudaEventDestroy(start));
   BENCH_CUDA_CHECK(cudaEventDestroy(stop));
 
-  std::array<double, 3> medians{};
+  std::array<double, implementation_count> medians{};
   for (size_t implementation = 0; implementation < trials.size();
        implementation++) {
     auto &implementation_trials = trials[implementation];
@@ -276,10 +283,6 @@ int ParsePositive(const char *value, const char *name)
 
 int main(int argc, char **argv)
 {
-#ifndef MATX_EN_MATHDX
-  std::cerr << "This benchmark requires -DMATX_EN_MATHDX=ON\n";
-  return 1;
-#else
   // Defaults reproduce the shape and timing protocol reported in README.md.
   int batches = 256;
   int fft_size = 4096;
@@ -311,7 +314,9 @@ int main(int argc, char **argv)
     auto calibration = matx::make_tensor<float>({batches, fft_size});
     auto raw_cuda_out = matx::make_tensor<float>({batches, fft_size});
     auto matx_cuda_out = matx::make_tensor<float>({batches, fft_size});
+#ifdef MATX_EN_MATHDX
     auto matx_jit_out = matx::make_tensor<float>({batches, fft_size});
+#endif
 #if defined(MATX_EN_NVPL) || defined(MATX_EN_X86_FFTW)
     auto matx_host_out = matx::make_tensor<float>({batches, fft_size});
 #endif
@@ -374,28 +379,34 @@ int main(int argc, char **argv)
       BENCH_CUDA_CHECK(cudaGetLastError());
     };
 
-    // Cases 2 and 3 share this exact MatX expression. Nothing is materialized
-    // here: MatX operators are lazy until assignment is run with an executor.
+    // Every MatX case shares this exact expression. Nothing is materialized here:
+    // MatX operators are lazy until assignment is run with an executor.
     auto normalized_signal = signal / (matx::abs(signal) + kEpsilon);
     auto pipeline = 20.0f * matx::log10(
         matx::abs(matx::fft(normalized_signal) * calibration) + kEpsilon);
+#ifdef MATX_EN_MATHDX
     // cuFFTDx supports a subset of FFT shapes and types. Fail clearly instead of
     // timing a different fallback path when the requested shape cannot be fused.
     if (!matx::jit_supported(pipeline)) {
       throw std::runtime_error(
           "The requested batch/FFT shape is not supported by CUDAJITExecutor");
     }
+#endif
 
     matx::cudaExecutor cuda_exec{stream};
+#ifdef MATX_EN_MATHDX
     matx::CUDAJITExecutor jit_exec{stream};
+#endif
 
     // Case 2: the standard CUDA executor lowers the expression to a generated
     // normalization kernel, cuFFT, and a generated post-processing kernel.
     auto run_matx_cuda = [&]() { (matx_cuda_out = pipeline).run(cuda_exec); };
 
+#ifdef MATX_EN_MATHDX
     // Case 3: only the executor changes. CUDAJITExecutor fuses the compatible
     // normalization, FFT, calibration, magnitude, and dB work into one kernel.
     auto run_matx_jit = [&]() { (matx_jit_out = pipeline).run(jit_exec); };
+#endif
 
     // Build the cuFFT plan/cache and materialize non-JIT temporary allocations.
     run_raw_cuda();
@@ -403,17 +414,26 @@ int main(int argc, char **argv)
     BENCH_CUDA_CHECK(cudaStreamSynchronize(stream));
 
     // Report online compilation separately; it is cached and excluded from the
-    // steady-state timings below.
+    // steady-state timings below. This case exists only when MathDx is enabled.
+#ifdef MATX_EN_MATHDX
     const double jit_compile_ms = MeasureHostMs([&]() {
       run_matx_jit();
       BENCH_CUDA_CHECK(cudaStreamSynchronize(stream));
     });
+#endif
 
+#ifdef MATX_EN_MATHDX
     const auto median_ms = MeasureInterleavedMedianMs(
         stream, iterations, run_raw_cuda, run_matx_cuda, run_matx_jit);
+#else
+    const auto median_ms = MeasureInterleavedMedianMs(
+        stream, iterations, run_raw_cuda, run_matx_cuda);
+#endif
     const double raw_cuda_ms = median_ms[0];
     const double matx_cuda_ms = median_ms[1];
+#ifdef MATX_EN_MATHDX
     const double matx_jit_ms = median_ms[2];
+#endif
 
 #if defined(MATX_EN_NVPL) || defined(MATX_EN_X86_FFTW)
     // Case 4 (optional): a configured host FFT backend lets the identical MatX
@@ -430,21 +450,31 @@ int main(int argc, char **argv)
     // agree with the handwritten CUDA + cuFFT reference within FP32 tolerance.
     run_raw_cuda();
     run_matx_cuda();
+#ifdef MATX_EN_MATHDX
     run_matx_jit();
+#endif
     BENCH_CUDA_CHECK(cudaStreamSynchronize(stream));
 
     const ErrorSummary cuda_error = Compare(
         raw_cuda_out.Data(), matx_cuda_out.Data(), element_count);
+#ifdef MATX_EN_MATHDX
     const ErrorSummary jit_error = Compare(
         raw_cuda_out.Data(), matx_jit_out.Data(), element_count);
+#endif
 #if defined(MATX_EN_NVPL) || defined(MATX_EN_X86_FFTW)
     const ErrorSummary host_error = Compare(
         raw_cuda_out.Data(), matx_host_out.Data(), element_count);
 #endif
     constexpr double tolerance = 2.0e-3;
-    if (cuda_error.max_rel > tolerance || jit_error.max_rel > tolerance) {
+    if (cuda_error.max_rel > tolerance) {
       throw std::runtime_error("output validation exceeded relative tolerance");
     }
+#ifdef MATX_EN_MATHDX
+    if (jit_error.max_rel > tolerance) {
+      throw std::runtime_error(
+          "JIT output validation exceeded relative tolerance");
+    }
+#endif
 #if defined(MATX_EN_NVPL) || defined(MATX_EN_X86_FFTW)
     constexpr double host_tolerance = 5.0e-3;
     if (host_error.max_rel > host_tolerance) {
@@ -464,7 +494,9 @@ int main(int argc, char **argv)
               << std::setw(10) << "Speedup\n";
     PrintResult("CUDA kernels + cuFFT", raw_cuda_ms, element_count, raw_cuda_ms);
     PrintResult("MatX cudaExecutor", matx_cuda_ms, element_count, raw_cuda_ms);
+#ifdef MATX_EN_MATHDX
     PrintResult("MatX CUDAJITExecutor", matx_jit_ms, element_count, raw_cuda_ms);
+#endif
 #if defined(MATX_EN_NVPL)
     PrintHostResult("NVIDIA NVPL", matx_host_ms, element_count,
                     host_exec.GetNumThreads(), host_iterations);
@@ -472,11 +504,14 @@ int main(int argc, char **argv)
     PrintHostResult("FFTW", matx_host_ms, element_count,
                     host_exec.GetNumThreads(), host_iterations);
 #endif
-    std::cout << "\nCUDAJITExecutor first run (compile + execute): "
+    std::cout << "\nMaximum relative error vs CUDA + cuFFT: cudaExecutor="
+              << std::scientific << cuda_error.max_rel << "\n";
+#ifdef MATX_EN_MATHDX
+    std::cout << "CUDAJITExecutor first run (compile + execute): "
               << std::fixed << std::setprecision(2) << jit_compile_ms << " ms\n"
-              << "Maximum relative error vs CUDA + cuFFT: cudaExecutor="
-              << std::scientific << cuda_error.max_rel
-              << ", CUDAJITExecutor=" << jit_error.max_rel << "\n";
+              << "Maximum relative error vs CUDA + cuFFT: CUDAJITExecutor="
+              << std::scientific << jit_error.max_rel << "\n";
+#endif
 #if defined(MATX_EN_NVPL) || defined(MATX_EN_X86_FFTW)
     std::cout << "Maximum relative error vs CUDA + cuFFT: host="
               << std::scientific << host_error.max_rel << "\n";
@@ -493,5 +528,4 @@ int main(int argc, char **argv)
   }
 
   return 0;
-#endif
 }

@@ -204,8 +204,6 @@ Unless otherwise noted, these options are OFF by default.
     - ``-DMATX_DISABLE_CUB_CACHE=ON``
   * - Enable NVIDIA MathDx support for kernel fusion
     - ``-DMATX_EN_MATHDX=ON``
-  * - Build the commented FFT benchmark example (requires MathDx)
-    - ``-DMATX_BUILD_FFT_BENCHMARK=ON``
   * - Enable pybind11 Support. This option is usually not explicitly set, but is enabled by other options.
     - ``-DMATX_EN_PYBIND11=ON``
   * - Disable Exceptions
@@ -332,12 +330,12 @@ Enabling MathDx support will enable MathDx-backed CUDA kernel fusion for support
 MatX uses the separate ``libmathdx`` runtime interface to query launch resources and generate LTOIR for runtime-sized
 operators before JIT compilation. See :ref:`fusion` for the current support matrix and limitations.
 
-The standalone ``fft_benchmark`` example target compares an input-normalization, batched FFT, frequency-domain
-calibration, magnitude, and decibel-conversion pipeline implemented with handwritten CUDA plus cuFFT, MatX ``cudaExecutor``, and MatX
-``CUDAJITExecutor``. Configure with both ``-DMATX_EN_MATHDX=ON`` and
-``-DMATX_BUILD_FFT_BENCHMARK=ON``, then build the ``fft_benchmark`` target. Its optional positional
-arguments are batch count, FFT size, and iterations per trial. When ``MATX_EN_NVPL`` or ``MATX_EN_X86_FFTW`` is
-enabled, the example also compiles the same pipeline for ``AllThreadsHostExecutor`` and reports a separate host result.
+The ``fft_benchmark`` target is built with the other examples when ``MATX_BUILD_EXAMPLES=ON``. It compares an
+input-normalization, batched FFT, frequency-domain calibration, magnitude, and decibel-conversion pipeline implemented
+with handwritten CUDA plus cuFFT and MatX ``cudaExecutor``. The JIT path is added when ``MATX_EN_MATHDX=ON``. Its
+optional positional arguments are batch count, FFT size, and iterations per trial. When ``MATX_EN_NVPL`` or
+``MATX_EN_X86_FFTW`` is enabled, the example also compiles the same pipeline for ``AllThreadsHostExecutor`` and reports
+a separate host result.
 
 
 MatX Library Linking
