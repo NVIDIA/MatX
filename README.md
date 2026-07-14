@@ -206,6 +206,8 @@ For 100 million independent FP32 option prices, the fused MatX expression is **5
 | CuPy 14.1.1 eager expression / GPU | 90.32 ms | 1.107 B options/s | 32.8× |
 | MatX expression / GPU | **16.07 ms** | **6.223 B options/s** | **184.5×** |
 
+**Built for real time.** At 6.223 billion results per second, even a single FP32 output stream represents nearly 200 Gbps—giving MatX the speed to process data in real time at hundreds of gigabits per second.
+
 Input creation and transfers are excluded. NumPy and CuPy report the median of five trials after two warmups. The MatX result is the median of five runs of the existing example; each run averages 100 CUDA-event-timed MatX iterations. The companion [NumPy/CuPy benchmark](examples/black_scholes_benchmark.py) keeps the equation, FP32 dtype, array size, and timing boundaries reproducible.
 
 <details>
