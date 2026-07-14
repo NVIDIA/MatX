@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="440" viewBox="0 0 1200 440" role="img" aria-labelledby="title desc">
+  <title id="title">MatX: expressive numerical computing, fused for speed</title>
+  <desc id="desc">A MatX wordmark beside a compact tensor expression flowing into one fused GPU kernel.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#070b10"/>
+      <stop offset="0.56" stop-color="#101820"/>
+      <stop offset="1" stop-color="#07110d"/>
+    </linearGradient>
+    <linearGradient id="green" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#76b900"/>
+      <stop offset="1" stop-color="#a6ff4d"/>
+    </linearGradient>
+    <radialGradient id="glow">
+      <stop offset="0" stop-color="#76b900" stop-opacity=".28"/>
+      <stop offset="1" stop-color="#76b900" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M32 0H0V32" fill="none" stroke="#a6ff4d" stroke-opacity=".055"/>
+    </pattern>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="16" stdDeviation="24" flood-color="#000" flood-opacity=".42"/>
+    </filter>
+    <filter id="greenGlow" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="10" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="440" rx="24" fill="url(#bg)"/>
+  <rect width="1200" height="440" rx="24" fill="url(#grid)"/>
+  <circle cx="1012" cy="85" r="300" fill="url(#glow)"/>
+  <circle cx="122" cy="435" r="220" fill="url(#glow)" opacity=".48"/>
+
+  <g transform="translate(62 62)">
+    <path d="M0 0h10v54H0zM16 0h10v54H16zM32 0h10v54H32z" fill="url(#green)" transform="skewX(-12)"/>
+    <text x="58" y="50" fill="#f5f8fa" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="68" font-weight="800" letter-spacing="-4">MatX</text>
+    <text x="0" y="120" fill="#a6ff4d" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="16" font-weight="700" letter-spacing="3.1">EXPRESSIVE NUMERICAL COMPUTING</text>
+    <text x="0" y="175" fill="#f7fafb" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="43" font-weight="750" letter-spacing="-1.3">Write the expression.</text>
+    <text x="0" y="224" fill="#f7fafb" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="43" font-weight="750" letter-spacing="-1.3">Fuse the pipeline.</text>
+    <text x="0" y="273" fill="#f7fafb" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="43" font-weight="750" letter-spacing="-1.3">Achieve speed of light.</text>
+    <g transform="translate(0 302)">
+      <rect width="86" height="31" rx="15.5" fill="#172029" stroke="#34424e"/>
+      <text x="43" y="21" text-anchor="middle" fill="#c9d2d9" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700">C++20</text>
+      <rect x="96" width="86" height="31" rx="15.5" fill="#172029" stroke="#34424e"/>
+      <text x="139" y="21" text-anchor="middle" fill="#c9d2d9" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700">CUDA</text>
+      <rect x="192" width="86" height="31" rx="15.5" fill="#172029" stroke="#34424e"/>
+      <text x="235" y="21" text-anchor="middle" fill="#c9d2d9" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700">CPU</text>
+    </g>
+  </g>
+
+  <g transform="translate(612 68)" filter="url(#shadow)">
+    <rect width="526" height="304" rx="18" fill="#0c1218" stroke="#2a3945"/>
+    <rect width="526" height="42" rx="18" fill="#151e26"/>
+    <path d="M0 42h526" stroke="#2a3945"/>
+    <circle cx="22" cy="21" r="5" fill="#ff6b6b"/>
+    <circle cx="40" cy="21" r="5" fill="#ffd166"/>
+    <circle cx="58" cy="21" r="5" fill="#76b900"/>
+    <text x="263" y="26" text-anchor="middle" fill="#7e8d99" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12">pipeline.cu</text>
+
+    <g font-family="SFMono-Regular,Consolas,Liberation Mono,monospace" font-size="17">
+      <text x="28" y="82" fill="#7e8d99">// normalize → FFT → calibrate → magnitude → dB</text>
+      <text x="28" y="116" fill="#d6e0e6">auto normalized = x / (abs(x) + eps);</text>
+      <text x="28" y="148" fill="#d6e0e6">auto op = <tspan fill="#a6ff4d">20 * log10(</tspan></text>
+      <text x="52" y="177" fill="#a6ff4d">abs(fft(normalized) * gain) + eps);</text>
+      <text x="28" y="211" fill="#7e8d99">// one generated pipeline</text>
+      <text x="28" y="235" fill="#d6e0e6">(out = op).<tspan fill="#71d7ff">run</tspan>(jit);</text>
+    </g>
+
+    <g transform="translate(28 252)">
+      <rect width="470" height="32" rx="8" fill="#121d18" stroke="#416919"/>
+      <circle cx="23" cy="16" r="5" fill="#a6ff4d" filter="url(#greenGlow)"/>
+      <text x="39" y="21" fill="#a6ff4d" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" letter-spacing="1.2">1 FUSED PIPELINE</text>
+      <text x="447" y="21" text-anchor="end" fill="#95a3ad" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12">LOAD → COMPUTE → STORE</text>
+    </g>
+  </g>
+
+  <path d="M566 220h28" stroke="#76b900" stroke-width="2" stroke-dasharray="4 6" opacity=".8"/>
+  <path d="m591 214 8 6-8 6" fill="none" stroke="#a6ff4d" stroke-width="2"/>
+</svg>

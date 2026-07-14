@@ -67,6 +67,7 @@ rapids_cmake_write_version_file(include/matx/version_config.h)
 option(MATX_BUILD_EXAMPLES "Build examples" OFF)
 option(MATX_BUILD_TESTS "Build unit tests" OFF)
 option(MATX_BUILD_BENCHMARKS "Build benchmarks" OFF)
+option(MATX_BUILD_FFT_BENCHMARK "Build the standalone CUDA/cuFFT/MatX FFT comparison example" OFF)
 option(MATX_NVTX_FLAGS "Enable NVTX Macros" OFF)
 option(MATX_BUILD_DOCS "Build documentation" OFF)
 option(MATX_BUILD_32_BIT "Build with 32-bit indexing support" OFF)
@@ -463,6 +464,16 @@ target_link_libraries(matx INTERFACE
     CUDA::cusparse)
 
 target_link_libraries(matx INTERFACE CUDA::nvtx3)
+
+if(MATX_BUILD_FFT_BENCHMARK)
+    if(NOT MATX_EN_MATHDX)
+        message(FATAL_ERROR "MATX_BUILD_FFT_BENCHMARK requires MATX_EN_MATHDX=ON")
+    endif()
+    add_executable(fft_benchmark examples/fft_benchmark.cu)
+    target_link_libraries(fft_benchmark PRIVATE matx::matx)
+    target_compile_options(fft_benchmark PRIVATE
+        $<$<COMPILE_LANGUAGE:CUDA>:${MATX_CUDA_FLAGS}>)
+endif()
 
 # Build config files if requested. At this point our transitive target should
 # have all build properties needed based on the options passed in.
