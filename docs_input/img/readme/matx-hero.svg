@@ -59,18 +59,17 @@
     <text x="263" y="26" text-anchor="middle" fill="#7e8d99" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12">pipeline.cu</text>
 
     <g font-family="SFMono-Regular,Consolas,Liberation Mono,monospace" font-size="17">
-      <text x="28" y="82" fill="#7e8d99">// normalize → FFT → calibrate → magnitude → dB</text>
-      <text x="28" y="116" fill="#d6e0e6">auto normalized = x / (abs(x) + eps);</text>
-      <text x="28" y="148" fill="#d6e0e6">auto op = <tspan fill="#a6ff4d">20 * log10(</tspan></text>
-      <text x="52" y="177" fill="#a6ff4d">abs(fft(normalized) * gain) + eps);</text>
-      <text x="28" y="211" fill="#7e8d99">// one generated pipeline</text>
-      <text x="28" y="235" fill="#d6e0e6">(out = op).<tspan fill="#71d7ff">run</tspan>(jit);</text>
+      <text x="28" y="82" fill="#7e8d99">// NumPy-like tensors, native C++</text>
+      <text x="28" y="120" fill="#d6e0e6">auto projected = matmul(x, weights);</text>
+      <text x="28" y="157" fill="#d6e0e6">auto op = <tspan fill="#a6ff4d">tanh(projected + bias);</tspan></text>
+      <text x="28" y="201" fill="#7e8d99">// choose CUDA, JIT, or CPU</text>
+      <text x="28" y="230" fill="#d6e0e6">(out = op).<tspan fill="#71d7ff">run</tspan>(exec);</text>
     </g>
 
     <g transform="translate(28 252)">
       <rect width="470" height="32" rx="8" fill="#121d18" stroke="#416919"/>
       <circle cx="23" cy="16" r="5" fill="#a6ff4d" filter="url(#greenGlow)"/>
-      <text x="39" y="21" fill="#a6ff4d" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" letter-spacing="1.2">1 FUSED PIPELINE</text>
+      <text x="39" y="21" fill="#a6ff4d" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" letter-spacing="1.2">FUSED WHERE SUPPORTED</text>
       <text x="447" y="21" text-anchor="end" fill="#95a3ad" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12">LOAD → COMPUTE → STORE</text>
     </g>
   </g>
