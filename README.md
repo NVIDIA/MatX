@@ -78,7 +78,7 @@ This reads like the algorithm: normalize every complex input sample, transform e
 
 For memory-bound workloads, eliminating launches and intermediate reads and writes lets a simple expression reach **speed-of-light performance** without hand-writing CUDA kernel plumbing.
 
-**Measured below: the short MatX CUDA expression stays within about 3% of handwritten CUDA + cuFFT, while the identical expression with JIT fusion runs 1.61× faster.**
+**Measured on an NVIDIA DGX Spark below: the short MatX CUDA expression stays within about 3% of handwritten CUDA + cuFFT, while the identical expression with JIT fusion runs 1.61× faster.**
 
 > Actual performance depends on the operation, shape, data type, and target GPU. Profile on your hardware; MatX makes the fast path concise, not mysterious.
 
@@ -172,7 +172,7 @@ cmake --build build --target fft_benchmark -j
 
 Performance depends on GPU, clocks, shape, and software versions; use the benchmark rather than assuming this ratio for every workload.
 
-[^fft-platform]: Measured with 256 batched 4096-point complex FP32 FFTs on an NVIDIA GB10 using CUDA 13.0 and MathDx 26.03.
+[^fft-platform]: Measured with 256 batched 4096-point complex FP32 FFTs on an NVIDIA DGX Spark (GB10) using CUDA 13.0 and MathDx 26.03.
 
 ## GPU acceleration and optimized host execution
 
@@ -198,7 +198,7 @@ All elementwise operators and reductions have host paths, as do FFT, BLAS, and L
 
 The [Black–Scholes example](examples/black_scholes.cu) expresses the complete pricing equation in concise MatX syntax and evaluates it as one fused GPU kernel—without hand-written CUDA or materialized intermediate arrays.
 
-For 100 million independent FP32 option prices, the fused MatX expression is **5.62× faster than the equivalent eager CuPy expression** and **184.5× faster than NumPy/SciPy** on the same system.[^black-scholes-platform]
+For 100 million independent FP32 option prices on the same NVIDIA DGX Spark, the fused MatX expression is **5.62× faster than the equivalent eager CuPy expression** and **184.5× faster than NumPy/SciPy**.[^black-scholes-platform]
 
 | Implementation | Median time | Throughput | vs. NumPy |
 |---|---:|---:|---:|
@@ -225,7 +225,7 @@ python examples/black_scholes_benchmark.py \
 
 </details>
 
-[^black-scholes-platform]: Measured on an NVIDIA GB10 with CUDA 13.0 and driver 580.159.03, paired with a 20-core Arm CPU (10 Cortex-X925 + 10 Cortex-A725 cores).
+[^black-scholes-platform]: Measured on an NVIDIA DGX Spark (GB10) with CUDA 13.0 and driver 580.159.03, including its 20-core Arm CPU (10 Cortex-X925 + 10 Cortex-A725 cores).
 
 ## Get running
 
