@@ -31,10 +31,8 @@ auto weights = matx::make_tensor<float>({inputs, outputs});
 auto bias = matx::make_tensor<float>({outputs});
 auto activations = matx::make_tensor<float>({batch, outputs});
 
-// A lightweight view broadcasts bias across the batch; no copy is made.
-auto bias_rows = matx::clone<2>(
-  bias, {batch, matx::matxKeepDim});
-auto layer = matx::tanh(matx::matmul(x, weights) + bias_rows);
+// bias broadcasts naturally across the batch dimension.
+auto layer = matx::tanh(matx::matmul(x, weights) + bias);
 
 (activations = layer).run(matx::cudaExecutor{});
 ```
@@ -45,7 +43,7 @@ This is ordinary numerical array code: a batched matrix product, broadcasting, a
 |---|---|
 | `ndarray` and views | Arbitrary-rank tensors, non-owning views, slicing, reshaping, and permutation |
 | Array creation | `zeros`, `ones`, `eye`, `linspace`, random generators, and custom generators |
-| Vectorized expressions | Lazy elementwise operators, explicit broadcast views, and batched transforms |
+| Vectorized expressions | Lazy elementwise operators, automatic broadcasting, and batched transforms |
 | Reductions and numerical routines | Reductions, BLAS, sparse operations, FFTs, decompositions, and solvers |
 | CPU/GPU selection | Run the same expression with a CUDA, JIT, or host executor |
 
