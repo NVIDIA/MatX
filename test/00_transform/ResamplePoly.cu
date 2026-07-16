@@ -36,6 +36,7 @@
 #include "utilities.h"
 #include "gtest/gtest.h"
 
+#include <algorithm>
 #include <cmath>
 #include <numeric>
 #include <vector>
@@ -801,4 +802,102 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Operators)
   }
 
   MATX_EXIT_HANDLER();
+}
+
+
+// ===========================================================================
+// Output window (out_offset): computing outputs [offset, offset+count) of the
+// full resample grid via matxResamplePoly1DInternal must match the
+// corresponding slice of a full one-shot resample_poly. This windowed path
+// underpins the streaming resampler (StreamingResample.cu). The internal takes
+// gcd-reduced factors, matching resample_poly_impl's internal reduction; the
+// comparison uses a tolerance because the window and the full run may select
+// different kernels (ElemBlock vs WarpCentric summation order).
+// ===========================================================================
+
+namespace rpoly_window_test {
+
+template <typename Exec>
+bool run_case(Exec &exec, index_t N, index_t up, index_t down, index_t L,
+              index_t offset, index_t count)
+{
+  using T = float;
+  const index_t M = (N * up + down - 1) / down; // full output count
+  if (offset < 0 || count <= 0 || offset + count > M) {
+    return true; // skip degenerate windows
+  }
+
+  auto h = make_tensor<T>({L});
+  for (index_t k = 0; k < L; ++k) {
+    h(k) = std::cos(0.12f * static_cast<float>(k)) *
+           std::exp(-0.02f * static_cast<float>(k)) / static_cast<float>(L);
+  }
+  auto sig = make_tensor<T>({N});
+  for (index_t i = 0; i < N; ++i) {
+    const float t = static_cast<float>(i);
+    sig(i) = std::sin(0.05f * t) + 0.4f * std::sin(0.2f * t) + 1e-4f * t;
+  }
+
+  // Full one-shot reference (public API, raw factors).
+  auto y_full = make_tensor<T>({M});
+  (y_full = resample_poly(sig, h, up, down)).run(exec);
+
+  // Windowed compute of outputs [offset, offset+count) via the internal, which
+  // takes gcd-reduced factors. (up == down after reduction is the identity
+  // special case handled above the internal, so such configs are not used here.)
+  const index_t g = std::gcd(up, down);
+  const index_t ur = up / g;
+  const index_t dr = down / g;
+  auto y_win = make_tensor<T>({count});
+  if constexpr (is_cuda_executor_v<Exec>) {
+    detail::matxResamplePoly1DInternal(y_win, sig, h, ur, dr, exec.getStream(),
+                                       offset);
+  } else {
+    detail::matxResamplePoly1DInternal(y_win, sig, h, ur, dr, exec, offset);
+  }
+  exec.sync();
+
+  float max_abs = 0.0f, max_err = 0.0f;
+  for (index_t i = 0; i < count; ++i) {
+    max_abs = std::max(max_abs, std::fabs(y_full(offset + i)));
+    max_err = std::max(max_err, std::fabs(y_win(i) - y_full(offset + i)));
+  }
+  const bool ok = max_err < 1e-4f * (1.0f + max_abs);
+  EXPECT_TRUE(ok) << "up=" << up << " down=" << down << " L=" << L
+                  << " offset=" << offset << " count=" << count
+                  << " max_err=" << max_err << " max_abs=" << max_abs;
+  return ok;
+}
+
+template <typename Exec>
+void sweep(Exec &exec, index_t N)
+{
+  struct Cfg { index_t up, down, L; };
+  for (Cfg c : {Cfg{3, 2, 61}, Cfg{2, 3, 61}, Cfg{5, 3, 101}, // coprime
+                Cfg{4, 2, 81}, Cfg{2, 4, 81},                 // non-coprime
+                Cfg{3, 2, 62}, Cfg{2, 3, 60},                 // even L
+                Cfg{1, 2, 2001}}) { // long filter: WarpCentric on every path
+    const index_t M = (N * c.up + c.down - 1) / c.down;
+    for (index_t offset : {index_t(1), index_t(7), M / 3, M - 5}) {
+      // Tail window (everything from offset), a small window (may select a
+      // different kernel than the full run), and a single output.
+      run_case(exec, N, c.up, c.down, c.L, offset, M - offset);
+      run_case(exec, N, c.up, c.down, c.L, offset, std::min(index_t(19), M - offset));
+      run_case(exec, N, c.up, c.down, c.L, offset, 1);
+    }
+  }
+}
+
+} // namespace rpoly_window_test
+
+TEST(ResamplePoly, OutputWindowMatchesFullSlice)
+{
+  cudaExecutor exec{};
+  rpoly_window_test::sweep(exec, 4096);
+}
+
+TEST(ResamplePoly, OutputWindowMatchesFullSliceHost)
+{
+  SingleThreadedHostExecutor exec{};
+  rpoly_window_test::sweep(exec, 512);
 }

@@ -20,7 +20,8 @@ set(examples
     svd_power
     qr
     black_scholes
-    print_styles)
+    print_styles
+    streaming)
 
 
 

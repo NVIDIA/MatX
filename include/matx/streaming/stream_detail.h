@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // BSD 3-Clause License
 //
-// Copyright (c) 2021, NVIDIA Corporation
+// Copyright (c) 2026, NVIDIA Corporation
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -30,41 +30,55 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
+// Shared internal helpers for the streaming polyphase objects.
+
 #pragma once
-#ifdef __CUDACC__
-#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ < 600
-#error "MatX requires CUDA compute capability 6.0 or newer."
-#endif
-#include <cuda_runtime_api.h>
-#endif
 
-// defines.h should always be included first. Its definitions may impact
-// the behavior of other headers.
-#include "matx/core/defines.h"
-#include "matx/core/error.h"
-#include "matx/core/log.h"
-#include "matx/file_io/file_io.h"
-#include "matx/core/half_complex.h"
-#include "matx/core/half.h"
-#include "matx/core/nvtx.h"
-#include "matx/core/print.h"
-#include "matx/core/pybind.h"
-#include "matx/core/tensor.h"
-#include "matx/core/dynamic_tensor.h"
-#include "matx/core/sparse_tensor.h"  // sparse support is experimental
-#include "matx/core/make_sparse_tensor.h"
-#include "matx/core/tie.h"
-#include "matx/core/utils.h"
-#include "matx/core/viz.h"
+#include "matx/core/operator_options.h"
+#include "matx/core/type_utils.h"
 
-#include "matx/executors/executors.h"
-#include "matx/generators/generators.h"
-#include "matx/operators/operators.h"
-#include "matx/transforms/transforms.h"
-#include "matx/streaming/streaming.h"
-
-#include <cuda/std/complex>
 namespace matx {
-  using fcomplex = cuda::std::complex<float>;
-  using dcomplex = cuda::std::complex<double>;
-}
+namespace detail {
+
+// Output plan for one streaming feed()/flush() call: the number of outputs this
+// call owns and the start index of that window in the local output grid.
+// Computed from sizes alone (no segment data), so a feed() can validate the
+// output buffer BEFORE running the segment operator's lifecycle.
+struct StreamSlicePlan {
+  index_t lo;
+  index_t cnt;
+};
+
+// RAII balance for an explicitly-run operator lifecycle. Construction runs the
+// operand's PreRun (materializing any operator that stages into a temporary)
+// and destruction runs the matching PostRun on every exit path, including
+// exceptions. A throw between the two (e.g. from exec.Exec, or a size check)
+// therefore neither leaks the temporary nor leaves a half-run lifecycle. Both
+// calls are guarded by is_matx_op, so a non-MatX operand is a no-op.
+template <typename Op, typename ExecT>
+class SegmentLifecycleGuard {
+public:
+  SegmentLifecycleGuard(const Op &op, ExecT &exec) : op_(op), exec_(exec)
+  {
+    if constexpr (is_matx_op<Op>()) {
+      op_.PreRun(NoShape{}, exec_);
+    }
+  }
+
+  ~SegmentLifecycleGuard()
+  {
+    if constexpr (is_matx_op<Op>()) {
+      op_.PostRun(NoShape{}, exec_);
+    }
+  }
+
+  SegmentLifecycleGuard(const SegmentLifecycleGuard &) = delete;
+  SegmentLifecycleGuard &operator=(const SegmentLifecycleGuard &) = delete;
+
+private:
+  const Op &op_;
+  ExecT &exec_;
+};
+
+}  // namespace detail
+}  // namespace matx

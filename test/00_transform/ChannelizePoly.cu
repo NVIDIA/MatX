@@ -36,6 +36,9 @@
 #include "utilities.h"
 #include "gtest/gtest.h"
 #include <cuda/std/complex>
+#include <algorithm>
+#include <cmath>
+#include <numeric>
 
 using namespace matx;
 
@@ -1685,4 +1688,134 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, GenericOversampledFallback)
   }
 
   MATX_EXIT_HANDLER();
+}
+
+
+// ===========================================================================
+// Output-element window (out_elem_offset): computing rows
+// [offset, offset+count) of the per-channel output-element (time) dimension
+// must match the corresponding rows of a full one-shot channelize_poly. This
+// windowed path underpins the streaming channelizer (StreamingChannelize.cu).
+// ===========================================================================
+
+namespace cpoly_window_test {
+
+// Run one windowed-vs-full comparison. InT is the input sample type (real ->
+// R2C path, complex -> C2C path); the filter is real.
+template <typename InT>
+bool run_case(cudaExecutor &exec, index_t N, index_t M, index_t D, index_t L,
+              index_t offset, index_t count)
+{
+  using OutT = cuda::std::complex<float>;
+  using FiltT = float;
+
+  const index_t T = (N + D - 1) / D; // full number of output elements per channel
+  if (offset < 0 || count <= 0 || offset + count > T) {
+    return true; // skip degenerate windows
+  }
+
+  auto h = make_tensor<FiltT>({L});
+  for (index_t k = 0; k < L; ++k) {
+    h(k) = std::cos(0.11f * static_cast<float>(k)) *
+           std::exp(-0.004f * static_cast<float>(k));
+  }
+
+  auto in = make_tensor<InT>({N});
+  for (index_t n = 0; n < N; ++n) {
+    const float t = static_cast<float>(n);
+    if constexpr (is_complex_v<InT>) {
+      in(n) = InT{std::sin(0.05f * t) + 0.3f * std::sin(0.17f * t),
+                  std::cos(0.03f * t) - 0.2f * std::sin(0.23f * t)};
+    } else {
+      in(n) = std::sin(0.05f * t) + 0.3f * std::sin(0.17f * t) + 1e-4f * t;
+    }
+  }
+
+  // Full one-shot reference (uses whichever kernel the heuristics pick).
+  auto out_full = make_tensor<OutT>({T, M});
+  (out_full = channelize_poly(in, h, M, D)).run(exec);
+
+  // Windowed compute of only rows [offset, offset+count) via normal dispatch.
+  auto out_win = make_tensor<OutT>({count, M});
+  channelize_poly_impl<decltype(out_win), decltype(in), decltype(h), float>(
+      out_win, in, h, M, D, exec.getStream(), offset);
+  exec.sync();
+
+  float max_abs = 0.0f, max_err = 0.0f;
+  for (index_t t = 0; t < count; ++t) {
+    for (index_t c = 0; c < M; ++c) {
+      const OutT ref = out_full(offset + t, c);
+      const OutT got = out_win(t, c);
+      max_abs = std::max(max_abs, cuda::std::abs(ref));
+      max_err = std::max(max_err, cuda::std::abs(got - ref));
+    }
+  }
+  const bool ok = max_err < 1e-3f * (1.0f + max_abs);
+  EXPECT_TRUE(ok) << "M=" << M << " D=" << D << " L=" << L << " offset=" << offset
+                  << " count=" << count << " max_err=" << max_err
+                  << " max_abs=" << max_abs;
+  return ok;
+}
+
+template <typename InT>
+void sweep(cudaExecutor &exec)
+{
+  struct Cfg { index_t M, D; };
+  const index_t N = 4096;
+  for (Cfg c : {Cfg{4, 4}, Cfg{8, 8},           // maximally decimated
+                Cfg{8, 4}, Cfg{8, 2},           // integer oversampled
+                Cfg{6, 4}, Cfg{8, 6}, Cfg{9, 6}}) { // rational oversampled
+    const index_t L = 4 * c.M;                  // P = 4 taps/branch
+    const index_t T = (N + c.D - 1) / c.D;
+    // Windows: interior starts, an lcm-aligned start, a middle window, and the
+    // trailing edge (last element, which includes the N%D right-edge padding).
+    const index_t g = std::gcd(c.M, c.D);
+    const index_t lcm = c.M / g * c.D;
+    for (index_t offset : {index_t(1), index_t(7), c.D, c.M, lcm, T / 3, T / 2, T - 1}) {
+      const index_t count = T - offset;         // emit everything from offset on
+      run_case<InT>(exec, N, c.M, c.D, L, offset, count);
+    }
+    // A bounded middle window as well.
+    run_case<InT>(exec, N, c.M, c.D, L, T / 3, T / 4);
+  }
+}
+
+// Target the non-fused CUDA paths with out_elem_offset > 0. P is the number
+// of prototype-filter taps per channel. These sizes are chosen from the
+// dispatcher thresholds in transforms/channelize_poly.h:
+//   M=16,  D=16,  P=8:   Smem
+//   M=64,  D=32,  P=8:   SmemTiled, Full filter layout
+//   M=256, D=128, P=8:   SmemTiled, Rotated filter layout
+//   M=64,  D=32,  P=20:  SmemTiled, Global filter layout
+//   M=64,  D=64/48, P=192: Generic (input tile exceeds 48 KiB)
+template <typename InT>
+void large_dispatch_sweep(cudaExecutor &exec)
+{
+  struct Cfg { index_t M, D, P; };
+  const index_t N = 2051; // partial trailing block for every D below
+  for (Cfg c : {Cfg{16, 16, 8}, Cfg{64, 32, 8}, Cfg{256, 128, 8},
+                Cfg{64, 32, 20}, Cfg{64, 64, 192}, Cfg{64, 48, 192}}) {
+    const index_t L = c.P * c.M - 1; // partial final polyphase row
+    const index_t T = (N + c.D - 1) / c.D;
+    const index_t offset = 3;
+    run_case<InT>(exec, N, c.M, c.D, L, offset,
+                  std::min(index_t(19), T - offset));
+    run_case<InT>(exec, N, c.M, c.D, L, T - 1, 1);
+  }
+}
+
+} // namespace cpoly_window_test
+
+TEST(ChannelizePoly, OutputElemWindowRealInput)
+{
+  cudaExecutor exec{};
+  cpoly_window_test::sweep<float>(exec);
+  cpoly_window_test::large_dispatch_sweep<float>(exec);
+}
+
+TEST(ChannelizePoly, OutputElemWindowComplexInput)
+{
+  cudaExecutor exec{};
+  cpoly_window_test::sweep<cuda::std::complex<float>>(exec);
+  cpoly_window_test::large_dispatch_sweep<cuda::std::complex<float>>(exec);
 }

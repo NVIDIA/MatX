@@ -61,12 +61,17 @@ __MATX_INLINE__ decltype(auto) ApplyOpWithIdx(Op &&op,
     }, idx);
 }
 
+// out_offset selects a window of the full resample grid: the output tensor `o`
+// is sized to the window length and receives the outputs whose *global* indices
+// are [out_offset, out_offset + o.Size(Rank-1)). out_offset == 0 (the default)
+// reproduces the full-grid behavior exactly. The streaming resampler object uses
+// this to compute only the outputs it owns instead of the whole grid + slice.
 template <typename OutType, typename InType, typename FilterType>
 inline void matxResamplePoly1DInternal(OutType &o, const InType &i,
                                      const FilterType &filter, index_t up, index_t down,
-                                     cudaStream_t stream)
+                                     cudaStream_t stream, index_t out_offset = 0)
 {
-#ifdef __CUDACC__  
+#ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
   
   using filter_t = typename FilterType::value_type;
@@ -93,10 +98,15 @@ inline void matxResamplePoly1DInternal(OutType &o, const InType &i,
   };
 
   const index_t output_len = o.Size(OutType::Rank()-1);
+  // The output is a window [out_offset, out_offset + output_len) of the full
+  // resample grid (the full grid when out_offset == 0 and the output is
+  // full-length); require only that the window fits within the grid.
+  MATX_ASSERT_STR(output_len + out_offset <=
+      (i.Size(i.Rank() - 1) * up + down - 1) / down, matxInvalidDim,
+      "resample_poly: output window exceeds the full output size");
 
   // We default to the ElemBlock kernel as it tends to work well for general problems.
   enum class ResampleKernel {
-    PhaseBlock,
     ElemBlock,
     WarpCentric,
   } kernel = ResampleKernel::ElemBlock;
@@ -114,9 +124,9 @@ inline void matxResamplePoly1DInternal(OutType &o, const InType &i,
     }
   }
 
-  // Currently, we select only ElemBlock or WarpCentric to keep things simpler. However, there are some
-  // cases where PhaseBlock is the fastest kernel. If there are specific parameter sets of interest, then
-  // we can benchmark the PhaseBlock method and, if it proves fastest, use that method in those cases.
+  // We select only ElemBlock or WarpCentric. The former is fastest for the
+  // general many-output case; the latter wins when there are few output points
+  // (occupancy) or many taps per output (coalesced reads + warp reduction).
 
   // Desired number of blocks to reach high occupancy
   constexpr index_t DESIRED_MIN_GRID_SIZE = 8192;
@@ -155,31 +165,17 @@ inline void matxResamplePoly1DInternal(OutType &o, const InType &i,
   constexpr int THREADS = MATX_RESAMPLE_POLY_MAX_NUM_THREADS;
   auto dispatch_kernel = [&](auto is_unit_c) {
     constexpr bool IsUnitStride = decltype(is_unit_c)::value;
-    if (kernel == ResampleKernel::PhaseBlock) {
-      const size_t smemBytes = (sizeof(filter_t) * max_phase_len <= MATX_RESAMPLE_POLY_MAX_SMEM_BYTES) ?
-        sizeof(filter_t) * max_phase_len : 0;
-      const index_t max_output_len_per_phase = (output_len + up - 1) / up;
-      grid.y = static_cast<int>(up);
-      const index_t elems_per_thread = compute_elems_per_comp_unit(max_output_len_per_phase, THREADS);
-      if (downcast_to_32b_index()) {
-        ResamplePoly1D_PhaseBlock<THREADS, IsUnitStride, OutType, InType, FilterType, int32_t><<<grid, THREADS, smemBytes, stream>>>(
-          o, i, filter, static_cast<int32_t>(up), static_cast<int32_t>(down),
-          static_cast<int32_t>(elems_per_thread));
-      } else {
-        ResamplePoly1D_PhaseBlock<THREADS, IsUnitStride, OutType, InType, FilterType, index_t><<<grid, THREADS, smemBytes, stream>>>(
-          o, i, filter, up, down, elems_per_thread);
-      }
-    } else if (kernel == ResampleKernel::ElemBlock) {
+    if (kernel == ResampleKernel::ElemBlock) {
       const size_t filter_sz_bytes = (filter_len % 2 == 0) ? sizeof(filter_t)*(filter_len+1) : sizeof(filter_t)*filter_len;
       const size_t smemBytes = (filter_sz_bytes <= MATX_RESAMPLE_POLY_MAX_SMEM_BYTES) ? filter_sz_bytes : 0;
       const index_t elems_per_thread = compute_elems_per_comp_unit(output_len, THREADS);
       if (downcast_to_32b_index()) {
         ResamplePoly1D_ElemBlock<THREADS, IsUnitStride, OutType, InType, FilterType, int32_t><<<grid, THREADS, smemBytes, stream>>>(
           o, i, filter, static_cast<int32_t>(up), static_cast<int32_t>(down),
-          static_cast<int32_t>(elems_per_thread));
+          static_cast<int32_t>(elems_per_thread), static_cast<int32_t>(out_offset));
       } else {
         ResamplePoly1D_ElemBlock<THREADS, IsUnitStride, OutType, InType, FilterType, index_t><<<grid, THREADS, smemBytes, stream>>>(
-          o, i, filter, up, down, elems_per_thread);
+          o, i, filter, up, down, elems_per_thread, out_offset);
       }
     } else {
       // We only select the WarpCentric kernel for trivially copyable types, but we need this
@@ -192,10 +188,10 @@ inline void matxResamplePoly1DInternal(OutType &o, const InType &i,
         if (downcast_to_32b_index()) {
           ResamplePoly1D_WarpCentric<THREADS, IsUnitStride, OutType, InType, FilterType, int32_t><<<grid, THREADS, smemBytes, stream>>>(
             o, i, filter, static_cast<int32_t>(up), static_cast<int32_t>(down),
-            static_cast<int32_t>(elems_per_warp));
+            static_cast<int32_t>(elems_per_warp), static_cast<int32_t>(out_offset));
         } else {
           ResamplePoly1D_WarpCentric<THREADS, IsUnitStride, OutType, InType, FilterType, index_t><<<grid, THREADS, smemBytes, stream>>>(
-            o, i, filter, up, down, elems_per_warp);
+            o, i, filter, up, down, elems_per_warp, out_offset);
         }
       }
     }
@@ -209,10 +205,12 @@ inline void matxResamplePoly1DInternal(OutType &o, const InType &i,
 #endif
 }
 
+// See the CUDA overload for out_offset window semantics.
 template <typename OutType, typename InType, typename FilterType, ThreadsMode MODE>
 inline void matxResamplePoly1DInternal(OutType &o, const InType &i,
                                      const FilterType &filter, index_t up, index_t down,
-                                     [[maybe_unused]] const HostExecutor<MODE> &exec)
+                                     [[maybe_unused]] const HostExecutor<MODE> &exec,
+                                     index_t out_offset = 0)
 {
   using filter_t = typename FilterType::value_type;
   using filter_inner_t = typename inner_op_type_t<filter_t>::type;
@@ -221,6 +219,9 @@ inline void matxResamplePoly1DInternal(OutType &o, const InType &i,
   constexpr int RANK = InType::Rank();
   const index_t output_len = o.Size(RANK - 1);
   const index_t input_len = i.Size(RANK - 1);
+  // Same window-fits-grid requirement as the CUDA overload.
+  MATX_ASSERT_STR(output_len + out_offset <= (input_len * up + down - 1) / down,
+      matxInvalidDim, "resample_poly: output window exceeds the full output size");
   index_t filter_len = filter.Size(FilterType::Rank() - 1);
   const bool is_even_filter = (filter_len % 2) == 0;
 
@@ -239,7 +240,7 @@ inline void matxResamplePoly1DInternal(OutType &o, const InType &i,
     auto output_idx = input_idx;
 
     for (index_t out_ind = 0; out_ind < output_len; out_ind++) {
-      const index_t up_ind = out_ind * down;
+      const index_t up_ind = (out_ind + out_offset) * down;
       const index_t up_start = (up_ind > filter_len_half) ?
         up_ind - filter_len_half : 0;
       const index_t up_end = cuda::std::min(max_input_ind * up,
