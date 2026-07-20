@@ -11,9 +11,6 @@
       <stop offset=".5" stop-color="#568c12"/>
       <stop offset="1" stop-color="#294b0c"/>
     </linearGradient>
-    <marker id="arrowGray" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto">
-      <path d="M0 0 8 4 0 8z" fill="#82929d"/>
-    </marker>
     <marker id="arrowGreen" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto">
       <path d="M0 0 8 4 0 8z" fill="#a6ff4d"/>
     </marker>
@@ -30,15 +27,15 @@
       <text x="125" y="39" text-anchor="middle" fill="#f1f5f7" font-size="23" font-weight="750">Normalize</text>
       <text x="125" y="65" text-anchor="middle" fill="#93a1aa" font-size="15">CUDA kernel</text>
 
-      <path d="M270 43h65" stroke="#82929d" stroke-width="3" marker-end="url(#arrowGray)"/>
-      <text x="302" y="76" text-anchor="middle" fill="#c28d99" font-size="14" font-weight="700">TEMP</text>
+      <path d="M270 38h48v-9l22 14-22 14v-9h-48z" fill="#82929d"/>
+      <text x="305" y="76" text-anchor="middle" fill="#c28d99" font-size="14" font-weight="700">TEMP</text>
 
       <rect x="360" width="250" height="86" rx="14" fill="#1b2630" stroke="#53626d" stroke-width="2"/>
       <text x="485" y="39" text-anchor="middle" fill="#f1f5f7" font-size="23" font-weight="750">FFT</text>
       <text x="485" y="65" text-anchor="middle" fill="#93a1aa" font-size="15">cuFFT</text>
 
-      <path d="M630 43h65" stroke="#82929d" stroke-width="3" marker-end="url(#arrowGray)"/>
-      <text x="662" y="76" text-anchor="middle" fill="#c28d99" font-size="14" font-weight="700">TEMP</text>
+      <path d="M630 38h48v-9l22 14-22 14v-9h-48z" fill="#82929d"/>
+      <text x="665" y="76" text-anchor="middle" fill="#c28d99" font-size="14" font-weight="700">TEMP</text>
 
       <rect x="720" width="370" height="86" rx="14" fill="#1b2630" stroke="#53626d" stroke-width="2"/>
       <text x="905" y="39" text-anchor="middle" fill="#f1f5f7" font-size="23" font-weight="750">Calibrate + magnitude + dB</text>
