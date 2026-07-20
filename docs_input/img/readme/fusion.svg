@@ -11,9 +11,6 @@
       <stop offset=".5" stop-color="#568c12"/>
       <stop offset="1" stop-color="#294b0c"/>
     </linearGradient>
-    <marker id="arrowGreen" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto">
-      <path d="M0 0 8 4 0 8z" fill="#a6ff4d"/>
-    </marker>
   </defs>
 
   <rect width="1200" height="500" rx="22" fill="url(#bg)"/>
@@ -23,23 +20,31 @@
     <text x="1145" y="55" text-anchor="end" fill="#aab5bc" font-size="20" font-weight="700">3 launches  ·  2 temporaries  ·  extra memory traffic</text>
 
     <g transform="translate(55 82)">
-      <rect width="250" height="86" rx="14" fill="#1b2630" stroke="#53626d" stroke-width="2"/>
-      <text x="125" y="39" text-anchor="middle" fill="#f1f5f7" font-size="23" font-weight="750">Normalize</text>
-      <text x="125" y="65" text-anchor="middle" fill="#93a1aa" font-size="15">CUDA kernel</text>
+      <rect width="220" height="86" rx="14" fill="#1b2630" stroke="#53626d" stroke-width="2"/>
+      <text x="110" y="39" text-anchor="middle" fill="#f1f5f7" font-size="22" font-weight="750">Normalize</text>
+      <text x="110" y="65" text-anchor="middle" fill="#93a1aa" font-size="15">CUDA kernel</text>
 
-      <path d="M270 38h48v-9l22 14-22 14v-9h-48z" fill="#82929d"/>
-      <text x="305" y="76" text-anchor="middle" fill="#c28d99" font-size="14" font-weight="700">TEMP</text>
+      <path d="M230 39h24v-8l16 12-16 12v-8h-24z" fill="#82929d"/>
 
-      <rect x="360" width="250" height="86" rx="14" fill="#1b2630" stroke="#53626d" stroke-width="2"/>
-      <text x="485" y="39" text-anchor="middle" fill="#f1f5f7" font-size="23" font-weight="750">FFT</text>
-      <text x="485" y="65" text-anchor="middle" fill="#93a1aa" font-size="15">cuFFT</text>
+      <rect x="280" y="17" width="100" height="52" rx="12" fill="#2a2028" stroke="#8f6572" stroke-width="2"/>
+      <text x="330" y="49" text-anchor="middle" fill="#f0b0c0" font-size="16" font-weight="750">TEMP</text>
 
-      <path d="M630 38h48v-9l22 14-22 14v-9h-48z" fill="#82929d"/>
-      <text x="665" y="76" text-anchor="middle" fill="#c28d99" font-size="14" font-weight="700">TEMP</text>
+      <path d="M390 39h24v-8l16 12-16 12v-8h-24z" fill="#82929d"/>
 
-      <rect x="720" width="370" height="86" rx="14" fill="#1b2630" stroke="#53626d" stroke-width="2"/>
-      <text x="905" y="39" text-anchor="middle" fill="#f1f5f7" font-size="23" font-weight="750">Calibrate + magnitude + dB</text>
-      <text x="905" y="65" text-anchor="middle" fill="#93a1aa" font-size="15">CUDA kernel</text>
+      <rect x="440" width="180" height="86" rx="14" fill="#1b2630" stroke="#53626d" stroke-width="2"/>
+      <text x="530" y="39" text-anchor="middle" fill="#f1f5f7" font-size="22" font-weight="750">FFT</text>
+      <text x="530" y="65" text-anchor="middle" fill="#93a1aa" font-size="15">cuFFT</text>
+
+      <path d="M630 39h24v-8l16 12-16 12v-8h-24z" fill="#82929d"/>
+
+      <rect x="680" y="17" width="100" height="52" rx="12" fill="#2a2028" stroke="#8f6572" stroke-width="2"/>
+      <text x="730" y="49" text-anchor="middle" fill="#f0b0c0" font-size="16" font-weight="750">TEMP</text>
+
+      <path d="M790 39h24v-8l16 12-16 12v-8h-24z" fill="#82929d"/>
+
+      <rect x="840" width="250" height="86" rx="14" fill="#1b2630" stroke="#53626d" stroke-width="2"/>
+      <text x="965" y="39" text-anchor="middle" fill="#f1f5f7" font-size="22" font-weight="750">Post-process</text>
+      <text x="965" y="65" text-anchor="middle" fill="#93a1aa" font-size="15">CUDA kernel</text>
     </g>
 
     <path d="M55 211h1090" stroke="#33414b" stroke-width="2"/>
@@ -50,10 +55,11 @@
     <g transform="translate(55 294)">
       <rect width="1090" height="118" rx="16" fill="url(#fused)" stroke="#8bd12b" stroke-width="2"/>
       <circle cx="48" cy="59" r="10" fill="#b7ff66"/>
-      <text x="82" y="50" fill="#f8fff4" font-size="25" font-weight="750">Normalize  +  FFT  +  calibrate  +  magnitude  +  dB</text>
+      <text x="82" y="50" fill="#f8fff4" font-size="25" font-weight="750">Normalize  +  FFT  +  post-process</text>
       <text x="82" y="80" fill="#d9f4c4" font-size="16" font-weight="750" letter-spacing="1.5">ONE GENERATED KERNEL</text>
-      <path d="M900 59h95" stroke="#a6ff4d" stroke-width="4" marker-end="url(#arrowGreen)"/>
-      <text x="1035" y="68" text-anchor="middle" fill="#f8fff4" font-size="27" font-weight="800">output</text>
+      <path d="M850 55h30v-10l20 14-20 14v-10h-30z" fill="#a6ff4d"/>
+      <rect x="920" y="25" width="140" height="68" rx="13" fill="#17300e" stroke="#a6ff4d" stroke-width="2"/>
+      <text x="990" y="67" text-anchor="middle" fill="#f8fff4" font-size="21" font-weight="800">OUTPUT</text>
     </g>
 
     <text x="600" y="463" text-anchor="middle" fill="#e8eef2" font-size="25" font-weight="750">Same expression. Less work. More speed.</text>
