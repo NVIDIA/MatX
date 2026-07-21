@@ -76,7 +76,7 @@ The syntax reads like the algorithm: normalize every complex input sample, trans
 
 For memory-bound workloads, eliminating launches and intermediate reads and writes lets a simple expression reach **speed-of-light performance** without hand-writing CUDA kernel plumbing.
 
-**Measured on an NVIDIA DGX Spark below: the short MatX CUDA expression stays within about 3% of handwritten CUDA + cuFFT, while the identical expression with JIT fusion runs 1.61× faster.**
+**Measured on an NVIDIA DGX Spark: 5 lines of MatX replace 59 lines of CUDA + cuFFT, stay within about 3% of its performance, and run 1.61× faster when the identical expression is JIT-fused.**
 
 > Actual performance depends on the operation, shape, data type, and target GPU.
 
@@ -100,6 +100,8 @@ The reproducible [FFT benchmark example](examples/fft_benchmark.cu) compares han
 1. Handwritten CUDA normalization and post-processing kernels around a batched cuFFT plan.
 2. One MatX expression with `cudaExecutor`, which uses cuFFT plus generated normalization and post-processing kernels.
 3. **The exact same MatX expression** with `CUDAJITExecutor`, which fuses both sides of the FFT through cuFFTDx.
+
+The complete MatX path takes **5 implementation lines versus 59 for CUDA + cuFFT—about 92% less code**.[^fft-loc] The JIT version uses the same five lines; only the executor changes.
 
 **MatX's concise CUDA path lands within about 3% of the handwritten implementation. Changing only the executor then makes that same expression 1.61× faster.**[^fft-platform]
 
@@ -171,6 +173,7 @@ cmake --build build --target fft_benchmark -j
 Performance depends on GPU, clocks, shape, and software versions; use the benchmark rather than assuming this ratio for every workload.
 
 [^fft-platform]: Measured with 256 batched 4096-point complex FP32 FFTs on an NVIDIA DGX Spark (GB10) using CUDA 13.0 and MathDx 26.03.
+[^fft-loc]: Counted from [the benchmark source](examples/fft_benchmark.cu), excluding comments, blank lines, shared tensor/input setup, timing, and validation. The CUDA + cuFFT count includes both custom kernels, temporary allocation and cleanup, FFT planning, launch geometry, and launches; the MatX count includes the expression, executor, and execution.
 
 ## GPU acceleration and optimized host execution
 
