@@ -15,7 +15,7 @@
 
 </div>
 
-MatX is a C++20 library for general numerical computing on NVIDIA GPUs and CPUs. Think **NumPy-style array programming with native C++ control**: create arbitrary-rank tensors, compose lazy expressions, and choose an optimized GPU or multithreaded CPU executor when the work runs.
+MatX is a C++20 library for general numerical computing on NVIDIA GPUs and CPUs. Think **NumPy-style array programming with native C++ control and speed**: create arbitrary-rank tensors, compose lazy expressions, and choose an optimized GPU or multithreaded CPU executor when the work runs.
 
 ## NumPy-like arrays. Native C++ execution.
 
@@ -49,7 +49,7 @@ This is ordinary numerical array code: a batched matrix product, broadcasting, a
 
 ## Kernel fusion across a complete numerical pipeline
 
-FFT processing is one useful fusion example because it crosses an optimized-library boundary and makes the cost of intermediate tensors easy to measure. It is one workload among the broader numerical operations above.
+FFT processing is a useful fusion example because it crosses an optimized-library boundary and makes the cost of intermediate tensors easy to measure:
 
 ```cpp
 #include <matx.h>
@@ -68,7 +68,7 @@ auto pipeline = 20.0f * matx::log10(
 (spectrum_db = pipeline).run(matx::CUDAJITExecutor{});
 ```
 
-This reads like the algorithm: normalize every complex input sample, transform every batch, apply frequency-domain calibration, compute magnitude, and convert the result to decibels. With `-DMATX_EN_MATHDX=ON` and a supported FFT shape, MatX lowers the compatible pipeline into **one generated kernel**—no normalized-input or FFT temporary, and no separate pre- or post-processing launch. The same fusion model also extends to supported matrix multiplication, solver, and random-number expressions.
+The syntax reads like the algorithm: normalize every complex input sample, transform every batch, apply frequency-domain calibration, compute magnitude, and convert the result to decibels. With `-DMATX_EN_MATHDX=ON` and a supported FFT shape, MatX lowers the compatible pipeline into **one generated kernel**—no normalized-input or FFT temporary, and no separate pre- or post-processing launch. The same fusion model also extends to supported matrix multiplication, solver, and random-number expressions.
 
 <div align="center">
   <img src="docs_input/img/readme/fusion.svg" alt="Unfused signal processing uses separate normalization, FFT, and calibrated magnitude stages; MatX fuses the compatible pipeline into one kernel" width="100%">
@@ -78,7 +78,7 @@ For memory-bound workloads, eliminating launches and intermediate reads and writ
 
 **Measured on an NVIDIA DGX Spark below: the short MatX CUDA expression stays within about 3% of handwritten CUDA + cuFFT, while the identical expression with JIT fusion runs 1.61× faster.**
 
-> Actual performance depends on the operation, shape, data type, and target GPU. Profile on your hardware; MatX makes the fast path concise, not mysterious.
+> Actual performance depends on the operation, shape, data type, and target GPU.
 
 ## JIT fusion crosses library boundaries
 
@@ -93,9 +93,9 @@ For memory-bound workloads, eliminating launches and intermediate reads and writ
 
 JIT kernel fusion is experimental and intentionally rejects unsupported combinations rather than silently changing the execution model. See the [fusion guide](https://nvidia.github.io/MatX/basics/fusion.html) for the current support matrix, constraints, and compile-cache behavior.
 
-## Near handwritten CUDA. Then fuse it to go faster.
+## Near handwritten CUDA speed. Then JIT-compile to go faster.
 
-The reproducible, commented [FFT benchmark example](examples/fft_benchmark.cu) always compares handwritten CUDA + cuFFT with MatX `cudaExecutor`. Enable MathDx to add the JIT case:
+The reproducible [FFT benchmark example](examples/fft_benchmark.cu) compares handwritten CUDA + cuFFT with MatX `cudaExecutor`. Enable MathDx to add the JIT case:
 
 1. Handwritten CUDA normalization and post-processing kernels around a batched cuFFT plan.
 2. One MatX expression with `cudaExecutor`, which uses cuFFT plus generated normalization and post-processing kernels.
