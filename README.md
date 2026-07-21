@@ -37,7 +37,7 @@ auto layer = matx::tanh(matx::matmul(x, weights) + bias);
 (activations = layer).run(matx::cudaExecutor{});
 ```
 
-This is ordinary numerical array code: a batched matrix product, broadcasting, and an elementwise activation. The same expression model covers slicing, reshaping, generators, reductions, convolutions, sparse tensors, linear algebra, solvers, random numbers, and FFTs. Change the executor—not the algorithm—to target CUDA, JIT fusion, or optimized host execution where supported.
+This is ordinary numerical array code: a batched matrix product, broadcasting, and an elementwise activation. The same expression model covers slicing, reshaping, generators, reductions, convolutions, sparse tensors, linear algebra, solvers, random numbers, and FFTs. Change the executor to target CUDA, JIT fusion, or optimized CPU execution where supported.
 
 | Familiar NumPy idea | MatX model |
 |---|---|
@@ -76,7 +76,7 @@ The syntax reads like the algorithm: normalize every complex input sample, trans
 
 For memory-bound workloads, eliminating launches and intermediate reads and writes lets a simple expression reach **speed-of-light performance** without hand-writing CUDA kernel plumbing.
 
-**Measured on an NVIDIA DGX Spark: 5 lines of MatX replace 59 lines of CUDA + cuFFT, stay within about 3% of its performance, and run 1.61× faster when the identical expression is JIT-fused.**
+**Measured on an NVIDIA DGX Spark: 5 lines of MatX replace 59 lines of CUDA + cuFFT and ran 1.61× faster with JIT enabled.**
 
 > Actual performance depends on the operation, shape, data type, and target GPU.
 
