@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="380" viewBox="0 0 1200 380" role="img" aria-labelledby="title desc">
+  <title id="title">MatX: simple numerical expressions, fused for speed</title>
+  <desc id="desc">MatX turns a NumPy-like C++ expression into a fused kernel for GPU or CPU execution.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#070b10"/>
+      <stop offset=".55" stop-color="#101820"/>
+      <stop offset="1" stop-color="#07110d"/>
+    </linearGradient>
+    <linearGradient id="green" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#76b900"/>
+      <stop offset="1" stop-color="#a6ff4d"/>
+    </linearGradient>
+    <radialGradient id="glow">
+      <stop offset="0" stop-color="#76b900" stop-opacity=".24"/>
+      <stop offset="1" stop-color="#76b900" stop-opacity="0"/>
+    </radialGradient>
+    <marker id="arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M0 0 8 4 0 8z" fill="#a6ff4d"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="380" rx="24" fill="url(#bg)"/>
+  <circle cx="1035" cy="55" r="280" fill="url(#glow)"/>
+  <circle cx="130" cy="390" r="230" fill="url(#glow)" opacity=".55"/>
+
+  <g font-family="Inter,Segoe UI,Arial,sans-serif" text-anchor="middle">
+    <g transform="translate(480 40)">
+      <path d="M0 0h12v62H0zM20 0h12v62H20zM40 0h12v62H40z" fill="url(#green)" transform="skewX(-12)"/>
+      <text x="146" y="58" fill="#f5f8fa" font-size="82" font-weight="800" letter-spacing="-5">MatX</text>
+    </g>
+
+    <text x="600" y="141" fill="#a6ff4d" font-size="17" font-weight="750" letter-spacing="3.5">NUMERICAL COMPUTING FOR C++20</text>
+    <text x="600" y="194" fill="#f7fafb" font-size="37" font-weight="750" letter-spacing="-.8">Simple syntax. Fused kernels. Speed of light.</text>
+
+    <g transform="translate(105 244)">
+      <rect width="285" height="78" rx="14" fill="#151e26" stroke="#40515e" stroke-width="2"/>
+      <text x="142.5" y="33" fill="#f1f5f7" font-size="21" font-weight="750">NumPy-like expression</text>
+      <text x="142.5" y="58" fill="#95a3ad" font-size="15">write the algorithm</text>
+
+      <path d="M310 39h70" stroke="#a6ff4d" stroke-width="3" marker-end="url(#arrow)"/>
+
+      <rect x="405" width="285" height="78" rx="14" fill="#203517" stroke="#76b900" stroke-width="2"/>
+      <text x="547.5" y="33" fill="#f4ffe9" font-size="21" font-weight="750">One fused kernel</text>
+      <text x="547.5" y="58" fill="#bddd9f" font-size="15">eliminate intermediates</text>
+
+      <path d="M715 39h70" stroke="#a6ff4d" stroke-width="3" marker-end="url(#arrow)"/>
+
+      <rect x="810" width="180" height="78" rx="14" fill="#151e26" stroke="#40515e" stroke-width="2"/>
+      <text x="900" y="34" fill="#f1f5f7" font-size="22" font-weight="750">GPU or CPU</text>
+      <text x="900" y="59" fill="#95a3ad" font-size="15">choose executor</text>
+    </g>
+  </g>
+</svg>
