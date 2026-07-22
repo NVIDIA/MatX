@@ -20,7 +20,7 @@ MatX is a C++20 library for general numerical computing on NVIDIA GPUs and CPUs.
 - 🧮 **Write familiar array expressions** — broadcasting, slicing, reductions, transforms, linear algebra, solvers, random numbers, and more.
 - ⚡ **Fuse compatible numerical pipelines** — eliminate launches and intermediate memory traffic by changing the executor, not the algorithm.
 - 🚀 **Reach NVIDIA GPU speed with less code** — use optimized CUDA libraries or generate fused kernels at runtime.
-- 🖥️ **Run on optimized CPUs too** — target multithreaded host execution with NVPL, FFTW, OpenBLAS, or BLIS.
+- 🖥️ **Run on CPUs too** — target multithreaded host execution with NVPL, FFTW, OpenBLAS, or BLIS.
 
 ## NumPy-like arrays. Native C++ execution.
 
