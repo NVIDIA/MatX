@@ -177,7 +177,7 @@ Performance depends on GPU, clocks, shape, and software versions; use the benchm
 
 ## GPU acceleration and optimized host execution
 
-MatX is not GPU-only. The same operator model runs on CPUs, and `AllThreadsHostExecutor` uses OpenMP—when enabled by a CPU backend—to distribute supported work across the available host threads:
+MatX is not GPU-only. The same operator model runs on CPUs, and `AllThreadsHostExecutor` uses OpenMP to distribute supported work across the available host threads:
 
 ```cpp
 matx::AllThreadsHostExecutor host{};
@@ -188,7 +188,7 @@ Host transforms dispatch to optimized CPU libraries when their corresponding CMa
 
 | Backend | Optimized host operations | Enable with |
 |---|---|---|
-| **NVIDIA NVPL** | FFT, BLAS, and LAPACK on NVIDIA Arm CPUs | `-DMATX_EN_NVPL=ON` |
+| **NVIDIA NVPL** | FFT, BLAS, and LAPACK on NVIDIA ARM CPUs | `-DMATX_EN_NVPL=ON` |
 | **FFTW** | FFT on x86 CPUs | `-DMATX_EN_X86_FFTW=ON` |
 | **OpenBLAS** | BLAS and LAPACK on x86 CPUs | `-DMATX_EN_OPENBLAS=ON` |
 | **BLIS** | BLAS on x86 CPUs | `-DMATX_EN_BLIS=ON` |
@@ -199,7 +199,7 @@ All elementwise operators and reductions have host paths, as do FFT, BLAS, and L
 
 The [Black–Scholes example](examples/black_scholes.cu) expresses the complete pricing equation in concise MatX syntax and evaluates it as one fused GPU kernel—without hand-written CUDA or materialized intermediate arrays.
 
-For 100 million independent FP32 option prices on the same NVIDIA DGX Spark, the fused MatX expression is **5.62× faster than the equivalent eager CuPy expression** and **184.5× faster than NumPy/SciPy**.[^black-scholes-platform]
+For 100 million independent FP32 option prices on the same NVIDIA DGX Spark, the fused MatX expression is **5.62× faster than the equivalent eager CuPy expression on the same GPU** and **184.5× faster than NumPy/SciPy**.[^black-scholes-platform]
 
 | Implementation | Median time | Throughput | vs. NumPy |
 |---|---:|---:|---:|
