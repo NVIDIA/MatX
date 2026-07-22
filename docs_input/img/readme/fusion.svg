@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="500" viewBox="0 0 1200 500" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="445" viewBox="0 0 1200 445" role="img" aria-labelledby="title desc">
   <title id="title">MatX JIT fusion performs the same pipeline with less work</title>
   <desc id="desc">A staged normalization, FFT, and post-processing pipeline uses three launches and two temporary tensors. MatX JIT combines it into one generated kernel with no temporary tensors.</desc>
   <defs>
@@ -13,7 +13,7 @@
     </linearGradient>
   </defs>
 
-  <rect width="1200" height="500" rx="22" fill="url(#bg)"/>
+  <rect width="1200" height="445" rx="22" fill="url(#bg)"/>
 
   <g font-family="Inter,Segoe UI,Arial,sans-serif">
     <text x="55" y="55" fill="#8f9da6" font-size="16" font-weight="750" letter-spacing="2.5">STAGED EXECUTION</text>
@@ -57,11 +57,9 @@
       <circle cx="48" cy="59" r="10" fill="#b7ff66"/>
       <text x="82" y="50" fill="#f8fff4" font-size="25" font-weight="750">Normalize  +  FFT  +  post-process</text>
       <text x="82" y="80" fill="#d9f4c4" font-size="16" font-weight="750" letter-spacing="1.5">ONE GENERATED KERNEL</text>
-      <path d="M850 55h30v-10l20 14-20 14v-10h-30z" fill="#a6ff4d"/>
+      <path d="M665 55h30v-10l20 14-20 14v-10h-30z" fill="#a6ff4d"/>
       <rect x="920" y="25" width="140" height="68" rx="13" fill="#17300e" stroke="#a6ff4d" stroke-width="2"/>
       <text x="990" y="67" text-anchor="middle" fill="#f8fff4" font-size="21" font-weight="800">OUTPUT</text>
     </g>
-
-    <text x="600" y="463" text-anchor="middle" fill="#e8eef2" font-size="25" font-weight="750">Same expression. Less work. More speed.</text>
   </g>
 </svg>
