@@ -17,6 +17,11 @@
 
 MatX is a C++20 library for general numerical computing on NVIDIA GPUs and CPUs. Think **NumPy-style array programming with native C++ control and speed**: create arbitrary-rank tensors, compose lazy expressions, and choose an optimized GPU or multithreaded CPU executor when the work runs.
 
+- 🧮 **Write familiar array expressions** — broadcasting, slicing, reductions, transforms, linear algebra, solvers, random numbers, and more.
+- ⚡ **Fuse compatible numerical pipelines** — eliminate launches and intermediate memory traffic by changing the executor, not the algorithm.
+- 🚀 **Reach NVIDIA GPU speed with less code** — use optimized CUDA libraries or generate fused kernels at runtime.
+- 🖥️ **Run on optimized CPUs too** — target multithreaded host execution with NVPL, FFTW, OpenBLAS, or BLIS.
+
 ## NumPy-like arrays. Native C++ execution.
 
 ```cpp
@@ -101,9 +106,9 @@ The reproducible [FFT benchmark example](examples/fft_benchmark.cu) compares han
 2. One MatX expression with `cudaExecutor`, which uses cuFFT plus generated normalization and post-processing kernels.
 3. **The exact same MatX expression** with `CUDAJITExecutor`, which fuses both sides of the FFT through cuFFTDx.
 
-The complete MatX path takes **5 implementation lines versus 59 for CUDA + cuFFT—about 92% less code**.[^fft-loc] The JIT version uses the same five lines; only the executor changes.
-
-**MatX's concise CUDA path lands within about 3% of the handwritten implementation. Changing only the executor then makes that same expression 1.61× faster.**[^fft-platform]
+- ✂️ **92% less implementation code:** 5 MatX lines replace 59 lines of CUDA + cuFFT.[^fft-loc]
+- ⚖️ **Near handwritten CUDA speed:** the concise `cudaExecutor` path lands within about 3% of the handwritten implementation.
+- ⚡ **Faster with JIT fusion:** the same five-line expression runs 1.61× faster by changing only the executor.[^fft-platform]
 
 | Implementation | Median time | Throughput | vs. CUDA + cuFFT |
 |---|---:|---:|---:|
