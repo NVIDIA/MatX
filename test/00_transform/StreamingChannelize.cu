@@ -31,7 +31,7 @@
 /////////////////////////////////////////////////////////////////////////////////
 
 // Test for the ChannelizePolyStream object. Streaming a signal in chunks
-// (feed() ... flush()) and concatenating the produced block slices must equal a
+// (feed() ... flush()) and concatenating the produced block outputs must equal a
 // single one-shot channelize_poly over the whole input.
 
 #include "matx.h"
@@ -93,17 +93,15 @@ bool run_case(Exec &exec, index_t N, index_t M, index_t D, index_t L,
     const index_t nl = std::min(chunks[ci++ % chunks.size()], N - g);
     auto in_chunk = slice(sig, {g}, {g + nl});
     g += nl;
-    auto produced = stream_obj.feed(in_chunk, frame);
-    const index_t cnt = produced.Size(0);
+    const index_t cnt = stream_obj.feed(in_chunk, frame);
     if (cnt > 0) {
-      (slice(acc, {off, 0}, {off + cnt, M}) = produced).run(exec);
+      (slice(acc, {off, 0}, {off + cnt, M}) = slice(frame, {0, 0}, {cnt, M})).run(exec);
     }
     off += cnt;
   }
-  auto tail = stream_obj.flush(frame);
-  const index_t tcnt = tail.Size(0);
+  const index_t tcnt = stream_obj.flush(frame);
   if (tcnt > 0) {
-    (slice(acc, {off, 0}, {off + tcnt, M}) = tail).run(exec);
+    (slice(acc, {off, 0}, {off + tcnt, M}) = slice(frame, {0, 0}, {tcnt, M})).run(exec);
   }
   off += tcnt;
   exec.sync();
@@ -226,12 +224,12 @@ TEST(StreamingChannelize, FlushRetryAfterFailure)
   auto frame = make_tensor<CT>({stream_obj.max_output(N), M});
   auto wrong_width = make_tensor<CT>({stream_obj.max_output(N), M - 1});
   const index_t T_blocks = (N + D - 1) / D;
-  const index_t fed = stream_obj.feed(x, frame).Size(0);
+  const index_t fed = stream_obj.feed(x, frame);
   ASSERT_EQ(T_blocks - fed, 1); // a partial trailing block exists (N % D != 0)
   EXPECT_THROW(stream_obj.flush(wrong_width), detail::matxException);
   // The failed flush did not end the stream; a retry emits the trailing block.
-  EXPECT_EQ(stream_obj.flush(frame).Size(0), 1);
-  EXPECT_EQ(stream_obj.flush(frame).Size(0), 0);
+  EXPECT_EQ(stream_obj.flush(frame), 1);
+  EXPECT_EQ(stream_obj.flush(frame), 0);
   exec.sync();
 }
 
@@ -250,13 +248,13 @@ TEST(StreamingChannelize, FlushEndsStream)
   auto stream_obj = make_channelize_poly_stream<T>(h, {.num_channels = M, .decimation_factor = D}, exec);
   auto frame = make_tensor<cuda::std::complex<float>>({stream_obj.max_output(N), M});
   const index_t T_blocks = (N + D - 1) / D; // one-shot block count
-  const index_t fed = stream_obj.feed(x, frame).Size(0);
-  EXPECT_EQ(fed + stream_obj.flush(frame).Size(0), T_blocks);
-  EXPECT_EQ(stream_obj.flush(frame).Size(0), 0);
+  const index_t fed = stream_obj.feed(x, frame);
+  EXPECT_EQ(fed + stream_obj.flush(frame), T_blocks);
+  EXPECT_EQ(stream_obj.flush(frame), 0);
   EXPECT_THROW(stream_obj.feed(x, frame), detail::matxException);
   stream_obj.reset();
-  EXPECT_EQ(stream_obj.feed(x, frame).Size(0), fed);
-  EXPECT_EQ(stream_obj.flush(frame).Size(0), T_blocks - fed);
+  EXPECT_EQ(stream_obj.feed(x, frame), fed);
+  EXPECT_EQ(stream_obj.flush(frame), T_blocks - fed);
   exec.sync();
 }
 
@@ -293,14 +291,12 @@ TEST(StreamingChannelize, TransformValuedFilterMaterializes)
   index_t off = 0;
   for (index_t g = 0; g < N; g += chunk) {
     const index_t nl = std::min(chunk, N - g);
-    auto produced = stream_obj.feed(slice(sig, {g}, {g + nl}), frame);
-    const index_t cnt = produced.Size(0);
-    if (cnt > 0) { (slice(acc, {off, 0}, {off + cnt, M}) = produced).run(exec); }
+    const index_t cnt = stream_obj.feed(slice(sig, {g}, {g + nl}), frame);
+    if (cnt > 0) { (slice(acc, {off, 0}, {off + cnt, M}) = slice(frame, {0, 0}, {cnt, M})).run(exec); }
     off += cnt;
   }
-  auto tail = stream_obj.flush(frame);
-  const index_t tcnt = tail.Size(0);
-  if (tcnt > 0) { (slice(acc, {off, 0}, {off + tcnt, M}) = tail).run(exec); }
+  const index_t tcnt = stream_obj.flush(frame);
+  if (tcnt > 0) { (slice(acc, {off, 0}, {off + tcnt, M}) = slice(frame, {0, 0}, {tcnt, M})).run(exec); }
   off += tcnt;
   exec.sync();
   ASSERT_EQ(off, T_blocks);
@@ -348,17 +344,15 @@ TEST(StreamingChannelize, SegmentLifecycleRunExactlyOnce)
     const index_t nl = std::min(chunk, N - g);
     PreRunLifecycle seg_life;
     auto seg = make_prerun_tester(slice(sig, {g}, {g + nl}), seg_life);
-    auto produced = stream_obj.feed(seg, frame);
-    const index_t cnt = produced.Size(0);
-    if (cnt > 0) { (slice(acc, {off, 0}, {off + cnt, M}) = produced).run(exec); }
+    const index_t cnt = stream_obj.feed(seg, frame);
+    if (cnt > 0) { (slice(acc, {off, 0}, {off + cnt, M}) = slice(frame, {0, 0}, {cnt, M})).run(exec); }
     off += cnt;
     // Counters are set host-side during feed(); assert without needing a sync.
     ExpectLifecycleClean(seg_life, "channelize segment feed at " + std::to_string(g));
   }
   // flush() ends the stream; it takes no segment, so nothing to probe here.
-  auto tail = stream_obj.flush(frame);
-  const index_t tcnt = tail.Size(0);
-  if (tcnt > 0) { (slice(acc, {off, 0}, {off + tcnt, M}) = tail).run(exec); }
+  const index_t tcnt = stream_obj.flush(frame);
+  if (tcnt > 0) { (slice(acc, {off, 0}, {off + tcnt, M}) = slice(frame, {0, 0}, {tcnt, M})).run(exec); }
   off += tcnt;
   exec.sync();
 
@@ -433,14 +427,12 @@ TEST(StreamingChannelize, TransformValuedSegmentMaterializes)
     const index_t nl = std::min(chunk, N - g);
     // Transform-valued segment (equals the plain chunk).
     auto seg = conv1d(slice(sig, {g}, {g + nl}), ones<T>({1}), MATX_C_MODE_SAME);
-    auto produced = stream_obj.feed(seg, frame);
-    const index_t cnt = produced.Size(0);
-    if (cnt > 0) { (slice(acc, {off, 0}, {off + cnt, M}) = produced).run(exec); }
+    const index_t cnt = stream_obj.feed(seg, frame);
+    if (cnt > 0) { (slice(acc, {off, 0}, {off + cnt, M}) = slice(frame, {0, 0}, {cnt, M})).run(exec); }
     off += cnt;
   }
-  auto tail = stream_obj.flush(frame);
-  const index_t tcnt = tail.Size(0);
-  if (tcnt > 0) { (slice(acc, {off, 0}, {off + tcnt, M}) = tail).run(exec); }
+  const index_t tcnt = stream_obj.flush(frame);
+  if (tcnt > 0) { (slice(acc, {off, 0}, {off + tcnt, M}) = slice(frame, {0, 0}, {tcnt, M})).run(exec); }
   off += tcnt;
   exec.sync();
   ASSERT_EQ(off, T_blocks);

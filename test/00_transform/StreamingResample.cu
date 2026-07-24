@@ -31,7 +31,7 @@
 /////////////////////////////////////////////////////////////////////////////////
 
 // Test for the ResamplePolyStream object. Streaming a signal in chunks
-// (feed() ... flush()) and concatenating the produced slices must equal a single
+// (feed() ... flush()) and concatenating the produced outputs must equal a single
 // one-shot resample_poly over the whole input.
 //
 // This compares to a floating-point tolerance rather than exact equality (unlike
@@ -91,17 +91,15 @@ bool run_case(Exec &exec, index_t N, index_t up, index_t down,
     const index_t nl = std::min(chunks[ci++ % chunks.size()], N - g);
     auto in_chunk = slice(sig, {g}, {g + nl});
     g += nl;
-    auto produced = stream_obj.feed(in_chunk, frame);
-    const index_t cnt = produced.Size(0);
+    const index_t cnt = stream_obj.feed(in_chunk, frame);
     if (cnt > 0) {
-      (slice(acc, {off}, {off + cnt}) = produced).run(exec);
+      (slice(acc, {off}, {off + cnt}) = slice(frame, {0}, {cnt})).run(exec);
     }
     off += cnt;
   }
-  auto tail = stream_obj.flush(frame);
-  const index_t tcnt = tail.Size(0);
+  const index_t tcnt = stream_obj.flush(frame);
   if (tcnt > 0) {
-    (slice(acc, {off}, {off + tcnt}) = tail).run(exec);
+    (slice(acc, {off}, {off + tcnt}) = slice(frame, {0}, {tcnt})).run(exec);
   }
   off += tcnt;
   exec.sync();
@@ -226,12 +224,12 @@ TEST(StreamingResample, FlushRetryAfterFailure)
   auto frame = make_tensor<T>({stream_obj.max_output(N)});
   auto small = make_tensor<T>({1});
   const index_t M = (N * up + down - 1) / down; // one-shot output count
-  const index_t fed = stream_obj.feed(x, frame).Size(0);
+  const index_t fed = stream_obj.feed(x, frame);
   ASSERT_GT(M - fed, 1); // the tail must exceed the undersized buffer
   EXPECT_THROW(stream_obj.flush(small), detail::matxException);
   // The failed flush did not end the stream; a retry emits the full tail.
-  EXPECT_EQ(stream_obj.flush(frame).Size(0), M - fed);
-  EXPECT_EQ(stream_obj.flush(frame).Size(0), 0);
+  EXPECT_EQ(stream_obj.flush(frame), M - fed);
+  EXPECT_EQ(stream_obj.flush(frame), 0);
   exec.sync();
 }
 
@@ -250,13 +248,13 @@ TEST(StreamingResample, FlushEndsStream)
   auto stream_obj = make_resample_poly_stream<T>(h, {.up = up, .down = down}, exec);
   auto frame = make_tensor<T>({stream_obj.max_output(N)});
   const index_t M = (N * up + down - 1) / down; // one-shot output count
-  const index_t fed = stream_obj.feed(x, frame).Size(0);
-  EXPECT_EQ(fed + stream_obj.flush(frame).Size(0), M);
-  EXPECT_EQ(stream_obj.flush(frame).Size(0), 0);
+  const index_t fed = stream_obj.feed(x, frame);
+  EXPECT_EQ(fed + stream_obj.flush(frame), M);
+  EXPECT_EQ(stream_obj.flush(frame), 0);
   EXPECT_THROW(stream_obj.feed(x, frame), detail::matxException);
   stream_obj.reset();
-  EXPECT_EQ(stream_obj.feed(x, frame).Size(0), fed);
-  EXPECT_EQ(stream_obj.flush(frame).Size(0), M - fed);
+  EXPECT_EQ(stream_obj.feed(x, frame), fed);
+  EXPECT_EQ(stream_obj.flush(frame), M - fed);
   exec.sync();
 }
 
@@ -290,14 +288,12 @@ TEST(StreamingResample, TransformValuedFilterMaterializes)
   index_t off = 0;
   for (index_t g = 0; g < N; g += chunk) {
     const index_t nl = std::min(chunk, N - g);
-    auto produced = stream_obj.feed(slice(sig, {g}, {g + nl}), frame);
-    const index_t cnt = produced.Size(0);
-    if (cnt > 0) { (slice(acc, {off}, {off + cnt}) = produced).run(exec); }
+    const index_t cnt = stream_obj.feed(slice(sig, {g}, {g + nl}), frame);
+    if (cnt > 0) { (slice(acc, {off}, {off + cnt}) = slice(frame, {0}, {cnt})).run(exec); }
     off += cnt;
   }
-  auto tail = stream_obj.flush(frame);
-  const index_t tcnt = tail.Size(0);
-  if (tcnt > 0) { (slice(acc, {off}, {off + tcnt}) = tail).run(exec); }
+  const index_t tcnt = stream_obj.flush(frame);
+  if (tcnt > 0) { (slice(acc, {off}, {off + tcnt}) = slice(frame, {0}, {tcnt})).run(exec); }
   off += tcnt;
   exec.sync();
   ASSERT_EQ(off, M);
@@ -341,17 +337,15 @@ TEST(StreamingResample, SegmentLifecycleRunExactlyOnce)
     const index_t nl = std::min(chunk, N - g);
     PreRunLifecycle seg_life;
     auto seg = make_prerun_tester(slice(sig, {g}, {g + nl}), seg_life);
-    auto produced = stream_obj.feed(seg, frame);
-    const index_t cnt = produced.Size(0);
-    if (cnt > 0) { (slice(acc, {off}, {off + cnt}) = produced).run(exec); }
+    const index_t cnt = stream_obj.feed(seg, frame);
+    if (cnt > 0) { (slice(acc, {off}, {off + cnt}) = slice(frame, {0}, {cnt})).run(exec); }
     off += cnt;
     // Counters are set host-side during feed(); assert without needing a sync.
     ExpectLifecycleClean(seg_life, "resample segment feed at " + std::to_string(g));
   }
   // flush() ends the stream; it takes no segment, so nothing to probe here.
-  auto tail = stream_obj.flush(frame);
-  const index_t tcnt = tail.Size(0);
-  if (tcnt > 0) { (slice(acc, {off}, {off + tcnt}) = tail).run(exec); }
+  const index_t tcnt = stream_obj.flush(frame);
+  if (tcnt > 0) { (slice(acc, {off}, {off + tcnt}) = slice(frame, {0}, {tcnt})).run(exec); }
   off += tcnt;
   exec.sync();
 
@@ -419,14 +413,12 @@ TEST(StreamingResample, TransformValuedSegmentMaterializes)
     const index_t nl = std::min(chunk, N - g);
     // Transform-valued segment (equals the plain chunk).
     auto seg = conv1d(slice(sig, {g}, {g + nl}), ones<T>({1}), MATX_C_MODE_SAME);
-    auto produced = stream_obj.feed(seg, frame);
-    const index_t cnt = produced.Size(0);
-    if (cnt > 0) { (slice(acc, {off}, {off + cnt}) = produced).run(exec); }
+    const index_t cnt = stream_obj.feed(seg, frame);
+    if (cnt > 0) { (slice(acc, {off}, {off + cnt}) = slice(frame, {0}, {cnt})).run(exec); }
     off += cnt;
   }
-  auto tail = stream_obj.flush(frame);
-  const index_t tcnt = tail.Size(0);
-  if (tcnt > 0) { (slice(acc, {off}, {off + tcnt}) = tail).run(exec); }
+  const index_t tcnt = stream_obj.flush(frame);
+  if (tcnt > 0) { (slice(acc, {off}, {off + tcnt}) = slice(frame, {0}, {tcnt})).run(exec); }
   off += tcnt;
   exec.sync();
   ASSERT_EQ(off, M);

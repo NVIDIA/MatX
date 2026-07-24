@@ -124,10 +124,8 @@ public:
     // so the allocation is exactly 2 * history_len(). One allocation, two
     // ping-pong halves (the retain update reads a view that includes itself).
     // max(.,1) at the allocation avoids a zero-size tensor in the degenerate
-    // M==D==1, L==1 case (history_len_ == 0: nothing is ever retained and every
-    // retain slice is empty, so the floored element is never touched). CUDA
-    // executors get stream-ordered device memory; host executors get
-    // system-allocated memory.
+    // M==D==1, L==1 case (history_len_ == 0). CUDA executors get stream-ordered
+    // device memory; host executors get system-allocated memory.
     history_len_ = H_ + lcm_ - 1;
     const index_t alloc_half = cuda::std::max(history_len_, index_t(1));
     if constexpr (is_cuda_executor_v<Exec>) {
@@ -179,7 +177,7 @@ public:
    * @brief Upper bound on the output blocks a single feed() or flush() call
    * can produce.
    *
-   * Size one reusable [max_output(largest segment size), num_channels] output
+   * Size one reusable [max_output(largest_input_segment_size), num_channels] output
    * buffer; it is then large enough for every feed() of up to that many
    * samples and for flush().
    *
@@ -207,16 +205,16 @@ public:
   }
 
   /**
-   * @brief Feed a segment of new samples and receive the output blocks it
-   * produces.
+   * @brief Feed a segment of new samples and receive the number of output
+   * blocks it produces.
    *
    * Emits every not-yet-emitted block whose decimation_factor input samples
    * have fully arrived. The per-call count varies with the segment size (it can
-   * be zero). Blocks are written to the leading rows of `out` and returned as
-   * a [count, num_channels] slice of `out`. Runs asynchronously on the
-   * object's executor. Consume (or copy) the returned slice before reusing
-   * `out`. Throws matxInvalidParameter if called after flush(). Use reset()
-   * to start a new stream.
+   * be zero). Blocks are written to the leading rows of `out`; the return value
+   * is the number of blocks written. Consume `slice(out, {0, 0}, {count, M})`
+   * (the produced rows) before reusing `out`. Runs asynchronously on the
+   * object's executor. Throws matxInvalidParameter if called after flush(). Use
+   * reset() to start a new stream.
    *
    * @tparam InOp 1D input operator type (deduced)
    * @tparam OutTensor 2D output tensor type (deduced)
@@ -225,13 +223,15 @@ public:
    *   segment (e.g. ifft(...)) therefore works but allocates and evaluates a
    *   per-call temporary; for hot streaming loops prefer a directly-evaluable
    *   segment (a tensor, view, or generator) or materialize once and reuse.
-   * @param out Output buffer shaped [>= max_output(segment size), num_channels];
+   * @param out Output buffer shaped [>= max_output(input_segment_size), num_channels];
    *   throws matxInvalidSize on a channel-count mismatch or if the row count
    *   is smaller than the produced block count
-   * @return Slice of `out` containing the produced blocks (possibly empty)
+   * @return Number of blocks (rows) written to the front of `out` (may be 0). A
+   *   zero-length slice is not valid, so create and use
+   *   `slice(out, {0, 0}, {count, num_channels})` only when count > 0.
    */
   template <typename InOp, typename OutTensor>
-  auto feed(const InOp &new_samples, OutTensor &out)
+  index_t feed(const InOp &new_samples, OutTensor &out)
   {
     static_assert(InOp::Rank() == 1, "ChannelizePolyStream::feed expects a 1D segment");
     static_assert(std::is_same_v<typename InOp::value_type, InType>,
@@ -251,15 +251,13 @@ public:
     const index_t buf_len = retain_len_ + nl;
     const index_t retain_len_next = cuda::std::min(
         H_ + nonneg_mod(buf_len - H_, lcm_), buf_len);
-    // New retain is written into the OTHER ping-pong half (disjoint from the
-    // half the concat buffer reads), so no aliasing.
     const index_t nxt = (1 - retain_buf_ind_) * history_len_;
-    auto next_retain = slice(retain_buf_, {nxt}, {nxt + retain_len_next});
 
     // Validate the output before running the segment's lifecycle. The count and
     // channel dimension depend only on sizes, not segment data, so a mis-shaped
     // or undersized buffer throws here -- before any segment temporary is
-    // allocated or filled.
+    // allocated or filled. Output/retain slices are taken only when their length
+    // is > 0, since MatX tensors cannot represent a zero-length slice.
     const auto plan = channelize_plan(buf_len, /*is_flush=*/false);
     if (out.Size(1) != M_) {
       MATX_THROW(matxInvalidSize,
@@ -278,23 +276,33 @@ public:
     // uses exec_.Exec (not run()) so it does not re-enter the segment's lifecycle.
     detail::SegmentLifecycleGuard<InOp, Exec> segment_guard(new_samples, exec_);
 
+    // retain_len_next is 0 in the degenerate no-history case (H == 0 and the
+    // buffer end lands on an lcm boundary); nothing is retained then, so skip
+    // the retain copy. The new retain goes into the OTHER ping-pong half
+    // (disjoint from the half the concat buffer reads), so no aliasing.
     if (retain_len_ == 0) {
       if (plan.cnt > 0) { channelize_exec(new_samples, plan.lo, plan.cnt, out); }
-      auto new_tail = slice(new_samples, {nl - retain_len_next}, {nl});
-      auto retain_copy = (next_retain = new_tail);
-      exec_.Exec(retain_copy);
+      if (retain_len_next > 0) {
+        auto next_retain = slice(retain_buf_, {nxt}, {nxt + retain_len_next});
+        auto new_tail = slice(new_samples, {nl - retain_len_next}, {nl});
+        auto retain_copy = (next_retain = new_tail);
+        exec_.Exec(retain_copy);
+      }
     } else {
       auto retain = cur_retain();
       auto buf = concat(0, retain, new_samples);
       if (plan.cnt > 0) { channelize_exec(buf, plan.lo, plan.cnt, out); }
-      auto buf_tail = slice(buf, {buf_len - retain_len_next}, {buf_len});
-      auto retain_copy = (next_retain = buf_tail);
-      exec_.Exec(retain_copy);
+      if (retain_len_next > 0) {
+        auto next_retain = slice(retain_buf_, {nxt}, {nxt + retain_len_next});
+        auto buf_tail = slice(buf, {buf_len - retain_len_next}, {buf_len});
+        auto retain_copy = (next_retain = buf_tail);
+        exec_.Exec(retain_copy);
+      }
     }
 
     retain_buf_ind_ = 1 - retain_buf_ind_;
     retain_len_ = retain_len_next;
-    return slice(out, {0, 0}, {plan.cnt, M_});
+    return plan.cnt;
   }
 
   /**
@@ -306,19 +314,21 @@ public:
    * final block of the one-shot channelize_poly. When the total length is a
    * multiple of decimation_factor, every block was fully covered and already
    * emitted, and flush() produces zero rows. The first call emits the trailing
-   * block and ends the stream. Subsequent calls return an empty slice, and
-   * feed() throws until reset() starts a new stream. A flush() that throws
-   * (for example, an undersized or mis-shaped output buffer) does not end the
-   * stream and can be retried. Runs asynchronously on the object's executor.
+   * block and ends the stream. Subsequent calls return 0, and feed() throws
+   * until reset() starts a new stream. A flush() that throws (for example, an
+   * undersized or mis-shaped output buffer) does not end the stream and can be
+   * retried. Runs asynchronously on the object's executor.
    *
    * @tparam OutTensor 2D output tensor type (deduced)
-   * @param out Output buffer shaped [>= max_output(segment size), num_channels];
+   * @param out Output buffer shaped [>= max_output(input_segment_size), num_channels];
    *   throws matxInvalidSize on a channel-count mismatch or if the row count
    *   is smaller than the produced block count
-   * @return Slice of `out` containing the produced blocks (possibly empty)
+   * @return Number of blocks (rows) written to the front of `out` (may be 0). A
+   *   zero-length slice is not valid, so create and use
+   *   `slice(out, {0, 0}, {count, num_channels})` only when count > 0.
    */
   template <typename OutTensor>
-  auto flush(OutTensor &out)
+  index_t flush(OutTensor &out)
   {
     static_assert(OutTensor::Rank() == 2, "ChannelizePolyStream::flush expects a 2D [blocks, M] output");
     static_assert(is_tensor_v<OutTensor>,
@@ -326,7 +336,7 @@ public:
         "storage-backed); a transform or expression operator cannot be an output");
     if (flushed_ || retain_len_ == 0) {
       flushed_ = true;
-      return slice(out, {0, 0}, {index_t(0), M_});
+      return index_t(0);
     }
     // flush() reads the retain buffer (a tensor), not an operator segment, so
     // there is no segment lifecycle to run here. Validate before committing
@@ -343,7 +353,7 @@ public:
     }
     if (plan.cnt > 0) { channelize_exec(cur_retain(), plan.lo, plan.cnt, out); }
     flushed_ = true;
-    return slice(out, {0, 0}, {plan.cnt, M_});
+    return plan.cnt;
   }
 
 private:
@@ -421,23 +431,25 @@ private:
  * any (possibly varying) size, into params.num_channels channels decimated by
  * params.decimation_factor. Callers provide input segments via @ref matx::ChannelizePolyStream::feed "feed()" and call
  * @ref matx::ChannelizePolyStream::flush "flush()" once at the end of the stream. The concatenation of the produced
- * [blocks, num_channels] slices equals a single one-shot
+ * [blocks, num_channels] outputs equals a single one-shot
  * `channelize_poly(signal, filter, num_channels, decimation_factor)` over the
  * whole signal. As with `channelize_poly`, the output element type must be complex.
  *
  * The object owns a small retained-history buffer sized from the filter,
  * num_channels, and decimation_factor. No allocation scales with the segment
  * size. Each call to @ref matx::ChannelizePolyStream::feed "feed()" or @ref matx::ChannelizePolyStream::flush "flush()" accepts an output buffer shaped
- * [rows, num_channels] and returns a slice of that buffer containing the
- * produced output blocks. The output buffer must have at least
+ * [rows, num_channels] and writes the produced blocks to its leading rows. The
+ * output buffer must have at least
  * @ref matx::ChannelizePolyStream::max_output "max_output(max_input_segment_size)" rows. If the maximum segment size is
  * known a priori, then a single output buffer can be allocated and reused for
  * all calls.
  *
- * The operator returned by @ref matx::ChannelizePolyStream::feed "feed()" / @ref matx::ChannelizePolyStream::flush "flush()" is a `slice` of the output buffer
- * and thus it aliases the output buffer's memory. This avoids dynamic memory
- * allocation during the @ref matx::ChannelizePolyStream::feed "feed()" / @ref matx::ChannelizePolyStream::flush "flush()" calls, but the user must ensure to
- * consume the returned slice before reusing the output buffer.
+ * Each @ref matx::ChannelizePolyStream::feed "feed()" / @ref matx::ChannelizePolyStream::flush "flush()" call writes the blocks to the front of the
+ * output buffer and returns the number of blocks written (which may be 0), so no
+ * dynamic memory is allocated during the call. Consume the produced region
+ * `slice(out, {0, 0}, {count, num_channels})` before reusing the output buffer.
+ * A zero-length slice is not valid, so create and use the slice only when
+ * count > 0.
  *
  * @tparam InType Sample type of the input stream (as in make_tensor<T>)
  * @tparam FilterOp Type of the filter operator (deduced)

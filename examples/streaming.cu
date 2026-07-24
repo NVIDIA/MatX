@@ -36,7 +36,7 @@
 // object once, then feed the signal in arbitrary-sized segments. The object owns
 // the small retain buffer (and, for the polyphase transforms, the phase state),
 // so per call the user only provides the new samples plus an output buffer and
-// gets back a slice of the outputs this call produced. The concatenation of the
+// gets back the number of outputs this call wrote to the front of it. The concatenation of the
 // per-segment outputs is equivalent to a single one-shot call over the whole
 // stream, which the example verifies.
 //
@@ -165,9 +165,9 @@ void run_conv1d(const Args &a, cudaExecutor &exec)
   (ref = conv1d(sig, h, MATX_C_MODE_SAME)).run(exec);
 
   // Canonical streaming pattern: a single reusable "frame"-sized output buffer.
-  // Each feed() writes this frame and returns the slice it produced; a real
-  // pipeline would consume that slice (hand it downstream, process it, ...) and
-  // then reuse the frame for the next segment. Here we instead copy each frame
+  // Each feed() writes outputs to the front of this frame and returns the count;
+  // a real pipeline would consume slice(frame, {0}, {count}) (hand it downstream,
+  // process it, ...) and then reuse the frame for the next segment. Here we copy
   // into a full-length buffer so we can validate against the one-shot result.
   // example-begin conv1d_stream-1
   auto conv_stream = make_conv1d_stream<T>(h, {.mode = MATX_C_MODE_SAME}, exec);
@@ -188,27 +188,25 @@ void run_conv1d(const Args &a, cudaExecutor &exec)
     const index_t in_length = std::min(a.chunk, N - g);
     auto in_chunk = slice(sig, {g}, {g + in_length});
 
-    // feed() writes into the reusable frame and returns the produced slice, which is
-    // a slice of output_frame to avoid dynamic memory allocation.
+    // feed() writes outputs to the front of the reusable frame and returns how
+    // many it produced. The produced region is slice(output_frame, {0}, {cnt}).
     // Everything runs on the object's bound stream, so the copy below is ordered
     // after this write and the next feed() is ordered after the copy.
-    auto produced = conv_stream.feed(in_chunk, output_frame);
-    const index_t cnt = produced.Size(0);
+    const index_t cnt = conv_stream.feed(in_chunk, output_frame);
 
-    // For real applications, consume produced here
+    // For real applications, consume slice(output_frame, {0}, {cnt}) here
 
     // For validation only, copy the frame into the full-length buffer.
     if (cnt > 0) {
-      (slice(full, {off}, {off + cnt}) = produced).run(exec);
+      (slice(full, {off}, {off + cnt}) = slice(output_frame, {0}, {cnt})).run(exec);
     }
     off += cnt;
     ++nchunks;
   }
   // End of stream: emit the trailing (right-zero-padded) SAME outputs.
-  auto tail = conv_stream.flush(output_frame);
-  const index_t tcnt = tail.Size(0);
+  const index_t tcnt = conv_stream.flush(output_frame);
   if (tcnt > 0) {
-    (slice(full, {off}, {off + tcnt}) = tail).run(exec);
+    (slice(full, {off}, {off + tcnt}) = slice(output_frame, {0}, {tcnt})).run(exec);
   }
   off += tcnt;
   // example-end conv1d_stream-2
@@ -290,23 +288,21 @@ void run_resample(const Args &a, cudaExecutor &exec)
   for (index_t g = 0; g < N; g += a.chunk) {
     const index_t in_length = std::min(a.chunk, N - g);
     auto in_chunk = slice(sig, {g}, {g + in_length});
-    auto produced = resample_stream.feed(in_chunk, output_frame);
-    const index_t cnt = produced.Size(0); // outputs this call actually emitted
+    const index_t cnt = resample_stream.feed(in_chunk, output_frame); // outputs emitted
 
-    // For real applications, consume produced here
+    // For real applications, consume slice(output_frame, {0}, {cnt}) here
 
     // For validation only, copy the frame into the full-length buffer.
     if (cnt > 0) {
-      (slice(full, {off}, {off + cnt}) = produced).run(exec);
+      (slice(full, {off}, {off + cnt}) = slice(output_frame, {0}, {cnt})).run(exec);
     }
     off += cnt;
     ++nchunks;
   }
   // End of stream: flush the trailing (edge) outputs.
-  auto tail = resample_stream.flush(output_frame);
-  const index_t tcnt = tail.Size(0);
+  const index_t tcnt = resample_stream.flush(output_frame);
   if (tcnt > 0) {
-    (slice(full, {off}, {off + tcnt}) = tail).run(exec);
+    (slice(full, {off}, {off + tcnt}) = slice(output_frame, {0}, {tcnt})).run(exec);
   }
   off += tcnt;
   // example-end resample_poly_stream-2
@@ -392,23 +388,21 @@ void run_channelize(const Args &a, cudaExecutor &exec)
   for (index_t g = 0; g < N; g += a.chunk) {
     const index_t in_length = std::min(a.chunk, N - g);
     auto in_chunk = slice(sig, {g}, {g + in_length});
-    auto produced = channelize_stream.feed(in_chunk, output_frame);
-    const index_t cnt = produced.Size(0); // whole blocks this call emitted
+    const index_t cnt = channelize_stream.feed(in_chunk, output_frame); // blocks emitted
 
-    // For real applications, consume produced here
+    // For real applications, consume slice(output_frame, {0, 0}, {cnt, M}) here
 
     // For validation only, copy the frame into the full-length buffer.
     if (cnt > 0) {
-      (slice(full, {off, 0}, {off + cnt, M}) = produced).run(exec);
+      (slice(full, {off, 0}, {off + cnt, M}) = slice(output_frame, {0, 0}, {cnt, M})).run(exec);
     }
     off += cnt;
     ++nchunks;
   }
   // End of stream: flush the trailing (edge-padded) block, if any.
-  auto tail = channelize_stream.flush(output_frame);
-  const index_t tcnt = tail.Size(0);
+  const index_t tcnt = channelize_stream.flush(output_frame);
   if (tcnt > 0) {
-    (slice(full, {off, 0}, {off + tcnt, M}) = tail).run(exec);
+    (slice(full, {off, 0}, {off + tcnt, M}) = slice(output_frame, {0, 0}, {tcnt, M})).run(exec);
   }
   off += tcnt;
   // example-end channelize_poly_stream-2

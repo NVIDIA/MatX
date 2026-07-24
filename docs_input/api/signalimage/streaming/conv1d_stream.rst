@@ -11,7 +11,7 @@ filter roles fixed and returns the input-aligned result. FULL mode is
 role-symmetric and matches for any length. The convolution uses the direct
 (time-domain) method, which limits the filter to 1024 taps.
 
-.. versionadded:: 1.0.0
+.. versionadded:: 1.1.0
 
 .. doxygenstruct:: matx::Conv1DStreamParams
    :members:

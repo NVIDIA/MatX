@@ -198,15 +198,16 @@ public:
   }
 
   /**
-   * @brief Feed a segment of new samples and receive the outputs it produces.
+   * @brief Feed a segment of new samples and receive the number of outputs it
+   * produces.
    *
    * Emits every not-yet-emitted output whose input samples have fully arrived;
    * the per-call count varies with the resampling ratio and segment size (it can
-   * be zero). Outputs are written to the front of `out` and returned as a
-   * slice of `out` sized to the produced count. Runs asynchronously on the
-   * object's executor; consume (or copy) the returned slice before reusing
-   * `out`. Throws matxInvalidParameter if called after flush(). Use reset()
-   * to start a new stream.
+   * be zero). Outputs are written to the front of `out`; the return value is the
+   * number written. Consume `slice(out, {0}, {count})` (the produced region)
+   * before reusing `out`. Runs asynchronously on the object's executor. Throws
+   * matxInvalidParameter if called after flush(). Use reset() to start a new
+   * stream.
    *
    * @tparam InOp 1D input operator type (deduced)
    * @tparam OutTensor 1D output tensor type (deduced)
@@ -215,12 +216,14 @@ public:
    *   segment (e.g. ifft(...)) therefore works but allocates and evaluates a
    *   per-call temporary; for hot streaming loops prefer a directly-evaluable
    *   segment (a tensor, view, or generator) or materialize once and reuse.
-   * @param out Output buffer with last-dim size >= max_output(segment size);
+   * @param out Output buffer with last-dim size >= max_output(input_segment_size);
    *   throws matxInvalidSize if smaller than the produced count
-   * @return Slice of `out` containing the produced outputs (possibly empty)
+   * @return Number of outputs written to the front of `out` (may be 0). A
+   *   zero-length slice is not valid, so create and use `slice(out, {0}, {count})`
+   *   only when count > 0.
    */
   template <typename InOp, typename OutTensor>
-  auto feed(const InOp &new_samples, OutTensor &out)
+  index_t feed(const InOp &new_samples, OutTensor &out)
   {
     static_assert(InOp::Rank() == 1, "ResamplePolyStream::feed expects a 1D segment");
     static_assert(std::is_same_v<typename InOp::value_type, InType>,
@@ -278,7 +281,7 @@ public:
 
     retain_buf_ind_ = 1 - retain_buf_ind_;
     retain_len_ = retain_len_next;
-    return slice(out, {0}, {plan.cnt});
+    return plan.cnt;
   }
 
   /**
@@ -287,18 +290,20 @@ public:
    * Produces the remaining outputs whose filter windows extend past the last
    * input sample (computed with implicit zero padding on the right), matching
    * the trailing outputs of the one-shot resample_poly. The first call emits
-   * the trailing outputs and ends the stream. Subsequent calls return an empty
-   * slice, and feed() throws until reset() starts a new stream. A flush() that
-   * throws (for example, an undersized output buffer) does not end the stream
-   * and can be retried. Runs asynchronously on the object's executor.
+   * the trailing outputs and ends the stream. Subsequent calls return 0, and
+   * feed() throws until reset() starts a new stream. A flush() that throws (for
+   * example, an undersized output buffer) does not end the stream and can be
+   * retried. Runs asynchronously on the object's executor.
    *
    * @tparam OutTensor 1D output tensor type (deduced)
-   * @param out Output buffer with last-dim size >= max_output(segment size);
+   * @param out Output buffer with last-dim size >= max_output(input_segment_size);
    *   throws matxInvalidSize if smaller than the produced count
-   * @return Slice of `out` containing the produced outputs (possibly empty)
+   * @return Number of outputs written to the front of `out` (may be 0). A
+   *   zero-length slice is not valid, so create and use `slice(out, {0}, {count})`
+   *   only when count > 0.
    */
   template <typename OutTensor>
-  auto flush(OutTensor &out)
+  index_t flush(OutTensor &out)
   {
     static_assert(OutTensor::Rank() == 1, "ResamplePolyStream::flush expects 1D output");
     static_assert(is_tensor_v<OutTensor>,
@@ -306,7 +311,7 @@ public:
         "storage-backed); a transform or expression operator cannot be an output");
     if (flushed_ || retain_len_ == 0) {
       flushed_ = true;
-      return slice(out, {0}, {index_t(0)});
+      return index_t(0);
     }
     // flush() reads the retain buffer (a tensor), not an operator segment, so
     // there is no segment lifecycle to run here. Validate before committing
@@ -319,7 +324,7 @@ public:
     }
     if (plan.cnt > 0) { resample_exec(cur_retain(), plan.lo, plan.cnt, out); }
     flushed_ = true;
-    return slice(out, {0}, {plan.cnt});
+    return plan.cnt;
   }
 
 private:
@@ -410,7 +415,7 @@ private:
  * The object resamples an arbitrarily long signal by `params.up` / `params.down`,
  * delivered in segments of any (possibly varying) size. Feed segments via @ref matx::ResamplePolyStream::feed "feed()"
  * and call @ref matx::ResamplePolyStream::flush "flush()" once at end of stream. The concatenation of the produced
- * slices equals a single one-shot
+ * outputs equals a single one-shot
  * `resample_poly(signal, filter, params.up, params.down)` over the whole
  * signal.
  *
@@ -429,10 +434,11 @@ private:
  * is known a priori, then a single output buffer can be allocated and reused for
  * all calls.
  *
- * The operator returned by @ref matx::ResamplePolyStream::feed "feed()" / @ref matx::ResamplePolyStream::flush "flush()" is a `slice` of the output buffer
- * and thus it aliases the output buffer's memory. This avoids dynamic memory
- * allocation during the @ref matx::ResamplePolyStream::feed "feed()" / @ref matx::ResamplePolyStream::flush "flush()" calls, but the user must ensure to
- * consume the returned slice before reusing the output buffer.
+ * Each @ref matx::ResamplePolyStream::feed "feed()" / @ref matx::ResamplePolyStream::flush "flush()" call writes the outputs to the front of the
+ * output buffer and returns the number written (which may be 0), so no dynamic
+ * memory is allocated during the call. Consume the produced region
+ * `slice(out, {0}, {count})` before reusing the output buffer. A zero-length
+ * slice is not valid, so create and use the slice only when count > 0.
  *
  * @tparam InType Sample type of the input stream (as in make_tensor<T>)
  * @tparam FilterOp Type of the filter operator (deduced)

@@ -7,7 +7,7 @@ Streaming polyphase channelizer: channelize a signal delivered in segments,
 equivalent to a one-shot :ref:`channelize_poly <channelize_poly_func>` over
 the concatenated stream
 
-.. versionadded:: 1.0.0
+.. versionadded:: 1.1.0
 
 .. doxygenstruct:: matx::ChannelizePolyStreamParams
    :members:

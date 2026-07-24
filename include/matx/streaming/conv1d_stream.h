@@ -215,15 +215,16 @@ public:
   }
 
   /**
-   * @brief Feed a segment of new samples and receive the outputs it produces.
+   * @brief Feed a segment of new samples and receive the number of outputs it
+   * produces.
    *
-   * Outputs are written to the front of `out` and returned as a slice of
-   * `out` sized to the produced count. Runs asynchronously on the object's
-   * executor; consume (or copy) the returned slice before reusing `out`.
-   * Emits up to one output per new sample; the first feeds of a SAME or VALID
-   * stream emit fewer while the mode's leading outputs are skipped. Throws
-   * matxInvalidParameter if called after flush(). Use reset() to start a new
-   * stream.
+   * Outputs are written to the front of `out`; the return value is the number
+   * of outputs written. Consume `slice(out, {0}, {count})` (the produced region)
+   * before reusing `out`. Runs asynchronously on the object's executor. Emits
+   * up to one output per new sample; the first feeds of a SAME or VALID stream
+   * emit fewer (possibly zero) while the mode's leading outputs are skipped.
+   * Throws matxInvalidParameter if called after flush(). Use reset() to start a
+   * new stream.
    *
    * @tparam InOp 1D input operator type (deduced)
    * @tparam OutTensor 1D output tensor type (deduced)
@@ -233,12 +234,14 @@ public:
    *   evaluates a per-call temporary; for hot streaming loops prefer a
    *   directly-evaluable segment (a tensor, view, or generator) or materialize
    *   once and reuse.
-   * @param out Output buffer with last-dim size >= max_output(segment size);
+   * @param out Output buffer with last-dim size >= max_output(input_segment_size);
    *   throws matxInvalidSize if smaller than the produced count
-   * @return Slice of `out` containing the produced outputs (possibly empty)
+   * @return Number of outputs written to the front of `out` (may be 0). A
+   *   zero-length slice is not valid, so create and use `slice(out, {0}, {count})`
+   *   only when count > 0.
    */
   template <typename InOp, typename OutTensor>
-  auto feed(const InOp &new_samples, OutTensor &out)
+  index_t feed(const InOp &new_samples, OutTensor &out)
   {
     static_assert(InOp::Rank() == 1, "Conv1DStream::feed expects a 1D segment");
     static_assert(std::is_same_v<typename InOp::value_type, InType>,
@@ -259,14 +262,14 @@ public:
     // owed to the mode's startup skip by trimming the buffer front instead
     // (VALID over sig[d:] starts at FULL[e-nl+d]; no skipped output computed).
     // The count depends only on sizes, so validate the output before running
-    // the segment's lifecycle.
+    // the segment's lifecycle. Output slices are taken only when cnt > 0, since
+    // MatX tensors cannot represent a zero-length slice.
     const index_t d = cuda::std::min(skip_rem_, nl);
     const index_t cnt = nl - d;
     if (out.Size(OutTensor::Rank() - 1) < cnt) {
       MATX_THROW(matxInvalidSize,
           "Conv1DStream::feed: output buffer smaller than the produced count");
     }
-    auto out_slice = slice(out, {0}, {cnt});
 
     // Materialize the segment for the two reads below (the convolution and the
     // retain-buffer update). The guard runs PreRun now and the matching PostRun
@@ -281,11 +284,11 @@ public:
 
     if (L_ == 1) { // degenerate length-1 filter: pointwise, no retained history
       if (cnt > 0) {
-        conv1d_impl(out_slice, new_samples, filter_, MATX_C_MODE_VALID,
+        conv1d_impl(slice(out, {0}, {cnt}), new_samples, filter_, MATX_C_MODE_VALID,
                     MATX_C_METHOD_DIRECT, exec_);
       }
       skip_rem_ -= d; // skip_ == 0 for L == 1, so d == 0; kept for uniformity
-      return out_slice;
+      return cnt;
     }
 
     // Lazy [retain | new] view. The retain lives in half `retain_buf_ind_` of
@@ -293,7 +296,7 @@ public:
     auto retain = cur_retain();
     auto sig = concat(0, retain, new_samples);
     if (cnt > 0) {
-      conv1d_impl(out_slice, slice(sig, {d}, {L_ - 1 + nl}), filter_,
+      conv1d_impl(slice(out, {0}, {cnt}), slice(sig, {d}, {L_ - 1 + nl}), filter_,
                   MATX_C_MODE_VALID, MATX_C_METHOD_DIRECT, exec_);
     }
 
@@ -308,7 +311,7 @@ public:
     retain_buf_ind_ = 1 - retain_buf_ind_;
     skip_rem_ -= d;
 
-    return out_slice;
+    return cnt;
   }
 
   /**
@@ -316,49 +319,50 @@ public:
    *
    * FULL emits the L-1 trailing (right-zero-padded) outputs, SAME emits
    * L-1-L/2, and VALID emits none. The first call emits the trailing outputs
-   * and ends the stream. Subsequent calls return an empty slice, and feed()
-   * throws until reset() starts a new stream. A flush() that throws (for
-   * example, an undersized output buffer) does not end the stream and can be
-   * retried. Runs asynchronously on the object's executor.
+   * and ends the stream. Subsequent calls return 0, and feed() throws until
+   * reset() starts a new stream. A flush() that throws (for example, an
+   * undersized output buffer) does not end the stream and can be retried. Runs
+   * asynchronously on the object's executor.
    *
    * @tparam OutTensor 1D output tensor type (deduced)
-   * @param out Output buffer with last-dim size >= max_output(segment size);
+   * @param out Output buffer with last-dim size >= max_output(input_segment_size);
    *   throws matxInvalidSize if smaller than the produced count
-   * @return Slice of `out` containing the produced outputs (possibly empty)
+   * @return Number of outputs written to the front of `out` (may be 0). A
+   *   zero-length slice is not valid, so create and use `slice(out, {0}, {count})`
+   *   only when count > 0.
    */
   template <typename OutTensor>
-  auto flush(OutTensor &out)
+  index_t flush(OutTensor &out)
   {
     static_assert(OutTensor::Rank() == 1, "Conv1DStream::flush expects a 1D output");
     static_assert(is_tensor_v<OutTensor>,
         "Conv1DStream::flush: output must be a tensor or tensor view (writable, "
         "storage-backed); a transform or expression operator cannot be an output");
     if (flushed_) {
-      return slice(out, {0}, {index_t(0)});
+      return index_t(0);
     }
     const index_t d = cuda::std::min(skip_rem_, flush_len_);
     const index_t cnt = flush_len_ - d;
     if (cnt == 0) {
       flushed_ = true;
-      return slice(out, {0}, {index_t(0)});
+      return index_t(0);
     }
     if (out.Size(OutTensor::Rank() - 1) < cnt) {
       MATX_THROW(matxInvalidSize,
           "Conv1DStream::flush: output buffer smaller than the produced count");
     }
-    auto out_slice = slice(out, {0}, {cnt});
     // [retain | zeros(flush_len)] has length L-1+flush_len; VALID over its
     // [d:] suffix yields exactly the cnt trailing outputs. flush() reads the
     // retain buffer (a tensor) and a zeros generator -- no operator segment --
     // so there is no segment lifecycle to run here.
     auto retain = cur_retain();
     auto sig = concat(0, retain, zeros<InType>({flush_len_}));
-    conv1d_impl(out_slice, slice(sig, {d}, {L_ - 1 + flush_len_}), filter_,
+    conv1d_impl(slice(out, {0}, {cnt}), slice(sig, {d}, {L_ - 1 + flush_len_}), filter_,
                 MATX_C_MODE_VALID, MATX_C_METHOD_DIRECT, exec_);
     // Commit end-of-stream only after validation and scheduling succeed, so a
     // failed flush() (e.g. an undersized output buffer) can be retried.
     flushed_ = true;
-    return out_slice;
+    return cnt;
   }
 
 private:
@@ -387,7 +391,7 @@ private:
  *
  * The object filters an arbitrarily long signal delivered in segments of any
  * (possibly varying) size. Feed segments via @ref matx::Conv1DStream::feed "feed()" and call @ref matx::Conv1DStream::flush "flush()" once at
- * end of stream. The concatenation of the produced slices equals a single
+ * end of stream. The concatenation of the produced outputs equals a single
  * one-shot `conv1d(signal, filter, params.mode)` over the whole signal
  * whenever the total signal length N is at least the filter length L. For
  * N < L the one-shot swaps its operand roles (the smaller operand becomes the
@@ -408,10 +412,11 @@ private:
  * If the maximum segment size is known a priori, then a single output buffer
  * can be allocated and reused for all calls.
  *
- * The operator returned by @ref matx::Conv1DStream::feed "feed()" / @ref matx::Conv1DStream::flush "flush()" is a `slice` of the output buffer
- * and thus it aliases the output buffer's memory. This avoids dynamic memory
- * allocation during the @ref matx::Conv1DStream::feed "feed()" / @ref matx::Conv1DStream::flush "flush()" calls, but the user must ensure to
- * consume the returned slice before reusing the output buffer.
+ * Each @ref matx::Conv1DStream::feed "feed()" / @ref matx::Conv1DStream::flush "flush()" call writes the outputs to the front of the
+ * output buffer and returns the number written (which may be 0), so no dynamic
+ * memory is allocated during the call. Consume the produced region
+ * `slice(out, {0}, {count})` before reusing the output buffer. A zero-length
+ * slice is not valid, so create and use the slice only when count > 0.
  *
  * @tparam InType Sample type of the input stream (as in make_tensor<T>)
  * @tparam FilterOp Type of the filter operator (deduced)

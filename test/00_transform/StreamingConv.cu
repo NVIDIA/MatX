@@ -31,7 +31,7 @@
 /////////////////////////////////////////////////////////////////////////////////
 
 // Test for the Conv1DStream object (matx/streaming/conv1d_stream.h). Streaming
-// a signal in chunks (feed() ... flush()) and concatenating the produced slices
+// a signal in chunks (feed() ... flush()) and concatenating the produced outputs
 // must equal a single one-shot conv1d over the whole input in the configured
 // mode (FULL / SAME / VALID). Covers odd and even filter lengths (the SAME
 // start offset differs by parity), the degenerate L==1 filter, chunk > N, and
@@ -107,17 +107,15 @@ bool run_case(Exec &exec, index_t N, index_t L, matxConvCorrMode_t mode,
     const index_t nl = std::min(chunks[ci++ % chunks.size()], N - g);
     auto in_chunk = slice(x, {g}, {g + nl});
     g += nl;
-    auto produced = stream_obj.feed(in_chunk, frame);
-    const index_t cnt = produced.Size(0);
+    const index_t cnt = stream_obj.feed(in_chunk, frame);
     if (cnt > 0) {
-      (slice(acc, {off}, {off + cnt}) = produced).run(exec);
+      (slice(acc, {off}, {off + cnt}) = slice(frame, {0}, {cnt})).run(exec);
     }
     off += cnt;
   }
-  auto tail = stream_obj.flush(frame);
-  const index_t tcnt = tail.Size(0);
+  const index_t tcnt = stream_obj.flush(frame);
   if (tcnt > 0) {
-    (slice(acc, {off}, {off + tcnt}) = tail).run(exec);
+    (slice(acc, {off}, {off + tcnt}) = slice(frame, {0}, {tcnt})).run(exec);
   }
   off += tcnt;
   exec.sync();
@@ -201,11 +199,11 @@ TEST(StreamingConv, ShortStreamValidEmitsNothing)
     }
     auto stream_obj = make_conv1d_stream<T>(h, {.mode = MATX_C_MODE_VALID}, exec);
     auto frame = make_tensor<T>({stream_obj.max_output(N)});
-    auto produced = stream_obj.feed(x, frame);
-    auto tail = stream_obj.flush(frame);
+    const index_t produced = stream_obj.feed(x, frame);
+    const index_t tail = stream_obj.flush(frame);
     exec.sync();
-    EXPECT_EQ(produced.Size(0), 0) << "N=" << N;
-    EXPECT_EQ(tail.Size(0), 0) << "N=" << N;
+    EXPECT_EQ(produced, 0) << "N=" << N;
+    EXPECT_EQ(tail, 0) << "N=" << N;
   }
 }
 
@@ -264,11 +262,11 @@ TEST(StreamingConv, FlushRetryAfterFailure)
   auto stream_obj = make_conv1d_stream<T>(h, {.mode = MATX_C_MODE_FULL}, exec);
   auto frame = make_tensor<T>({stream_obj.max_output(N)});
   auto small = make_tensor<T>({L - 2}); // smaller than the L-1 flush outputs
-  EXPECT_EQ(stream_obj.feed(x, frame).Size(0), N);
+  EXPECT_EQ(stream_obj.feed(x, frame), N);
   EXPECT_THROW(stream_obj.flush(small), detail::matxException);
   // The failed flush did not end the stream; a retry emits the full tail.
-  EXPECT_EQ(stream_obj.flush(frame).Size(0), L - 1);
-  EXPECT_EQ(stream_obj.flush(frame).Size(0), 0);
+  EXPECT_EQ(stream_obj.flush(frame), L - 1);
+  EXPECT_EQ(stream_obj.flush(frame), 0);
   exec.sync();
 }
 
@@ -286,13 +284,13 @@ TEST(StreamingConv, FlushEndsStream)
   for (index_t i = 0; i < N; i++) { x(i) = static_cast<float>(i + 1); }
   auto stream_obj = make_conv1d_stream<T>(h, {.mode = MATX_C_MODE_FULL}, exec);
   auto frame = make_tensor<T>({stream_obj.max_output(N)});
-  EXPECT_EQ(stream_obj.feed(x, frame).Size(0), N);
-  EXPECT_EQ(stream_obj.flush(frame).Size(0), L - 1);
-  EXPECT_EQ(stream_obj.flush(frame).Size(0), 0);
+  EXPECT_EQ(stream_obj.feed(x, frame), N);
+  EXPECT_EQ(stream_obj.flush(frame), L - 1);
+  EXPECT_EQ(stream_obj.flush(frame), 0);
   EXPECT_THROW(stream_obj.feed(x, frame), detail::matxException);
   stream_obj.reset();
-  EXPECT_EQ(stream_obj.feed(x, frame).Size(0), N);
-  EXPECT_EQ(stream_obj.flush(frame).Size(0), L - 1);
+  EXPECT_EQ(stream_obj.feed(x, frame), N);
+  EXPECT_EQ(stream_obj.flush(frame), L - 1);
   exec.sync();
 }
 
@@ -323,14 +321,12 @@ TEST(StreamingConv, TransformValuedFilterMaterializes)
   index_t off = 0;
   for (index_t g = 0; g < N; g += chunk) {
     const index_t nl = std::min(chunk, N - g);
-    auto produced = stream_obj.feed(slice(sig, {g}, {g + nl}), frame);
-    const index_t cnt = produced.Size(0);
-    if (cnt > 0) { (slice(acc, {off}, {off + cnt}) = produced).run(exec); }
+    const index_t cnt = stream_obj.feed(slice(sig, {g}, {g + nl}), frame);
+    if (cnt > 0) { (slice(acc, {off}, {off + cnt}) = slice(frame, {0}, {cnt})).run(exec); }
     off += cnt;
   }
-  auto tail = stream_obj.flush(frame);
-  const index_t tcnt = tail.Size(0);
-  if (tcnt > 0) { (slice(acc, {off}, {off + tcnt}) = tail).run(exec); }
+  const index_t tcnt = stream_obj.flush(frame);
+  if (tcnt > 0) { (slice(acc, {off}, {off + tcnt}) = slice(frame, {0}, {tcnt})).run(exec); }
   off += tcnt;
   exec.sync();
   ASSERT_EQ(off, N);
@@ -360,14 +356,12 @@ matx::tensor_t<float, 1> stream_conv_same(cudaExecutor &exec,
   for (index_t g = 0; g < N; g += chunk) {
     const index_t nl = std::min(chunk, N - g);
     auto seg = build_seg(slice(sig, {g}, {g + nl}), nl);
-    auto produced = stream_obj.feed(seg, frame);
-    const index_t cnt = produced.Size(0);
-    if (cnt > 0) { (slice(acc, {off}, {off + cnt}) = produced).run(exec); }
+    const index_t cnt = stream_obj.feed(seg, frame);
+    if (cnt > 0) { (slice(acc, {off}, {off + cnt}) = slice(frame, {0}, {cnt})).run(exec); }
     off += cnt;
   }
-  auto tail = stream_obj.flush(frame);
-  const index_t tcnt = tail.Size(0);
-  if (tcnt > 0) { (slice(acc, {off}, {off + tcnt}) = tail).run(exec); }
+  const index_t tcnt = stream_obj.flush(frame);
+  if (tcnt > 0) { (slice(acc, {off}, {off + tcnt}) = slice(frame, {0}, {tcnt})).run(exec); }
   off += tcnt;
   exec.sync();
   EXPECT_EQ(off, N);
@@ -412,15 +406,13 @@ TEST(StreamingConv, SegmentLifecycleRunExactlyOnce)
     const index_t nl = std::min(chunk, N - g);
     PreRunLifecycle seg_life;
     auto seg = make_prerun_tester(slice(sig, {g}, {g + nl}), seg_life);
-    auto produced = stream_obj.feed(seg, frame);
-    const index_t cnt = produced.Size(0);
-    if (cnt > 0) { (slice(acc, {off}, {off + cnt}) = produced).run(exec); }
+    const index_t cnt = stream_obj.feed(seg, frame);
+    if (cnt > 0) { (slice(acc, {off}, {off + cnt}) = slice(frame, {0}, {cnt})).run(exec); }
     off += cnt;
     ExpectLifecycleClean(seg_life, "conv segment feed at " + std::to_string(g));
   }
-  auto tail = stream_obj.flush(frame);
-  const index_t tcnt = tail.Size(0);
-  if (tcnt > 0) { (slice(acc, {off}, {off + tcnt}) = tail).run(exec); }
+  const index_t tcnt = stream_obj.flush(frame);
+  if (tcnt > 0) { (slice(acc, {off}, {off + tcnt}) = slice(frame, {0}, {tcnt})).run(exec); }
   off += tcnt;
   exec.sync();
   ASSERT_EQ(off, N);

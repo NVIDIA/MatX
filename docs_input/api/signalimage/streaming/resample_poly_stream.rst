@@ -7,7 +7,7 @@ Streaming polyphase resampler: resample a signal delivered in segments,
 equivalent to a one-shot :ref:`resample_poly <resample_poly_func>` over the
 concatenated stream
 
-.. versionadded:: 1.0.0
+.. versionadded:: 1.1.0
 
 .. doxygenstruct:: matx::ResamplePolyStreamParams
    :members:
