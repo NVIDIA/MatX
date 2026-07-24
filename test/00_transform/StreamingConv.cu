@@ -381,11 +381,11 @@ inline float max_rel_err(const matx::tensor_t<float, 1> &a,
   return max_err / (1.0f + max_abs);
 }
 
-// Directly verify the segment operator's PreRun/PostRun lifecycle runs exactly
-// once per feed. The old design ran two independent conv1d(...).run() and
-// (next_retain = ...).run() expressions, materializing a transform segment
-// twice; the probe (no idempotency guard) fails if the lifecycle is run zero or
-// two times. A final flush() reconstructs the full result.
+// Verify the invariant that a segment operator is materialized exactly once per
+// feed -- its PreRun/PostRun lifecycle runs a single time. The probe is a
+// pass-through that counts the PreRun/PostRun calls forwarded to it, so it can
+// distinguish one lifecycle from two where a value check cannot. A final
+// flush() reconstructs the full result.
 TEST(StreamingConv, SegmentLifecycleRunExactlyOnce)
 {
   cudaExecutor exec{};
@@ -415,6 +415,59 @@ TEST(StreamingConv, SegmentLifecycleRunExactlyOnce)
   if (tcnt > 0) { (slice(acc, {off}, {off + tcnt}) = slice(frame, {0}, {tcnt})).run(exec); }
   off += tcnt;
   exec.sync();
+  ASSERT_EQ(off, N);
+  EXPECT_LT(max_rel_err(acc, ref, 1.0f, N), 1e-4f);
+}
+
+// Reusing the same materializing operator requires each completed PostRun to
+// reopen its PreRun guard. Without that reset, the second feed skips
+// materialization, reads the first feed's freed temporary, and unbalances the
+// nested operand lifecycle.
+TEST(StreamingConv, ReusedTransformSegmentRematerializes)
+{
+  cudaExecutor exec{};
+  using T = float;
+  const index_t chunk = 32, N = 2 * chunk, L = 17;
+  auto h = make_tensor<T>({L});
+  for (index_t k = 0; k < L; k++) {
+    h(k) = 1.0f / static_cast<float>(k + 1);
+  }
+  auto sig = make_tensor<T>({chunk});
+  auto full = make_tensor<T>({N});
+  for (index_t i = 0; i < chunk; i++) {
+    sig(i) = std::sin(0.11f * static_cast<float>(i));
+    full(i) = sig(i);
+    full(chunk + i) = sig(i);
+  }
+  auto ref = make_tensor<T>({N});
+  (ref = conv1d(full, h, MATX_C_MODE_SAME)).run(exec);
+
+  PreRunLifecycle segment_operand_life;
+  auto segment = conv1d(make_prerun_tester(sig, segment_operand_life),
+                        ones<T>({1}), MATX_C_MODE_SAME);
+  auto stream_obj = make_conv1d_stream<T>(
+      h, {.mode = MATX_C_MODE_SAME}, exec);
+  auto frame = make_tensor<T>({stream_obj.max_output(chunk)});
+  auto acc = make_tensor<T>({N});
+
+  index_t off = 0;
+  for (int feed = 0; feed < 2; feed++) {
+    const index_t cnt = stream_obj.feed(segment, frame);
+    if (cnt > 0) {
+      (slice(acc, {off}, {off + cnt}) = slice(frame, {0}, {cnt})).run(exec);
+    }
+    off += cnt;
+  }
+  ExpectLifecycleClean(segment_operand_life, "reused conv1d segment",
+                       /*expected_calls=*/2);
+
+  const index_t tcnt = stream_obj.flush(frame);
+  if (tcnt > 0) {
+    (slice(acc, {off}, {off + tcnt}) = slice(frame, {0}, {tcnt})).run(exec);
+  }
+  off += tcnt;
+  exec.sync();
+
   ASSERT_EQ(off, N);
   EXPECT_LT(max_rel_err(acc, ref, 1.0f, N), 1e-4f);
 }

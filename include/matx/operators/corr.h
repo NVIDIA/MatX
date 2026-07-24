@@ -207,6 +207,8 @@ namespace matx
           } 
 
           matxFree(ptr);
+          ptr = nullptr;
+          prerun_done_ = false;
         }          
     };
   }

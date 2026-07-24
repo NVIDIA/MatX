@@ -149,7 +149,9 @@ namespace matx
             b_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           } 
 
-          matxFree(ptr); 
+          matxFree(ptr);
+          ptr = nullptr;
+          prerun_done_ = false;
         }           
     };
   }
