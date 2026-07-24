@@ -198,8 +198,6 @@ Unless otherwise noted, these options are OFF by default.
     - ``-DMATX_EN_BLIS=ON``
   * - OpenBLAS Support
     - ``-DMATX_EN_OPENBLAS=ON``
-  * - Multi-GPU Support
-    - ``-DMATX_MULTI_GPU=ON``
   * - Disable CUB Caching
     - ``-DMATX_DISABLE_CUB_CACHE=ON``
   * - Enable NVIDIA MathDx support for kernel fusion

@@ -197,7 +197,14 @@ namespace matx
             tp->Exec(ex);
           }
           else if constexpr (is_matx_set_op<T>()) {
-            if constexpr (is_matx_transform_op<typename T::op_type>() && is_tensor_view_v<typename T::tensor_type>) {
+            if constexpr (is_distributed_tensor_v<typename T::op_type> &&
+                          is_tensor_view_v<typename T::tensor_type>) {
+              static_assert(is_distributed_executor_v<Ex>,
+                            "Distributed-to-regular assignment requires "
+                            "distributedCUDAExecutor");
+              tp->get_rhs().MaterializeTo(tp->get_lhs(), ex);
+            }
+            else if constexpr (is_matx_transform_op<typename T::op_type>() && is_tensor_view_v<typename T::tensor_type>) {
               // If we're doing a simple set operation from a transform we take a shorcut to avoid the extra
               // async allocation we'd normally have to do   
               if (!can_alias<decltype(tp->get_rhs())>() && detail::check_aliased_memory(tp->get_lhs(), tp->get_rhs(), false)) {

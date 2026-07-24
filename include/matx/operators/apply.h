@@ -36,6 +36,11 @@
 #include "matx/operators/base_operator.h"
 #include <format>
 
+namespace matx::experimental::detail {
+template <typename Function, typename... Inputs>
+auto MakeDistributedApply(Function &&function, const Inputs &...inputs);
+}
+
 namespace matx
 {
   /**
@@ -222,8 +227,18 @@ namespace matx
   template <typename Func, typename... Ops>
   auto __MATX_INLINE__ apply(Func func, const Ops&... ops)
   {
-    return detail::ApplyOp<Func, Ops...>(func, ops...);
+    static_assert(sizeof...(Ops) > 0,
+                  "apply requires at least one input operator");
+    if constexpr ((is_distributed_tensor_v<Ops> || ...)) {
+      static_assert(
+          (is_distributed_tensor_v<Ops> && ...),
+          "apply does not mix distributed and non-distributed tensor inputs");
+      return experimental::detail::MakeDistributedApply(
+          std::move(func), ops...);
+    }
+    else {
+      return detail::ApplyOp<Func, Ops...>(func, ops...);
+    }
   }
 
 } // end namespace matx
-

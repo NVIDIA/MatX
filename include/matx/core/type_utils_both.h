@@ -103,6 +103,20 @@ inline constexpr bool is_dynamic_tensor_v =
   requires { typename remove_cvref_t<T>::dynamic_tensor; };
 
 /**
+ * @brief Determine if a type is an experimental distributed tensor
+ */
+template <typename T>
+inline constexpr bool is_distributed_tensor_v =
+  requires { typename remove_cvref_t<T>::distributed_tensor; };
+
+/**
+ * @brief Determine if a type is an experimental distributed expression
+ */
+template <typename T>
+inline constexpr bool is_distributed_expression_v =
+  requires { typename remove_cvref_t<T>::distributed_expression; };
+
+/**
  * @brief Determine if an expression tree contains dynamic tensors
  */
 template <typename T>
@@ -396,8 +410,15 @@ concept is_cuda_executor = requires {
 };
 
 // Legacy variable for backwards compatibility
-template <typename T> 
+template <typename T>
 inline constexpr bool is_cuda_executor_v = requires { typename remove_cvref_t<T>::cuda_executor; };
+
+/**
+ * @brief Determine if a type is a distributed executor
+ */
+template <typename T>
+inline constexpr bool is_distributed_executor_v =
+  requires { typename remove_cvref_t<T>::distributed_executor; };
 
 /**
  * @brief Determine if a type is a CUDA executor but NOT a JIT CUDA executor
@@ -1212,4 +1233,3 @@ namespace detail {
 
 
 } // end namespace matx
-
