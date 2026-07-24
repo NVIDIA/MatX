@@ -41,6 +41,9 @@
 #include "matx/core/log.h"
 #include "matx/transforms/matmul/matmul_cuda.h"
 #include "matx/transforms/matmul/matmul_cusparse.h"
+#ifdef MATX_EN_CUBLASMP
+  #include "matx/transforms/distributed/distributed_mp.h"
+#endif
 #ifdef MATX_EN_CPU_MATMUL
   #include "matx/transforms/matmul/matmul_cblas.h"
 #endif
@@ -456,6 +459,48 @@ namespace matx
     };
   }
 
+  namespace experimental::detail {
+
+    template <typename OpA, typename OpB>
+    class distributed_mp_matmul_op {
+    public:
+      using distributed_expression = bool;
+      using value_type = typename remove_cvref_t<OpA>::value_type;
+
+      distributed_mp_matmul_op(const OpA &a, const OpB &b, float alpha,
+                               float beta)
+          : a_{a}, b_{b}, alpha_{alpha}, beta_{beta} {}
+
+      template <typename Out, typename Executor>
+      void ExecuteTo(Out &out, Executor &executor) const {
+        static_assert(is_block_cyclic_distributed_tensor_v<Out>,
+                      "Block-cyclic matmul requires a block-cyclic output");
+        if constexpr (std::is_same_v<remove_cvref_t<Executor>,
+                                     distributedCUDAExecutor>) {
+#ifdef MATX_EN_CUBLASMP
+          MatmulMpImpl(out, a_, b_, executor, static_cast<value_type>(alpha_),
+                       static_cast<value_type>(beta_));
+#else
+          MATX_THROW(matxNotSupported,
+                     "Block-cyclic matmul requires MATX_EN_CUBLASMP");
+#endif
+        }
+        else {
+          MATX_THROW(
+              matxInvalidExecutor,
+              "Block-cyclic matmul requires distributedCUDAExecutor");
+        }
+      }
+
+    private:
+      remove_cvref_t<OpA> a_;
+      remove_cvref_t<OpB> b_;
+      float alpha_;
+      float beta_;
+    };
+
+  } // namespace experimental::detail
+
 
   /**
    * Run a GEMM (generic matrix multiply))
@@ -490,21 +535,32 @@ namespace matx
       static_assert(is_distributed_tensor_v<OpA> &&
                         is_distributed_tensor_v<OpB>,
                     "matmul requires both inputs to be distributed");
-      static_assert(remove_cvref_t<OpA>::Rank() ==
-                        remove_cvref_t<OpB>::Rank(),
-                    "First-pass distributed matmul requires equal input ranks");
-      static_assert(remove_cvref_t<OpA>::Rank() >= 3,
-                    "Distributed matmul requires a batch dimension followed "
-                    "by matrix dimensions");
+      if constexpr (is_block_cyclic_distributed_tensor_v<OpA> ||
+                    is_block_cyclic_distributed_tensor_v<OpB>) {
+        static_assert(is_block_cyclic_distributed_tensor_v<OpA> &&
+                          is_block_cyclic_distributed_tensor_v<OpB>,
+                      "Block-cyclic matmul requires both inputs to use "
+                      "block_cyclic_distribution_t");
+        return experimental::detail::distributed_mp_matmul_op<OpA, OpB>{
+            A, B, alpha, beta};
+      }
+      else {
+        static_assert(
+            remove_cvref_t<OpA>::Rank() == remove_cvref_t<OpB>::Rank(),
+            "Batch-sharded distributed matmul requires equal input ranks");
+        static_assert(remove_cvref_t<OpA>::Rank() >= 3,
+                      "Distributed matmul needs block-cyclic rank-2 matrices "
+                      "or a batch dimension followed by local matrix dimensions");
 
-      auto local_matmul = [alpha, beta](const auto &local_a,
-                                        const auto &local_b) {
-        return detail::MatMulOp(local_a, local_b, alpha, beta,
-                                detail::no_permute_t{});
-      };
-      return experimental::detail::make_distributed_local_transform<
-          typename remove_cvref_t<OpA>::value_type, 2>(
-          std::move(local_matmul), A, B);
+        auto local_matmul = [alpha, beta](const auto &local_a,
+                                          const auto &local_b) {
+          return detail::MatMulOp(local_a, local_b, alpha, beta,
+                                  detail::no_permute_t{});
+        };
+        return experimental::detail::make_distributed_local_transform<
+            typename remove_cvref_t<OpA>::value_type, 2>(
+            std::move(local_matmul), A, B);
+      }
     }
     else {
       return detail::MatMulOp(A, B, alpha, beta, detail::no_permute_t{});

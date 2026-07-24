@@ -41,6 +41,7 @@
 #include "matx/core/operator_options.h"
 #include "matx/core/log.h"
 
+#include "matx/transforms/distributed/fft_mg.h"
 #include "matx/transforms/fft/fft_cuda.h"
 #ifdef MATX_EN_CPU_FFT
   #include "matx/transforms/fft/fft_fftw.h"
@@ -519,6 +520,120 @@ namespace matx
     };
   }
 
+  namespace experimental::detail {
+
+    template <typename ValueType, matx::detail::FFTDirection Direction,
+              typename OpA>
+    class distributed_fft_op {
+    public:
+      using distributed_expression = bool;
+      using value_type = ValueType;
+
+      distributed_fft_op(const OpA &a, index_t fft_size, FFTNorm norm)
+          : a_{a}, fft_size_{fft_size}, norm_{norm} {}
+
+      template <typename Out, typename Executor>
+      void ExecuteTo(Out &out, Executor &executor) const {
+        static_assert(is_distributed_tensor_v<Out>,
+                      "Distributed FFT requires a distributed output");
+        static_assert(is_distributed_executor_v<Executor>,
+                      "Distributed FFT requires a distributed executor");
+        static_assert(remove_cvref_t<Out>::Rank() ==
+                          remove_cvref_t<OpA>::Rank(),
+                      "Distributed FFT input and output ranks must match");
+        static_assert(
+            std::is_same_v<typename remove_cvref_t<Out>::value_type,
+                           value_type>,
+            "Distributed FFT output type does not match the transform");
+
+        if (TransformDimensionIsLocal(a_.DistributionDescriptor())) {
+          auto local_fft = [fft_size = fft_size_,
+                            norm = norm_](const auto &local_a) {
+            using local_type = remove_cvref_t<decltype(local_a)>;
+            if constexpr (Direction == matx::detail::FFTDirection::FORWARD) {
+              constexpr auto fft_type =
+                  matx::detail::ComplexInType<local_type>();
+              return matx::detail::FFTOp<
+                  local_type, matx::detail::no_permute_t, Direction,
+                  fft_type>(local_a, fft_size, matx::detail::no_permute_t{},
+                            norm);
+            }
+            else {
+              return matx::detail::FFTOp<
+                  local_type, matx::detail::no_permute_t, Direction,
+                  matx::detail::FFTType::C2C>(
+                  local_a, fft_size, matx::detail::no_permute_t{}, norm);
+            }
+          };
+          auto local_transform =
+              make_distributed_local_transform<ValueType, 1>(
+                  std::move(local_fft), a_);
+          local_transform.ExecuteTo(out, executor);
+          return;
+        }
+
+        if constexpr (remove_cvref_t<OpA>::Rank() != 1) {
+          MATX_THROW(
+              matxNotSupported,
+              "A partitioned distributed FFT dimension currently requires "
+              "a rank-1 complex transform");
+        }
+        else {
+          matx::detail::DistributedCheck(
+              fft_size_ == 0 || fft_size_ == a_.Size(0), matxNotSupported,
+              "cuFFT multi-GPU does not currently support FFT resizing");
+          for (size_t fragment = 0;
+               fragment < a_.DistributionDescriptor().FragmentCount();
+               ++fragment) {
+            matx::detail::DistributedCheck(
+                a_.DistributionDescriptor()
+                        .FragmentEndpoint(fragment)
+                        .process_rank == a_.ProcessRank(),
+                matxNotSupported,
+                "A transform dimension spanning processes requires cuFFTMp, "
+                "whose distributed allocation path is not yet available");
+          }
+          if constexpr (
+              std::is_same_v<
+                  typename remove_cvref_t<OpA>::value_type, ValueType> &&
+              (std::is_same_v<ValueType, cuda::std::complex<float>> ||
+               std::is_same_v<ValueType, cuda::std::complex<double>>)) {
+            FftMgImpl<Direction>(out, a_, executor, norm_);
+          }
+          else {
+            MATX_THROW(matxNotSupported,
+                       "cuFFT multi-GPU currently supports only complex-to-"
+                       "complex float and double transforms");
+          }
+        }
+      }
+
+    private:
+      template <typename Distribution>
+      static bool TransformDimensionIsLocal(
+          const Distribution &distribution) {
+        constexpr int rank = Distribution::Rank();
+        for (size_t fragment = 0; fragment < distribution.FragmentCount();
+             ++fragment) {
+          distributed_index_t<rank> local_zero{};
+          const auto origin =
+              distribution.LocalToGlobal(fragment, local_zero);
+          const auto local_shape = distribution.LocalShape(fragment);
+          if (origin[rank - 1] != 0 ||
+              local_shape[rank - 1] != distribution.GlobalShape()[rank - 1]) {
+            return false;
+          }
+        }
+        return true;
+      }
+
+      remove_cvref_t<OpA> a_;
+      index_t fft_size_;
+      FFTNorm norm_;
+    };
+
+  } // namespace experimental::detail
+
 
   /**
    * Run a 1D FFT with a cached plan
@@ -543,23 +658,13 @@ namespace matx
     constexpr auto fft_type = detail::ComplexInType<OpA>();
     const index_t fft_size_ = static_cast<index_t>(fft_size);
     if constexpr (is_distributed_tensor_v<OpA>) {
-      static_assert(remove_cvref_t<OpA>::Rank() >= 2,
-                    "Distributed FFT requires a batch dimension followed by "
-                    "the transform dimension");
       using input_type = typename remove_cvref_t<OpA>::value_type;
       using output_type = std::conditional_t<
           is_complex_v<input_type>, input_type,
           typename detail::scalar_to_complex<input_type>::ctype>;
-      auto local_fft = [fft_size_, norm](const auto &local_a) {
-        using local_type = remove_cvref_t<decltype(local_a)>;
-        constexpr auto local_fft_type = detail::ComplexInType<local_type>();
-        return detail::FFTOp<local_type, detail::no_permute_t,
-                             detail::FFTDirection::FORWARD, local_fft_type>(
-            local_a, fft_size_, detail::no_permute_t{}, norm);
-      };
-      return experimental::detail::make_distributed_local_transform<
-          output_type, 1>(
-          std::move(local_fft), a);
+      return experimental::detail::distributed_fft_op<
+          output_type, detail::FFTDirection::FORWARD, OpA>{
+          a, fft_size_, norm};
     }
     else {
       return detail::FFTOp<OpA, detail::no_permute_t,
@@ -678,7 +783,18 @@ namespace matx
   template<typename OpA>
   __MATX_INLINE__ auto ifft(const OpA &a, uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD) {
     const index_t fft_size_ = static_cast<index_t>(fft_size);
-    return detail::FFTOp<OpA, detail::no_permute_t, detail::FFTDirection::BACKWARD, detail::FFTType::C2C>(a, fft_size_, detail::no_permute_t{} , norm);
+    if constexpr (is_distributed_tensor_v<OpA>) {
+      using output_type = typename remove_cvref_t<OpA>::value_type;
+      return experimental::detail::distributed_fft_op<
+          output_type, detail::FFTDirection::BACKWARD, OpA>{
+          a, fft_size_, norm};
+    }
+    else {
+      return detail::FFTOp<OpA, detail::no_permute_t,
+                           detail::FFTDirection::BACKWARD,
+                           detail::FFTType::C2C>(
+          a, fft_size_, detail::no_permute_t{}, norm);
+    }
   }
 
   /**
@@ -703,6 +819,8 @@ namespace matx
    */
   template<typename OpA>
   __MATX_INLINE__ auto ifft(const OpA &a, const int32_t (&axis)[1], uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD) {
+    static_assert(!is_distributed_tensor_v<OpA>,
+                  "Axis-selecting distributed IFFT is not supported");
     if constexpr (is_dynamic_rank_op_v<remove_cvref_t<OpA>>) {
       auto perm = detail::getPermuteDims(detail::get_dyn_rank(a), axis);
       const index_t fft_size_ = static_cast<index_t>(fft_size);

@@ -39,6 +39,20 @@ Optional Third-party Dependencies
 - `cutensor <https://developer.nvidia.com/cutensor>`_ 2.3.1.0+ (Required when using `einsum`)
 - `cutensornet <https://docs.nvidia.com/cuda/cuquantum/cutensornet>`_ 25.09.1.12+ (Required when using `einsum`)
 - `cuDSS <https://developer.nvidia.com/cudss>`_ 0.7.0.20+ (Required when using `solve` on sparse matrices)
+- `NCCL <https://developer.nvidia.com/nccl>`_ (Required by cuBLASMp and cuSOLVERMp)
+- `cuBLASMp <https://docs.nvidia.com/cuda/cublasmp/>`_ (Required for block-cyclic ``matmul``)
+- `cuSOLVERMp <https://docs.nvidia.com/cuda/cusolvermp/>`_ (Required for block-cyclic ``chol``)
+
+Distributed NVIDIA MP backends are opt-in because cuBLASMp and cuSOLVERMp are
+distributed separately from the CUDA Toolkit. Enable them with
+``-DMATX_EN_CUBLASMP=ON`` and/or ``-DMATX_EN_CUSOLVERMP=ON``. Package prefixes
+may be supplied through ``cublasmp_DIR``, ``cusolvermp_DIR``, and ``nccl_DIR``
+or the corresponding ``CUBLASMP_HOME``, ``CUSOLVERMP_HOME``, and ``NCCL_HOME``
+environment variables.
+
+The single-process cuFFT multi-GPU Xt/Mg path is part of the CUDA Toolkit and
+does not require another CMake option. Include ``<matx/distributed.h>`` to use
+the experimental distributed APIs.
 
 Host (CPU) Support
 ------------------
@@ -190,6 +204,10 @@ Unless otherwise noted, these options are OFF by default.
     - ``-DMATX_EN_CUTENSOR=ON``
   * - cuDSS Support
     - ``-DMATX_EN_CUDSS=ON``
+  * - cuBLASMp Support
+    - ``-DMATX_EN_CUBLASMP=ON``
+  * - cuSOLVERMp Support
+    - ``-DMATX_EN_CUSOLVERMP=ON``
   * - FFTW Support
     - ``-DMATX_EN_X86_FFTW=ON``
   * - NVPL Support

@@ -26,6 +26,7 @@ set (test_sources
     00_tensor/DynamicTensorTests.cu
     00_tensor/DistributedTensorTests.cu
     00_tensor/DistributedTensorMultiGpuTests.cu
+    00_tensor/DistributedMpApiTests.cu
     ${OPERATOR_TEST_FILES}
     00_operators/GeneratorTests.cu
     00_operators/PWelch.cu
