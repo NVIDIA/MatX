@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // BSD 3-Clause License
 //
-// Copyright (c) 2021, NVIDIA Corporation
+// Copyright (c) 2026, NVIDIA Corporation
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -31,40 +31,7 @@
 /////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#ifdef __CUDACC__
-#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ < 600
-#error "MatX requires CUDA compute capability 6.0 or newer."
-#endif
-#include <cuda_runtime_api.h>
-#endif
 
-// defines.h should always be included first. Its definitions may impact
-// the behavior of other headers.
-#include "matx/core/defines.h"
-#include "matx/core/error.h"
-#include "matx/core/log.h"
-#include "matx/file_io/file_io.h"
-#include "matx/core/half_complex.h"
-#include "matx/core/half.h"
-#include "matx/core/nvtx.h"
-#include "matx/core/print.h"
-#include "matx/core/pybind.h"
-#include "matx/core/tensor.h"
-#include "matx/core/dynamic_tensor.h"
-#include "matx/core/sparse_tensor.h"  // sparse support is experimental
-#include "matx/core/make_sparse_tensor.h"
-#include "matx/core/tie.h"
-#include "matx/core/utils.h"
-#include "matx/core/viz.h"
-
-#include "matx/executors/executors.h"
-#include "matx/generators/generators.h"
-#include "matx/operators/operators.h"
-#include "matx/transforms/transforms.h"
-#include "matx/streaming/streaming.h"
-
-#include <cuda/std/complex>
-namespace matx {
-  using fcomplex = cuda::std::complex<float>;
-  using dcomplex = cuda::std::complex<double>;
-}
+#include "matx/streaming/channelize_poly_stream.h"
+#include "matx/streaming/conv1d_stream.h"
+#include "matx/streaming/resample_poly_stream.h"

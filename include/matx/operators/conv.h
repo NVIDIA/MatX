@@ -44,6 +44,12 @@
 namespace matx
 {
   namespace detail {
+    // Direct conv1d limits only the SMALLER operand, min(len_a, len_b): the
+    // kernel stages it in shared memory alongside each signal tile, while the
+    // larger operand may be arbitrarily long. This is the largest minimum
+    // dimension the direct method supports; longer requires MATX_C_METHOD_FFT.
+    static constexpr int CONV1D_MAX_MIN_DIMENSION_DIRECT = 1024;
+
     template <typename OpA, typename OpB, typename PermDims>
     class Conv1DOp : public BaseOp<Conv1DOp<OpA, OpB, PermDims>>
     {
@@ -60,8 +66,6 @@ namespace matx
         mutable detail::tensor_impl_t<out_t, max_rank> tmp_out_;
         mutable out_t *ptr = nullptr;
         mutable bool prerun_done_ = false; 
-
-        static constexpr int MAX_MIN_DIMENSION_DIRECT = 1024;
 
       public:
         using matxop = bool;
@@ -132,7 +136,7 @@ namespace matx
             }
           }
 
-          MATX_ASSERT_STR(method == MATX_C_METHOD_FFT || min_axis <= MAX_MIN_DIMENSION_DIRECT, 
+          MATX_ASSERT_STR(method == MATX_C_METHOD_FFT || min_axis <= CONV1D_MAX_MIN_DIMENSION_DIRECT,
                           matxInvalidSize, "Dimension too large for direct convolution. "
                           "Please switch to FFT convolution using MATX_C_METHOD_FFT");
         }

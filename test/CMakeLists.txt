@@ -37,6 +37,9 @@ set (test_sources
     00_transform/Norm.cu
     00_transform/ResamplePoly.cu
     00_transform/SarBp.cu
+    00_transform/StreamingConv.cu
+    00_transform/StreamingResample.cu
+    00_transform/StreamingChannelize.cu
     00_transform/Solve.cu
     00_solver/Cholesky.cu
     00_solver/LU.cu

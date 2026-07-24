@@ -331,7 +331,7 @@ __MATX_HOST__ __MATX_INLINE__ ComplexAccumT HostTwiddle(index_t channel, index_t
 template <int CTILE, typename OutType, typename InType, typename FilterType, typename AccumType>
 inline void SmemTiledImpl(
     OutType o, const InType &i, const FilterType &filter,
-    index_t decimation_factor, cudaStream_t stream)
+    index_t decimation_factor, cudaStream_t stream, index_t out_elem_offset = 0)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
@@ -389,16 +389,17 @@ inline void SmemTiledImpl(
     constexpr bool IsUnitStride = decltype(is_unit_c)::value;
     const IdxT epb = static_cast<IdxT>(elem_per_block);
     const IdxT df  = static_cast<IdxT>(decimation_factor);
+    const IdxT oeo = static_cast<IdxT>(out_elem_offset);
 
     auto launch_with_layout = [&](auto in_smem_c, auto full_c) {
       constexpr bool FIS = decltype(in_smem_c)::value;
       constexpr bool FFL = decltype(full_c)::value;
       if (decimation_factor == num_channels) {
         ChannelizePoly1D_SmemTiled<CTILE, NOUT, kMaxDec, FIS, FFL, IsUnitStride, IdxT, OutType, InType, FilterType, AccumType>
-            <<<grid, block, smem_size, stream>>>(o, i, filter, epb, df, K);
+            <<<grid, block, smem_size, stream>>>(o, i, filter, epb, df, K, oeo);
       } else {
         ChannelizePoly1D_SmemTiled<CTILE, NOUT, kOversampled, FIS, FFL, IsUnitStride, IdxT, OutType, InType, FilterType, AccumType>
-            <<<grid, block, smem_size, stream>>>(o, i, filter, epb, df, K);
+            <<<grid, block, smem_size, stream>>>(o, i, filter, epb, df, K, oeo);
       }
     };
 
@@ -451,23 +452,30 @@ inline void SmemTiledImpl(
 template <typename OutType, typename InType, typename FilterType, typename AccumType>
 inline void SmemTiled(
     OutType o, const InType &i, const FilterType &filter,
-    index_t decimation_factor, cudaStream_t stream)
+    index_t decimation_factor, cudaStream_t stream, index_t out_elem_offset = 0)
 {
   const index_t num_channels = o.Size(OutType::Rank() - 1);
   if (num_channels <= SmemTiledCtileSmall) {
     SmemTiledImpl<
         SmemTiledCtileSmall,
-        OutType, InType, FilterType, AccumType>(o, i, filter, decimation_factor, stream);
+        OutType, InType, FilterType, AccumType>(o, i, filter, decimation_factor, stream, out_elem_offset);
   } else {
     SmemTiledImpl<
         SmemTiledCtile,
-        OutType, InType, FilterType, AccumType>(o, i, filter, decimation_factor, stream);
+        OutType, InType, FilterType, AccumType>(o, i, filter, decimation_factor, stream, out_elem_offset);
   }
 }
 
+// out_elem_offset selects a window of the full per-channel output-element (time)
+// grid: the output tensor `o` is sized to the window length and receives the
+// output elements whose global time indices are
+// [out_elem_offset, out_elem_offset + o.Size(OutRank-2)). The streaming
+// channelizer uses this to compute only the elements that will be output based
+// on newly provided samples versus the full grid.
 template <typename OutType, typename InType, typename FilterType, typename AccumType>
 inline void Generic(OutType o, const InType &i,
-                                     const FilterType &filter, index_t decimation_factor, cudaStream_t stream)
+                                     const FilterType &filter, index_t decimation_factor, cudaStream_t stream,
+                                     index_t out_elem_offset = 0)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
@@ -503,10 +511,10 @@ inline void Generic(OutType o, const InType &i,
       const uint32_t smem_bytes = (smem_needed <= GenericMaxFilterSmemBytes)
           ? static_cast<uint32_t>(smem_needed) : 0;
       ChannelizePoly1D<THREADS, true, IsUnitStride, OutType, InType, FilterType, AccumType>
-          <<<grid, THREADS, smem_bytes, stream>>>(o, i, filter, decimation_factor, smem_bytes);
+          <<<grid, THREADS, smem_bytes, stream>>>(o, i, filter, decimation_factor, smem_bytes, out_elem_offset);
     } else {
       ChannelizePoly1D<THREADS, false, IsUnitStride, OutType, InType, FilterType, AccumType>
-          <<<grid, THREADS, 0, stream>>>(o, i, filter, decimation_factor, 0);
+          <<<grid, THREADS, 0, stream>>>(o, i, filter, decimation_factor, 0, out_elem_offset);
     }
   };
 
@@ -563,7 +571,8 @@ inline size_t ShouldUseSmem(const OutType &out, const InType &in, const FilterTy
 }
 
 template <typename OutType, typename InType, typename FilterType, typename AccumType>
-inline void Smem(OutType o, const InType &i, const FilterType &filter, cudaStream_t stream)
+inline void Smem(OutType o, const InType &i, const FilterType &filter, cudaStream_t stream,
+                 index_t out_elem_offset = 0)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
@@ -587,7 +596,7 @@ inline void Smem(OutType o, const InType &i, const FilterType &filter, cudaStrea
   auto launch = [&](auto is_unit_c) {
     constexpr bool IsUnitStride = decltype(is_unit_c)::value;
     ChannelizePoly1D_Smem<IsUnitStride, OutType, InType, FilterType, AccumType>
-        <<<grid, block, smem_size, stream>>>(o, i, filter, elem_per_block);
+        <<<grid, block, smem_size, stream>>>(o, i, filter, elem_per_block, out_elem_offset);
   };
   if constexpr (fast_path_eligible) {
     const bool is_unit_stride =
@@ -607,7 +616,8 @@ inline void Smem(OutType o, const InType &i, const FilterType &filter, cudaStrea
 
 template <typename OutType, typename InType, typename FilterType, typename AccumType>
 inline void FusedChan(OutType o, const InType &i,
-                                     const FilterType &filter, cudaStream_t stream)
+                                     const FilterType &filter, cudaStream_t stream,
+                                     index_t out_elem_offset = 0)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
@@ -638,7 +648,7 @@ inline void FusedChan(OutType o, const InType &i,
       return ((num_channels == kMinChan + Is
                  ? (ChannelizePoly1D_FusedChan<THREADS, kMinChan + Is, IsUnitStride,
                                                OutType, InType, FilterType, AccumType>
-                        <<<grid, THREADS, 0, stream>>>(o, i, filter),
+                        <<<grid, THREADS, 0, stream>>>(o, i, filter, out_elem_offset),
                     true)
                  : false)
                || ...);
@@ -720,10 +730,17 @@ inline void UnpackDFT(DataType inout, cudaStream_t stream)
  * channels. Both integer (num_channels % decimation_factor == 0) and rational oversampling ratios
  * are supported.
  * @param stream CUDA stream on which to run the kernel(s)
+ * @param out_elem_offset Global index of the first output element (time step)
+ * to compute. The output tensor's second-to-last dimension is sized to the
+ * requested window, and the elements written are those with global time
+ * indices [out_elem_offset, out_elem_offset + window). The default of 0 with a
+ * full-length output computes the entire output; a windowed call computes only
+ * that range (used by the streaming channelizer).
  */
 template <typename OutType, typename InType, typename FilterType, typename AccumType>
 inline void channelize_poly_impl(OutType out, const InType &in, const FilterType &f,
-                   index_t num_channels, index_t decimation_factor, cudaStream_t stream = 0) {
+                   index_t num_channels, index_t decimation_factor, cudaStream_t stream = 0,
+                   index_t out_elem_offset = 0) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   using OutputOp = std::remove_cv_t<std::remove_reference_t<OutType>>;
   using InputOp = std::remove_cv_t<std::remove_reference_t<InType>>;
@@ -760,8 +777,16 @@ inline void channelize_poly_impl(OutType out, const InType &in, const FilterType
 
   MATX_ASSERT_STR(out.Size(OUT_RANK-1) == num_channels, matxInvalidDim,
     "channelize_poly: output size OUT_RANK-1 mismatch");
-  MATX_ASSERT_STR(out.Size(OUT_RANK-2) == num_elem_per_channel, matxInvalidDim,
-    "channelize_poly: output size OUT_RANK-2 mismatch");
+  // The output is a window [out_elem_offset, out_elem_offset + rows) of the
+  // full output-element grid; a full (non-windowed) call is the special case
+  // rows == num_elem_per_channel, offset == 0. A zero offset does NOT imply the
+  // full grid: the streaming channelizer's first feed emits only the
+  // fully-covered prefix rows (floor(chunk/D)) at offset 0, while the full
+  // local grid has ceil(chunk/D) rows. The only requirement is that the window
+  // fits within the grid.
+  MATX_ASSERT_STR(out.Size(OUT_RANK-2) + out_elem_offset <= num_elem_per_channel,
+    matxInvalidDim,
+    "channelize_poly: output-element window exceeds the full output size");
 
   // If neither the input nor the filter is complex, then the filtered samples will be real-valued
   // and we will use an R2C transform. Otherwise, we will use a C2C transform.
@@ -770,10 +795,11 @@ inline void channelize_poly_impl(OutType out, const InType &in, const FilterType
     // num_channels == 1 is degenerate (no channelization, trivial DFT) and
     // the fused kernel's switch starts at N=2. Let num_channels==1 fall
     // through to Smem / SmemTiled / Generic, all of which handle it
-    // correctly as a plain FIR.
+    // correctly as a plain FIR. All four filter kernels honor out_elem_offset,
+    // so the windowed path uses the same kernel selection as the full grid.
     if (decimation_factor == num_channels && num_channels >= 2 &&
         num_channels <= detail::cpoly::FusedChanThreshold) {
-      detail::cpoly::FusedChan<OutputOp, InputOp, FilterOp, AccumType>(out, in, f, stream);
+      detail::cpoly::FusedChan<OutputOp, InputOp, FilterOp, AccumType>(out, in, f, stream, out_elem_offset);
     } else {
       index_t start_dims[OUT_RANK], stop_dims[OUT_RANK];
       std::fill_n(start_dims, OUT_RANK, 0);
@@ -813,11 +839,11 @@ inline void channelize_poly_impl(OutType out, const InType &in, const FilterType
       }();
 
       if (decimation_factor == num_channels && detail::cpoly::ShouldUseSmem(out, in, f)) {
-        detail::cpoly::Smem<decltype(fft_in_slice), InputOp, FilterOp, AccumType>(fft_in_slice, in, f, stream);
+        detail::cpoly::Smem<decltype(fft_in_slice), InputOp, FilterOp, AccumType>(fft_in_slice, in, f, stream, out_elem_offset);
       } else if (detail::cpoly::ShouldUseSmemTiled(out, in, f, decimation_factor)) {
-        detail::cpoly::SmemTiled<decltype(fft_in_slice), InputOp, FilterOp, AccumType>(fft_in_slice, in, f, decimation_factor, stream);
+        detail::cpoly::SmemTiled<decltype(fft_in_slice), InputOp, FilterOp, AccumType>(fft_in_slice, in, f, decimation_factor, stream, out_elem_offset);
       } else {
-        detail::cpoly::Generic<decltype(fft_in_slice), InputOp, FilterOp, AccumType>(fft_in_slice, in, f, decimation_factor, stream);
+        detail::cpoly::Generic<decltype(fft_in_slice), InputOp, FilterOp, AccumType>(fft_in_slice, in, f, decimation_factor, stream, out_elem_offset);
       }
       stop_dims[OUT_RANK-1] = (num_channels/2) + 1;
       auto out_packed = slice<OUT_RANK>(out, start_dims, stop_dims);
@@ -829,17 +855,18 @@ inline void channelize_poly_impl(OutType out, const InType &in, const FilterType
     // num_channels == 1 is degenerate (no channelization, trivial DFT) and
     // the fused kernel's switch starts at N=2. Let num_channels==1 fall
     // through to Smem / SmemTiled / Generic, all of which handle it
-    // correctly as a plain FIR.
+    // correctly as a plain FIR. All four filter kernels honor out_elem_offset,
+    // so the windowed path uses the same kernel selection as the full grid.
     if (decimation_factor == num_channels && num_channels >= 2 &&
         num_channels <= detail::cpoly::FusedChanThreshold) {
-      detail::cpoly::FusedChan<OutputOp, InputOp, FilterOp, AccumType>(out, in, f, stream);
+      detail::cpoly::FusedChan<OutputOp, InputOp, FilterOp, AccumType>(out, in, f, stream, out_elem_offset);
     } else {
       if (decimation_factor == num_channels && detail::cpoly::ShouldUseSmem(out, in, f)) {
-        detail::cpoly::Smem<OutputOp, InputOp, FilterOp, AccumType>(out, in, f, stream);
+        detail::cpoly::Smem<OutputOp, InputOp, FilterOp, AccumType>(out, in, f, stream, out_elem_offset);
       } else if (detail::cpoly::ShouldUseSmemTiled(out, in, f, decimation_factor)) {
-        detail::cpoly::SmemTiled<OutputOp, InputOp, FilterOp, AccumType>(out, in, f, decimation_factor, stream);
+        detail::cpoly::SmemTiled<OutputOp, InputOp, FilterOp, AccumType>(out, in, f, decimation_factor, stream, out_elem_offset);
       } else {
-        detail::cpoly::Generic<OutputOp, InputOp, FilterOp, AccumType>(out, in, f, decimation_factor, stream);
+        detail::cpoly::Generic<OutputOp, InputOp, FilterOp, AccumType>(out, in, f, decimation_factor, stream, out_elem_offset);
       }
       // Specify FORWARD here to prevent any normalization after the ifft. We do not
       // want any extra scaling on the output values.
@@ -854,11 +881,32 @@ inline void channelize_poly_impl(OutType out, const InType &in, const FilterType
  * This is a feature-parity implementation for CPU executors. It directly
  * computes the per-branch FIR values and then applies the unnormalized,
  * positive-sign DFT used by the CUDA channelizer.
+ *
+ * @tparam OutType Type of output
+ * @tparam InType Type of input
+ * @tparam FilterType Type of filter
+ * @tparam AccumType Type of accumulator. This type should always be real, but
+ * it will be promoted to complex when necessary.
+ * @tparam MODE Host executor threading mode
+ * @param out Output tensor
+ * @param in Input operator
+ * @param f Filter operator
+ * @param num_channels Number of channels in which to separate the signal
+ * @param decimation_factor Factor by which to downsample the input signal into
+ * the channels
+ * @param exec Host executor on which to run
+ * @param out_elem_offset Global index of the first output element (time step)
+ * to compute, with the same window semantics as the CUDA overload: the output
+ * tensor's second-to-last dimension is sized to the requested window, and the
+ * elements written are those with global time indices
+ * [out_elem_offset, out_elem_offset + window). The default of 0 with a
+ * full-length output computes the entire output.
  */
 template <typename OutType, typename InType, typename FilterType, typename AccumType, ThreadsMode MODE>
 inline void channelize_poly_impl(OutType out, const InType &in, const FilterType &f,
                    index_t num_channels, index_t decimation_factor,
-                   [[maybe_unused]] const HostExecutor<MODE> &exec) {
+                   [[maybe_unused]] const HostExecutor<MODE> &exec,
+                   index_t out_elem_offset = 0) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   using OutputOp = std::remove_cv_t<std::remove_reference_t<OutType>>;
   using InputOp = std::remove_cv_t<std::remove_reference_t<InType>>;
@@ -898,11 +946,19 @@ inline void channelize_poly_impl(OutType out, const InType &in, const FilterType
   }
 
   const index_t input_len = in.Size(IN_RANK-1);
-  const index_t num_elem_per_channel = (input_len + decimation_factor - 1) / decimation_factor;
+  [[maybe_unused]] const index_t num_elem_per_channel =
+      (input_len + decimation_factor - 1) / decimation_factor;
+  // Rows actually computed: the window [out_elem_offset, out_elem_offset +
+  // out_rows) of the full output-element grid (the full grid when not
+  // windowed). A zero offset does NOT imply the full grid -- the streaming
+  // channelizer's first feed emits only the fully-covered prefix rows
+  // (floor(chunk/D)) at offset 0 while the full local grid has ceil(chunk/D)
+  // rows -- so require only that the window fits within the grid.
+  const index_t out_rows = out.Size(OUT_RANK-2);
   MATX_ASSERT_STR(out.Size(OUT_RANK-1) == num_channels, matxInvalidDim,
     "channelize_poly: output size OUT_RANK-1 mismatch");
-  MATX_ASSERT_STR(out.Size(OUT_RANK-2) == num_elem_per_channel, matxInvalidDim,
-    "channelize_poly: output size OUT_RANK-2 mismatch");
+  MATX_ASSERT_STR(out_rows + out_elem_offset <= num_elem_per_channel, matxInvalidDim,
+    "channelize_poly: output-element window exceeds the full output size");
 
   const index_t filter_full_len = f.Size(FilterOp::Rank()-1);
   const index_t filter_phase_len = (filter_full_len + num_channels - 1) / num_channels;
@@ -924,6 +980,10 @@ inline void channelize_poly_impl(OutType out, const InType &in, const FilterType
       static_cast<size_t>(num_thread_buffers * num_channels));
 
   const auto compute_output = [&](index_t batch, index_t t) {
+    // t is the local write row; tg is the global output element (time) index
+    // that drives the input footprint and polyphase phase (tg == t when not
+    // windowed).
+    const index_t tg = t + out_elem_offset;
     const auto in_batch_idx = detail::BlockToIdx(in, batch, 1);
     const auto out_batch_idx = detail::BlockToIdx(out, batch, 2);
     index_t thread_index = 0;
@@ -943,7 +1003,7 @@ inline void channelize_poly_impl(OutType out, const InType &in, const FilterType
 
       if (decimation_factor == num_channels) {
         const index_t s = num_channels - 1 - branch;
-        sample_idx = s + t * num_channels;
+        sample_idx = s + tg * num_channels;
         index_t h_skip = 0;
         if (sample_idx >= input_len) {
           h_skip = 1;
@@ -956,19 +1016,19 @@ inline void channelize_poly_impl(OutType out, const InType &in, const FilterType
           available_taps--;
         }
 
-        if (available_taps > h_skip && (t + 1) > h_skip) {
-          niter = std::min(available_taps - h_skip, t + 1 - h_skip);
+        if (available_taps > h_skip && (tg + 1) > h_skip) {
+          niter = std::min(available_taps - h_skip, tg + 1 - h_skip);
           h_ind = branch + h_skip * num_channels;
         }
       } else {
         const index_t r_remapped = (branch + num_channels - decimation_factor) % num_channels;
         const index_t s = num_channels - 1 - r_remapped;
-        const index_t last_arrived = t * decimation_factor + decimation_factor - 1;
+        const index_t last_arrived = tg * decimation_factor + decimation_factor - 1;
         if (last_arrived >= s) {
           const index_t A = last_arrived - s;
           sample_idx = last_arrived - (A % num_channels);
           const index_t causal_count = A / num_channels + 1;
-          const index_t phase = (branch + t * decimation_factor) % num_channels;
+          const index_t phase = (branch + tg * decimation_factor) % num_channels;
           index_t h_skip = 0;
           if (sample_idx >= input_len) {
             h_skip = 1;
@@ -1012,18 +1072,18 @@ inline void channelize_poly_impl(OutType out, const InType &in, const FilterType
     }
   };
 
-  const index_t total_outputs = batch_count * num_elem_per_channel;
+  const index_t total_outputs = batch_count * out_rows;
 #ifdef MATX_EN_OMP
   if (exec.GetNumThreads() > 1) {
     #pragma omp parallel for num_threads(exec.GetNumThreads())
     for (index_t i = 0; i < total_outputs; i++) {
-      compute_output(i / num_elem_per_channel, i % num_elem_per_channel);
+      compute_output(i / out_rows, i % out_rows);
     }
   } else
 #endif
   {
     for (index_t i = 0; i < total_outputs; i++) {
-      compute_output(i / num_elem_per_channel, i % num_elem_per_channel);
+      compute_output(i / out_rows, i % out_rows);
     }
   }
 }

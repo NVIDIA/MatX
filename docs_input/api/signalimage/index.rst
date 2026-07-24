@@ -10,3 +10,4 @@ Signal and Image Processing
    filtering/index.rst
    general/index.rst
    radar/index.rst
+   streaming/index.rst
