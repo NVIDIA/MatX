@@ -229,6 +229,10 @@ namespace matx
   {
     static_assert(sizeof...(Ops) > 0,
                   "apply requires at least one input operator");
+    static_assert(
+        !(is_distributed_expression_v<Ops> || ...),
+        "apply requires distributed expression inputs to be assigned to "
+        "distributed tensors first");
     if constexpr ((is_distributed_tensor_v<Ops> || ...)) {
       static_assert(
           (is_distributed_tensor_v<Ops> && ...),

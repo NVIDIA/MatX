@@ -69,6 +69,8 @@ struct IncrementValue {
 
 template <typename Distributed, typename Generator>
 void FillMultiGpu(Distributed &tensor, Generator &&generator) {
+  static_assert(Distributed::Rank() == 1,
+                "FillMultiGpu supports only rank-1 distributed tensors");
   const auto &distribution = tensor.DistributionDescriptor();
   for (size_t local = 0; local < tensor.LocalFragmentCount(); ++local) {
     const auto &fragment = tensor.LocalFragment(local);

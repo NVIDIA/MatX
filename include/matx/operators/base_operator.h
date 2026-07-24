@@ -204,6 +204,14 @@ namespace matx
                             "distributedCUDAExecutor");
               tp->get_rhs().MaterializeTo(tp->get_lhs(), ex);
             }
+            else if constexpr (
+                is_distributed_expression_v<typename T::op_type> &&
+                is_tensor_view_v<typename T::tensor_type>) {
+              static_assert(
+                  !is_distributed_expression_v<typename T::op_type>,
+                  "A distributed expression must be assigned to a distributed "
+                  "tensor before materialization into a regular tensor");
+            }
             else if constexpr (is_matx_transform_op<typename T::op_type>() && is_tensor_view_v<typename T::tensor_type>) {
               // If we're doing a simple set operation from a transform we take a shorcut to avoid the extra
               // async allocation we'd normally have to do   

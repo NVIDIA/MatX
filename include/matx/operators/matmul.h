@@ -539,22 +539,17 @@ namespace matx
    */
   template<typename OpA, typename OpB>
   __MATX_INLINE__ auto matmul(const OpA &A, const OpB &B, const int32_t (&axis)[2], float alpha = 1.0, float beta = 0.0) {
-    if constexpr (is_distributed_tensor_v<OpA> ||
-                  is_distributed_tensor_v<OpB>) {
-      static_assert(!is_distributed_tensor_v<OpA> &&
-                        !is_distributed_tensor_v<OpB>,
-                    "Axis-selecting distributed matmul is not supported in "
-                    "the first-pass batch-sharded executor");
-    }
-    else {
-      MATX_STATIC_ASSERT(OpA::Rank() == OpB::Rank(), "matmul: inputs must have same rank to use matmul with axis parameter");
-      MATX_STATIC_ASSERT(OpA::Rank() == OpB::Rank(), "matmul: inputs and outputs must have same rank to use matmul with axis parameter");
+    static_assert(!is_distributed_tensor_v<OpA> &&
+                      !is_distributed_tensor_v<OpB>,
+                  "Axis-selecting distributed matmul is not supported in "
+                  "the first-pass batch-sharded executor");
+    MATX_STATIC_ASSERT(OpA::Rank() == OpB::Rank(), "matmul: inputs must have same rank to use matmul with axis parameter");
+    MATX_STATIC_ASSERT(OpA::Rank() == OpB::Rank(), "matmul: inputs and outputs must have same rank to use matmul with axis parameter");
 
-      auto perm = detail::getPermuteDims<OpA::Rank()>(axis);
-      auto in1 = permute(A, perm);
-      auto in2 = permute(B, perm);
+    auto perm = detail::getPermuteDims<OpA::Rank()>(axis);
+    auto in1 = permute(A, perm);
+    auto in2 = permute(B, perm);
 
-      return detail::MatMulOp(in1, in2, alpha, beta, perm);
-    }
+    return detail::MatMulOp(in1, in2, alpha, beta, perm);
   }  
 }
