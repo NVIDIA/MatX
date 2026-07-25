@@ -21,6 +21,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexNonHalfAllExecs, Frexp)
   // Output fractional/integer parts
   auto tofrac = make_tensor<TestType>({10});
   auto toint  = make_tensor<int>({10});
+  auto toexp_parity = make_tensor<int>({10});
 
   for (index_t i = 0; i < tiv0.Size(0); i++) {
     const double x = (static_cast<double>(i) - 5.0) * 0.25;
@@ -32,6 +33,11 @@ TYPED_TEST(OperatorTestsFloatNonComplexNonHalfAllExecs, Frexp)
   (tofrac = ofrac, toint = oint).run(exec);
   // example-end frexp-test-1
 
+  static_assert(std::is_same_v<typename decltype(ofrac)::value_type,
+                               TestType>);
+  static_assert(std::is_same_v<typename decltype(oint)::value_type, int>);
+  (toexp_parity = oint & 1).run(exec);
+
   exec.sync();
 
   int texp;  
@@ -40,11 +46,13 @@ TYPED_TEST(OperatorTestsFloatNonComplexNonHalfAllExecs, Frexp)
       float tfrac = cuda::std::frexpf(tiv0(i), &texp);
       ASSERT_EQ(tfrac, tofrac(i)); 
       ASSERT_EQ(texp,  toint(i)); 
+      ASSERT_EQ(texp & 1, toexp_parity(i));
     }
     else {
       double tfrac = cuda::std::frexp(tiv0(i), &texp);
       ASSERT_EQ(tfrac, tofrac(i)); 
       ASSERT_EQ(texp,  toint(i));   
+      ASSERT_EQ(texp & 1, toexp_parity(i));
     }
   }
 
