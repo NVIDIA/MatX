@@ -321,6 +321,7 @@ namespace detail {
         }
 
         matxFree(ptr);
+        ptr = nullptr;
       }
 
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
