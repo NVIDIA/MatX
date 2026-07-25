@@ -254,17 +254,20 @@ namespace matx
               return op_.Size(dim);
             }
             else {
-              if (k_ == 0) {
-                return cuda::std::min(op_.Size(RANK - 1), op_.Size(RANK-2));
+              const auto rows = op_.Size(RANK - 2);
+              const auto cols = op_.Size(RANK - 1);
+
+              if (k_ >= 0) {
+                if (k_ >= cols) {
+                  return 0;
+                }
+                return cuda::std::min(rows, cols - k_);
               }
               else {
-                // If k is off the main diagonal we need to adjust the sizes
-                if (k_ > 0) {
-                  return cuda::std::min(op_.Size(RANK - 1), op_.Size(RANK-2) - k_);
+                if (k_ <= -rows) {
+                  return 0;
                 }
-                else {
-                  return cuda::std::min(op_.Size(RANK - 1) + k_, op_.Size(RANK-2));
-                }
+                return cuda::std::min(rows + k_, cols);
               }
             }
           }

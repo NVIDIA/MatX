@@ -205,6 +205,35 @@ TYPED_TEST(BasicGeneratorTestsAll, Diag)
       }
     }    
 
+    {
+      auto wide = make_tensor<TestType>({3, 5});
+      auto tall = make_tensor<TestType>({5, 3});
+
+      auto wide_upper = diag(wide, 1);
+      auto wide_lower = diag(wide, -2);
+      auto tall_upper = diag(tall, 1);
+      auto tall_lower = diag(tall, -1);
+
+      ASSERT_EQ(wide_upper.Size(0), 3);
+      ASSERT_EQ(wide_lower.Size(0), 1);
+      ASSERT_EQ(tall_upper.Size(0), 2);
+      ASSERT_EQ(tall_lower.Size(0), 3);
+
+      ASSERT_EQ(diag(wide, 5).Size(0), 0);
+      ASSERT_EQ(diag(wide, -3).Size(0), 0);
+      ASSERT_EQ(diag(tall, 3).Size(0), 0);
+      ASSERT_EQ(diag(tall, -5).Size(0), 0);
+    }
+
+    {
+      auto batched = make_tensor<TestType>({2, 3, 5});
+      auto op = diag(batched, 1);
+
+      ASSERT_EQ(op.Rank(), 2);
+      ASSERT_EQ(op.Size(0), 2);
+      ASSERT_EQ(op.Size(1), 3);
+    }
+
     // Test with a nested transform. Restrict to floating point types for
     // the convolution
     if constexpr (std::is_same_v<TestType,float> || std::is_same_v<TestType,double>)
