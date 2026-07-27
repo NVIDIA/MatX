@@ -227,9 +227,11 @@ namespace matx
 
           if constexpr (is_matx_op<OpB>()) {
             b_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-          } 
+          }
 
           matxFree(ptr);
+          ptr = nullptr;
+          prerun_done_ = false;
         }
     };
   }

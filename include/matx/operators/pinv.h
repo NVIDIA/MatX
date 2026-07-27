@@ -136,6 +136,8 @@ namespace detail {
         }
 
         matxFree(ptr);
+        ptr = nullptr;
+        prerun_done_ = false;
       }
   };
 }

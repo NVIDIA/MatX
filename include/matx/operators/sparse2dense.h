@@ -140,6 +140,8 @@ public:
     static_assert(is_sparse_tensor_v<OpA>,
                   "Cannot use sparse2dense on dense input");
     matxFree(ptr);
+    ptr = nullptr;
+    prerun_done_ = false;
   }
 };
 
