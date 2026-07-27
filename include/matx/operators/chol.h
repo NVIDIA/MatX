@@ -359,7 +359,8 @@ private:
 template<typename OpA>
 __MATX_INLINE__ auto chol(const OpA &a, SolverFillMode uplo = SolverFillMode::UPPER) {
   if constexpr (is_distributed_tensor_v<OpA>) {
-    if constexpr (is_block_cyclic_distributed_tensor_v<OpA>) {
+    if constexpr (
+        experimental::is_block_cyclic_distributed_tensor_v<OpA>) {
       return experimental::detail::distributed_mp_chol_op<OpA>{a, uplo};
     }
     else {

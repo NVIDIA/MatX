@@ -1,7 +1,7 @@
 # Find the separately distributed cuBLASMp package.
 
 find_path(cuBLASMp_INCLUDE_DIR
-  NAMES cublasMp.h
+  NAMES cublasMp.h cublasmp.h
   HINTS ${cublasmp_DIR} ENV CUBLASMP_HOME
   PATH_SUFFIXES include)
 

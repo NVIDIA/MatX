@@ -535,10 +535,12 @@ namespace matx
       static_assert(is_distributed_tensor_v<OpA> &&
                         is_distributed_tensor_v<OpB>,
                     "matmul requires both inputs to be distributed");
-      if constexpr (is_block_cyclic_distributed_tensor_v<OpA> ||
-                    is_block_cyclic_distributed_tensor_v<OpB>) {
-        static_assert(is_block_cyclic_distributed_tensor_v<OpA> &&
-                          is_block_cyclic_distributed_tensor_v<OpB>,
+      if constexpr (
+          experimental::is_block_cyclic_distributed_tensor_v<OpA> ||
+          experimental::is_block_cyclic_distributed_tensor_v<OpB>) {
+        static_assert(
+            experimental::is_block_cyclic_distributed_tensor_v<OpA> &&
+                experimental::is_block_cyclic_distributed_tensor_v<OpB>,
                       "Block-cyclic matmul requires both inputs to use "
                       "block_cyclic_distribution_t");
         return experimental::detail::distributed_mp_matmul_op<OpA, OpB>{

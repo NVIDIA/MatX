@@ -44,7 +44,11 @@
 #include <nccl.h>
 #endif
 #ifdef MATX_EN_CUBLASMP
+#if __has_include(<cublasMp.h>)
 #include <cublasMp.h>
+#else
+#include <cublasmp.h>
+#endif
 #endif
 #ifdef MATX_EN_CUSOLVERMP
 #include <cusolverMp.h>

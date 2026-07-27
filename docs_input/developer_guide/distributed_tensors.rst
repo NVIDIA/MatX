@@ -184,9 +184,10 @@ cuFFTMp is deliberately not treated as an interchangeable cuFFT Mg backend.
 It targets multi-process 2D/3D slab and pencil decompositions and requires
 NVSHMEM-compatible allocation, bootstrapping, and descriptor ownership.
 Ordinary ``make_distributed_tensor`` allocations do not satisfy that contract.
-A future cuFFTMp path should therefore add an explicit cuFFTMp-owned tensor
-factory and reshape semantics rather than silently copying through a nominally
-distributed tensor.
+Configure with ``MATX_EN_CUFFTMP`` to require and link compatible cuFFTMp and
+NVSHMEM installations. Transform execution still requires a cuFFTMp-owned
+tensor factory and reshape semantics rather than silently copying through a
+nominally distributed tensor.
 
 Materialization
 ===============

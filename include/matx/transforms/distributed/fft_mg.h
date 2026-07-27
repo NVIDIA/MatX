@@ -115,7 +115,8 @@ void ScatterMgOutput(Tensor &tensor,
   }
 }
 
-template <FFTDirection Direction, typename Out, typename In, typename Executor>
+template <matx::detail::FFTDirection Direction, typename Out, typename In,
+          typename Executor>
 void FftMgImpl(Out &out, const In &in, Executor &executor, FFTNorm norm) {
   using value_type = typename remove_cvref_t<Out>::value_type;
   static_assert(
@@ -210,13 +211,15 @@ void FftMgImpl(Out &out, const In &in, Executor &executor, FFTNorm norm) {
     CufftMgCheck(
         cufftXtExecDescriptorC2C(
             plan.Handle(), plan.Input(), plan.Output(),
-            Direction == FFTDirection::FORWARD ? CUFFT_FORWARD : CUFFT_INVERSE),
+            Direction == matx::detail::FFTDirection::FORWARD ? CUFFT_FORWARD
+                                                             : CUFFT_INVERSE),
         "cufftXtExecDescriptorC2C");
   } else {
     CufftMgCheck(
         cufftXtExecDescriptorZ2Z(
             plan.Handle(), plan.Input(), plan.Output(),
-            Direction == FFTDirection::FORWARD ? CUFFT_FORWARD : CUFFT_INVERSE),
+            Direction == matx::detail::FFTDirection::FORWARD ? CUFFT_FORWARD
+                                                             : CUFFT_INVERSE),
         "cufftXtExecDescriptorZ2Z");
   }
   CufftMgCheck(cufftXtMemcpy(plan.Handle(), host_output.Data(), plan.Output(),
@@ -226,9 +229,10 @@ void FftMgImpl(Out &out, const In &in, Executor &executor, FFTNorm norm) {
   double scale = 1.0;
   if (norm == FFTNorm::ORTHO) {
     scale = 1.0 / std::sqrt(static_cast<double>(in.Size(0)));
-  } else if ((norm == FFTNorm::FORWARD && Direction == FFTDirection::FORWARD) ||
+  } else if ((norm == FFTNorm::FORWARD &&
+              Direction == matx::detail::FFTDirection::FORWARD) ||
              (norm == FFTNorm::BACKWARD &&
-              Direction == FFTDirection::BACKWARD)) {
+              Direction == matx::detail::FFTDirection::BACKWARD)) {
     scale = 1.0 / static_cast<double>(in.Size(0));
   }
   if (scale != 1.0) {

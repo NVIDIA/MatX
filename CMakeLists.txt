@@ -76,6 +76,7 @@ option(MATX_EN_CUTENSOR OFF)
 option(MATX_EN_CUDSS OFF)
 option(MATX_EN_CUBLASMP "Enable cuBLASMp distributed dense linear algebra" OFF)
 option(MATX_EN_CUSOLVERMP "Enable cuSOLVERMp distributed dense solvers" OFF)
+option(MATX_EN_CUFFTMP "Enable cuFFTMp multi-process FFT dependencies" OFF)
 option(MATX_EN_FILEIO OFF)
 option(MATX_EN_NVTIFF OFF "Enable nvTiff support")
 option(MATX_EN_X86_FFTW OFF "Enable x86 FFTW support")
@@ -98,7 +99,9 @@ set(MATX_EN_PYBIND11 OFF CACHE BOOL "Enable pybind11 support")
 set(cudss_DIR "" CACHE PATH "Directory where cuDSS is installed.")
 set(cublasmp_DIR "" CACHE PATH "Directory where cuBLASMp is installed.")
 set(cusolvermp_DIR "" CACHE PATH "Directory where cuSOLVERMp is installed.")
+set(cufftmp_DIR "" CACHE PATH "Directory where cuFFTMp is installed.")
 set(nccl_DIR "" CACHE PATH "Directory where NCCL is installed.")
+set(nvshmem_DIR "" CACHE PATH "Directory where NVSHMEM is installed.")
 set(cutensor_DIR "" CACHE PATH "Directory where cuTENSOR is installed.")
 set(cutensornet_DIR "" CACHE PATH "Directory where cuTensorNet is installed.")
 set(eigen_DIR "" CACHE PATH "Directory where Eigen is installed")
@@ -445,6 +448,26 @@ if (MATX_EN_CUSOLVERMP)
     endif()
     target_compile_definitions(matx INTERFACE MATX_EN_CUSOLVERMP)
     target_link_libraries(matx INTERFACE cuSOLVERMp::cuSOLVERMp)
+endif()
+
+if (MATX_EN_CUFFTMP)
+    include(cmake/FindcuFFTMp.cmake)
+    if (NOT TARGET cuFFTMp::cuFFTMp)
+        message(FATAL_ERROR "MATX_EN_CUFFTMP requires cuFFTMp")
+    endif()
+
+    include(cmake/FindNVSHMEM.cmake)
+    if (NOT TARGET nvshmem::nvshmem_host OR
+        NOT TARGET nvshmem::nvshmem_device)
+        message(FATAL_ERROR
+            "MATX_EN_CUFFTMP requires NVSHMEM host and device libraries")
+    endif()
+
+    target_compile_definitions(matx INTERFACE MATX_EN_CUFFTMP)
+    target_link_libraries(matx INTERFACE
+        cuFFTMp::cuFFTMp
+        nvshmem::nvshmem_host
+        nvshmem::nvshmem_device)
 endif()
 
 # Find python3 and pybind11 for generating unit tests and benchmarks

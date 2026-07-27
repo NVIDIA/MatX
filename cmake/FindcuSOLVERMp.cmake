@@ -6,7 +6,7 @@ find_path(cuSOLVERMp_INCLUDE_DIR
   PATH_SUFFIXES include)
 
 find_library(cuSOLVERMp_LIBRARY
-  NAMES cusolvermp
+  NAMES cusolverMp cusolvermp
   HINTS ${cusolvermp_DIR} ENV CUSOLVERMP_HOME
   PATH_SUFFIXES lib lib64)
 

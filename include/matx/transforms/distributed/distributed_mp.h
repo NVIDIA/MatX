@@ -226,13 +226,16 @@ void MatmulMpImpl(Out &out, const A &a, const B &b,
 
     detail::cublas_mp_descriptor desc_a{
         a.DistributionDescriptor(), packed_a.rows,
-        MatXTypeToCudaType<value_type>(), executor.CublasGrid()};
+        matx::detail::MatXTypeToCudaType<value_type>(),
+        executor.CublasGrid()};
     detail::cublas_mp_descriptor desc_b{
         b.DistributionDescriptor(), packed_b.rows,
-        MatXTypeToCudaType<value_type>(), executor.CublasGrid()};
+        matx::detail::MatXTypeToCudaType<value_type>(),
+        executor.CublasGrid()};
     detail::cublas_mp_descriptor desc_c{
         out.DistributionDescriptor(), packed_c.rows,
-        MatXTypeToCudaType<value_type>(), executor.CublasGrid()};
+        matx::detail::MatXTypeToCudaType<value_type>(),
+        executor.CublasGrid()};
 
     size_t device_workspace_size = 0;
     size_t host_workspace_size = 0;
@@ -241,8 +244,8 @@ void MatmulMpImpl(Out &out, const A &a, const B &b,
             executor.CublasHandle(), CUBLAS_OP_N, CUBLAS_OP_N, out.Size(0),
             out.Size(1), a.Size(1), &alpha, packed_a.data, 1, 1, desc_a,
             packed_b.data, 1, 1, desc_b, &beta, packed_c.data, 1, 1, desc_c,
-            MatXTypeToCudaComputeType<value_type>(), &device_workspace_size,
-            &host_workspace_size),
+            matx::detail::MatXTypeToCudaComputeType<value_type>(),
+            &device_workspace_size, &host_workspace_size),
         "cublasMpGemm_bufferSize");
 
     void *device_workspace = nullptr;
@@ -256,8 +259,9 @@ void MatmulMpImpl(Out &out, const A &a, const B &b,
             executor.CublasHandle(), CUBLAS_OP_N, CUBLAS_OP_N, out.Size(0),
             out.Size(1), a.Size(1), &alpha, packed_a.data, 1, 1, desc_a,
             packed_b.data, 1, 1, desc_b, &beta, packed_c.data, 1, 1, desc_c,
-            MatXTypeToCudaComputeType<value_type>(), device_workspace,
-            device_workspace_size, host_workspace.data(), host_workspace_size),
+            matx::detail::MatXTypeToCudaComputeType<value_type>(),
+            device_workspace, device_workspace_size, host_workspace.data(),
+            host_workspace_size),
         "cublasMpGemm");
 
     detail::UnpackColumnMajor(out, packed_c, local_executor);
@@ -320,7 +324,8 @@ void CholMpImpl(Out &out, const A &a, distributedCUDAExecutor &executor,
     auto packed = detail::PackColumnMajor(a, local_executor);
     detail::cusolver_mp_descriptor descriptor{
         a.DistributionDescriptor(), packed.rows,
-        MatXTypeToCudaType<value_type>(), executor.CusolverGrid()};
+        matx::detail::MatXTypeToCudaType<value_type>(),
+        executor.CusolverGrid()};
     const cublasFillMode_t fill = uplo == SolverFillMode::UPPER
                                       ? CUBLAS_FILL_MODE_UPPER
                                       : CUBLAS_FILL_MODE_LOWER;
@@ -330,7 +335,7 @@ void CholMpImpl(Out &out, const A &a, distributedCUDAExecutor &executor,
     matx::detail::CusolverMpCheck(
         cusolverMpPotrf_bufferSize(
             executor.CusolverHandle(), fill, a.Size(0), packed.data, 1, 1,
-            descriptor, MatXTypeToCudaType<value_type>(),
+            descriptor, matx::detail::MatXTypeToCudaType<value_type>(),
             &device_workspace_size, &host_workspace_size),
         "cusolverMpPotrf_bufferSize");
 
@@ -345,7 +350,8 @@ void CholMpImpl(Out &out, const A &a, distributedCUDAExecutor &executor,
     std::vector<std::byte> host_workspace(host_workspace_size);
     matx::detail::CusolverMpCheck(
         cusolverMpPotrf(executor.CusolverHandle(), fill, a.Size(0), packed.data,
-                        1, 1, descriptor, MatXTypeToCudaType<value_type>(),
+                        1, 1, descriptor,
+                        matx::detail::MatXTypeToCudaType<value_type>(),
                         device_workspace, device_workspace_size,
                         host_workspace.data(), host_workspace_size, info),
         "cusolverMpPotrf");
