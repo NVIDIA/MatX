@@ -34,6 +34,7 @@
 
 #include <unordered_map>
 #include <string>
+#include "matx/core/distributed_tensor.h"
 #include "matx/core/type_utils.h"
 #include "matx/core/utils.h"
 #include "matx/operators/base_operator.h"
@@ -541,7 +542,30 @@ namespace matx
   __MATX_INLINE__ auto fft(const OpA &a, uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD) {
     constexpr auto fft_type = detail::ComplexInType<OpA>();
     const index_t fft_size_ = static_cast<index_t>(fft_size);
-    return detail::FFTOp<OpA, detail::no_permute_t, detail::FFTDirection::FORWARD, fft_type>(a, fft_size_, detail::no_permute_t{}, norm);
+    if constexpr (is_distributed_tensor_v<OpA>) {
+      static_assert(remove_cvref_t<OpA>::Rank() >= 2,
+                    "Distributed FFT requires a batch dimension followed by "
+                    "the transform dimension");
+      using input_type = typename remove_cvref_t<OpA>::value_type;
+      using output_type = std::conditional_t<
+          is_complex_v<input_type>, input_type,
+          typename detail::scalar_to_complex<input_type>::ctype>;
+      auto local_fft = [fft_size_, norm](const auto &local_a) {
+        using local_type = remove_cvref_t<decltype(local_a)>;
+        constexpr auto local_fft_type = detail::ComplexInType<local_type>();
+        return detail::FFTOp<local_type, detail::no_permute_t,
+                             detail::FFTDirection::FORWARD, local_fft_type>(
+            local_a, fft_size_, detail::no_permute_t{}, norm);
+      };
+      return experimental::detail::make_distributed_local_transform<
+          output_type, 1>(
+          std::move(local_fft), a);
+    }
+    else {
+      return detail::FFTOp<OpA, detail::no_permute_t,
+                           detail::FFTDirection::FORWARD, fft_type>(
+          a, fft_size_, detail::no_permute_t{}, norm);
+    }
   }
 
   /**
@@ -566,6 +590,9 @@ namespace matx
    */
   template<typename OpA>
   __MATX_INLINE__ auto fft(const OpA &a, const int32_t (&axis)[1], uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD) {
+    static_assert(!is_distributed_tensor_v<OpA>,
+                  "Axis-selecting distributed FFT is not supported in the "
+                  "first-pass batch-sharded executor");
     constexpr auto fft_type = detail::ComplexInType<OpA>();
     if constexpr (is_dynamic_rank_op_v<remove_cvref_t<OpA>>) {
       auto perm = detail::getPermuteDims(detail::get_dyn_rank(a), axis);

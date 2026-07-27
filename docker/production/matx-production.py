@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import hpccm
-from hpccm.building_blocks import gnu, mlnx_ofed, nvshmem, cmake
+from hpccm.building_blocks import gnu, mlnx_ofed, cmake
 from hpccm.primitives import baseimage
 
 DOXYGEN_VER = "1.9.6"

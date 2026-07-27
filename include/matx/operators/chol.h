@@ -33,6 +33,7 @@
 #pragma once
 
 
+#include "matx/core/distributed_tensor.h"
 #include "matx/core/type_utils.h"
 #include "matx/core/utils.h"
 #include "matx/operators/base_operator.h"
@@ -317,7 +318,20 @@ namespace detail {
  */
 template<typename OpA>
 __MATX_INLINE__ auto chol(const OpA &a, SolverFillMode uplo = SolverFillMode::UPPER) {
-  return detail::CholOp(a, uplo);
+  if constexpr (is_distributed_tensor_v<OpA>) {
+    static_assert(remove_cvref_t<OpA>::Rank() >= 3,
+                  "Distributed Cholesky factorization requires a batch "
+                  "dimension followed by matrix dimensions");
+    auto local_chol = [uplo](const auto &local_a) {
+      return detail::CholOp(local_a, uplo);
+    };
+    return experimental::detail::make_distributed_local_transform<
+        typename remove_cvref_t<OpA>::value_type, 2>(
+        std::move(local_chol), a);
+  }
+  else {
+    return detail::CholOp(a, uplo);
+  }
 }
 
 }
