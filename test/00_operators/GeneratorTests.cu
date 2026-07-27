@@ -1196,6 +1196,49 @@ TYPED_TEST(BasicGeneratorTestsFloatNonComplex, Logspace)
   MATX_EXIT_HANDLER();
 }
 
+#ifdef MATX_EN_JIT
+template <typename TestType>
+void TestLogspaceJITType(CUDAJITExecutor &exec)
+{
+  constexpr index_t count = 8;
+  auto direct = make_tensor<TestType>({count});
+  auto composed = make_tensor<TestType>({count});
+  auto op = logspace<0>(direct.Shape(), TestType{0.0f}, TestType{2.0f});
+
+  (direct = op).run(exec);
+  (composed = op * TestType{2.0f}).run(exec);
+  exec.sync();
+
+  for (index_t i = 0; i < count; i++) {
+    const auto exponent = 2.0 * static_cast<double>(i) /
+                          static_cast<double>(count - 1);
+    const auto expected = cuda::std::pow(10.0, exponent);
+
+    if constexpr (IsHalfType<TestType>()) {
+      EXPECT_TRUE(MatXUtils::MatXTypeCompare(direct(i), expected, 2));
+      EXPECT_TRUE(MatXUtils::MatXTypeCompare(composed(i), expected * 2.0, 2));
+    }
+    else {
+      EXPECT_TRUE(MatXUtils::MatXTypeCompare(direct(i), expected, 0.01));
+      EXPECT_TRUE(MatXUtils::MatXTypeCompare(composed(i), expected * 2.0, 0.01));
+    }
+  }
+}
+
+TEST(OperatorTests, LogspaceJIT)
+{
+  MATX_ENTER_HANDLER();
+  CUDAJITExecutor exec{};
+
+  TestLogspaceJITType<matxFp16>(exec);
+  TestLogspaceJITType<matxBf16>(exec);
+  TestLogspaceJITType<float>(exec);
+  TestLogspaceJITType<double>(exec);
+
+  MATX_EXIT_HANDLER();
+}
+#endif
+
 
 TYPED_TEST(BasicGeneratorTestsNumeric, Eye)
 {
