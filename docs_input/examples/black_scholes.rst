@@ -4,9 +4,9 @@ Black-Scholes
 #############
 
 This example evaluates the Black-Scholes formula for a European call option
-using four equivalent MatX implementations. Its purpose is to compare the GPU
-execution time of a regular MatX expression with implementations that make
-reused input values explicit to the compiler.
+using four equivalent MatX implementations. Several different forms of the same 
+expression are compared to illustrate different ways of accomplishing the same computation 
+in MatX.
 
 The source code is in ``examples/black_scholes.cu``.
 
