@@ -56,14 +56,15 @@ endforeach()
 add_executable(distributed_fft_multi_gpu distributed_fft_multi_gpu.cu)
 target_link_libraries(distributed_fft_multi_gpu example_lib)
 
-# The collective GEMM example is available with the opt-in cuBLASMp backend.
-if(MATX_EN_CUBLASMP)
+# The collective Cholesky example is available with the opt-in cuSOLVERMp
+# backend.
+if(MATX_EN_CUSOLVERMP)
     find_package(MPI QUIET COMPONENTS CXX)
     if(MPI_CXX_FOUND)
-        add_executable(distributed_matmul_mpi distributed_matmul_mpi.cu)
-        target_link_libraries(distributed_matmul_mpi example_lib MPI::MPI_CXX)
+        add_executable(distributed_cholesky_mpi distributed_cholesky_mpi.cu)
+        target_link_libraries(distributed_cholesky_mpi example_lib MPI::MPI_CXX)
     else()
-        message(STATUS "MPI C++ support not found; skipping distributed_matmul_mpi")
+        message(STATUS "MPI C++ support not found; skipping distributed_cholesky_mpi")
     endif()
 endif()
 

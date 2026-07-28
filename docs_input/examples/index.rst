@@ -12,4 +12,4 @@ the examples require compiling them into an executable. Instructions for buildin
 
    fftconv.rst
    distributed_fft_multi_gpu.rst
-   distributed_matmul_mpi.rst
+   distributed_cholesky_mpi.rst
