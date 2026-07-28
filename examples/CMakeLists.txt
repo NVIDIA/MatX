@@ -53,6 +53,9 @@ foreach( example ${examples} )
     target_link_libraries(${example} example_lib)
 endforeach()
 
+add_executable(distributed_fft_multi_gpu distributed_fft_multi_gpu.cu)
+target_link_libraries(distributed_fft_multi_gpu example_lib)
+
 # The collective GEMM example is available with the opt-in cuBLASMp backend.
 if(MATX_EN_CUBLASMP)
     find_package(MPI QUIET COMPONENTS CXX)

@@ -11,4 +11,5 @@ the examples require compiling them into an executable. Instructions for buildin
    :maxdepth: 1
 
    fftconv.rst
+   distributed_fft_multi_gpu.rst
    distributed_matmul_mpi.rst
