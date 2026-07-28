@@ -47,16 +47,22 @@ else()
     target_compile_options(example_lib INTERFACE ${MATX_CUDA_FLAGS})
 endif()
 
-if (MULTI_GPU)
-    set_target_properties(example_lib PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
-endif()
-
-
 foreach( example ${examples} )
     string( CONCAT file ${example} ".cu" )
     add_executable( ${example} ${file} )
     target_link_libraries(${example} example_lib)
 endforeach()
+
+# The collective GEMM example is available with the opt-in cuBLASMp backend.
+if(MATX_EN_CUBLASMP)
+    find_package(MPI QUIET COMPONENTS CXX)
+    if(MPI_CXX_FOUND)
+        add_executable(distributed_matmul_mpi distributed_matmul_mpi.cu)
+        target_link_libraries(distributed_matmul_mpi example_lib MPI::MPI_CXX)
+    else()
+        message(STATUS "MPI C++ support not found; skipping distributed_matmul_mpi")
+    endif()
+endif()
 
 # Examples in subdirectories
 add_executable(sarbp sarbp/sarbp.cu)
