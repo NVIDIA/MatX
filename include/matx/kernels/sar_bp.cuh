@@ -464,6 +464,31 @@ __device__ inline SarBpBinAndWeight<loose_compute_t> ComputeBinWeightToPixelPuls
     };
 }
 
+template <SarBpComputeType ComputeType, SarBpPixelZMode PixelZMode, bool TaylorFastAddThirdOrder>
+struct SarBpMinCtaCount { static constexpr int value = 5; };
+
+template <> struct SarBpMinCtaCount<SarBpComputeType::TaylorFast, SarBpPixelZMode::Zero, false> { static constexpr int value = 6; };
+template <> struct SarBpMinCtaCount<SarBpComputeType::TaylorFast, SarBpPixelZMode::Fixed, false> { static constexpr int value = 6; };
+template <> struct SarBpMinCtaCount<SarBpComputeType::Float, SarBpPixelZMode::Zero, false> { static constexpr int value = 6; };
+template <> struct SarBpMinCtaCount<SarBpComputeType::Float, SarBpPixelZMode::Fixed, false> { static constexpr int value = 6; };
+template <> struct SarBpMinCtaCount<SarBpComputeType::Float, SarBpPixelZMode::Variable, false> { static constexpr int value = 6; };
+
+// Cap the maximum CTA count to the architecture's limit. sm_75 caps at 1024 threads/SM
+// and all other supported architectures allow at least 1536 (6 CTAs). Pushing to 8
+// CTAS_PER_SM would greatly limit register allocation, so treat 6 as the common maximum.
+#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ == 750
+#define MATX_SARBP_MAX_CTAS_PER_SM 4
+#else
+#define MATX_SARBP_MAX_CTAS_PER_SM 6
+#endif
+
+// The requested CTA count, clamped to what this architecture can honor.
+template <SarBpComputeType ComputeType, SarBpPixelZMode PixelZMode, bool TaylorFastAddThirdOrder>
+inline constexpr int SarBpMinCtas =
+    (SarBpMinCtaCount<ComputeType, PixelZMode, TaylorFastAddThirdOrder>::value < MATX_SARBP_MAX_CTAS_PER_SM)
+        ? SarBpMinCtaCount<ComputeType, PixelZMode, TaylorFastAddThirdOrder>::value
+        : MATX_SARBP_MAX_CTAS_PER_SM;
+
 // SarBp backprojection kernel. PixelZMode is a compile-time assumption about
 // the pixel z (height) coordinates, selected by the caller via the
 // PropSarBpPixelZIsZero / PropSarBpPixelZIsFixed properties (see
@@ -477,8 +502,13 @@ __device__ inline SarBpBinAndWeight<loose_compute_t> ComputeBinWeightToPixelPuls
 //     compute paths the per-pulse z contribution dz^2 is uniform across pixels
 //     and is precomputed once per pulse (see FillPulseBlockCache), removing the
 //     per-pixel-per-pulse subtract+square from the inner loop.
-template <SarBpComputeType ComputeType, typename OutImageType, typename InitialImageType, typename RangeProfilesType, typename PlatPosType, typename VoxLocType, typename RangeToMcpType, bool PhaseLUT, bool IsUnitStride, bool TaylorFastAddThirdOrder = false, SarBpPixelZMode PixelZMode = SarBpPixelZMode::Variable>
-__launch_bounds__(16*16)
+template <SarBpComputeType ComputeType, typename OutImageType, typename InitialImageType, typename RangeProfilesType, typename PlatPosType, typename VoxLocType, typename RangeToMcpType, bool PhaseLUT, bool IsUnitStride, bool TaylorFastAddThirdOrder = false, SarBpPixelZMode PixelZMode = SarBpPixelZMode::Variable, typename IdxT = index_t>
+// Set the minimum CTA count as a function of the compute type and pixel z mode. This
+// is most important for Double/Mixed where increasing occupancy even at the cost of
+// register spills is beneficial. For modes with reduced register pressure, we set
+// higher minimum CTA counts to avoid the occupancy loss associated with a fixed value
+// for all instantiations.
+__launch_bounds__(16*16, (SarBpMinCtas<ComputeType, PixelZMode, TaylorFastAddThirdOrder>))
 __global__ void SarBp(OutImageType output, const InitialImageType initial_image, const __grid_constant__ RangeProfilesType range_profiles, const __grid_constant__ PlatPosType platform_positions, const __grid_constant__ VoxLocType voxel_locations, const __grid_constant__ RangeToMcpType range_to_mcp,
                       strict_or_ff_compute_param_t<ComputeType> dr_inv,
                       strict_compute_param_t<ComputeType> phase_correction_partial,
@@ -618,7 +648,7 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
     // operator(). Binding the tensor's Data() and Stride(0) into the
     // accessor's members forces the compiler to materialize the grid-constant
     // LDCs once at kernel entry rather than reloading inside the pulse loop.
-    detail::TensorAccessor<RangeProfilesType, IsUnitStride> rp(range_profiles);
+    detail::TensorAccessor<RangeProfilesType, IsUnitStride, IdxT> rp(range_profiles);
     detail::TensorAccessor<PlatPosType, IsUnitStride> pp(platform_positions);
 
     // range_to_mcp is required to be a rank-0 or rank-1 MatX operator; the
