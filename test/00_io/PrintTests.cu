@@ -188,6 +188,35 @@ TEST_F(PrintTest, DefaultTest4)
   MATX_EXIT_HANDLER();
 }
 
+TEST_F(PrintTest, DefaultTest5D)
+{
+  MATX_ENTER_HANDLER();
+  auto pft = get_print_format_type();
+  ASSERT_EQ(MATX_PRINT_FORMAT_DEFAULT, pft);
+
+  auto A5 = reshape(A1, {2,2,1,2,2});
+
+  print_checker(A5,
+      "Operator{complex<double>} Rank: 5, Sizes:[2, 2, 1, 2, 2]\n"
+      "[000000,000000,000000,:,:]\n"
+      "000000: -9.2466e-01+9.9114e-01j -4.2534e-01+1.0676e+00j \n"
+      "000001: -2.6438e+00-6.2723e-01j  1.4518e-01+3.2016e-01j \n"
+      "\n"
+      "[000000,000001,000000,:,:]\n"
+      "000000: -1.2087e-01-3.1101e-01j -5.7973e-01-3.4408e-01j \n"
+      "000001: -6.2285e-01-1.1709e+00j -3.2839e-01-5.3706e-01j \n"
+      "\n"
+      "[000001,000000,000000,:,:]\n"
+      "000000: -1.0745e+00+1.3390e+00j -3.6314e-01-2.4011e-01j \n"
+      "000001: -1.6711e+00+1.2149e+00j  2.2655e+00-2.0518e-01j \n"
+      "\n"
+      "[000001,000001,000000,:,:]\n"
+      "000000:  3.1168e-01+1.2999e+00j -1.8419e-01+2.1812e-01j \n"
+      "000001:  1.2866e+00-1.2135e+00j  1.1820e+00-1.3723e+00j \n\n");
+
+  MATX_EXIT_HANDLER();
+}
+
 TEST_F(PrintTest, DefaultTest5)
 {
   MATX_ENTER_HANDLER();
@@ -297,6 +326,37 @@ TEST_F(PrintTest, MlabTest4)
   MATX_EXIT_HANDLER();
 }
 
+
+TEST_F(PrintTest, MlabTest5D)
+{
+  MATX_ENTER_HANDLER();
+  set_print_format_type(MATX_PRINT_FORMAT_MLAB);
+  auto pft = get_print_format_type();
+  ASSERT_EQ(MATX_PRINT_FORMAT_MLAB, pft);
+
+  auto A5 = reshape(A1, {2,2,1,2,2});
+
+  print_checker(A5,
+      "Operator{complex<double>} Rank: 5, Sizes:[2, 2, 1, 2, 2]\n"
+      "cat(5, ...\n"
+      "       cat(4, ...\n"
+      "              cat(3, ...\n"
+      "                     [-9.2466e-01+9.9114e-01j , -4.2534e-01+1.0676e+00j ; ...\n"
+      "                      -2.6438e+00-6.2723e-01j ,  1.4518e-01+3.2016e-01j ]), ...\n"
+      "              cat(3, ...\n"
+      "                     [-1.2087e-01-3.1101e-01j , -5.7973e-01-3.4408e-01j ; ...\n"
+      "                      -6.2285e-01-1.1709e+00j , -3.2839e-01-5.3706e-01j ])), ...\n"
+      "       cat(4, ...\n"
+      "              cat(3, ...\n"
+      "                     [-1.0745e+00+1.3390e+00j , -3.6314e-01-2.4011e-01j ; ...\n"
+      "                      -1.6711e+00+1.2149e+00j ,  2.2655e+00-2.0518e-01j ]), ...\n"
+      "              cat(3, ...\n"
+      "                     [ 3.1168e-01+1.2999e+00j , -1.8419e-01+2.1812e-01j ; ...\n"
+      "                       1.2866e+00-1.2135e+00j ,  1.1820e+00-1.3723e+00j ])))\n\n");
+
+  MATX_EXIT_HANDLER();
+}
+
 TEST_F(PrintTest, MlabTest5)
 {
   MATX_ENTER_HANDLER();
@@ -399,6 +459,30 @@ TEST_F(PrintTest, PythonTest4)
       "   [-1.6711e+00+1.2149e+00j ,  2.2655e+00-2.0518e-01j ]],\n"
       "  [[ 3.1168e-01+1.2999e+00j , -1.8419e-01+2.1812e-01j ],\n"
       "   [ 1.2866e+00-1.2135e+00j ,  1.1820e+00-1.3723e+00j ]]]]\n");
+
+  MATX_EXIT_HANDLER();
+}
+
+
+TEST_F(PrintTest, PythonTest5D)
+{
+  MATX_ENTER_HANDLER();
+  set_print_format_type(MATX_PRINT_FORMAT_PYTHON);
+  auto pft = get_print_format_type();
+  ASSERT_EQ(MATX_PRINT_FORMAT_PYTHON, pft);
+
+  auto A5 = reshape(A1, {2,2,1,2,2});
+
+  print_checker(A5,
+      "Operator{complex<double>} Rank: 5, Sizes:[2, 2, 1, 2, 2]\n"
+      "[[[[[-9.2466e-01+9.9114e-01j , -4.2534e-01+1.0676e+00j ],\n"
+      "    [-2.6438e+00-6.2723e-01j ,  1.4518e-01+3.2016e-01j ]]],\n"
+      "  [[[-1.2087e-01-3.1101e-01j , -5.7973e-01-3.4408e-01j ],\n"
+      "    [-6.2285e-01-1.1709e+00j , -3.2839e-01-5.3706e-01j ]]]],\n"
+      " [[[[-1.0745e+00+1.3390e+00j , -3.6314e-01-2.4011e-01j ],\n"
+      "    [-1.6711e+00+1.2149e+00j ,  2.2655e+00-2.0518e-01j ]]],\n"
+      "  [[[ 3.1168e-01+1.2999e+00j , -1.8419e-01+2.1812e-01j ],\n"
+      "    [ 1.2866e+00-1.2135e+00j ,  1.1820e+00-1.3723e+00j ]]]]]\n");
 
   MATX_EXIT_HANDLER();
 }

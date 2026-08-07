@@ -36,6 +36,9 @@
 #include "utilities.h"
 #include "gtest/gtest.h"
 #include <cuda/std/complex>
+#include <algorithm>
+#include <cmath>
+#include <numeric>
 
 using namespace matx;
 
@@ -81,6 +84,11 @@ class ChannelizePolyTestFloatTypes
     : public ChannelizePolyTest<TensorType> {
 };
 
+template <typename TensorType>
+class ChannelizePolyTestHostTypes
+    : public ChannelizePolyTest<TensorType> {
+};
+
 namespace test_types {
     template<typename T>
     struct inner_type {
@@ -115,6 +123,181 @@ namespace test_types {
 
 TYPED_TEST_SUITE(ChannelizePolyTestNonHalfFloatTypes, MatXFloatNonHalfTypesCUDAExec);
 TYPED_TEST_SUITE(ChannelizePolyTestDoubleType, MatXDoubleOnlyTypeCUDAExec);
+using ChannelizePolyHostExecTypes = Types<
+  cuda::std::tuple<float, matx::SingleThreadedHostExecutor>,
+  cuda::std::tuple<double, matx::SingleThreadedHostExecutor>,
+  cuda::std::tuple<cuda::std::complex<float>, matx::SingleThreadedHostExecutor>>;
+TYPED_TEST_SUITE(ChannelizePolyTestHostTypes, ChannelizePolyHostExecTypes);
+
+TYPED_TEST(ChannelizePolyTestHostTypes, HostSimpleOversampledAndBatched)
+{
+  MATX_ENTER_HANDLER();
+
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using InnerType = typename test_types::inner_type<TestType>::type;
+  using ComplexType = typename test_types::complex_type<TestType>::type;
+
+  const auto scale = []() {
+    if constexpr (is_complex_v<TestType>) {
+      return TestType{static_cast<InnerType>(2.0), static_cast<InnerType>(0.0)};
+    } else {
+      return static_cast<TestType>(2.0);
+    }
+  }();
+  const auto inv_scale = []() {
+    if constexpr (is_complex_v<TestType>) {
+      return TestType{static_cast<InnerType>(0.5), static_cast<InnerType>(0.0)};
+    } else {
+      return static_cast<TestType>(0.5);
+    }
+  }();
+
+  struct {
+    index_t a_len;
+    index_t f_len;
+    index_t num_channels;
+    index_t decimation_factor;
+  } test_cases[] = {
+    { 96, 23, 4, 4 },
+    { 97, 25, 5, 3 },
+  };
+
+  for (size_t i = 0; i < sizeof(test_cases)/sizeof(test_cases[0]); i++) {
+    const index_t a_len = test_cases[i].a_len;
+    const index_t f_len = test_cases[i].f_len;
+    const index_t num_channels = test_cases[i].num_channels;
+    const index_t decimation_factor = test_cases[i].decimation_factor;
+    const index_t b_len_per_channel = (a_len + decimation_factor - 1) / decimation_factor;
+
+    this->pb->template InitAndRunTVGenerator<TestType>(
+      "00_transforms", "channelize_poly_operators", "channelize_oversampled",
+      {a_len, f_len, num_channels, decimation_factor});
+
+    auto a = make_tensor<TestType>({a_len});
+    auto f = make_tensor<TestType>({f_len});
+    auto b = make_tensor<ComplexType>({b_len_per_channel, num_channels});
+
+    this->pb->NumpyToTensorView(a, "a");
+    this->pb->NumpyToTensorView(f, "filter_random");
+
+    (b = channelize_poly(a, f, num_channels, decimation_factor)).run(this->exec);
+    this->exec.sync();
+    MATX_TEST_ASSERT_COMPARE(this->pb, b, "b_random", this->thresh);
+
+    (b = channelize_poly(scale * a, f, num_channels, decimation_factor)).run(this->exec);
+    (b = b * inv_scale).run(this->exec);
+    this->exec.sync();
+    MATX_TEST_ASSERT_COMPARE(this->pb, b, "b_random", this->thresh);
+
+    auto bp = make_tensor<ComplexType>({num_channels, b_len_per_channel});
+    auto b_permuted = permute(bp, {1, 0});
+    (b_permuted = channelize_poly(a, f, num_channels, decimation_factor)).run(this->exec);
+    this->exec.sync();
+    MATX_TEST_ASSERT_COMPARE(this->pb, b_permuted, "b_random", this->thresh);
+  }
+
+  {
+    const index_t a_len = 48;
+    const index_t f_len = 11;
+    const index_t num_channels = 4;
+    const index_t decimation_factor = 2;
+    const index_t b_len_per_channel = (a_len + decimation_factor - 1) / decimation_factor;
+    this->pb->template InitAndRunTVGenerator<TestType>(
+      "00_transforms", "channelize_poly_operators", "channelize_oversampled",
+      {a_len, f_len, num_channels, decimation_factor, 2, 3});
+
+    auto a = make_tensor<TestType>({2, 3, a_len});
+    auto f = make_tensor<TestType>({f_len});
+    auto b = make_tensor<ComplexType>({2, 3, b_len_per_channel, num_channels});
+
+    this->pb->NumpyToTensorView(a, "a");
+    this->pb->NumpyToTensorView(f, "filter_random");
+    (b = channelize_poly(a, f, num_channels, decimation_factor)).run(this->exec);
+    this->exec.sync();
+    MATX_TEST_ASSERT_COMPARE(this->pb, b, "b_random", this->thresh);
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(ChannelizePolyHostExecutor, AccumAndOutputProperties)
+{
+  MATX_ENTER_HANDLER();
+
+  auto pb = std::make_unique<detail::MatXPybind>();
+  matx::SingleThreadedHostExecutor exec{};
+
+  const index_t a_len = 96;
+  const index_t f_len = 21;
+  const index_t num_channels = 4;
+  const index_t decimation_factor = 3;
+  const index_t b_len_per_channel = (a_len + decimation_factor - 1) / decimation_factor;
+  pb->template InitAndRunTVGenerator<float>(
+    "00_transforms", "channelize_poly_operators", "channelize_oversampled",
+    {a_len, f_len, num_channels, decimation_factor});
+
+  auto a = make_tensor<float>({a_len});
+  auto f = make_tensor<float>({f_len});
+  auto b = make_tensor<cuda::std::complex<double>>({b_len_per_channel, num_channels});
+
+  pb->NumpyToTensorView(a, "a");
+  pb->NumpyToTensorView(f, "filter_random");
+
+  auto chan_poly = channelize_poly(a, f, num_channels, decimation_factor)
+    .props<PropAccum<double>, PropOutput<cuda::std::complex<double>>>();
+  (b = chan_poly).run(exec);
+  exec.sync();
+
+  MATX_TEST_ASSERT_COMPARE(pb, b, "b_random", 1e-5);
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(ChannelizePolyHostExecutor, SelectThreadsMatchesSingleThreaded)
+{
+  MATX_ENTER_HANDLER();
+
+  matx::SingleThreadedHostExecutor single_exec{};
+  HostExecParams params{4};
+  matx::SelectThreadsHostExecutor threaded_exec{params};
+
+  const index_t a_len = 96;
+  const index_t f_len = 21;
+  const index_t num_channels = 4;
+  const index_t decimation_factor = 3;
+  const index_t b_len_per_channel = (a_len + decimation_factor - 1) / decimation_factor;
+
+  auto a = make_tensor<float>({a_len});
+  auto f = make_tensor<float>({f_len});
+  auto b_single = make_tensor<cuda::std::complex<float>>({b_len_per_channel, num_channels});
+  auto b_threaded = make_tensor<cuda::std::complex<float>>({b_len_per_channel, num_channels});
+
+  for (index_t i = 0; i < a_len; i++) {
+    a(i) = static_cast<float>((i % 9) - 4) * 0.25f +
+        static_cast<float>(i % 5) * 0.03125f;
+  }
+
+  for (index_t i = 0; i < f_len; i++) {
+    f(i) = static_cast<float>((i % 7) - 3) * 0.125f +
+        static_cast<float>(i + 1) * 0.01f;
+  }
+
+  (b_single = channelize_poly(a, f, num_channels, decimation_factor)).run(single_exec);
+  single_exec.sync();
+  (b_threaded = channelize_poly(a, f, num_channels, decimation_factor)).run(threaded_exec);
+  threaded_exec.sync();
+
+  for (index_t t = 0; t < b_len_per_channel; t++) {
+    for (index_t channel = 0; channel < num_channels; channel++) {
+      ASSERT_NEAR(static_cast<double>(b_single(t, channel).real()),
+                  static_cast<double>(b_threaded(t, channel).real()), 1e-5);
+      ASSERT_NEAR(static_cast<double>(b_single(t, channel).imag()),
+                  static_cast<double>(b_threaded(t, channel).imag()), 1e-5);
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
 
 // Simple tests use random input and filter values
 TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, Simple)
@@ -1505,4 +1688,134 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, GenericOversampledFallback)
   }
 
   MATX_EXIT_HANDLER();
+}
+
+
+// ===========================================================================
+// Output-element window (out_elem_offset): computing rows
+// [offset, offset+count) of the per-channel output-element (time) dimension
+// must match the corresponding rows of a full one-shot channelize_poly. This
+// windowed path underpins the streaming channelizer (StreamingChannelize.cu).
+// ===========================================================================
+
+namespace cpoly_window_test {
+
+// Run one windowed-vs-full comparison. InT is the input sample type (real ->
+// R2C path, complex -> C2C path); the filter is real.
+template <typename InT>
+bool run_case(cudaExecutor &exec, index_t N, index_t M, index_t D, index_t L,
+              index_t offset, index_t count)
+{
+  using OutT = cuda::std::complex<float>;
+  using FiltT = float;
+
+  const index_t T = (N + D - 1) / D; // full number of output elements per channel
+  if (offset < 0 || count <= 0 || offset + count > T) {
+    return true; // skip degenerate windows
+  }
+
+  auto h = make_tensor<FiltT>({L});
+  for (index_t k = 0; k < L; ++k) {
+    h(k) = std::cos(0.11f * static_cast<float>(k)) *
+           std::exp(-0.004f * static_cast<float>(k));
+  }
+
+  auto in = make_tensor<InT>({N});
+  for (index_t n = 0; n < N; ++n) {
+    const float t = static_cast<float>(n);
+    if constexpr (is_complex_v<InT>) {
+      in(n) = InT{std::sin(0.05f * t) + 0.3f * std::sin(0.17f * t),
+                  std::cos(0.03f * t) - 0.2f * std::sin(0.23f * t)};
+    } else {
+      in(n) = std::sin(0.05f * t) + 0.3f * std::sin(0.17f * t) + 1e-4f * t;
+    }
+  }
+
+  // Full one-shot reference (uses whichever kernel the heuristics pick).
+  auto out_full = make_tensor<OutT>({T, M});
+  (out_full = channelize_poly(in, h, M, D)).run(exec);
+
+  // Windowed compute of only rows [offset, offset+count) via normal dispatch.
+  auto out_win = make_tensor<OutT>({count, M});
+  channelize_poly_impl<decltype(out_win), decltype(in), decltype(h), float>(
+      out_win, in, h, M, D, exec.getStream(), offset);
+  exec.sync();
+
+  float max_abs = 0.0f, max_err = 0.0f;
+  for (index_t t = 0; t < count; ++t) {
+    for (index_t c = 0; c < M; ++c) {
+      const OutT ref = out_full(offset + t, c);
+      const OutT got = out_win(t, c);
+      max_abs = std::max(max_abs, cuda::std::abs(ref));
+      max_err = std::max(max_err, cuda::std::abs(got - ref));
+    }
+  }
+  const bool ok = max_err < 1e-3f * (1.0f + max_abs);
+  EXPECT_TRUE(ok) << "M=" << M << " D=" << D << " L=" << L << " offset=" << offset
+                  << " count=" << count << " max_err=" << max_err
+                  << " max_abs=" << max_abs;
+  return ok;
+}
+
+template <typename InT>
+void sweep(cudaExecutor &exec)
+{
+  struct Cfg { index_t M, D; };
+  const index_t N = 4096;
+  for (Cfg c : {Cfg{4, 4}, Cfg{8, 8},           // maximally decimated
+                Cfg{8, 4}, Cfg{8, 2},           // integer oversampled
+                Cfg{6, 4}, Cfg{8, 6}, Cfg{9, 6}}) { // rational oversampled
+    const index_t L = 4 * c.M;                  // P = 4 taps/branch
+    const index_t T = (N + c.D - 1) / c.D;
+    // Windows: interior starts, an lcm-aligned start, a middle window, and the
+    // trailing edge (last element, which includes the N%D right-edge padding).
+    const index_t g = std::gcd(c.M, c.D);
+    const index_t lcm = c.M / g * c.D;
+    for (index_t offset : {index_t(1), index_t(7), c.D, c.M, lcm, T / 3, T / 2, T - 1}) {
+      const index_t count = T - offset;         // emit everything from offset on
+      run_case<InT>(exec, N, c.M, c.D, L, offset, count);
+    }
+    // A bounded middle window as well.
+    run_case<InT>(exec, N, c.M, c.D, L, T / 3, T / 4);
+  }
+}
+
+// Target the non-fused CUDA paths with out_elem_offset > 0. P is the number
+// of prototype-filter taps per channel. These sizes are chosen from the
+// dispatcher thresholds in transforms/channelize_poly.h:
+//   M=16,  D=16,  P=8:   Smem
+//   M=64,  D=32,  P=8:   SmemTiled, Full filter layout
+//   M=256, D=128, P=8:   SmemTiled, Rotated filter layout
+//   M=64,  D=32,  P=20:  SmemTiled, Global filter layout
+//   M=64,  D=64/48, P=192: Generic (input tile exceeds 48 KiB)
+template <typename InT>
+void large_dispatch_sweep(cudaExecutor &exec)
+{
+  struct Cfg { index_t M, D, P; };
+  const index_t N = 2051; // partial trailing block for every D below
+  for (Cfg c : {Cfg{16, 16, 8}, Cfg{64, 32, 8}, Cfg{256, 128, 8},
+                Cfg{64, 32, 20}, Cfg{64, 64, 192}, Cfg{64, 48, 192}}) {
+    const index_t L = c.P * c.M - 1; // partial final polyphase row
+    const index_t T = (N + c.D - 1) / c.D;
+    const index_t offset = 3;
+    run_case<InT>(exec, N, c.M, c.D, L, offset,
+                  std::min(index_t(19), T - offset));
+    run_case<InT>(exec, N, c.M, c.D, L, T - 1, 1);
+  }
+}
+
+} // namespace cpoly_window_test
+
+TEST(ChannelizePoly, OutputElemWindowRealInput)
+{
+  cudaExecutor exec{};
+  cpoly_window_test::sweep<float>(exec);
+  cpoly_window_test::large_dispatch_sweep<float>(exec);
+}
+
+TEST(ChannelizePoly, OutputElemWindowComplexInput)
+{
+  cudaExecutor exec{};
+  cpoly_window_test::sweep<cuda::std::complex<float>>(exec);
+  cpoly_window_test::large_dispatch_sweep<cuda::std::complex<float>>(exec);
 }

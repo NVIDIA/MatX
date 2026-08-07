@@ -158,7 +158,7 @@ void read_csv(TensorType &t, const std::string fname,
   auto obj = np.attr("genfromtxt")("fname"_a = fname.c_str(), "delimiter"_a = delimiter,
                                    "skip_header"_a = skip_header,
                                    "dtype"_a = detail::MatXPybind::GetNumpyDtype<typename TensorType::value_type>());
-  pb->NumpyToTensorView(t, obj);
+  pb->NumpyToTensorView(t, obj, true);
 }
 
 /**
@@ -200,9 +200,9 @@ void write_csv(const TensorType &t, const std::string fname,
 /**
  * @brief Read a MAT file into a tensor view
  *
- * MAT files use SciPy's loadmat() function to read various MATLAB file
- * types in. MAT files are supersets of HDF5 files, and are allowed to
- * have multiple fields in them.
+ * MAT files use SciPy's loadmat() function to read MATLAB variables. MATLAB
+ * v7.3 MAT files are HDF5-based, but this helper is intended for MAT-file
+ * variables rather than as a general HDF5 interface.
  *
  * @tparam TensorType
  *   Data type of tensor
@@ -235,15 +235,15 @@ void read_mat(TensorType &t, const std::string fname,
   auto obj = (pybind11::dict)sp.attr("loadmat")("file_name"_a = fname);
   auto v = obj[var.c_str()];
 
-  pb->NumpyToTensorView(t, v);
+  pb->NumpyToTensorView(t, v, true);
 }
 
 /**
  * @brief Read a MAT file and return a tensor view
  *
- * MAT files use SciPy's loadmat() function to read various MATLAB file
- * types in. MAT files are supersets of HDF5 files, and are allowed to
- * have multiple fields in them.
+ * MAT files use SciPy's loadmat() function to read MATLAB variables. MATLAB
+ * v7.3 MAT files are HDF5-based, but this helper is intended for MAT-file
+ * variables rather than as a general HDF5 interface.
  *
  * @tparam TensorType
  *   Data type of tensor
@@ -333,7 +333,7 @@ void read_npy(TensorType &t, const std::string& fname)
   auto np = pybind11::module_::import("numpy");
   auto obj = np.attr("load")("file"_a = fname);
 
-  pb->NumpyToTensorView(t, obj);
+  pb->NumpyToTensorView(t, obj, true);
 }
 
 /**

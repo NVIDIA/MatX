@@ -13,7 +13,10 @@ is supported for any tensor with a rank higher than 2.
 
 .. note::
 
-    GEMM kernel fusion is supported by cuBLASDx if ``-DMATX_EN_MATHDX=ON`` is enabled.   
+    GEMM kernel fusion is supported by cuBLASDx if ``-DMATX_EN_MATHDX=ON`` is enabled. The JIT path is available for
+    compatible ``matmul`` shapes and data types supported by cuBLASDx. When fused with other MathDx-backed operations,
+    the runtime block-dimension requirements must be compatible; otherwise ``CUDAJITExecutor`` reports the unsupported
+    fusion before launch. Use ``CUDAExecutor`` for the normal non-JIT cuBLAS path.
 
 .. doxygenfunction:: matmul(const OpA &A, const OpB &B, float alpha = 1.0, float beta = 0.0)
 .. doxygenfunction:: matmul(const OpA &A, const OpB &B, const int32_t (&axis)[2], float alpha = 1.0, float beta = 0.0)

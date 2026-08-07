@@ -83,12 +83,7 @@ constexpr bool CheckFFTSupport() {
 
 template <typename Exec>
 constexpr bool CheckDirect1DConvSupport() {
-  if constexpr (is_host_executor_v<Exec>) {
-    return false;
-  }
-  else {
-    return true;
-  }
+  return true;
 }
 
 template <typename Exec, typename T>
@@ -103,12 +98,7 @@ constexpr bool CheckFFT1DConvSupport() {
 
 template <typename Exec>
 constexpr bool Check2DConvSupport() {
-  if constexpr (is_host_executor_v<Exec>) {
-    return false;
-  }
-  else {
-    return true;
-  }
+  return true;
 }
 
 template <typename Exec, typename T>

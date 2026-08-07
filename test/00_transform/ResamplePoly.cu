@@ -36,7 +36,108 @@
 #include "utilities.h"
 #include "gtest/gtest.h"
 
+#include <algorithm>
+#include <cmath>
+#include <numeric>
+#include <vector>
+
 using namespace matx;
+
+namespace {
+
+template <typename T>
+T MakeResampleTestValue(double real, double imag = 0.0)
+{
+  if constexpr (is_complex_v<T>) {
+    using inner_t = typename inner_op_type_t<T>::type;
+    return T{static_cast<inner_t>(real), static_cast<inner_t>(imag)};
+  }
+  else {
+    return static_cast<T>(real);
+  }
+}
+
+template <typename T>
+double ResampleAbsDiff(const T &a, const T &b)
+{
+  if constexpr (is_complex_v<T>) {
+    return static_cast<double>(cuda::std::abs(a - b));
+  }
+  else {
+    return std::abs(static_cast<double>(a - b));
+  }
+}
+
+template <typename T>
+std::vector<T> ReferenceResamplePoly(const std::vector<T> &in,
+                                     const std::vector<T> &filter,
+                                     index_t up, index_t down)
+{
+  const index_t g = std::gcd(up, down);
+  up /= g;
+  down /= g;
+
+  const index_t out_len =
+    static_cast<index_t>((in.size() * up + down - 1) / down);
+  std::vector<T> out(static_cast<size_t>(out_len), T{});
+
+  if (up == 1 && down == 1) {
+    return in;
+  }
+
+  const bool is_even_filter = (filter.size() % 2) == 0;
+  const index_t logical_filter_len =
+    static_cast<index_t>(filter.size()) + (is_even_filter ? 1 : 0);
+  const index_t filter_center = (logical_filter_len - 1) / 2;
+
+  for (index_t out_ind = 0; out_ind < out_len; out_ind++) {
+    T accum {};
+    const index_t up_ind = out_ind * down;
+    for (index_t in_ind = 0; in_ind < static_cast<index_t>(in.size()); in_ind++) {
+      const index_t h_ind = filter_center + up_ind - in_ind * up;
+      if (h_ind < 0 || h_ind >= logical_filter_len) {
+        continue;
+      }
+
+      if (is_even_filter && h_ind == 0) {
+        continue;
+      }
+
+      const index_t filter_ind = is_even_filter ? h_ind - 1 : h_ind;
+      accum += in[static_cast<size_t>(in_ind)] *
+        filter[static_cast<size_t>(filter_ind)];
+    }
+
+    out[static_cast<size_t>(out_ind)] =
+      accum * MakeResampleTestValue<T>(static_cast<double>(up));
+  }
+
+  return out;
+}
+
+template <typename T>
+void FillResampleInputs(std::vector<T> &in, std::vector<T> &filter)
+{
+  for (size_t i = 0; i < in.size(); i++) {
+    const double real = (static_cast<int>(i * 5 % 17) - 8) / 4.0;
+    const double imag = (static_cast<int>(i * 3 % 11) - 5) / 7.0;
+    in[i] = MakeResampleTestValue<T>(real, imag);
+  }
+
+  for (size_t i = 0; i < filter.size(); i++) {
+    const double real = (static_cast<int>(i * 7 % 13) - 6) / 9.0;
+    const double imag = (static_cast<int>(i * 2 % 9) - 4) / 8.0;
+    filter[i] = MakeResampleTestValue<T>(real, imag);
+  }
+}
+
+template <typename T>
+void AssertNearResampleValue(const T &actual, const T &expected, double thresh)
+{
+  ASSERT_NEAR(ResampleAbsDiff(actual, expected), 0.0, thresh);
+}
+
+} // namespace
 
 template <typename T>
 class ResamplePolyTest : public ::testing::Test {
@@ -78,6 +179,126 @@ class ResamplePolyTestFloatTypes
 
 TYPED_TEST_SUITE(ResamplePolyTestNonHalfFloatTypes, MatXFloatNonHalfTypesCUDAExec);
 TYPED_TEST_SUITE(ResamplePolyTestFloatTypes, MatXFloatTypesCUDAExec);
+
+template <typename T>
+class ResamplePolyHostTest : public ::testing::Test {};
+
+using ResamplePolyHostTypes = ::testing::Types<float, double, cuda::std::complex<float>>;
+TYPED_TEST_SUITE(ResamplePolyHostTest, ResamplePolyHostTypes);
+
+TYPED_TEST(ResamplePolyHostTest, SmallSignalsMatchReference)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = TypeParam;
+
+  SingleThreadedHostExecutor exec{};
+  struct {
+    index_t a_len;
+    index_t f_len;
+    index_t up;
+    index_t down;
+  } test_cases[] = {
+    {7, 5, 3, 2},
+    {8, 4, 2, 5},
+    {6, 1, 4, 1},
+    {9, 3, 1, 3},
+    {7, 4, 6, 4}
+  };
+
+  for (const auto &tc : test_cases) {
+    std::vector<TestType> input(static_cast<size_t>(tc.a_len));
+    std::vector<TestType> filter(static_cast<size_t>(tc.f_len));
+    FillResampleInputs(input, filter);
+    const auto expected = ReferenceResamplePoly(input, filter, tc.up, tc.down);
+
+    auto a = make_tensor<TestType>({tc.a_len}, MATX_HOST_MALLOC_MEMORY);
+    auto f = make_tensor<TestType>({tc.f_len}, MATX_HOST_MALLOC_MEMORY);
+    auto b = make_tensor<TestType>({static_cast<index_t>(expected.size())},
+      MATX_HOST_MALLOC_MEMORY);
+
+    for (index_t i = 0; i < tc.a_len; i++) {
+      a(i) = input[static_cast<size_t>(i)];
+    }
+    for (index_t i = 0; i < tc.f_len; i++) {
+      f(i) = filter[static_cast<size_t>(i)];
+    }
+
+    (b = resample_poly(shift<0>(shift<0>(a, 1), -1),
+                       shift<0>(shift<0>(f, 1), -1),
+                       tc.up, tc.down)).run(exec);
+
+    for (index_t i = 0; i < b.Size(0); i++) {
+      AssertNearResampleValue(b(i), expected[static_cast<size_t>(i)], 1.0e-5);
+    }
+
+    if (tc.a_len == 7 && tc.f_len == 5) {
+      (b = resample_poly(shift<0>(shift<0>(a, 1), -1),
+                         shift<0>(shift<0>(f, 1), -1),
+                         tc.up, tc.down) + MakeResampleTestValue<TestType>(0.0)).run(exec);
+
+      for (index_t i = 0; i < b.Size(0); i++) {
+        AssertNearResampleValue(b(i), expected[static_cast<size_t>(i)], 1.0e-5);
+      }
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(ResamplePolyHostTest, BatchedSignalsMatchReference)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = TypeParam;
+
+  SingleThreadedHostExecutor exec{};
+  constexpr index_t batches = 3;
+  constexpr index_t a_len = 8;
+  constexpr index_t f_len = 4;
+  constexpr index_t up = 3;
+  constexpr index_t down = 2;
+
+  std::vector<TestType> filter(static_cast<size_t>(f_len));
+  std::vector<TestType> seed(static_cast<size_t>(a_len));
+  FillResampleInputs(seed, filter);
+  const auto expected_shape = ReferenceResamplePoly(seed, filter, up, down);
+  const index_t b_len = static_cast<index_t>(expected_shape.size());
+
+  auto a = make_tensor<TestType>({batches, a_len}, MATX_HOST_MALLOC_MEMORY);
+  auto f = make_tensor<TestType>({f_len}, MATX_HOST_MALLOC_MEMORY);
+  auto b = make_tensor<TestType>({batches, b_len}, MATX_HOST_MALLOC_MEMORY);
+
+  for (index_t i = 0; i < f_len; i++) {
+    f(i) = filter[static_cast<size_t>(i)];
+  }
+
+  std::vector<std::vector<TestType>> expected;
+  for (index_t batch = 0; batch < batches; batch++) {
+    std::vector<TestType> input(static_cast<size_t>(a_len));
+    for (index_t i = 0; i < a_len; i++) {
+      const double real = static_cast<double>(batch + 1) * 0.25 +
+        (static_cast<int>(i * 5 % 17) - 8) / 5.0;
+      const double imag = static_cast<double>(batch - 1) * 0.5 +
+        (static_cast<int>(i * 3 % 11) - 5) / 6.0;
+      input[static_cast<size_t>(i)] = MakeResampleTestValue<TestType>(real, imag);
+      a(batch, i) = input[static_cast<size_t>(i)];
+    }
+
+    expected.push_back(ReferenceResamplePoly(input, filter, up, down));
+  }
+
+  (b = resample_poly(shift<1>(shift<1>(a, 2), -2),
+                     shift<0>(shift<0>(f, 1), -1),
+                     up, down)).run(exec);
+
+  for (index_t batch = 0; batch < batches; batch++) {
+    for (index_t i = 0; i < b_len; i++) {
+      AssertNearResampleValue(b(batch, i),
+        expected[static_cast<size_t>(batch)][static_cast<size_t>(i)], 1.0e-5);
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
 
 // SimpleOddLength tests use random input and filter values and
 // odd-length filters.
@@ -581,4 +802,102 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Operators)
   }
 
   MATX_EXIT_HANDLER();
+}
+
+
+// ===========================================================================
+// Output window (out_offset): computing outputs [offset, offset+count) of the
+// full resample grid via matxResamplePoly1DInternal must match the
+// corresponding slice of a full one-shot resample_poly. This windowed path
+// underpins the streaming resampler (StreamingResample.cu). The internal takes
+// gcd-reduced factors, matching resample_poly_impl's internal reduction; the
+// comparison uses a tolerance because the window and the full run may select
+// different kernels (ElemBlock vs WarpCentric summation order).
+// ===========================================================================
+
+namespace rpoly_window_test {
+
+template <typename Exec>
+bool run_case(Exec &exec, index_t N, index_t up, index_t down, index_t L,
+              index_t offset, index_t count)
+{
+  using T = float;
+  const index_t M = (N * up + down - 1) / down; // full output count
+  if (offset < 0 || count <= 0 || offset + count > M) {
+    return true; // skip degenerate windows
+  }
+
+  auto h = make_tensor<T>({L});
+  for (index_t k = 0; k < L; ++k) {
+    h(k) = std::cos(0.12f * static_cast<float>(k)) *
+           std::exp(-0.02f * static_cast<float>(k)) / static_cast<float>(L);
+  }
+  auto sig = make_tensor<T>({N});
+  for (index_t i = 0; i < N; ++i) {
+    const float t = static_cast<float>(i);
+    sig(i) = std::sin(0.05f * t) + 0.4f * std::sin(0.2f * t) + 1e-4f * t;
+  }
+
+  // Full one-shot reference (public API, raw factors).
+  auto y_full = make_tensor<T>({M});
+  (y_full = resample_poly(sig, h, up, down)).run(exec);
+
+  // Windowed compute of outputs [offset, offset+count) via the internal, which
+  // takes gcd-reduced factors. (up == down after reduction is the identity
+  // special case handled above the internal, so such configs are not used here.)
+  const index_t g = std::gcd(up, down);
+  const index_t ur = up / g;
+  const index_t dr = down / g;
+  auto y_win = make_tensor<T>({count});
+  if constexpr (is_cuda_executor_v<Exec>) {
+    detail::matxResamplePoly1DInternal(y_win, sig, h, ur, dr, exec.getStream(),
+                                       offset);
+  } else {
+    detail::matxResamplePoly1DInternal(y_win, sig, h, ur, dr, exec, offset);
+  }
+  exec.sync();
+
+  float max_abs = 0.0f, max_err = 0.0f;
+  for (index_t i = 0; i < count; ++i) {
+    max_abs = std::max(max_abs, std::fabs(y_full(offset + i)));
+    max_err = std::max(max_err, std::fabs(y_win(i) - y_full(offset + i)));
+  }
+  const bool ok = max_err < 1e-4f * (1.0f + max_abs);
+  EXPECT_TRUE(ok) << "up=" << up << " down=" << down << " L=" << L
+                  << " offset=" << offset << " count=" << count
+                  << " max_err=" << max_err << " max_abs=" << max_abs;
+  return ok;
+}
+
+template <typename Exec>
+void sweep(Exec &exec, index_t N)
+{
+  struct Cfg { index_t up, down, L; };
+  for (Cfg c : {Cfg{3, 2, 61}, Cfg{2, 3, 61}, Cfg{5, 3, 101}, // coprime
+                Cfg{4, 2, 81}, Cfg{2, 4, 81},                 // non-coprime
+                Cfg{3, 2, 62}, Cfg{2, 3, 60},                 // even L
+                Cfg{1, 2, 2001}}) { // long filter: WarpCentric on every path
+    const index_t M = (N * c.up + c.down - 1) / c.down;
+    for (index_t offset : {index_t(1), index_t(7), M / 3, M - 5}) {
+      // Tail window (everything from offset), a small window (may select a
+      // different kernel than the full run), and a single output.
+      run_case(exec, N, c.up, c.down, c.L, offset, M - offset);
+      run_case(exec, N, c.up, c.down, c.L, offset, std::min(index_t(19), M - offset));
+      run_case(exec, N, c.up, c.down, c.L, offset, 1);
+    }
+  }
+}
+
+} // namespace rpoly_window_test
+
+TEST(ResamplePoly, OutputWindowMatchesFullSlice)
+{
+  cudaExecutor exec{};
+  rpoly_window_test::sweep(exec, 4096);
+}
+
+TEST(ResamplePoly, OutputWindowMatchesFullSliceHost)
+{
+  SingleThreadedHostExecutor exec{};
+  rpoly_window_test::sweep(exec, 512);
 }

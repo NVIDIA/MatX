@@ -18,5 +18,17 @@ TYPED_TEST(OperatorTestsFloatAllExecs, Print)
   auto t3 = matx::make_tensor<TestType>({3, 2, 20});
   print(matx::ones(t3.Shape()), 1, 0, 2);
 
+  auto t5 = matx::make_tensor<TestType>({2, 2, 2, 2, 2});
+  auto r5 = matx::ones(t5.Shape());
+  print(r5, 1, 0, 0, 0, 2);
+
+  set_print_format_type(MATX_PRINT_FORMAT_MLAB);
+  print(r5, 1, 0, 0, 0, 2);
+
+  set_print_format_type(MATX_PRINT_FORMAT_PYTHON);
+  print(r5, 1, 0, 0, 0, 2);
+
+  set_print_format_type(MATX_PRINT_FORMAT_DEFAULT);
+
   MATX_EXIT_HANDLER();
-} 
+}

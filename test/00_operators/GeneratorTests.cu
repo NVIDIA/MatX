@@ -35,6 +35,7 @@
 #include "test_types.h"
 #include "utilities.h"
 #include "gtest/gtest.h"
+#include <cmath>
 #include <type_traits>
 
 using namespace matx;
@@ -203,6 +204,35 @@ TYPED_TEST(BasicGeneratorTestsAll, Diag)
         MATX_ASSERT_EQ(tdk(i), tc(i + 6, i));
       }
     }    
+
+    {
+      auto wide = make_tensor<TestType>({3, 5});
+      auto tall = make_tensor<TestType>({5, 3});
+
+      auto wide_upper = diag(wide, 1);
+      auto wide_lower = diag(wide, -2);
+      auto tall_upper = diag(tall, 1);
+      auto tall_lower = diag(tall, -1);
+
+      ASSERT_EQ(wide_upper.Size(0), 3);
+      ASSERT_EQ(wide_lower.Size(0), 1);
+      ASSERT_EQ(tall_upper.Size(0), 2);
+      ASSERT_EQ(tall_lower.Size(0), 3);
+
+      ASSERT_EQ(diag(wide, 5).Size(0), 0);
+      ASSERT_EQ(diag(wide, -3).Size(0), 0);
+      ASSERT_EQ(diag(tall, 3).Size(0), 0);
+      ASSERT_EQ(diag(tall, -5).Size(0), 0);
+    }
+
+    {
+      auto batched = make_tensor<TestType>({2, 3, 5});
+      auto op = diag(batched, 1);
+
+      ASSERT_EQ(op.Rank(), 2);
+      ASSERT_EQ(op.Size(0), 2);
+      ASSERT_EQ(op.Size(1), 3);
+    }
 
     // Test with a nested transform. Restrict to floating point types for
     // the convolution
@@ -512,6 +542,359 @@ TYPED_TEST(BasicGeneratorTestsAll, FillRank0EmptyBrace)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(BasicGeneratorTestsFloatNonComplexNonHalf, RandomDirectUniformSeeded)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  ExecType exec{};
+
+  constexpr index_t count = 257;
+  constexpr uint64_t seed = 1234;
+  auto a = make_tensor<TestType>({count});
+  auto b = make_tensor<TestType>({count});
+
+  (a = random<TestType>({count}, UNIFORM, seed, static_cast<TestType>(2), static_cast<TestType>(-1))).run(exec);
+  (b = random<TestType>({count}, UNIFORM, seed, static_cast<TestType>(2), static_cast<TestType>(-1))).run(exec);
+  exec.sync();
+
+  for (index_t i = 0; i < count; i++) {
+    ASSERT_LE(a(i), static_cast<TestType>(1));
+    ASSERT_LE(static_cast<TestType>(-1), a(i));
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(a(i), b(i)));
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(BasicGeneratorTestsFloatNonComplexNonHalf, RandomDirectNormalOddSize)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  ExecType exec{};
+
+  constexpr index_t count = 4097;
+  constexpr uint64_t seed = 5678;
+  auto a = make_tensor<TestType>({count});
+  auto b = make_tensor<TestType>({count});
+
+  (a = random<TestType>({count}, NORMAL, seed, static_cast<TestType>(2), static_cast<TestType>(3))).run(exec);
+  (b = random<TestType>({count}, NORMAL, seed, static_cast<TestType>(2), static_cast<TestType>(3))).run(exec);
+  exec.sync();
+
+  TestType sum = 0;
+  for (index_t i = 0; i < count; i++) {
+    sum += a(i);
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(a(i), b(i)));
+  }
+
+  ASSERT_LT(fabs(static_cast<double>(sum / static_cast<TestType>(count) - static_cast<TestType>(3))), 0.2);
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(OperatorTests, RandomDirectComplexUniform)
+{
+  MATX_ENTER_HANDLER();
+  cudaExecutor exec{};
+
+  auto check_complex = [&]<typename TestType>() {
+    using InnerType = typename inner_op_type_t<TestType>::type;
+    constexpr index_t count = 257;
+    constexpr uint64_t seed = 9012;
+    auto a = make_tensor<TestType>({count});
+    auto b = make_tensor<TestType>({count});
+
+    (a = random<TestType>({count}, UNIFORM, seed, static_cast<InnerType>(2), static_cast<InnerType>(-1))).run(exec);
+    (b = random<TestType>({count}, UNIFORM, seed, static_cast<InnerType>(2), static_cast<InnerType>(-1))).run(exec);
+    exec.sync();
+
+    for (index_t i = 0; i < count; i++) {
+      ASSERT_LE(a(i).real(), static_cast<InnerType>(1));
+      ASSERT_LE(static_cast<InnerType>(-1), a(i).real());
+      ASSERT_LE(a(i).imag(), static_cast<InnerType>(2));
+      ASSERT_LE(static_cast<InnerType>(0), a(i).imag());
+      EXPECT_TRUE(MatXUtils::MatXTypeCompare(a(i), b(i)));
+    }
+  };
+
+  check_complex.template operator()<cuda::std::complex<float>>();
+  check_complex.template operator()<cuda::std::complex<double>>();
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(OperatorTests, RandomDirectScalarToComplex)
+{
+  MATX_ENTER_HANDLER();
+  cudaExecutor exec{};
+
+  constexpr index_t count = 257;
+  constexpr uint64_t seed = 9014;
+  auto a = make_tensor<cuda::std::complex<float>>({count});
+  auto b = make_tensor<cuda::std::complex<float>>({count});
+
+  (a = random<float>({count}, UNIFORM, seed, 2.0f, -1.0f)).run(exec);
+  (b = random<float>({count}, UNIFORM, seed, 2.0f, -1.0f)).run(exec);
+  exec.sync();
+
+  for (index_t i = 0; i < count; i++) {
+    ASSERT_LE(a(i).real(), 1.0f);
+    ASSERT_LE(-1.0f, a(i).real());
+    EXPECT_EQ(a(i).imag(), 0.0f);
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(a(i), b(i)));
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(OperatorTests, RandomDirectComplexNormalBetaRealOnly)
+{
+  MATX_ENTER_HANDLER();
+  cudaExecutor exec{};
+
+  auto check_complex = [&]<typename TestType>() {
+    using InnerType = typename inner_op_type_t<TestType>::type;
+    constexpr index_t count = 4096;
+    constexpr uint64_t seed = 9013;
+    constexpr InnerType beta = static_cast<InnerType>(5);
+    auto a = make_tensor<TestType>({count});
+    auto b = make_tensor<TestType>({count});
+
+    (a = random<TestType>({count}, NORMAL, seed, static_cast<InnerType>(1), beta)).run(exec);
+    (b = random<TestType>({count}, NORMAL, seed, static_cast<InnerType>(1), beta)).run(exec);
+    exec.sync();
+
+    double real_sum = 0;
+    double imag_sum = 0;
+    for (index_t i = 0; i < count; i++) {
+      real_sum += static_cast<double>(a(i).real());
+      imag_sum += static_cast<double>(a(i).imag());
+      EXPECT_TRUE(MatXUtils::MatXTypeCompare(a(i), b(i)));
+    }
+
+    EXPECT_NEAR(real_sum / static_cast<double>(count), static_cast<double>(beta), 0.2);
+    EXPECT_NEAR(imag_sum / static_cast<double>(count), 0.0, 0.2);
+  };
+
+  check_complex.template operator()<cuda::std::complex<float>>();
+  check_complex.template operator()<cuda::std::complex<double>>();
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(BasicGeneratorTestsIntegral, RandomiDirectSeeded)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  ExecType exec{};
+
+  constexpr index_t count = 257;
+  constexpr uint64_t seed = 3456;
+  const TestType min_bound = static_cast<TestType>(3);
+  const TestType max_bound = static_cast<TestType>(17);
+  auto a = make_tensor<TestType>({count});
+  auto b = make_tensor<TestType>({count});
+
+  (a = randomi<TestType>({count}, seed, min_bound, max_bound)).run(exec);
+  (b = randomi<TestType>({count}, seed, min_bound, max_bound)).run(exec);
+  exec.sync();
+
+  for (index_t i = 0; i < count; i++) {
+    ASSERT_LE(a(i), max_bound);
+    ASSERT_LE(min_bound, a(i));
+    EXPECT_EQ(a(i), b(i));
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(BasicGeneratorTestsFloatNonComplexNonHalf, RandomDirectRank0)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  ExecType exec{};
+
+  auto a = make_tensor<TestType>({});
+  auto b = make_tensor<TestType>({});
+  cuda::std::array<index_t, 0> shape{};
+
+  (a = random<TestType>(shape, UNIFORM, 7890)).run(exec);
+  (b = random<TestType>(shape, UNIFORM, 7890)).run(exec);
+  exec.sync();
+
+  ASSERT_LE(a(), static_cast<TestType>(1));
+  ASSERT_LE(static_cast<TestType>(0), a());
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(a(), b()));
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(BasicGeneratorTestsFloatNonComplexNonHalf, RandomDirectShapeMismatchThrows)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  ExecType exec{};
+
+  auto out = make_tensor<TestType>({10});
+  auto rand_op = random<TestType>({5}, UNIFORM, 1357);
+
+  EXPECT_THROW({ (out = rand_op).run(exec); }, matx::detail::matxException);
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(BasicGeneratorTestsFloatNonComplexNonHalf, RandomExpressionStillWorks)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  ExecType exec{};
+
+  constexpr index_t count = 100;
+  constexpr uint64_t seed = 2468;
+  auto out = make_tensor<TestType>({count});
+  auto materialized = make_tensor<TestType>({count});
+  auto rand_op = random<TestType>({count}, UNIFORM, seed);
+
+  (materialized = random<TestType>({count}, UNIFORM, seed)).run(exec);
+  (out = rand_op + rand_op).run(exec);
+  exec.sync();
+
+  for (index_t i = 0; i < count; i++) {
+    ASSERT_LE(out(i), static_cast<TestType>(2));
+    ASSERT_LE(static_cast<TestType>(0), out(i));
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(out(i), static_cast<TestType>(2) * materialized(i)));
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(OperatorTests, RandomHostNormalScalesOnce)
+{
+  MATX_ENTER_HANDLER();
+  SingleThreadedHostExecutor exec{};
+
+  constexpr index_t count = 8192;
+  constexpr uint64_t seed = 13579;
+  constexpr float alpha = 2.0f;
+  constexpr float beta = 3.0f;
+  auto out = make_tensor<float>({count});
+
+  (out = random<float>({count}, NORMAL, seed, alpha, beta)).run(exec);
+  exec.sync();
+
+  double sum = 0.0;
+  double sum_sq = 0.0;
+  for (index_t i = 0; i < count; i++) {
+    const double v = static_cast<double>(out(i));
+    sum += v;
+    sum_sq += v * v;
+  }
+
+  const double mean = sum / static_cast<double>(count);
+  const double variance = (sum_sq / static_cast<double>(count)) - (mean * mean);
+
+  EXPECT_NEAR(mean, beta, 0.2);
+  EXPECT_NEAR(std::sqrt(variance), alpha, 0.2);
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(OperatorTests, RandomJITCapabilityLimits)
+{
+  MATX_ENTER_HANDLER();
+
+  auto small = random<float>({1024}, UNIFORM, 1111);
+  auto large = random<float>({1025}, UNIFORM, 1111);
+  auto ints = randomi<int32_t>({128}, 2222);
+
+#if defined(MATX_EN_MATHDX) && defined(MATX_EN_JIT)
+  EXPECT_TRUE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(small));
+#else
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(small));
+#endif
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(large));
+  EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(ints));
+
+  MATX_EXIT_HANDLER();
+}
+
+#if defined(MATX_EN_MATHDX) && defined(MATX_EN_JIT)
+TEST(OperatorTests, RandomJITFusedUniform)
+{
+  MATX_ENTER_HANDLER();
+  CUDAJITExecutor exec{};
+
+  constexpr index_t count = 128;
+  constexpr uint64_t seed = 1122;
+  auto out = make_tensor<float>({count});
+
+  (out = random<float>({count}, UNIFORM, seed, 2.0f, -1.0f) + 3.0f).run(exec);
+  exec.sync();
+
+  int different_count = 0;
+  const float first = out(0);
+  for (index_t i = 0; i < count; i++) {
+    ASSERT_LE(2.0f, out(i));
+    ASSERT_LE(out(i), 4.0f);
+    different_count += MatXUtils::MatXTypeCompare(out(i), first) ? 0 : 1;
+  }
+  EXPECT_GT(different_count, 0);
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(OperatorTests, RandomJITRepeatedLeafUsesSameValue)
+{
+  MATX_ENTER_HANDLER();
+  CUDAJITExecutor exec{};
+
+  constexpr index_t count = 64;
+  constexpr uint64_t seed = 3344;
+  auto single = make_tensor<double>({count});
+  auto doubled = make_tensor<double>({count});
+  auto rand_op = random<double>({count}, UNIFORM, seed);
+
+  (single = rand_op + 0.0).run(exec);
+  (doubled = rand_op + rand_op).run(exec);
+  exec.sync();
+
+  for (index_t i = 0; i < count; i++) {
+    EXPECT_NEAR(doubled(i), 2.0 * single(i), 1e-12);
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(OperatorTests, RandomJITComplexUniformBetaRealOnly)
+{
+  MATX_ENTER_HANDLER();
+  CUDAJITExecutor exec{};
+
+  using TestType = cuda::std::complex<float>;
+  constexpr index_t count = 64;
+  constexpr uint64_t seed = 5566;
+  auto out = make_tensor<TestType>({count});
+
+  (out = random<TestType>({count}, UNIFORM, seed, 2.0f, -1.0f)).run(exec);
+  exec.sync();
+
+  for (index_t i = 0; i < count; i++) {
+    ASSERT_LE(-1.0f, out(i).real());
+    ASSERT_LE(out(i).real(), 1.0f);
+    ASSERT_LE(0.0f, out(i).imag());
+    ASSERT_LE(out(i).imag(), 2.0f);
+  }
+
+  MATX_EXIT_HANDLER();
+}
+#endif
+
 // fill() in a slot that requires an actual MatX operator (not a scalar).
 // zipvec is templated on operator types; passing a bare scalar here fails
 // to compile because float has no Rank() / value_type / operator(). fill()
@@ -812,6 +1195,49 @@ TYPED_TEST(BasicGeneratorTestsFloatNonComplex, Logspace)
 
   MATX_EXIT_HANDLER();
 }
+
+#ifdef MATX_EN_JIT
+template <typename TestType>
+void TestLogspaceJITType(CUDAJITExecutor &exec)
+{
+  constexpr index_t count = 8;
+  auto direct = make_tensor<TestType>({count});
+  auto composed = make_tensor<TestType>({count});
+  auto op = logspace<0>(direct.Shape(), TestType{0.0f}, TestType{2.0f});
+
+  (direct = op).run(exec);
+  (composed = op * TestType{2.0f}).run(exec);
+  exec.sync();
+
+  for (index_t i = 0; i < count; i++) {
+    const auto exponent = 2.0 * static_cast<double>(i) /
+                          static_cast<double>(count - 1);
+    const auto expected = cuda::std::pow(10.0, exponent);
+
+    if constexpr (IsHalfType<TestType>()) {
+      EXPECT_TRUE(MatXUtils::MatXTypeCompare(direct(i), expected, 2));
+      EXPECT_TRUE(MatXUtils::MatXTypeCompare(composed(i), expected * 2.0, 2));
+    }
+    else {
+      EXPECT_TRUE(MatXUtils::MatXTypeCompare(direct(i), expected, 0.01));
+      EXPECT_TRUE(MatXUtils::MatXTypeCompare(composed(i), expected * 2.0, 0.01));
+    }
+  }
+}
+
+TEST(OperatorTests, LogspaceJIT)
+{
+  MATX_ENTER_HANDLER();
+  CUDAJITExecutor exec{};
+
+  TestLogspaceJITType<matxFp16>(exec);
+  TestLogspaceJITType<matxBf16>(exec);
+  TestLogspaceJITType<float>(exec);
+  TestLogspaceJITType<double>(exec);
+
+  MATX_EXIT_HANDLER();
+}
+#endif
 
 
 TYPED_TEST(BasicGeneratorTestsNumeric, Eye)

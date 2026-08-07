@@ -210,11 +210,17 @@ TYPED_TEST(TensorCreationTestsAll, StaticTensorDataPointer)
 {
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
+  tensor_t<TestType, 2> uninitialized;
+  ASSERT_EQ(uninitialized.Data(), nullptr);
+  ASSERT_FALSE(uninitialized.IsInitialized());
+
   auto mt1 = make_tensor<TestType, 10>();
   ASSERT_NE(mt1.Data(), nullptr);
+  ASSERT_TRUE(mt1.IsInitialized());
 
   auto mt2 = make_tensor<TestType, 4, 5>();
   ASSERT_NE(mt2.Data(), nullptr);
+  ASSERT_TRUE(mt2.IsInitialized());
 }
 
 TYPED_TEST(TensorCreationTestsAll, StaticTensorAssignOnes)

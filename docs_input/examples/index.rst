@@ -10,4 +10,5 @@ the examples require compiling them into an executable. Instructions for buildin
 .. toctree::
    :maxdepth: 1
 
+   black_scholes.rst
    fftconv.rst

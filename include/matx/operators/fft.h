@@ -34,6 +34,7 @@
 
 #include <unordered_map>
 #include <string>
+#include "matx/core/distributed_tensor.h"
 #include "matx/core/type_utils.h"
 #include "matx/core/utils.h"
 #include "matx/operators/base_operator.h"
@@ -183,13 +184,7 @@ namespace matx
           }
 
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
-            int major = 0;
-            int minor = 0;
-            int device;
-            cudaGetDevice(&device);            
-            cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device);
-            cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device);
-            int cc = major * 100 + minor * 10;
+            const int cc = GetComputeCapability();
             dx_fft_helper_.set_fft_size(fft_size_);
             dx_fft_helper_.set_fft_type(DeduceFFTTransformType<typename scalar_to_complex<typename OpA::value_type>::ctype, value_type>());
             dx_fft_helper_.set_direction(Direction);
@@ -245,7 +240,7 @@ namespace matx
                  "  constexpr __MATX_INLINE__  __MATX_DEVICE__ index_t Size(int dim) const\n" +
                  "  {\n" +
                  "    return out_dims_[dim];\n " +
-                 "  }\n" +    
+                 "  }\n" +
                  "};\n")
           );
         }     
@@ -517,7 +512,9 @@ namespace matx
             a_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           }
 
-          matxFree(ptr); 
+          matxFree(ptr);
+          ptr = nullptr;
+          prerun_done_ = false;
         }
     };
   }
@@ -545,7 +542,30 @@ namespace matx
   __MATX_INLINE__ auto fft(const OpA &a, uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD) {
     constexpr auto fft_type = detail::ComplexInType<OpA>();
     const index_t fft_size_ = static_cast<index_t>(fft_size);
-    return detail::FFTOp<OpA, detail::no_permute_t, detail::FFTDirection::FORWARD, fft_type>(a, fft_size_, detail::no_permute_t{}, norm);
+    if constexpr (is_distributed_tensor_v<OpA>) {
+      static_assert(remove_cvref_t<OpA>::Rank() >= 2,
+                    "Distributed FFT requires a batch dimension followed by "
+                    "the transform dimension");
+      using input_type = typename remove_cvref_t<OpA>::value_type;
+      using output_type = std::conditional_t<
+          is_complex_v<input_type>, input_type,
+          typename detail::scalar_to_complex<input_type>::ctype>;
+      auto local_fft = [fft_size_, norm](const auto &local_a) {
+        using local_type = remove_cvref_t<decltype(local_a)>;
+        constexpr auto local_fft_type = detail::ComplexInType<local_type>();
+        return detail::FFTOp<local_type, detail::no_permute_t,
+                             detail::FFTDirection::FORWARD, local_fft_type>(
+            local_a, fft_size_, detail::no_permute_t{}, norm);
+      };
+      return experimental::detail::make_distributed_local_transform<
+          output_type, 1>(
+          std::move(local_fft), a);
+    }
+    else {
+      return detail::FFTOp<OpA, detail::no_permute_t,
+                           detail::FFTDirection::FORWARD, fft_type>(
+          a, fft_size_, detail::no_permute_t{}, norm);
+    }
   }
 
   /**
@@ -570,6 +590,9 @@ namespace matx
    */
   template<typename OpA>
   __MATX_INLINE__ auto fft(const OpA &a, const int32_t (&axis)[1], uint64_t fft_size = 0, FFTNorm norm = FFTNorm::BACKWARD) {
+    static_assert(!is_distributed_tensor_v<OpA>,
+                  "Axis-selecting distributed FFT is not supported in the "
+                  "first-pass batch-sharded executor");
     constexpr auto fft_type = detail::ComplexInType<OpA>();
     if constexpr (is_dynamic_rank_op_v<remove_cvref_t<OpA>>) {
       auto perm = detail::getPermuteDims(detail::get_dyn_rank(a), axis);
@@ -760,12 +783,31 @@ namespace matx
         mutable detail::tensor_impl_t<ttype, OpA::Rank()> tmp_out_; 
         mutable ttype *ptr = nullptr;
         mutable bool prerun_done_ = false;                                                
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
+        mutable cuFFTDx2DHelper<typename OpA::value_type> dx_fft2_helper_;
+        bool jit_axes_supported_ = true;
+#endif
 
       public:
         using matxop = bool;
         using value_type = typename OpA::value_type;
         using matx_transform_op = bool;
         using fft2_xform_op = bool;
+        using self_type = FFT2Op<OpA, PermDims, Direction, Type>;
+
+        // Propagate dynamic tensor marker through expression tree
+        using dynamic_tensor_expr = cuda::std::bool_constant<
+          is_dynamic_tensor_v<OpA> || is_dynamic_rank_op_v<OpA>>;
+
+#ifdef MATX_EN_JIT
+        struct JIT_Storage {
+          typename detail::inner_storage_or_self_t<detail::base_type_t<OpA>> a_;
+        };
+
+        JIT_Storage ToJITStorage() const {
+          return JIT_Storage{detail::to_jit_storage(a_)};
+        }
+#endif
 
         __MATX_INLINE__ std::string str() const { 
           if constexpr (Direction == detail::FFTDirection::FORWARD) {
@@ -808,9 +850,88 @@ namespace matx
               out_dims_[Rank() - 2] = out_dims_[Rank() - 2];
             }
           }
+
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
+          if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
+            for (int32_t i = 0; i < Rank(); i++) {
+              if (perm_[static_cast<size_t>(i)] != i) {
+                jit_axes_supported_ = false;
+                break;
+              }
+            }
+          }
+
+          const int cc = GetComputeCapability();
+
+          dx_fft2_helper_.set_fft_size_y(out_dims_[Rank() - 2]);
+          dx_fft2_helper_.set_fft_size_x(out_dims_[Rank() - 1]);
+          dx_fft2_helper_.set_fft_type(Type);
+          dx_fft2_helper_.set_direction(Direction);
+          dx_fft2_helper_.set_cc(cc);
+#endif
         }
 
-        
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
+        __MATX_INLINE__ std::string get_jit_class_name() const {
+          std::string symbol_name = "JITFFT2Op_";
+          symbol_name += "R";
+          symbol_name += std::to_string(jit_rank());
+          symbol_name += "_";
+          symbol_name += std::to_string(dx_fft2_helper_.get_fft_size_y());
+          symbol_name += "_";
+          symbol_name += std::to_string(dx_fft2_helper_.get_fft_size_x());
+          symbol_name += "_T";
+          symbol_name += std::to_string(static_cast<int>(Type));
+          symbol_name += "_D";
+          symbol_name += Direction == detail::FFTDirection::FORWARD ? std::string("F") : std::string("B");
+          symbol_name += "_SM";
+          symbol_name += std::to_string(dx_fft2_helper_.get_cc());
+          symbol_name += "_N";
+          symbol_name += std::to_string(static_cast<int>(norm_));
+          return symbol_name;
+        }
+
+        __MATX_INLINE__ auto get_jit_op_str() const {
+          const int actual_rank = jit_rank();
+          const std::string class_name = get_jit_class_name();
+          const std::string fft_x_func_name = dx_fft2_helper_.GetXFuncName();
+          const std::string fft_y_func_name = dx_fft2_helper_.GetYFuncName();
+
+          std::string declarations =
+            " extern \"C\" __device__ void " + fft_x_func_name + "(" + detail::type_to_string<value_type>() + "*);\n";
+          if (fft_y_func_name != fft_x_func_name) {
+            declarations +=
+              " extern \"C\" __device__ void " + fft_y_func_name + "(" + detail::type_to_string<value_type>() + "*);\n";
+          }
+
+          return cuda::std::make_tuple(
+             class_name,
+             std::string(
+                 declarations +
+                 " template <typename OpA> struct " + class_name + "  {\n" +
+                 "  using input_type = typename OpA::value_type;\n" +
+                 "  using matxop = bool;\n" +
+                 "  using value_type = input_type;\n" +
+                 "  typename detail::inner_storage_or_self_t<detail::base_type_t<OpA>> a_;\n" +
+                 "  constexpr static cuda::std::array<index_t, " + std::to_string(actual_rank) + "> out_dims_ = { " +
+                 detail::array_to_string(out_dims_, actual_rank) + " };\n" +
+                 "  template <typename CapType, typename... Is>\n" +
+                 "  __MATX_INLINE__ __MATX_DEVICE__  decltype(auto) operator()(Is... indices) const\n" +
+                 "  {\n" +
+                 "    " + dx_fft2_helper_.GetFuncStr(fft_x_func_name, fft_y_func_name, static_cast<int>(norm_), actual_rank) + "\n" +
+                 "  }\n" +
+                 "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank()\n" +
+                 "  {\n" +
+                 "    return " + std::to_string(actual_rank) + ";\n" +
+                 "  }\n" +
+                 "  constexpr __MATX_INLINE__  __MATX_DEVICE__ index_t Size(int dim) const\n" +
+                 "  {\n" +
+                 "    return out_dims_[dim];\n " +
+                 "  }\n" +
+                 "};\n")
+          );
+        }
+#endif
 
         template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
@@ -831,6 +952,14 @@ namespace matx
           return out_dims_[dim];
         }
 
+        __MATX_INLINE__ __MATX_HOST__ int32_t DynRank() const {
+          return detail::get_dyn_rank(a_);
+        }
+
+        __MATX_INLINE__ __MATX_HOST__ int32_t jit_rank() const {
+          if constexpr (is_dynamic_rank_op_v<self_type>) return DynRank();
+          else return Rank();
+        }
 
         __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
@@ -871,10 +1000,143 @@ namespace matx
 
         template <OperatorCapability Cap, typename InType>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
-          // 1. Determine if the binary operation ITSELF intrinsically has this capability.
-          auto self_has_cap = capability_attributes<Cap>::default_value;
-          auto result = combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
-          return result;
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
+          if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
+            const int self_shm = (jit_axes_supported_ && dx_fft2_helper_.template CheckJITSizeAndTypeRequirements<OpA>()) ?
+              dx_fft2_helper_.GetShmRequired() : capability_attributes<Cap>::default_value;
+            auto result = combine_capabilities<Cap>(self_shm, detail::get_operator_capability<Cap>(a_, in));
+            MATX_LOG_DEBUG("cuFFTDx 2D DYN_SHM_SIZE: {}", result);
+            return result;
+          }
+          else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+            bool supported = jit_axes_supported_;
+            if (supported && !dx_fft2_helper_.template CheckJITSizeAndTypeRequirements<OpA>()) {
+              supported = false;
+            }
+            else if (supported) {
+              supported = dx_fft2_helper_.IsSupported();
+              if (supported && dx_fft2_helper_.GetElementsPerThread() == ElementsPerThread::INVALID) {
+                supported = false;
+              }
+            }
+
+            auto result = combine_capabilities<Cap>(supported, detail::get_operator_capability<Cap>(a_, in));
+            MATX_LOG_DEBUG("cuFFTDx 2D SUPPORTS_JIT: {}", result);
+            return result;
+          }
+          else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+            const auto [key, value] = get_jit_op_str();
+            if (in.find(key) == in.end()) {
+              in[key] = value;
+            }
+            detail::get_operator_capability<Cap>(a_, in);
+            MATX_LOG_DEBUG("cuFFTDx 2D JIT_CLASS_QUERY: true");
+            return true;
+          }
+          else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
+            ElementsPerThread ept = ElementsPerThread::ONE;
+            if (in.jit) {
+              ept = (jit_axes_supported_ && dx_fft2_helper_.template CheckJITSizeAndTypeRequirements<OpA>()) ?
+                dx_fft2_helper_.GetElementsPerThread() : ElementsPerThread::INVALID;
+            }
+            const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ept, ept};
+            auto result = combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(a_, in));
+            MATX_LOG_DEBUG("cuFFTDx 2D ELEMENTS_PER_THREAD: [{},{}]",
+                           static_cast<int>(result[0]), static_cast<int>(result[1]));
+            return result;
+          }
+          else if constexpr (Cap == OperatorCapability::MAX_EPT_VEC_LOAD) {
+            auto result = combine_capabilities<Cap>(1, detail::get_operator_capability<Cap>(a_, in));
+            MATX_LOG_DEBUG("cuFFTDx 2D MAX_EPT_VEC_LOAD: {}", result);
+            return result;
+          }
+          else if constexpr (Cap == OperatorCapability::GLOBAL_KERNEL) {
+            MATX_LOG_DEBUG("cuFFTDx 2D GLOBAL_KERNEL: false");
+            return false;
+          }
+          else if constexpr (Cap == OperatorCapability::PASS_THROUGH_THREADS) {
+            MATX_LOG_DEBUG("cuFFTDx 2D PASS_THROUGH_THREADS: true");
+            return true;
+          }
+          else if constexpr (Cap == OperatorCapability::PASS_THROUGH_INNER_RANK) {
+            MATX_LOG_DEBUG("cuFFTDx 2D PASS_THROUGH_INNER_RANK: 2");
+            return 2;
+          }
+          else if constexpr (Cap == OperatorCapability::GROUPS_PER_BLOCK) {
+            const int ffts_per_block = dx_fft2_helper_.GetFFTsPerBlock();
+            const auto my_cap = cuda::std::array<int, 2>{ffts_per_block, ffts_per_block};
+            auto result = combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(a_, in));
+            MATX_LOG_DEBUG("cuFFTDx 2D GROUPS_PER_BLOCK: [{},{}]", result[0], result[1]);
+            return result;
+          }
+          else if constexpr (Cap == OperatorCapability::SET_GROUPS_PER_BLOCK ||
+                             Cap == OperatorCapability::SET_ELEMENTS_PER_THREAD) {
+            auto result = combine_capabilities<Cap>(capability_attributes<Cap>::default_value, detail::get_operator_capability<Cap>(a_, in));
+            MATX_LOG_DEBUG("cuFFTDx 2D SET_GROUPS/EPT: {}", result);
+            return result;
+          }
+          else if constexpr (Cap == OperatorCapability::BLOCK_DIM) {
+            const int block_dim = dx_fft2_helper_.GetBlockDim();
+            const auto my_block = block_dim > 0 ?
+              cuda::std::array<int, 2>{block_dim, block_dim} :
+              cuda::std::array<int, 2>{capability_attributes<Cap>::invalid, capability_attributes<Cap>::invalid};
+            auto result = combine_capabilities<Cap>(my_block, detail::get_operator_capability<Cap>(a_, in));
+            MATX_LOG_DEBUG("cuFFTDx 2D BLOCK_DIM: [{},{}]", result[0], result[1]);
+            return result;
+          }
+          else if constexpr (Cap == OperatorCapability::GENERATE_LTOIR) {
+            auto result = combine_capabilities<Cap>(
+                dx_fft2_helper_.GenerateLTOIR(in.ltoir_symbols),
+                detail::get_operator_capability<Cap>(a_, in));
+            MATX_LOG_DEBUG("cuFFTDx 2D GENERATE_LTOIR: {}", result);
+            return result;
+          }
+          else if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+            const auto inner_op_jit_name = detail::get_operator_capability<Cap>(a_, in);
+            auto result = get_jit_class_name() + "<" + inner_op_jit_name + ">";
+            MATX_LOG_DEBUG("cuFFTDx 2D JIT_TYPE_QUERY: {}", result);
+            return result;
+          }
+          else if constexpr (Cap == OperatorCapability::JIT_CACHE_KEY) {
+#ifdef MATX_EN_JIT
+            auto key = detail::MakeJITCacheKeyForType<self_type>("JITFFT2");
+            const int actual_rank = jit_rank();
+            detail::HashJITCacheValue(key, actual_rank);
+            for (int i = 0; i < actual_rank; ++i) {
+              detail::HashJITCacheValue(key, out_dims_[i]);
+            }
+            detail::HashJITCacheValue(key, dx_fft2_helper_.get_fft_size_y());
+            detail::HashJITCacheValue(key, dx_fft2_helper_.get_fft_size_x());
+            detail::HashJITCacheValue(key, dx_fft2_helper_.get_cc());
+            detail::HashJITCacheValue(key, static_cast<int>(Type));
+            detail::HashJITCacheValue(key, static_cast<int>(Direction));
+            detail::HashJITCacheValue(key, static_cast<int>(norm_));
+            detail::HashJITCacheString(key, dx_fft2_helper_.GetXFuncName());
+            detail::HashJITCacheString(key, dx_fft2_helper_.GetYFuncName());
+            return combine_capabilities<Cap>(key, detail::get_operator_capability<Cap>(a_, in));
+#else
+            return detail::MakeInvalidJITCacheKey();
+#endif
+          }
+          else {
+            auto self_has_cap = capability_attributes<Cap>::default_value;
+            auto result = combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
+            return result;
+          }
+#else
+          if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+            bool supported = false;
+            return combine_capabilities<Cap>(supported, detail::get_operator_capability<Cap>(a_, in));
+          }
+          else if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+            return "";
+          }
+          else {
+            auto self_has_cap = capability_attributes<Cap>::default_value;
+            auto result = combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
+            return result;
+          }
+#endif
         }
 
         template <typename ShapeType, typename Executor>
@@ -907,7 +1169,9 @@ namespace matx
             a_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           }
 
-          matxFree(ptr);           
+          matxFree(ptr);
+          ptr = nullptr;
+          prerun_done_ = false;
         }    
     };    
   }

@@ -34,8 +34,13 @@
 
 
 #include "matx/core/type_utils.h"
+#include "matx/core/utils.h"
 #include "matx/operators/base_operator.h"
+#include "matx/operators/solver_projection.h"
 #include "matx/transforms/eig/eig_cuda.h"
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
+  #include "matx/transforms/solver_cusolverdx.h"
+#endif
 #ifdef MATX_EN_CPU_SOLVER
   #include "matx/transforms/eig/eig_lapack.h"
 #endif
@@ -45,22 +50,344 @@ namespace matx {
 
 
 namespace detail {
+  enum EigComponents : int {
+    EIG_VECTORS = 0,
+    EIG_VALUES = 1
+  };
+
+  template<typename OpA>
+  class EigState
+  {
+    private:
+      static_assert(OpA::Rank() >= 2, "eig() requires input rank 2 or higher");
+      using a_value_type = typename OpA::value_type;
+      using w_value_type = typename inner_op_type_t<a_value_type>::type;
+      static constexpr int RANK = OpA::Rank();
+
+      typename detail::base_type_t<OpA> a_;
+      EigenMode jobz_;
+      SolverFillMode uplo_;
+      cuda::std::array<index_t, RANK> vectors_shape_;
+      cuda::std::array<index_t, RANK - 1> values_shape_;
+      mutable detail::tensor_impl_t<a_value_type, RANK> vectors_;
+      mutable detail::tensor_impl_t<w_value_type, RANK - 1> values_;
+      mutable a_value_type *vectors_ptr_ = nullptr;
+      mutable w_value_type *values_ptr_ = nullptr;
+      mutable bool materialized_ = false;
+      mutable int materialize_count_ = 0;
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
+      mutable cuSolverDxHelper<a_value_type> dx_heev_values_helper_;
+      mutable cuSolverDxHelper<a_value_type> dx_heev_vectors_helper_;
+#endif
+
+      template <typename T, typename Executor>
+      void FreeTempBuffer(T *&ptr, Executor &&ex) const
+      {
+        if (ptr == nullptr) {
+          return;
+        }
+
+        if constexpr (is_cuda_executor_v<Executor>) {
+          matxFree(ptr, ex.getStream());
+        }
+        else {
+          matxFree(ptr);
+        }
+        ptr = nullptr;
+      }
+
+      template <typename Executor>
+      void ReleaseMaterializedResources(Executor &&ex) const
+      {
+        FreeTempBuffer(vectors_ptr_, ex);
+        FreeTempBuffer(values_ptr_, ex);
+        materialized_ = false;
+        materialize_count_ = 0;
+
+        if constexpr (is_matx_op<OpA>()) {
+          a_.PostRun(detail::NoShape{}, std::forward<Executor>(ex));
+        }
+      }
+
+      template <typename Executor>
+      void CleanupMaterializeFailure(Executor &&ex) const noexcept
+      {
+        try {
+          ReleaseMaterializedResources(std::forward<Executor>(ex));
+        }
+        catch (...) {
+          materialized_ = false;
+          materialize_count_ = 0;
+        }
+      }
+
+    public:
+      using input_type = OpA;
+
+      EigState(const OpA &a, EigenMode jobz, SolverFillMode uplo) : a_(a), jobz_(jobz), uplo_(uplo)
+      {
+        vectors_shape_ = SolverShapeFromInput<RANK>(a_);
+        values_shape_ = SolverVectorShapeFromMatrixShape<RANK>(vectors_shape_);
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
+        const int cc = GetComputeCapability();
+
+        const index_t n = vectors_shape_[RANK - 1];
+        // cuSolverDx HEEV is the dense Hermitian/symmetric eigensolver. HTEV is
+        // the tridiagonal eigensolver and expects diagonal/off-diagonal storage.
+        const auto eig_function = CUSOLVERDX_FUNCTION_HEEV;
+        dx_heev_values_helper_.set_m(n);
+        dx_heev_values_helper_.set_n(n);
+        dx_heev_values_helper_.set_cc(cc);
+        dx_heev_values_helper_.set_function(eig_function);
+        dx_heev_values_helper_.set_fill_mode(uplo_);
+        dx_heev_values_helper_.set_job(CUSOLVERDX_JOB_NO_VECTORS);
+
+        dx_heev_vectors_helper_.set_m(n);
+        dx_heev_vectors_helper_.set_n(n);
+        dx_heev_vectors_helper_.set_cc(cc);
+        dx_heev_vectors_helper_.set_function(eig_function);
+        dx_heev_vectors_helper_.set_fill_mode(uplo_);
+        dx_heev_vectors_helper_.set_job(CUSOLVERDX_JOB_OVERWRITE_VECTORS);
+#endif
+      }
+
+      const auto &Input() const { return a_; }
+      const auto &VectorsShape() const { return vectors_shape_; }
+      const auto &ValuesShape() const { return values_shape_; }
+      EigenMode Jobz() const { return jobz_; }
+      SolverFillMode Uplo() const { return uplo_; }
+
+      template <int Component>
+      void ValidateProjection() const
+      {
+        if constexpr (Component == EIG_VECTORS) {
+          if (jobz_ != EigenMode::VECTOR) {
+            MATX_THROW(matxInvalidParameter, "eig().Vectors cannot be used when EigenMode::NO_VECTOR is selected");
+          }
+        }
+      }
+
+      template <typename Executor>
+      void Materialize(Executor &&ex) const
+      {
+        if (materialized_) {
+          materialize_count_++;
+          return;
+        }
+
+        if constexpr (is_matx_op<OpA>()) {
+          a_.PreRun(detail::NoShape{}, std::forward<Executor>(ex));
+        }
+
+        try {
+          detail::AllocateTempTensor(vectors_, std::forward<Executor>(ex), vectors_shape_, &vectors_ptr_);
+          detail::AllocateTempTensor(values_, std::forward<Executor>(ex), values_shape_, &values_ptr_);
+          eig_impl(vectors_, values_, a_, std::forward<Executor>(ex), jobz_, uplo_);
+        }
+        catch (...) {
+          CleanupMaterializeFailure(std::forward<Executor>(ex));
+          throw;
+        }
+        materialized_ = true;
+        materialize_count_ = 1;
+      }
+
+      template <typename Executor>
+      void Release(Executor &&ex) const
+      {
+        if (!materialized_) {
+          return;
+        }
+        if (materialize_count_ > 1) {
+          materialize_count_--;
+          return;
+        }
+
+        ReleaseMaterializedResources(std::forward<Executor>(ex));
+      }
+
+      template <int Component>
+      auto Tensor() const
+      {
+        ValidateProjection<Component>();
+
+        if constexpr (Component == EIG_VECTORS) {
+          return vectors_;
+        }
+        else {
+          return values_;
+        }
+      }
+
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
+      template <int Component>
+      bool SupportsJITProjection() const
+      {
+        const bool square = vectors_shape_[RANK - 2] == vectors_shape_[RANK - 1];
+        if constexpr (Component == EIG_VECTORS) {
+          return (RANK >= 2) && (RANK <= 4) && square &&
+                 jobz_ == EigenMode::VECTOR &&
+                 dx_heev_vectors_helper_.IsSupported();
+        }
+        else {
+          return (RANK >= 2) && (RANK <= 4) && square &&
+                 dx_heev_values_helper_.IsSupported();
+        }
+      }
+
+      template <int Component>
+      int GetJITProjectionShmRequired() const
+      {
+        if (!SupportsJITProjection<Component>()) {
+          return 0;
+        }
+        if constexpr (Component == EIG_VECTORS) {
+          return dx_heev_vectors_helper_.GetShmRequired();
+        }
+        else {
+          return dx_heev_values_helper_.GetShmRequired();
+        }
+      }
+
+      template <int Component>
+      cuda::std::array<int, 2> GetJITProjectionBlockDimRange() const
+      {
+        if constexpr (Component == EIG_VECTORS) {
+          return dx_heev_vectors_helper_.GetBlockDimRange();
+        }
+        else {
+          return dx_heev_values_helper_.GetBlockDimRange();
+        }
+      }
+
+      template <int Component>
+      bool GenerateJITProjectionLTOIR(std::set<std::string> &ltoir_symbols) const
+      {
+        if constexpr (Component == EIG_VECTORS) {
+          return dx_heev_vectors_helper_.GenerateLTOIR(ltoir_symbols);
+        }
+        else {
+          return dx_heev_values_helper_.GenerateLTOIR(ltoir_symbols);
+        }
+      }
+
+      template <int Component>
+      std::string GetJITProjectionClassName() const
+      {
+        return std::string("JITEigProjectionOp_R") + std::to_string(RANK) + "_" +
+               (Component == EIG_VALUES ? dx_heev_values_helper_.GetSymbolName() : dx_heev_vectors_helper_.GetSymbolName()) +
+               "_C" + std::to_string(Component);
+      }
+
+      template <int Component>
+      std::string GetJITProjectionTypeName(const std::string &inner_op_jit_name) const
+      {
+        return GetJITProjectionClassName<Component>() + "<" + inner_op_jit_name + ", " + std::to_string(Component) + ">";
+      }
+
+      template <int Component>
+      JITCacheKey GetJITProjectionCacheKey() const
+      {
+        auto key = detail::MakeJITCacheKeyForType<EigState<OpA>>("JITEigProjection_v2");
+        detail::HashJITCacheValue(key, Component);
+        detail::HashJITCacheValue(key, RANK);
+        if constexpr (Component == EIG_VECTORS) {
+          detail::HashJITCacheValue(key, static_cast<int>(jobz_));
+        }
+        detail::HashJITCacheValue(key, static_cast<int>(uplo_));
+        if constexpr (Component == EIG_VALUES) {
+          for (int i = 0; i < RANK - 1; ++i) {
+            detail::HashJITCacheValue(key, values_shape_[i]);
+          }
+          detail::HashJITCacheString(key, dx_heev_values_helper_.GetSymbolName());
+        }
+        else {
+          for (int i = 0; i < RANK; ++i) {
+            detail::HashJITCacheValue(key, vectors_shape_[i]);
+          }
+          detail::HashJITCacheString(key, dx_heev_vectors_helper_.GetSymbolName());
+        }
+        return key;
+      }
+
+      template <int Component>
+      void AddJITProjectionClasses(std::unordered_map<std::string, std::string> &in) const
+      {
+        const std::string class_name = GetJITProjectionClassName<Component>();
+        if (in.find(class_name) != in.end()) {
+          return;
+        }
+
+        std::string externs;
+        std::string projection_body;
+        if constexpr (Component == EIG_VALUES) {
+          const std::string values_func_name = std::string(SOLVER_DX_FUNC_PREFIX) + "_" + dx_heev_values_helper_.GetSymbolName();
+          externs =
+            " extern \"C\" __device__ void " + values_func_name + "(" + detail::type_to_string<a_value_type>() + "*, " + detail::type_to_string<w_value_type>() + "*, " + detail::type_to_string<a_value_type>() + "*, int*);\n";
+          projection_body = dx_heev_values_helper_.GetHeevProjectionFuncStr(values_func_name, EIG_VECTORS, EIG_VALUES);
+        }
+        else {
+          const std::string vectors_func_name = std::string(SOLVER_DX_FUNC_PREFIX) + "_" + dx_heev_vectors_helper_.GetSymbolName();
+          externs =
+            " extern \"C\" __device__ void " + vectors_func_name + "(" + detail::type_to_string<a_value_type>() + "*, " + detail::type_to_string<w_value_type>() + "*, " + detail::type_to_string<a_value_type>() + "*, int*);\n";
+          projection_body = dx_heev_vectors_helper_.GetHeevProjectionFuncStr(vectors_func_name, EIG_VECTORS, EIG_VALUES);
+        }
+        in[class_name] =
+          externs +
+          " template <typename OpA, int Component> struct " + class_name + "  {\n"
+          "  using solver_value_type = typename OpA::value_type;\n"
+          "  using precision_type = typename inner_op_type_t<solver_value_type>::type;\n"
+          "  using value_type = cuda::std::conditional_t<Component == " + std::to_string(EIG_VALUES) + ", precision_type, solver_value_type>;\n"
+          "  using matxop = bool;\n"
+          "  typename detail::inner_storage_or_self_t<detail::base_type_t<OpA>> a_;\n"
+          "  template <typename CapType, typename... Is>\n"
+          "  __MATX_INLINE__ __MATX_DEVICE__ value_type operator()(Is... indices) const\n"
+          "  {\n"
+          "    " + projection_body + "\n"
+          "  }\n"
+          "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank()\n"
+          "  {\n"
+          "    if constexpr (Component == " + std::to_string(EIG_VALUES) + ") { return OpA::Rank() - 1; }\n"
+          "    else { return OpA::Rank(); }\n"
+          "  }\n"
+          "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const\n"
+          "  {\n"
+          "    if constexpr (Component == " + std::to_string(EIG_VALUES) + ") {\n"
+          "      if (dim < OpA::Rank() - 2) { return a_.Size(dim); }\n"
+          "      return a_.Size(OpA::Rank() - 1);\n"
+          "    }\n"
+          "    else { return a_.Size(dim); }\n"
+          "  }\n"
+          "};\n";
+      }
+#endif
+  };
+
   template<typename OpA>
   class EigOp : public BaseOp<EigOp<OpA>>
   {
     private:
-      typename detail::base_type_t<OpA> a_;
-      EigenMode jobz_;
-      SolverFillMode uplo_;
+      using state_type = EigState<OpA>;
+      std::shared_ptr<state_type> state_;
 
     public:
       using matxop = bool;
       using value_type = typename OpA::value_type;
       using matx_transform_op = bool;
       using eig_xform_op = bool;
+      using values_value_type = typename inner_op_type_t<value_type>::type;
+      using vectors_type = detail::tensor_impl_t<value_type, OpA::Rank()>;
+      using values_type = detail::tensor_impl_t<values_value_type, OpA::Rank() - 1>;
+
+      SolverProjectionOp<state_type, EIG_VECTORS, vectors_type> Vectors;
+      SolverProjectionOp<state_type, EIG_VALUES, values_type> Values;
 
       __MATX_INLINE__ std::string str() const { return "eig()"; }
-      __MATX_INLINE__ EigOp(const OpA &a, EigenMode jobz, SolverFillMode uplo) : a_(a), jobz_(jobz), uplo_(uplo) {
+      __MATX_INLINE__ EigOp(const OpA &a, EigenMode jobz, SolverFillMode uplo) :
+        state_(std::make_shared<state_type>(a, jobz, uplo)),
+        Vectors(state_, state_->VectorsShape(), "eig().Vectors"),
+        Values(state_, state_->ValuesShape(), "eig().Values")
+      {
         MATX_LOG_TRACE("{} constructor: jobz={}, uplo={}", str(), static_cast<int>(jobz), static_cast<int>(uplo));
       };
 
@@ -71,14 +398,14 @@ namespace detail {
       template <OperatorCapability Cap, typename InType>
       __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
         auto self_has_cap = capability_attributes<Cap>::default_value;
-        return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(a_, in));
+        return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(state_->Input(), in));
       }
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
         static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 2 outputs on eig(). ie: (mtie(O, w) = eig(A))");     
 
-        eig_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), a_, ex, jobz_, uplo_);
+        eig_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), state_->Input(), ex, state_->Jobz(), state_->Uplo());
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -90,14 +417,23 @@ namespace detail {
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
       {
         if constexpr (is_matx_op<OpA>()) {
-          a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          state_->Input().PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
       }
+
+      template <typename ShapeType, typename Executor>
+      __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
+      {
+        if constexpr (is_matx_op<OpA>()) {
+          state_->Input().PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
+      }
+
       // Size is not relevant in eig() since there are multiple return values and it
       // is not allowed to be called in larger expressions
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
       {
-        return a_.Size(dim);
+        return state_->Input().Size(dim);
       }
 
   };

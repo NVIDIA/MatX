@@ -65,16 +65,20 @@ namespace matx
           
           return cuda::std::make_tuple(
             func_name,
-            std::format("template <typename T> struct {} {{\n"
-                "  using value_type = T;\n"
+            std::format("template <typename RangeOp> struct {} {{\n"
+                "  using value_type = typename RangeOp::value_type;\n"
                 "  using matxop = bool;\n"
-                "  Range<T> range_;\n"
+                "  typename detail::inner_storage_or_self_t<RangeOp> range_;\n"
                 "  template <typename CapType>\n"
                 "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(index_t idx) const\n"
                 "  {{\n"
                 "    auto range_val = range_.template operator()<CapType>(idx);\n"
                 "    auto log_func = [](const auto &val) {{\n"
-                "      return cuda::std::pow(10, val);\n"
+                "      if constexpr (is_matx_half_v<value_type>) {{\n"
+                "        return static_cast<value_type>(cuda::std::pow(10, static_cast<float>(val)));\n"
+                "      }} else {{\n"
+                "        return cuda::std::pow(10, val);\n"
+                "      }}\n"
                 "    }};\n"
                 "    return detail::ApplyVecFunc<CapType, value_type>(log_func, range_val);\n"
                 "  }}\n"
@@ -147,6 +151,10 @@ namespace matx
           }
           else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
 #ifdef MATX_EN_JIT
+            const auto [key, value] = get_jit_op_str();
+            if (in.find(key) == in.end()) {
+              in[key] = value;
+            }
             detail::get_operator_capability<Cap>(range_, in);
             return true;
 #else

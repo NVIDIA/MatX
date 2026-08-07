@@ -49,6 +49,7 @@
 #include "matx/operators/cgsolve.h"
 #include "matx/operators/comma.h"
 #include "matx/operators/corr.h"
+#include "matx/operators/corrmap.h"
 #include "matx/operators/cov.h"
 #include "matx/operators/cross.h"
 #include "matx/operators/cumsum.h"

@@ -189,6 +189,8 @@ public:
     static_assert(is_matx_op_lvalue<T>() == true, "Invalid operator on LHS of set/operator=");
     static_assert(!is_matx_transform_op<T>(), "Cannot use transform operator on LHS of assignment");
 
+    detail::get_operator_capability<detail::OperatorCapability::VALID_USAGE>(op_);
+
     // set() is a placeholder when using mtie() for multiple return types, so we don't need to check compatible
     // sizes
     if constexpr (!is_mtie<T>()) {
@@ -316,9 +318,31 @@ public:
           "    if constexpr (requires { typename Op::matx_jit_block_reduction; }) {\n" +
           "      return op_.template Store<CapType>(out_, indices...);\n" +
           "    }\n" +
+          "    bool valid = true;\n" +
+          "    if constexpr (Rank() > 0) {\n" +
+          "      index_t idx_arr[] = { static_cast<index_t>(indices)... };\n" +
+          "      MATX_LOOP_UNROLL\n" +
+          "      for (int dim = 0; dim < Rank(); dim++) {\n" +
+          "        valid = valid && idx_arr[dim] < out_.Size(dim);\n" +
+          "      }\n" +
+          "    }\n" +
+          "    if (!valid) {\n" +
+          "      if constexpr (!CapType::pass_through_threads) {\n" +
+          "        if constexpr (is_vector_v<in_val_type>) {\n" +
+          "          using scalar_type = typename in_val_type::value_type;\n" +
+          "          return in_val_type{scalar_type{}};\n" +
+          "        }\n" +
+          "        else {\n" +
+          "          return in_val_type{};\n" +
+          "        }\n" +
+          "      }\n" +
+          "    }\n" +
           "    auto in_val = detail::get_value<CapType>(op_, indices...);\n" +
           "    using out_type = decltype(out_.template operator()<CapType>(indices...));\n" +
-          "    if constexpr (ContainsBlockReduction<Op>()) {\n" +
+          "    if (!valid) {\n" +
+          "      return in_val;\n" +
+          "    }\n" +
+          "    else if constexpr (ContainsBlockReduction<Op>()) {\n" +
           "      using ScalarCap = CapabilityParams<ElementsPerThread::ONE, CapType::jit>;\n" +
           "      if (threadIdx.x == 0) {\n" +
           "        out_.template operator()<ScalarCap>(indices...) = in_val;\n" +
@@ -392,6 +416,21 @@ public:
       return "";
 #endif
     }  
+    else if constexpr (Cap == OperatorCapability::JIT_CACHE_KEY) {
+#ifdef MATX_EN_JIT
+      auto key = detail::MakeJITCacheKeyForType<set<T, Op>>("JITSetOp");
+      const int actual_rank = jit_rank();
+      detail::HashJITCacheValue(key, actual_rank);
+      for (int i = 0; i < actual_rank; ++i) {
+        detail::HashJITCacheValue(key, Size(i));
+      }
+      return combine_capabilities<Cap>(key,
+                                       detail::get_operator_capability<Cap>(out_, in),
+                                       detail::get_operator_capability<Cap>(op_, in));
+#else
+      return detail::MakeInvalidJITCacheKey();
+#endif
+    }
     else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
 #ifdef MATX_EN_JIT
             return combine_capabilities<Cap>(true, detail::get_operator_capability<Cap>(op_, in), detail::get_operator_capability<Cap>(out_, in));

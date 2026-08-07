@@ -62,12 +62,14 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   auto A2 = reshape(A1, {4,4});
   auto A3 = reshape(A1, {2,2,4});
   auto A4 = reshape(A1, {2,2,2,2});
+  auto A5 = reshape(A1, {2,2,1,2,2});
 
   printf("MATX_PRINT_FORMAT_DEFAULT:\n");
   print(A1);
   print(A2);
   print(A3);
   print(A4);
+  print(A5);
 
   set_print_format_type(MATX_PRINT_FORMAT_MLAB);
   printf("MATX_PRINT_FORMAT_MLAB:\n");
@@ -75,6 +77,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   print(A2);
   print(A3);
   print(A4);
+  print(A5);
 
   set_print_format_type(MATX_PRINT_FORMAT_PYTHON);
   printf("MATX_PRINT_FORMAT_PYTHON:\n");
@@ -82,6 +85,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
   print(A2);
   print(A3);
   print(A4);
+  print(A5);
   // example-end print-example-1
 
   MATX_CUDA_CHECK_LAST_ERROR();

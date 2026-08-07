@@ -81,16 +81,30 @@
  *
  * Usage:
  *   sarbp <input.sarbp> [output_file] [-u upsample_factor] [-w window]
+ *
+ * Validation (optional):
+ *   --gold <gold.raw>   Compare the computed image against a golden image (same
+ *                       raw interleaved complex<float> row-major format this
+ *                       example writes). Reports correlation-map metrics
+ *                       (minimum and 1st-percentile coherence over a 3x3 window)
+ *                       and a signal-to-error ratio in dB.
+ *   --cmap <cmap.raw>   Write the correlation map (coherence magnitude, raw
+ *                       float32, row-major) to a file. Requires --gold.
  */
 
 #include "matx.h"
 #include <cuda/std/complex>
 #include <cuda/cmath>
+#include <algorithm>
+#include <charconv>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -99,6 +113,110 @@
 using namespace matx;
 
 using complex_t = cuda::std::complex<float>;
+
+// Use up to this fraction of L2 for range profiles and phase lookup table
+static constexpr double SARBP_AUTO_L2_TARGET_MULTIPLIER = 0.8;
+static constexpr index_t SARBP_AUTO_BLOCK_GRANULARITY = 256;
+static constexpr index_t SARBP_AUTO_MIN_BLOCK_SIZE = 256;
+
+enum class BlockSizeMode {
+  Auto,
+  All,
+  Manual
+};
+
+struct BlockSizeSelection {
+  BlockSizeMode mode{BlockSizeMode::Auto};
+  index_t manual_size{0};
+};
+
+static bool parse_index_arg(const std::string &arg, index_t &value, index_t min_value)
+{
+  index_t parsed{};
+  const auto *begin = arg.data();
+  const auto *end = arg.data() + arg.size();
+  const auto [ptr, ec] = std::from_chars(begin, end, parsed);
+  if (arg.empty() || ec != std::errc{} || ptr != end || parsed < min_value) {
+    return false;
+  }
+
+  value = parsed;
+  return true;
+}
+
+static bool parse_block_size_arg(const std::string &arg, BlockSizeSelection &selection)
+{
+  if (arg == "auto") {
+    selection = BlockSizeSelection{BlockSizeMode::Auto, 0};
+    return true;
+  }
+  if (arg == "all") {
+    selection = BlockSizeSelection{BlockSizeMode::All, 0};
+    return true;
+  }
+
+  index_t parsed{};
+  if (!parse_index_arg(arg, parsed, 0)) {
+    return false;
+  }
+
+  if (parsed == 0) {
+    // Preserve the old "-b 0" behavior as an alias for all pulses.
+    selection = BlockSizeSelection{BlockSizeMode::All, 0};
+  } else {
+    selection = BlockSizeSelection{BlockSizeMode::Manual, parsed};
+  }
+  return true;
+}
+
+static index_t round_down_to_multiple(index_t value, index_t multiple)
+{
+  if (multiple <= 1) {
+    return value;
+  }
+  return (value / multiple) * multiple;
+}
+
+static size_t get_phase_lut_bytes(index_t output_range_bins, const SarBpParams &params)
+{
+  if (!has_feature(params.features, SarBpFeature::PhaseLUTOptimization)) {
+    return 0;
+  }
+
+  const size_t elem_size = (params.compute_type == SarBpComputeType::Double)
+      ? sizeof(cuda::std::complex<double>)
+      : sizeof(cuda::std::complex<float>);
+  return static_cast<size_t>(output_range_bins) * elem_size;
+}
+
+static index_t choose_auto_block_size(index_t num_pulses, index_t output_range_bins,
+                                      const SarBpParams &params,
+                                      const cudaDeviceProp &device_prop)
+{
+  const size_t profile_bytes_per_pulse =
+      static_cast<size_t>(output_range_bins) * sizeof(complex_t);
+  if (num_pulses <= 0 || profile_bytes_per_pulse == 0 ||
+      device_prop.l2CacheSize <= 0) {
+    return num_pulses;
+  }
+
+  const size_t phase_lut_bytes = get_phase_lut_bytes(output_range_bins, params);
+  const double l2_target_bytes =
+      static_cast<double>(device_prop.l2CacheSize) * SARBP_AUTO_L2_TARGET_MULTIPLIER;
+  double profile_budget_bytes = l2_target_bytes - static_cast<double>(phase_lut_bytes);
+  const double min_profile_budget =
+      static_cast<double>(profile_bytes_per_pulse) *
+      static_cast<double>(SARBP_AUTO_MIN_BLOCK_SIZE);
+  if (profile_budget_bytes < min_profile_budget) {
+    profile_budget_bytes = min_profile_budget;
+  }
+
+  index_t block_size =
+      static_cast<index_t>(profile_budget_bytes / static_cast<double>(profile_bytes_per_pulse));
+  block_size = round_down_to_multiple(block_size, SARBP_AUTO_BLOCK_GRANULARITY);
+  block_size = std::max(block_size, SARBP_AUTO_MIN_BLOCK_SIZE);
+  return std::min(block_size, num_pulses);
+}
 
 // Aggregate of non-tensor state needed by run_bp_device(). Kept separate from
 // the tensor and host-buffer parameters because most members are scalar
@@ -116,12 +234,17 @@ struct BpRunCtx {
   index_t ifft_shift;
   index_t image_width;
   index_t image_height;
+  index_t image_tiles;
   bool is_fx_domain;
   bool is_int16_mode;
   bool apply_window;
+  bool taylor_fast_add_third_order;
+  SarBpPixelZMode pixel_z_mode;  // compile-time pixel-z assumption to apply
   int sgn;
   bool do_warmup;
   std::string output_file;
+  std::string gold_file;
+  std::string cmap_file;
   double del_r;
   SarBpParams params;
   double3 *h_positions;
@@ -130,6 +253,135 @@ struct BpRunCtx {
   int16_t *h_range_profiles_i16;
   float *h_ampsf;
 };
+
+// Compare the freshly computed image against a golden reference image and
+// report accuracy metrics. The gold uses the same raw interleaved complex<float>
+// row-major layout this example writes its output in.
+//
+// Two metrics are reported:
+//   1. Correlation-map coherence: a windowed (3x3) interferometric coherence
+//      magnitude in [0, 1] is formed with corrmap(). We report the minimum
+//      coherence over all pixels and the 1st-percentile coherence (the value
+//      below which only 1% of pixels fall).
+//   2. Signal-to-error ratio (dB): 10*log10(signal_energy / error_energy),
+//      where signal_energy = sum|gold|^2 and error_energy = sum|image-gold|^2.
+//
+// Templated on the image tensor type so it can take the device tensor that
+// run_bp_device() allocated locally.
+template <typename ImageTensor>
+static int run_validation(const ImageTensor &image, const BpRunCtx &ctx)
+{
+  const index_t H = ctx.image_height;
+  const index_t W = ctx.image_width;
+  const size_t num_pixels = static_cast<size_t>(H) * static_cast<size_t>(W);
+  const size_t image_bytes = num_pixels * sizeof(complex_t);
+
+  // Read the golden image (raw interleaved complex<float>, row-major).
+  std::ifstream gin(ctx.gold_file, std::ios::binary | std::ios::ate);
+  if (!gin.is_open()) {
+    std::cerr << "ERROR: cannot open gold file " << ctx.gold_file << std::endl;
+    return 1;
+  }
+  const std::streamsize gold_bytes = gin.tellg();
+  if (gold_bytes < 0) {
+    std::cerr << "ERROR: could not determine the size of gold file " << ctx.gold_file
+              << std::endl;
+    return 1;
+  }
+  if (static_cast<size_t>(gold_bytes) != image_bytes) {
+    std::cerr << "ERROR: gold file " << ctx.gold_file << " is " << gold_bytes
+              << " bytes but expected " << image_bytes << " (" << H << " x " << W
+              << " complex<float>)" << std::endl;
+    return 1;
+  }
+  gin.seekg(0);
+
+  complex_t *h_gold = nullptr;
+  MATX_CUDA_CHECK(cudaHostAlloc(&h_gold, image_bytes, cudaHostAllocDefault));
+  gin.read(reinterpret_cast<char *>(h_gold), gold_bytes);
+  if (!gin) {
+    std::cerr << "ERROR: failed to read gold file " << ctx.gold_file << std::endl;
+    MATX_CUDA_CHECK(cudaFreeHost(h_gold));
+    return 1;
+  }
+  gin.close();
+
+  auto gold = make_tensor<complex_t>({H, W}, matx::MATX_DEVICE_MEMORY);
+  MATX_CUDA_CHECK(cudaMemcpyAsync(gold.Data(), h_gold, image_bytes,
+                                  cudaMemcpyHostToDevice, ctx.stream));
+
+  // Correlation map: interferometric coherence magnitude over a 3x3 window.
+  const cuda::std::array<index_t, 2> corr_window{3, 3};
+  auto coh = make_tensor<float>({H, W}, matx::MATX_DEVICE_MEMORY);
+  (coh = matx::abs(matx::corrmap<CorrMapNormalize::MAGNITUDE>(image, gold, corr_window)))
+      .run(ctx.exec);
+
+  // Correlation metrics: minimum coherence and the 1st-percentile coherence.
+  auto min_corr = make_tensor<float>({});
+  auto p1_corr  = make_tensor<float>({});
+  (min_corr = matx::min(coh)).run(ctx.exec);
+  (p1_corr  = matx::percentile(coh, 1)).run(ctx.exec);
+
+  // Signal-to-error ratio. Accumulate energies in double precision to avoid
+  // catastrophic precision loss when summing over the full image.
+  auto sig_energy = make_tensor<double>({});
+  auto err_energy = make_tensor<double>({});
+  (sig_energy = matx::sum(matx::as_double(matx::abs2(gold)))).run(ctx.exec);
+  (err_energy = matx::sum(matx::as_double(matx::abs2(image - gold)))).run(ctx.exec);
+
+  ctx.exec.sync();
+
+  const double signal = sig_energy();
+  const double error  = err_energy();
+  const double ser_db = (error > 0.0)
+      ? 10.0 * std::log10(signal / error)
+      : std::numeric_limits<double>::infinity();
+
+  // The coherence values may sit extremely close to 1, so print enough significant
+  // digits to make the difference from 1 visible (the stream default of 6 would
+  // round 0.9999996 to "1"); float metrics carry ~7 useful digits.
+  std::cout << "Validation gold  : " << ctx.gold_file << std::endl;
+  const std::streamsize old_prec = std::cout.precision();
+  std::cout << std::setprecision(8)
+            << "  Min correlation: " << min_corr() << std::endl
+            << "  1% correlation : " << p1_corr() << std::endl;
+  std::cout << std::setprecision(6)
+            << "  Signal/error   : " << ser_db << " dB" << std::endl;
+  std::cout.precision(old_prec);
+
+  // Optionally write the correlation map (coherence magnitude, raw float32,
+  // row-major) to disk.
+  int rc = 0;
+  if (!ctx.cmap_file.empty()) {
+    const size_t cmap_bytes = num_pixels * sizeof(float);
+    float *h_cmap = nullptr;
+    MATX_CUDA_CHECK(cudaHostAlloc(&h_cmap, cmap_bytes, cudaHostAllocDefault));
+    MATX_CUDA_CHECK(cudaMemcpyAsync(h_cmap, coh.Data(), cmap_bytes,
+                                    cudaMemcpyDeviceToHost, ctx.stream));
+    ctx.exec.sync();
+
+    std::ofstream cmap_out(ctx.cmap_file, std::ios::binary);
+    if (!cmap_out.is_open()) {
+      std::cerr << "ERROR: cannot open " << ctx.cmap_file << " for writing" << std::endl;
+      rc = 1;
+    } else {
+      cmap_out.write(reinterpret_cast<const char *>(h_cmap),
+                     static_cast<std::streamsize>(cmap_bytes));
+      cmap_out.close();
+      if (!cmap_out) {
+        std::cerr << "ERROR: failed to write correlation map to " << ctx.cmap_file << std::endl;
+        rc = 1;
+      } else {
+        std::cout << "Wrote " << H << " x " << W
+                  << " float32 correlation map to " << ctx.cmap_file << std::endl;
+      }
+    }
+    MATX_CUDA_CHECK(cudaFreeHost(h_cmap));
+  }
+
+  MATX_CUDA_CHECK(cudaFreeHost(h_gold));
+  return rc;
+}
 
 // Run all device-side work (allocate block buffers, optional warmup, the
 // main pulse-block BP loop, copy result out, print timings, write the
@@ -199,6 +451,42 @@ static int run_bp_device(PosTensor blk_positions, RtmTensor blk_rtm,
   auto image = make_tensor<complex_t>({ctx.image_height, ctx.image_width}, matx::MATX_DEVICE_MEMORY);
   (image = matx::zeros<complex_t>({ctx.image_height, ctx.image_width})).run(ctx.exec);
 
+  auto run_bp_tiles = [&](auto &cur_profiles, auto &cur_positions, auto &cur_rtm) {
+    for (index_t tile_y = 0; tile_y < ctx.image_tiles; tile_y++) {
+      const index_t y0 = (ctx.image_height * tile_y) / ctx.image_tiles;
+      const index_t y1 = (ctx.image_height * (tile_y + 1)) / ctx.image_tiles;
+      for (index_t tile_x = 0; tile_x < ctx.image_tiles; tile_x++) {
+        const index_t x0 = (ctx.image_width * tile_x) / ctx.image_tiles;
+        const index_t x1 = (ctx.image_width * (tile_x + 1)) / ctx.image_tiles;
+
+        auto cur_image = matx::slice(image, {y0, x0}, {y1, x1});
+        auto cur_voxel_locations = matx::slice(voxel_locations, {y0, x0}, {y1, x1});
+        auto bp = matx::experimental::sar_bp(
+            cur_image, cur_profiles, cur_positions, cur_voxel_locations, cur_rtm, ctx.params);
+        // Cross product of the optional TaylorFast third-order term and the
+        // compile-time pixel-z assumption (variable / zero / fixed).
+        auto run_with_z = [&](auto bp_props) {
+          switch (ctx.pixel_z_mode) {
+            case SarBpPixelZMode::Zero:
+              (cur_image = bp_props.template props<matx::PropSarBpPixelZIsZero>()).run(ctx.exec);
+              break;
+            case SarBpPixelZMode::Fixed:
+              (cur_image = bp_props.template props<matx::PropSarBpPixelZIsFixed>()).run(ctx.exec);
+              break;
+            case SarBpPixelZMode::Variable:
+              (cur_image = bp_props).run(ctx.exec);
+              break;
+          }
+        };
+        if (ctx.taylor_fast_add_third_order) {
+          run_with_z(bp.template props<matx::PropSarBpTaylorFastAddThirdOrder>());
+        } else {
+          run_with_z(bp);
+        }
+      }
+    }
+  };
+
   // Warmup: run kernels with correct tensor sizes to initialize FFT plans,
   // load kernels, etc. so that the timed run reflects steady-state performance.
   if (ctx.do_warmup) {
@@ -246,10 +534,7 @@ static int run_bp_device(PosTensor blk_positions, RtmTensor blk_rtm,
         (cur_profiles = matx::fftshift1D(cur_compressed)).run(ctx.exec);
       }
 
-      (image = matx::experimental::sar_bp(
-          matx::zeros<complex_t>({ctx.image_height, ctx.image_width}),
-          cur_profiles, cur_positions, voxel_locations, cur_rtm, ctx.params))
-          .run(ctx.exec);
+      run_bp_tiles(cur_profiles, cur_positions, cur_rtm);
     };
 
     // Warmup with primary block size
@@ -267,11 +552,12 @@ static int run_bp_device(PosTensor blk_positions, RtmTensor blk_rtm,
     std::cout << " done" << std::endl;
   }
 
-  // Pre-allocate pinned host buffer for image output
+  // Pre-allocate pinned host buffer for image output.
   const size_t num_pixels =
       static_cast<size_t>(ctx.image_height) * static_cast<size_t>(ctx.image_width);
+  const size_t image_bytes = num_pixels * sizeof(complex_t);
   complex_t *h_image = nullptr;
-  MATX_CUDA_CHECK(cudaHostAlloc(&h_image, num_pixels * sizeof(complex_t), cudaHostAllocDefault));
+  MATX_CUDA_CHECK(cudaHostAlloc(&h_image, image_bytes, cudaHostAllocDefault));
 
   std::cout << "Running backprojection (" << ctx.output_range_bins << " range bins, del_r="
             << ctx.del_r << " m)..." << std::endl;
@@ -404,10 +690,7 @@ static int run_bp_device(PosTensor blk_positions, RtmTensor blk_rtm,
 
     // Backprojection - accumulates this block's pulses into image
     MATX_CUDA_CHECK(cudaEventRecord(ev_bp_start[blk], ctx.stream));
-    (image = matx::experimental::sar_bp(image, cur_profiles,
-                                         cur_positions, voxel_locations,
-                                         cur_rtm, ctx.params))
-        .run(ctx.exec);
+    run_bp_tiles(cur_profiles, cur_positions, cur_rtm);
     MATX_CUDA_CHECK(cudaEventRecord(ev_bp_stop[blk], ctx.stream));
 
     if (ctx.num_blocks > 1) {
@@ -415,8 +698,8 @@ static int run_bp_device(PosTensor blk_positions, RtmTensor blk_rtm,
     }
   }
 
-  // Copy result to pinned host buffer (included in timed region)
-  MATX_CUDA_CHECK(cudaMemcpyAsync(h_image, image.Data(), num_pixels * sizeof(complex_t),
+  // Copy result to host buffer (included in timed region)
+  MATX_CUDA_CHECK(cudaMemcpyAsync(h_image, image.Data(), image_bytes,
              cudaMemcpyDeviceToHost, ctx.stream));
 
   MATX_CUDA_CHECK(cudaEventRecord(ev_stop, ctx.stream));
@@ -464,11 +747,24 @@ static int run_bp_device(PosTensor blk_positions, RtmTensor blk_rtm,
     return 1;
   }
   out.write(reinterpret_cast<const char *>(h_image),
-            static_cast<std::streamsize>(num_pixels * sizeof(complex_t)));
+            static_cast<std::streamsize>(image_bytes));
   out.close();
+  if (!out) {
+    std::cerr << "ERROR: failed to write " << ctx.output_file << std::endl;
+    MATX_CUDA_CHECK(cudaFreeHost(h_image));
+    return 1;
+  }
 
   std::cout << "Wrote " << ctx.image_height << " x " << ctx.image_width
             << " complex<float> image to " << ctx.output_file << std::endl;
+
+  if (!ctx.gold_file.empty()) {
+    const int val_status = run_validation(image, ctx);
+    if (val_status != 0) {
+      MATX_CUDA_CHECK(cudaFreeHost(h_image));
+      return val_status;
+    }
+  }
 
   MATX_CUDA_CHECK(cudaFreeHost(h_image));
   return 0;
@@ -551,11 +847,19 @@ int main(int argc, char **argv) {
         << "\n"
         << "  <input.sarbp>          .sarbp input file from cphd_to_sarbp_input.py\n"
         << "  -o, --output <file>    Output file (default: input path with .raw extension)\n"
+        << "  --gold <file>          Golden image (raw complex<float>) to validate against;\n"
+        << "                          reports correlation-map and signal-to-error metrics\n"
+        << "  --cmap <file>          Write the correlation map (raw float32) to a file (requires --gold)\n"
         << "  -u, --upsample <N>     Range upsample factor via zero-padding (default: 1)\n"
         << "  -w, --window <type>    Window for range compression: hamming, none (default: hamming)\n"
-        << "  -b, --block-size <N>   Pulses per block for reduced GPU memory (default: all)\n"
+        << "  -b, --block-size <N|0|auto|all>\n"
+        << "                          Pulses per block; 0/all use all pulses, auto uses an L2-cache heuristic (default: auto)\n"
+        << "  --image-tiles <N>      Process image as N x N tiles (default: 1)\n"
+        << "  --taylor-fast-third-order\n"
+        << "                          Add the third-order term for --precision taylor_fast\n"
         << "  --warmup               Warmup GPU kernels and FFT plans before timed run\n"
-        << "  --precision <type>     Compute precision: double, float, fltflt, mixed (default: mixed)\n"
+        << "  --precision <type>     Compute precision: double, float, fltflt, mixed, taylor_fast (default: mixed)\n"
+        << "  --pixel-z <mode>       Compile-time pixel-z assumption: variable, zero, fixed (default: variable)\n"
         << "  -h, --help             Print this help message and exit\n";
   };
 
@@ -566,11 +870,17 @@ int main(int argc, char **argv) {
 
   std::string input_file;
   std::string output_file;
+  std::string gold_file;
+  std::string cmap_file;
   int upsample_factor = 1;
   std::string window_type = "hamming";
-  int block_size_arg = 0;  // 0 = all pulses in one block
+  std::string block_size_arg = "auto";
+  index_t image_tiles = 1;
   bool do_warmup = false;
+  bool taylor_fast_add_third_order = false;
   std::string precision_type = "mixed";
+  std::string pixel_z_arg = "variable";
+  SarBpPixelZMode pixel_z_mode = SarBpPixelZMode::Variable;
 
   auto needs_value = [&](int i) -> bool {
     if (i + 1 >= argc) {
@@ -594,14 +904,33 @@ int main(int argc, char **argv) {
     } else if (std::strcmp(argv[i], "-o") == 0 || std::strcmp(argv[i], "--output") == 0) {
       if (!needs_value(i)) return 1;
       output_file = argv[++i];
+    } else if (std::strcmp(argv[i], "--gold") == 0) {
+      if (!needs_value(i)) return 1;
+      gold_file = argv[++i];
+    } else if (std::strcmp(argv[i], "--cmap") == 0) {
+      if (!needs_value(i)) return 1;
+      cmap_file = argv[++i];
     } else if (std::strcmp(argv[i], "-b") == 0 || std::strcmp(argv[i], "--block-size") == 0) {
       if (!needs_value(i)) return 1;
-      block_size_arg = std::atoi(argv[++i]);
+      block_size_arg = argv[++i];
+    } else if (std::strcmp(argv[i], "--image-tiles") == 0) {
+      if (!needs_value(i)) return 1;
+      if (!parse_index_arg(argv[++i], image_tiles, 1)) {
+        std::cerr << "ERROR: invalid image tile count '" << argv[i]
+                  << "' (use a positive integer)" << std::endl;
+        print_usage();
+        return 1;
+      }
     } else if (std::strcmp(argv[i], "--warmup") == 0) {
       do_warmup = true;
+    } else if (std::strcmp(argv[i], "--taylor-fast-third-order") == 0) {
+      taylor_fast_add_third_order = true;
     } else if (std::strcmp(argv[i], "--precision") == 0) {
       if (!needs_value(i)) return 1;
       precision_type = argv[++i];
+    } else if (std::strcmp(argv[i], "--pixel-z") == 0) {
+      if (!needs_value(i)) return 1;
+      pixel_z_arg = argv[++i];
     } else if (argv[i][0] == '-') {
       std::cerr << "ERROR: unknown option '" << argv[i] << "'" << std::endl;
       print_usage();
@@ -623,9 +952,43 @@ int main(int argc, char **argv) {
     return 1;
   }
 
+  BlockSizeSelection block_size_selection;
+  if (!parse_block_size_arg(block_size_arg, block_size_selection)) {
+    std::cerr << "ERROR: invalid block size '" << block_size_arg
+              << "' (use a positive integer, 0, auto, or all)" << std::endl;
+    print_usage();
+    return 1;
+  }
+
   if (output_file.empty()) {
     auto dot = input_file.rfind('.');
     output_file = (dot != std::string::npos ? input_file.substr(0, dot) : input_file) + ".raw";
+  }
+
+  if (!cmap_file.empty() && gold_file.empty()) {
+    std::cerr << "ERROR: --cmap requires --gold (the correlation map is computed "
+                 "against the golden image)" << std::endl;
+    print_usage();
+    return 1;
+  }
+
+  if (taylor_fast_add_third_order && precision_type != "taylor_fast") {
+    std::cerr << "ERROR: --taylor-fast-third-order requires --precision taylor_fast" << std::endl;
+    print_usage();
+    return 1;
+  }
+
+  if (pixel_z_arg == "variable") {
+    pixel_z_mode = SarBpPixelZMode::Variable;
+  } else if (pixel_z_arg == "zero") {
+    pixel_z_mode = SarBpPixelZMode::Zero;
+  } else if (pixel_z_arg == "fixed") {
+    pixel_z_mode = SarBpPixelZMode::Fixed;
+  } else {
+    std::cerr << "ERROR: invalid --pixel-z '" << pixel_z_arg
+              << "' (use variable, zero, or fixed)" << std::endl;
+    print_usage();
+    return 1;
   }
 
   // -------------------------------------------------------------------
@@ -646,6 +1009,22 @@ int main(int argc, char **argv) {
   const bool is_fx_domain   = (hdr.flags & 0x1) != 0;
   const bool is_int16_mode  = (hdr.flags & 0x2) != 0;
   const int sgn             = hdr.sgn;
+
+  if (num_pulses <= 0 || num_range_bins <= 0 ||
+      image_width <= 0 || image_height <= 0) {
+    std::cerr << "ERROR: invalid .sarbp dimensions: pulses=" << num_pulses
+              << ", samples=" << num_range_bins
+              << ", image=" << image_height << " x " << image_width
+              << std::endl;
+    return 1;
+  }
+
+  if (image_tiles > image_width || image_tiles > image_height) {
+    std::cerr << "ERROR: --image-tiles " << image_tiles
+              << " exceeds image dimensions " << image_height << " x "
+              << image_width << std::endl;
+    return 1;
+  }
 
   std::cout << "Input file       : " << input_file << std::endl;
   std::cout << "Pulses           : " << num_pulses << std::endl;
@@ -760,7 +1139,9 @@ int main(int argc, char **argv) {
   // incompatible types and is undefined behaviour under strict aliasing.
   // unsigned char* may alias any object type, and std::memcpy of
   // trivially-copyable types is the standards-blessed way to bit-cast.
-  if (precision_type == "fltflt") {
+  const bool use_fltflt_platform_inputs =
+      precision_type == "fltflt";
+  if (use_fltflt_platform_inputs) {
     auto *pos_bytes = reinterpret_cast<unsigned char *>(h_positions);
     for (size_t i = 0; i < static_cast<size_t>(num_pulses) * 3; i++) {
       unsigned char *slot = pos_bytes + i * sizeof(double);
@@ -841,26 +1222,67 @@ int main(int argc, char **argv) {
     params.compute_type = SarBpComputeType::FloatFloat;
   } else if (precision_type == "mixed") {
     params.compute_type = SarBpComputeType::Mixed;
+  } else if (precision_type == "taylor_fast") {
+    params.compute_type = SarBpComputeType::TaylorFast;
   } else {
     std::cerr << "ERROR: unknown precision type '" << precision_type
-              << "' (use double, float, fltflt, or mixed)" << std::endl;
+              << "' (use double, float, fltflt, mixed, or taylor_fast)" << std::endl;
     return 1;
   }
-  params.features = SarBpFeature::PhaseLUTOptimization;
+  if (params.compute_type != SarBpComputeType::Double) {
+    params.features = SarBpFeature::PhaseLUTOptimization;
+  }
   params.center_frequency = (sgn >= 0) ? -hdr.center_frequency : hdr.center_frequency;
   params.del_r = del_r;
 
   // -------------------------------------------------------------------
   // Block processing: range compression (if FX) + backprojection
   // -------------------------------------------------------------------
-  const index_t block_size = (block_size_arg > 0)
-      ? std::min(static_cast<index_t>(block_size_arg), num_pulses)
-      : num_pulses;
+  size_t l2_cache_bytes = 0;
+  const size_t profile_bytes_per_pulse =
+      static_cast<size_t>(output_range_bins) * sizeof(complex_t);
+  const size_t phase_lut_bytes = get_phase_lut_bytes(output_range_bins, params);
+
+  index_t block_size = num_pulses;
+  if (block_size_selection.mode == BlockSizeMode::Auto) {
+    int device = 0;
+    cudaDeviceProp device_prop{};
+    MATX_CUDA_CHECK(cudaGetDevice(&device));
+    MATX_CUDA_CHECK(cudaGetDeviceProperties(&device_prop, device));
+    l2_cache_bytes = static_cast<size_t>(device_prop.l2CacheSize);
+    block_size = choose_auto_block_size(num_pulses, output_range_bins, params, device_prop);
+  } else if (block_size_selection.mode == BlockSizeMode::Manual) {
+    block_size = std::min(block_size_selection.manual_size, num_pulses);
+  }
   const index_t num_blocks = (num_pulses + block_size - 1) / block_size;
 
-  std::cout << "Block size       : " << block_size << " pulses (" << num_blocks
-            << " block" << (num_blocks > 1 ? "s" : "") << ")" << std::endl;
-  std::cout << "BP precision     : " << precision_type << std::endl;
+  std::cout << "Block size       : " << block_size << " pulses ";
+  if (block_size_selection.mode == BlockSizeMode::Auto) {
+    std::cout << "(auto, ";
+  } else if (block_size_selection.mode == BlockSizeMode::All) {
+    std::cout << "(all, ";
+  } else {
+    std::cout << "(manual, ";
+  }
+  std::cout << num_blocks << " block" << (num_blocks > 1 ? "s" : "") << ")" << std::endl;
+  if (block_size_selection.mode == BlockSizeMode::Auto) {
+    std::cout << "  Auto heuristic : L2 "
+              << static_cast<double>(l2_cache_bytes) / (1024.0 * 1024.0)
+              << " MiB, target " << SARBP_AUTO_L2_TARGET_MULTIPLIER
+              << "x L2, profiles "
+              << static_cast<double>(profile_bytes_per_pulse) / 1024.0
+              << " KiB/pulse, phase LUT "
+              << static_cast<double>(phase_lut_bytes) / (1024.0 * 1024.0)
+              << " MiB" << std::endl;
+  }
+  std::cout << "BP precision     : " << precision_type;
+  if (precision_type == "taylor_fast") {
+    std::cout << (taylor_fast_add_third_order ? " (third order)" : " (second order)");
+  }
+  std::cout << std::endl;
+  std::cout << "Pixel-z mode     : " << pixel_z_arg << std::endl;
+  std::cout << "Image tiles      : " << image_tiles << " x " << image_tiles
+            << std::endl;
 
   cudaStream_t stream;
   MATX_CUDA_CHECK(cudaStreamCreate(&stream));
@@ -871,11 +1293,11 @@ int main(int argc, char **argv) {
 
   // Bundle non-tensor state for run_bp_device(). The platform-positions and
   // range-to-mcp tensors are allocated below with a type that matches
-  // `precision_type`: `tensor<double3>` / `tensor<double>` for the standard
-  // paths, or `tensor<fltflt>` / `tensor<fltflt>` when
-  // `precision_type == "fltflt"`. In the fltflt case we already converted
-  // the pinned host buffers in-place from double to fltflt right after the
-  // file read above (same byte layout, no extra storage). The kernel
+  // `use_fltflt_platform_inputs`: `tensor<double3>` / `tensor<double>` for the
+  // standard paths, or `tensor<fltflt>` / `tensor<fltflt>` for the FloatFloat
+  // path. In the fltflt case we already converted the pinned host buffers
+  // in-place from double to fltflt right after the file read above (same byte
+  // layout, no extra storage). The kernel
   // template (`SarBp<...>`) already handles both rank-1 (vector-of-double3
   // / -fltflt3-style) and rank-2 (matrix of [pulses, 3]) layouts for
   // platform_positions, so run_bp_device() branches internally only on the
@@ -893,12 +1315,17 @@ int main(int argc, char **argv) {
       .ifft_shift            = ifft_shift,
       .image_width           = image_width,
       .image_height          = image_height,
+      .image_tiles           = image_tiles,
       .is_fx_domain          = is_fx_domain,
       .is_int16_mode         = is_int16_mode,
       .apply_window          = apply_window,
+      .taylor_fast_add_third_order = taylor_fast_add_third_order,
+      .pixel_z_mode          = pixel_z_mode,
       .sgn                   = sgn,
       .do_warmup             = do_warmup,
       .output_file           = output_file,
+      .gold_file             = gold_file,
+      .cmap_file             = cmap_file,
       .del_r                 = del_r,
       .params                = params,
       .h_positions           = h_positions,
@@ -909,7 +1336,7 @@ int main(int argc, char **argv) {
   };
 
   int dev_status;
-  if (precision_type == "fltflt") {
+  if (use_fltflt_platform_inputs) {
     auto blk_positions = make_tensor<matx::fltflt>({block_size, 3}, matx::MATX_DEVICE_MEMORY);
     auto blk_rtm       = make_tensor<matx::fltflt>({block_size},    matx::MATX_DEVICE_MEMORY);
     dev_status = run_bp_device(blk_positions, blk_rtm, voxel_locations, ctx);
@@ -921,8 +1348,8 @@ int main(int argc, char **argv) {
   if (dev_status != 0) return dev_status;
 
 
-  MATX_CUDA_CHECK(cudaFreeHost(h_positions));
-  MATX_CUDA_CHECK(cudaFreeHost(h_range_to_mcp));
+  if (h_positions) MATX_CUDA_CHECK(cudaFreeHost(h_positions));
+  if (h_range_to_mcp) MATX_CUDA_CHECK(cudaFreeHost(h_range_to_mcp));
   if (h_range_profiles) MATX_CUDA_CHECK(cudaFreeHost(h_range_profiles));
   if (h_range_profiles_i16) MATX_CUDA_CHECK(cudaFreeHost(h_range_profiles_i16));
   if (h_ampsf) MATX_CUDA_CHECK(cudaFreeHost(h_ampsf));

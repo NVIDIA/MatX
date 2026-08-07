@@ -7,6 +7,7 @@ set(examples
     conv2d
     cgsolve
     eigenExample
+    fft_benchmark
     fft_conv
     interpolate
     resample
@@ -20,7 +21,8 @@ set(examples
     svd_power
     qr
     black_scholes
-    print_styles)
+    print_styles
+    streaming)
 
 
 

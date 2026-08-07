@@ -47,7 +47,10 @@ namespace detail {
 
     public:
       using matxop = bool;
-      using value_type = typename OpA::value_type;
+      using input_type = typename OpA::value_type;
+      using fraction_type = typename inner_op_type_t<input_type>::type;
+      using value_type = cuda::std::conditional_t<(WHICH % 2) == 0,
+                                                  fraction_type, int>;
       using self_type = FrexpOp<OpA, WHICH>;
 
       // Propagate dynamic tensor marker through expression tree
@@ -78,9 +81,11 @@ namespace detail {
         return cuda::std::make_tuple(
           func_name,
           std::format("template <typename OpA> struct {} {{\n"
-              "  using value_type = typename OpA::value_type;\n"
-              "  using matxop = bool;\n"
               "  constexpr static int WHICH_ = {};\n"
+              "  using input_type = typename OpA::value_type;\n"
+              "  using fraction_type = typename inner_op_type_t<input_type>::type;\n"
+              "  using value_type = cuda::std::conditional_t<(WHICH_ % 2) == 0, fraction_type, int>;\n"
+              "  using matxop = bool;\n"
               "  constexpr static int Rank_ = {};\n"
               "  constexpr static cuda::std::array<index_t, Rank_> out_dims_ = {{ {} }};\n"
               "  typename detail::inner_storage_or_self_t<detail::base_type_t<OpA>> a_;\n"
@@ -89,8 +94,8 @@ namespace detail {
               "    if constexpr (CapType::ept == ElementsPerThread::ONE) {{\n"
               "      const auto val = get_value<CapType>(a_, indices...);\n"
               "      int rexp;\n"
-              "      if constexpr (is_cuda_complex_v<value_type>) {{\n"
-              "        using inner_type = typename value_type::value_type;\n"
+              "      if constexpr (is_cuda_complex_v<input_type>) {{\n"
+              "        using inner_type = typename input_type::value_type;\n"
               "        const inner_type in = (WHICH_ < 2) ? static_cast<inner_type>(val.real()) : static_cast<inner_type>(val.imag());\n"
               "        if constexpr (cuda::std::is_same_v<float, inner_type>) {{\n"
               "          const float frac = cuda::std::frexpf(in, &rexp);\n"
@@ -108,7 +113,7 @@ namespace detail {
               "          }}\n"
               "        }}\n"
               "      }} else {{\n"
-              "        if constexpr (cuda::std::is_same_v<float, value_type>) {{\n"
+              "        if constexpr (cuda::std::is_same_v<float, input_type>) {{\n"
               "          const float frac = cuda::std::frexpf(val, &rexp);\n"
               "          if constexpr (WHICH_ == 0) {{\n"
               "            return frac;\n"
@@ -139,8 +144,8 @@ namespace detail {
       __MATX_INLINE__ std::string str() const { return "frexp()"; }
       __MATX_INLINE__ FrexpOp(const OpA &a) : a_(a) {
         MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
-        static_assert(std::is_floating_point_v<value_type> ||
-                      is_cuda_complex_v<value_type>, "frexp() must take a floating point input");
+        static_assert(std::is_floating_point_v<input_type> ||
+                      is_cuda_complex_v<input_type>, "frexp() must take a floating point input");
 
       };
 
@@ -149,8 +154,8 @@ namespace detail {
       {
         auto get_scalar = [](const auto &x){
           [[maybe_unused]] int rexp;        
-          if constexpr (is_cuda_complex_v<value_type>) {
-            if constexpr (std::is_same_v<float, typename value_type::value_type>) {
+          if constexpr (is_cuda_complex_v<input_type>) {
+            if constexpr (std::is_same_v<float, typename input_type::value_type>) {
               if constexpr (WHICH == 0) { // real fractional
                 const auto frac = cuda::std::frexpf(x.real(), &rexp);
                 return frac;
@@ -182,7 +187,7 @@ namespace detail {
             }
           }
           else {
-            if constexpr (std::is_same_v<float, value_type>) {
+            if constexpr (std::is_same_v<float, input_type>) {
               [[maybe_unused]] const float frac = cuda::std::frexpf(x, &rexp);
               if constexpr (WHICH == 0) { // fractional
                 return frac;

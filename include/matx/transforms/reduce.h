@@ -45,6 +45,7 @@
 #include "matx/core/cache.h"
 #include "matx/core/nvtx.h"
 #include "matx/transforms/cub.h"
+#include "matx/transforms/host_algorithms.h"
 #include "matx/transforms/copy.h"
 #include "matx/core/reduce_utils.h"
 #include "matx/core/half.h"
@@ -312,7 +313,7 @@ void __MATX_INLINE__ mean_impl(OutType dest, const InType &in,
  *   Single thread host executor
  */
 template <typename OutType, typename InType, ThreadsMode MODE>
-void __MATX_INLINE__ mean_impl(OutType dest, const InType &in, [[maybe_unused]] const HostExecutor<MODE> &exec)
+void __MATX_INLINE__ mean_impl(OutType dest, const InType &in, const HostExecutor<MODE> &exec)
 {
   MATX_NVTX_START("mean_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
@@ -322,11 +323,11 @@ void __MATX_INLINE__ mean_impl(OutType dest, const InType &in, [[maybe_unused]] 
   auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) {
     if constexpr (OutType::Rank() == 0) {
       auto ts = TotalSize(in);
-      *lout = std::accumulate(lin, lin + ts, static_cast<typename InType::value_type>(0)) / static_cast<inner_type>(ts);
+      *lout = detail::host_reduce(exec, lin, lin + ts, static_cast<typename InType::value_type>(0)) / static_cast<inner_type>(ts);
     }
     else {
       for (index_t b = 0; b < lin.Size(0); b++) {
-        *(lout + b) = std::accumulate(lin + lbegin[b], lin + lend[b], static_cast<typename InType::value_type>(0)) / static_cast<inner_type>(lin.Size(1));
+        *(lout + b) = detail::host_reduce(exec, lin + lbegin[b], lin + lend[b], static_cast<typename InType::value_type>(0)) / static_cast<inner_type>(lin.Size(1));
       }
     }
   };
@@ -577,17 +578,18 @@ void __MATX_INLINE__ median_impl(OutType dest,
  *   Single thread host executor
  */
 template <typename OutType, typename InType, ThreadsMode MODE>
-void __MATX_INLINE__ median_impl(OutType dest, const InType &in, [[maybe_unused]] const HostExecutor<MODE> &exec)
+void __MATX_INLINE__ median_impl(OutType dest, const InType &in, const HostExecutor<MODE> &exec)
 {
   MATX_NVTX_START("median_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
   auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) {
     if constexpr (OutType::Rank() == 0) {
       auto insize = TotalSize(in);
       auto tin = new typename InType::value_type[insize];
-      std::partial_sort_copy( lin,
-                              lin + insize,
-                              tin,
-                              tin + insize);
+      detail::host_sort_copy(exec,
+                             lin,
+                             lin + insize,
+                             tin,
+                             tin + insize);
       if ((insize % 2) == 0) {
         *lout = (tin[insize / 2] + tin[insize / 2 - 1]) / 2.0f;
       }
@@ -601,10 +603,11 @@ void __MATX_INLINE__ median_impl(OutType dest, const InType &in, [[maybe_unused]
       auto insize = lin.Size(1);
       auto tin = new typename InType::value_type[insize];
       for (index_t b = 0; b < lin.Size(0); b++) {
-        std::partial_sort_copy( lin + lbegin[b],
-                                lin + lend[b],
-                                tin,
-                                tin + insize);
+        detail::host_sort_copy(exec,
+                               lin + lbegin[b],
+                               lin + lend[b],
+                               tin,
+                               tin + insize);
 
         if ((insize % 2) == 0) {
           *(lout + b) = (tin[insize / 2] + tin[insize / 2 - 1]) / 2.0f;
@@ -669,16 +672,16 @@ void __MATX_INLINE__ sum_impl(OutType dest, const InType &in, const cudaExecutor
  *   Single thread host executor
  */
 template <typename OutType, typename InType, ThreadsMode MODE>
-void __MATX_INLINE__ sum_impl(OutType dest, const InType &in, [[maybe_unused]] const HostExecutor<MODE> &exec)
+void __MATX_INLINE__ sum_impl(OutType dest, const InType &in, const HostExecutor<MODE> &exec)
 {
   MATX_NVTX_START("sum_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
   auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) {
     if constexpr (OutType::Rank() == 0) {
-      *lout = std::accumulate(lin, lin + lin.Size(0), static_cast<typename InType::value_type>(0));
+      *lout = detail::host_reduce(exec, lin, lin + TotalSize(in), static_cast<typename InType::value_type>(0));
     }
     else {
       for (index_t b = 0; b < lin.Size(0); b++) {
-        auto f = std::accumulate(lin + lbegin[b], lin + lend[b], static_cast<typename InType::value_type>(0));
+        auto f = detail::host_reduce(exec, lin + lbegin[b], lin + lend[b], static_cast<typename InType::value_type>(0));
         *(lout + b) = f;
       }
     }
@@ -736,22 +739,24 @@ void __MATX_INLINE__ prod_impl(OutType dest, const InType &in, const cudaExecuto
  *   Single thread host executor
  */
 template <typename OutType, typename InType, ThreadsMode MODE>
-void __MATX_INLINE__ prod_impl(OutType dest, const InType &in, [[maybe_unused]] const HostExecutor<MODE> &exec)
+void __MATX_INLINE__ prod_impl(OutType dest, const InType &in, const HostExecutor<MODE> &exec)
 {
   MATX_NVTX_START("prod_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
   auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) {
     if constexpr (OutType::Rank() == 0) {
-      *lout = std::accumulate(lin,
-                              lin + TotalSize(in),
-                              static_cast<typename InType::value_type>(1),
-                              std::multiplies<typename InType::value_type>());
+      *lout = detail::host_reduce(exec,
+                                  lin,
+                                  lin + TotalSize(in),
+                                  static_cast<typename InType::value_type>(1),
+                                  std::multiplies<typename InType::value_type>());
     }
     else {
       for (index_t b = 0; b < lin.Size(0); b++) {
-        *(lout + b) = std::accumulate(lin + lbegin[b],
-                                      lin + lend[b],
-                                      static_cast<typename InType::value_type>(1),
-                                      std::multiplies<typename InType::value_type>());
+        *(lout + b) = detail::host_reduce(exec,
+                                          lin + lbegin[b],
+                                          lin + lend[b],
+                                          static_cast<typename InType::value_type>(1),
+                                          std::multiplies<typename InType::value_type>());
       }
     }
   };
@@ -807,18 +812,18 @@ void __MATX_INLINE__ max_impl(OutType dest, const InType &in, const cudaExecutor
  *   Single threaded host executor
  */
 template <typename OutType, typename InType, ThreadsMode MODE>
-void __MATX_INLINE__ max_impl(OutType dest, const InType &in, [[maybe_unused]] const HostExecutor<MODE> &exec)
+void __MATX_INLINE__ max_impl(OutType dest, const InType &in, const HostExecutor<MODE> &exec)
 {
   MATX_NVTX_START("max_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
   auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) {
     if constexpr (OutType::Rank() == 0) {
-      *lout = *std::max_element(lin, lin + TotalSize(in));
+      *lout = *detail::host_max_element(exec, lin, lin + TotalSize(in));
     }
     else {
       const index_t BATCHES = TotalSize(dest);
       for (index_t b = 0; b < BATCHES; b++) {
-        lout[b] = *std::max_element(lin + lbegin[b], lin + lend[b]);
+        lout[b] = *detail::host_max_element(exec, lin + lbegin[b], lin + lend[b]);
       }
     }
   };
@@ -885,18 +890,18 @@ void __MATX_INLINE__ argmax_impl(OutType dest, TensorIndexType &idest, const InT
  *   Single threaded host executor
  */
 template <typename OutType, typename TensorIndexType, typename InType, ThreadsMode MODE>
-void __MATX_INLINE__ argmax_impl(OutType dest, TensorIndexType &idest, const InType &in, [[maybe_unused]] const HostExecutor<MODE> &exec)
+void __MATX_INLINE__ argmax_impl(OutType dest, TensorIndexType &idest, const InType &in, const HostExecutor<MODE> &exec)
 {
   MATX_NVTX_START("argmax_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
   auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) {
     if constexpr (OutType::Rank() == 0) {
-      *lout = static_cast<index_t>(cuda::std::max_element(lin, lin + TotalSize(in)) - lin);
+      *lout = static_cast<index_t>(detail::host_max_element(exec, lin, lin + TotalSize(in)) - lin);
     }
     else {
       const index_t BATCHES = TotalSize(dest);
       for (index_t b = 0; b < BATCHES; b++) {
-        lout[b] = static_cast<index_t>(cuda::std::max_element(lin + lbegin[b], lin + lend[b]) - lin);
+        lout[b] = static_cast<index_t>(detail::host_max_element(exec, lin + lbegin[b], lin + lend[b]) - lin);
       }
     }
   };
@@ -955,17 +960,17 @@ void __MATX_INLINE__ min_impl(OutType dest, const InType &in, const cudaExecutor
  *   Single threaded host executor
  */
 template <typename OutType, typename InType, ThreadsMode MODE>
-void __MATX_INLINE__ min_impl(OutType dest, const InType &in, [[maybe_unused]] const HostExecutor<MODE> &exec)
+void __MATX_INLINE__ min_impl(OutType dest, const InType &in, const HostExecutor<MODE> &exec)
 {
   MATX_NVTX_START("min_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
   auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) {
     if constexpr (OutType::Rank() == 0) {
-      *lout = *std::min_element(lin, lin + TotalSize(in));
+      *lout = *detail::host_min_element(exec, lin, lin + TotalSize(in));
     }
     else {
       const index_t BATCHES = TotalSize(dest);
       for (index_t b = 0; b < BATCHES; b++) {
-        lout[b] = *std::min_element(lin + lbegin[b], lin + lend[b]);
+        lout[b] = *detail::host_min_element(exec, lin + lbegin[b], lin + lend[b]);
       }
     }
   };
@@ -1035,18 +1040,18 @@ void __MATX_INLINE__ argmin_impl(OutType dest, TensorIndexType &idest, const InT
  *   Single host executor
  */
 template <typename OutType, typename TensorIndexType, typename InType, ThreadsMode MODE>
-void __MATX_INLINE__ argmin_impl(OutType dest, TensorIndexType &idest, const InType &in, [[maybe_unused]] const HostExecutor<MODE> &exec)
+void __MATX_INLINE__ argmin_impl(OutType dest, TensorIndexType &idest, const InType &in, const HostExecutor<MODE> &exec)
 {
   MATX_NVTX_START("argmin_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
   auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) {
     if constexpr (OutType::Rank() == 0) {
-      *lout = static_cast<index_t>(cuda::std::min_element(lin, lin + TotalSize(in)) - lin);
+      *lout = static_cast<index_t>(detail::host_min_element(exec, lin, lin + TotalSize(in)) - lin);
     }
     else {
       const index_t BATCHES = TotalSize(dest);
       for (index_t b = 0; b < BATCHES; b++) {
-        lout[b] = static_cast<index_t>(cuda::std::min_element(lin + lbegin[b], lin + lend[b]) - lin);
+        lout[b] = static_cast<index_t>(detail::host_min_element(exec, lin + lbegin[b], lin + lend[b]) - lin);
       }
     }
   };
@@ -1192,19 +1197,19 @@ void __MATX_INLINE__ any_impl(OutType dest, const InType &in, const cudaExecutor
  *   Single threaded host executor
  */
 template <typename OutType, typename InType, ThreadsMode MODE>
-void __MATX_INLINE__ any_impl(OutType dest, const InType &in, [[maybe_unused]] const HostExecutor<MODE> &exec)
+void __MATX_INLINE__ any_impl(OutType dest, const InType &in, const HostExecutor<MODE> &exec)
 {
   MATX_NVTX_START("any_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
   auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) {
     if constexpr (OutType::Rank() == 0) {
-      *lout = std::any_of(lin, lin + TotalSize(in), [](typename InType::value_type vin) {
+      *lout = detail::host_any_of(exec, lin, lin + TotalSize(in), [](typename InType::value_type vin) {
           return vin != static_cast<typename InType::value_type>(0);
         });
     }
     else {
       for (index_t b = 0; b < lin.Size(0); b++) {
-        lout[b] = std::any_of(lin + lbegin[b], lin + lend[b], [](typename InType::value_type vin) {
+        lout[b] = detail::host_any_of(exec, lin + lbegin[b], lin + lend[b], [](typename InType::value_type vin) {
           return vin != static_cast<typename InType::value_type>(0);
         });
       }
@@ -1265,19 +1270,19 @@ void __MATX_INLINE__ all_impl(OutType dest, const InType &in, const cudaExecutor
  *   Single threaded host executor
  */
 template <typename OutType, typename InType, ThreadsMode MODE>
-void __MATX_INLINE__ all_impl(OutType dest, const InType &in, [[maybe_unused]] const HostExecutor<MODE> &exec)
+void __MATX_INLINE__ all_impl(OutType dest, const InType &in, const HostExecutor<MODE> &exec)
 {
   MATX_NVTX_START("all_impl(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
 
   auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) {
     if constexpr (OutType::Rank() == 0) {
-      *lout = std::all_of(lin, lin + TotalSize(in), [](typename InType::value_type vin) {
+      *lout = detail::host_all_of(exec, lin, lin + TotalSize(in), [](typename InType::value_type vin) {
           return vin != static_cast<typename InType::value_type>(0);
         });
     }
     else {
       for (index_t b = 0; b < lin.Size(0); b++) {
-        lout[b] = std::all_of(lin + lbegin[b], lin + lend[b], [](typename InType::value_type vin) {
+        lout[b] = detail::host_all_of(exec, lin + lbegin[b], lin + lend[b], [](typename InType::value_type vin) {
           return vin != static_cast<typename InType::value_type>(0);
         });
       }
@@ -1351,7 +1356,7 @@ void __MATX_INLINE__ allclose(OutType dest, const InType1 &in1, const InType2 &i
  *   Single threaded host executor
  */
 template <typename OutType, typename InType1, typename InType2, ThreadsMode MODE>
-void __MATX_INLINE__ allclose(OutType dest, const InType1 &in1, const InType2 &in2, double rtol, double atol, [[maybe_unused]] const HostExecutor<MODE> &exec)
+void __MATX_INLINE__ allclose(OutType dest, const InType1 &in1, const InType2 &in2, double rtol, double atol, const HostExecutor<MODE> &exec)
 {
   MATX_NVTX_START("allclose(" + get_type_str(in1) + ", " + get_type_str(in2) + ")", matx::MATX_NVTX_LOG_API)
   static_assert(OutType::Rank() == 0, "allclose output must be rank 0");
@@ -1359,7 +1364,7 @@ void __MATX_INLINE__ allclose(OutType dest, const InType1 &in1, const InType2 &i
   auto isc = isclose(in1, in2, rtol, atol);
 
   auto ft = [&](auto &&lin, auto &&lout, [[maybe_unused]] auto &&lbegin, [[maybe_unused]] auto &&lend) {
-    *lout = std::all_of(lin, lin + TotalSize(in1), [](int vin) {
+    *lout = detail::host_all_of(exec, lin, lin + TotalSize(in1), [](int vin) {
         return vin != 0;
       });
   };

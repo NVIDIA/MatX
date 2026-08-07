@@ -155,8 +155,12 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv) {
   auto X = make_tensor<float>({2, 4}); // solution along rows
   auto Y = make_tensor<float>({2, 4}); // RHS along rows
   Y.SetVals({{5, 6, 12, 20}, {17, 18, 28, 40}});
+#ifdef MATX_EN_CUDSS
   (X = solve(Acsr, Y)).run(exec);
   print(X);
+#else
+  printf("Skipping CSR sparse direct solve because MatX was built without cuDSS.\n");
+#endif
 
   //
   // A direct dense2sparse conversion. This is the correct way of

@@ -34,6 +34,8 @@
 
 
 #include "matx/core/type_utils.h"
+#include "matx/core/utils.h"
+#include "matx/core/distributed_tensor.h"
 #include "matx/operators/base_operator.h"
 #include "matx/core/operator_options.h"
 #include "matx/core/log.h"
@@ -183,13 +185,7 @@ namespace matx
           // m = rows of output (from A's second-to-last dim)
           // n = cols of output (from B's last dim)
           // k = inner dimension (A's last dim = B's second-to-last dim)
-          int major = 0;
-          int minor = 0;
-          int device;
-          cudaGetDevice(&device);
-          cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device);
-          cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device);
-          int cc = major * 100 + minor * 10;  // Compute capability as __CUDA_ARCH__ digits (e.g., 890 for SM 8.9)
+          const int cc = GetComputeCapability();  // Compute capability as __CUDA_ARCH__ digits (e.g., 890 for SM 8.9)
           
           dx_gemm_helper_.set_m(a_.Size(OpA::Rank() - 2));
           dx_gemm_helper_.set_n(b_.Size(OpB::Rank() - 1));
@@ -287,6 +283,28 @@ namespace matx
             MATX_LOG_DEBUG("cuBLASDx JIT_TYPE_QUERY: {}", result);
             return result;
           }
+          else if constexpr (Cap == OperatorCapability::JIT_CACHE_KEY) {
+#ifdef MATX_EN_JIT
+            auto key = detail::MakeJITCacheKeyForType<self_type>("JITMatMul");
+            const int actual_rank = jit_rank();
+            detail::HashJITCacheValue(key, actual_rank);
+            detail::HashJITCacheValue(key, dx_gemm_helper_.get_m());
+            detail::HashJITCacheValue(key, dx_gemm_helper_.get_n());
+            detail::HashJITCacheValue(key, dx_gemm_helper_.get_k());
+            const bool is_complex = dx_gemm_helper_.get_is_complex();
+            detail::HashJITCacheValue(key, is_complex);
+            detail::HashJITCacheValue(key, alpha_);
+            detail::HashJITCacheValue(key, beta_);
+            for (int i = 0; i < actual_rank; ++i) {
+              detail::HashJITCacheValue(key, out_dims_[i]);
+            }
+            return combine_capabilities<Cap>(key,
+                                             detail::get_operator_capability<Cap>(a_, in),
+                                             detail::get_operator_capability<Cap>(b_, in));
+#else
+            return detail::MakeInvalidJITCacheKey();
+#endif
+          }
           else if constexpr (Cap == OperatorCapability::GLOBAL_KERNEL) {
             // If MathDx is enabled we always return false. Other checks on size and type may prevent JIT compilation.
             MATX_LOG_DEBUG("cuBLASDx GLOBAL_KERNEL: false");
@@ -296,6 +314,9 @@ namespace matx
             // cuBLASDx needs all threads to call operator() for block-level cooperation
             MATX_LOG_DEBUG("cuBLASDx PASS_THROUGH_THREADS: true");
             return true;
+          }
+          else if constexpr (Cap == OperatorCapability::PASS_THROUGH_INNER_RANK) {
+            return 2;
           }
           else if constexpr (Cap == OperatorCapability::GROUPS_PER_BLOCK) {
             // 2D block operators only support one group per block
@@ -428,7 +449,9 @@ namespace matx
             b_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           }
 
-          matxFree(ptr);         
+          matxFree(ptr);
+          ptr = nullptr;
+          prerun_done_ = false;
         }
     };
   }
@@ -462,7 +485,30 @@ namespace matx
    */
   template<typename OpA, typename OpB>
   __MATX_INLINE__ auto matmul(const OpA &A, const OpB &B, float alpha = 1.0, float beta = 0.0) {
-    return detail::MatMulOp(A, B, alpha, beta, detail::no_permute_t{});
+    if constexpr (is_distributed_tensor_v<OpA> ||
+                  is_distributed_tensor_v<OpB>) {
+      static_assert(is_distributed_tensor_v<OpA> &&
+                        is_distributed_tensor_v<OpB>,
+                    "matmul requires both inputs to be distributed");
+      static_assert(remove_cvref_t<OpA>::Rank() ==
+                        remove_cvref_t<OpB>::Rank(),
+                    "First-pass distributed matmul requires equal input ranks");
+      static_assert(remove_cvref_t<OpA>::Rank() >= 3,
+                    "Distributed matmul requires a batch dimension followed "
+                    "by matrix dimensions");
+
+      auto local_matmul = [alpha, beta](const auto &local_a,
+                                        const auto &local_b) {
+        return detail::MatMulOp(local_a, local_b, alpha, beta,
+                                detail::no_permute_t{});
+      };
+      return experimental::detail::make_distributed_local_transform<
+          typename remove_cvref_t<OpA>::value_type, 2>(
+          std::move(local_matmul), A, B);
+    }
+    else {
+      return detail::MatMulOp(A, B, alpha, beta, detail::no_permute_t{});
+    }
   }
 
   /**
@@ -495,6 +541,10 @@ namespace matx
    */
   template<typename OpA, typename OpB>
   __MATX_INLINE__ auto matmul(const OpA &A, const OpB &B, const int32_t (&axis)[2], float alpha = 1.0, float beta = 0.0) {
+    static_assert(!is_distributed_tensor_v<OpA> &&
+                      !is_distributed_tensor_v<OpB>,
+                  "Axis-selecting distributed matmul is not supported in "
+                  "the first-pass batch-sharded executor");
     MATX_STATIC_ASSERT(OpA::Rank() == OpB::Rank(), "matmul: inputs must have same rank to use matmul with axis parameter");
     MATX_STATIC_ASSERT(OpA::Rank() == OpB::Rank(), "matmul: inputs and outputs must have same rank to use matmul with axis parameter");
 

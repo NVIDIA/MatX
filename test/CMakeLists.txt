@@ -24,6 +24,8 @@ set (test_sources
     00_tensor/TensorCreationTests.cu
     00_tensor/EinsumTests.cu
     00_tensor/DynamicTensorTests.cu
+    00_tensor/DistributedTensorTests.cu
+    00_tensor/DistributedTensorMultiGpuTests.cu
     ${OPERATOR_TEST_FILES}
     00_operators/GeneratorTests.cu
     00_operators/PWelch.cu
@@ -37,6 +39,9 @@ set (test_sources
     00_transform/Norm.cu
     00_transform/ResamplePoly.cu
     00_transform/SarBp.cu
+    00_transform/StreamingConv.cu
+    00_transform/StreamingResample.cu
+    00_transform/StreamingChannelize.cu
     00_transform/Solve.cu
     00_solver/Cholesky.cu
     00_solver/LU.cu
@@ -100,6 +105,8 @@ endforeach()
 set(target_inc ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/../examples/ ${proprietary_inc_list})
 set(system_inc ${CUTLASS_INC} ${GTEST_INC_DIRS} ${pybind11_INCLUDE_DIR} ${PYTHON_INCLUDE_DIRS})
 
+enable_testing()
+
 # Function to create individual test executables
 function(create_test_executable test_file)
     # Get the filename without path and extension for the target name
@@ -129,17 +136,13 @@ function(create_test_executable test_file)
     target_include_directories(${target_name} PRIVATE "${target_inc}")
     target_include_directories(${target_name} SYSTEM PRIVATE "${system_inc}")
     target_link_libraries(${target_name} PRIVATE matx::matx) # Transitive properties
-    target_link_libraries(${target_name} PRIVATE ${NVSHMEM_LIBRARY} gtest)
+    target_link_libraries(${target_name} PRIVATE gtest)
 
-    # Register the test with CTest
     add_test(NAME ${target_name} COMMAND ${target_name})
     set_tests_properties(${target_name} PROPERTIES
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     )
 endfunction()
-
-# Enable CTest
-enable_testing()
 
 # Create individual executables for each test file
 foreach(test_file ${test_sources})
@@ -155,6 +158,21 @@ endforeach()
 set(CTEST_PARALLEL_JOBS 4)
 
 set_tests_properties(test_00_misc_ClearCacheTests PROPERTIES RUN_SERIAL TRUE)
+set_tests_properties(test_00_tensor_DistributedTensorMultiGpuTests PROPERTIES
+    LABELS "multi_gpu" RUN_SERIAL TRUE)
+
+# Keep the intended multi-node assignment semantics visible in CTest until a
+# communicator-backed two-rank launcher is available.
+add_test(
+    NAME test_00_tensor_DistributedTensorTwoRankMaterialization
+    COMMAND $<TARGET_FILE:test_00_tensor_DistributedTensorMultiGpuTests>
+            --gtest_also_run_disabled_tests
+            --gtest_filter=DistributedTensorMultiGpu.DISABLED_ReplicatedTwoRankMaterialization
+)
+set_tests_properties(
+    test_00_tensor_DistributedTensorTwoRankMaterialization
+    PROPERTIES DISABLED TRUE LABELS "multi_node;future"
+)
 
 # Create a legacy matx_test script for CI compatibility
 configure_file(

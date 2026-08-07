@@ -335,5 +335,28 @@ TYPED_TEST(OperatorTestsFloatAllExecs, MatmulAliasing)
   MATX_EXIT_HANDLER();
 }
 
+// Test that corrmap() with aliasing DOES throw. Each output element reads a
+// window of neighboring input samples, so writing to A while still reading
+// from A would corrupt the result.
+TYPED_TEST(OperatorTestsFloatAllExecs, CorrMapAliasing)
+{
+  MATX_ENTER_HANDLER();
+
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+
+  ExecType exec{};
+
+  auto a = make_tensor<TestType>({10, 10});
+  auto b = make_tensor<TestType>({10, 10});
+
+  // a appears on the LHS and as an input to corrmap on the RHS.
+  EXPECT_THROW({
+    (a = corrmap(a, b, cuda::std::array<index_t, 2>{3, 3})).run(exec);
+    exec.sync();
+  }, matx::detail::matxException);
+
+  MATX_EXIT_HANDLER();
+}
 
 #endif

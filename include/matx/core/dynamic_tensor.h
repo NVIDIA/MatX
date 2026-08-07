@@ -218,6 +218,11 @@ public:
 
   __MATX_INLINE__ T *Data() const { return ldata_; }
 
+  __MATX_INLINE__ bool IsInitialized() const noexcept
+  {
+    return Data() != nullptr;
+  }
+
   __MATX_INLINE__ index_t TotalSize() const {
     index_t total = 1;
     for (int i = 0; i < rank_; ++i) {
@@ -320,6 +325,21 @@ public:
       return get_jit_class_name();
 #else
       return std::string("");
+#endif
+    }
+    else if constexpr (Cap == detail::OperatorCapability::JIT_CACHE_KEY) {
+#ifdef MATX_EN_JIT
+      auto key = detail::MakeJITCacheKeyForType<dynamic_tensor_t<T>>("JITDynamicTensor");
+      detail::HashJITCacheValue(key, rank_);
+      for (int i = 0; i < rank_; ++i) {
+        detail::HashJITCacheValue(key, shape_[i]);
+      }
+      for (int i = 0; i < rank_; ++i) {
+        detail::HashJITCacheValue(key, strides_[i]);
+      }
+      return key;
+#else
+      return detail::MakeInvalidJITCacheKey();
 #endif
     }
     else if constexpr (Cap == detail::OperatorCapability::SUPPORTS_JIT) {

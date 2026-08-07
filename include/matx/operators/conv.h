@@ -44,6 +44,12 @@
 namespace matx
 {
   namespace detail {
+    // Direct conv1d limits only the SMALLER operand, min(len_a, len_b): the
+    // kernel stages it in shared memory alongside each signal tile, while the
+    // larger operand may be arbitrarily long. This is the largest minimum
+    // dimension the direct method supports; longer requires MATX_C_METHOD_FFT.
+    static constexpr int CONV1D_MAX_MIN_DIMENSION_DIRECT = 1024;
+
     template <typename OpA, typename OpB, typename PermDims>
     class Conv1DOp : public BaseOp<Conv1DOp<OpA, OpB, PermDims>>
     {
@@ -60,8 +66,6 @@ namespace matx
         mutable detail::tensor_impl_t<out_t, max_rank> tmp_out_;
         mutable out_t *ptr = nullptr;
         mutable bool prerun_done_ = false; 
-
-        static constexpr int MAX_MIN_DIMENSION_DIRECT = 1024;
 
       public:
         using matxop = bool;
@@ -132,7 +136,7 @@ namespace matx
             }
           }
 
-          MATX_ASSERT_STR(method == MATX_C_METHOD_FFT || min_axis <= MAX_MIN_DIMENSION_DIRECT, 
+          MATX_ASSERT_STR(method == MATX_C_METHOD_FFT || min_axis <= CONV1D_MAX_MIN_DIMENSION_DIRECT,
                           matxInvalidSize, "Dimension too large for direct convolution. "
                           "Please switch to FFT convolution using MATX_C_METHOD_FFT");
         }
@@ -177,7 +181,6 @@ namespace matx
 
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
-          MATX_ASSERT_STR(!(is_host_executor_v<Executor> && method_ == MATX_C_METHOD_DIRECT), matxNotSupported, "direct conv1d() only supports the CUDA executor currently");
           MATX_STATIC_ASSERT_STR((Rank() == cuda::std::tuple_element_t<0, remove_cvref_t<Out>>::Rank()), 
                 matxInvalidParameter, "conv1d: inputs and outputs must have same rank to use conv1d with axis parameter");
           if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
@@ -224,9 +227,11 @@ namespace matx
 
           if constexpr (is_matx_op<OpB>()) {
             b_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-          } 
+          }
 
           matxFree(ptr);
+          ptr = nullptr;
+          prerun_done_ = false;
         }
     };
   }
@@ -405,13 +410,11 @@ namespace detail {
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
-        static_assert(is_cuda_executor_v<Executor>, "conv2d() only supports the CUDA executor currently");
-
         if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
-          conv2d_impl(permute(cuda::std::get<0>(out), perm_), a_, b_, mode_, ex.getStream());
+          conv2d_impl(permute(cuda::std::get<0>(out), perm_), a_, b_, mode_, ex);
         }
         else {
-          conv2d_impl(cuda::std::get<0>(out), a_, b_, mode_, ex.getStream());
+          conv2d_impl(cuda::std::get<0>(out), a_, b_, mode_, ex);
         }
       }
 

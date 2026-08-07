@@ -433,6 +433,17 @@ namespace matx {
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const {
 
+        // Forward PreRun to the operands to support generic operators/transforms
+        if constexpr (is_matx_op<OpX>()) {
+          x_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
+        if constexpr (is_matx_op<OpV>()) {
+          v_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
+        if constexpr (is_matx_op<OpXQ>()) {
+          xq_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
+
         // Allocate temporary storage for spline coefficients
         if (method_ == InterpMethod::SPLINE) {
           static_assert(is_cuda_executor_v<Executor>, "cubic spline interpolation only supports the CUDA executor currently");
@@ -481,6 +492,16 @@ namespace matx {
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape,
                                   [[maybe_unused]] Executor &&ex) const noexcept {
+        if constexpr (is_matx_op<OpX>()) {
+          x_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
+        if constexpr (is_matx_op<OpV>()) {
+          v_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
+        if constexpr (is_matx_op<OpXQ>()) {
+          xq_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
+
         if (method_ == InterpMethod::SPLINE) {
           matxFree(ptr_m_);
         }

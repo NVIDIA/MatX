@@ -165,6 +165,11 @@ namespace matx
           }
         }
 
+        template<typename U>
+        static constexpr bool is_matx_direct_assign_op() {
+          return requires { typename remove_cvref_t<U>::matx_direct_assign_op; };
+        }
+
       public:
         /**
          * @brief Launch work in an arbitrary executor
@@ -192,7 +197,22 @@ namespace matx
             tp->Exec(ex);
           }
           else if constexpr (is_matx_set_op<T>()) {
-            if constexpr (is_matx_transform_op<typename T::op_type>() && is_tensor_view_v<typename T::tensor_type>) {
+            if constexpr (is_distributed_tensor_v<typename T::op_type> &&
+                          is_tensor_view_v<typename T::tensor_type>) {
+              static_assert(is_distributed_executor_v<Ex>,
+                            "Distributed-to-regular assignment requires "
+                            "distributedCUDAExecutor");
+              tp->get_rhs().MaterializeTo(tp->get_lhs(), ex);
+            }
+            else if constexpr (
+                is_distributed_expression_v<typename T::op_type> &&
+                is_tensor_view_v<typename T::tensor_type>) {
+              static_assert(
+                  !is_distributed_expression_v<typename T::op_type>,
+                  "A distributed expression must be assigned to a distributed "
+                  "tensor before materialization into a regular tensor");
+            }
+            else if constexpr (is_matx_transform_op<typename T::op_type>() && is_tensor_view_v<typename T::tensor_type>) {
               // If we're doing a simple set operation from a transform we take a shorcut to avoid the extra
               // async allocation we'd normally have to do   
               if (!can_alias<decltype(tp->get_rhs())>() && detail::check_aliased_memory(tp->get_lhs(), tp->get_rhs(), false)) {
@@ -200,6 +220,23 @@ namespace matx
               }
 
               tp->TransformExec(tp->Shape(), ex);
+            }
+            else if constexpr (is_matx_direct_assign_op<typename T::op_type>() &&
+                               is_tensor_view_v<typename T::tensor_type> &&
+                               is_cuda_executor_v<Ex>) {
+              // Direct fill is limited to concrete tensor-view outputs; other writable
+              // expressions use the normal materialized random-expression path.
+              if (detail::check_aliased_memory(tp->get_lhs(), tp->get_rhs(), false)) {
+                MATX_THROW(matxInvalidParameter, "Possible aliased memory detected: LHS and RHS memory ranges overlap");
+              }
+
+              if (tp->get_rhs().CanDirectFill(tp->get_lhs())) {
+                tp->TransformExec(tp->Shape(), ex);
+              }
+              else {
+                MATX_THROW(matxInvalidSize,
+                           "Random direct assignment requires identical input and output shapes and assignable value types");
+              }
             }
             else if constexpr (is_tensor_view_v<typename T::tensor_type> && is_tensor_view_v<typename T::op_type> && is_cuda_executor_v<Ex>) {
               // If we are doing a tensor to tensor assignment we should prefer cudaMemcpyAsync instead of a kernel

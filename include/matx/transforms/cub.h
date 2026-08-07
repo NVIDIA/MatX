@@ -36,6 +36,7 @@
 #include <functional>
 #include <cstdio>
 #include <numeric>
+#include <type_traits>
 
 #ifdef __CUDACC__
 #include <cub/cub.cuh>
@@ -49,6 +50,7 @@
 #include "matx/core/operator_utils.h"
 #include "matx/core/type_utils_both.h"
 #include "matx/transforms/cccl_iterators.h"
+#include "matx/transforms/host_algorithms.h"
 
 
 namespace matx {
@@ -78,6 +80,7 @@ typedef enum {
 struct CubParams_t {
   CUBOperation_t op;
   std::vector<index_t> size{10};
+  std::vector<index_t> out_size{10};
   index_t batches{0};
   MatXDataType_t dtype;
   cudaStream_t stream;
@@ -97,7 +100,7 @@ struct SortParams_t {
 template <typename Op, typename I>
 struct ReduceParams_t {
   Op reduce_op;
-  I init;
+  std::decay_t<I> init;
 };
 
 template <typename SelectOp, typename CountTensor>
@@ -140,7 +143,7 @@ public:
    *
    */
   matxCubPlan_t(OutputTensor &a_out, const InputOperator &a, const CParams &cparams, const cudaStream_t stream = 0) :
-    cparams_(cparams)
+    stream_(stream), cparams_(cparams)
   {
 #ifdef __CUDACC__
     // Input/output tensors much match rank/dims
@@ -155,13 +158,13 @@ public:
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
     if constexpr (op == CUB_OP_RADIX_SORT) {
-      ExecSort(a_out, a, cparams_.dir, stream);
+      ExecSort(a_out, a, Params().dir, stream);
     }
     else if constexpr (op == CUB_OP_INC_SUM) {
       ExecPrefixScanEx(a_out, a, stream);
     }
     else if constexpr (op == CUB_OP_HIST_EVEN) {
-      ExecHistEven(a_out, a, cparams_.lower_level, cparams_.upper_level, cparams_.num_levels, stream);
+      ExecHistEven(a_out, a, Params().lower_level, Params().upper_level, Params().num_levels, stream);
     }
     else if constexpr (op == CUB_OP_REDUCE) { // General reduce
       ExecReduce(a_out, a, stream);
@@ -203,6 +206,9 @@ public:
     for (int r = 0; r < InputOperator::Rank(); r++) {
       params.size.push_back(a.Size(r));
     }
+    for (int r = 0; r < OutputTensor::Rank(); r++) {
+      params.out_size.push_back(a_out.Size(r));
+    }
 
     params.op = op;
     if constexpr (op == CUB_OP_RADIX_SORT) {
@@ -237,7 +243,12 @@ public:
    */
   ~matxCubPlan_t()
   {
-    matxFree(d_temp, cudaStreamDefault);
+    matxFree(d_temp, stream_);
+  }
+
+  void SetParams(const CParams &cparams)
+  {
+    cparams_ = cparams;
   }
 
   template <typename Func>
@@ -662,23 +673,23 @@ inline void ExecSort(OutputTensor &a_out,
       if constexpr(is_tensor_view_v<InputOperator>) {
         if( a.IsContiguous() && a_out.IsContiguous()) {
           const int seg_size = static_cast<int>(TotalSize(a) / TotalSize(out_base));
-          err = cub::DeviceSegmentedReduce::Reduce(d_temp, temp_storage_bytes, in_base.Data(), out_base.Data(), static_cast<cuda::std::int64_t>(TotalSize(out_base)), seg_size, cparams_.reduce_op,
-                                                  cparams_.init, stream);
+          err = cub::DeviceSegmentedReduce::Reduce(d_temp, temp_storage_bytes, in_base.Data(), out_base.Data(), static_cast<cuda::std::int64_t>(TotalSize(out_base)), seg_size, Params().reduce_op,
+                                                  Params().init, stream);
           MATX_ASSERT_STR_EXP(err, cudaSuccess, matxCudaError, "Error in cub::DeviceSegmentedReduce::Reduce");
           return;
         }
       }
 
       auto ft = [&](auto &&in, auto &&out, auto &&begin, auto &&end) {
-        return cub::DeviceSegmentedReduce::Reduce(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(out_base)), begin, end, cparams_.reduce_op,
-                                  cparams_.init, stream);
+        return cub::DeviceSegmentedReduce::Reduce(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(out_base)), begin, end, Params().reduce_op,
+                                  Params().init, stream);
       };
       err = ReduceInput(ft, out_base, in_base);
       MATX_ASSERT_STR_EXP(err, cudaSuccess, matxCudaError, "Error in cub::DeviceSegmentedReduce::Reduce");
 #else
       auto ft = [&](auto &&in, auto &&out, auto &&begin, auto &&end) {
-          return cub::DeviceSegmentedReduce::Reduce(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(out_base)), begin, end, cparams_.reduce_op,
-                                    cparams_.init, stream);
+          return cub::DeviceSegmentedReduce::Reduce(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(out_base)), begin, end, Params().reduce_op,
+                                    Params().init, stream);
       };
       [[maybe_unused]] auto rv = ReduceInput(ft, out_base, in_base);
       MATX_ASSERT_STR_EXP(rv, cudaSuccess, matxCudaError, "Error in cub::DeviceSegmentedReduce::Reduce");
@@ -686,8 +697,8 @@ inline void ExecSort(OutputTensor &a_out,
     }
     else {
       auto ft = [&](auto &&in, auto &&out, [[maybe_unused]] auto &&unused1, [[maybe_unused]] auto &&unused2) {
-        return cub::DeviceReduce::Reduce(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(in_base)), cparams_.reduce_op,
-                                    cparams_.init, stream);
+        return cub::DeviceReduce::Reduce(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(in_base)), Params().reduce_op,
+                                    Params().init, stream);
       };
       [[maybe_unused]] auto rv = ReduceInput(ft, out_base, in_base);
       MATX_ASSERT_STR_EXP(rv, cudaSuccess, matxCudaError, "Error in cub::DeviceReduce::Reduce");
@@ -922,9 +933,9 @@ inline void ExecSort(OutputTensor &a_out,
                               temp_storage_bytes,
                               a.Data(),
                               a_out.Data(),
-                              cparams_.num_found.Data(),
+                              Params().num_found.Data(),
                               static_cast<int>(TotalSize(a)),
-                              cparams_.op,
+                              Params().op,
                               stream);
       }
       else {
@@ -932,9 +943,9 @@ inline void ExecSort(OutputTensor &a_out,
                               temp_storage_bytes,
                               RandomOperatorIterator{base},
                               a_out.Data(),
-                              cparams_.num_found.Data(),
+                              Params().num_found.Data(),
                               static_cast<int>(TotalSize(a)),
-                              cparams_.op,
+                              Params().op,
                               stream);
       }
     }
@@ -943,9 +954,9 @@ inline void ExecSort(OutputTensor &a_out,
                             temp_storage_bytes,
                             RandomOperatorIterator{a},
                             a_out.Data(),
-                            cparams_.num_found.Data(),
+                            Params().num_found.Data(),
                             static_cast<int>(TotalSize(a)),
-                            cparams_.op,
+                            Params().op,
                             stream);
     }
 #endif
@@ -993,16 +1004,16 @@ inline void ExecSort(OutputTensor &a_out,
 #ifdef __CUDACC__
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
-    if constexpr (!has_index_cmp_op_v<decltype(cparams_.op)>) {
+    if constexpr (!has_index_cmp_op_v<decltype(Params().op)>) {
       if constexpr (is_tensor_view_v<InputOperator>) {
         if (a.IsContiguous()) {
           cub::DeviceSelect::If(d_temp,
                                 temp_storage_bytes,
                                 detail::counting_iterator<index_t>(0),
                                 a_out.Data(),
-                                cparams_.num_found.Data(),
+                                Params().num_found.Data(),
                                 static_cast<int>(TotalSize(a)),
-                                IndexToSelectOp<decltype(a.Data()), decltype(cparams_.op)>{a.Data(), cparams_.op},
+                                IndexToSelectOp<decltype(a.Data()), decltype(Params().op)>{a.Data(), Params().op},
                                 stream);
         }
         else {
@@ -1011,10 +1022,10 @@ inline void ExecSort(OutputTensor &a_out,
                                 temp_storage_bytes,
                                 detail::counting_iterator<index_t>(0),
                                 a_out.Data(),
-                                cparams_.num_found.Data(),
+                                Params().num_found.Data(),
                                 static_cast<int>(TotalSize(a)),
-                                IndexToSelectOp<decltype(RandomOperatorIterator{base}), decltype(cparams_.op)>
-                                  {RandomOperatorIterator{base}, cparams_.op},
+                                IndexToSelectOp<decltype(RandomOperatorIterator{base}), decltype(Params().op)>
+                                  {RandomOperatorIterator{base}, Params().op},
                                 stream);
         }
       }
@@ -1024,10 +1035,10 @@ inline void ExecSort(OutputTensor &a_out,
                               temp_storage_bytes,
                               detail::counting_iterator<index_t>(0),
                               a_out.Data(),
-                              cparams_.num_found.Data(),
+                              Params().num_found.Data(),
                               static_cast<int>(TotalSize(a)),
-                              IndexToSelectOp<decltype(RandomOperatorIterator{base}), decltype(cparams_.op)>
-                                {RandomOperatorIterator{base}, cparams_.op},
+                              IndexToSelectOp<decltype(RandomOperatorIterator{base}), decltype(Params().op)>
+                                {RandomOperatorIterator{base}, Params().op},
                               stream);
       }
     }
@@ -1038,9 +1049,9 @@ inline void ExecSort(OutputTensor &a_out,
         temp_storage_bytes,
         detail::counting_iterator<index_t>(0),
         a_out.Data(),
-        cparams_.num_found.Data(),
+        Params().num_found.Data(),
         static_cast<int>(TotalSize(a)),
-        cparams_.op,
+        Params().op,
         stream);
     }
 
@@ -1077,7 +1088,7 @@ inline void ExecSort(OutputTensor &a_out,
                                 temp_storage_bytes,
                                 a.Data(),
                                 a_out.Data(),
-                                cparams_.num_found.Data(),
+                                Params().num_found.Data(),
                                 static_cast<int>(TotalSize(a)),
                                 stream);
         }
@@ -1086,7 +1097,7 @@ inline void ExecSort(OutputTensor &a_out,
                                 temp_storage_bytes,
                                 RandomOperatorIterator{base},
                                 a_out.Data(),
-                                cparams_.num_found.Data(),
+                                Params().num_found.Data(),
                                 static_cast<int>(TotalSize(a)),
                                 stream);
         }
@@ -1096,7 +1107,7 @@ inline void ExecSort(OutputTensor &a_out,
                             temp_storage_bytes,
                             RandomOperatorIterator{a},
                             a_out.Data(),
-                            cparams_.num_found.Data(),
+                            Params().num_found.Data(),
                             static_cast<int>(TotalSize(a)),
                             stream);
     }
@@ -1104,6 +1115,16 @@ inline void ExecSort(OutputTensor &a_out,
   }
 
 private:
+  const CParams &Params() const
+  {
+    return cparams_;
+  }
+
+  CParams &Params()
+  {
+    return cparams_;
+  }
+
   // Member variables
   cublasStatus_t ret = CUBLAS_STATUS_SUCCESS;
 
@@ -1209,7 +1230,7 @@ class matxCubSingleArgPlan_t {
 
 public:
   matxCubSingleArgPlan_t(OutputTensor &a_out, TensorIndexType &aidx_out, const InputOperator &a, CUBOperation_t op, const CParams &cparams, const cudaStream_t stream = 0) :
-    cparams_(cparams)
+    stream_(stream), cparams_(cparams)
   {
 #ifdef __CUDACC__
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
@@ -1237,6 +1258,12 @@ public:
 
     for (int r = 0; r < InputOperator::Rank(); r++) {
       params.size.push_back(a.Size(r));
+    }
+    for (int r = 0; r < OutputTensor::Rank(); r++) {
+      params.out_size.push_back(a_out.Size(r));
+    }
+    for (int r = 0; r < TensorIndexType::Rank(); r++) {
+      params.out_size.push_back(aidx_out.Size(r));
     }
 
     params.op = op;
@@ -1306,8 +1333,8 @@ public:
         BATCHES,
         r0_iter,
         r1_iter,
-        cparams_.reduce_op,
-        cparams_.init,
+        Params().reduce_op,
+        Params().init,
         stream);
     }
     else {
@@ -1319,8 +1346,8 @@ public:
         zipped_input,
         zipped_output,
         N,
-        cparams_.reduce_op,
-        cparams_.init,
+        Params().reduce_op,
+        Params().init,
         stream);
     }
 #endif
@@ -1335,10 +1362,25 @@ public:
    */
   ~matxCubSingleArgPlan_t()
   {
-    matxFree(d_temp, cudaStreamDefault);
+    matxFree(d_temp, stream_);
+  }
+
+  void SetParams(const CParams &cparams)
+  {
+    cparams_ = cparams;
   }
 
 private:
+  const CParams &Params() const
+  {
+    return cparams_;
+  }
+
+  CParams &Params()
+  {
+    return cparams_;
+  }
+
   // Member variables
   cublasStatus_t ret = CUBLAS_STATUS_SUCCESS;
 
@@ -1361,7 +1403,7 @@ public:
                        CUBOperation_t op,
                        const CParams &cparams,
                        const cudaStream_t stream = 0) :
-    cparams_(cparams)
+    stream_(stream), cparams_(cparams)
   {
 #ifdef __CUDACC__
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
@@ -1391,6 +1433,18 @@ public:
 
     for (int r = 0; r < InputOperator::Rank(); r++) {
       params.size.push_back(a.Size(r));
+    }
+    for (int r = 0; r < OutputTensor::Rank(); r++) {
+      params.out_size.push_back(a1_out.Size(r));
+    }
+    for (int r = 0; r < TensorIndexType::Rank(); r++) {
+      params.out_size.push_back(aidx1_out.Size(r));
+    }
+    for (int r = 0; r < OutputTensor::Rank(); r++) {
+      params.out_size.push_back(a2_out.Size(r));
+    }
+    for (int r = 0; r < TensorIndexType::Rank(); r++) {
+      params.out_size.push_back(aidx2_out.Size(r));
     }
 
     params.op = op;
@@ -1469,8 +1523,8 @@ public:
         BATCHES,
         r0_iter,
         r1_iter,
-        cparams_.reduce_op,
-        cparams_.init,
+        Params().reduce_op,
+        Params().init,
         stream);
     }
     else {
@@ -1482,8 +1536,8 @@ public:
         zipped_input,
         zipped_output,
         N,
-        cparams_.reduce_op,
-        cparams_.init,
+        Params().reduce_op,
+        Params().init,
         stream);
     }
 #endif
@@ -1499,10 +1553,25 @@ public:
    */
   ~matxCubDualArgPlan_t()
   {
-    matxFree(d_temp, cudaStreamDefault);
+    matxFree(d_temp, stream_);
+  }
+
+  void SetParams(const CParams &cparams)
+  {
+    cparams_ = cparams;
   }
 
 private:
+  const CParams &Params() const
+  {
+    return cparams_;
+  }
+
+  CParams &Params()
+  {
+    return cparams_;
+  }
+
   // Member variables
   cublasStatus_t ret = CUBLAS_STATUS_SUCCESS;
 
@@ -1522,13 +1591,21 @@ struct CubParamsKeyHash {
   std::size_t operator()(const CubParams_t &k) const noexcept
   {
     uint64_t shash = 0;
+    auto hash_dim = [](uint64_t &seed, index_t dim) {
+      const uint64_t value = static_cast<uint64_t>(dim);
+      seed ^= std::hash<uint64_t>()(value + 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2));
+    };
     for (size_t r = 0; r < k.size.size(); r++) {
-      shash += std::hash<uint64_t>()(k.size[r]);
+      hash_dim(shash, k.size[r]);
+    }
+    for (size_t r = 0; r < k.out_size.size(); r++) {
+      hash_dim(shash, k.out_size[r]);
     }
 
     return (std::hash<uint64_t>()(k.batches)) +
            (std::hash<uint64_t>()((uint64_t)k.stream)) +
            (std::hash<uint64_t>()((uint64_t)k.op)) +
+           (std::hash<uint64_t>()((uint64_t)k.dtype)) +
            (std::hash<size_t>()(k.plan_type_hash)) +
            shash;
   }
@@ -1544,9 +1621,17 @@ struct CubParamsKeyEq {
     if (l.size.size() != t.size.size()) {
       return false;
     }
+    if (l.out_size.size() != t.out_size.size()) {
+      return false;
+    }
 
     for (size_t r = 0; r < l.size.size(); r++) {
       if (l.size[r] != t.size[r]) {
+        return false;
+      }
+    }
+    for (size_t r = 0; r < l.out_size.size(); r++) {
+      if (l.out_size[r] != t.out_size[r]) {
         return false;
       }
     }
@@ -1593,6 +1678,7 @@ void sort_impl_inner(OutputTensor &a_out, const InputOperator &a,
         return std::make_shared<cache_val_type>(a_out, a, p, stream);
       },
       [&](std::shared_ptr<cache_val_type> ctype) {
+        ctype->SetParams(p);
         ctype->ExecSort(a_out, a, dir, stream);
       },
       exec
@@ -1795,6 +1881,7 @@ void cub_reduce(OutputTensor &a_out, const InputOperator &a, typename InputOpera
       return std::make_shared<cache_val_type>(a_out, a, reduce_params, stream);
     },
     [&](std::shared_ptr<cache_val_type> ctype) {
+      ctype->SetParams(reduce_params);
       ctype->ExecReduce(a_out, a, stream);
     },
     exec
@@ -1849,6 +1936,7 @@ void cub_sum(OutputTensor &a_out, const InputOperator &a,
         return std::make_shared<cache_val_type>(a_out, a, detail::EmptyParams_t{}, stream);
       },
       [&](std::shared_ptr<cache_val_type> ctype) {
+        ctype->SetParams(detail::EmptyParams_t{});
         ctype->ExecSum(a_out, a, stream);
       },
       exec
@@ -1898,6 +1986,7 @@ void cub_min(OutputTensor &a_out, const InputOperator &a,
         return std::make_shared<cache_val_type>(a_out, a, detail::EmptyParams_t{}, stream);
       },
       [&](std::shared_ptr<cache_val_type> ctype) {
+        ctype->SetParams(detail::EmptyParams_t{});
         ctype->ExecMin(a_out, a, stream);
       },
       exec
@@ -1948,6 +2037,7 @@ void cub_max(OutputTensor &a_out, const InputOperator &a,
         return std::make_shared<cache_val_type>(a_out, a, detail::EmptyParams_t{}, stream);
       },
       [&](std::shared_ptr<cache_val_type> ctype) {
+        ctype->SetParams(detail::EmptyParams_t{});
         ctype->ExecMax(a_out, a, stream);
       },
       exec
@@ -2022,6 +2112,7 @@ void cub_argreduce(OutputTensor &a_out, TensorIndexType &aidx_out, const InputOp
                                                   stream);
         },
         [&](std::shared_ptr<cache_val_type> ctype) {
+          ctype->SetParams(reduce_params);
           ctype->ExecArgReduce(a_out_supported, aidx_out_supported, a_supported, stream);
         },
         exec
@@ -2102,6 +2193,7 @@ void cub_dualargreduce(OutputTensor &a1_out,
                                                   stream);
         },
         [&](std::shared_ptr<cache_val_type> ctype) {
+          ctype->SetParams(reduce_params);
           ctype->ExecDualArgReduce(a1_out, aidx1_out, a2_out, aidx2_out, a, stream);
         },
         exec
@@ -2260,7 +2352,7 @@ void argsort_impl(OutputTensor &idx_out, const InputOperator &a,
 template <typename OutputTensor, typename InputOperator, ThreadsMode MODE>
 void argsort_impl(OutputTensor &idx_out, const InputOperator &a,
           const SortDirection_t dir,
-          [[maybe_unused]] const HostExecutor<MODE> &exec)
+          const HostExecutor<MODE> &exec)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
@@ -2271,25 +2363,23 @@ void argsort_impl(OutputTensor &idx_out, const InputOperator &a,
 
   if constexpr (RANK == 1) {
     if (dir == SORT_DIR_ASC) {
-      std::sort(
-          lout, lout + idx_out.Size(0),
-          [&a](index_t i, index_t j) { return a(i) < a(j); });
+      detail::host_sort(exec, lout, lout + idx_out.Size(0),
+                        [&a](index_t i, index_t j) { return a(i) < a(j); });
     }
     else {
-      std::sort(
-          lout, lout + idx_out.Size(0),
-          [&a](index_t i, index_t j) { return a(i) > a(j); });
+      detail::host_sort(exec, lout, lout + idx_out.Size(0),
+                        [&a](index_t i, index_t j) { return a(i) > a(j); });
     }
   }
   else if constexpr (RANK == 2) {
     for (index_t b = 0; b < lout.Size(0); b++) {
       if (dir == SORT_DIR_ASC) {
-        std::sort( lout + b*a.Size(1), lout + (b+1)*a.Size(1),
-                  [&a, b](index_t i, index_t j) { return a(b,i) < a(b,j); });
+        detail::host_sort(exec, lout + b*a.Size(1), lout + (b+1)*a.Size(1),
+                          [&a, b](index_t i, index_t j) { return a(b,i) < a(b,j); });
       }
       else {
-        std::sort( lout + b*a.Size(1), lout + (b+1)*a.Size(1),
-                  [&a, b](index_t i, index_t j) { return a(b,i) > a(b,j); });
+        detail::host_sort(exec, lout + b*a.Size(1), lout + (b+1)*a.Size(1),
+                          [&a, b](index_t i, index_t j) { return a(b,i) > a(b,j); });
       }
     }
   }
@@ -2301,7 +2391,7 @@ void argsort_impl(OutputTensor &idx_out, const InputOperator &a,
 template <typename OutputTensor, typename InputOperator, ThreadsMode MODE>
 void sort_impl(OutputTensor &a_out, const InputOperator &a,
           const SortDirection_t dir,
-          [[maybe_unused]] const HostExecutor<MODE> &exec)
+          const HostExecutor<MODE> &exec)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
@@ -2312,33 +2402,37 @@ void sort_impl(OutputTensor &a_out, const InputOperator &a,
 
   if constexpr (InputOperator::Rank() == 1) {
     if (dir == SORT_DIR_ASC) {
-      std::partial_sort_copy( lin,
-                              lin  + a.Size(0),
-                              lout,
-                              lout + a_out.Size(0));
+      detail::host_sort_copy(exec,
+                             lin,
+                             lin  + a.Size(0),
+                             lout,
+                             lout + a_out.Size(0));
     }
     else {
-      std::partial_sort_copy( lin,
-                              lin  + a.Size(0),
-                              lout,
-                              lout + a_out.Size(0),
-                              std::greater<typename InputOperator::value_type>());
+      detail::host_sort_copy(exec,
+                             lin,
+                             lin  + a.Size(0),
+                             lout,
+                             lout + a_out.Size(0),
+                             std::greater<typename InputOperator::value_type>());
     }
   }
   else {
     for (index_t b = 0; b < lout.Size(0); b++) {
       if (dir == SORT_DIR_ASC) {
-        std::partial_sort_copy( lin  + b*a.Size(1),
-                                lin  + (b+1)*a.Size(1),
-                                lout + b*a.Size(1),
-                                lout + (b+1)*a.Size(1));
+        detail::host_sort_copy(exec,
+                               lin  + b*a.Size(1),
+                               lin  + (b+1)*a.Size(1),
+                               lout + b*a.Size(1),
+                               lout + (b+1)*a.Size(1));
       }
       else {
-        std::partial_sort_copy( lin  + b*a.Size(1),
-                                lin  + (b+1)*a.Size(1),
-                                lout + b*a.Size(1),
-                                lout + (b+1)*a.Size(1),
-                                std::greater<typename InputOperator::value_type>());
+        detail::host_sort_copy(exec,
+                               lin  + b*a.Size(1),
+                               lin  + (b+1)*a.Size(1),
+                               lout + b*a.Size(1),
+                               lout + (b+1)*a.Size(1),
+                               std::greater<typename InputOperator::value_type>());
       }
     }
   }
@@ -2385,6 +2479,7 @@ void cumsum_impl(OutputTensor &a_out, const InputOperator &a,
         return std::make_shared<cache_val_type>(a_out, a, detail::EmptyParams_t{}, stream);
       },
       [&](std::shared_ptr<cache_val_type> ctype) {
+        ctype->SetParams(detail::EmptyParams_t{});
         ctype->ExecPrefixScanEx(a_out, a, stream);
       },
       exec
@@ -2399,7 +2494,7 @@ void cumsum_impl(OutputTensor &a_out, const InputOperator &a,
 
 template <typename OutputTensor, typename InputOperator, ThreadsMode MODE>
 void cumsum_impl(OutputTensor &a_out, const InputOperator &a,
-            [[maybe_unused]] const HostExecutor<MODE> &exec)
+            const HostExecutor<MODE> &exec)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
@@ -2409,15 +2504,17 @@ void cumsum_impl(OutputTensor &a_out, const InputOperator &a,
   auto lout = matx::RandomOperatorOutputIterator{out_base};
 
   if constexpr (OutputTensor::Rank() == 1) {
-    std::partial_sum( lin,
-                      lin  + a.Size(0),
-                      lout);
+    detail::host_inclusive_scan(exec,
+                                lin,
+                                lin  + a.Size(0),
+                                lout);
   }
   else if constexpr (InputOperator::Rank() == 2) {
     for (index_t b = 0; b < a.Size(0); b++) {
-      std::partial_sum( lin  + b     * a.Size(1),
-                        lin  + (b+1) * a.Size(1),
-                        lout + b     * a.Size(1));
+      detail::host_inclusive_scan(exec,
+                                  lin  + b     * a.Size(1),
+                                  lin  + (b+1) * a.Size(1),
+                                  lout + b     * a.Size(1));
     }
   }
   else {
@@ -2485,6 +2582,7 @@ void hist_impl(OutputTensor &a_out, const InputOperator &a,
         return std::make_shared<cache_val_type>(a_out, a, hp, stream);
       },
       [&](std::shared_ptr<cache_val_type> ctype) {
+        ctype->SetParams(hp);
         ctype->ExecHistEven(a_out, a, lower, upper, num_levels, stream);
       },
       exec
@@ -2834,7 +2932,7 @@ void unique_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperato
  *   Single thread executor
  */
 template <typename CountTensor, typename OutputTensor, typename InputOperator, ThreadsMode MODE>
-void unique_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperator &a, [[maybe_unused]] const HostExecutor<MODE> &exec)
+void unique_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperator &a, const HostExecutor<MODE> &exec)
 {
 #ifdef __CUDACC__
   static_assert(CountTensor::Rank() == 0, "Num found output tensor rank must be 0");
@@ -2845,8 +2943,8 @@ void unique_impl(OutputTensor &a_out, CountTensor &num_found, const InputOperato
     return;
   }
 
-  std::partial_sort_copy(cbegin(a), cend(a), begin(a_out), end(a_out));
-  auto last = std::unique(begin(a_out), end(a_out));
+  detail::host_sort_copy(exec, cbegin(a), cend(a), begin(a_out), end(a_out));
+  auto last = detail::host_unique(exec, begin(a_out), end(a_out));
   num_found() = static_cast<int>(last - begin(a_out));
 #endif
 }

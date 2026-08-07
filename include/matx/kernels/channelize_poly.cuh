@@ -131,9 +131,15 @@ __MATX_DEVICE__ __MATX_INLINE__ void channelize_cmac(
 
 } // namespace detail
 
+// out_elem_offset shifts the global per-channel output element (time) index
+// used for the input footprint and polyphase phase, while the write row stays
+// local, so this kernel can emit an arbitrary window
+// [out_elem_offset, out_elem_offset + output.Size(OutElemRank)] of the full
+// output-element grid. out_elem_offset is 0 for a normal full-grid call, but
+// can be non-zero for a streaming channelizer call.
 template <int THREADS, bool MaximallyDecimated, bool IsUnitStride, typename OutType, typename InType, typename FilterType, typename AccumType>
 __launch_bounds__(THREADS)
-__global__ void ChannelizePoly1D(OutType output, InType input, FilterType filter, index_t decimation_factor, uint32_t smem_filter_bytes)
+__global__ void ChannelizePoly1D(OutType output, InType input, FilterType filter, index_t decimation_factor, uint32_t smem_filter_bytes, index_t out_elem_offset)
 {
     using output_t = typename OutType::value_type;
     using input_t = typename InType::value_type;
@@ -211,15 +217,16 @@ __global__ void ChannelizePoly1D(OutType output, InType input, FilterType filter
 
         if (use_smem_filter) {
             for (index_t t = first_out_elem+tid; t <= last_out_elem; t += THREADS) {
+                const index_t g = t + out_elem_offset; // global output element (time) index
                 accum_t accum {};
-                index_t sample_idx = s + t * num_channels;
+                index_t sample_idx = s + g * num_channels;
                 index_t h_skip = 0;
                 if (sample_idx >= input_len) {
                     h_skip = 1;
                     sample_idx -= num_channels;
                 }
                 const filter_t *h = smem_filter + h_skip;
-                int niter = static_cast<int>(cuda::std::min(filter_phase_len - h_skip, t + 1 - h_skip));
+                int niter = static_cast<int>(cuda::std::min(filter_phase_len - h_skip, g + 1 - h_skip));
                 for (int i = 0; i < niter; i++) {
                     const input_t in_val = input_b(sample_idx);
                     detail::channelize_cmac(accum,
@@ -240,15 +247,16 @@ __global__ void ChannelizePoly1D(OutType output, InType input, FilterType filter
             }
 
             for (index_t t = first_out_elem+tid; t <= last_out_elem; t += THREADS) {
+                const index_t g = t + out_elem_offset; // global output element (time) index
                 accum_t accum {};
-                index_t sample_idx = s + t * num_channels;
+                index_t sample_idx = s + g * num_channels;
                 index_t h_skip = 0;
                 if (sample_idx >= input_len) {
                     h_skip = 1;
                     sample_idx -= num_channels;
                 }
                 index_t h_ind = channel + h_skip * num_channels;
-                index_t niter = cuda::std::min(available_taps - h_skip, t + 1 - h_skip);
+                index_t niter = cuda::std::min(available_taps - h_skip, g + 1 - h_skip);
                 for (index_t i = 0; i < niter; i++) {
                     const input_t in_val = input_b(sample_idx);
                     const filter_t h_val = filter_acc(h_ind);
@@ -270,9 +278,10 @@ __global__ void ChannelizePoly1D(OutType output, InType input, FilterType filter
         const index_t r_remapped = (channel + num_channels - decimation_factor) % num_channels;
         const index_t s = num_channels - 1 - r_remapped;
         for (index_t t = first_out_elem+tid; t <= last_out_elem; t += THREADS) {
-            const index_t last_arrived = t * decimation_factor + decimation_factor - 1;
+            const index_t g = t + out_elem_offset; // global output element (time) index
+            const index_t last_arrived = g * decimation_factor + decimation_factor - 1;
             index_t niter = 0;
-            const index_t phase = (channel + t * decimation_factor) % num_channels;
+            const index_t phase = (channel + g * decimation_factor) % num_channels;
             index_t h_ind { phase };
             index_t sample_idx = 0;
             accum_t accum {};
@@ -337,9 +346,14 @@ template <int CTILE, int NOUT, bool MaximallyDecimated, bool FilterInSmem, bool 
           bool IsUnitStride, typename IdxT,
           typename OutType, typename InType, typename FilterType, typename AccumType>
 __launch_bounds__(CTILE * NOUT)
+// See ChannelizePoly1D for the out_elem_offset output-element window semantics.
+// Every local output element is shifted to its global index before it drives the
+// input footprint / phase / circular-buffer block index (via max_bidx and the
+// newest_raw/last_arrived/phase computations); the write row stays local.
 __global__ void ChannelizePoly1D_SmemTiled(
     OutType output, InType input, FilterType filter,
-    IdxT elems_per_channel_per_cta, IdxT decimation_factor, int32_t num_phases_per_channel)
+    IdxT elems_per_channel_per_cta, IdxT decimation_factor, int32_t num_phases_per_channel,
+    IdxT out_elem_offset)
 {
     using output_t = typename OutType::value_type;
     using input_t  = typename InType::value_type;
@@ -493,7 +507,11 @@ __global__ void ChannelizePoly1D_SmemTiled(
         }
     };
 
-    auto max_bidx = [&](IdxT t) -> IdxT {
+    // Converts a local output element to the newest global input-block index it
+    // needs, folding in out_elem_offset so buffer bookkeeping and loads all key
+    // off the global block index. All callers pass local output elements.
+    auto max_bidx = [&](IdxT t_local) -> IdxT {
+        const IdxT t = t_local + out_elem_offset;
         if constexpr (MaximallyDecimated) {
             return t;
         } else {
@@ -526,8 +544,8 @@ __global__ void ChannelizePoly1D_SmemTiled(
         // bidx = t, causal_count = t+1, last_arrived >= s always true.
         // Track buf_row incrementally across iterations to avoid modulo.
 
-        // Seed buf_row for ty=0 at start_elem
-        int32_t buf_row_base = static_cast<int32_t>(start_elem % height);
+        // Seed buf_row for ty=0 at the global block index of start_elem
+        int32_t buf_row_base = static_cast<int32_t>((start_elem + out_elem_offset) % height);
         // Per-iteration advance: NOUT output steps = NOUT buf_row advance. This is a defensive modulo
         // so that we can keep buf_row_base in [0, height) with only a conditional subtraction.
         const int32_t nout_wrap = NOUT % height;
@@ -538,18 +556,20 @@ __global__ void ChannelizePoly1D_SmemTiled(
             if (t <= last_elem && active) {
                 accum_t accum{};
 
+                const IdxT tg = t + out_elem_offset; // global output element index
+
                 // buf_row for this thread's output step
                 int32_t my_buf_row = buf_row_base + ty;
                 if (my_buf_row >= height) my_buf_row -= height;
 
-                const IdxT newest_raw = static_cast<IdxT>(s) + t * M;
+                const IdxT newest_raw = static_cast<IdxT>(s) + tg * M;
                 int32_t h_skip = 0;
                 int32_t niter = static_cast<int32_t>(
-                    cuda::std::min(static_cast<IdxT>(P), t + 1));
+                    cuda::std::min(static_cast<IdxT>(P), tg + 1));
                 if (newest_raw >= input_len) {
                     h_skip = 1;
                     niter = static_cast<int32_t>(
-                        cuda::std::min(static_cast<IdxT>(P - 1), t));
+                        cuda::std::min(static_cast<IdxT>(P - 1), tg));
                     if (--my_buf_row < 0) my_buf_row += height;
                 }
 
@@ -641,16 +661,17 @@ __global__ void ChannelizePoly1D_SmemTiled(
             if (t <= last_elem && active) {
                 accum_t accum{};
 
-                const IdxT last_arrived = t * decimation_factor + decimation_factor - 1;
+                const IdxT tg = t + out_elem_offset; // global output element index
+                const IdxT last_arrived = tg * decimation_factor + decimation_factor - 1;
                 if (last_arrived >= s) {
                     const IdxT A = last_arrived - s;
                     const IdxT bidx = A / M;
                     const IdxT causal_count = bidx + 1;
 
-                    const int32_t k = static_cast<int32_t>(t % K);
+                    const int32_t k = static_cast<int32_t>(tg % K);
                     // Phase uses the original logical channel (not remapped)
                     const int32_t phase = static_cast<int32_t>(
-                        (c + t * decimation_factor) % M);
+                        (c + tg * decimation_factor) % M);
 
                     int32_t available_taps = P;
                     if (((P - 1) * M + phase) >= filter_full_len) {
@@ -754,8 +775,11 @@ __global__ void ChannelizePoly1D_SmemTiled(
 
 // This kernel works in cases where the full filter (with potentially some zero padding) and
 // the inputs required to compute elems_per_channel_per_cta outputs all fit into shared memory.
+// See ChannelizePoly1D for the out_elem_offset output-element window semantics.
+// Here only the two input-staging loads consult the global output-element index
+// (out_sample_ind / input_ind); the write row (out_elem_idx) stays local.
 template <bool IsUnitStride, typename OutType, typename InType, typename FilterType, typename AccumType>
-__global__ void ChannelizePoly1D_Smem(OutType output, InType input, FilterType filter, index_t elems_per_channel_per_cta)
+__global__ void ChannelizePoly1D_Smem(OutType output, InType input, FilterType filter, index_t elems_per_channel_per_cta, index_t out_elem_offset)
 {
     using output_t = typename OutType::value_type;
     using input_t = typename InType::value_type;
@@ -822,7 +846,7 @@ __global__ void ChannelizePoly1D_Smem(OutType output, InType input, FilterType f
     const index_t last_elem = cuda::std::min(output_len_per_channel-1, last_elem_this_block);
 
     for (int32_t t = ty; t < filter_phase_len-1; t += by) {
-        const index_t out_sample_ind = start_elem - (filter_phase_len-1) + t;
+        const index_t out_sample_ind = start_elem + out_elem_offset - (filter_phase_len-1) + t;
         const int32_t smem_ind = t * num_channels + chan;
         const index_t input_ind = out_sample_ind * num_channels + chan;
         if (input_ind >= 0 && input_ind < input_len) {
@@ -845,7 +869,7 @@ __global__ void ChannelizePoly1D_Smem(OutType output, InType input, FilterType f
         const index_t next_last_elem = cuda::std::min(next_start_elem + static_cast<index_t>(by) - 1, last_elem);
         const int32_t out_samples_this_iter = static_cast<int32_t>(next_last_elem - next_start_elem + 1);
         if (ty < out_samples_this_iter) {
-            const index_t input_ind = (next_start_elem + ty) * num_channels + chan;
+            const index_t input_ind = (next_start_elem + out_elem_offset + ty) * num_channels + chan;
             const int32_t smem_ind = cached_input_ind_tail * num_channels + chan;
             if (input_ind < input_len) {
                 smem_input[smem_ind] = input_b(input_ind);
@@ -902,9 +926,10 @@ __global__ void ChannelizePoly1D_Smem(OutType output, InType input, FilterType f
     }
 }
 
+// See ChannelizePoly1D for the out_elem_offset output-element window semantics.
 template <int THREADS, int NUM_CHAN, bool IsUnitStride, typename OutType, typename InType, typename FilterType, typename AccumType>
 __launch_bounds__(THREADS)
-__global__ void ChannelizePoly1D_FusedChan(OutType output, InType input, FilterType filter)
+__global__ void ChannelizePoly1D_FusedChan(OutType output, InType input, FilterType filter, index_t out_elem_offset)
 {
     using output_t = typename OutType::value_type;
     using input_t = typename InType::value_type;
@@ -973,9 +998,10 @@ __global__ void ChannelizePoly1D_FusedChan(OutType output, InType input, FilterT
         for (int i = 0; i < NUM_CHAN; i++) {
             accum[i] = static_cast<filtering_accum_t>(0);
         }
-        index_t first_ind = cuda::std::max(static_cast<index_t>(0), t - filter_phase_len + 1);
-        index_t sample_idx = t * NUM_CHAN + NUM_CHAN - 1;
-        index_t j_start = t;
+        const index_t g = t + out_elem_offset; // global output element (time) index
+        index_t first_ind = cuda::std::max(static_cast<index_t>(0), g - filter_phase_len + 1);
+        index_t sample_idx = g * NUM_CHAN + NUM_CHAN - 1;
+        index_t j_start = g;
         index_t h_ind { 0 };
         index_t niter = j_start - first_ind + 1;
         // For the last signal element, we need bounds-checking because we may need to zero-pad the signal.

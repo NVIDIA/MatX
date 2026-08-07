@@ -35,7 +35,6 @@ class inv:
             'A_inv': A_inv
         }
 
-
 class solve:
     def __init__(self, dtype: str, size: List[int]):
         self.size = size
@@ -108,6 +107,28 @@ class solve:
             'A': A,
             'B': B,
             'X': X,
+        }
+
+
+class inv_gram:
+    def __init__(self, dtype: str, size: List[int]):
+        self.size = size
+        self.dtype = dtype
+
+    def run(self):
+        m, n = self.size[-2:]
+        H = np.zeros((m, n), dtype=self.dtype)
+
+        for i in range(m):
+            for j in range(n):
+                diag = 1.0 if i == j else 0.1 * (i + 1) * (j + 2)
+                H[i, j] = diag + 0.05 * (i + j + 1)
+
+        gram_inv = np.linalg.inv(np.matmul(np.swapaxes(H, -2, -1), H))
+
+        return {
+            'H': H,
+            'gram_inv': gram_inv
         }
 
 

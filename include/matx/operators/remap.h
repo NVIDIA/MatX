@@ -231,6 +231,10 @@ namespace matx
           if constexpr (is_matx_op<T>()) {
             op_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           }
+
+          if constexpr (is_matx_op<IdxType>()) {
+            idx_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
         }
 
         template <typename ShapeType, typename Executor>
@@ -238,6 +242,10 @@ namespace matx
         {
           if constexpr (is_matx_op<T>()) {
             op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+
+          if constexpr (is_matx_op<IdxType>()) {
+            idx_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           }
         }
 
@@ -254,7 +262,8 @@ namespace matx
           }
           else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
 #ifdef MATX_EN_JIT
-            return combine_capabilities<Cap>(true, detail::get_operator_capability<Cap>(op_, in));
+            return combine_capabilities<Cap>(true, detail::get_operator_capability<Cap>(op_, in),
+                                                    detail::get_operator_capability<Cap>(idx_, in));
 #else
             return false;
 #endif

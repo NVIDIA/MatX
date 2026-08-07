@@ -44,6 +44,38 @@ namespace matx
 {
 namespace detail
 {
+  __MATX_INLINE__ void ValidateJITBlockDimRange(const cuda::std::array<int, 2> &block_dim_range)
+  {
+    constexpr int invalid = capability_attributes<OperatorCapability::BLOCK_DIM>::invalid;
+    if (block_dim_range[0] == invalid || block_dim_range[1] == invalid ||
+        block_dim_range[0] <= 0 || block_dim_range[1] <= 0 ||
+        block_dim_range[1] < block_dim_range[0]) {
+      MATX_LOG_WARN("JIT block dimension query returned invalid range [{}, {}]. "
+                    "The fused expression requires block-level operators with incompatible block sizes.",
+                    block_dim_range[0], block_dim_range[1]);
+      MATX_THROW(matxInvalidParameter,
+                 "Operator does not support JIT compilation because block size requirements have no valid intersection");
+    }
+  }
+
+  __MATX_INLINE__ int SelectJITPassThroughBlockDim(const cuda::std::array<int, 2> &block_dim_range)
+  {
+    ValidateJITBlockDimRange(block_dim_range);
+
+    if (block_dim_range[0] == block_dim_range[1]) {
+      return block_dim_range[0];
+    }
+
+    constexpr int preferred_block_dim = 256;
+    if (preferred_block_dim < block_dim_range[0]) {
+      return block_dim_range[0];
+    }
+    if (preferred_block_dim > block_dim_range[1]) {
+      return block_dim_range[1];
+    }
+    return preferred_block_dim;
+  }
+
   /**
    * @brief Base class for CUDA executors with common functionality
    *
@@ -371,10 +403,8 @@ namespace detail
           const auto set_groups_per_block_query = detail::SetGroupsPerBlockQueryInput{groups_per_block};
           const auto set_groups_per_block = detail::get_operator_capability<detail::OperatorCapability::SET_GROUPS_PER_BLOCK>(op, set_groups_per_block_query);
           const auto block_dim_range = detail::get_operator_capability<detail::OperatorCapability::BLOCK_DIM>(op);
-          if (block_dim_range[0] == detail::capability_attributes<detail::OperatorCapability::BLOCK_DIM>::invalid) {
-            MATX_THROW(matxInvalidParameter, "No valid JIT block dimension satisfies the fused operator requirements");
-          }
-          block_size = global_kernel ? 256 : block_dim_range[0];
+          detail::ValidateJITBlockDimRange(block_dim_range);
+          block_size = global_kernel ? 256 : block_dim_range[1];
           shm_size = detail::get_operator_capability<detail::OperatorCapability::DYN_SHM_SIZE>(op);
           const int static_shm_size = detail::get_operator_capability<detail::OperatorCapability::STATIC_SHM_SIZE>(op);
           const int total_shm_size = shm_size + static_shm_size;
@@ -454,11 +484,9 @@ namespace detail
     int shm_size = detail::get_operator_capability<detail::OperatorCapability::DYN_SHM_SIZE>(op);
     if (use_jit) {
       const auto block_dim_range = detail::get_operator_capability<detail::OperatorCapability::BLOCK_DIM>(op);
-      if (block_dim_range[0] == detail::capability_attributes<detail::OperatorCapability::BLOCK_DIM>::invalid) {
-        MATX_THROW(matxInvalidParameter, "No valid JIT block dimension satisfies the fused operator requirements");
-      }
+      detail::ValidateJITBlockDimRange(block_dim_range);
       const bool global_kernel = detail::get_operator_capability<detail::OperatorCapability::GLOBAL_KERNEL>(op);
-      block_size = global_kernel ? 256 : block_dim_range[0];
+      block_size = global_kernel ? 256 : block_dim_range[1];
     }
     //printf("Fallback to minimum EPT %d with shm_size %d\n", static_cast<int>(min_ept), shm_size);
     return cuda::std::make_tuple(min_ept, shm_size, block_size, groups_per_block);

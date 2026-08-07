@@ -3,11 +3,15 @@
 read_mat
 ========
 
-Read a CSV file into a tensor
+Read a variable from a MAT file into a tensor
 
 .. note::
    This function requires the optional ``MATX_ENABLE_FILEIO`` compile flag
 
+MAT files can contain multiple named variables. Pass the variable name in
+``var`` to select the tensor to read. MATLAB v7.3 MAT files are HDF5-based, but
+these helpers use SciPy's MAT-file routines and are not a general HDF5
+interface.
 
 
 .. versionadded:: 0.3.0

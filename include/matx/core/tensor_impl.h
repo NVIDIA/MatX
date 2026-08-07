@@ -1398,6 +1398,23 @@ MATX_IGNORE_WARNING_POP_GCC
         return "";
 #endif
       } 
+      else if constexpr (Cap == OperatorCapability::JIT_CACHE_KEY) {
+#ifdef MATX_EN_JIT
+        auto key = detail::MakeJITCacheKeyForType<self_type>("JITTensorImpl");
+        const auto &shape = desc_.Shape();
+        const auto &strides = desc_.Strides();
+        detail::HashJITCacheValue(key, RANK);
+        for (int i = 0; i < RANK; ++i) {
+          detail::HashJITCacheValue(key, shape[i]);
+        }
+        for (int i = 0; i < RANK; ++i) {
+          detail::HashJITCacheValue(key, strides[i]);
+        }
+        return key;
+#else
+        return detail::MakeInvalidJITCacheKey();
+#endif
+      }
       else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
 #ifdef MATX_EN_JIT
         const auto [key, value] = get_jit_op_str();
@@ -1538,6 +1555,16 @@ MATX_IGNORE_WARNING_POP_GCC
      */
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__  auto Data() const noexcept {
       return data_.ldata_;
+    }
+
+    /**
+     * @brief Check whether this tensor has an assigned data pointer.
+     *
+     * @return true if the tensor has storage or a non-owning data pointer
+     */
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ bool IsInitialized() const noexcept
+    {
+      return Data() != nullptr;
     }
 
     /**

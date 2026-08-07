@@ -3,11 +3,13 @@
 write_mat
 =========
 
-Write an operator to a MAT file
+Write a tensor to a MAT file variable
 
 .. note::
    This function requires the optional ``MATX_ENABLE_FILEIO`` compile flag
 
+MAT files can contain multiple named variables. ``write_mat`` writes the tensor
+under the variable name passed in ``var``.
 
 
 .. versionadded:: 0.3.0

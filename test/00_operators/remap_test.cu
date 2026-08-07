@@ -2,6 +2,7 @@
 #include "matx.h"
 #include "test_types.h"
 #include "utilities.h"
+#include "prerun_tester.h"
 
 using namespace matx;
 using namespace matx::test;
@@ -350,8 +351,52 @@ TYPED_TEST(OperatorTestsNumericAllExecs, RemapOp)
           }
         }
       }
-    } 
+    }
   }
 
   MATX_EXIT_HANDLER();
-} 
+}
+
+// Verify remap forwards PreRun/PostRun to both the data operand and the index
+// operand by wrapping each in a lifecycle probe.
+TYPED_TEST(OperatorTestsNumericAllExecsWithoutJIT, RemapOperatorIndex)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  using inner_type = typename inner_op_type_t<TestType>::type;
+
+  ExecType exec{};
+
+  constexpr int N = 5;
+  auto tiv = make_tensor<TestType>({N, N});
+  for (int i = 0; i < N; i++) {
+    for (int j = 0; j < N; j++) {
+      tiv(i, j) = inner_type(i * N + j);
+    }
+  }
+
+  auto idx = make_tensor<int>({3});
+  idx.SetVals({1, 2, 3});  // select source rows 1, 2, 3
+
+  // Reference from the raw operands.
+  auto out_ref = make_tensor<TestType>({3, N});
+  (out_ref = remap<0>(tiv, idx)).run(exec);
+
+  // Wrap both the data operand and the index operand in lifecycle probes.
+  PreRunLifecycle sd, si;
+  auto out_test = make_tensor<TestType>({3, N});
+  (out_test = remap<0>(make_prerun_tester(tiv, sd), make_prerun_tester(idx, si))).run(exec);
+  exec.sync();
+
+  ExpectLifecycleClean(sd, "data");
+  ExpectLifecycleClean(si, "index");
+
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < N; j++) {
+      ASSERT_EQ(out_test(i, j), out_ref(i, j)) << "mismatch at (" << i << "," << j << ")";
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}

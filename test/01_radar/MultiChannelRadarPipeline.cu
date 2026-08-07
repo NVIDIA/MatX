@@ -41,7 +41,9 @@ template <typename T> class MultiChannelRadarPipeline : public ::testing::Test {
 protected:
   using GTestType = cuda::std::tuple_element_t<0, T>;
   using GExecType = cuda::std::tuple_element_t<1, T>;
-  void SetUp() override
+
+public:
+  static void SetUpTestSuite()
   {
     assert(numSamples > waveformLength);
 
@@ -56,15 +58,17 @@ protected:
     pb->RunTVGenerator("run");
   }
 
-  void TearDown() override { pb.reset(); }
-  uint32_t iterations = 100;
-  index_t numChannels = 16;
-  index_t numPulses = 128;
-  index_t numSamples = 9000;
-  index_t waveformLength = 1000;
-  index_t numSamplesRnd = 16384;
-  index_t numCompressedSamples = numSamples - waveformLength + 1;
-  std::unique_ptr<detail::MatXPybind> pb;
+  static void TearDownTestSuite() { pb.reset(); }
+
+protected:
+  static constexpr uint32_t iterations = 100;
+  static constexpr index_t numChannels = 16;
+  static constexpr index_t numPulses = 128;
+  static constexpr index_t numSamples = 9000;
+  static constexpr index_t waveformLength = 1000;
+  static constexpr index_t numSamplesRnd = 16384;
+  static constexpr index_t numCompressedSamples = numSamples - waveformLength + 1;
+  inline static std::unique_ptr<detail::MatXPybind> pb;
 };
 
 template <typename TensorType>

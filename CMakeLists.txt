@@ -7,13 +7,6 @@ if(POLICY CMP0144)
 endif()
 set(MATX_VERSION 1.0.0)
 
-# Used for config file generation
-if(NOT DEFINED PROJECT_NAME)
-  set(NOT_SUBPROJECT ON)
-else()
-  set(NOT_SUBPROJECT OFF)
-endif()
-
 # Use the vendored rapids-cmake copy for GPU architecture discovery unless a parent
 # project already provided it. The user can optionally override GPU_ARCH to specify
 # their own.
@@ -52,6 +45,17 @@ project(MATX
         VERSION ${MATX_VERSION}
         HOMEPAGE_URL "https://github.com/NVIDIA/MatX")
 
+if (NOT DEFINED MATX_GENERATE_CONFIG)
+    set(MATX_GENERATE_CONFIG ${PROJECT_IS_TOP_LEVEL})
+endif()
+set(MATX_GENERATE_CONFIG ${MATX_GENERATE_CONFIG} CACHE BOOL
+    "Generate MatX CMake package config files and install rules")
+set(MATX_INSTALL_INCLUDEDIR include)
+if (MATX_GENERATE_CONFIG)
+    include(GNUInstallDirs)
+    set(MATX_INSTALL_INCLUDEDIR ${CMAKE_INSTALL_INCLUDEDIR})
+endif()
+
 if (NOT CMAKE_CUDA_ARCHITECTURES)
     set(CMAKE_CUDA_ARCHITECTURES "70;80")
 endif()
@@ -66,7 +70,6 @@ option(MATX_BUILD_BENCHMARKS "Build benchmarks" OFF)
 option(MATX_NVTX_FLAGS "Enable NVTX Macros" OFF)
 option(MATX_BUILD_DOCS "Build documentation" OFF)
 option(MATX_BUILD_32_BIT "Build with 32-bit indexing support" OFF)
-option(MATX_MULTI_GPU "Multi-GPU support" OFF)
 option(MATX_EN_VISUALIZATION "Enable visualization support" OFF)
 #option(MATX_EN_CUTLASS OFF)
 option(MATX_EN_CUTENSOR OFF)
@@ -139,10 +142,12 @@ rapids_find_package(
 # Create our transitive target to pass build properties to external users and our own build environment
 add_library(matx INTERFACE)
 add_library(matx::matx ALIAS matx)
-target_include_directories(matx INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-                                         "$<INSTALL_INTERFACE:include>")
-target_include_directories(matx INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/matx/kernels>"
-"$<INSTALL_INTERFACE:include/matx/kernels>")
+target_include_directories(matx INTERFACE
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+    "$<INSTALL_INTERFACE:${MATX_INSTALL_INCLUDEDIR}>")
+target_include_directories(matx INTERFACE
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/matx/kernels>"
+    "$<INSTALL_INTERFACE:${MATX_INSTALL_INCLUDEDIR}/matx/kernels>")
 
                            
 target_compile_features(matx INTERFACE cxx_std_20 $<BUILD_INTERFACE:cuda_std_20>)
@@ -159,6 +164,9 @@ rapids_cpm_cccl(
 )
 
 target_link_libraries(matx INTERFACE CCCL::CCCL)
+if(CCCL_SOURCE_DIR)
+    target_compile_definitions(matx INTERFACE MATX_CCCL_SOURCE_DIR="${CCCL_SOURCE_DIR}")
+endif()
 
 # Set flags for compiling tests faster (only for nvcc)
 if (NOT CMAKE_CUDA_COMPILER_ID STREQUAL "Clang")
@@ -197,6 +205,10 @@ if (NOT ${IS_NVCPP} GREATER -1)
             -Wlogical-op
             -Wnull-dereference)
     endif()
+else()
+    # nvc++ diagnoses libcudacxx's if-consteval usage under all-warnings.
+    set(WARN_FLAGS ${WARN_FLAGS}
+        $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=--diag_suppress,if_consteval_in_nonconstexpr_function>)
 endif()
 
 if (CMAKE_CUDA_COMPILER_ID STREQUAL "Clang")
@@ -364,13 +376,28 @@ if (MATX_EN_JIT OR MATX_EN_MATHDX)
     
     # Link NVRTC library
     target_link_libraries(matx INTERFACE CUDA::nvrtc)
+    if(TARGET CUDA::nvJitLink)
+        target_link_libraries(matx INTERFACE CUDA::nvJitLink)
+    endif()
 endif()
 
 if (MATX_EN_MATHDX)
-    set(MathDx_VERSION 25.06)
+    set(MathDx_VERSION 26.03)
     set(MathDx_NANO 0)
+    set(LIBMATHDX_VERSION 0.3.2)
     include(cmake/FindMathDx.cmake)
     target_compile_definitions(matx INTERFACE MATX_EN_MATHDX)
+    target_compile_definitions(matx INTERFACE
+        MATX_MATHDX_INCLUDE_DIR="${MATHDX_INCLUDE_DIR}"
+        MATX_MATHDX_CUTLASS_INCLUDE_DIR="${MATHDX_CUTLASS_INCLUDE_DIR}"
+        MATX_LIBMATHDX_INCLUDE_DIR="${LIBMATHDX_INCLUDE_DIR}"
+    )
+    if(EXISTS "${MATHDX_ROOT}/lib/libcusolverdx.fatbin")
+        target_compile_definitions(matx INTERFACE MATX_CUSOLVERDX_FATBIN="${MATHDX_ROOT}/lib/libcusolverdx.fatbin")
+    endif()
+    if(EXISTS "${MATHDX_ROOT}/lib/libcusolverdx.a")
+        target_compile_definitions(matx INTERFACE MATX_CUSOLVERDX_LIBRARY="${MATHDX_ROOT}/lib/libcusolverdx.a")
+    endif()
     
     # Link libmathdx if available
     if(TARGET libmathdx::libmathdx)
@@ -379,7 +406,7 @@ if (MATX_EN_MATHDX)
     endif()
     
     # Link mathdx components
-    target_link_libraries(matx INTERFACE mathdx::cufftdx)
+    target_link_libraries(matx INTERFACE mathdx::cufftdx mathdx::cublasdx_no_lto mathdx::cusolverdx mathdx::curanddx)
 endif()
 
 if (MATX_EN_CUDSS)
@@ -387,11 +414,6 @@ if (MATX_EN_CUDSS)
     include(cmake/FindcuDSS.cmake)
     target_compile_definitions(matx INTERFACE MATX_EN_CUDSS)
     target_link_libraries(matx INTERFACE cuDSS::cuDSS)
-endif()
-
-if (MATX_MULTI_GPU)
-    include(cmake/FindNvshmem.cmake)
-    find_package(Nvshmem REQUIRED)
 endif()
 
 # Find python3 and pybind11 for generating unit tests and benchmarks
@@ -436,15 +458,15 @@ target_link_libraries(matx INTERFACE
 
 target_link_libraries(matx INTERFACE CUDA::nvtx3)
 
-# Build config files if the user isn't adding this as a subdirectory. At this point our transitive target
-# should have all build properties needed based on the options passed in
-if (NOT_SUBPROJECT)
-    include(GNUInstallDirs)
+# Build config files if requested. At this point our transitive target should
+# have all build properties needed based on the options passed in.
+if (MATX_GENERATE_CONFIG)
     include(CMakePackageConfigHelpers)
 
     install(TARGETS matx EXPORT matx-exports)
-    install(DIRECTORY include/ DESTINATION include)
-    install(FILES ${CMAKE_BINARY_DIR}/include/matx/version_config.h DESTINATION include)
+    install(DIRECTORY include/ DESTINATION ${MATX_INSTALL_INCLUDEDIR})
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/include/matx/version_config.h
+            DESTINATION ${MATX_INSTALL_INCLUDEDIR}/matx)
 
     set(doc_string
     [=[

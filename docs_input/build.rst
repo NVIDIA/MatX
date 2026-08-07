@@ -205,7 +205,7 @@ Additional Build Options
 ========================
 
 There are several additional build options to control MatX options and enable additional features.
-By default, all of these options are OFF.
+Unless otherwise noted, these options are OFF by default.
 
 .. list-table::
   :widths: 60 40
@@ -241,8 +241,6 @@ By default, all of these options are OFF.
     - ``-DMATX_EN_BLIS=ON``
   * - OpenBLAS Support
     - ``-DMATX_EN_OPENBLAS=ON``
-  * - Multi-GPU Support
-    - ``-DMATX_MULTI_GPU=ON``
   * - Disable CUB Caching
     - ``-DMATX_DISABLE_CUB_CACHE=ON``
   * - Enable NVIDIA MathDx support for kernel fusion
@@ -251,6 +249,9 @@ By default, all of these options are OFF.
     - ``-DMATX_EN_PYBIND11=ON``
   * - Disable Exceptions
     - ``-DMATX_DISABLE_EXCEPTIONS=ON``
+  * - Generate CMake package config files and install rules. This defaults to ON for top-level MatX builds
+      and OFF when MatX is added as a subproject.
+    - ``-DMATX_GENERATE_CONFIG=ON``
 
 
 NVTX Flags
@@ -366,7 +367,16 @@ Enabling this option will disable the caching of CUB allocations. This is useful
 MathDx Support
 --------------
 
-Enabling MathDx support will enable the use of MathDx for CUDA kernel fusion. See :ref:`fusion` for more information.
+Enabling MathDx support will enable MathDx-backed CUDA kernel fusion for supported FFT, GEMM, and solver operations.
+MatX uses the separate ``libmathdx`` runtime interface to query launch resources and generate LTOIR for runtime-sized
+operators before JIT compilation. See :ref:`fusion` for the current support matrix and limitations.
+
+The ``fft_benchmark`` target is built with the other examples when ``MATX_BUILD_EXAMPLES=ON``. It compares an
+input-normalization, batched FFT, frequency-domain calibration, magnitude, and decibel-conversion pipeline implemented
+with handwritten CUDA plus cuFFT and MatX ``cudaExecutor``. The JIT path is added when ``MATX_EN_MATHDX=ON``. Its
+optional positional arguments are batch count, FFT size, and iterations per trial. When ``MATX_EN_NVPL`` or
+``MATX_EN_X86_FFTW`` is enabled, the example also compiles the same pipeline for ``AllThreadsHostExecutor`` and reports
+a separate host result.
 
 
 MatX Library Linking
