@@ -263,7 +263,7 @@ cmake --build build -j
 ctest --test-dir build
 ```
 
-MatX currently targets Linux and requires a C++20 build environment. GPU builds require the CUDA Toolkit and a supported host compiler; consult the [build guide](https://nvidia.github.io/MatX/build.html) for exact current versions, optional backends, offline setup, and CPU support.
+MatX currently fully supports Linux with alpha support for Windows. A C++20 build environment is required. GPU builds require the CUDA Toolkit and a supported host compiler; consult the [build guide](https://nvidia.github.io/MatX/build.html) for exact current versions, optional backends, offline setup, and CPU support.
 
 ## Choose your next step
 
