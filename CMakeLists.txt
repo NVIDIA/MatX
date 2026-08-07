@@ -173,6 +173,15 @@ if(WIN32)
     target_compile_definitions(matx INTERFACE NOMINMAX WIN32_LEAN_AND_MEAN NOGDI _USE_MATH_DEFINES)
 
     if(MSVC)
+        # cudart_static.lib can introduce LIBCMT into otherwise dynamic-runtime targets.
+        # Suppress that default library only when the consuming target uses /MD or /MDd;
+        # /MT and /MTd targets require LIBCMT and must retain it.
+        function(matx_suppress_msvc_dynamic_runtime_mismatch target scope)
+            target_link_options(${target} ${scope}
+                "$<$<NOT:$<IN_LIST:$<TARGET_PROPERTY:MSVC_RUNTIME_LIBRARY>,MultiThreaded;MultiThreadedDebug>>:/NODEFAULTLIB:LIBCMT>"
+            )
+        endfunction()
+
         # /Zc:preprocessor: MSVC conformance preprocessor required by libcudacxx / MatX.
         # Passed as -Xcompiler so it reaches cl.exe through nvcc.
         add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/Zc:preprocessor>")

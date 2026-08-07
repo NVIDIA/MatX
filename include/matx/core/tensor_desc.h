@@ -157,13 +157,6 @@ public:
     InitFromShape(cuda::std::move(tshape));
   }
 
-#ifndef _MSC_VER
-  // MSVC/nvcc on Windows eagerly validates C-array (&arr)[N] parameter signatures in every
-  // member function during class template instantiation, even when RANK==0 makes N==0 (which
-  // is invalid in standard C++). GCC/Clang permit zero-sized arrays as an extension so these
-  // overloads compile there. On Windows, the equivalent cuda::std::array overloads below are
-  // available on all platforms and provide the same functionality.
-
   /**
    * @brief Constructor with perfect-forwarded shape and C array of strides
    *
@@ -172,9 +165,9 @@ public:
    * @param strides
    *   Strides of tensor
    */
-  template <typename S2>
-    requires (!cuda::std::is_array_v<S2>)
-  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ tensor_desc_t(S2 &&shape, const stride_type (&strides)[RANK]) :
+  template <typename S2, int M = RANK>
+    requires (!cuda::std::is_array_v<remove_cvref_t<S2>> && M > 0 && M == RANK)
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ tensor_desc_t(S2 &&shape, const stride_type (&strides)[M]) :
       shape_(std::forward<S2>(shape)) {
     for (int i = 0; i < RANK; i++) {
       MATX_ASSERT_STR(*(shape.begin() + i) > 0, matxInvalidSize,
@@ -191,9 +184,9 @@ public:
    * @param strides
    *   Strides of tensor
    */
-  template <typename = void>
-    requires (!cuda::std::is_array_v<StrideContainer>)
-  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ tensor_desc_t(const shape_type (&shape)[RANK], StrideContainer &&strides) :
+  template <typename = void, int M = RANK>
+    requires (!cuda::std::is_array_v<StrideContainer> && M > 0 && M == RANK)
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ tensor_desc_t(const shape_type (&shape)[M], StrideContainer &&strides) :
       stride_(std::forward<StrideContainer>(strides)) {
     for (int i = 0; i < RANK; i++) {
       MATX_ASSERT_STR(shape[i] > 0, matxInvalidSize,
@@ -210,7 +203,9 @@ public:
    * @param strides
    *   Strides of tensor
    */
-  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ tensor_desc_t(const shape_type (&shape)[RANK], const stride_type (&strides)[RANK]) {
+  template <int M = RANK>
+    requires (M > 0 && M == RANK)
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ tensor_desc_t(const shape_type (&shape)[M], const stride_type (&strides)[M]) {
     for (int i = 0; i < RANK; i++) {
       MATX_ASSERT_STR(shape[i] > 0, matxInvalidSize,
                       "Must specify size larger than 0 for each dimension");
@@ -218,8 +213,6 @@ public:
       *(shape_.begin() + i) = shape[i];
     }
   }
-#endif // !_MSC_VER
-
   /**
    * Check if a descriptor is contiguous in memory for all elements in the view
    *

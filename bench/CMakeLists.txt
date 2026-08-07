@@ -45,9 +45,7 @@ function(create_bench_executable bench_file)
             $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/WX>
         )
 
-        # cudart_static.lib pulls in LIBCMT (static CRT); suppress the LNK4098 warning
-        # that results from mixing it with the /MD (dynamic CRT) runtime used elsewhere.
-        target_link_options(${target_name} PRIVATE /NODEFAULTLIB:LIBCMT)
+        matx_suppress_msvc_dynamic_runtime_mismatch(${target_name} PRIVATE)
     else()
         target_compile_options(${target_name} PRIVATE ${WARN_FLAGS})
         target_compile_options(${target_name} PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:${MATX_CUDA_FLAGS}>)

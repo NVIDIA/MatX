@@ -52,9 +52,7 @@ if (MSVC)
         $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/WX>
     )
 
-    # cudart_static.lib pulls in LIBCMT (static CRT); suppress the LNK4098 warning
-    # that results from mixing it with the /MD (dynamic CRT) runtime used elsewhere.
-    target_link_options(example_lib INTERFACE /NODEFAULTLIB:LIBCMT)
+    matx_suppress_msvc_dynamic_runtime_mismatch(example_lib INTERFACE)
 else()
     target_compile_options(example_lib INTERFACE ${WARN_FLAGS})
     target_compile_options(example_lib INTERFACE ${MATX_CUDA_FLAGS})
@@ -101,8 +99,7 @@ if (MSVC)
     # -Wall/-Werror are GCC/Clang flags; cl.exe uses /WX for warnings-as-errors.
     # /Werror is not a valid MSVC option and causes D8021.
     target_compile_options(test_host PRIVATE /WX)
-    # matx::matx transitively links cudart_static which pulls in LIBCMT; suppress LNK4098.
-    target_link_options(test_host PRIVATE /NODEFAULTLIB:LIBCMT)
+    matx_suppress_msvc_dynamic_runtime_mismatch(test_host PRIVATE)
 else()
     target_compile_options(test_host PRIVATE -Wall -Werror)
 endif()

@@ -436,6 +436,36 @@ TYPED_TEST(TensorCreationTestsAll, StaticTensorDescriptor)
   ASSERT_TRUE(desc.IsContiguous());
 }
 
+TEST(TensorCreationTests, CArrayDescriptorConstructors)
+{
+  static_assert(std::is_default_constructible_v<DefaultDescriptor<0>>);
+
+  index_t shape[2] = {2, 3};
+  index_t strides[2] = {3, 1};
+  DefaultDescriptor<2> desc{shape, strides};
+
+  ASSERT_EQ(desc.Size(0), 2);
+  ASSERT_EQ(desc.Size(1), 3);
+  ASSERT_EQ(desc.Stride(0), 3);
+  ASSERT_EQ(desc.Stride(1), 1);
+}
+
+TEST(TensorCreationTests, CArraySliceOverloads)
+{
+  auto tensor = make_tensor<float>({4, 4});
+  index_t firsts[2] = {1, 1};
+  index_t ends[2] = {3, 4};
+  index_t strides[2] = {1, 2};
+
+  auto sliced = tensor.Slice(firsts, ends);
+  auto strided = tensor.Slice(firsts, ends, strides);
+
+  ASSERT_EQ(sliced.Size(0), 2);
+  ASSERT_EQ(sliced.Size(1), 3);
+  ASSERT_EQ(strided.Size(0), 2);
+  ASSERT_EQ(strided.Size(1), 2);
+}
+
 // Tests for static tensors with complex types (issue #759)
 TYPED_TEST(TensorCreationTestsComplex, StaticTensorRealView)
 {
