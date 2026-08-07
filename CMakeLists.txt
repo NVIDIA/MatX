@@ -5,7 +5,7 @@ if(POLICY CMP0144)
     # that should not override dependencies fetched through CPM.
     cmake_policy(SET CMP0144 OLD)
 endif()
-set(MATX_VERSION 1.0.0)
+set(MATX_VERSION 1.1.0)
 
 # Use the vendored rapids-cmake copy for GPU architecture discovery unless a parent
 # project already provided it. The user can optionally override GPU_ARCH to specify
