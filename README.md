@@ -134,36 +134,48 @@ find_package(matx CONFIG REQUIRED)
 ```
 
 #### 3. MatX via Conan
-MatX includes a local Conan package recipe in the repository root with a package name of ``matx`` and a package version placeholder ``<version>`` (for example ``1.0.0``).
-Because this recipe is local to the MatX repository, the repository must be cloned and the Conan package created locally before a consumer
-project can require it.
-
-From the root of the MatX repository run:
+MatX is available from the Conan Center Index (for example `matx/1.0.0` and `matx/0.9.4`). Consumers can install the package from the central
+index instead of creating a local package from this repository. For example:
 
 ```sh
-conan create .
+conan install matx/1.0.0
 ```
 
-That command publishes ``matx/<version>`` to your local Conan cache. A consumer project can then use:
-
-```python
-self.requires("matx/<version>")  # e.g. "matx/1.0.0"
-```
-
-and still rely on CMake to find MatX with:
+After installing, use CMake to locate and link MatX:
 
 ```cmake
 find_package(matx CONFIG REQUIRED)
 target_link_libraries(MyProject PRIVATE matx::matx)
 ```
 
-The ``test_package/`` directory contains a sample consumer CMake project and Conan test recipe showing how to build and run an application against the locally-created MatX Conan package.
-
 #### MatX CMake Targets
 **Once either of the two methods above are done**, you can use the transitive target ``matx::matx`` in your library inside of ``target_link_libraries``, e.g:
 
 ```
 target_link_libraries(MyProject matx::matx)
+
+Conan package notes
+-------------------
+
+Packages for MatX are published to the Conan Center Index. Notes for consumers:
+
+- `matx/1.0.0` requires C++20 and a CUDA Toolkit 13.x environment (system-installed or provided via a Conan `CUDAToolkit` recipe).
+- `matx/0.9.4` is compatible with C++17 and CUDA Toolkit 12.x.
+
+The published recipes set CMake-related `cpp_info` properties so downstream CMake projects will receive the proper CUDA
+linkage information. These recipes require Conan 2.30+.
+
+Example `conanfile.py` (consumer):
+
+```python
+from conan import ConanFile
+
+class ConsumerConan(ConanFile):
+    name = "consumer"
+    requires = ["matx/1.0.0"]
+```
+
+After `conan install`, run your CMake configure step and use `find_package(matx CONFIG REQUIRED)` to consume the package.
 ```
 
 MatX may add other optional targets in the future inside the matx:: namespace as well.
