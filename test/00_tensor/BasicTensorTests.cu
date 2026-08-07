@@ -331,7 +331,7 @@ TYPED_TEST(BasicTensorTestsIntegral, AssignmentOps)
   this->exec.sync();
   for (index_t i = 0; i < t2c.Size(0); i++) {
     for (index_t j = 0; j < t2c.Size(1); j++) {
-      ASSERT_EQ(this->t2(i,j), 3);
+      ASSERT_EQ(this->t2(i,j), static_cast<TestType>(3));
     }
   }
 
@@ -339,7 +339,7 @@ TYPED_TEST(BasicTensorTestsIntegral, AssignmentOps)
   this->exec.sync();
   for (index_t i = 0; i < t2c.Size(0); i++) {
     for (index_t j = 0; j < t2c.Size(1); j++) {
-      ASSERT_EQ(this->t2(i,j), 2);
+      ASSERT_EQ(this->t2(i,j), static_cast<TestType>(2));
     }
   }       
 
@@ -347,7 +347,7 @@ TYPED_TEST(BasicTensorTestsIntegral, AssignmentOps)
   this->exec.sync();
   for (index_t i = 0; i < t2c.Size(0); i++) {
     for (index_t j = 0; j < t2c.Size(1); j++) {
-      ASSERT_EQ(this->t2(i,j), 0);
+      ASSERT_EQ(this->t2(i,j), static_cast<TestType>(0));
     }
   }   
 
@@ -383,7 +383,7 @@ TYPED_TEST(BasicTensorTestsIntegral, Swizzle)
 
   for (index_t i = 0; i < this->t2s.Size(0); i++) {
     for (index_t j = 0; j < this->t2s.Size(1); j++) {
-      ASSERT_EQ(this->t2s(i, j), j * 100 + i);
+      ASSERT_EQ(this->t2s(i, j), static_cast<TestType>(j * 100 + i));
     }
   }
 
@@ -399,7 +399,7 @@ TYPED_TEST(BasicTensorTestsIntegral, Swizzle)
   for (index_t i = 0; i < this->t3s.Size(0); i++) {
     for (index_t j = 0; j < this->t3s.Size(1); j++) {
       for (index_t k = 0; k < this->t3s.Size(2); k++) {
-        ASSERT_EQ(this->t3s(i, j, k), k * 10000 + j * 100 + i);
+        ASSERT_EQ(this->t3s(i, j, k), static_cast<TestType>(k * 10000 + j * 100 + i));
       }
     }
   }
@@ -421,7 +421,7 @@ TYPED_TEST(BasicTensorTestsIntegral, Swizzle)
       for (index_t k = 0; k < this->t4s.Size(2); k++) {
         for (index_t l = 0; l < this->t4s.Size(3); l++) {
           ASSERT_EQ(this->t4s(i, j, k, l),
-                    l * 1000000 + k * 10000 + j * 100 + i);
+                    static_cast<TestType>(l * 1000000 + k * 10000 + j * 100 + i));
         }
       }
     }
@@ -439,7 +439,7 @@ TYPED_TEST(BasicTensorTestsIntegral, InitAssign)
   tensor_t<TestType, 1> t1v_small{{4}};
   t1v_small.SetVals({1, 2, 3, 4});
   for (index_t i = 0; i < 4; i++) {
-    ASSERT_EQ(t1v_small(i), i + 1);
+    ASSERT_EQ(t1v_small(i), static_cast<TestType>(i + 1));
   }
 
   tensor_t<TestType, 2> t2v_small{{4, 4}};
@@ -448,7 +448,7 @@ TYPED_TEST(BasicTensorTestsIntegral, InitAssign)
 
   for (index_t i = 0; i < 4; i++) {
     for (index_t j = 0; j < 4; j++) {
-      ASSERT_EQ(t2v_small(i, j), i * 4 + j + 1);
+      ASSERT_EQ(t2v_small(i, j), static_cast<TestType>(i * 4 + j + 1));
     }
   }
 
@@ -466,13 +466,15 @@ TYPED_TEST(BasicTensorTestsIntegral, StridedKernels)
     auto tb = make_tensor<TestType>({70000 * 1024, 1});
     auto tc = make_tensor<TestType>({70000 * 1024, 1});
 
+    MATX_IGNORE_WARNING_PUSH_MSVC(4834)
     (ta = TestType{1}, tb = TestType{2}).run();
+    MATX_IGNORE_WARNING_POP_MSVC
     (tc = ta + tb).run();
 
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < tc.Size(0); i++) {
-      ASSERT_EQ(tc(i, 0), 3);
+      ASSERT_EQ(tc(i, 0), static_cast<TestType>(3));
     }    
   }
 
@@ -481,13 +483,15 @@ TYPED_TEST(BasicTensorTestsIntegral, StridedKernels)
     auto tb = make_tensor<TestType>({70000 * 1024, 1, 1});
     auto tc = make_tensor<TestType>({70000 * 1024, 1, 1});
 
+    MATX_IGNORE_WARNING_PUSH_MSVC(4834)
     (ta = TestType{1}, tb = TestType{2}).run();
+    MATX_IGNORE_WARNING_POP_MSVC
     (tc = ta + tb).run();
 
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < tc.Size(0); i++) {
-      ASSERT_EQ(tc(i, 0, 0), 3);
+      ASSERT_EQ(tc(i, 0, 0), static_cast<TestType>(3));
     }    
   }
 
@@ -496,13 +500,15 @@ TYPED_TEST(BasicTensorTestsIntegral, StridedKernels)
     auto tb = make_tensor<TestType>({70000 * 1024, 1, 1, 1});
     auto tc = make_tensor<TestType>({70000 * 1024, 1, 1, 1});
 
+    MATX_IGNORE_WARNING_PUSH_MSVC(4834)
     (ta = TestType{1}, tb = TestType{2}).run();
+    MATX_IGNORE_WARNING_POP_MSVC
     (tc = ta + tb).run();
 
     cudaStreamSynchronize(0);
 
     for (index_t i = 0; i < tc.Size(0); i++) {
-      ASSERT_EQ(tc(i, 0, 0, 0), 3);
+      ASSERT_EQ(tc(i, 0, 0, 0), static_cast<TestType>(3));
     }    
   }  
 

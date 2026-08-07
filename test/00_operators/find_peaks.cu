@@ -17,9 +17,9 @@ TYPED_TEST(OperatorTestsFloatNonComplexSingleThreadedHostAllExecs, FindPeaks)
   // example-begin findpeaks-test-1
   auto tiv = make_tensor<TestType>({32});
   auto tidx = make_tensor<index_t>({32});
-  tiv.SetVals({ 3.9905e-01, 5.1668e-01, 2.4930e-02, 9.4008e-01, 9.4585e-01, 7.9673e-01, 4.1501e-01, 8.2026e-01, 2.2904e-01, 9.0959e-01, 1.0000e+01,
-    7.5222e-02, 4.0922e-01, 9.6007e-01, 2.0930e-01, 1.9395e-01, 8.9094e-01, 4.3867e-01, 3.5698e-01, 5.4537e-01, 8.2992e-01, 2.0994e-01, 7.6842e-01,
-    4.2899e-01, 2.1167e-01, 6.6055e-01, 1.6536e-01, 4.2499e-01, 9.9267e-01, 6.9642e-01, 2.4719e-01, 7.0281e-01});
+  tiv.SetVals({ static_cast<TestType>(3.9905e-01), static_cast<TestType>(5.1668e-01), static_cast<TestType>(2.4930e-02), static_cast<TestType>(9.4008e-01), static_cast<TestType>(9.4585e-01), static_cast<TestType>(7.9673e-01), static_cast<TestType>(4.1501e-01), static_cast<TestType>(8.2026e-01), static_cast<TestType>(2.2904e-01), static_cast<TestType>(9.0959e-01), static_cast<TestType>(1.0000e+01),
+    static_cast<TestType>(7.5222e-02), static_cast<TestType>(4.0922e-01), static_cast<TestType>(9.6007e-01), static_cast<TestType>(2.0930e-01), static_cast<TestType>(1.9395e-01), static_cast<TestType>(8.9094e-01), static_cast<TestType>(4.3867e-01), static_cast<TestType>(3.5698e-01), static_cast<TestType>(5.4537e-01), static_cast<TestType>(8.2992e-01), static_cast<TestType>(2.0994e-01), static_cast<TestType>(7.6842e-01),
+    static_cast<TestType>(4.2899e-01), static_cast<TestType>(2.1167e-01), static_cast<TestType>(6.6055e-01), static_cast<TestType>(1.6536e-01), static_cast<TestType>(4.2499e-01), static_cast<TestType>(9.9267e-01), static_cast<TestType>(6.9642e-01), static_cast<TestType>(2.4719e-01), static_cast<TestType>(7.0281e-01)});
   auto num_found = make_tensor<int>({});
 
   (mtie(tidx, num_found) = find_peaks(tiv, static_cast<TestType>(0.5), static_cast<TestType>(0.1))).run(exec);

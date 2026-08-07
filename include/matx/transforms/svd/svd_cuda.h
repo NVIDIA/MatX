@@ -422,8 +422,8 @@ inline void svdbpi_impl(UType &U, SType &S, VTType &VT, const AType &A, int max_
   MATX_ASSERT_STR(S.Size(RANK-2) == d, matxInvalidDim, "svdbpi:  S must have Size(RANK-2) == d");
 
   int converged_host = false;
-  cudaStream_t d2h;
-  cudaEvent_t event;
+  cudaStream_t d2h = nullptr;
+  cudaEvent_t event = nullptr;
   if(tol>0.0f) {
     cudaStreamCreateWithFlags(&d2h,cudaStreamNonBlocking);
     cudaEventCreate(&event);
@@ -462,7 +462,7 @@ inline void svdbpi_impl(UType &U, SType &S, VTType &VT, const AType &A, int max_
     if(tol!=0.0f) {
 
       cudaStreamSynchronize(d2h);  // wait for d2h transfer to finish
-      if(converged_host == true) {
+      if(converged_host != 0) {
         // if converged exit loop
         break;
       }

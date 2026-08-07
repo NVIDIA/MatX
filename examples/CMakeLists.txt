@@ -41,7 +41,18 @@ if(eigen_DIR)
 endif()
 
 if (MSVC)
-    target_compile_options(example_lib INTERFACE /W4 /WX)
+    # /W4 and /WX must be wrapped in -Xcompiler for CUDA source files.
+    # nvcc does not recognize MSVC-style /flags as its own options; passing them
+    # directly without -Xcompiler causes nvcc to treat them as extra input files,
+    # triggering "A single input file is required for a non-link phase".
+    target_compile_options(example_lib INTERFACE
+        $<$<COMPILE_LANGUAGE:CXX>:/W4>
+        $<$<COMPILE_LANGUAGE:CXX>:/WX>
+        $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/W4>
+        $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/WX>
+    )
+
+    matx_suppress_msvc_dynamic_runtime_mismatch(example_lib INTERFACE)
 else()
     target_compile_options(example_lib INTERFACE ${WARN_FLAGS})
     target_compile_options(example_lib INTERFACE ${MATX_CUDA_FLAGS})
@@ -84,7 +95,14 @@ endforeach()
 # Add host-compiler only example program to catch missing ifdef __CUDACC__ guards
 add_executable(test_host test_host.cpp)
 target_link_libraries(test_host matx::matx)
-target_compile_options(test_host PRIVATE -Wall -Werror)
+if (MSVC)
+    # -Wall/-Werror are GCC/Clang flags; cl.exe uses /WX for warnings-as-errors.
+    # /Werror is not a valid MSVC option and causes D8021.
+    target_compile_options(test_host PRIVATE /WX)
+    matx_suppress_msvc_dynamic_runtime_mismatch(test_host PRIVATE)
+else()
+    target_compile_options(test_host PRIVATE -Wall -Werror)
+endif()
 
 if(MATX_EN_PYBIND11)
     add_subdirectory(python_integration_sample)

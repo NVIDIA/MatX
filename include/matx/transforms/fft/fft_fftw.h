@@ -125,8 +125,8 @@ struct FftFFTWParams_t {
       params.onembed[0] = static_cast<int>(o.Size(RANK - 1)); // Unused
       params.istride = static_cast<int>(i.Stride(RANK - 1));
       params.ostride = static_cast<int>(o.Stride(RANK - 1));
-      params.idist = (RANK == 1) ? 1 : static_cast<int>(i.Stride(RANK - 2));
-      params.odist = (RANK == 1) ? 1 : static_cast<int>(o.Stride(RANK - 2));
+      params.idist = (RANK == 1) ? 1 : static_cast<int>(i.Stride(static_cast<uint32_t>(RANK - 2)));
+      params.odist = (RANK == 1) ? 1 : static_cast<int>(o.Stride(static_cast<uint32_t>(RANK - 2)));
     }
     else if (fft_rank == 2) {
       if (params.transform_type == FFTType::C2R) {
@@ -145,8 +145,8 @@ struct FftFFTWParams_t {
       params.onembed[1] = static_cast<int>(o.Size(RANK-1));
       params.istride = static_cast<int>(i.Stride(RANK-1));
       params.ostride = static_cast<int>(o.Stride(RANK-1));
-      params.idist = (RANK<=2) ? 1 : (int) static_cast<int>(i.Stride(RANK-3));
-      params.odist = (RANK<=2) ? 1 : (int) static_cast<int>(o.Stride(RANK-3));
+      params.idist = (RANK<=2) ? 1 : static_cast<int>(i.Stride(static_cast<uint32_t>(RANK-3)));
+      params.odist = (RANK<=2) ? 1 : static_cast<int>(o.Stride(static_cast<uint32_t>(RANK-3)));
     }
 
     params.is_fp32 = is_fp32_inner_type_v<typename OutTensorType::value_type>;

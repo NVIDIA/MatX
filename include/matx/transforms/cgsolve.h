@@ -70,8 +70,8 @@ namespace matx
       MATX_ASSERT_STR(A.Rank() -1 == X.Rank(), matxInvalidDim, "cgsolve:  A rank must be one larger than X rank");
       MATX_ASSERT_STR(X.Rank() == B.Rank(), matxInvalidDim, "cgsole: X rank and B rank must match");
 
-      cudaStream_t d2h;
-      cudaEvent_t event;
+      cudaStream_t d2h = nullptr;
+      cudaEvent_t event = nullptr;
       
 
       if(tol>0.0f) {
@@ -148,10 +148,15 @@ namespace matx
         // Fuse these into 1 kernel with comma op
         // r1 = r0 - a * Ap 
         // x = x + a * p
+        // MSVC C4834: MatX overloads operator, to combine two [[nodiscard]] set-ops into
+        // a single compound op; the lhs result is NOT discarded (it is captured by the
+        // overloaded comma), but MSVC's [[nodiscard]] checker doesn't see through it.
+MATX_IGNORE_WARNING_PUSH_MSVC(4834)
         auto updateOp = ( r1 = r0 - (r0r0c/pApc) * Ap,
              X = X + (r0r0c/pApc) * p);
+MATX_IGNORE_WARNING_POP_MSVC
 
-        (IF( pApc != value_type(0), updateOp)).run(stream);
+        (void)(IF( pApc != value_type(0), updateOp)).run(stream);
         
         // r1r1 = dot(r1, r1)
         (r1r1 = sum(r1*r1)).run(stream);
@@ -163,7 +168,7 @@ namespace matx
           cudaMemcpyAsync(&converged_host, converged.Data(), sizeof(int), cudaMemcpyDeviceToHost, d2h);
           cudaStreamSynchronize(d2h);
 
-          if(converged_host == true) {
+          if(converged_host != 0) {  // != 0 instead of == true: converged_host is int (CUDA device copy); mixing int and bool triggers MSVC C4805 as an error under /WX
             break;
           }
 

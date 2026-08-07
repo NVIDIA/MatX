@@ -83,8 +83,8 @@ public:
     int cmp_result = strncmp(expected_text,actual_text,2047);
     if (cmp_result != 0)
     {
-        printf("Actual text (length %lu):\n%s\n",strnlen(actual_text,2047),actual_text);
-        printf("Expected text (length %lu):\n%s\n",strnlen(expected_text,2047),expected_text);
+        printf("Actual text (length %zu):\n%s\n",strnlen(actual_text,2047),actual_text);
+        printf("Expected text (length %zu):\n%s\n",strnlen(expected_text,2047),expected_text);
     }
     ASSERT_EQ(cmp_result,0) << "Strcmp difference between actual and expected text";
     fclose(fp);

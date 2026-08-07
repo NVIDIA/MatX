@@ -1403,10 +1403,13 @@ MATX_LOOP_UNROLL
     return tensor_t<T, N, decltype(new_desc)>{storage_, std::move(new_desc), data};
   }
 
-  template <typename StrideType, int N = RANK>
-  __MATX_INLINE__ auto Slice(const typename Desc::shape_type (&firsts)[RANK],
-                            const typename Desc::shape_type (&ends)[RANK],
-                            StrideType strides) const
+  // Keep the array extent dependent so MSVC does not form a zero-length array signature
+  // while instantiating a rank-zero tensor. Rank-positive tensors retain this overload.
+  template <typename StrideType, int N = RANK, int M = RANK>
+    requires (M > 0 && M == RANK)
+  __MATX_INLINE__ auto Slice(const typename Desc::shape_type (&firsts)[M],
+                            const typename Desc::shape_type (&ends)[M],
+                            const StrideType (&strides)[M]) const
   {
     return Slice<N>(detail::to_array(firsts), detail::to_array(ends), detail::to_array(strides));
   }
@@ -1446,9 +1449,10 @@ MATX_LOOP_UNROLL
     return Slice<N, detail::NoStride>(firsts, ends, detail::NoStride{});
   }
 
-  template <int N = RANK>
-  __MATX_INLINE__ auto Slice(const typename Desc::shape_type (&firsts)[RANK],
-                              const typename Desc::shape_type (&ends)[RANK]) const
+  template <int N = RANK, int M = RANK>
+    requires (M > 0 && M == RANK)
+  __MATX_INLINE__ auto Slice(const typename Desc::shape_type (&firsts)[M],
+                            const typename Desc::shape_type (&ends)[M]) const
   {
     return Slice<N>(detail::to_array(firsts), detail::to_array(ends));
   }

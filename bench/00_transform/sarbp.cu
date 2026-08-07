@@ -37,7 +37,7 @@ using namespace matx;
 
 // SAR backprojection benchmarks for different precision modes
 
-const std::vector<ssize_t> PROBLEM_SIZES = {2000};
+const std::vector<int64_t> PROBLEM_SIZES = {2000};
 
 // Gigabackprojections per second derived metric. Operations per launch =
 // num_pulses * image_width * image_height = problem_size^3. Reading this

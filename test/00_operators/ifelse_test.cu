@@ -37,7 +37,9 @@ TYPED_TEST(OperatorTestsAllExecs, OperatorFuncs)
   exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), z));
 
+  MATX_IGNORE_WARNING_PUSH_MSVC(4834) // discarding return value of [[nodiscard]] function (comma operator)
   (tov0 = c, tov00 = c).run(exec);
+  MATX_IGNORE_WARNING_POP_MSVC
   exec.sync();
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov0(), c));
   EXPECT_TRUE(MatXUtils::MatXTypeCompare(tov00(), c));  

@@ -19,8 +19,11 @@ the CPM documentation or the documentation for each package for more information
 
 System Requirements
 -------------------
-MatX requires **CUDA 12.2.1** or higher, and **g++ 9.3+**, **clang 17+**, or **nvc++ 24.5** for the host compiler. See the CUDA toolkit documentation
+**Linux**: MatX requires **CUDA 12.2.1** or higher, and **g++ 9.3+**, **clang 17+**, or **nvc++ 24.5** for the host compiler. See the CUDA toolkit documentation
 for supported host compilers. Other requirements for optional components are listed below.
+
+**Windows**: Windows support is currently in alpha. Visual Studio 2026 and CUDA 13.3 or above is required. Windows is not yet tested as part of the 
+CI pipeline, but on a best-effort basis. JIT and multi-GPU are not supported on Windows.
 
 .. warning:: Using MatX with an unsupported compiler may result in compiler and/or runtime errors.
 

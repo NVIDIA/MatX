@@ -31,6 +31,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "matx.h"
+#include "utilities.h"
 #include <gtest/gtest.h>
 #include <cstdlib>
 #include <fstream>
@@ -38,6 +39,7 @@
 #include <regex>
 #include <thread>
 #include <chrono>
+#include <filesystem>
 
 using namespace matx;
 
@@ -53,9 +55,10 @@ protected:
     original_dest_ = std::getenv("MATX_LOG_DEST");
     
     // Generate a unique test file name
-    test_log_file_ = std::string("/tmp/matx_test_log_") + 
-                     std::to_string(std::chrono::system_clock::now().time_since_epoch().count()) + 
-                     ".log";
+    test_log_file_ = (std::filesystem::temp_directory_path() /
+                      ("matx_test_log_" +
+                       std::to_string(std::chrono::system_clock::now().time_since_epoch().count()) +
+                       ".log")).string();
   }
 
   void TearDown() override {

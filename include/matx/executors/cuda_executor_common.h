@@ -100,7 +100,7 @@ namespace detail
         }
       }
 
-      CudaExecutorBase(int stream, bool profiling = false) : stream_(reinterpret_cast<cudaStream_t>(stream)), profiling_(profiling), start_(nullptr), stop_(nullptr) {
+      CudaExecutorBase(int stream, bool profiling = false) : stream_(reinterpret_cast<cudaStream_t>(static_cast<intptr_t>(stream))), profiling_(profiling), start_(nullptr), stop_(nullptr) {
         if (profiling_) {
           MATX_CUDA_CHECK(cudaEventCreate(&start_));
           MATX_CUDA_CHECK(cudaEventCreate(&stop_));
@@ -371,7 +371,7 @@ namespace detail
       num_regs = attr.numRegs;
 
       const auto set_ept_query = detail::SetEPTQueryInput{current_ept};
-      const auto set_ept = detail::get_operator_capability<detail::OperatorCapability::SET_ELEMENTS_PER_THREAD>(op, set_ept_query);
+      [[maybe_unused]] const auto set_ept = detail::get_operator_capability<detail::OperatorCapability::SET_ELEMENTS_PER_THREAD>(op, set_ept_query);
 
       // Determine block size for register calculation
       if (use_jit) {
@@ -401,7 +401,8 @@ namespace detail
 
           groups_per_block = current_groups_per_block;
           const auto set_groups_per_block_query = detail::SetGroupsPerBlockQueryInput{groups_per_block};
-          const auto set_groups_per_block = detail::get_operator_capability<detail::OperatorCapability::SET_GROUPS_PER_BLOCK>(op, set_groups_per_block_query);
+          [[maybe_unused]] const auto set_groups_per_block =
+            detail::get_operator_capability<detail::OperatorCapability::SET_GROUPS_PER_BLOCK>(op, set_groups_per_block_query);
           const auto block_dim_range = detail::get_operator_capability<detail::OperatorCapability::BLOCK_DIM>(op);
           detail::ValidateJITBlockDimRange(block_dim_range);
           block_size = global_kernel ? 256 : block_dim_range[1];
@@ -480,7 +481,7 @@ namespace detail
 
     // Fallback to minimum EPT
     const auto set_ept_query = detail::SetEPTQueryInput{min_ept};
-    const auto set_ept = detail::get_operator_capability<detail::OperatorCapability::SET_ELEMENTS_PER_THREAD>(op, set_ept_query);
+    [[maybe_unused]] const auto set_ept = detail::get_operator_capability<detail::OperatorCapability::SET_ELEMENTS_PER_THREAD>(op, set_ept_query);
     int shm_size = detail::get_operator_capability<detail::OperatorCapability::DYN_SHM_SIZE>(op);
     if (use_jit) {
       const auto block_dim_range = detail::get_operator_capability<detail::OperatorCapability::BLOCK_DIM>(op);

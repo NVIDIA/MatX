@@ -176,7 +176,7 @@ namespace matx
         {   
           if constexpr (CapType::ept == ElementsPerThread::ONE) {
             cuda::std::array<index_t, Rank()> inds{indices...};
-            cuda::std::array<index_t, T::Rank()> ninds;
+            cuda::std::array<index_t, T::Rank()> ninds{};
 
             index_t idx = 0;
             index_t stride = 1;

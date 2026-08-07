@@ -44,11 +44,11 @@ namespace matx
       private:
         index_t size_;
 
-        static constexpr T a0 = 0.21557895;
-        static constexpr T a1 = 0.41663158;
-        static constexpr T a2 = 0.277263158;
-        static constexpr T a3 = 0.083578947;
-        static constexpr T a4 = 0.006947368;  
+        static constexpr T a0 = static_cast<T>(0.21557895);
+        static constexpr T a1 = static_cast<T>(0.41663158);
+        static constexpr T a2 = static_cast<T>(0.277263158);
+        static constexpr T a3 = static_cast<T>(0.083578947);
+        static constexpr T a4 = static_cast<T>(0.006947368);  
 
       public:
         using value_type = T;

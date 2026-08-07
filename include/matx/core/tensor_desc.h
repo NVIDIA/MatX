@@ -165,9 +165,9 @@ public:
    * @param strides
    *   Strides of tensor
    */
-  template <typename S2>
-    requires (!cuda::std::is_array_v<S2>)
-  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ tensor_desc_t(S2 &&shape, const stride_type (&strides)[RANK]) :
+  template <typename S2, int M = RANK>
+    requires (!cuda::std::is_array_v<remove_cvref_t<S2>> && M > 0 && M == RANK)
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ tensor_desc_t(S2 &&shape, const stride_type (&strides)[M]) :
       shape_(std::forward<S2>(shape)) {
     for (int i = 0; i < RANK; i++) {
       MATX_ASSERT_STR(*(shape.begin() + i) > 0, matxInvalidSize,
@@ -184,9 +184,9 @@ public:
    * @param strides
    *   Strides of tensor
    */
-  template <typename = void>
-    requires (!cuda::std::is_array_v<StrideContainer>)
-  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ tensor_desc_t(const shape_type (&shape)[RANK], StrideContainer &&strides) :
+  template <typename = void, int M = RANK>
+    requires (!cuda::std::is_array_v<StrideContainer> && M > 0 && M == RANK)
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ tensor_desc_t(const shape_type (&shape)[M], StrideContainer &&strides) :
       stride_(std::forward<StrideContainer>(strides)) {
     for (int i = 0; i < RANK; i++) {
       MATX_ASSERT_STR(shape[i] > 0, matxInvalidSize,
@@ -203,7 +203,9 @@ public:
    * @param strides
    *   Strides of tensor
    */
-  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ tensor_desc_t(const shape_type (&shape)[RANK], const stride_type (&strides)[RANK]) {
+  template <int M = RANK>
+    requires (M > 0 && M == RANK)
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ tensor_desc_t(const shape_type (&shape)[M], const stride_type (&strides)[M]) {
     for (int i = 0; i < RANK; i++) {
       MATX_ASSERT_STR(shape[i] > 0, matxInvalidSize,
                       "Must specify size larger than 0 for each dimension");
@@ -211,7 +213,6 @@ public:
       *(shape_.begin() + i) = shape[i];
     }
   }
-
   /**
    * Check if a descriptor is contiguous in memory for all elements in the view
    *
@@ -297,6 +298,7 @@ public:
 
 // gcc 14.1 incorrectly reports shape_ as uninitialized in some contexts
 MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
+MATX_IGNORE_WARNING_NEXT_LINE_MSVC(4702)
     return *(shape_.begin() + dim);
 MATX_IGNORE_WARNING_POP_GCC
   }
@@ -328,6 +330,7 @@ MATX_IGNORE_WARNING_POP_GCC
         so it can never count up to 3. */
 MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
 MATX_IGNORE_WARNING_PUSH_GCC("-Warray-bounds")
+MATX_IGNORE_WARNING_NEXT_LINE_MSVC(4702)
     return *(stride_.begin() + dim);
 MATX_IGNORE_WARNING_POP_GCC
 MATX_IGNORE_WARNING_POP_GCC
@@ -437,7 +440,7 @@ private:
       const auto shape = make_shape();
       m[m.size()-1] = 1;
       if constexpr (m.size() > 1) {
-        for (int i = m.size()-2; i >= 0; i--) {
+        for (int i = static_cast<int>(m.size())-2; i >= 0; i--) {
             m[i] = m[i+1] * shape[i + 1];
         }
       }

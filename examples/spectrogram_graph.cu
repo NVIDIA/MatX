@@ -57,7 +57,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
   using complex = cuda::std::complex<float>;
   cudaGraph_t graph;
-  cudaGraphExec_t instance;
+  cudaGraphExec_t instance = nullptr;
 
   cudaStream_t stream;
   cudaStreamCreate(&stream);

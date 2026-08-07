@@ -50,6 +50,11 @@ endif()
 
 add_library(matxutil MODULE matxutil.cu)
 target_link_libraries(matxutil PRIVATE matx::matx CUDA::cudart)
+
+if (MSVC)
+    matx_suppress_msvc_dynamic_runtime_mismatch(matxutil PRIVATE)
+endif()
+
 set_target_properties(matxutil PROPERTIES SUFFIX ".so" PREFIX "")
 
 configure_file(
