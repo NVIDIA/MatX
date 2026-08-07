@@ -472,7 +472,7 @@ internet-enabled system and transfer the Conan client cache to the offline envir
   .. code-block:: shell
 
     tar -xzvf matx_conan_cache.tar.gz -C $HOME_OFFLINE/
-    export CONAN_USER_HOME=$HOME_OFFLINE/.conan2
+    export CONAN_USER_HOME=$HOME_OFFLINE
     export CPM_SOURCE_CACHE=$HOME_OFFLINE/matx_cpm_cache
 
 2. Use your consumer project's standard Conan workflow to install packages from the local cache without network access.
