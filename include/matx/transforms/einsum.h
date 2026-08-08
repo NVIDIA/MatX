@@ -307,8 +307,55 @@ public:
   }
 
   /**
+   * @brief Splits a string on "," into a vector of substrings
+   * 
+   * @param str string to split
+   * @param out vector to append each comma-separated substring to
+   */
+  static void SplitOnCommas(const std::string &str, std::vector<std::string> &out){
+    size_t start = 0;
+    while (start < str.size()){
+      auto sep = str.find(",", start);
+
+      if (sep == std::string::npos){
+        out.push_back(str.substr(start));
+        break;
+      }
+      out.push_back(str.substr(start, sep-start));
+      start = sep + 1;
+
+    }
+  }
+
+  /**
+   * @brief Infers the output subscript for implicit mode einsum without "->"
+   * 
+   */
+  static std::string InferImplicitOutput(const std::vector<std::string> &input_tokens){
+    cuda::std::array<int32_t, 256> counts{};
+    for (const auto &tok : input_tokens){
+        for (const char &c: tok){
+          counts[static_cast<unsigned char>(c)]++;
+    }
+    }
+
+    std::string implicit_out;
+    for (int32_t c=0; c< 256; c++){
+      if (counts[c]==1){
+        implicit_out.push_back(static_cast<char>(c));
+      }
+    }
+    return implicit_out;
+ 
+  }
+
+  /**
    * @brief Tokenizes an einsum string into a vector
    *
+   * Supports both explicit mode, where subscripts contain "->", and
+   * implicit mode (no "->"), where the output subscript is inferred using NumPy's
+   * implicit-output rule. See InferImplicitOutput().
+   * 
    * @param str einsum string
    * @param out tokenized vector
    * @return true if tokenized successfully, or false otherwise
@@ -318,23 +365,18 @@ public:
 
     // Find output separator
     auto iout = str.find("->");
+
+    //If output separator not found, we detect implicit mode ("ij, jk") instead
+    // of explicit mode ("ij, jk->ik")
+    //Program infers the output for implicit mode
     if (iout == std::string::npos) {
-      return false;
+      SplitOnCommas(str, out);
+      out.push_back(InferImplicitOutput(out));
+      return true;
     }
 
-    auto istr = str.substr(0, iout);
-    size_t start = 0;
-    while (start < istr.size()) {
-      auto sep = istr.find(",", start);
-      if (sep == std::string::npos) {
-        out.push_back(istr.substr(start));
-        break;
-      }
-
-      out.push_back(istr.substr(start, sep - start));
-      start += sep - start + 1;
-    }
-
+    SplitOnCommas(str.substr(0, iout), out);
+    
     // Nothing after the output separator -> indicates this is a 0D output
     out.push_back(str.substr(iout + 2));
 
