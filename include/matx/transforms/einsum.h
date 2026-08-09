@@ -34,6 +34,7 @@
 #pragma once
 
 #ifdef MATX_EN_CUTENSOR
+#include <algorithm>
 #include <cstdio>
 #include <numeric>
 #include "error.h"
@@ -330,16 +331,31 @@ public:
   /**
    * @brief Infers the output subscript for implicit mode einsum without "->"
    * 
+   * If any input token contains a broadcast ellips ("..."), it represents
+   * the other remaining dimensions
    */
   static std::string InferImplicitOutput(const std::vector<std::string> &input_tokens){
     cuda::std::array<int32_t, 256> counts{};
+
+    bool has_ellipsis = false;
+
     for (const auto &tok : input_tokens){
-        for (const char &c: tok){
-          counts[static_cast<unsigned char>(c)]++;
-    }
+      auto epos = tok.find("...");
+
+      has_ellipsis = has_ellipsis || (epos != std::string::npos);
+
+      for (size_t pos = 0; pos < tok.size(); pos++){
+        if (epos != std::string::npos 
+        && pos >= epos
+        && pos < epos +3){
+          continue;
+        }
+        counts[static_cast<unsigned char>(tok[pos])]++;
+      }
     }
 
-    std::string implicit_out;
+    std::string implicit_out = has_ellipsis ? "..." : "";
+    
     for (int32_t c=0; c< 256; c++){
       if (counts[c]==1){
         implicit_out.push_back(static_cast<char>(c));
@@ -383,6 +399,93 @@ public:
     return true;
   }
 
+/**
+ * @brief Locates the broadcast ellipsis ("...") starting position in a subscript token
+ *
+ * @param token subscript token
+ * @return position of the first "." of "...", or std::string::npos if absent
+ */
+
+ static size_t FindEllipsis(const std::string &token){
+  auto pos = token.find("...");
+
+  // If ellipsis is found, do the following:
+  if (pos != std::string::npos){
+        MATX_ASSERT_STR(token.find("...", pos + 3) == std::string::npos, matxInvalidDim,
+        "einsum subscript may contain at most one ellipsis (\"...\") per operand");
+    }
+  return pos;
+}
+ 
+/**
+ * @brief Returns how many tensor dimensions are represented by "..."
+ * 
+ * @param token subscript token for one einsum operand
+ * @param rank number of dimensions in that operand's tensor
+ */
+
+  static int32_t EllipsisRank(const std::string &token, int32_t rank){
+    auto epos = FindEllipsis(token);
+
+    // If no ellipsis, ellipsis represents 0 dimensions.
+    if (epos == std::string::npos){
+      return 0;
+    }
+    
+  
+    auto ellipsis_rank = rank - static_cast<int32_t>(token.length() - 3); 
+    MATX_ASSERT_STR(ellipsis_rank >=0,
+      matxInvalidDim,
+      "einsum operand rank is too small for the explicit subscripts given alongside \"...\""
+    );
+    return ellipsis_rank;
+  }
+
+  /**
+   * @brief Expands a subscript token into one mode ID per tensor dimension
+   *
+   * "..." is replaced with synthetic mode IDs that align broadcast dimensi
+   * from the right across operands, matching NumPy's broadcasting rule
+   * rightmost dimension covered by "..." always gets the same mode ID
+   * regardless of how many dimensions "..." covers for this particular
+   * operand.
+   *
+   * @param token subscript token, possibly containing "..."
+   * @param rank n describes
+   * @param modes_out vector to append the expanded mode IDs to
+   */
+  static void ExpandTokenModes(
+    const std::string &token,
+    int32_t rank,
+    std::vector<int32_t> &modes_out){
+      constexpr int32_t kEllipsisModeBase = 1000;
+
+      auto epos = FindEllipsis(token);
+      if (epos == std::string::npos) {
+        for (const char &c : token){
+          modes_out.push_back(static_cast<int32_t>(c));
+        }
+        return;
+      }
+      auto ellipsis_rank = EllipsisRank(token, rank);
+      auto before = token.substr(0, epos);
+      auto after = token.substr(epos + 3);
+
+      for (const char &c : before) {
+        modes_out.push_back(static_cast<int32_t>(c));
+      }
+
+      // Add a synthetic mode ID for each hidden dimension represented by "..."
+      // Assigns higher IDs to left dimensions so the rightmost broadcast dimension always gets ID 1000
+      for (int32_t m = 0; m < ellipsis_rank; m++) {
+        modes_out.push_back(kEllipsisModeBase + (ellipsis_rank - 1 - m));
+      }
+
+      for (const char &c : after) {
+        modes_out.push_back(static_cast<int32_t>(c));
+      }
+    }
+  
   static EinsumParams_t<InT...> GetEinsumParams(OutputTensor &out, const std::string &subscripts, const InT&... tensors)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
@@ -396,20 +499,79 @@ public:
     MATX_ASSERT_STR(tokens.size() - 1 == sizeof...(InT), matxInvalidDim, "Number of subscript groups in Einstein notation must match the number of operators (input and output)");
 
     // Set all the token characters
-    for (i = 0; i < tokens.size(); i++) {
-      for (const char &c: tokens[i]) {
-        params.modes_[i].push_back(static_cast<int32_t>(c));
-      }
-    }
-
     i = 0;
     ((params.nmodes_[i++] = tensors.Rank()), ...);
 
+    //For tokens with ellipsis, we cannot compare raw string length
+    // to tnesor rank. Therefore, ellipsis tokens are validated with EllipsisRank()
+
     i = 0;
-    MATX_IGNORE_WARNING_PUSH_GCC("-Wunused-value")
-    MATX_ASSERT_STR(((tokens[i++].length() == static_cast<size_t>(tensors.Rank())), ...), matxInvalidDim,
-        "Tensor rank must match number of einsum subscripts");
-    MATX_IGNORE_WARNING_POP_GCC
+    auto check_rank = [&](const std::string &tok, int32_t rank) {
+      bool ok =
+        tok.find("...") != std::string::npos ||
+        tok.length() == static_cast<size_t>(rank);
+        i++;
+        return ok;
+    };
+
+    MATX_ASSERT_STR(
+    (check_rank(tokens[i], tensors.Rank()) && ...),
+    matxInvalidDim,
+    "Tensor rank must match number of einsum subscripts");
+    
+    i = 0;
+    int32_t max_ellipsis_rank = 0;
+
+    // Calculate this operand’s ellipsis rank and update the maximum.
+    auto track_ellipsis_rank =
+      [&](const std::string &tok, int32_t rank) {
+          max_ellipsis_rank = std::max(max_ellipsis_rank, EllipsisRank(tok, rank));
+          i++;
+        };
+    (track_ellipsis_rank(tokens[i], tensors.Rank()), ...);
+
+    // Ellipsis-covered batch dimensions must match exactly across every operand
+    // cuTensorNet requires tensors share the same modeID to have identical dimension
+    // size. Therefore, MatX does not support NumPy-style size-1 broadcasting for
+    // "..." batch dimensions. 
+    
+    if (max_ellipsis_rank > 0) {
+      std::vector<int64_t> ellipsis_sizes(max_ellipsis_rank, -1);
+      
+      i = 0;
+      auto check_ellipsis_sizes = [&](const auto &t, const std::string &tok) {
+        auto epos = FindEllipsis(tok);
+        if (epos != std::string::npos) {
+          auto ellipsis_rank = EllipsisRank(tok, t.Rank());
+          for (int32_t d = 0; d < ellipsis_rank; d++) {
+            auto dim = static_cast<int32_t>(epos) + (ellipsis_rank - 1 - d);
+            auto size = t.Size(dim);
+            MATX_ASSERT_STR(ellipsis_sizes[d] == -1 || ellipsis_sizes[d] == size, matxInvalidDim,
+                "einsum broadcast (\"...\") dimensions must match exactly across operands; "
+                "MatX does not support NumPy-style size-1 broadcasting for batch dimensions");
+            ellipsis_sizes[d] = size;
+          }
+        }
+        i++;
+      };
+      (check_ellipsis_sizes(tensors, tokens[i]), ...);
+    }
+
+    if (FindEllipsis(tokens[sizeof...(InT)]) != std::string::npos) {
+      MATX_ASSERT_STR(EllipsisRank(tokens[sizeof...(InT)], out.Rank()) == max_ellipsis_rank,
+          matxInvalidDim,
+          "Output tensor rank does not match the number of broadcast dimensions implied by \"...\" in the inputs");
+    }
+
+    // Set all the token characters, expanding "..." into synthetic mode IDs
+    i = 0;
+    auto expand_modes = [&](const std::string &tok, int32_t rank, std::vector<int32_t> &modes) {
+      ExpandTokenModes(tok, rank, modes);
+      i++;
+    };
+    (expand_modes(tokens[i], tensors.Rank(), params.modes_[i]), ...);
+    ExpandTokenModes(tokens[sizeof...(InT)], out.Rank(), params.modes_[sizeof...(InT)]); // output tensor
+  
 
     auto set_sizes = [](auto &t, std::vector<int64_t> &sizes) {
       for (int32_t s = 0; s < t.Rank(); s++) {
