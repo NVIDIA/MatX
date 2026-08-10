@@ -422,7 +422,9 @@ public:
  * 
  * @param token subscript token for one einsum operand
  * @param rank number of dimensions in that operand's tensor
+ * @return number of dimensions "..." represents for this operand
  */
+
 
   static int32_t EllipsisRank(const std::string &token, int32_t rank){
     auto epos = FindEllipsis(token);
@@ -451,7 +453,7 @@ public:
    * operand.
    *
    * @param token subscript token, possibly containing "..."
-   * @param rank n describes
+   * @param rank total number of dimensions in this operand's tensor
    * @param modes_out vector to append the expanded mode IDs to
    */
   static void ExpandTokenModes(
