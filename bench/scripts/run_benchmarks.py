@@ -379,7 +379,6 @@ def run_profile(name, profile, build_dir, out_dir, extra_args, dry_run):
     if exe is None:
         if not dry_run:
             print(
-
                 f"[{name}] could not find any of {profile['exe_stems']} "
                 f"under {build_dir}/bench/",
                 file=sys.stderr,
