@@ -107,7 +107,9 @@ inline void sar_bp_impl(OutImageType &out, const InitialImageType &initial_image
   }
 
   // 32-bit tensor indexing requires tensor views as otherwise the operator may
-  // have no defined Stride().
+  // have no defined Stride(). In addition to proving the largest range-profile
+  // offset fits, this inequality proves num_pulses itself fits in int32_t, so
+  // the selected kernel may also use IdxT for its pulse counters and indices.
   bool use_32bit = false;
   if constexpr (is_tensor_view_v<RangeProfilesType>) {
     const index_t rp_stride = range_profiles.Stride(0);
