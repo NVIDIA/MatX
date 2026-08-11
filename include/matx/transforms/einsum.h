@@ -331,7 +331,7 @@ public:
   /**
    * @brief Infers the output subscript for implicit mode einsum without "->"
    * 
-   * If any input token contains a broadcast ellips ("..."), it represents
+   * If any input token contains a broadcast ellipsis ("..."), it represents
    * the other remaining dimensions
    */
   static std::string InferImplicitOutput(const std::vector<std::string> &input_tokens){
@@ -382,9 +382,9 @@ public:
     // Find output separator
     auto iout = str.find("->");
 
-    //If output separator not found, we detect implicit mode ("ij, jk") instead
+    // If output separator not found, we detect implicit mode ("ij, jk") instead
     // of explicit mode ("ij, jk->ik")
-    //Program infers the output for implicit mode
+    // Program infers the output for implicit mode
     if (iout == std::string::npos) {
       SplitOnCommas(str, out);
       out.push_back(InferImplicitOutput(out));
@@ -446,7 +446,7 @@ public:
   /**
    * @brief Expands a subscript token into one mode ID per tensor dimension
    *
-   * "..." is replaced with synthetic mode IDs that align broadcast dimensi
+   * "..." is replaced with synthetic mode IDs that align broadcast dimensions
    * from the right across operands, matching NumPy's broadcasting rule
    * rightmost dimension covered by "..." always gets the same mode ID
    * regardless of how many dimensions "..." covers for this particular
@@ -504,8 +504,8 @@ public:
     i = 0;
     ((params.nmodes_[i++] = tensors.Rank()), ...);
 
-    //For tokens with ellipsis, we cannot compare raw string length
-    // to tnesor rank. Therefore, ellipsis tokens are validated with EllipsisRank()
+    // For tokens with ellipsis, we cannot compare raw string length
+    // to tensor rank. Therefore, ellipsis tokens are validated with EllipsisRank()
 
     i = 0;
     auto check_rank = [&](const std::string &tok, int32_t rank) {

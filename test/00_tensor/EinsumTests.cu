@@ -426,18 +426,18 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, BroadcastBatchMatmul)
   auto a1 = make_tensor<TestType>({5*2*4*3}); 
   auto b1 = make_tensor<TestType>({5*2*3*4});
 
-  // Generates 120 evenly spaces numbers from 0 to 119
+  // Generates 120 evenly spaced numbers from 0 to 119
   (a1 = linspace((TestType)0, static_cast<TestType>(a1.Size(0) - 1), a1.Size(0))).run(exec);
   (b1 = linspace((TestType)0, static_cast<TestType>(b1.Size(0) - 1), b1.Size(0))).run(exec);
   
-  //Converts 1D tensors into 4D tensors
+  // Converts 1D tensors into 4D tensors
   auto a = a1.View({5,2,4,3});
   auto b = b1.View({5,2,3,4});
 
   // Output tensor that will store the result of einsum with broadcast notation
   auto c = make_tensor<TestType>({5,2,4,4});
 
-  // Output tensor that will store result from explicitly-letter einsum
+  // Output tensor that will store result from explicit-letter einsum
   auto c_ref = make_tensor<TestType>({5,2,4,4});
 
   // "..." should behave identically to spelling the batch dims out explicitly
@@ -488,7 +488,7 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, BroadcastBatchMatmulImplicitO
   // and implicit output
   auto c = make_tensor<TestType>({5,2,4,4});
 
-  // Output tensor that will store result from explicitly-letter einsum
+  // Output tensor that will store result from explicit-letter einsum
   auto c_ref = make_tensor<TestType>({5,2,4,4});
 
 
@@ -512,7 +512,7 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, BroadcastBatchMatmulImplicitO
   MATX_EXIT_HANDLER();
 }
 
-//Checks if MatX rejects invalid batch sizes when ... is used
+// Checks if MatX rejects invalid batch sizes when ... is used
 TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, BroadcastBatchSizeMismatchThrows)
 {
   MATX_ENTER_HANDLER();
@@ -523,7 +523,7 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, BroadcastBatchSizeMismatchThr
 
   // Batch dims (5 vs 3) covered by "..." do not match. MatX does
   // not support NumPy-style size-1 broadcasting for these dims due to cuTensor 
-  // limitations. Therefore, mismatch dimensions must throw an error.
+  // limitations. Therefore, mismatched dimensions must throw an error.
   auto a = make_tensor<TestType>({5,2,4,3});
   auto b = make_tensor<TestType>({3,2,3,4});
   auto c = make_tensor<TestType>({5,2,4,4});
