@@ -25,12 +25,25 @@ shorter syntax, and is sometimes more optimized than a direct version of the ope
 
 As of now, MatX only supports a limited set of ``einsum`` operations that would be supported in
 the NumPy version. Specifically only tensor contractions, inner products, and GEMMs are supported 
-and tested at this time. MatX also does not support broadcast '...' notation and has no plans to. While
-the broadcast notation is useful for high-rank tensors, it doesn't add any new features and
-isn't compatible in all expressions inside NumPy. We feel listing out the dimensions makes the 
-syntax more clear without giving up any features. Since ``einsum`` requires an output tensor parameter, 
-only *explicit* mode is supported using the ``->`` operator. This allows type and size checking on the 
-output tensor at the cost of extra verbosity.
+and tested at this time. 
+
+``einsum`` supports two subscript styles:
+
+* **Explicit mode**, using ``->`` to name the output subscript directly. This allows type
+  and size checking on the output tensor. Ex: ``ij,jk->ik``.
+* **Implicit mode**, where ``->`` is omitted and the output subscript is inferred using
+  NumPy's rule: any letter that appears exactly once across all inputs goes to the output
+  (in sorted order); any letter that repeats is summed over. Ex: ``ij,jk`` will automatically
+  infer ``ik`` as output.
+
+``einsum`` also supports NumPy-style broadcast ellipsis (``...``) to represent batch dimensions, 
+instead of spelling them out with letters. For instance, without broadcast notation, you would use:
+``bcij,bcjk->bcik``. However, with broadcast notation you can do the following: ``...ij,...jk->...ik``.
+
+For broadcast notation to work correctly, the batch dimensions represented by ``...`` must have matching sizes. 
+For example, if ``...`` represents ``[5, 2]`` in one tensor, it must also represent ``[5, 2]`` in the other tensor. 
+MatX does not currently support NumPy-style size-1 broadcasting for these dimensions because cuTensorNet requires 
+shared dimensions to have matching sizes. Therefore, MatX throws a clear error if the sizes don't match.
 
 For tensor contractions, MatX uses cuTENSOR and cuTensorNet as the optimized backend libraries. Since
 neither of these libraries are included with CUDA, and not all users need ``einsum`` functionality, ``einsum``

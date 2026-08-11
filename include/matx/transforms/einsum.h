@@ -504,7 +504,7 @@ public:
     i = 0;
     ((params.nmodes_[i++] = tensors.Rank()), ...);
 
-    // For tokens with ellipsis, we cannot compare raw string length
+    //For tokens with ellipsis, we cannot compare raw string length
     // to tensor rank. Therefore, ellipsis tokens are validated with EllipsisRank()
 
     i = 0;
@@ -748,9 +748,10 @@ namespace cutensor {
    * MatX uses a syntax very similar to NumPy's einsum syntax:
    * https://numpy.org/doc/stable/reference/generated/numpy.einsum.html
    *
-   * Ellipses are not supported yet, but a variadic list of tensors for contraction is supported. The output
-   * operator '->' is required in MatX currently, and serves to provide error checking on the output tensor size.
-   *
+   * Broadcast ellipses ("...") are supported for aligning batch dimensions across
+   * operands, and a variadic list of tensors for contraction is also supported. The output
+   * operator '->' is optional; if omitted, the output subscript is inferred using NumPy's
+   * implicit-output rule.
    *
    * @tparam OutputType Output tensor type
    * @tparam InT Types of input tensors
