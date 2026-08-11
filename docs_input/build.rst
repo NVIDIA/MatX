@@ -460,7 +460,7 @@ internet-enabled system and transfer the Conan client cache to the offline envir
 
   .. code-block:: shell
 
-    tar -czvf matx_conan_cache.tar.gz ~/.conan2
+    tar -C "$HOME" -czvf matx_conan_cache.tar.gz .conan2
 
 4. Transfer the CPM cache (if used) and the Conan cache archive to the offline system.
 
