@@ -444,8 +444,7 @@ internet-enabled system and transfer the Conan client cache to the offline envir
 
 1. Decide which MatX versions and consumer profiles you need (for example `matx/1.0.0`).
 
-2. Pre-download MatX and its dependencies into a local Conan cache. One approach is to use `conan download` or run `conan install`
-  against a temporary consumer project to populate the cache. For example:
+2. Pre-download MatX and its dependencies into a local Conan cache. One approach is to use `conan download` or run `conan install` against a temporary consumer project to populate the cache. For example:
 
   .. code-block:: shell
 
@@ -475,8 +474,7 @@ internet-enabled system and transfer the Conan client cache to the offline envir
     export CONAN_USER_HOME=$HOME_OFFLINE
     export CPM_SOURCE_CACHE=$HOME_OFFLINE/matx_cpm_cache
 
-2. Use your consumer project's standard Conan workflow to install packages from the local cache without network access.
-  For example:
+2. Use your consumer project's standard Conan workflow to install packages from the local cache without network access. For example:
 
   .. code-block:: shell
 
