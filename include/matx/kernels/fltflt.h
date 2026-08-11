@@ -33,9 +33,301 @@
 #pragma once
 
 #include <cmath>
+#include <cuda/std/bit>
 #include <cuda/std/limits>
 
 namespace matx {
+
+namespace detail {
+// CUDA intrinsics and operators acquire an .ftz modifier when compiled with
+// --ftz=true (including through --use_fast_math). Float-float arithmetic
+// requires gradual underflow. is_ftz_enabled() compares the smallest FP32
+// subnormal with zero, which NVCC folds according to the active device FTZ mode.
+// This allows the non-FTZ build to retain optimizer-visible intrinsics while the
+// FTZ build selects explicit PTX instructions without .ftz. This is intentionally
+// an ordinary condition: __uint_as_float is not constexpr, and constexpr bit casts
+// that were tested always used standard C++ gradual-underflow semantics and failed
+// to correctly determine the FTZ mode.
+//
+// Note that we do not handle FTZ detection or mitigation for host code. Host
+// code implements FTZ via mode bits rather than per-instruction encodings, so
+// we do not have a practical way to handle it here. Users of the host fltflt
+// functions should investigate FTZ and DAZ handling on their platform.
+#if defined(__CUDA_ARCH__)
+static __MATX_DEVICE__ __MATX_INLINE__ bool is_ftz_enabled()
+{
+    return __uint_as_float(0x00000001U) == 0.0f;
+}
+
+// -G disables the optimization that folds the FTZ probe. It also removes the
+// optimizer visibility that the intrinsic path preserves, so explicit PTX is
+// the correct unconditional debug path in both FTZ modes.
+#if defined(__clang__) && defined(__CUDA__)
+// Our is_ftz_enabled() function does not properly detect ftz mode in Clang. Always use
+// explicit PTX so gradual underflow is preserved with and without FTZ enabled.
+#define MATX_FLTFLT_USE_PTX true
+#elif defined(__CUDACC_DEBUG__)
+#define MATX_FLTFLT_USE_PTX true
+#else
+#define MATX_FLTFLT_USE_PTX ::matx::detail::is_ftz_enabled()
+#endif
+#endif
+
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ float fadd_rn(float a, float b)
+{
+#if defined(__CUDA_ARCH__)
+    if (MATX_FLTFLT_USE_PTX) {
+        float result;
+        asm("add.rn.f32 %0, %1, %2;" : "=f"(result) : "f"(a), "f"(b));
+        return result;
+    }
+    return __fadd_rn(a, b);
+#else
+    return a + b;
+#endif
+}
+
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ float fsub_rn(float a, float b)
+{
+#if defined(__CUDA_ARCH__)
+    if (MATX_FLTFLT_USE_PTX) {
+        float result;
+        asm("sub.rn.f32 %0, %1, %2;" : "=f"(result) : "f"(a), "f"(b));
+        return result;
+    }
+    return __fsub_rn(a, b);
+#else
+    return a - b;
+#endif
+}
+
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ float fmul_rn(float a, float b)
+{
+#if defined(__CUDA_ARCH__)
+    if (MATX_FLTFLT_USE_PTX) {
+        float result;
+        asm("mul.rn.f32 %0, %1, %2;" : "=f"(result) : "f"(a), "f"(b));
+        return result;
+    }
+    return __fmul_rn(a, b);
+#else
+    return a * b;
+#endif
+}
+
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ float fmaf_rn(float a, float b, float c)
+{
+#if defined(__CUDA_ARCH__)
+    // Unlike __fmaf_rn(), this intrinsic ignores the -ftz=true compiler flag.
+    return __fmaf_ieee_rn(a, b, c);
+#else
+    // Use fmaf on host for better precision when available.
+    return ::fmaf(a, b, c);
+#endif
+}
+
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ float fdividef_rn(float a, float b)
+{
+#if defined(__CUDA_ARCH__)
+    if (MATX_FLTFLT_USE_PTX) {
+        float result;
+        asm("div.rn.f32 %0, %1, %2;" : "=f"(result) : "f"(a), "f"(b));
+        return result;
+    }
+    return __fdiv_rn(a, b);
+#else
+    return a / b;
+#endif
+}
+
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ float fneg(float a)
+{
+#if defined(__CUDA_ARCH__)
+    if (MATX_FLTFLT_USE_PTX) {
+        float result;
+        asm("neg.f32 %0, %1;" : "=f"(result) : "f"(a));
+        return result;
+    }
+    return -a;
+#else
+    return -a;
+#endif
+}
+
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ float fabs_noftz(float a)
+{
+#if defined(__CUDA_ARCH__)
+    if (MATX_FLTFLT_USE_PTX) {
+        float result;
+        asm("abs.f32 %0, %1;" : "=f"(result) : "f"(a));
+        return result;
+    }
+    return ::fabsf(a);
+#else
+    return ::fabsf(a);
+#endif
+}
+
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ float fcopysign(float magnitude, float sign)
+{
+    return ::copysignf(magnitude, sign);
+}
+
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ double float_to_double(float a)
+{
+#if defined(__CUDA_ARCH__)
+    if (MATX_FLTFLT_USE_PTX) {
+        double result;
+        asm("cvt.f64.f32 %0, %1;" : "=d"(result) : "f"(a));
+        return result;
+    }
+    return static_cast<double>(a);
+#else
+    return static_cast<double>(a);
+#endif
+}
+
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ float double_to_float_rn(double a)
+{
+#if defined(__CUDA_ARCH__)
+    if (MATX_FLTFLT_USE_PTX) {
+        float result;
+        asm("cvt.rn.f32.f64 %0, %1;" : "=f"(result) : "d"(a));
+        return result;
+    }
+    return __double2float_rn(a);
+#else
+    return static_cast<float>(a);
+#endif
+}
+
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ float fround_to_nearest(float a)
+{
+    return ::nearbyintf(a);
+}
+
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ float fround_toward_zero(float a)
+{
+    return ::truncf(a);
+}
+
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ float fround_down(float a)
+{
+#if defined(__CUDA_ARCH__)
+    if (MATX_FLTFLT_USE_PTX) {
+        float result;
+        asm("cvt.rmi.f32.f32 %0, %1;" : "=f"(result) : "f"(a));
+        return result;
+    }
+    return ::floorf(a);
+#else
+    return ::floorf(a);
+#endif
+}
+
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool feq(float a, float b)
+{
+#if defined(__CUDA_ARCH__)
+    if (MATX_FLTFLT_USE_PTX) {
+        unsigned int result;
+        asm("{ .reg .pred p; setp.eq.f32 p, %1, %2; selp.u32 %0, 1, 0, p; }"
+            : "=r"(result) : "f"(a), "f"(b));
+        return result != 0U;
+    }
+    return a == b;
+#else
+    return a == b;
+#endif
+}
+
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool fne(float a, float b)
+{
+#if defined(__CUDA_ARCH__)
+    if (MATX_FLTFLT_USE_PTX) {
+        unsigned int result;
+        asm("{ .reg .pred p; setp.neu.f32 p, %1, %2; selp.u32 %0, 1, 0, p; }"
+            : "=r"(result) : "f"(a), "f"(b));
+        return result != 0U;
+    }
+    return a != b;
+#else
+    return a != b;
+#endif
+}
+
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool flt(float a, float b)
+{
+#if defined(__CUDA_ARCH__)
+    if (MATX_FLTFLT_USE_PTX) {
+        unsigned int result;
+        asm("{ .reg .pred p; setp.lt.f32 p, %1, %2; selp.u32 %0, 1, 0, p; }"
+            : "=r"(result) : "f"(a), "f"(b));
+        return result != 0U;
+    }
+    return a < b;
+#else
+    return a < b;
+#endif
+}
+
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool fle(float a, float b)
+{
+#if defined(__CUDA_ARCH__)
+    if (MATX_FLTFLT_USE_PTX) {
+        unsigned int result;
+        asm("{ .reg .pred p; setp.le.f32 p, %1, %2; selp.u32 %0, 1, 0, p; }"
+            : "=r"(result) : "f"(a), "f"(b));
+        return result != 0U;
+    }
+    return a <= b;
+#else
+    return a <= b;
+#endif
+}
+
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool fgt(float a, float b)
+{
+#if defined(__CUDA_ARCH__)
+    if (MATX_FLTFLT_USE_PTX) {
+        unsigned int result;
+        asm("{ .reg .pred p; setp.gt.f32 p, %1, %2; selp.u32 %0, 1, 0, p; }"
+            : "=r"(result) : "f"(a), "f"(b));
+        return result != 0U;
+    }
+    return a > b;
+#else
+    return a > b;
+#endif
+}
+
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool fge(float a, float b)
+{
+#if defined(__CUDA_ARCH__)
+    if (MATX_FLTFLT_USE_PTX) {
+        unsigned int result;
+        asm("{ .reg .pred p; setp.ge.f32 p, %1, %2; selp.u32 %0, 1, 0, p; }"
+            : "=r"(result) : "f"(a), "f"(b));
+        return result != 0U;
+    }
+    return a >= b;
+#else
+    return a >= b;
+#endif
+}
+
+// All callers pass an integral float. Determine parity from its representation
+// without invoking floating-point arithmetic.
+static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool fis_odd_integer(float a)
+{
+    const unsigned int bits = cuda::std::bit_cast<unsigned int>(a);
+    const int exponent = static_cast<int>((bits >> 23) & 0xFFU) - 127;
+    if (exponent < 0 || exponent > 23) {
+        return false;
+    }
+    const unsigned int significand = (bits & 0x007FFFFFU) | 0x00800000U;
+    return ((significand >> (23 - exponent)) & 1U) != 0U;
+}
+} // namespace detail
 
 // This header implements a float-float type (fltflt) that uses two single-precision floating
 // point values to represent a higher-precision value. When normalized, the components of the
@@ -77,6 +369,7 @@ struct alignas(8) fltflt {
             hi = static_cast<float>(x);
             if (cuda::std::isfinite(hi)) {
                 lo = static_cast<float>(x - static_cast<double>(hi));
+                // Constant evaluation emits no device FP32 arithmetic instructions.
                 float s = hi + lo;
                 lo = lo - (s - hi);
                 hi = s;
@@ -91,36 +384,61 @@ struct alignas(8) fltflt {
             // hi_exp: float biased exponent = (e_x - 1023) + 127 = e_x - 896.
             int hi_exp = static_cast<int>(e_x) - 896;
             if (e_x == 0 || hi_exp <= 0 || hi_exp >= 255) {
-                hi = (float)x;
+                if (MATX_FLTFLT_USE_PTX) {
+                    hi = detail::double_to_float_rn(x);
+                } else {
+                    hi = static_cast<float>(x);
+                }
                 lo = 0.0f;
             } else {
                 // hi: top 23 explicit mantissa bits, round-nearest, ties away from zero.
                 // use + to mux in the mantissa, as we may need to carry into the exponent.
-                hi = __int_as_float((sign << 31) | ((unsigned int)hi_exp << 23) + (((unsigned int)(mant >> 28) + 1) >> 1));
+                hi = __int_as_float((sign << 31) | ((unsigned int)hi_exp << 23) +
+                                    (((unsigned int)(mant >> 28) + 1) >> 1));
                 // r: remainder as signed integer (we shift by 3 to get the 29 mantissa bits, with top-most bit the sign bit)
                 int r = static_cast<int>(static_cast<unsigned int>(mant) << 3);
-                lo = (__int2float_rn(r) * 0x1p-55f) * __int_as_float((sign << 31) | (hi_exp << 23));
                 // fast2sum: adjust hi to round-to-nearest and absorb the correction into lo,
                 // guaranteeing fl(hi + lo) == hi.
                 // two special cases can result in overflow here:
-                // 1. |x| >= FLT_MAX + ulp(FLT_MAX)/2, 
-                //   input: hi == +/-Inf, lo normal. 
+                // 1. |x| >= FLT_MAX + ulp(FLT_MAX)/2,
+                //   input: hi == +/-Inf, lo normal.
                 //   output: hi == +/-Inf, lo == NaN.
-                // 2. |x| > FLT_MAX + ulp(FLT_MAX)/2 - ulp(ulp(FLT_MAX)/2)/2: 
+                // 2. |x| > FLT_MAX + ulp(FLT_MAX)/2 - ulp(ulp(FLT_MAX)/2)/2:
                 //   input: hi == +/-FLT_MAX, lo == +/-ulp(FLT_MAX)/2
                 //   output: hi == +/-Inf, lo == -/+Inf.
-                float s = hi + lo;
-                lo = lo - (s - hi);
-                hi = s;
+                if (MATX_FLTFLT_USE_PTX) {
+                    // Keep the correction fused so an exact half-subnormal is not rounded
+                    // to zero before it can adjust hi.
+                    const float scale = __int_as_float((sign << 31) | (hi_exp << 23));
+                    const float scaled_r = detail::fmul_rn(__int2float_rn(r), 0x1p-55f);
+                    float s = detail::fmaf_rn(scaled_r, scale, hi);
+                    lo = detail::fmaf_rn(scaled_r, scale, detail::fsub_rn(hi, s));
+                    hi = s;
+                } else {
+                    // Preserve the original expression form when FTZ is disabled so the
+                    // compiler can fold constant conversions and contract the fast2sum.
+                    lo = (__int2float_rn(r) * 0x1p-55f) *
+                         __int_as_float((sign << 31) | (hi_exp << 23));
+                    float s = hi + lo;
+                    lo = lo - (s - hi);
+                    hi = s;
+                }
             }
         }
 #else
         hi = static_cast<float>(x);
         if (cuda::std::isfinite(hi)) {
             lo = static_cast<float>(x - static_cast<double>(hi));
-            float s = hi + lo;
-            lo = lo - (s - hi);
-            hi = s;
+            if (__builtin_is_constant_evaluated()) {
+                // Constant evaluation emits no device FP32 arithmetic instructions.
+                float s = hi + lo;
+                lo = lo - (s - hi);
+                hi = s;
+            } else {
+                float s = detail::fadd_rn(hi, lo);
+                lo = detail::fsub_rn(lo, detail::fsub_rn(s, hi));
+                hi = s;
+            }
         } else {
             lo = 0.0f;
         }
@@ -131,7 +449,10 @@ struct alignas(8) fltflt {
     // normalized components when they require the float-float invariants.
     __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ constexpr explicit fltflt(float hi_, float lo_) : hi(hi_), lo(lo_) {}
     __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ constexpr explicit operator double() const {
-        return static_cast<double>(hi) + static_cast<double>(lo);
+        if (__builtin_is_constant_evaluated()) {
+            return static_cast<double>(hi) + static_cast<double>(lo);
+        }
+        return detail::float_to_double(hi) + detail::float_to_double(lo);
     }
     __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ constexpr explicit operator float() const { return hi; }
 };
@@ -139,7 +460,7 @@ struct alignas(8) fltflt {
 // The constructors and conversion operators in the fltflt struct allow conversion to double and float
 // via static_cast<double>(fltflt_val) and similar for float. The fltflt_to_* functions are provided for completeness.
 static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ double fltflt_to_double(fltflt x) {
-    return static_cast<double>(x.hi) + static_cast<double>(x.lo);
+    return static_cast<double>(x);
 }
 
 static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ float fltflt_to_float(fltflt x) {
@@ -157,69 +478,22 @@ static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_make_from_flo
 }
 
 namespace detail {
-// Provide host/device wrappers for CUDA round-to-nearest intrinsics. On host, we fall back
-// to standard operations. These helpers allow fltflt arithmetic to be callable from host
-// code in a .cu translation unit (NVCC host pass), while still using fast intrinsics in
-// device code.
-static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ float fadd_rn(float a, float b)
-{
-#if defined(__CUDA_ARCH__)
-    return __fadd_rn(a, b);
-#else
-    return a + b;
-#endif
-}
-
-static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ float fsub_rn(float a, float b)
-{
-#if defined(__CUDA_ARCH__)
-    return __fsub_rn(a, b);
-#else
-    return a - b;
-#endif
-}
-
-static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ float fmul_rn(float a, float b)
-{
-#if defined(__CUDA_ARCH__)
-    return __fmul_rn(a, b);
-#else
-    return a * b;
-#endif
-}
-
-static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ float fmaf_rn(float a, float b, float c)
-{
-#if defined(__CUDA_ARCH__)
-    return __fmaf_rn(a, b, c);
-#else
-    // Use fmaf on host for better precision when available.
-    return ::fmaf(a, b, c);
-#endif
-}
-
-static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ float fdividef_rn(float a, float b)
-{
-#if defined(__CUDA_ARCH__)
-    // In many cases, __fdividef() is sufficient (e.g., when computing an initial estimate
-    // for a Newton-Raphson iteration). However, for now we stick with the more accurate
-    // __fdiv_rn() intrinsic until we have more robust error bounds.
-    return __fdiv_rn(a, b);
-#else
-    return a / b;
-#endif
-}
-
 static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ float fltflt_rsqrt(float x)
 {
 #if defined(__CUDA_ARCH__)
-    // rsqrtf has up to 2 ULP of error. This is less precise than 1.0f / ::sqrtf(x), which
-    // would be 0.5 ULP of error. We currently use rsqrtf() because it is significantly faster
-    // while maintaining 44+ bits of precision in testing thus far, but we may need to revisit
-    // this in the future.
-    return rsqrtf(x);
+    // rsqrt.approx.f32 has up to 2 ULP of error. This is less precise than
+    // 1.0f / ::sqrtf(x), which
+    // would be 0.5 ULP of error. We currently use the approximate instruction because it is
+    // significantly faster while maintaining 44+ bits of precision in testing thus far, but
+    // we may need to revisit this in the future.
+    if (MATX_FLTFLT_USE_PTX) {
+        float result;
+        asm("rsqrt.approx.f32 %0, %1;" : "=f"(result) : "f"(x));
+        return result;
+    }
+    return ::rsqrtf(x);
 #else
-    return 1.0f / ::sqrtf(x);
+    return fdividef_rn(1.0f, ::sqrtf(x));
 #endif
 }
 } // namespace detail
@@ -252,7 +526,7 @@ static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_fast_two_sum(
 // using a fused multiply-add operation.
 static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_two_prod_fma(float a, float b) {
     const float x = detail::fmul_rn(a, b);
-    const float y = detail::fmaf_rn(a, b, -x);
+    const float y = detail::fmaf_rn(a, b, detail::fneg(x));
     return fltflt{ x, y };
 }
 
@@ -331,20 +605,20 @@ static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_add_same_sign
 
 // fltflt_sub() subtracts b from a. It delegates to fltflt_add() with a negated b.
 static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_sub(fltflt a, fltflt b) {
-    const fltflt neg_b = fltflt{ -b.hi, -b.lo };
+    const fltflt neg_b = fltflt{ detail::fneg(b.hi), detail::fneg(b.lo) };
     return fltflt_add(a, neg_b);
 }
 
 // This overload is an optimization of fltflt_sub() for the case where b is
 // a float, and thus b.lo is zero. It delegates to fltflt_add() with a negated b.
 static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_sub(fltflt a, float b) {
-    return fltflt_add(a, -b);
+    return fltflt_add(a, detail::fneg(b));
 }
 
 // This overload is an optimization of fltflt_sub() for the case where a is
 // a float, and thus a.lo is zero. It delegates to fltflt_add() with a negated b.
 static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_sub(float a, fltflt b) {
-    return fltflt_add(fltflt{ -b.hi, -b.lo }, a);
+    return fltflt_add(fltflt{ detail::fneg(b.hi), detail::fneg(b.lo) }, a);
 }
 
 // fltflt_mul() is the df64_mult() function given by Thall. This function uses the
@@ -540,11 +814,11 @@ static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_fma_approx(fl
 
 // fltflt_div() is the df64_div() function given by Thall, which he attributes to Karp.
 // This function implements Algorithm 6 from Thall's paper. For the initial approximation,
-// we use the __fdividef() intrinsic on the device.
+// we use a round-to-nearest divide on the device.
 static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_div(fltflt a, fltflt b) {
-    const float xn = (b.hi == 0.0f) ? 0.0f : detail::fdividef_rn(1.0f, b.hi);
+    const float xn = detail::feq(b.hi, 0.0f) ? 0.0f : detail::fdividef_rn(1.0f, b.hi);
     const float yn = detail::fmul_rn(a.hi, xn);
-    const fltflt diff = fltflt_fma(-yn, b, a);
+    const fltflt diff = fltflt_fma(detail::fneg(yn), b, a);
     const fltflt prod = fltflt_two_prod_fma(xn, diff.hi);
     return fltflt_add(prod, yn);
 }
@@ -552,9 +826,9 @@ static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_div(fltflt a,
 // This overload is an optimization of fltflt_div() for the case where b is
 // a float, and thus b.lo is zero.
 static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_div(fltflt a, float b) {
-    const float xn = (b == 0.0f) ? 0.0f : detail::fdividef_rn(1.0f, b);
+    const float xn = detail::feq(b, 0.0f) ? 0.0f : detail::fdividef_rn(1.0f, b);
     const float yn = detail::fmul_rn(a.hi, xn);
-    const fltflt diff = fltflt_fma(-yn, b, a);
+    const fltflt diff = fltflt_fma(detail::fneg(yn), b, a);
     const fltflt prod = fltflt_two_prod_fma(xn, diff.hi);
     return fltflt_add(prod, yn);
 }
@@ -562,9 +836,9 @@ static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_div(fltflt a,
 // This overload is an optimization of fltflt_div() for the case where a is
 // a float, and thus a.lo is zero.
 static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_div(float a, fltflt b) {
-    const float xn = (b.hi == 0.0f) ? 0.0f : detail::fdividef_rn(1.0f, b.hi);
+    const float xn = detail::feq(b.hi, 0.0f) ? 0.0f : detail::fdividef_rn(1.0f, b.hi);
     const float yn = detail::fmul_rn(a, xn);
-    const fltflt diff = fltflt_fma(-yn, b, a);
+    const fltflt diff = fltflt_fma(detail::fneg(yn), b, a);
     const fltflt prod = fltflt_two_prod_fma(xn, diff.hi);
     return fltflt_add(prod, yn);
 }
@@ -575,40 +849,43 @@ static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_div(float a, 
 // the even significand).
 static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_round_to_nearest(fltflt a) {
     constexpr float FAST_PATH_THRESHOLD = 8388608.0f;
-    if (fabsf(a.hi) < FAST_PATH_THRESHOLD) {
-        const float candidate = nearbyintf(a.hi);
+    if (detail::flt(detail::fabs_noftz(a.hi), FAST_PATH_THRESHOLD)) {
+        const float candidate = detail::fround_to_nearest(a.hi);
 
         const float err = detail::fsub_rn(a.hi, candidate);
 
-        if (fabsf(err) != 0.5f) {
+        if (detail::fne(detail::fabs_noftz(err), 0.5f)) {
             return fltflt{ candidate, 0.0f };
         } else {
             // We should not have errors > 0.5 ulp(a.hi). Since ulp is at most 1, the max error should
             // be 0.5 for the boundary case.
             fltflt result{ candidate, 0.0f };
-            if (a.lo == 0.0f) {
+            if (detail::feq(a.lo, 0.0f)) {
                 // Perfect tie, round to even
-                const float corrected = (fmodf(candidate, 2.0f) == 0.0f) ? candidate : candidate + copysignf(1.0f, err);
+                const float corrected = !detail::fis_odd_integer(candidate)
+                    ? candidate
+                    : detail::fadd_rn(candidate, detail::fcopysign(1.0f, err));
                 result.hi = corrected;
-            } else if ((err > 0 && a.lo > 0) || (err < 0 && a.lo < 0)) {
-                result.hi = detail::fadd_rn(candidate, copysignf(1.0f, err));
+            } else if ((detail::fgt(err, 0.0f) && detail::fgt(a.lo, 0.0f)) ||
+                       (detail::flt(err, 0.0f) && detail::flt(a.lo, 0.0f))) {
+                result.hi = detail::fadd_rn(candidate, detail::fcopysign(1.0f, err));
             }
             // We do not need to renormalize because we know the full integral part fits
             // exactly in hi due to the original magnitude check.
             return result;
         }
     } else { // |a.hi| >= 2^23, so a.hi is an integer
-        float r_lo = nearbyintf(a.lo);
+        float r_lo = detail::fround_to_nearest(a.lo);
         const float frac = detail::fsub_rn(a.lo, r_lo);
 
-        if (fabsf(frac) > 0.5f) {
-            r_lo = detail::fadd_rn(r_lo, copysignf(1.0f, frac));
-        } else if (fabsf(frac) == 0.5f) {
+        if (detail::fgt(detail::fabs_noftz(frac), 0.5f)) {
+            r_lo = detail::fadd_rn(r_lo, detail::fcopysign(1.0f, frac));
+        } else if (detail::feq(detail::fabs_noftz(frac), 0.5f)) {
             // Check if hi + r_lo would be odd (sum is odd iff parities differ)
-            bool hi_is_odd = (fmodf(a.hi, 2.0f) != 0.0f);
-            bool rlo_is_odd = (fmodf(r_lo, 2.0f) != 0.0f);
+            bool hi_is_odd = detail::fis_odd_integer(a.hi);
+            bool rlo_is_odd = detail::fis_odd_integer(r_lo);
             if (hi_is_odd != rlo_is_odd) {  // XOR of parities
-                r_lo = detail::fadd_rn(r_lo, copysignf(1.0f, frac));
+                r_lo = detail::fadd_rn(r_lo, detail::fcopysign(1.0f, frac));
             }
         }
 
@@ -621,30 +898,32 @@ static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_round_to_near
 // result being truncated toward zero (vs floor, which will truncate toward
 // negative infinity).
 static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_round_toward_zero(fltflt a) {
-    if (fabsf(a.hi) < 8388608.0f) { // |a.hi| < 2^23, so a.hi is not an integer
-        const float hi_trunc = truncf(a.hi);
+    if (detail::flt(detail::fabs_noftz(a.hi), 8388608.0f)) { // |a.hi| < 2^23, so a.hi is not an integer
+        const float hi_trunc = detail::fround_toward_zero(a.hi);
         // If hi is exactly an integer, then lo can cause a boundary crossing
-        if (hi_trunc == a.hi) {
+        if (detail::feq(hi_trunc, a.hi)) {
             // If hi is 1.0 and lo is -1e-9, value is 0.999... -> trunc to 0.0
             // This happens when signs are opposite.
-            if ((a.hi > 0.0f && a.lo < 0.0f) || (a.hi < 0.0f && a.lo > 0.0f)) {
+            if ((detail::fgt(a.hi, 0.0f) && detail::flt(a.lo, 0.0f)) ||
+                (detail::flt(a.hi, 0.0f) && detail::fgt(a.lo, 0.0f))) {
                 // Pull toward zero by 1 unit
-                return fltflt{ a.hi + (a.hi > 0.0f ? -1.0f : 1.0f), 0.0f };
+                return fltflt{ detail::fadd_rn(a.hi, detail::fgt(a.hi, 0.0f) ? -1.0f : 1.0f), 0.0f };
             } else {
                 // Signs match or lo is 0: truncation is just hi. Fallthrough case.
             }
         }
         return fltflt{ hi_trunc, 0.0f };
     } else { // |a.hi| >= 2^23, so a.hi is an integer
-        float lo_trunc = truncf(a.lo);
-        if (lo_trunc != a.lo) { // lo has a fractional part, so we may need a correction
+        float lo_trunc = detail::fround_toward_zero(a.lo);
+        if (detail::fne(lo_trunc, a.lo)) { // lo has a fractional part, so we may need a correction
             // If lo is opposite sign of hi,
             // the fractional part nudges us across an integer boundary.
-            if ((a.hi > 0.0f && a.lo < 0.0f) || (a.hi < 0.0f && a.lo > 0.0f)) {
+            if ((detail::fgt(a.hi, 0.0f) && detail::flt(a.lo, 0.0f)) ||
+                (detail::flt(a.hi, 0.0f) && detail::fgt(a.lo, 0.0f))) {
                 // If hi=pos, lo=neg (e.g., 10, -0.5), we need 9.
                 // If hi=neg, lo=pos (e.g., -10, 0.5), we need -9.
-                const float adj = (a.hi > 0.0f) ? -1.0f : 1.0f;
-                lo_trunc = lo_trunc + adj;
+                const float adj = detail::fgt(a.hi, 0.0f) ? -1.0f : 1.0f;
+                lo_trunc = detail::fadd_rn(lo_trunc, adj);
             }
         }
         return fltflt_fast_two_sum(a.hi, lo_trunc);
@@ -654,16 +933,16 @@ static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_round_toward_
 // fltflt_floor() returns an integer truncated toward negative infinity. This is
 // the largest integer that is not larger than the value a.
 static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_floor(fltflt a) {
-    if (fabsf(a.hi) < 8388608.0f) { // |a.hi| < 2^23, so a.hi might not be an integer
-        const float hi_floor = floorf(a.hi);
+    if (detail::flt(detail::fabs_noftz(a.hi), 8388608.0f)) { // |a.hi| < 2^23, so a.hi might not be an integer
+        const float hi_floor = detail::fround_down(a.hi);
         // If hi was exactly an integer and lo is negative,
         // the actual value is just below hi, so floor should be hi - 1
-        if (hi_floor == a.hi && a.lo < 0.0f) {
-            return fltflt{ a.hi - 1.0f, 0.0f };
+        if (detail::feq(hi_floor, a.hi) && detail::flt(a.lo, 0.0f)) {
+            return fltflt{ detail::fsub_rn(a.hi, 1.0f), 0.0f };
         }
         return fltflt{ hi_floor, 0.0f };
     } else { // |a.hi| >= 2^23, so a.hi is already an integer
-        const float lo_floor = floorf(a.lo);
+        const float lo_floor = detail::fround_down(a.lo);
         // Renormalize the result
         return fltflt_fast_two_sum(a.hi, lo_floor);
     }
@@ -674,11 +953,11 @@ static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_floor(fltflt 
 // two_prod_fma() function for the hi components followed by subtraction of the square
 // of the result and re-normalization to a non-overlapping expansion.
 static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_sqrt(fltflt a) {
-    const float xn = (a.hi == 0.0f) ? 0.0f : detail::fltflt_rsqrt(a.hi);
+    const float xn = detail::feq(a.hi, 0.0f) ? 0.0f : detail::fltflt_rsqrt(a.hi);
     const float yn = detail::fmul_rn(a.hi, xn);
     const fltflt ynsqr = fltflt_two_prod_fma(yn, yn);
     const fltflt diff = fltflt_sub(a, ynsqr);
-    fltflt prod = fltflt_two_prod_fma(xn, 0.5f * diff.hi);
+    fltflt prod = fltflt_two_prod_fma(xn, detail::fmul_rn(0.5f, diff.hi));
     return fltflt_add(prod, yn);
 }
 
@@ -691,10 +970,10 @@ static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_sqrt(fltflt a
 // baseline in all mantissa bits and fltflt_sqrt_fast() matches the first 45 mantissa bits.
 // This function may eventually become the default sqrt() implementation.
 static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_sqrt_fast(fltflt a) {
-    const float xn = (a.hi == 0.0f) ? 0.0f : detail::fltflt_rsqrt(a.hi);
+    const float xn = detail::feq(a.hi, 0.0f) ? 0.0f : detail::fltflt_rsqrt(a.hi);
     const float yn = detail::fmul_rn(a.hi, xn);
     const float residual = detail::fadd_rn(
-        detail::fmaf_rn(-yn, yn, a.hi), a.lo);
+        detail::fmaf_rn(detail::fneg(yn), yn, a.hi), a.lo);
     const float correction = detail::fmul_rn(
         detail::fmul_rn(xn, 0.5f), residual);
     return fltflt_fast_two_sum(yn, correction);
@@ -746,8 +1025,8 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt sqrt(fltflt a) { return flt
 // in implementations that allow non-normalized values, it should either be added or the
 // value should be re-normalized prior to calling this function.
 static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_abs(fltflt a) {
-    if (a.hi < 0.0f) {
-        return fltflt{ -a.hi, -a.lo };
+    if (detail::flt(a.hi, 0.0f)) {
+        return fltflt{ detail::fneg(a.hi), detail::fneg(a.lo) };
     }
     return a;
 }
@@ -763,7 +1042,9 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt operator-(fltflt a, fltflt 
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt operator-(fltflt a, float b) { return fltflt_sub(a, b); }
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt operator-(float a, fltflt b) { return fltflt_sub(a, b); }
 
-__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt operator-(fltflt a) { return fltflt{ -a.hi, -a.lo }; }
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt operator-(fltflt a) {
+    return fltflt{ detail::fneg(a.hi), detail::fneg(a.lo) };
+}
 
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt operator*(fltflt a, fltflt b) { return fltflt_mul(a, b); }
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt operator*(fltflt a, float b) { return fltflt_mul(a, b); }
@@ -773,29 +1054,137 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt operator/(fltflt a, fltflt 
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt operator/(fltflt a, float b) { return fltflt_div(a, b); }
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt operator/(float a, fltflt b) { return fltflt_div(a, b); }
 
-__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator==(fltflt a, fltflt b) { return a.hi == b.hi && a.lo == b.lo; }
-__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator==(fltflt a, float b) { return a.hi == b && a.lo == 0.0f; }
-__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator==(float a, fltflt b) { return b.hi == a && b.lo == 0.0f; }
+// Dispatch once around each composite comparison. In non-FTZ builds this keeps the
+// complete expression visible to the optimizer instead of hiding each scalar
+// comparison behind a separately dispatched wrapper.
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator==(fltflt a, fltflt b) {
+#if defined(__CUDA_ARCH__)
+    if (MATX_FLTFLT_USE_PTX) {
+        return detail::feq(a.hi, b.hi) && detail::feq(a.lo, b.lo);
+    }
+#endif
+    return a.hi == b.hi && a.lo == b.lo;
+}
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator==(fltflt a, float b) {
+#if defined(__CUDA_ARCH__)
+    if (MATX_FLTFLT_USE_PTX) {
+        return detail::feq(a.hi, b) && detail::feq(a.lo, 0.0f);
+    }
+#endif
+    return a.hi == b && a.lo == 0.0f;
+}
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator==(float a, fltflt b) {
+#if defined(__CUDA_ARCH__)
+    if (MATX_FLTFLT_USE_PTX) {
+        return detail::feq(b.hi, a) && detail::feq(b.lo, 0.0f);
+    }
+#endif
+    return b.hi == a && b.lo == 0.0f;
+}
 
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator!=(fltflt a, fltflt b) { return !(a == b); }
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator!=(fltflt a, float b) { return !(a == b); }
 __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator!=(float a, fltflt b) { return !(a == b); }
 
-__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator<(fltflt a, fltflt b) { return a.hi < b.hi || (a.hi == b.hi && a.lo < b.lo); }
-__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator<(fltflt a, float b) { return a.hi < b || (a.hi == b && a.lo < 0.0f); }
-__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator<(float a, fltflt b) { return a < b.hi || (a == b.hi && b.lo > 0.0f); }
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator<(fltflt a, fltflt b) {
+#if defined(__CUDA_ARCH__)
+    if (MATX_FLTFLT_USE_PTX) {
+        return detail::flt(a.hi, b.hi) || (detail::feq(a.hi, b.hi) && detail::flt(a.lo, b.lo));
+    }
+#endif
+    return a.hi < b.hi || (a.hi == b.hi && a.lo < b.lo);
+}
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator<(fltflt a, float b) {
+#if defined(__CUDA_ARCH__)
+    if (MATX_FLTFLT_USE_PTX) {
+        return detail::flt(a.hi, b) || (detail::feq(a.hi, b) && detail::flt(a.lo, 0.0f));
+    }
+#endif
+    return a.hi < b || (a.hi == b && a.lo < 0.0f);
+}
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator<(float a, fltflt b) {
+#if defined(__CUDA_ARCH__)
+    if (MATX_FLTFLT_USE_PTX) {
+        return detail::flt(a, b.hi) || (detail::feq(a, b.hi) && detail::fgt(b.lo, 0.0f));
+    }
+#endif
+    return a < b.hi || (a == b.hi && b.lo > 0.0f);
+}
 
-__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator>(fltflt a, fltflt b) { return a.hi > b.hi || (a.hi == b.hi && a.lo > b.lo); }
-__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator>(fltflt a, float b) { return a.hi > b || (a.hi == b && a.lo > 0.0f); }
-__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator>(float a, fltflt b) { return a > b.hi || (a == b.hi && b.lo < 0.0f); }
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator>(fltflt a, fltflt b) {
+#if defined(__CUDA_ARCH__)
+    if (MATX_FLTFLT_USE_PTX) {
+        return detail::fgt(a.hi, b.hi) || (detail::feq(a.hi, b.hi) && detail::fgt(a.lo, b.lo));
+    }
+#endif
+    return a.hi > b.hi || (a.hi == b.hi && a.lo > b.lo);
+}
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator>(fltflt a, float b) {
+#if defined(__CUDA_ARCH__)
+    if (MATX_FLTFLT_USE_PTX) {
+        return detail::fgt(a.hi, b) || (detail::feq(a.hi, b) && detail::fgt(a.lo, 0.0f));
+    }
+#endif
+    return a.hi > b || (a.hi == b && a.lo > 0.0f);
+}
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator>(float a, fltflt b) {
+#if defined(__CUDA_ARCH__)
+    if (MATX_FLTFLT_USE_PTX) {
+        return detail::fgt(a, b.hi) || (detail::feq(a, b.hi) && detail::flt(b.lo, 0.0f));
+    }
+#endif
+    return a > b.hi || (a == b.hi && b.lo < 0.0f);
+}
 
-__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator<=(fltflt a, fltflt b) { return a < b || a == b; }
-__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator<=(fltflt a, float b) { return a < b || a == b; }
-__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator<=(float a, fltflt b) { return a < b || a == b; }
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator<=(fltflt a, fltflt b) {
+#if defined(__CUDA_ARCH__)
+    if (MATX_FLTFLT_USE_PTX) {
+        return detail::flt(a.hi, b.hi) || (detail::feq(a.hi, b.hi) && detail::fle(a.lo, b.lo));
+    }
+#endif
+    return a.hi < b.hi || (a.hi == b.hi && a.lo <= b.lo);
+}
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator<=(fltflt a, float b) {
+#if defined(__CUDA_ARCH__)
+    if (MATX_FLTFLT_USE_PTX) {
+        return detail::flt(a.hi, b) || (detail::feq(a.hi, b) && detail::fle(a.lo, 0.0f));
+    }
+#endif
+    return a.hi < b || (a.hi == b && a.lo <= 0.0f);
+}
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator<=(float a, fltflt b) {
+#if defined(__CUDA_ARCH__)
+    if (MATX_FLTFLT_USE_PTX) {
+        return detail::flt(a, b.hi) || (detail::feq(a, b.hi) && detail::fge(b.lo, 0.0f));
+    }
+#endif
+    return a < b.hi || (a == b.hi && b.lo >= 0.0f);
+}
 
-__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator>=(fltflt a, fltflt b) { return a > b || a == b; }
-__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator>=(fltflt a, float b) { return a > b || a == b; }
-__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator>=(float a, fltflt b) { return a > b || a == b; }
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator>=(fltflt a, fltflt b) {
+#if defined(__CUDA_ARCH__)
+    if (MATX_FLTFLT_USE_PTX) {
+        return detail::fgt(a.hi, b.hi) || (detail::feq(a.hi, b.hi) && detail::fge(a.lo, b.lo));
+    }
+#endif
+    return a.hi > b.hi || (a.hi == b.hi && a.lo >= b.lo);
+}
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator>=(fltflt a, float b) {
+#if defined(__CUDA_ARCH__)
+    if (MATX_FLTFLT_USE_PTX) {
+        return detail::fgt(a.hi, b) || (detail::feq(a.hi, b) && detail::fge(a.lo, 0.0f));
+    }
+#endif
+    return a.hi > b || (a.hi == b && a.lo >= 0.0f);
+}
+__MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator>=(float a, fltflt b) {
+#if defined(__CUDA_ARCH__)
+    if (MATX_FLTFLT_USE_PTX) {
+        return detail::fgt(a, b.hi) || (detail::feq(a, b.hi) && detail::fle(b.lo, 0.0f));
+    }
+#endif
+    return a > b.hi || (a == b.hi && b.lo <= 0.0f);
+}
 
 // fltflt_fmod() computes the floating-point remainder of division. In other words,
 // fltflt_fmod(a, b) = a - n * b where n = trunc(a/b) and trunc() truncates to an integer
@@ -806,7 +1195,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ bool operator>=(float a, fltflt b)
 // not use range reduction or similar techniques to improve precision in these cases, but a
 // future implementation may do so.
 static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_fmod(fltflt a, fltflt b) {
-    if (b.hi == 0.0f && b.lo == 0.0f) {
+    if (detail::feq(b.hi, 0.0f) && detail::feq(b.lo, 0.0f)) {
         return fltflt{cuda::std::numeric_limits<float>::quiet_NaN(),
                       cuda::std::numeric_limits<float>::quiet_NaN()};
     }
@@ -829,12 +1218,12 @@ static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_fmod(fltflt a
         result = fltflt_add(result, b);
     }
 
-    return fltflt{ sign * result.hi, sign * result.lo };
+    return fltflt{ detail::fmul_rn(sign, result.hi), detail::fmul_rn(sign, result.lo) };
 }
 
 // fltflt_fmod() overload where b is a float.
 static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_fmod(fltflt a, float b) {
-    if (b == 0.0f) {
+    if (detail::feq(b, 0.0f)) {
         return fltflt{cuda::std::numeric_limits<float>::quiet_NaN(),
                       cuda::std::numeric_limits<float>::quiet_NaN()};
     }
@@ -844,7 +1233,7 @@ static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_fmod(fltflt a
         sign = -1.0f;
         a = -a;
     }
-    b = fabsf(b);
+    b = detail::fabs_noftz(b);
 
     const fltflt q = fltflt_div(a, b);
     const fltflt trunc_q = fltflt_round_toward_zero(q);
@@ -857,7 +1246,7 @@ static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ fltflt fltflt_fmod(fltflt a
         result = fltflt_add(result, b);
     }
 
-    return fltflt{ sign * result.hi, sign * result.lo };
+    return fltflt{ detail::fmul_rn(sign, result.hi), detail::fmul_rn(sign, result.lo) };
 }
 
 } // namespace matx
@@ -907,3 +1296,7 @@ public:
 };
 
 }} // namespace cuda::std
+
+#if defined(__CUDA_ARCH__)
+#undef MATX_FLTFLT_USE_PTX
+#endif

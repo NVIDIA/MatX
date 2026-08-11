@@ -9,6 +9,7 @@ set (test_sources
     00_misc/ClearCacheTests.cu
     00_misc/CudaExecutorCommonTests.cu
     00_misc/ErrorTests.cu
+    00_misc/FloatFloatFastMathTests.cu
     00_misc/FloatFloatTests.cu
     00_misc/GridDimTests.cu
     00_misc/ProfilingTests.cu
@@ -172,6 +173,13 @@ endfunction()
 foreach(test_file ${test_sources})
     create_test_executable(${test_file})
 endforeach()
+
+# Float-float arithmetic must preserve gradual underflow when CUDA FTZ is
+# enabled, including through --use_fast_math under NVCC.
+target_compile_options(test_00_misc_FloatFloatFastMathTests PRIVATE
+    $<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CUDA_COMPILER_ID:NVIDIA>>:--use_fast_math>
+    $<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CUDA_COMPILER_ID:Clang>>:-fgpu-flush-denormals-to-zero>
+)
 
 # Create individual executables for proprietary tests
 foreach(test_file ${proprietary_sources})
