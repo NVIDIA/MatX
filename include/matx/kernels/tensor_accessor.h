@@ -59,7 +59,7 @@ template <typename Op>
 using data_ptr_of_op_t = typename data_ptr_of_op<Op, is_tensor_view_v<Op>>::type;
 
 // Forward declaration — defined below.
-template <typename Op, bool IsUnitStride, int NumBound>
+template <typename Op, bool IsUnitStride, int NumBound, typename IdxT = index_t>
 struct BoundAccessor;
 
 // ----------------------------------------------------------------------------
@@ -86,7 +86,10 @@ struct BoundAccessor;
 // access time; on the slow path it captures the bound indices and forwards
 // them to op(leading..., is...).
 // ----------------------------------------------------------------------------
-template <typename Op, bool IsUnitStride, int RankParam = Op::Rank()>
+// IdxT selects the width of the offset arithmetic. It defaults to index_t.
+// Callers that have already proven every index the kernel forms fits in 32 bits
+// can pass int32_t to collapse the 64-bit integer arithmetic into 32-bit arithmetic.
+template <typename Op, bool IsUnitStride, typename IdxT = index_t, int RankParam = Op::Rank()>
 struct TensorAccessor {
     static_assert(is_matx_op<Op>(), "TensorAccessor requires a MatX operator");
     static constexpr bool FastPath = IsUnitStride && is_tensor_view_v<Op>;
@@ -100,7 +103,7 @@ struct TensorAccessor {
 
     const Op& op_;
     data_ptr_of_op_t<Op> data_;
-    index_t outer_strides_[NumOuterStored];
+    IdxT outer_strides_[NumOuterStored];
 
     __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__
     explicit TensorAccessor(const Op& op) : op_(op), data_(nullptr) {
@@ -109,7 +112,7 @@ struct TensorAccessor {
             if constexpr (NumOuter > 0) {
                 MATX_LOOP_UNROLL
                 for (int d = 0; d < NumOuter; ++d) {
-                    outer_strides_[d] = op.Stride(d);
+                    outer_strides_[d] = static_cast<IdxT>(op.Stride(d));
                 }
             }
         }
@@ -126,9 +129,9 @@ struct TensorAccessor {
         requires (Rank >= 1 && sizeof...(Is) == Rank)
     {
         if constexpr (FastPath) {
-            const index_t idx_arr[] = { static_cast<index_t>(is)... };
+            const IdxT idx_arr[] = { static_cast<IdxT>(is)... };
             // Last-dim stride is 1 under IsUnitStride.
-            index_t offset = idx_arr[Rank - 1];
+            IdxT offset = idx_arr[Rank - 1];
             if constexpr (NumOuter > 0) {
                 MATX_LOOP_UNROLL
                 for (int d = 0; d < NumOuter; ++d) {
@@ -148,7 +151,7 @@ struct TensorAccessor {
     auto bind(Leading... leading) const
         requires (sizeof...(Leading) > 0 && sizeof...(Leading) <= Rank)
     {
-        return BoundAccessor<Op, IsUnitStride, sizeof...(Leading)>(
+        return BoundAccessor<Op, IsUnitStride, sizeof...(Leading), IdxT>(
             *this, static_cast<index_t>(leading)...);
     }
 };
@@ -167,7 +170,7 @@ struct TensorAccessor {
 // Slow path: stores the bound indices and forwards them, together with the
 // per-access indices, to op(leading..., is...).
 // ----------------------------------------------------------------------------
-template <typename Op, bool IsUnitStride, int NumBound>
+template <typename Op, bool IsUnitStride, int NumBound, typename IdxT>
 struct BoundAccessor {
     static_assert(NumBound > 0, "BoundAccessor requires at least one bound dim");
     static_assert(is_matx_op<Op>(), "BoundAccessor requires a MatX operator");
@@ -182,13 +185,13 @@ struct BoundAccessor {
 
     const Op& op_;
     data_ptr_of_op_t<Op> base_;              // fast path: already advanced past bound coords
-    index_t rem_outer_strides_[NumRemOuterStored];
+    IdxT rem_outer_strides_[NumRemOuterStored];
     index_t bound_idxs_[NumBound];           // slow path: forward to op(bound..., is...)
 
     // Construct from a parent TensorAccessor + leading index pack.
     template <typename... Leading>
     __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__
-    BoundAccessor(const TensorAccessor<Op, IsUnitStride>& parent, Leading... leading)
+    BoundAccessor(const TensorAccessor<Op, IsUnitStride, IdxT>& parent, Leading... leading)
         : op_(parent.op_), base_(nullptr)
     {
         static_assert(sizeof...(Leading) == NumBound, "Mismatched bind arity");
@@ -201,17 +204,17 @@ struct BoundAccessor {
 
         if constexpr (FastPath) {
             base_ = parent.data_;
-            index_t off = 0;
+            IdxT off = 0;
             MATX_LOOP_UNROLL
             for (int d = 0; d < NumBound; ++d) {
                 // parent.outer_strides_ only covers dims 0..OriginalRank-2.
                 // The last dim's stride is implicitly 1 under IsUnitStride
                 // and is not stored, so bind of that dim must use 1 directly
                 // rather than read past the populated slots.
-                const index_t stride_d = (d < OriginalRank - 1)
+                const IdxT stride_d = (d < OriginalRank - 1)
                     ? parent.outer_strides_[d]
-                    : static_cast<index_t>(1);
-                off += leading_arr[d] * stride_d;
+                    : static_cast<IdxT>(1);
+                off += static_cast<IdxT>(leading_arr[d]) * stride_d;
             }
             base_ += off;
             if constexpr (NumRemOuter > 0) {
@@ -240,8 +243,8 @@ struct BoundAccessor {
         requires (Rank >= 1 && sizeof...(Is) == Rank)
     {
         if constexpr (FastPath) {
-            const index_t idx_arr[] = { static_cast<index_t>(is)... };
-            index_t offset = idx_arr[Rank - 1];
+            const IdxT idx_arr[] = { static_cast<IdxT>(is)... };
+            IdxT offset = idx_arr[Rank - 1];
             if constexpr (NumRemOuter > 0) {
                 MATX_LOOP_UNROLL
                 for (int d = 0; d < NumRemOuter; ++d) {

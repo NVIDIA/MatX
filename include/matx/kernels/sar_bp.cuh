@@ -82,8 +82,8 @@ struct SarBpBinAndWeight {
     int32_t bin_floor_int;
 };
 
-template <typename PlatPosAccessor, SarBpComputeType ComputeType, typename strict_compute_t, typename loose_compute_t>
-__device__ inline strict_compute_t ComputeRangeToPixel(const PlatPosAccessor &ant_pos, const index_t pulse_idx, const loose_compute_t px, const loose_compute_t py, const loose_compute_t pz) {
+template <typename PlatPosAccessor, SarBpComputeType ComputeType, typename strict_compute_t, typename loose_compute_t, typename IdxT>
+__device__ inline strict_compute_t ComputeRangeToPixel(const PlatPosAccessor &ant_pos, const IdxT pulse_idx, const loose_compute_t px, const loose_compute_t py, const loose_compute_t pz) {
     using plat_pos_t = typename PlatPosAccessor::value_type;
     constexpr int Rank = PlatPosAccessor::Rank;
     constexpr bool IsFloat = ComputeType == SarBpComputeType::Float;
@@ -257,10 +257,10 @@ struct SarBpThreadState<SarBpComputeType::TaylorFast, true> {
 // Domain: at least one of dx/dy/dz must not fully cancel (sum of squared
 // distances must be strictly positive) -- three-way simultaneous
 // cancellation is not a meaningful SAR geometry and is not supported.
-template <bool UseCachedPz2 = false>
+template <bool UseCachedPz2 = false, typename IdxT = index_t>
 __device__ inline SarBpBinAndWeight<float> ComputeBinWeightToPixelFloatFloat(
     const SarBpPulseBlockCache<SarBpComputeType::FloatFloat, true> &sh_mem,
-    index_t ip,
+    IdxT ip,
     float px, float py, [[maybe_unused]] float pz,
     fltflt dr_inv)
 {
@@ -366,11 +366,11 @@ __device__ inline SarBpBinAndWeight<float> ComputeBinWeightToPixelFloatFloat(
     };
 }
 
-template <bool TaylorFastAddThirdOrder = false, bool PixelZIsUniform = false>
+template <bool TaylorFastAddThirdOrder = false, bool PixelZIsUniform = false, typename IdxT = index_t>
 __device__ inline SarBpBinAndWeight<float> ComputeBinWeightToPixelTaylorFast(
     const SarBpPulseBlockCache<SarBpComputeType::TaylorFast, true> &sh_mem,
     const SarBpThreadState<SarBpComputeType::TaylorFast, true> &thread_state,
-    index_t ip)
+    IdxT ip)
 {
     // In the mathematical derivation in the documentation, we defined s = dot(u, d) as
     // the dot product of the along-range unit vector u=(ux, uy, uz) with the local offset d,
@@ -407,10 +407,10 @@ __device__ inline SarBpBinAndWeight<float> ComputeBinWeightToPixelTaylorFast(
     };
 }
 
-template <SarBpComputeType ComputeType, bool PixelZIsZero, bool UseCachedDz2, typename strict_compute_t, typename loose_compute_t>
+template <SarBpComputeType ComputeType, bool PixelZIsZero, bool UseCachedDz2, typename strict_compute_t, typename loose_compute_t, typename IdxT>
 __device__ inline SarBpBinAndWeight<loose_compute_t> ComputeBinWeightToPixelPulseBlockCache(
     const SarBpPulseBlockCache<ComputeType, true> &sh_mem,
-    index_t ip,
+    IdxT ip,
     loose_compute_t px,
     loose_compute_t py,
     [[maybe_unused]] loose_compute_t pz,
@@ -464,6 +464,31 @@ __device__ inline SarBpBinAndWeight<loose_compute_t> ComputeBinWeightToPixelPuls
     };
 }
 
+template <SarBpComputeType ComputeType, SarBpPixelZMode PixelZMode, bool TaylorFastAddThirdOrder>
+struct SarBpMinCtaCount { static constexpr int value = 5; };
+
+template <> struct SarBpMinCtaCount<SarBpComputeType::TaylorFast, SarBpPixelZMode::Zero, false> { static constexpr int value = 6; };
+template <> struct SarBpMinCtaCount<SarBpComputeType::TaylorFast, SarBpPixelZMode::Fixed, false> { static constexpr int value = 6; };
+template <> struct SarBpMinCtaCount<SarBpComputeType::Float, SarBpPixelZMode::Zero, false> { static constexpr int value = 6; };
+template <> struct SarBpMinCtaCount<SarBpComputeType::Float, SarBpPixelZMode::Fixed, false> { static constexpr int value = 6; };
+template <> struct SarBpMinCtaCount<SarBpComputeType::Float, SarBpPixelZMode::Variable, false> { static constexpr int value = 6; };
+
+// Cap the maximum CTA count to the architecture's limit. sm_75 caps at 1024 threads/SM
+// and all other supported architectures allow at least 1536 (6 CTAs). Pushing to 8
+// CTAS_PER_SM would greatly limit register allocation, so treat 6 as the common maximum.
+#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ == 750
+#define MATX_SARBP_MAX_CTAS_PER_SM 4
+#else
+#define MATX_SARBP_MAX_CTAS_PER_SM 6
+#endif
+
+// The requested CTA count, clamped to what this architecture can honor.
+template <SarBpComputeType ComputeType, SarBpPixelZMode PixelZMode, bool TaylorFastAddThirdOrder>
+inline constexpr int SarBpMinCtas =
+    (SarBpMinCtaCount<ComputeType, PixelZMode, TaylorFastAddThirdOrder>::value < MATX_SARBP_MAX_CTAS_PER_SM)
+        ? SarBpMinCtaCount<ComputeType, PixelZMode, TaylorFastAddThirdOrder>::value
+        : MATX_SARBP_MAX_CTAS_PER_SM;
+
 // SarBp backprojection kernel. PixelZMode is a compile-time assumption about
 // the pixel z (height) coordinates, selected by the caller via the
 // PropSarBpPixelZIsZero / PropSarBpPixelZIsFixed properties (see
@@ -477,8 +502,13 @@ __device__ inline SarBpBinAndWeight<loose_compute_t> ComputeBinWeightToPixelPuls
 //     compute paths the per-pulse z contribution dz^2 is uniform across pixels
 //     and is precomputed once per pulse (see FillPulseBlockCache), removing the
 //     per-pixel-per-pulse subtract+square from the inner loop.
-template <SarBpComputeType ComputeType, typename OutImageType, typename InitialImageType, typename RangeProfilesType, typename PlatPosType, typename VoxLocType, typename RangeToMcpType, bool PhaseLUT, bool IsUnitStride, bool TaylorFastAddThirdOrder = false, SarBpPixelZMode PixelZMode = SarBpPixelZMode::Variable>
-__launch_bounds__(16*16)
+template <SarBpComputeType ComputeType, typename OutImageType, typename InitialImageType, typename RangeProfilesType, typename PlatPosType, typename VoxLocType, typename RangeToMcpType, bool PhaseLUT, bool IsUnitStride, bool TaylorFastAddThirdOrder = false, SarBpPixelZMode PixelZMode = SarBpPixelZMode::Variable, typename IdxT = index_t>
+// Set the minimum CTA count as a function of the compute type and pixel z mode. This
+// is most important for Double/Mixed where increasing occupancy even at the cost of
+// register spills is beneficial. For modes with reduced register pressure, we set
+// higher minimum CTA counts to avoid the occupancy loss associated with a fixed value
+// for all instantiations.
+__launch_bounds__(16*16, (SarBpMinCtas<ComputeType, PixelZMode, TaylorFastAddThirdOrder>))
 __global__ void SarBp(OutImageType output, const InitialImageType initial_image, const __grid_constant__ RangeProfilesType range_profiles, const __grid_constant__ PlatPosType platform_positions, const __grid_constant__ VoxLocType voxel_locations, const __grid_constant__ RangeToMcpType range_to_mcp,
                       strict_or_ff_compute_param_t<ComputeType> dr_inv,
                       strict_compute_param_t<ComputeType> phase_correction_partial,
@@ -585,7 +615,7 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
         if (! is_valid) return;
     }
 
-    const index_t num_pulses = range_profiles.Size(0);
+    const IdxT num_pulses = static_cast<IdxT>(range_profiles.Size(0));
     const int32_t num_range_bins = static_cast<int32_t>(range_profiles.Size(1));
 
     static_assert(cuda::std::is_same_v<voxel_loc_t, double3> || cuda::std::is_same_v<voxel_loc_t, double4> ||
@@ -618,7 +648,7 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
     // operator(). Binding the tensor's Data() and Stride(0) into the
     // accessor's members forces the compiler to materialize the grid-constant
     // LDCs once at kernel entry rather than reloading inside the pulse loop.
-    detail::TensorAccessor<RangeProfilesType, IsUnitStride> rp(range_profiles);
+    detail::TensorAccessor<RangeProfilesType, IsUnitStride, IdxT> rp(range_profiles);
     detail::TensorAccessor<PlatPosType, IsUnitStride> pp(platform_positions);
 
     // range_to_mcp is required to be a rank-0 or rank-1 MatX operator; the
@@ -626,7 +656,7 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
     // views or forwards to operator() for computed ops (e.g. ConstVal).
     const detail::TensorAccessor<RangeToMcpType, IsUnitStride> rtm_acc(range_to_mcp);
 
-    const auto r_to_mcp = [rtm_acc](index_t p) -> auto {
+    const auto r_to_mcp = [rtm_acc](IdxT p) -> auto {
         if constexpr (RangeToMcpType::Rank() == 0) {
             return rtm_acc();
         } else {
@@ -734,11 +764,12 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
 
     // Most ComputeTypes amortize some redundant computations or data conversions by leveraging
     // per-pulse-block shared memory.
-    const auto FillPulseBlockCache = [&](index_t pulse_base, index_t num_pulses_in_block) {
+    const auto FillPulseBlockCache = [&](IdxT pulse_base, IdxT num_pulses_in_block) {
         if constexpr (UsePulseBlockCache) {
             __syncthreads();
-            for (index_t ip = tid; ip < num_pulses_in_block; ip += blockDim.x * blockDim.y) {
-                const index_t p = pulse_base + ip;
+            for (IdxT ip = static_cast<IdxT>(tid); ip < num_pulses_in_block;
+                 ip += static_cast<IdxT>(blockDim.x * blockDim.y)) {
+                const IdxT p = pulse_base + ip;
                 // Accessor does the IsUnitStride / rank dispatch internally,
                 // so we just ask for (apx, apy, apz) uniformly.
                 auto load_xyz = [&]() {
@@ -837,12 +868,14 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
     };
 
     const int num_pulse_blocks = static_cast<int>(
-        (num_pulses + static_cast<index_t>(PULSE_BLOCK_SIZE) - 1) / static_cast<index_t>(PULSE_BLOCK_SIZE));
+        (num_pulses + static_cast<IdxT>(PULSE_BLOCK_SIZE) - static_cast<IdxT>(1)) /
+        static_cast<IdxT>(PULSE_BLOCK_SIZE));
     for (int block = 0; block < num_pulse_blocks; ++block) {
-        const index_t pulse_base = static_cast<index_t>(block) * static_cast<index_t>(PULSE_BLOCK_SIZE);
-        const index_t pulses_remaining = num_pulses - pulse_base;
-        const index_t num_pulses_in_block =
-            (pulses_remaining < static_cast<index_t>(PULSE_BLOCK_SIZE)) ? pulses_remaining : static_cast<index_t>(PULSE_BLOCK_SIZE);
+        const IdxT pulse_base = static_cast<IdxT>(block) * static_cast<IdxT>(PULSE_BLOCK_SIZE);
+        const IdxT pulses_remaining = num_pulses - pulse_base;
+        const IdxT num_pulses_in_block =
+            (pulses_remaining < static_cast<IdxT>(PULSE_BLOCK_SIZE)) ?
+                pulses_remaining : static_cast<IdxT>(PULSE_BLOCK_SIZE);
 
         FillPulseBlockCache(pulse_base, num_pulses_in_block);
         if (! is_valid) {
@@ -850,8 +883,8 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
         }
 
         #pragma unroll 4
-        for (index_t ip = 0; ip < num_pulses_in_block; ++ip) {
-            const index_t p = pulse_base + ip;
+        for (IdxT ip = 0; ip < num_pulses_in_block; ++ip) {
+            const IdxT p = pulse_base + ip;
 
             // The following branches all compute at least the base range bin index and interpolation weight
             // for the current pulse. Paths not using the PhaseLUT optimization will also populate the
