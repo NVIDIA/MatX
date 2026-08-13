@@ -68,6 +68,30 @@ SARBP_VERSION = 2
 SARBP_HEADER_SIZE = 256               # fixed header size in bytes (padded for alignment)
 
 
+def _range_bin_spacing_from_scss(num_samples: int, scss: np.ndarray,
+                                 speed_of_light: float = 299792458.0):
+    """Return FX-to-range FFT bin spacing from the CPHD sample grid.
+
+    ``Global.FxBand`` describes the valid signal support, which can exclude
+    guard samples. FFT delay-bin spacing is instead set by the complete
+    sampled-frequency grid: ``num_samples * SCSS``.
+
+    The .sarbp format currently stores one range spacing for every pulse. Use
+    the median SCSS and report its relative span so callers can warn when a
+    CPHD has materially pulse-varying sample spacing.
+    """
+    scss_values = np.asarray(scss, dtype=np.float64)
+    if scss_values.size == 0:
+        raise ValueError("CPHD contains no SCSS values")
+    if not np.all(np.isfinite(scss_values)) or np.any(scss_values <= 0.0):
+        raise ValueError("CPHD SCSS values must be finite and positive")
+
+    scss_ref = float(np.median(scss_values))
+    relative_span = float(np.ptp(scss_values) / scss_ref)
+    del_r = speed_of_light / (2.0 * num_samples * scss_ref)
+    return del_r, scss_ref, relative_span
+
+
 def ecef_to_enu(ecef_points: np.ndarray, ref_ecef: np.ndarray,
                 ref_lat_rad: float, ref_lon_rad: float) -> np.ndarray:
     """Convert ECEF coordinates to local East-North-Up (ENU) frame.
@@ -784,7 +808,18 @@ def process_cphd(cphd_path: str, output_path: str,
     bandwidth = data['bandwidth_hz']
     center_freq = data['center_freq_hz']
     lam = c / center_freq
-    del_r = c / (2.0 * bandwidth)  # range bin spacing = slant-range resolution
+    slant_range_res = c / (2.0 * bandwidth)
+    # Range-bin spacing after the FX-to-range FFT is determined by the full
+    # sampled-frequency grid, not by Global.FxBand signal support. FxBand may
+    # exclude guard samples and therefore cannot be used as the FFT bandwidth.
+    del_r, scss_ref, scss_relative_span = _range_bin_spacing_from_scss(
+        num_range_bins, data['scss'], c)
+    print(f"FX sample spacing: {scss_ref:.6f} Hz "
+          f"(relative pulse span: {scss_relative_span:.3e})")
+    print(f"Range-bin spacing: {del_r:.6f} m (SCSS sample-grid definition)")
+    if scss_relative_span > 1.0e-6:
+        print("WARNING: SCSS varies materially across pulses; the .sarbp format "
+              "stores a single del_r, so the median SCSS will be used")
 
     # Mid-aperture geometry for resolution/extent computation
     mid = num_pulses // 2
@@ -795,7 +830,7 @@ def process_cphd(cphd_path: str, output_path: str,
     incidence = np.pi / 2.0 - grazing
 
     # Ground-range resolution (slant-range projected onto ground plane)
-    ground_range_res = del_r / np.sin(incidence)
+    ground_range_res = slant_range_res / np.sin(incidence)
 
     # Cross-range resolution: lambda * R / (2 * v_cross * T_aperture)
     vel_ecef = (data['tx_vel'] + data['rx_vel']) / 2.0
@@ -812,7 +847,7 @@ def process_cphd(cphd_path: str, output_path: str,
     T_aperture = (num_pulses - 1) * pulse_stride / data['prf']
     cross_range_res = lam * R0 / (2.0 * v_cross * T_aperture)
 
-    print(f"Native resolution: slant-range={del_r:.3f} m, "
+    print(f"Native resolution: slant-range={slant_range_res:.3f} m, "
           f"ground-range={ground_range_res:.3f} m, "
           f"cross-range={cross_range_res:.3f} m")
     print(f"  Grazing angle: {np.degrees(grazing):.1f} deg, "
