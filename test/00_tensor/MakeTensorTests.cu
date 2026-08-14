@@ -41,6 +41,16 @@ using namespace matx;
 
 namespace {
 
+// This kernel helps test operator[] on the GPU
+// Since GoogleTests tests run on CPU, the GPU code is placed in 
+// a CUDA kernel and launched from the test
+#if defined(__cpp_multidimensional_subscript) && (__cpp_multidimensional_subscript >= 202211L)
+  __global__ void TestMultidimensionalSubscriptKernel(detail::tensor_impl_t<int, 2> tensor)
+  {
+    tensor[1, 2] = 27;
+  }
+#endif
+  
 struct CountingAllocator {
   static inline size_t allocations = 0;
   static inline size_t deallocations = 0;
@@ -294,3 +304,50 @@ TEST(MakeTensorTests, CreatesCustomAllocatorTensors)
 
   MATX_EXIT_HANDLER();
 }
+
+#if defined(__cpp_multidimensional_subscript) && (__cpp_multidimensional_subscript >= 202211L)
+  
+  // Tests if operator[] works on CPU
+  TEST(MakeTensorTests, MultidimensionalSubscriptHost)
+  {
+    MATX_ENTER_HANDLER();
+
+    auto tensor = make_tensor<int>({2, 3}, MATX_MANAGED_MEMORY);
+
+    tensor[1, 2] = 17;
+
+
+    // Checks if the new operator[] can read 
+    // the value we wrote using operator[]
+    EXPECT_EQ((tensor[1, 2]), 17);
+
+    // Checks if the old operator() refers to the
+    // same element as new operator[]
+    EXPECT_EQ((tensor(1, 2)), 17);
+
+    // Reads the tensor using the const reference to the tensor
+    const auto &const_tensor = tensor;
+    EXPECT_EQ((const_tensor[1, 2]), 17);
+
+    MATX_EXIT_HANDLER();
+  }
+
+  // Tests if operator[] works on GPU
+  TEST(MakeTensorTests, MultidimensionalSubscriptDevice)
+  {
+    MATX_ENTER_HANDLER();
+
+    auto tensor = make_tensor<int>({2, 3}, MATX_MANAGED_MEMORY);
+
+    detail::tensor_impl_t<int, 2> tensor_impl = tensor;
+    TestMultidimensionalSubscriptKernel<<<1, 1>>>(tensor_impl);
+
+    ASSERT_EQ(cudaDeviceSynchronize(), cudaSuccess);
+
+    EXPECT_EQ((tensor[1, 2]), 27);
+    EXPECT_EQ((tensor(1, 2)), 27);
+
+    MATX_EXIT_HANDLER();
+  }
+
+#endif
