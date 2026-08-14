@@ -85,7 +85,7 @@ inline void sar_bp_impl(OutImageType &out, const InitialImageType &initial_image
   }
 
   // The Float, Mixed, FloatFloat, and TaylorFast compute types all use loose_compute_t =
-  // float, which makes the per-pulse `bin_offset = 0.5 * (num_range_bins - 1)`
+  // float, which makes the per-pulse `bin_offset = floor(num_range_bins / 2)`
   // an fp32 value. fp32 can exactly represent all integers in [-2^24, 2^24];
   // above that, the gaps grow (2.0 at 2^24+, 4.0 at 2^25+, ...), so
   // bin_offset would lose precision and bin_floor_int would be off by up to

@@ -123,6 +123,44 @@ def ecef_to_enu(ecef_points: np.ndarray, ref_ecef: np.ndarray,
     return diff @ R.T
 
 
+def _phase_reference_frequency(num_samples: int, sc0: np.ndarray,
+                               scss: np.ndarray) -> tuple[float, float, float]:
+    """Return the physical frequency moved to IFFT bin zero.
+
+    The range-compression path applies an ifftshift to the raw FX samples.
+    Consequently, raw sample floor(N/2) becomes the IFFT's DC input.  A
+    .sarbp header has only one frequency reference, so the per-pulse values
+    must also be effectively constant.
+    """
+    if num_samples <= 0:
+        raise ValueError(f"num_samples must be positive, got {num_samples}")
+
+    sc0 = np.asarray(sc0, dtype=np.float64)
+    scss = np.asarray(scss, dtype=np.float64)
+    if sc0.shape != scss.shape or sc0.size == 0:
+        raise ValueError("SC0 and SCSS must be non-empty arrays of equal shape")
+    if not np.all(np.isfinite(sc0)) or not np.all(np.isfinite(scss)):
+        raise ValueError("SC0 and SCSS must contain only finite values")
+
+    references = sc0 + (num_samples // 2) * scss
+    reference = float(np.median(references))
+    minimum = float(np.min(references))
+    maximum = float(np.max(references))
+    max_deviation = max(abs(minimum - reference), abs(maximum - reference))
+
+    # A larger variation cannot be represented by the scalar frequency in the
+    # .sarbp header without first rephasing the individual pulses.
+    tolerance_hz = max(1.0, abs(reference) * 1.0e-9)
+    if max_deviation > tolerance_hz:
+        raise ValueError(
+            "Per-pulse FFT-center frequencies are not constant enough for "
+            f"the .sarbp format: reference={reference:.9f} Hz, "
+            f"range=[{minimum:.9f}, {maximum:.9f}] Hz, "
+            f"allowed deviation={tolerance_hz:.9f} Hz")
+
+    return reference, minimum, maximum
+
+
 def read_cphd(cphd_path: str, pulse_stride: int = 1, max_pulses: int = 0,
               use_streaming: bool = False, int16_mode: bool = False):
     """Read CPHD file using sarpy and extract all needed data.
@@ -144,7 +182,7 @@ def read_cphd(cphd_path: str, pulse_stride: int = 1, max_pulses: int = 0,
                     reader (or None), pulse_indices,
                     tx_pos, rx_pos, srp_pos, fx1, fx2, sc0, scss,
                     iarp_ecef, iarp_lat_deg, iarp_lon_deg, iarp_hae,
-                    center_freq_hz, bandwidth_hz, sgn
+                    signal_center_freq_hz, bandwidth_hz, sgn
     """
     from sarpy.io.phase_history.converter import open_phase_history
 
@@ -167,12 +205,13 @@ def read_cphd(cphd_path: str, pulse_stride: int = 1, max_pulses: int = 0,
 
     fx_min = meta.Global.FxBand.FxMin
     fx_max = meta.Global.FxBand.FxMax
-    center_freq = (fx_min + fx_max) / 2.0
+    signal_center_freq = (fx_min + fx_max) / 2.0
     bandwidth = fx_max - fx_min
 
     print(f"  Domain: {domain}, SGN: {sgn}")
     print(f"  FxBand: {fx_min/1e9:.4f} - {fx_max/1e9:.4f} GHz")
-    print(f"  Center freq: {center_freq/1e9:.4f} GHz, BW: {bandwidth/1e6:.1f} MHz")
+    print(f"  FxBand center: {signal_center_freq/1e9:.4f} GHz, "
+          f"BW: {bandwidth/1e6:.1f} MHz")
 
     # Scene reference point
     sc = meta.SceneCoordinates
@@ -278,7 +317,7 @@ def read_cphd(cphd_path: str, pulse_stride: int = 1, max_pulses: int = 0,
         iarp_lat_deg=iarp_lat,
         iarp_lon_deg=iarp_lon,
         iarp_hae=iarp_hae,
-        center_freq_hz=center_freq,
+        signal_center_freq_hz=signal_center_freq,
         bandwidth_hz=bandwidth,
         sgn=sgn,
         num_samples=num_samples,
@@ -576,7 +615,7 @@ def write_sarbp_file(output_path: str, range_profiles: np.ndarray,
       12      4     uint32    num_range_bins
       16      4     uint32    image_width
       20      4     uint32    image_height
-      24      8     float64   center_frequency  [Hz]
+      24      8     float64   center_frequency  [Hz] (FX phase reference)
       32      8     float64   del_r             [m]
       40      8     float64   bandwidth         [Hz]
       48      8     float64   pixel_spacing     [m]
@@ -806,14 +845,25 @@ def process_cphd(cphd_path: str, output_path: str,
 
     # --- Step 4: Compute sar_bp parameters and native resolution ---
     bandwidth = data['bandwidth_hz']
-    center_freq = data['center_freq_hz']
-    lam = c / center_freq
+    signal_center_freq = data['signal_center_freq_hz']
+    (phase_reference_freq,
+     phase_reference_min,
+     phase_reference_max) = _phase_reference_frequency(
+         data['num_samples'], data['sc0'], data['scss'])
+    print(f"FX phase reference: {phase_reference_freq:.6f} Hz "
+          f"(SC0 + floor(N/2) * SCSS)")
+    print(f"  Offset from FxBand center: "
+          f"{phase_reference_freq - signal_center_freq:+.6f} Hz")
+    if phase_reference_max != phase_reference_min:
+        print(f"  Per-pulse range: [{phase_reference_min:.6f}, "
+              f"{phase_reference_max:.6f}] Hz")
+    lam = c / signal_center_freq
     slant_range_res = c / (2.0 * bandwidth)
     # Range-bin spacing after the FX-to-range FFT is determined by the full
     # sampled-frequency grid, not by Global.FxBand signal support. FxBand may
     # exclude guard samples and therefore cannot be used as the FFT bandwidth.
     del_r, scss_ref, scss_relative_span = _range_bin_spacing_from_scss(
-        num_range_bins, data['scss'], c)
+        data['num_samples'], data['scss'], c)
     print(f"FX sample spacing: {scss_ref:.6f} Hz "
           f"(relative pulse span: {scss_relative_span:.3e})")
     print(f"Range-bin spacing: {del_r:.6f} m (SCSS sample-grid definition)")
@@ -929,7 +979,7 @@ def process_cphd(cphd_path: str, output_path: str,
         prf_effective = data['prf'] / pulse_stride
         range_profiles = doppler_prefilter(
             range_profiles, apc_enu, vel_enu,
-            image_extent, data['center_freq_hz'], prf_effective)
+            image_extent, signal_center_freq, prf_effective)
 
     # --- Step 6: Compute range_to_mcp ---
     # MCP = scene centre = ENU origin = (0, 0, 0) in local frame
@@ -947,13 +997,13 @@ def process_cphd(cphd_path: str, output_path: str,
             prf_effective = data['prf'] / pulse_stride
             doppler_mask, info = _build_doppler_mask(
                 num_pulses, apc_enu, vel_enu,
-                image_extent, data['center_freq_hz'], prf_effective)
+                image_extent, signal_center_freq, prf_effective)
             print(info)
 
         write_sarbp_file_streamed(
             output_path, data['reader'], data['pulse_indices'],
             apc_enu, range_to_mcp,
-            center_freq, del_r, bandwidth, pixel_spacing_m, image_size,
+            phase_reference_freq, del_r, bandwidth, pixel_spacing_m, image_size,
             is_fx_domain=True, sgn=data['sgn'],
             toa1=data['toa1'], toa2=data['toa2'],
             num_samples_raw=data['num_samples'],
@@ -967,7 +1017,7 @@ def process_cphd(cphd_path: str, output_path: str,
             output_path,
             None if int16_mode else range_profiles,
             apc_enu, range_to_mcp,
-            center_freq, del_r, bandwidth, pixel_spacing_m, image_size,
+            phase_reference_freq, del_r, bandwidth, pixel_spacing_m, image_size,
             is_fx_domain=True, sgn=data['sgn'],
             toa1=data['toa1'], toa2=data['toa2'],
             num_samples_raw=data['num_samples'],

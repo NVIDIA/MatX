@@ -60,6 +60,14 @@ For FX-domain input, the converter derives the compressed range-bin spacing from
 sampled-frequency grid (`num_samples * SCSS`). The CPHD `Global.FxBand` support is used for
 physical range-resolution estimates, not FFT bin spacing.
 
+The CPHD `Global.FxBand` midpoint is used as the signal center frequency for
+wavelength-based image sizing and Doppler filtering. The phase-reference
+frequency stored in the `.sarbp` header is instead the physical frequency of
+the raw FX sample moved to IFFT bin zero:
+`median(SC0 + floor(NumSamples/2) * SCSS)`. The converter verifies that this
+per-pulse value is effectively constant before storing it in the scalar header
+field.
+
 ### Common options
 
 | Flag | Description |
