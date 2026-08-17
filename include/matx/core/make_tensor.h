@@ -636,17 +636,20 @@ template <typename ElementType,
           typename Extents,
           typename LayoutPolicy,
           typename AccessorPolicy>
-
+  // Ensures users can only use layout_right, layout_left, and layout_stride
+  requires(
+    std::is_same_v<LayoutPolicy, cuda::std::layout_right> ||
+    std::is_same_v<LayoutPolicy, cuda::std::layout_left> ||
+    std::is_same_v<LayoutPolicy, cuda::std::layout_stride>)
 auto make_tensor(
   const cuda::std::mdspan<
     ElementType,
     Extents,
     LayoutPolicy,
-    AccessorPolicy> &span
-  ){
+    AccessorPolicy>&span
+    ){
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
     using mdspan_type = cuda::std::mdspan<ElementType, Extents, LayoutPolicy, AccessorPolicy>;
-    using mapping_type = typename mdspan_type::mapping_type;
     
     static_assert(
     !std::is_const_v<ElementType>,
@@ -665,10 +668,6 @@ auto make_tensor(
         typename mdspan_type::data_handle_type,
         ElementType *>,
     "make_tensor requires an mdspan with an ElementType* data handle");
-
-    static_assert(
-    mapping_type::is_always_strided(),
-    "make_tensor requires an mdspan with a strided layout mapping");
 
     constexpr int RANK = static_cast<int>(Extents::rank());
 
