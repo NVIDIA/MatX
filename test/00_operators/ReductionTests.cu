@@ -572,6 +572,145 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, PermutedReduce)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(ReductionTestsNumericNonComplex, TransposedMatrixReduce)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+
+  ExecType exec{};
+
+  // Odd dimensions exercise partial tiles in both the output and reduction
+  // directions. Rank three also verifies that batches retain their offsets.
+  constexpr index_t batches = 3;
+  constexpr index_t rows = 19;
+  constexpr index_t columns = 37;
+  tensor_t<TestType, 3> input({batches, rows, columns});
+  tensor_t<TestType, 2> sum_out({batches, columns});
+  tensor_t<TestType, 2> prod_out({batches, columns});
+  tensor_t<TestType, 2> min_out({batches, columns});
+  tensor_t<TestType, 2> max_out({batches, columns});
+
+  for (index_t batch = 0; batch < batches; ++batch) {
+    for (index_t row = 0; row < rows; ++row) {
+      for (index_t column = 0; column < columns; ++column) {
+        input(batch, row, column) =
+            static_cast<TestType>(row == 0 ? 2 : 1);
+      }
+    }
+  }
+
+  const auto transposed = input.Permute({0, 2, 1});
+  (sum_out = sum(transposed)).run(exec);
+  (prod_out = prod(transposed)).run(exec);
+  (min_out = min(transposed)).run(exec);
+  (max_out = max(transposed)).run(exec);
+  exec.sync();
+
+  for (index_t batch = 0; batch < batches; ++batch) {
+    for (index_t column = 0; column < columns; ++column) {
+      ASSERT_TRUE(MatXUtils::MatXTypeCompare(sum_out(batch, column),
+                                             static_cast<TestType>(rows + 1)));
+      ASSERT_TRUE(MatXUtils::MatXTypeCompare(prod_out(batch, column),
+                                             static_cast<TestType>(2)));
+      ASSERT_TRUE(MatXUtils::MatXTypeCompare(min_out(batch, column),
+                                             static_cast<TestType>(1)));
+      ASSERT_TRUE(MatXUtils::MatXTypeCompare(max_out(batch, column),
+                                             static_cast<TestType>(2)));
+    }
+  }
+
+  // A plain non-contiguous slice is intentionally not treated as a transpose;
+  // it must continue through the general reduction fallback.
+  const cuda::std::array<index_t, 3> slice_firsts{0, 0, 0};
+  const cuda::std::array<index_t, 3> slice_ends{batches, rows, columns};
+  const cuda::std::array<index_t, 3> slice_strides{1, 1, 2};
+  auto sliced = input.Slice(slice_firsts, slice_ends, slice_strides);
+  tensor_t<TestType, 2> sliced_sum({batches, rows});
+  (sliced_sum = sum(sliced)).run(exec);
+  exec.sync();
+
+  for (index_t batch = 0; batch < batches; ++batch) {
+    for (index_t row = 0; row < rows; ++row) {
+      TestType expected{};
+      for (index_t column = 0; column < sliced.Size(2); ++column) {
+        expected += input(batch, row, column * 2);
+      }
+      ASSERT_TRUE(MatXUtils::MatXTypeCompare(sliced_sum(batch, row), expected));
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(ReductionTestsComplex, TransposedMatrixSum)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  using InnerType = typename inner_op_type_t<TestType>::type;
+
+  ExecType exec{};
+  constexpr index_t rows = 11;
+  constexpr index_t columns = 35;
+  tensor_t<TestType, 2> input({rows, columns});
+  tensor_t<TestType, 1> output({columns});
+
+  for (index_t row = 0; row < rows; ++row) {
+    for (index_t column = 0; column < columns; ++column) {
+      input(row, column) = TestType{static_cast<InnerType>(1)};
+    }
+  }
+
+  (output = sum(input.Permute({1, 0}))).run(exec);
+  exec.sync();
+
+  for (index_t column = 0; column < columns; ++column) {
+    const TestType expected{static_cast<InnerType>(rows)};
+    ASSERT_TRUE(MatXUtils::MatXTypeCompare(output(column), expected));
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(ReductionTestsFloatHalf, TransposedMatrixReduce)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+
+  ExecType exec{};
+  constexpr index_t rows = 13;
+  constexpr index_t columns = 33;
+  tensor_t<TestType, 2> input({rows, columns});
+  tensor_t<TestType, 1> sum_out({columns});
+  tensor_t<TestType, 1> min_out({columns});
+  tensor_t<TestType, 1> max_out({columns});
+
+  for (index_t row = 0; row < rows; ++row) {
+    for (index_t column = 0; column < columns; ++column) {
+      input(row, column) = static_cast<TestType>(row == 0 ? 2 : 1);
+    }
+  }
+
+  const auto transposed = input.Permute({1, 0});
+  (sum_out = sum(transposed)).run(exec);
+  (min_out = min(transposed)).run(exec);
+  (max_out = max(transposed)).run(exec);
+  exec.sync();
+
+  for (index_t column = 0; column < columns; ++column) {
+    ASSERT_TRUE(MatXUtils::MatXTypeCompare(
+        sum_out(column), static_cast<TestType>(rows + 1)));
+    ASSERT_TRUE(MatXUtils::MatXTypeCompare(
+        min_out(column), static_cast<TestType>(1)));
+    ASSERT_TRUE(MatXUtils::MatXTypeCompare(
+        max_out(column), static_cast<TestType>(2)));
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(ReductionTestsNumericNonComplexAllExecs, Any)
 {
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
