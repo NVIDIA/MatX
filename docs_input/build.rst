@@ -124,8 +124,9 @@ executing the binary.
 
 Benchmarks
 ----------
-MatX uses the NVBench software for the benchmarking framework. Like other packages, NVBench will be download using CPM according to
-the methods mentioned above.
+MatX uses the NVBench software for the benchmarking framework. MatX always resolves its tested NVBench commit through CPM so that
+package-root environment variables cannot select a different installation. Offline builds can provide the source through the CPM
+cache or ``CPM_nvbench_SOURCE``.
 
 NVBench has a small library that will be compiled on the first ``make`` run. With ``-DMATX_BUILD_BENCHMARKS=ON``, CMake emits one executable per
 benchmark source file under ``build/bench``, named ``bench_<subdir>_<basename>`` (for example ``bench_00_transform_matmul``). You can build a
