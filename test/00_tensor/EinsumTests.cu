@@ -328,6 +328,212 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Trace)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Contraction3DImplicitOutput)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+
+  ExecType exec{};
+
+  this->pb->template InitAndRunTVGenerator<TestType>(
+      "00_operators", "contraction", "run", {});
+
+  auto a1 = make_tensor<TestType>({60});
+  auto b1 = make_tensor<TestType>({24});
+  auto c2 = make_tensor<TestType>({5,2});
+
+  (a1 = linspace((TestType)0, static_cast<TestType>(a1.Size(0) - 1), a1.Size(0))).run(exec);
+  (b1 = linspace((TestType)0, static_cast<TestType>(b1.Size(0) - 1), b1.Size(0))).run(exec);
+  auto a = a1.View({3,4,5});
+  auto b = b1.View({4,3,2});
+
+  // "i" and "j" each occur twice across the two operands and are summed;
+  // "k" and "l" each occur once and become the inferred output "kl",
+  // matching the explicit "ijk,jil->kl" used in Contraction3D.
+  (c2 = cutensor::einsum("ijk,jil", a, b)).run(exec);
+  exec.sync();
+  MATX_TEST_ASSERT_COMPARE(this->pb, c2, "c_float3d", 0.01);
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, GEMMImplicitOutput)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+
+  ExecType exec{};
+
+  auto a2 = make_tensor<TestType>({10,20});
+  auto b2 = make_tensor<TestType>({20,10});
+  auto c2 = make_tensor<TestType>({10,10});
+  auto c22 = make_tensor<TestType>({10,10});
+  (a2 = ones<TestType>()).run(exec);
+  (b2 = ones<TestType>()).run(exec);
+
+  // "k" is contracted (appears in both operands); "m" and "n" each occur
+  // once and are inferred as the output "mn", matching explicit "mk,kn->mn".
+  (c2 = cutensor::einsum("mk,kn", a2, b2)).run(exec);
+  (c22 = matmul(a2, b2)).run(exec);
+  exec.sync();
+
+  for (auto i = 0; i < c2.Size(0); i++) {
+    for (auto j = 0; j < c2.Size(1); j++) {
+      MATX_ASSERT_EQ(c2(i,j), c22(i,j));
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, TraceImplicitOutput)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+
+  ExecType exec{};
+
+  auto a2 = make_tensor<TestType>({10,10});
+  auto c0_0 = make_tensor<TestType>({});
+  auto c0_1 = make_tensor<TestType>({});
+  (a2 = ones<TestType>()).run(exec);
+
+  // "i" occurs twice within the single operand, so it is summed and the
+  // inferred output is empty (0D), matching explicit "ii->".
+  (c0_0 = cutensor::einsum("ii", a2)).run(exec);
+  (c0_1 = trace(a2)).run(exec);
+  exec.sync();
+
+  MATX_ASSERT_EQ(c0_0(), c0_1());
+  MATX_ASSERT_EQ(c0_0(), 10);
+
+  MATX_EXIT_HANDLER();
+}
+
+// Checks broadcast notation in einsum
+TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, BroadcastBatchMatmul)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+
+  ExecType exec{};
+
+  // Two batch dimensions (5,2) are covered by "..."
+  auto a1 = make_tensor<TestType>({5*2*4*3}); 
+  auto b1 = make_tensor<TestType>({5*2*3*4});
+
+  // Generates 120 evenly spaced numbers from 0 to 119
+  (a1 = linspace((TestType)0, static_cast<TestType>(a1.Size(0) - 1), a1.Size(0))).run(exec);
+  (b1 = linspace((TestType)0, static_cast<TestType>(b1.Size(0) - 1), b1.Size(0))).run(exec);
+  
+  // Converts 1D tensors into 4D tensors
+  auto a = a1.View({5,2,4,3});
+  auto b = b1.View({5,2,3,4});
+
+  // Output tensor that will store the result of einsum with broadcast notation
+  auto c = make_tensor<TestType>({5,2,4,4});
+
+  // Output tensor that will store result from explicit-letter einsum
+  auto c_ref = make_tensor<TestType>({5,2,4,4});
+
+  // "..." should behave identically to spelling the batch dims out explicitly
+  
+  // Result from einsum using "..."
+  (c = cutensor::einsum("...ij,...jk->...ik", a, b)).run(exec);
+  
+  // Reference result using explicit batch labels
+  (c_ref = cutensor::einsum("bcij,bcjk->bcik", a, b)).run(exec);
+  
+  exec.sync();
+
+  for (auto i = 0; i < c.Size(0); i++) {
+    for (auto j = 0; j < c.Size(1); j++) {
+      for (auto k = 0; k < c.Size(2); k++) {
+        for (auto l = 0; l < c.Size(3); l++) {
+          MATX_ASSERT_EQ(c(i,j,k,l), c_ref(i,j,k,l));
+        }
+      }
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+// Checks implicit output in einsum with broadcast notation
+TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, BroadcastBatchMatmulImplicitOutput)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+
+  ExecType exec{};
+
+  // Two batch dimensions (5,2) are covered by "..."
+  auto a1 = make_tensor<TestType>({5*2*4*3}); 
+  auto b1 = make_tensor<TestType>({5*2*3*4});
+
+  // Generates 120 evenly spaced numbers from 0 to 119
+  (a1 = linspace((TestType)0, static_cast<TestType>(a1.Size(0) - 1), a1.Size(0))).run(exec);
+  (b1 = linspace((TestType)0, static_cast<TestType>(b1.Size(0) - 1), b1.Size(0))).run(exec);
+  
+  // View the 1D tensors as 4D tensors 
+  auto a = a1.View({5,2,4,3});
+  auto b = b1.View({5,2,3,4});
+
+  // Output tensor that will store the result of einsum with broadcast notation
+  // and implicit output
+  auto c = make_tensor<TestType>({5,2,4,4});
+
+  // Output tensor that will store result from explicit-letter einsum
+  auto c_ref = make_tensor<TestType>({5,2,4,4});
+
+
+  // Result from einsum using "..." and implicit output
+  (c = cutensor::einsum("...ij,...jk", a, b)).run(exec);
+  
+  // Reference result using explicit batch labels
+  (c_ref = cutensor::einsum("bcij,bcjk->bcik", a, b)).run(exec);
+  exec.sync();
+
+  for (auto i = 0; i < c.Size(0); i++) {
+    for (auto j = 0; j < c.Size(1); j++) {
+      for (auto k = 0; k < c.Size(2); k++) {
+        for (auto l = 0; l < c.Size(3); l++) {
+          MATX_ASSERT_EQ(c(i,j,k,l), c_ref(i,j,k,l));
+        }
+      }
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+// Checks if MatX rejects invalid batch sizes when ... is used
+TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, BroadcastBatchSizeMismatchThrows)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+
+  ExecType exec{};
+
+  // Batch dims (5 vs 3) covered by "..." do not match. MatX does
+  // not support NumPy-style size-1 broadcasting for these dims due to cuTensor 
+  // limitations. Therefore, mismatched dimensions must throw an error.
+  auto a = make_tensor<TestType>({5,2,4,3});
+  auto b = make_tensor<TestType>({3,2,3,4});
+  auto c = make_tensor<TestType>({5,2,4,4});
+
+  ASSERT_THROW({ (c = cutensor::einsum("...ij,...jk->...ik", a, b)).run(exec); },
+      matx::detail::matxException);
+
+  MATX_EXIT_HANDLER();
+}
 
 
 #endif
+

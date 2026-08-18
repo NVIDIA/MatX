@@ -41,6 +41,7 @@ Usage:
     python view_sarbp_image.py output.raw --size 2048x2048
     python view_sarbp_image.py output.raw --percentile 2,98
     python view_sarbp_image.py output.raw --dynamic-range 50
+    python view_sarbp_image.py output.raw --flip-ud
     python view_sarbp_image.py output.raw --save output.png
 """
 
@@ -111,6 +112,9 @@ def main():
                         help="Save image to file (e.g. output.png) instead of displaying")
     parser.add_argument("--cmap", default="gray",
                         help="Matplotlib colormap (default: gray)")
+    parser.add_argument("--flip-ud", action="store_true",
+                        help="Flip the image and vertical coordinate axis up-down; "
+                             "does not modify the raw image file")
     args = parser.parse_args()
 
     # Determine image dimensions (priority: --size > --sarbp / auto-discover > square guess)
@@ -183,8 +187,22 @@ def main():
             print(f"ERROR: --percentile LO,HI must satisfy 0 <= LO < HI <= 100, "
                   f"got {lo_p},{hi_p}", file=sys.stderr)
             sys.exit(1)
-        vmin, vmax = np.percentile(mag_db, [lo_p, hi_p])
-        print(f"Percentile stretch: {lo_p}th={vmin:.2f} dB, {hi_p}th={vmax:.2f} dB")
+        # Pixels with exactly zero magnitude received no backprojection
+        # contribution (for example, outside the range swath). Including them
+        # can pin the lower percentile to the log floor and wash out the valid
+        # image. Fall back to all pixels for an all-zero image.
+        stretch_values = mag_db[mag > 0.0]
+        if stretch_values.size == 0:
+            stretch_values = mag_db.ravel()
+        # Boolean indexing above already produced a disposable dense array.
+        # Let percentile partition it in place instead of making another
+        # image-sized copy, which is significant for the large SAR images this
+        # viewer is intended to handle. In the all-zero fallback, modifying the
+        # flattened mag_db view is harmless because every value is identical.
+        vmin, vmax = np.percentile(stretch_values, [lo_p, hi_p],
+                                   overwrite_input=True)
+        print(f"Percentile stretch (nonzero pixels): "
+              f"{lo_p}th={vmin:.2f} dB, {hi_p}th={vmax:.2f} dB")
 
     # Import matplotlib only when needed so the script can be used without
     # a display if only --save is used.
@@ -235,6 +253,9 @@ def main():
     im = ax.imshow(mag_db, cmap=args.cmap, vmin=vmin, vmax=vmax,
                    origin="lower", aspect="equal", extent=extent)
     fig.colorbar(im, ax=ax, label="dB", shrink=0.8)
+    if args.flip_ud:
+        ax.invert_yaxis()
+        print("Display orientation: flipped up-down (vertical axis reversed)")
     ax.set_title("SAR Backprojection Image")
     if has_coords:
         ax.set_xlabel("East (m)")

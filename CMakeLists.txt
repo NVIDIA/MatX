@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.30.4)
 
-set(MATX_VERSION 1.0.0)
+set(MATX_VERSION 1.1.0)
 
 # Use the vendored rapids-cmake copy for GPU architecture discovery unless a parent
 # project already provided it. The user can optionally override GPU_ARCH to specify

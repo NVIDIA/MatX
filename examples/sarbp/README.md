@@ -56,6 +56,9 @@ python cphd_to_sarbp_input.py /path/to/file.cphd -o sarbp_input.sarbp
 
 This writes a `.sarbp` file (`sarbp_input.sarbp` in the example) that packages the phase history,
 platform positions, and image grid parameters into a single binary.
+For FX-domain input, the converter derives the compressed range-bin spacing from the complete
+sampled-frequency grid (`num_samples * SCSS`). The CPHD `Global.FxBand` support is used for
+physical range-resolution estimates, not FFT bin spacing.
 
 ### Common options
 
@@ -151,10 +154,11 @@ The script determines image dimensions in this order:
 | `--size HxW` | Image dimensions (overrides `.sarbp` header) |
 | `--percentile LO,HI` | Percentile-based contrast stretch on the dB image (default: `5,95`) |
 | `--dynamic-range DB` | Use a fixed dB-below-peak floor instead of the percentile stretch |
+| `--flip-ud` | Flip the image and vertical coordinate axis without modifying the raw file |
 | `--save FILE` | Save to file instead of displaying |
 | `--cmap NAME` | Matplotlib colormap (default: gray) |
 
-By default the viewer applies a percentile-based contrast stretch: it computes the 5th and 95th percentiles of the dB-scaled image and uses those as the colormap's vmin/vmax. This prevents a small number of bright scatterers (specular returns from buildings, corner reflectors, etc.) from dominating the dynamic range and washing the rest of the scene to black. A fixed dB-below-peak floor (`--dynamic-range`) is available as an override, but the percentile stretch is generally the more useful default for inspecting these images.
+By default the viewer applies a percentile-based contrast stretch: it computes the 5th and 95th percentiles of the nonzero dB-scaled pixels and uses those as the colormap's vmin/vmax. Exact-zero pixels receive no backprojection contribution (for example, outside the range swath) and are excluded so they do not pin the lower percentile to the logarithmic floor and wash out the valid image. A fixed dB-below-peak floor (`--dynamic-range`) is available as an override, but the percentile stretch is generally the more useful default for inspecting these images.
 
 Below is the image generated for the 8192 x 8192 reconstruction using `python view_sarbp_image.py /path/to/file.raw --save image.png`.
 The scene is Hartsfield-Jackson Atlanta International Airport. The terminals are the vertical structures and the runways around the
