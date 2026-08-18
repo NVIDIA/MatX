@@ -168,7 +168,7 @@ constexpr bool has_feature(SarBpFeature features, SarBpFeature feature) noexcept
 struct SarBpParams {
   SarBpComputeType compute_type{SarBpComputeType::Double}; //!<  The floating point compute type (precision) of the kernel.
   SarBpFeature features{SarBpFeature::None}; //!<  The features to enable or disable in the kernel.
-  double center_frequency{0.0}; //!<  The center frequency of the radar in Hz.
+  double center_frequency{0.0}; //!<  The range-profile phase-reference frequency in Hz; for FFT-compressed FX data, this is the frequency placed at IFFT DC.
   double del_r{0.0}; //!<  The range per compressed range bin. The units should match those of the other locations and distances provided to the backprojector.
 };
 
@@ -384,6 +384,7 @@ namespace experimental {
 * during backprojection will be added to the initial image. The user can use the zeros generator (i.e., matx::zeros) if no initial image is needed.
 * See \p ImageType documentation for details on supported rank and data types.
 * @param range_profiles Range profiles. Range profiles must represent a 2D operator of size num_pulses x num_range_bins containing the range-compressed complex samples.
+* They must use the FFT-shift convention in which zero differential range is at bin floor(num_range_bins / 2).
 * See \p RangeProfilesType documentation for details on supported rank and data types.
 * @param platform_positions Platform positions represent the x, y, and z coordinates of the aperture phase center for each pulse. The coordinates should be in
 * the same coordinate system and units as the voxel locations. See \p PlatPosType documentation for details on supported rank and data types.

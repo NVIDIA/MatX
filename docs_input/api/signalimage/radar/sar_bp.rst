@@ -135,7 +135,10 @@ The bin coordinate for pixel :math:`x` is typically:
    b(x) = \frac{\Delta R_p(x)}{\Delta r} + b_{\mathrm{offset}}
 
 Here :math:`\Delta r` is the range-bin spacing and :math:`b_{\mathrm{offset}}` is the centered
-range-bin offset used by the SAR backprojection operator. We can now reformulate this as:
+range-bin offset used by the SAR backprojection operator. Range profiles are expected to use
+the FFT-shift convention, so zero differential range is at
+:math:`b_{\mathrm{offset}} = \lfloor N/2 \rfloor` for :math:`N` range bins. We can now
+reformulate this as:
 
 .. math::
 

@@ -47,7 +47,7 @@
  *   12      4     uint32    num_range_bins
  *   16      4     uint32    image_width
  *   20      4     uint32    image_height
- *   24      8     float64   center_frequency  [Hz]
+ *   24      8     float64   center_frequency  [Hz] (range-profile phase reference)
  *   32      8     float64   del_r             [m]
  *   40      8     float64   bandwidth         [Hz]
  *   48      8     float64   pixel_spacing     [m]

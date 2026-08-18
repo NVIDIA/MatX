@@ -129,7 +129,12 @@ __global__ void SarBpFillPhaseLUT(cuda::std::complex<StorageType> *phase_lut, Co
     const int tid = blockIdx.x * blockDim.x + threadIdx.x;
     if (tid >= num_range_bins) return;
     constexpr ComputeType four_pi_over_c = static_cast<ComputeType>(4.0 * M_PI / SPEED_OF_LIGHT);
-    const ComputeType range_bin_start = static_cast<ComputeType>(tid - 0.5 * (num_range_bins-1)) * dr;
+    // fftshift places zero differential range at floor(N/2). For even N,
+    // this is index N/2, the higher-indexed of the two bins adjacent to
+    // the array's geometric midpoint (N-1)/2.
+    const index_t bin_offset = num_range_bins / 2;
+    const ComputeType range_bin_start =
+        static_cast<ComputeType>(static_cast<index_t>(tid) - bin_offset) * dr;
     const ComputeType phase = four_pi_over_c * ref_freq * range_bin_start;
     if constexpr (cuda::std::is_same_v<ComputeType, float>) {
         ComputeType sinx, cosx;
@@ -760,7 +765,11 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
     }
 
     loose_complex_compute_t accum{};
-    const loose_compute_t bin_offset = static_cast<loose_compute_t>(0.5) * static_cast<loose_compute_t>(num_range_bins-1);
+    // fftshift places zero differential range at floor(N/2). For even N,
+    // this is index N/2, the higher-indexed of the two bins adjacent to
+    // the array's geometric midpoint (N-1)/2.
+    const loose_compute_t bin_offset =
+        static_cast<loose_compute_t>(num_range_bins / 2);
 
     // Most ComputeTypes amortize some redundant computations or data conversions by leveraging
     // per-pulse-block shared memory.
