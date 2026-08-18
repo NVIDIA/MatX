@@ -1,10 +1,5 @@
 cmake_minimum_required(VERSION 3.30.4)
 
-if(POLICY CMP0144)
-    # Preserve current behavior: CI may export upper-case package root variables
-    # that should not override dependencies fetched through CPM.
-    cmake_policy(SET CMP0144 OLD)
-endif()
 set(MATX_VERSION 1.1.0)
 
 # Use the vendored rapids-cmake copy for GPU architecture discovery unless a parent
