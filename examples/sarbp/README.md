@@ -115,6 +115,7 @@ real/imag, row-major), written to `output_image.raw` in this example.
 | `-o OUTPUT` | Output file path (default: input with `.raw` extension) |
 | `-u N` | Range upsample factor via zero-padding (default: 1) |
 | `-w {hamming,none}` | Window for range compression (default: hamming) |
+| `--bulk-mocomp` | Apply bulk motion compensation to FX-domain input using the per-pulse `range_to_mcp` values stored by the CPHD converter |
 | `-b {auto,all,0,N}` | Pulses per processing block. `auto` uses the GPU L2 cache size to choose a block size; `all` and `0` use all pulses (default: auto) |
 | `--image-tiles N` | Process the image as N x N tiles during backprojection (default: 1) |
 | `--taylor-fast-third-order` | Add the third-order range term when using `--precision taylor_fast` |
@@ -123,6 +124,15 @@ real/imag, row-major), written to `output_image.raw` in this example.
 | `--warmup` | Warmup GPU kernels and FFT plans before timed run |
 | `--gold FILE` | Validate the output against a golden image (raw `complex<float>`, same format the example writes) and report accuracy metrics (3x3-window correlation and signal-to-error ratio) |
 | `--cmap FILE` | Write the correlation map (raw `float32`) to a file; requires `--gold` |
+
+`--bulk-mocomp` assumes the FX-domain input has not already been bulk motion
+compensated to the stored reference ranges. Applying bulk motion compensation
+to data that has already been motion compensated is not idempotent and results
+in an incorrect phase reference. Bulk mocomp always uses double-precision phase
+arithmetic. With `--precision fltflt`, each per-pulse range-to-MCP block is
+converted from double to float-float on the device after mocomp and before
+backprojection. No extra conversion kernel is used when bulk mocomp is disabled.
+The example reports the bulk-mocomp path time separately from backprojection.
 
 The `--precision` flag controls the arithmetic used by the `sar_bp` operator. For spaceborne SAR, `float` does not provide enough precision to store fractional wavelengths at the range-to-MCP magnitudes (hundreds of km), so pure `float` is not sufficient to produce focused images. The available modes are:
 
