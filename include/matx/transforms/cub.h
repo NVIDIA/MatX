@@ -116,6 +116,187 @@ struct UniqueParams_t {
 
 struct EmptyParams_t {};
 
+#ifdef __CUDACC__
+
+// A last-two-dimension transpose followed by a one-dimensional reduction is a
+// particularly poor fit for CUB's random-access iterator path: threads in a
+// warp walk the same (strided) output segment instead of adjacent input
+// elements.  This kernel assigns adjacent x threads to adjacent output
+// segments and splits each segment across y threads, keeping the global loads
+// coalesced while reducing the partials in shared memory.
+constexpr int TransposedReduceBlockX = 32;
+constexpr int TransposedReduceBlockY = 8;
+
+template <typename OutputTensor, typename InputTensor, typename ReduceOp,
+          bool IncludeInit>
+__global__ void TransposedMatrixReduceKernel(
+    OutputTensor out, InputTensor in, ReduceOp reduce_op,
+    typename InputTensor::value_type init, index_t output_elements)
+{
+  using value_type = typename InputTensor::value_type;
+
+  __shared__ value_type partials[TransposedReduceBlockY]
+                                [TransposedReduceBlockX];
+  __shared__ bool valid[TransposedReduceBlockY][TransposedReduceBlockX];
+
+  const int x = static_cast<int>(threadIdx.x);
+  const int y = static_cast<int>(threadIdx.y);
+  const index_t output_idx =
+      static_cast<index_t>(blockIdx.x) * TransposedReduceBlockX + x;
+
+  bool has_value = false;
+  value_type partial{};
+
+  if (output_idx < output_elements) {
+    const auto out_idx = detail::GetIdxFromAbs(out, output_idx);
+    cuda::std::array<index_t, InputTensor::Rank()> in_idx{};
+    for (int dim = 0; dim < OutputTensor::Rank(); ++dim) {
+      in_idx[dim] = out_idx[dim];
+    }
+
+    for (index_t row = y; row < in.Size(InputTensor::Rank() - 1);
+         row += TransposedReduceBlockY) {
+      in_idx[InputTensor::Rank() - 1] = row;
+      const value_type value = in(in_idx);
+      partial = has_value ? reduce_op(partial, value) : value;
+      has_value = true;
+    }
+  }
+
+  if (has_value) {
+    partials[y][x] = partial;
+  }
+  valid[y][x] = has_value;
+  __syncthreads();
+
+  for (int offset = TransposedReduceBlockY / 2; offset > 0; offset /= 2) {
+    if (y < offset && valid[y + offset][x]) {
+      if (valid[y][x]) {
+        partials[y][x] = reduce_op(partials[y][x], partials[y + offset][x]);
+      }
+      else {
+        partials[y][x] = partials[y + offset][x];
+        valid[y][x] = true;
+      }
+    }
+    __syncthreads();
+  }
+
+  if (y == 0 && output_idx < output_elements) {
+    value_type result = partials[0][x];
+    if constexpr (IncludeInit) {
+      result = valid[0][x] ? reduce_op(init, result) : init;
+    }
+    out(detail::GetIdxFromAbs(out, output_idx)) = result;
+  }
+}
+
+template <typename OutputTensor, typename InputTensor>
+__MATX_INLINE__ bool IsTransposedMatrixReduction(const OutputTensor &out,
+                                                  const InputTensor &in)
+{
+  if constexpr (!is_tensor_view_v<OutputTensor> ||
+                !is_tensor_view_v<InputTensor> || InputTensor::Rank() < 2 ||
+                OutputTensor::Rank() + 1 != InputTensor::Rank()) {
+    return false;
+  }
+  else {
+    constexpr int in_rank = InputTensor::Rank();
+
+    for (int dim = 0; dim < OutputTensor::Rank(); ++dim) {
+      if (out.Size(dim) != in.Size(dim)) {
+        return false;
+      }
+    }
+
+    // CUB defines the empty-range behavior for each built-in reduction. Keep
+    // that behavior rather than entering a kernel with no partial value.
+    if (in.Size(in_rank - 1) == 0) {
+      return false;
+    }
+
+    // Exact layout of a contiguous tensor with the final two dimensions
+    // swapped. Restricting the fast path to this layout preserves support for
+    // arbitrary slices and permutations through the generic iterator path.
+    if (in.Stride(in_rank - 2) != 1 ||
+        in.Stride(in_rank - 1) != in.Size(in_rank - 2)) {
+      return false;
+    }
+
+    index_t expected_stride = in.Size(in_rank - 2) * in.Size(in_rank - 1);
+    for (int dim = in_rank - 3; dim >= 0; --dim) {
+      if (in.Stride(dim) != expected_stride) {
+        return false;
+      }
+      expected_stride *= in.Size(dim);
+    }
+
+    return true;
+  }
+}
+
+template <bool IncludeInit, typename OutputTensor, typename InputTensor,
+          typename ReduceOp>
+__MATX_INLINE__ bool TryTransposedMatrixReduce(
+    OutputTensor &out, const InputTensor &in, ReduceOp reduce_op,
+    typename InputTensor::value_type init, cudaStream_t stream)
+{
+  if constexpr (is_tensor_view_v<OutputTensor> &&
+                is_tensor_view_v<InputTensor> && InputTensor::Rank() >= 2 &&
+                OutputTensor::Rank() + 1 == InputTensor::Rank()) {
+    if (!IsTransposedMatrixReduction(out, in)) {
+      return false;
+    }
+
+    const index_t output_elements = TotalSize(out);
+    if (output_elements == 0) {
+      return true;
+    }
+
+    const dim3 threads{TransposedReduceBlockX, TransposedReduceBlockY, 1};
+    const dim3 blocks{
+        static_cast<unsigned int>((output_elements +
+                                   TransposedReduceBlockX - 1) /
+                                  TransposedReduceBlockX),
+        1, 1};
+    TransposedMatrixReduceKernel<OutputTensor, InputTensor, ReduceOp,
+                                 IncludeInit>
+        <<<blocks, threads, 0, stream>>>(out, in, reduce_op, init,
+                                        output_elements);
+    MATX_CUDA_CHECK_LAST_ERROR();
+    return true;
+  }
+  else {
+    return false;
+  }
+}
+
+struct TransposedSumReduce {
+  template <typename T>
+  __MATX_INLINE__ __MATX_DEVICE__ T operator()(const T &a, const T &b) const
+  {
+    return a + b;
+  }
+};
+
+struct TransposedMinReduce {
+  template <typename T>
+  __MATX_INLINE__ __MATX_DEVICE__ T operator()(const T &a, const T &b) const
+  {
+    return a < b ? a : b;
+  }
+};
+
+struct TransposedMaxReduce {
+  template <typename T>
+  __MATX_INLINE__ __MATX_DEVICE__ T operator()(const T &a, const T &b) const
+  {
+    return a > b ? a : b;
+  }
+};
+
+#endif
+
 
 
 template <typename OutputTensor, typename InputOperator, CUBOperation_t op, typename CParams = EmptyParams_t>
@@ -1859,6 +2040,10 @@ void cub_reduce(OutputTensor &a_out, const InputOperator &a, typename InputOpera
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  if (detail::TryTransposedMatrixReduce<true>(a_out, a, ReduceOp{}, init,
+                                               stream)) {
+    return;
+  }
   const cudaExecutor exec{stream};
   // Get parameters required by these tensors
   using param_type = typename detail::ReduceParams_t<ReduceOp, typename InputOperator::value_type>;
@@ -1918,6 +2103,11 @@ void cub_sum(OutputTensor &a_out, const InputOperator &a,
 
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  if (detail::TryTransposedMatrixReduce<true>(
+          a_out, a, detail::TransposedSumReduce{},
+          typename InputOperator::value_type{}, stream)) {
+    return;
+  }
   const cudaExecutor exec{stream};
 
 #ifndef MATX_DISABLE_CUB_CACHE
@@ -1968,6 +2158,11 @@ void cub_min(OutputTensor &a_out, const InputOperator &a,
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  if (detail::TryTransposedMatrixReduce<false>(
+          a_out, a, detail::TransposedMinReduce{},
+          typename InputOperator::value_type{}, stream)) {
+    return;
+  }
   const cudaExecutor exec{stream};
 
 #ifndef MATX_DISABLE_CUB_CACHE
@@ -2020,6 +2215,11 @@ void cub_max(OutputTensor &a_out, const InputOperator &a,
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  if (detail::TryTransposedMatrixReduce<false>(
+          a_out, a, detail::TransposedMaxReduce{},
+          typename InputOperator::value_type{}, stream)) {
+    return;
+  }
   const cudaExecutor exec{stream};
 #ifndef MATX_DISABLE_CUB_CACHE
   auto params =

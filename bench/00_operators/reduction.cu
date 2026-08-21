@@ -112,6 +112,33 @@ void reduce_0d_cub_permute(nvbench::state &state, nvbench::type_list<ValueType>)
 NVBENCH_BENCH_TYPES(reduce_0d_cub_permute, NVBENCH_TYPE_AXES(reduce_types))
   .add_int64_power_of_two_axis("Tensor Size", nvbench::range(6, 7, 1));  
 
+template <typename ValueType>
+void reduce_transposed_matrix(nvbench::state &state,
+                              nvbench::type_list<ValueType>)
+{
+  const index_t size = static_cast<index_t>(state.get_int64("Tensor Size"));
+
+  auto input = make_tensor<ValueType>({size, size});
+  auto output = make_tensor<ValueType>({size});
+  auto transposed = input.Permute({1, 0});
+
+  state.add_element_count(input.TotalSize(), "NumElements");
+  state.add_global_memory_reads<ValueType>(input.TotalSize(), "DataSize");
+  state.add_global_memory_writes<ValueType>(output.TotalSize());
+
+  input.PrefetchDevice(0);
+  output.PrefetchDevice(0);
+  (output = matx::sum(transposed)).run();
+
+  state.exec([&transposed, &output](nvbench::launch &launch) {
+    (output = matx::sum(transposed))
+        .run(static_cast<cudaStream_t>(launch.get_stream()));
+  });
+}
+NVBENCH_BENCH_TYPES(reduce_transposed_matrix,
+                    NVBENCH_TYPE_AXES(reduce_types))
+  .add_int64_power_of_two_axis("Tensor Size", nvbench::range(6, 12, 1));
+
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
