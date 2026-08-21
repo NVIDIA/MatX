@@ -39,11 +39,16 @@ Optional Third-party Dependencies
 - `cutensor <https://developer.nvidia.com/cutensor>`_ 2.3.1.0+ (Required when using `einsum`)
 - `cutensornet <https://docs.nvidia.com/cuda/cuquantum/cutensornet>`_ 25.09.1.12+ (Required when using `einsum`)
 - `cuDSS <https://developer.nvidia.com/cudss>`_ 0.7.0.20+ (Required when using `solve` on sparse matrices)
-- `NCCL <https://developer.nvidia.com/nccl>`_ (Only required for multi-GPU or multi-node cuBLASMp and cuSOLVERMp support)
+- `NCCL <https://developer.nvidia.com/nccl>`_ (Required for distributed reductions and for multi-GPU or multi-node cuBLASMp and cuSOLVERMp support)
 - `cuBLASMp <https://docs.nvidia.com/cuda/cublasmp/>`_ (Only required for multi-GPU or multi-node block-cyclic ``matmul``)
 - `cuSOLVERMp <https://docs.nvidia.com/cuda/cusolvermp/>`_ (Only required for multi-GPU or multi-node block-cyclic ``chol``)
 - `cuFFTMp <https://docs.nvidia.com/cuda/cufftmp/>`_ (Only required for multi-process, multi-GPU, or multi-node FFT support)
 - `NVSHMEM <https://docs.nvidia.com/nvshmem/>`_ (Only required for multi-process, multi-GPU, or multi-node FFT support through cuFFTMp)
+
+NCCL collectives are enabled with ``MATX_EN_NCCL=ON``. Distributed reductions
+use NCCL directly and do not require an MPI dependency in MatX; the application
+may use MPI or another bootstrap to create its caller-owned communicators.
+Enabling cuBLASMp or cuSOLVERMp enables NCCL automatically.
 
 Distributed NVIDIA MP backends are opt-in because cuBLASMp and cuSOLVERMp are
 needed only for multi-GPU or multi-node execution and are distributed

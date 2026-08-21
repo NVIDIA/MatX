@@ -27,6 +27,7 @@ set (test_sources
     00_tensor/DistributedTensorTests.cu
     00_tensor/DistributedTensorMultiGpuTests.cu
     00_tensor/DistributedMpApiTests.cu
+    00_tensor/DistributedReductionTests.cu
     ${OPERATOR_TEST_FILES}
     00_operators/GeneratorTests.cu
     00_operators/PWelch.cu
@@ -150,8 +151,11 @@ foreach(test_file ${test_sources})
     create_test_executable(${test_file})
 endforeach()
 
-if(MATX_EN_CUBLASMP OR MATX_EN_CUSOLVERMP)
-    find_package(MPI REQUIRED COMPONENTS CXX)
+if(MATX_EN_NCCL)
+    find_package(MPI QUIET COMPONENTS CXX)
+endif()
+
+if(MATX_EN_NCCL AND MPI_CXX_FOUND)
     add_executable(
         test_00_tensor_DistributedMpIntegrationTests
         00_tensor/DistributedMpIntegrationTests.cu
@@ -193,6 +197,8 @@ set(CTEST_PARALLEL_JOBS 4)
 
 set_tests_properties(test_00_misc_ClearCacheTests PROPERTIES RUN_SERIAL TRUE)
 set_tests_properties(test_00_tensor_DistributedTensorMultiGpuTests PROPERTIES
+    LABELS "multi_gpu" RUN_SERIAL TRUE)
+set_tests_properties(test_00_tensor_DistributedReductionTests PROPERTIES
     LABELS "multi_gpu" RUN_SERIAL TRUE)
 
 # Keep the intended multi-node assignment semantics visible in CTest until a

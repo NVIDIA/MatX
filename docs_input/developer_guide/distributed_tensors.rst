@@ -11,9 +11,9 @@ logical tensor whose storage is split across CUDA devices and, eventually,
 processes. The prototype executes single-process, multi-GPU pointwise work,
 batch-local ``matmul``, ``chol``, and ``fft``, communicator-backed
 cuBLASMp and cuSOLVERMp execution selected by block-cyclic inputs, a cuFFT
-Xt/Mg transform selected when an FFT dimension spans local GPUs, and gathers a
-distributed tensor into a regular tensor. It is not yet a general distributed
-MatX operator system.
+Xt/Mg transform selected when an FFT dimension spans local GPUs, NCCL-backed
+distributed reductions, and gathers a distributed tensor into a regular
+tensor. It is not yet a general distributed MatX operator system.
 
 The logical tensor has exactly one element type and rank. Every local fragment
 is a ``tensor_t<T, RANK>``. Fragment extents, strides, process ranks, device
@@ -189,6 +189,52 @@ NVSHMEM installations. Transform execution still requires a cuFFTMp-owned
 tensor factory and reshape semantics rather than silently copying through a
 nominally distributed tensor.
 
+Distributed reductions
+======================
+
+``sum``, ``prod``, ``min``, ``max``, ``mean``, ``all``, and ``any`` accept a
+distributed tensor and use the usual MatX assignment syntax. The result must
+use ``replicated_distribution_t`` over every endpoint in NCCL rank order. A
+complete reduction uses a rank-zero replicated distributed tensor:
+
+.. code-block:: cpp
+
+  std::vector<distributed_endpoint_t> endpoints{{0, 0}, {0, 1}};
+  distributed_nccl_topology_t topology{
+      endpoints, {{{0, 0}, comm0}, {{0, 1}, comm1}}};
+  distributed_context context{{0, 1}};
+  distributedCUDAExecutor exec{context, std::move(topology)};
+
+  auto input_layout = block_distribution_t<2>::Slab({rows, columns},
+                                                      endpoints, 0);
+  auto input = make_distributed_tensor<float>(input_layout, context);
+  replicated_distribution_t<1> column_layout{{columns}, endpoints};
+  auto column_sum = make_distributed_tensor<float>(column_layout, context);
+  int row_axis[]{0};
+  (column_sum = sum(input, row_axis)).run(exec);
+
+  replicated_distribution_t<0> scalar_layout{{}, endpoints};
+  auto total = make_distributed_tensor<float>(scalar_layout, context);
+  (total = sum(input)).run(exec);
+  exec.sync();
+
+MatX borrows the communicators. For single-process multi-GPU execution the
+application can create them with ``ncclCommInitAll``. For multi-process
+execution it creates one global NCCL rank per ``(process_rank, device_id)``
+endpoint, commonly by broadcasting an ``ncclUniqueId`` with MPI and calling
+``ncclCommInitRank`` on each local GPU. Every rank must enter collectives in the
+same order, and communicators must outlive the executor.
+
+Block, replicated, and block-cyclic inputs are accepted, including uneven
+fragments and arbitrary reduction axes. Non-replicated inputs first produce a
+dense partial result on every endpoint and then use ``ncclAllReduce``;
+replicated inputs reduce each complete replica without a collective. This
+correctness-first path uses dense endpoint temporaries and host-built index
+maps. It does not yet provide reduce-scatter, sharded or root-only results,
+custom reducers, or argument reductions. Complex float and double support is
+limited to ``sum``, ``mean``, ``all``, and ``any`` because NCCL has no native
+complex product or ordering operation.
+
 Materialization
 ===============
 
@@ -216,12 +262,12 @@ Limitations and next steps
 ==========================
 
 * Pointwise execution and materialization remain single-process. Multi-process
-  execution is currently limited to block-cyclic ``matmul`` and ``chol``
-  collectives.
+  execution covers NCCL-backed reductions and block-cyclic ``matmul`` and
+  ``chol`` collectives.
 * Pointwise operations require identical layouts. Batch-local transforms
   require aligned batch fragments and fully local operation dimensions.
   Redistribution and scattering will be explicit operations.
-* Other distributed BLAS, solver, cuFFTMp, reduction, DLPack, printing, and
+* Other distributed BLAS, solver, cuFFTMp, DLPack, printing, and
   global element-access paths are not provided yet.
 * Materialization enqueues copies on the per-endpoint CUDA streams;
   ``distributedCUDAExecutor::sync`` is the completion boundary.

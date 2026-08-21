@@ -5,13 +5,15 @@
 // All rights reserved.
 ////////////////////////////////////////////////////////////////////////////////
 
-#include "gtest/gtest.h"
 #include "matx.h"
 #include "matx/distributed.h"
+#include "gtest/gtest.h"
 
 #include <mpi.h>
 #include <nccl.h>
 
+#include <algorithm>
+#include <cstdlib>
 #include <stdexcept>
 #include <vector>
 
@@ -50,7 +52,7 @@ public:
     }
   }
 
-  ncclComm_t get() const noexcept { return communicator_; }
+  [[maybe_unused]] ncclComm_t get() const noexcept { return communicator_; }
 
 private:
   ncclComm_t communicator_ = nullptr;
@@ -66,7 +68,7 @@ struct MpEnvironment {
   std::vector<distributed_endpoint_t> endpoints;
 };
 
-MpEnvironment GetMpEnvironment() {
+[[maybe_unused]] MpEnvironment GetMpEnvironment() {
   MpEnvironment environment;
   EXPECT_EQ(MPI_Comm_rank(MPI_COMM_WORLD, &environment.rank), MPI_SUCCESS);
   EXPECT_EQ(MPI_Comm_size(MPI_COMM_WORLD, &environment.size), MPI_SUCCESS);
@@ -86,16 +88,14 @@ MpEnvironment GetMpEnvironment() {
   EXPECT_EQ(MPI_Comm_free(&local_communicator), MPI_SUCCESS);
 
   environment.process_rows = environment.size % 2 == 0 ? 2 : 1;
-  environment.process_columns =
-      environment.size / environment.process_rows;
+  environment.process_columns = environment.size / environment.process_rows;
   std::vector<int> devices(static_cast<size_t>(environment.size));
   EXPECT_EQ(MPI_Allgather(&environment.device, 1, MPI_INT, devices.data(), 1,
                           MPI_INT, MPI_COMM_WORLD),
             MPI_SUCCESS);
   environment.endpoints.reserve(devices.size());
   for (int rank = 0; rank < environment.size; ++rank) {
-    environment.endpoints.push_back(
-        {rank, devices[static_cast<size_t>(rank)]});
+    environment.endpoints.push_back({rank, devices[static_cast<size_t>(rank)]});
   }
   return environment;
 }
@@ -142,6 +142,114 @@ void VerifyLocalMatrix(const Tensor &tensor, Verifier &&verifier) {
 
 } // namespace
 
+#ifdef MATX_EN_NCCL
+TEST(DistributedMpIntegration, NcclDistributedSum) {
+  int rank = 0;
+  int size = 0;
+  ASSERT_EQ(MPI_Comm_rank(MPI_COMM_WORLD, &rank), MPI_SUCCESS);
+  ASSERT_EQ(MPI_Comm_size(MPI_COMM_WORLD, &size), MPI_SUCCESS);
+  int device_count = 0;
+  MATX_CUDA_CHECK(cudaGetDeviceCount(&device_count));
+  MPI_Comm local_communicator = MPI_COMM_NULL;
+  ASSERT_EQ(MPI_Comm_split_type(MPI_COMM_WORLD, MPI_COMM_TYPE_SHARED, rank,
+                                MPI_INFO_NULL, &local_communicator),
+            MPI_SUCCESS);
+  int local_rank = 0;
+  int local_size = 0;
+  ASSERT_EQ(MPI_Comm_rank(local_communicator, &local_rank), MPI_SUCCESS);
+  ASSERT_EQ(MPI_Comm_size(local_communicator, &local_size), MPI_SUCCESS);
+  ASSERT_EQ(MPI_Comm_free(&local_communicator), MPI_SUCCESS);
+
+  int gpus_per_process = 1;
+  if (const char *configured = std::getenv("MATX_MNMG_GPUS_PER_PROCESS")) {
+    gpus_per_process = std::max(1, std::atoi(configured));
+  }
+  if (size < 2 || device_count < local_size * gpus_per_process) {
+    GTEST_SKIP() << "Requires two MPI ranks and " << gpus_per_process
+                 << " non-overlapping GPU(s) per process";
+  }
+
+  std::vector<int> local_devices(static_cast<size_t>(gpus_per_process));
+  for (int local = 0; local < gpus_per_process; ++local)
+    local_devices[static_cast<size_t>(local)] =
+        local_rank * gpus_per_process + local;
+  std::vector<int> all_devices(static_cast<size_t>(size * gpus_per_process));
+  ASSERT_EQ(MPI_Allgather(local_devices.data(), gpus_per_process, MPI_INT,
+                          all_devices.data(), gpus_per_process, MPI_INT,
+                          MPI_COMM_WORLD),
+            MPI_SUCCESS);
+  std::vector<distributed_endpoint_t> endpoints;
+  endpoints.reserve(all_devices.size());
+  for (int process = 0; process < size; ++process)
+    for (int local = 0; local < gpus_per_process; ++local)
+      endpoints.push_back({process, all_devices[static_cast<size_t>(
+                                        process * gpus_per_process + local)]});
+
+  ncclUniqueId id{};
+  if (rank == 0)
+    matx::detail::NcclCheck(ncclGetUniqueId(&id), "ncclGetUniqueId");
+  ASSERT_EQ(MPI_Bcast(&id, sizeof(id), MPI_BYTE, 0, MPI_COMM_WORLD),
+            MPI_SUCCESS);
+  std::vector<ncclComm_t> communicators(static_cast<size_t>(gpus_per_process),
+                                        nullptr);
+  matx::detail::NcclCheck(ncclGroupStart(), "ncclGroupStart");
+  for (int local = 0; local < gpus_per_process; ++local) {
+    MATX_CUDA_CHECK(cudaSetDevice(local_devices[static_cast<size_t>(local)]));
+    matx::detail::NcclCheck(
+        ncclCommInitRank(&communicators[static_cast<size_t>(local)],
+                         size * gpus_per_process, id,
+                         rank * gpus_per_process + local),
+        "ncclCommInitRank");
+  }
+  matx::detail::NcclCheck(ncclGroupEnd(), "ncclGroupEnd");
+
+  {
+    distributed_context context{local_devices, rank, size};
+    std::vector<distributed_nccl_binding_t> bindings;
+    for (int local = 0; local < gpus_per_process; ++local)
+      bindings.push_back({{rank, local_devices[static_cast<size_t>(local)]},
+                          communicators[static_cast<size_t>(local)]});
+    distributed_nccl_topology_t topology{endpoints, std::move(bindings)};
+    distributedCUDAExecutor executor{context, std::move(topology)};
+
+    constexpr index_t count = 37;
+    auto distribution = block_distribution_t<1>::Slab({count}, endpoints);
+    auto input = make_distributed_tensor<float>(distribution, context);
+    for (size_t local = 0; local < input.LocalFragmentCount(); ++local) {
+      const auto &fragment = input.LocalFragment(local);
+      const auto shape = distribution.LocalShape(fragment.distribution_index);
+      std::vector<float> host(static_cast<size_t>(shape[0]));
+      for (index_t i = 0; i < shape[0]; ++i) {
+        const auto global =
+            distribution.LocalToGlobal(fragment.distribution_index, {i});
+        host[static_cast<size_t>(i)] = static_cast<float>(global[0] + 1);
+      }
+      matx::detail::distributed_device_guard guard{fragment.endpoint.device_id};
+      MATX_CUDA_CHECK(cudaMemcpy(input.LocalView(local).Data(), host.data(),
+                                 host.size() * sizeof(float),
+                                 cudaMemcpyHostToDevice));
+    }
+
+    replicated_distribution_t<0> output_distribution{distributed_index_t<0>{},
+                                                     endpoints};
+    auto output = make_distributed_tensor<float>(output_distribution, context);
+    (output = sum(input)).run(executor);
+    executor.sync();
+    for (size_t local = 0; local < output.LocalFragmentCount(); ++local) {
+      const auto &fragment = output.LocalFragment(local);
+      matx::detail::distributed_device_guard guard{fragment.endpoint.device_id};
+      float result = 0.0F;
+      MATX_CUDA_CHECK(cudaMemcpy(&result, output.LocalView(local).Data(),
+                                 sizeof(float), cudaMemcpyDeviceToHost));
+      EXPECT_FLOAT_EQ(result, 703.0F);
+    }
+  }
+  for (auto communicator : communicators)
+    if (communicator != nullptr)
+      (void)ncclCommDestroy(communicator);
+}
+#endif
+
 #ifdef MATX_EN_CUBLASMP
 TEST(DistributedMpIntegration, CublasMpMatmul) {
   const auto environment = GetMpEnvironment();
@@ -153,11 +261,11 @@ TEST(DistributedMpIntegration, CublasMpMatmul) {
 
   MATX_CUDA_CHECK(cudaSetDevice(environment.device));
   NcclCommunicator communicator{environment.rank, environment.size};
-  distributed_context context{{environment.device}, environment.rank,
-                              environment.size};
-  distributedCUDAExecutor executor{
-      context, communicator.get(), environment.process_rows,
-      environment.process_columns};
+  distributed_context context{
+      {environment.device}, environment.rank, environment.size};
+  distributedCUDAExecutor executor{context, communicator.get(),
+                                   environment.process_rows,
+                                   environment.process_columns};
 
   constexpr index_t matrix_size = 16;
   block_cyclic_distribution_t distribution{
@@ -199,11 +307,11 @@ TEST(DistributedMpIntegration, CusolverMpCholesky) {
 
   MATX_CUDA_CHECK(cudaSetDevice(environment.device));
   NcclCommunicator communicator{environment.rank, environment.size};
-  distributed_context context{{environment.device}, environment.rank,
-                              environment.size};
-  distributedCUDAExecutor executor{
-      context, communicator.get(), environment.process_rows,
-      environment.process_columns};
+  distributed_context context{
+      {environment.device}, environment.rank, environment.size};
+  distributedCUDAExecutor executor{context, communicator.get(),
+                                   environment.process_rows,
+                                   environment.process_columns};
 
   constexpr index_t matrix_size = 16;
   block_cyclic_distribution_t distribution{
@@ -224,8 +332,7 @@ TEST(DistributedMpIntegration, CusolverMpCholesky) {
 
   VerifyLocalMatrix(output, [](index_t row, index_t column, float value) {
     if (row >= column) {
-      const float expected =
-          row == column ? static_cast<float>(row + 2) : 0.0F;
+      const float expected = row == column ? static_cast<float>(row + 2) : 0.0F;
       EXPECT_NEAR(value, expected, 2.0e-3F);
     }
   });

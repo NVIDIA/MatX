@@ -223,7 +223,6 @@ private:
 /** A full logical tensor replica on each endpoint. */
 template <int RANK> class replicated_distribution_t {
 public:
-  static_assert(RANK > 0, "Distributed rank-zero tensors are not supported");
   static constexpr int Rank() noexcept { return RANK; }
 
   replicated_distribution_t(distributed_index_t<RANK> global_shape,
@@ -269,6 +268,11 @@ private:
   distributed_index_t<RANK> global_shape_{};
   std::vector<distributed_endpoint_t> endpoints_;
 };
+
+template <typename T> inline constexpr bool is_replicated_distribution_v = false;
+template <int RANK>
+inline constexpr bool
+    is_replicated_distribution_v<replicated_distribution_t<RANK>> = true;
 
 /**
  * Two-dimensional block-cyclic mapping compatible with the descriptor model

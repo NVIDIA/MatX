@@ -9,6 +9,7 @@
 
 #include "matx/core/distributed_tensor.h"
 #include "matx/executors/distributed.h"
+#include "matx/operators/distributed_reduce.h"
 #include "matx/transforms/distributed/fft_mg.h"
 
 #if defined(MATX_EN_CUBLASMP) || defined(MATX_EN_CUSOLVERMP)

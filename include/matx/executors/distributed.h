@@ -33,6 +33,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <atomic>
 #include <cstdint>
 #include <memory>
@@ -40,7 +41,8 @@
 #include <utility>
 #include <vector>
 
-#if defined(MATX_EN_CUBLASMP) || defined(MATX_EN_CUSOLVERMP)
+#if defined(MATX_EN_NCCL) || defined(MATX_EN_CUBLASMP) ||                      \
+    defined(MATX_EN_CUSOLVERMP)
 #include <nccl.h>
 #endif
 #ifdef MATX_EN_CUBLASMP
@@ -95,6 +97,15 @@ inline void CusolverMpCheck(cusolverStatus_t status, const char *operation) {
 }
 #endif
 
+#ifdef MATX_EN_NCCL
+inline void NcclCheck(ncclResult_t status, const char *operation) {
+  if (status != ncclSuccess) {
+    MATX_THROW(matxInvalidExecutor, std::string(operation) + " failed: " +
+                                        ncclGetErrorString(status));
+  }
+}
+#endif
+
 } // namespace detail
 
 /** Identifies a CUDA device in a process participating in distributed work. */
@@ -108,6 +119,24 @@ struct distributed_endpoint_t {
 
 /** Ordering used to map communicator ranks onto a two-dimensional grid. */
 enum class distributed_grid_layout { row_major, column_major };
+
+#ifdef MATX_EN_NCCL
+/** A borrowed NCCL communicator attached to one locally owned endpoint. */
+struct distributed_nccl_binding_t {
+  distributed_endpoint_t endpoint;
+  ncclComm_t communicator = nullptr;
+};
+
+/**
+ * Global NCCL rank ordering plus the communicators owned by this process.
+ * MatX borrows the communicators; the caller must keep them alive until every
+ * operation using the executor has completed.
+ */
+struct distributed_nccl_topology_t {
+  std::vector<distributed_endpoint_t> rank_to_endpoint;
+  std::vector<distributed_nccl_binding_t> local_communicators;
+};
+#endif
 
 /**
  * Lightweight topology identity shared by distributed tensors and executors.
@@ -286,6 +315,19 @@ public:
       : distributedCUDAExecutor(distributed_context{std::move(local_devices)}) {
   }
 
+#ifdef MATX_EN_NCCL
+  distributedCUDAExecutor(distributed_context context,
+                          distributed_nccl_topology_t topology)
+      : distributedCUDAExecutor(std::move(context)) {
+    try {
+      InitializeNcclTopology(std::move(topology));
+    } catch (...) {
+      DestroyStreams();
+      throw;
+    }
+  }
+#endif
+
 #if defined(MATX_EN_CUBLASMP) || defined(MATX_EN_CUSOLVERMP)
   distributedCUDAExecutor(
       distributed_context context, ncclComm_t communicator, int process_rows,
@@ -309,6 +351,10 @@ public:
       : context_{std::move(other.context_)}, streams_{std::move(
                                                  other.streams_)},
         transfer_count_{other.transfer_count_.load(std::memory_order_relaxed)}
+#ifdef MATX_EN_NCCL
+        ,
+        nccl_topology_{std::move(other.nccl_topology_)}
+#endif
 #if defined(MATX_EN_CUBLASMP) || defined(MATX_EN_CUSOLVERMP)
         ,
         collectives_{std::move(other.collectives_)}
@@ -355,6 +401,17 @@ public:
       detail::distributed_device_guard guard{entry.device_id};
       MATX_CUDA_CHECK(cudaStreamSynchronize(entry.stream));
     }
+#ifdef MATX_EN_NCCL
+    if (nccl_topology_ != nullptr) {
+      for (const auto &binding : nccl_topology_->local_communicators) {
+        ncclResult_t asynchronous = ncclSuccess;
+        detail::NcclCheck(
+            ncclCommGetAsyncError(binding.communicator, &asynchronous),
+            "ncclCommGetAsyncError");
+        detail::NcclCheck(asynchronous, "NCCL asynchronous operation");
+      }
+    }
+#endif
   }
 
   void RecordTransfer() const noexcept {
@@ -364,6 +421,30 @@ public:
   size_t TransferCount() const noexcept {
     return transfer_count_.load(std::memory_order_relaxed);
   }
+
+#ifdef MATX_EN_NCCL
+  bool HasNcclTopology() const noexcept { return nccl_topology_ != nullptr; }
+
+  const std::vector<distributed_endpoint_t> &CollectiveEndpoints() const {
+    detail::DistributedCheck(HasNcclTopology(), matxInvalidExecutor,
+                             "The distributed executor has no NCCL topology");
+    return nccl_topology_->rank_to_endpoint;
+  }
+
+  ncclComm_t NcclCommunicator(const distributed_endpoint_t &endpoint) const {
+    detail::DistributedCheck(HasNcclTopology(), matxInvalidExecutor,
+                             "The distributed executor has no NCCL topology");
+    for (const auto &binding : nccl_topology_->local_communicators) {
+      if (binding.endpoint == endpoint) {
+        return binding.communicator;
+      }
+    }
+    MATX_THROW(matxInvalidExecutor,
+               "No NCCL communicator is bound to the requested endpoint");
+  }
+#else
+  bool HasNcclTopology() const noexcept { return false; }
+#endif
 
 #if defined(MATX_EN_CUBLASMP) || defined(MATX_EN_CUSOLVERMP)
   bool HasCollectiveResources() const noexcept {
@@ -414,6 +495,69 @@ private:
     }
     streams_.clear();
   }
+
+#ifdef MATX_EN_NCCL
+  void InitializeNcclTopology(distributed_nccl_topology_t topology) {
+    detail::DistributedCheck(!topology.rank_to_endpoint.empty(),
+                             matxInvalidParameter,
+                             "An NCCL topology needs at least one endpoint");
+    for (size_t i = 0; i < topology.rank_to_endpoint.size(); ++i) {
+      const auto &endpoint = topology.rank_to_endpoint[i];
+      detail::DistributedCheck(
+          endpoint.process_rank >= 0 &&
+              endpoint.process_rank < context_.ProcessCount(),
+          matxInvalidParameter,
+          "NCCL topology contains an invalid process rank");
+      for (size_t j = i + 1; j < topology.rank_to_endpoint.size(); ++j) {
+        detail::DistributedCheck(endpoint != topology.rank_to_endpoint[j],
+                                 matxInvalidParameter,
+                                 "NCCL topology endpoints must be unique");
+      }
+    }
+
+    for (int device : context_.LocalDevices()) {
+      const distributed_endpoint_t expected{context_.ProcessRank(), device};
+      const auto rank_it = std::find(topology.rank_to_endpoint.begin(),
+                                     topology.rank_to_endpoint.end(), expected);
+      detail::DistributedCheck(
+          rank_it != topology.rank_to_endpoint.end(), matxInvalidParameter,
+          "Every local device must appear in the NCCL topology");
+      const auto binding_it = std::find_if(
+          topology.local_communicators.begin(),
+          topology.local_communicators.end(),
+          [&](const auto &binding) { return binding.endpoint == expected; });
+      detail::DistributedCheck(
+          binding_it != topology.local_communicators.end(),
+          matxInvalidParameter,
+          "Every local endpoint needs an NCCL communicator");
+      detail::DistributedCheck(binding_it->communicator != nullptr,
+                               matxInvalidParameter,
+                               "NCCL communicators cannot be null");
+      int communicator_count = 0;
+      int communicator_rank = -1;
+      detail::NcclCheck(
+          ncclCommCount(binding_it->communicator, &communicator_count),
+          "ncclCommCount");
+      detail::NcclCheck(
+          ncclCommUserRank(binding_it->communicator, &communicator_rank),
+          "ncclCommUserRank");
+      detail::DistributedCheck(
+          communicator_count ==
+                  static_cast<int>(topology.rank_to_endpoint.size()) &&
+              communicator_rank ==
+                  static_cast<int>(rank_it - topology.rank_to_endpoint.begin()),
+          matxInvalidParameter,
+          "NCCL communicator rank ordering does not match the endpoint "
+          "topology");
+    }
+    detail::DistributedCheck(
+        topology.local_communicators.size() == context_.LocalDevices().size(),
+        matxInvalidParameter,
+        "NCCL topology has duplicate or non-local communicator bindings");
+    nccl_topology_ =
+        std::make_unique<distributed_nccl_topology_t>(std::move(topology));
+  }
+#endif
 
 #if defined(MATX_EN_CUBLASMP) || defined(MATX_EN_CUSOLVERMP)
   void InitializeCollectives(ncclComm_t communicator, int process_rows,
@@ -477,6 +621,9 @@ private:
   distributed_context context_;
   std::vector<stream_entry_t> streams_;
   mutable std::atomic<size_t> transfer_count_{0};
+#ifdef MATX_EN_NCCL
+  std::unique_ptr<distributed_nccl_topology_t> nccl_topology_;
+#endif
 #if defined(MATX_EN_CUBLASMP) || defined(MATX_EN_CUSOLVERMP)
   std::unique_ptr<detail::distributed_collective_state> collectives_;
 #endif
