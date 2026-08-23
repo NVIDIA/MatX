@@ -225,7 +225,23 @@ private:
     const range_type phase_over_pi = phase_over_pi_per_meter * range_offset;
     range_type sin_phase;
     range_type cos_phase;
-    if constexpr (cuda::std::is_same_v<range_type, double>) {
+    if constexpr (cuda::std::is_same_v<range_type, double> &&
+                  cuda::std::is_same_v<fx_scalar_type, float>) {
+      // Keep the range-sensitive phase construction and argument reduction in
+      // double, but evaluate the bounded angle with single-precision sincospif.
+      // This avoids the costly full-range double-precision sincospi path on
+      // GPUs with reduced FP64 throughput without first narrowing the large
+      // unreduced phase.
+      const double periods = cuda::std::nearbyint(phase_over_pi * 0.5);
+      const double reduced_phase_over_pi =
+          cuda::std::fma(periods, -2.0, phase_over_pi);
+      float fast_sin_phase;
+      float fast_cos_phase;
+      sincospif(static_cast<float>(reduced_phase_over_pi), &fast_sin_phase,
+                &fast_cos_phase);
+      sin_phase = fast_sin_phase;
+      cos_phase = fast_cos_phase;
+    } else if constexpr (cuda::std::is_same_v<range_type, double>) {
       sincospi(phase_over_pi, &sin_phase, &cos_phase);
     } else {
       sincospif(phase_over_pi, &sin_phase, &cos_phase);
@@ -514,7 +530,22 @@ private:
     range_type sin_phase;
     range_type cos_phase;
 #if defined(__CUDA_ARCH__)
-    if constexpr (cuda::std::is_same_v<range_type, double>) {
+    if constexpr (cuda::std::is_same_v<range_type, double> &&
+                  cuda::std::is_same_v<fx_scalar_type, float>) {
+      // A float output cannot retain double-precision trig results. Reduce the
+      // large phase modulo 2 in double before converting the bounded angle to
+      // float, which makes the lower-cost sincospif path accurate enough for
+      // the destination type.
+      const double periods = cuda::std::nearbyint(phase_over_pi * 0.5);
+      const double reduced_phase_over_pi =
+          cuda::std::fma(periods, -2.0, phase_over_pi);
+      float fast_sin_phase;
+      float fast_cos_phase;
+      sincospif(static_cast<float>(reduced_phase_over_pi), &fast_sin_phase,
+                &fast_cos_phase);
+      sin_phase = fast_sin_phase;
+      cos_phase = fast_cos_phase;
+    } else if constexpr (cuda::std::is_same_v<range_type, double>) {
       sincospi(phase_over_pi, &sin_phase, &cos_phase);
     } else {
       sincospif(phase_over_pi, &sin_phase, &cos_phase);
@@ -553,8 +584,10 @@ private:
  * Sample floor(num_samples / 2) has frequency
  * \p params.phase_reference_frequency. The operator applies
  * exp(j * -sgn * 4*pi/c * frequency * target_reference_range) to every FX
- * sample. Phase arithmetic uses the value type of \p target_reference_range,
- * which must currently be float or double.
+ * sample. Phase construction and reduction use the value type of
+ * \p target_reference_range, which must currently be float or double. On CUDA,
+ * double-range phase for complex<float> FX data uses a float trigonometric
+ * evaluation after double-precision argument reduction.
  *
  * @tparam FxOp FX tensor or operator type.
  * @tparam TargetRangeOp Target-reference-range tensor or operator type.

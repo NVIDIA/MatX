@@ -128,11 +128,7 @@ real/imag, row-major), written to `output_image.raw` in this example.
 `--bulk-mocomp` assumes the FX-domain input has not already been bulk motion
 compensated to the stored reference ranges. Applying bulk motion compensation
 to data that has already been motion compensated is not idempotent and results
-in an incorrect phase reference. Bulk mocomp always uses double-precision phase
-arithmetic. With `--precision fltflt`, each per-pulse range-to-MCP block is
-converted from double to float-float on the device after mocomp and before
-backprojection. No extra conversion kernel is used when bulk mocomp is disabled.
-The example reports the bulk-mocomp path time separately from backprojection.
+in an incorrect phase reference.
 
 The `--precision` flag controls the arithmetic used by the `sar_bp` operator. For spaceborne SAR, `float` does not provide enough precision to store fractional wavelengths at the range-to-MCP magnitudes (hundreds of km), so pure `float` is not sufficient to produce focused images. The available modes are:
 

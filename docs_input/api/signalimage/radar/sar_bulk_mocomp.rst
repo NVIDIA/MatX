@@ -52,8 +52,12 @@ target_reference_range and uses
 
 Phase arithmetic follows the range-offset value type. Float ranges use
 single-precision frequency, phase, and trigonometric arithmetic; double ranges
-use double precision. The parameter frequencies are stored as double and
-narrowed for the single-precision path. Other range types, including fltflt and
+use double precision for phase construction and argument reduction. With CUDA,
+when double ranges are combined with ``cuda::std::complex<float>`` FX data, the
+bounded, reduced angle is converted to float for a fast single-precision
+``sincospif`` evaluation. Double-complex FX data retains the full double-precision
+trigonometric path. The parameter frequencies are stored as double and narrowed
+for the single-precision range path. Other range types, including fltflt and
 half precision, are not currently supported. FX values must be
 cuda::std::complex<float> or cuda::std::complex<double>.
 

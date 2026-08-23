@@ -189,6 +189,20 @@ using SarBulkMocompTestTypes =
 
 TYPED_TEST_SUITE(SarBulkMocompTests, SarBulkMocompTestTypes);
 
+template <typename Executor>
+class SarBulkMocompMixedPrecisionGPUTests : public ::testing::Test {};
+
+#ifdef MATX_EN_JIT
+using SarBulkMocompMixedPrecisionGPUExecutorTypes =
+    ::testing::Types<cudaExecutor, CUDAJITExecutor>;
+#else
+using SarBulkMocompMixedPrecisionGPUExecutorTypes =
+    ::testing::Types<cudaExecutor>;
+#endif
+
+TYPED_TEST_SUITE(SarBulkMocompMixedPrecisionGPUTests,
+                 SarBulkMocompMixedPrecisionGPUExecutorTypes);
+
 #ifdef MATX_EN_JIT
 template <typename RangeType>
 class SarBulkMocompJITTests : public ::testing::Test {};
@@ -383,6 +397,49 @@ TEST(SarBulkMocompTests, PhasePrecisionFollowsRangeType) {
                 2.0e-6);
     EXPECT_NEAR(out_float(0, sample).imag(), expected_float_output.imag(),
                 2.0e-6);
+  }
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(SarBulkMocompMixedPrecisionGPUTests,
+           FloatOutputPreservesDoublePhaseReduction) {
+  MATX_ENTER_HANDLER();
+  constexpr index_t pulses = 5;
+  constexpr index_t samples = 17;
+  TypeParam exec{};
+
+  auto fx = make_tensor<Complex<float>>({pulses, samples}, MATX_MANAGED_MEMORY);
+  auto ranges = make_tensor<double>({pulses}, MATX_MANAGED_MEMORY);
+  auto output =
+      make_tensor<Complex<float>>({pulses, samples}, MATX_MANAGED_MEMORY);
+
+  // Cover ordinary offsets, spaceborne slant ranges, negative offsets, and a
+  // very large phase whose fractional cycle would be lost if it were narrowed
+  // to float before reduction.
+  const double range_values[pulses] = {
+      0.125, 1.25, 725000.125, -725000.375, 8000000.0625};
+  for (index_t pulse = 0; pulse < pulses; ++pulse) {
+    ranges(pulse) = range_values[pulse];
+    for (index_t sample = 0; sample < samples; ++sample) {
+      fx(pulse, sample) =
+          Complex<float>{0.75f + 0.125f * static_cast<float>(pulse),
+                         -0.5f + 0.03125f * static_cast<float>(sample)};
+    }
+  }
+
+  const experimental::SarBulkMocompParams params{9.6e9, 27500.0, -1};
+  (output = experimental::sar_bulk_mocomp(fx, ranges, params)).run(exec);
+  exec.sync();
+
+  for (index_t pulse = 0; pulse < pulses; ++pulse) {
+    for (index_t sample = 0; sample < samples; ++sample) {
+      const auto input = Complex<double>{fx(pulse, sample).real(),
+                                         fx(pulse, sample).imag()};
+      const auto expected = ExpectedCorrection(input, ranges(pulse), sample,
+                                               samples, params);
+      EXPECT_NEAR(output(pulse, sample).real(), expected.real(), 1.0e-6);
+      EXPECT_NEAR(output(pulse, sample).imag(), expected.imag(), 1.0e-6);
+    }
   }
   MATX_EXIT_HANDLER();
 }

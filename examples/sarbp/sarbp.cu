@@ -1417,7 +1417,7 @@ int main(int argc, char **argv) {
   std::cout << "Pixel-z mode     : " << pixel_z_arg << std::endl;
   std::cout << "Bulk mocomp      : ";
   if (apply_bulk_mocomp) {
-    std::cout << "enabled (double phase arithmetic)";
+    std::cout << "enabled";
   } else {
     std::cout << "disabled";
   }
