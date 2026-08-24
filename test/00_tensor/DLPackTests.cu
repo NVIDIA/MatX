@@ -232,23 +232,34 @@ TYPED_TEST(DLPackTestsAll, ExportLegacyDLPack)
     // Default memory space -> exercises whatever the allocator handed
     // back. On devices where cudaDevAttrConcurrentManagedAccess == 0 (e.g.
     // Jetson), the allocator falls back to host pinned memory. This test
-    // derives the expected device type from GetPointerKind, instead of
-    // hardcoding kDLCUDA
+    // derives the expected device type from GetPointerKind
     auto t = make_tensor<TestType>({5, 10, 20});
-    auto expected_device_type = (GetPointerKind(t.GetStorage().data()) == MATX_HOST_MEMORY ? kDLCUDAHost : kDLCUDA);
-    check_dl_export(t, expected_device_type);
+    auto kind = GetPointerKind(t.GetStorage().data());
+    
+    // Default allocation can only be MATX_MANAGED_MEMORY or MATX_HOST_MEMORY.
+    // Assert that explicitly so a future allocator change can't silently
+    // produce a wrong expectation below
+    ASSERT_TRUE(kind == MATX_MANAGED_MEMORY || kind == MATX_HOST_MEMORY);
+    auto expected_device_type = (kind == MATX_HOST_MEMORY ? kDLCUDAHost : kDLCUDA);
+    ASSERT_NO_FATAL_FAILURE(check_dl_export(t, expected_device_type));
   }
 
   {
     // Explicit device memory -> should resolve to kDLCUDA
     auto t = make_tensor<TestType>({5, 10, 20}, MATX_DEVICE_MEMORY);
-    check_dl_export(t, kDLCUDA);
+    ASSERT_NO_FATAL_FAILURE(check_dl_export(t, kDLCUDA));
   }
 
   {
     // Explicit host pinned memory -> should resolve to kDLCUDAHost
     auto t = make_tensor<TestType>({5, 10, 20}, MATX_HOST_MEMORY);
-    check_dl_export(t, kDLCUDAHost);
+    ASSERT_NO_FATAL_FAILURE(check_dl_export(t, kDLCUDAHost));
+  }
+
+  {
+    // Explicit plain malloc host memory -> should resolve to kDLCPU
+    auto t = make_tensor<TestType>({5, 10, 20}, MATX_HOST_MALLOC_MEMORY);
+    ASSERT_NO_FATAL_FAILURE(check_dl_export(t, kDLCPU));
   }
 
   MATX_EXIT_HANDLER();
