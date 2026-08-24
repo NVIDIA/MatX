@@ -135,13 +135,13 @@ void RunRank2ReferenceCase(ExecType &exec, index_t num_samples, int sgn) {
 
   constexpr auto memory_space = TestMemorySpace<ExecType>();
   auto fx = make_tensor<FxType>({num_pulses, num_samples}, memory_space);
-  auto ranges = make_tensor<RangeType>({num_pulses}, memory_space);
+  auto range_to_mcp = make_tensor<RangeType>({num_pulses}, memory_space);
   auto output = make_tensor<FxType>({num_pulses, num_samples}, memory_space);
 
   for (index_t pulse = 0; pulse < num_pulses; ++pulse) {
     const auto pulse_value = static_cast<RangeType>(pulse);
-    ranges(pulse) = static_cast<RangeType>(1.25) +
-                    static_cast<RangeType>(0.5) * pulse_value;
+    range_to_mcp(pulse) = static_cast<RangeType>(1.25) +
+                          static_cast<RangeType>(0.5) * pulse_value;
     for (index_t sample = 0; sample < num_samples; ++sample) {
       const auto sample_value = static_cast<RangeType>(sample);
       fx(pulse, sample) =
@@ -153,22 +153,32 @@ void RunRank2ReferenceCase(ExecType &exec, index_t num_samples, int sgn) {
     }
   }
 
-  const experimental::SarBulkMocompParams params{1.25e6, 2.5e4, sgn};
-  (output = experimental::sar_bulk_mocomp(fx, ranges, params)).run(exec);
+  // example-begin sar-bulk-mocomp-1
+  const experimental::SarBulkMocompParams params{
+      .phase_reference_frequency = 9.6e9,
+      .sample_frequency_spacing = 2.5e4,
+      .sgn = sgn,
+  };
+
+  auto compensated =
+      experimental::sar_bulk_mocomp(fx, range_to_mcp, params);
+  (output = compensated).run(exec);
+  // example-end sar-bulk-mocomp-1
   exec.sync();
 
   const double tolerance = std::is_same_v<RangeType, float> ? 2.0e-5 : 1.0e-12;
   for (index_t pulse = 0; pulse < num_pulses; ++pulse) {
     for (index_t sample = 0; sample < num_samples; ++sample) {
-      const auto expected = ExpectedCorrection(fx(pulse, sample), ranges(pulse),
-                                               sample, num_samples, params);
+      const auto expected = ExpectedCorrection(
+          fx(pulse, sample), range_to_mcp(pulse), sample, num_samples, params);
       EXPECT_NEAR(output(pulse, sample).real(), expected.real(), tolerance);
       EXPECT_NEAR(output(pulse, sample).imag(), expected.imag(), tolerance);
     }
   }
 
   // Applying the opposite range offset in place should recover the input.
-  (output = experimental::sar_bulk_mocomp(output, -ranges, params)).run(exec);
+  (output = experimental::sar_bulk_mocomp(output, -range_to_mcp, params))
+      .run(exec);
   exec.sync();
   for (index_t pulse = 0; pulse < num_pulses; ++pulse) {
     for (index_t sample = 0; sample < num_samples; ++sample) {

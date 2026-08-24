@@ -38,17 +38,14 @@ two-range overload changes reference from initial_reference_range to
 target_reference_range and uses
 :math:`\Delta R_p = R_{\mathrm{target},p} - R_{\mathrm{initial},p}`.
 
-.. code-block:: cpp
+Examples
+~~~~~~~~
 
-   matx::experimental::SarBulkMocompParams params{
-       .phase_reference_frequency = 9.6e9,
-       .sample_frequency_spacing = 3.0e6,
-       .sgn = -1,
-   };
-
-   auto compensated =
-       matx::experimental::sar_bulk_mocomp(fx, range_to_mcp, params);
-   (output = compensated).run(exec);
+.. literalinclude:: ../../../../test/00_operators/sar_bulk_mocomp_test.cu
+   :language: cpp
+   :start-after: example-begin sar-bulk-mocomp-1
+   :end-before: example-end sar-bulk-mocomp-1
+   :dedent:
 
 Phase arithmetic follows the range-offset value type. Float ranges use
 single-precision frequency, phase, and trigonometric arithmetic; double ranges
