@@ -213,15 +213,6 @@ using SarBulkMocompMixedPrecisionGPUExecutorTypes =
 TYPED_TEST_SUITE(SarBulkMocompMixedPrecisionGPUTests,
                  SarBulkMocompMixedPrecisionGPUExecutorTypes);
 
-#ifdef MATX_EN_JIT
-template <typename RangeType>
-class SarBulkMocompJITTests : public ::testing::Test {};
-
-using SarBulkMocompJITTestTypes = ::testing::Types<float, double>;
-
-TYPED_TEST_SUITE(SarBulkMocompJITTests, SarBulkMocompJITTestTypes);
-#endif
-
 } // namespace
 
 TYPED_TEST(SarBulkMocompTests, Rank2OddAndEvenFrequencyGrids) {
@@ -235,12 +226,11 @@ TYPED_TEST(SarBulkMocompTests, Rank2OddAndEvenFrequencyGrids) {
   MATX_EXIT_HANDLER();
 }
 
-#ifdef MATX_EN_JIT
-TYPED_TEST(SarBulkMocompJITTests, TransformBackedRangeOffset) {
+TYPED_TEST(SarBulkMocompTests, TransformBackedRangeOffset) {
   MATX_ENTER_HANDLER();
-  using RangeType = TypeParam;
+  using RangeType = cuda::std::tuple_element_t<0, TypeParam>;
   using FxType = Complex<RangeType>;
-  using ExecType = CUDAJITExecutor;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
   constexpr index_t pulses = 3;
   constexpr index_t samples = 32;
@@ -289,7 +279,6 @@ TYPED_TEST(SarBulkMocompJITTests, TransformBackedRangeOffset) {
   }
   MATX_EXIT_HANDLER();
 }
-#endif
 
 TYPED_TEST(SarBulkMocompTests, BatchedReferenceChangeAndComposition) {
   MATX_ENTER_HANDLER();
