@@ -205,26 +205,51 @@ TYPED_TEST(DLPackTestsAll, ExportLegacyDLPack)
   MATX_ENTER_HANDLER();
 
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  auto t = make_tensor<TestType>({5, 10, 20});
-  auto dl = t.ToDlPack();
 
-  ASSERT_EQ(dl->dl_tensor.ndim, 3);
-  ASSERT_EQ(dl->dl_tensor.data, t.Data());
-  ASSERT_EQ(dl->dl_tensor.device.device_id, 0);
-  ASSERT_EQ(dl->dl_tensor.device.device_type, kDLCUDA);
-  auto dlt = detail::TypeToDLPackType<TestType>();
-  ASSERT_EQ(dl->dl_tensor.dtype.code, dlt.code);
-  ASSERT_EQ(dl->dl_tensor.dtype.bits, dlt.bits);
-  ASSERT_EQ(dl->dl_tensor.dtype.lanes, dlt.lanes);
-  ASSERT_EQ(dl->dl_tensor.shape[0], t.Size(0));
-  ASSERT_EQ(dl->dl_tensor.shape[1], t.Size(1));
-  ASSERT_EQ(dl->dl_tensor.shape[2], t.Size(2));
-  ASSERT_EQ(dl->dl_tensor.strides[0], t.Stride(0));
-  ASSERT_EQ(dl->dl_tensor.strides[1], t.Stride(1));
-  ASSERT_EQ(dl->dl_tensor.strides[2], t.Stride(2));
-  ASSERT_EQ(t.GetRefCount(), 2);
-  dl->deleter(dl);
-  ASSERT_EQ(t.GetRefCount(), 1);
+  auto check_dl_export = [](auto &t, DLDeviceType expected_device_type) {
+    auto dl = t.ToDlPack();
+
+    ASSERT_EQ(dl->dl_tensor.ndim, 3);
+    ASSERT_EQ(dl->dl_tensor.data, t.Data());
+    ASSERT_EQ(dl->dl_tensor.device.device_id, 0);
+    ASSERT_EQ(dl->dl_tensor.device.device_type, expected_device_type);
+    auto dlt = detail::TypeToDLPackType<TestType>();
+    ASSERT_EQ(dl->dl_tensor.dtype.code, dlt.code);
+    ASSERT_EQ(dl->dl_tensor.dtype.bits, dlt.bits);
+    ASSERT_EQ(dl->dl_tensor.dtype.lanes, dlt.lanes);
+    ASSERT_EQ(dl->dl_tensor.shape[0], t.Size(0));
+    ASSERT_EQ(dl->dl_tensor.shape[1], t.Size(1));
+    ASSERT_EQ(dl->dl_tensor.shape[2], t.Size(2));
+    ASSERT_EQ(dl->dl_tensor.strides[0], t.Stride(0));
+    ASSERT_EQ(dl->dl_tensor.strides[1], t.Stride(1));
+    ASSERT_EQ(dl->dl_tensor.strides[2], t.Stride(2));
+    ASSERT_EQ(t.GetRefCount(), 2);
+    dl->deleter(dl);
+    ASSERT_EQ(t.GetRefCount(), 1);
+  };
+
+  {
+    // Default memory space -> exercises whatever the allocator handed
+    // back. On devices where cudaDevAttrConcurrentManagedAccess == 0 (e.g.
+    // Jetson), the allocator falls back to host pinned memory. This test
+    // derives the expected device type from GetPointerKind, instead of
+    // hardcoding kDLCUDA
+    auto t = make_tensor<TestType>({5, 10, 20});
+    auto expected_device_type = (GetPointerKind(t.GetStorage().data()) == MATX_HOST_MEMORY ? kDLCUDAHost : kDLCUDA);
+    check_dl_export(t, expected_device_type);
+  }
+
+  {
+    // Explicit device memory -> should resolve to kDLCUDA
+    auto t = make_tensor<TestType>({5, 10, 20}, MATX_DEVICE_MEMORY);
+    check_dl_export(t, kDLCUDA);
+  }
+
+  {
+    // Explicit host pinned memory -> should resolve to kDLCUDAHost
+    auto t = make_tensor<TestType>({5, 10, 20}, MATX_HOST_MEMORY);
+    check_dl_export(t, kDLCUDAHost);
+  }
 
   MATX_EXIT_HANDLER();
 }
