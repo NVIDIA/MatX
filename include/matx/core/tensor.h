@@ -830,7 +830,7 @@ MATX_LOOP_UNROLL
    *
    * @return storage container
    */
-  __MATX_INLINE__ auto GetStorage() noexcept {
+  __MATX_INLINE__ auto GetStorage() const noexcept {
     return storage_;
   }
 
@@ -1490,7 +1490,9 @@ MATX_LOOP_UNROLL
     t->device.device_id = 0;
 
     // Determine where this memory resides
-    void *data_ptr = const_cast<void *>(static_cast<const void *>(this->Data()));
+    // Pass in the base pointer, not a potentially offset pointer
+    // returned by this->Data()
+    void *data_ptr = const_cast<void *>(static_cast<const void *>(this->GetStorage().data()));
     auto kind = GetPointerKind(data_ptr);
     [[maybe_unused]] auto mem_res = cuPointerGetAttributes(sizeof(attr)/sizeof(attr[0]), attr, data, reinterpret_cast<CUdeviceptr>(data_ptr));
     MATX_ASSERT_STR_EXP(mem_res, CUDA_SUCCESS, matxCudaError, "Error returned from cuPointerGetAttributes");
