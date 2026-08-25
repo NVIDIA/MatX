@@ -55,6 +55,7 @@ set(OPERATOR_TEST_FILES
   repmat_test.cu
   reshape_test.cu
   reverse_test.cu
+  sar_bulk_mocomp_test.cu
   shift_test.cu
   simple_executor_accessor_test.cu
   slice_and_reduce_test.cu

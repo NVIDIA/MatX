@@ -238,6 +238,7 @@ struct BpRunCtx {
   bool is_fx_domain;
   bool is_int16_mode;
   bool apply_window;
+  bool apply_bulk_mocomp;
   bool taylor_fast_add_third_order;
   SarBpPixelZMode pixel_z_mode;  // compile-time pixel-z assumption to apply
   int sgn;
@@ -246,6 +247,7 @@ struct BpRunCtx {
   std::string gold_file;
   std::string cmap_file;
   double del_r;
+  matx::experimental::SarBulkMocompParams bulk_mocomp_params;
   SarBpParams params;
   double3 *h_positions;
   double *h_range_to_mcp;
@@ -395,12 +397,10 @@ static int run_bp_device(PosTensor blk_positions, RtmTensor blk_rtm,
   using PosT = typename std::decay_t<decltype(blk_positions)>::value_type;
   constexpr bool pos_is_fltflt = std::is_same_v<PosT, matx::fltflt>;
 
-  // The host buffers ctx.h_positions / ctx.h_range_to_mcp were declared with
-  // double element types and either hold doubles (standard paths) or
-  // fltflt-encoded bytes (after the in-place conversion done in main when
-  // precision is fltflt). Since the byte sizes are identical between the two
-  // representations, the cudaMemcpyAsync calls below are just byte copies
-  // regardless of which device tensor type is being filled.
+  // The host position buffer contains fltflt-encoded bytes for the FloatFloat
+  // path. The range-to-MCP buffer normally follows the same convention, but
+  // remains double when FloatFloat is combined with bulk mocomp so that mocomp
+  // can use double phase arithmetic before a per-block conversion to fltflt.
   static_assert(3 * sizeof(matx::fltflt) == sizeof(double3),
                 "fltflt[3] must match double3 byte size for the in-place conversion to work");
   static_assert(sizeof(matx::fltflt) == sizeof(double),
@@ -423,29 +423,90 @@ static int run_bp_device(PosTensor blk_positions, RtmTensor blk_rtm,
         cudaMemcpyHostToDevice, ctx.stream));
   };
 
+  // Pre-allocate GPU block buffers (sized for largest block)
+  auto blk_profiles = make_tensor<complex_t>({ctx.block_size, ctx.output_range_bins}, matx::MATX_DEVICE_MEMORY);
+  tensor_t<complex_t, 2> blk_compressed;
+  tensor_t<complex_t, 2> blk_fx;
+  if (ctx.is_fx_domain) {
+    make_tensor(
+        blk_compressed, {ctx.block_size, ctx.fft_size},
+        matx::MATX_DEVICE_MEMORY);
+    make_tensor(
+        blk_fx, {ctx.block_size, ctx.num_samples_raw},
+        matx::MATX_DEVICE_MEMORY);
+  }
+
+  // int16 interleaved I/Q samples and per-pulse scale (int16 mode only)
+  tensor_t<int16_t, 2> blk_fx_i16;
+  tensor_t<float, 1> blk_ampsf;
+  if (ctx.is_int16_mode && ctx.is_fx_domain) {
+    make_tensor(
+        blk_fx_i16, {ctx.block_size, ctx.num_samples_raw * 2},
+        matx::MATX_DEVICE_MEMORY);
+    make_tensor(
+        blk_ampsf, {ctx.block_size},
+        matx::MATX_DEVICE_MEMORY);
+  }
+
+  // Only FloatFloat with bulk mocomp needs double RTM staging.
+  tensor_t<double, 1> blk_bulk_mocomp_rtm;
+  if constexpr (pos_is_fltflt) {
+    if (ctx.apply_bulk_mocomp) {
+      make_tensor(
+          blk_bulk_mocomp_rtm, {ctx.block_size},
+          matx::MATX_DEVICE_MEMORY);
+    }
+  }
+
   auto upload_rtm = [&](auto &cur_rtm, index_t p0, index_t npulses) {
+    void *destination = cur_rtm.Data();
+    if constexpr (pos_is_fltflt) {
+      if (ctx.apply_bulk_mocomp) {
+        destination = blk_bulk_mocomp_rtm.Data();
+      }
+    }
     MATX_CUDA_CHECK(cudaMemcpyAsync(
-        cur_rtm.Data(),
-        reinterpret_cast<const uint8_t *>(ctx.h_range_to_mcp) + p0 * sizeof(double),
+        destination,
+        reinterpret_cast<const uint8_t *>(ctx.h_range_to_mcp) +
+            p0 * sizeof(double),
         static_cast<size_t>(npulses) * sizeof(double),
         cudaMemcpyHostToDevice, ctx.stream));
   };
 
-  // Pre-allocate GPU block buffers (sized for largest block)
-  auto blk_profiles = make_tensor<complex_t>({ctx.block_size, ctx.output_range_bins}, matx::MATX_DEVICE_MEMORY);
-  auto blk_compressed = ctx.is_fx_domain
-      ? make_tensor<complex_t>({ctx.block_size, ctx.fft_size}, matx::MATX_DEVICE_MEMORY)
-      : make_tensor<complex_t>({1, 1});
-  auto blk_fx = ctx.is_fx_domain
-      ? make_tensor<complex_t>({ctx.block_size, ctx.num_samples_raw}, matx::MATX_DEVICE_MEMORY)
-      : make_tensor<complex_t>({1, 1});
-  // int16 interleaved I/Q samples and per-pulse scale (int16 mode only)
-  auto blk_fx_i16 = (ctx.is_int16_mode && ctx.is_fx_domain)
-      ? make_tensor<int16_t>({ctx.block_size, ctx.num_samples_raw * 2}, matx::MATX_DEVICE_MEMORY)
-      : make_tensor<int16_t>({1, 1});
-  auto blk_ampsf = ctx.is_int16_mode
-      ? make_tensor<float>({ctx.block_size}, matx::MATX_DEVICE_MEMORY)
-      : make_tensor<float>({1});
+  const bool window_in_conversion =
+      ctx.is_int16_mode && ctx.apply_window && !ctx.apply_bulk_mocomp;
+
+  auto apply_fx_preprocessing = [&](auto &cur_fx, auto &cur_rtm, index_t npulses, bool window_already_applied) {
+    if (!ctx.apply_bulk_mocomp) {
+      if (ctx.apply_window && !window_already_applied) {
+        (cur_fx = cur_fx * matx::hamming<1>({npulses, ctx.num_samples_raw})).run(ctx.exec);
+        MATX_CUDA_CHECK(cudaGetLastError());
+      }
+      return;
+    }
+
+    auto run_mocomp = [&](const auto &fx_input, const auto &mocomp_rtm) {
+      (cur_fx = matx::experimental::sar_bulk_mocomp(fx_input, mocomp_rtm, ctx.bulk_mocomp_params)).run(ctx.exec);
+    };
+
+    if constexpr (pos_is_fltflt) {
+      auto cur_bulk_mocomp_rtm = matx::slice(
+          blk_bulk_mocomp_rtm, {0}, {npulses});
+      if (ctx.apply_window && !window_already_applied) {
+        run_mocomp(cur_fx * matx::hamming<1>({npulses, ctx.num_samples_raw}), cur_bulk_mocomp_rtm);
+      } else {
+        run_mocomp(cur_fx, cur_bulk_mocomp_rtm);
+      }
+      (cur_rtm = matx::as_type<matx::fltflt>(cur_bulk_mocomp_rtm))
+          .run(ctx.exec);
+    } else {
+      if (ctx.apply_window && !window_already_applied) {
+        run_mocomp(cur_fx * matx::hamming<1>({npulses, ctx.num_samples_raw}), cur_rtm);
+      } else {
+        run_mocomp(cur_fx, cur_rtm);
+      }
+    }
+  };
 
   // Image tensor --zeroed before first block
   auto image = make_tensor<complex_t>({ctx.image_height, ctx.image_width}, matx::MATX_DEVICE_MEMORY);
@@ -504,7 +565,13 @@ static int run_bp_device(PosTensor blk_positions, RtmTensor blk_rtm,
                       static_cast<size_t>(npulses) * sizeof(double3), ctx.stream));
       MATX_CUDA_CHECK(cudaMemsetAsync(cur_rtm.Data(), 0,
                       static_cast<size_t>(npulses) * sizeof(double), ctx.stream));
-
+      if constexpr (pos_is_fltflt) {
+        if (ctx.apply_bulk_mocomp) {
+          MATX_CUDA_CHECK(cudaMemsetAsync(
+              blk_bulk_mocomp_rtm.Data(), 0,
+              static_cast<size_t>(npulses) * sizeof(double), ctx.stream));
+        }
+      }
       if (ctx.is_fx_domain) {
         auto cur_fx = matx::slice(blk_fx, {0, 0}, {npulses, ctx.num_samples_raw});
         if (ctx.is_int16_mode) {
@@ -518,13 +585,24 @@ static int run_bp_device(PosTensor blk_positions, RtmTensor blk_rtm,
           auto q_vals = matx::slice(cur_fx_i16, {0, 1},
                                     {npulses, ctx.num_samples_raw * 2}, {1, 2});
           auto ampsf_b = matx::clone<2>(cur_ampsf, {matxKeepDim, ctx.num_samples_raw});
-          (cur_fx = matx::as_complex_float(
-              matx::as_float(i_vals) * ampsf_b,
-              matx::as_float(q_vals) * ampsf_b)).run(ctx.exec);
+          if (window_in_conversion) {
+            auto win = matx::hamming<1>({npulses, ctx.num_samples_raw});
+            (cur_fx = matx::as_complex_float(
+                matx::as_float(i_vals) * ampsf_b * win,
+                matx::as_float(q_vals) * ampsf_b * win)).run(ctx.exec);
+          } else {
+            (cur_fx = matx::as_complex_float(
+                matx::as_float(i_vals) * ampsf_b,
+                matx::as_float(q_vals) * ampsf_b)).run(ctx.exec);
+          }
+        } else {
+          // Initialize cur_fx to avoid uninitialized memory reads in warmup
+          // kernels.
+          (cur_fx = matx::zeros<complex_t>(
+               {npulses, ctx.num_samples_raw}))
+              .run(ctx.exec);
         }
-        if (ctx.apply_window) {
-          (cur_fx = cur_fx * matx::hamming<1>({npulses, ctx.num_samples_raw})).run(ctx.exec);
-        }
+        apply_fx_preprocessing(cur_fx, cur_rtm, npulses, window_in_conversion);
         auto cur_compressed = matx::slice(blk_compressed, {0, 0}, {npulses, ctx.fft_size});
         if (ctx.sgn == -1) {
           (cur_compressed = matx::ifft(cur_profiles)).run(ctx.exec);
@@ -568,9 +646,17 @@ static int run_bp_device(PosTensor blk_positions, RtmTensor blk_rtm,
 
   std::vector<cudaEvent_t> ev_bp_start(ctx.num_blocks);
   std::vector<cudaEvent_t> ev_bp_stop(ctx.num_blocks);
+  std::vector<cudaEvent_t> ev_mocomp_start(
+      ctx.apply_bulk_mocomp ? ctx.num_blocks : 0);
+  std::vector<cudaEvent_t> ev_mocomp_stop(
+      ctx.apply_bulk_mocomp ? ctx.num_blocks : 0);
   for (index_t blk = 0; blk < ctx.num_blocks; blk++) {
     MATX_CUDA_CHECK(cudaEventCreate(&ev_bp_start[blk]));
     MATX_CUDA_CHECK(cudaEventCreate(&ev_bp_stop[blk]));
+    if (ctx.apply_bulk_mocomp) {
+      MATX_CUDA_CHECK(cudaEventCreate(&ev_mocomp_start[blk]));
+      MATX_CUDA_CHECK(cudaEventCreate(&ev_mocomp_stop[blk]));
+    }
   }
 
   cudaProfilerStart();
@@ -615,7 +701,7 @@ static int run_bp_device(PosTensor blk_positions, RtmTensor blk_rtm,
         auto ampsf_b = matx::clone<2>(cur_ampsf, {matxKeepDim, ctx.num_samples_raw});
 
         // Convert int16 -> float, scale by AmpSF, combine to complex<float>
-        if (ctx.apply_window) {
+        if (window_in_conversion) {
           auto win = matx::hamming<1>({npulses, ctx.num_samples_raw});
           (cur_fx = matx::as_complex_float(
               matx::as_float(i_vals) * ampsf_b * win,
@@ -631,11 +717,14 @@ static int run_bp_device(PosTensor blk_positions, RtmTensor blk_rtm,
                         ctx.h_range_profiles + p0 * ctx.num_samples_raw,
                         static_cast<size_t>(npulses) * static_cast<size_t>(ctx.num_samples_raw) * sizeof(complex_t),
                         cudaMemcpyHostToDevice, ctx.stream));
+      }
 
-        if (ctx.apply_window) {
-          (cur_fx = cur_fx * matx::hamming<1>({npulses, ctx.num_samples_raw})).run(ctx.exec);
-          MATX_CUDA_CHECK(cudaGetLastError());
-        }
+      if (ctx.apply_bulk_mocomp) {
+        MATX_CUDA_CHECK(cudaEventRecord(ev_mocomp_start[blk], ctx.stream));
+      }
+      apply_fx_preprocessing(cur_fx, cur_rtm, npulses, window_in_conversion);
+      if (ctx.apply_bulk_mocomp) {
+        MATX_CUDA_CHECK(cudaEventRecord(ev_mocomp_stop[blk], ctx.stream));
       }
 
       // Zero only the padding region (middle of each row after ifftshift)
@@ -712,10 +801,16 @@ static int run_bp_device(PosTensor blk_positions, RtmTensor blk_rtm,
   if (ctx.num_blocks > 1) std::cout << std::endl;
 
   float bp_elapsed_ms = 0;
+  float mocomp_elapsed_ms = 0;
   for (index_t blk = 0; blk < ctx.num_blocks; blk++) {
     float blk_ms = 0;
     MATX_CUDA_CHECK(cudaEventElapsedTime(&blk_ms, ev_bp_start[blk], ev_bp_stop[blk]));
     bp_elapsed_ms += blk_ms;
+    if (ctx.apply_bulk_mocomp) {
+      MATX_CUDA_CHECK(cudaEventElapsedTime(
+          &blk_ms, ev_mocomp_start[blk], ev_mocomp_stop[blk]));
+      mocomp_elapsed_ms += blk_ms;
+    }
   }
 
   const double total_backprojections =
@@ -728,6 +823,12 @@ static int run_bp_device(PosTensor blk_positions, RtmTensor blk_rtm,
             << std::endl;
   std::cout << "  Giga Backprojections: " << total_backprojections / 1e9
             << " (num_pixels * num_pulses)" << std::endl;
+  if (ctx.apply_bulk_mocomp) {
+    std::cout << "Bulk mocomp          : " << mocomp_elapsed_ms / 1000.0f
+              << " s (" << (ctx.apply_window ? "mocomp+window" : "mocomp only")
+              << ") (summed over " << ctx.num_blocks << " block"
+              << (ctx.num_blocks > 1 ? "s" : "") << ")" << std::endl;
+  }
   std::cout << "BP kernels only      : " << bp_elapsed_ms / 1000.0f << " s (summed over "
             << ctx.num_blocks << " block" << (ctx.num_blocks > 1 ? "s" : "") << ")" << std::endl;
   std::cout << "  Rate                : " << bp_gbp_per_sec << " Gbp/s" << std::endl;
@@ -737,6 +838,10 @@ static int run_bp_device(PosTensor blk_positions, RtmTensor blk_rtm,
   for (index_t blk = 0; blk < ctx.num_blocks; blk++) {
     MATX_CUDA_CHECK(cudaEventDestroy(ev_bp_start[blk]));
     MATX_CUDA_CHECK(cudaEventDestroy(ev_bp_stop[blk]));
+    if (ctx.apply_bulk_mocomp) {
+      MATX_CUDA_CHECK(cudaEventDestroy(ev_mocomp_start[blk]));
+      MATX_CUDA_CHECK(cudaEventDestroy(ev_mocomp_stop[blk]));
+    }
   }
 
   // Write raw binary file
@@ -852,6 +957,7 @@ int main(int argc, char **argv) {
         << "  --cmap <file>          Write the correlation map (raw float32) to a file (requires --gold)\n"
         << "  -u, --upsample <N>     Range upsample factor via zero-padding (default: 1)\n"
         << "  -w, --window <type>    Window for range compression: hamming, none (default: hamming)\n"
+        << "  --bulk-mocomp         Apply bulk motion compensation using per-pulse range_to_mcp\n"
         << "  -b, --block-size <N|0|auto|all>\n"
         << "                          Pulses per block; 0/all use all pulses, auto uses an L2-cache heuristic (default: auto)\n"
         << "  --image-tiles <N>      Process image as N x N tiles (default: 1)\n"
@@ -877,6 +983,7 @@ int main(int argc, char **argv) {
   std::string block_size_arg = "auto";
   index_t image_tiles = 1;
   bool do_warmup = false;
+  bool apply_bulk_mocomp = false;
   bool taylor_fast_add_third_order = false;
   std::string precision_type = "mixed";
   std::string pixel_z_arg = "variable";
@@ -923,6 +1030,8 @@ int main(int argc, char **argv) {
       }
     } else if (std::strcmp(argv[i], "--warmup") == 0) {
       do_warmup = true;
+    } else if (std::strcmp(argv[i], "--bulk-mocomp") == 0) {
+      apply_bulk_mocomp = true;
     } else if (std::strcmp(argv[i], "--taylor-fast-third-order") == 0) {
       taylor_fast_add_third_order = true;
     } else if (std::strcmp(argv[i], "--precision") == 0) {
@@ -1009,6 +1118,8 @@ int main(int argc, char **argv) {
   const bool is_fx_domain   = (hdr.flags & 0x1) != 0;
   const bool is_int16_mode  = (hdr.flags & 0x2) != 0;
   const int sgn             = hdr.sgn;
+  const index_t num_samples_raw = hdr.num_samples_raw > 0
+      ? static_cast<index_t>(hdr.num_samples_raw) : num_range_bins;
 
   if (num_pulses <= 0 || num_range_bins <= 0 ||
       image_width <= 0 || image_height <= 0) {
@@ -1016,6 +1127,11 @@ int main(int argc, char **argv) {
               << ", samples=" << num_range_bins
               << ", image=" << image_height << " x " << image_width
               << std::endl;
+    return 1;
+  }
+
+  if (!std::isfinite(hdr.del_r) || hdr.del_r <= 0.0) {
+    std::cerr << "ERROR: invalid .sarbp del_r: " << hdr.del_r << std::endl;
     return 1;
   }
 
@@ -1052,6 +1168,22 @@ int main(int argc, char **argv) {
               << std::endl;
     return 1;
   }
+
+  if (apply_bulk_mocomp && !is_fx_domain) {
+    std::cerr << "ERROR: --bulk-mocomp requires FX-domain input" << std::endl;
+    return 1;
+  }
+
+  double sample_frequency_spacing = 0.0;
+  if (apply_bulk_mocomp) {
+    // The .sarbp header stores raw FFT range-bin spacing rather than SCSS:
+    // del_r = c / (2 * num_samples_raw * SCSS).
+    sample_frequency_spacing =
+        matx::constants::speed_of_light /
+        (2.0 * static_cast<double>(num_samples_raw) * hdr.del_r);
+  }
+  const matx::experimental::SarBulkMocompParams bulk_mocomp_params{
+      hdr.center_frequency, sample_frequency_spacing, sgn};
 
   MATX_ENTER_HANDLER();
 
@@ -1130,10 +1262,12 @@ int main(int argc, char **argv) {
   fin.close();
   std::cout << "Loaded " << num_pulses << " pulses from .sarbp file" << std::endl;
 
-  // If the user selected the fltflt precision, convert the platform positions
-  // and range_to_mcp values in-place from double to fltflt. Both types are
-  // 8 bytes per scalar (double = 8 bytes, fltflt = 2 * 4 bytes); see the
-  // static_asserts in run_bp_device(). We perform the type-punning via
+  // If the user selected fltflt precision, convert the platform positions
+  // in-place from double to fltflt. Convert range_to_mcp here as well unless
+  // bulk mocomp is enabled. In that case it remains double through upload and
+  // mocomp, then a small device kernel converts each pulse block to fltflt for
+  // backprojection. Both scalar types are 8 bytes; see the static_asserts in
+  // run_bp_device(). We perform the host type-punning via
   // unsigned char* + std::memcpy rather than reinterpret_cast through
   // double*/fltflt*, because the latter would alias the same storage as two
   // incompatible types and is undefined behaviour under strict aliasing.
@@ -1150,21 +1284,21 @@ int main(int argc, char **argv) {
       const matx::fltflt ff(d);
       std::memcpy(slot, &ff, sizeof(matx::fltflt)); // overwrite as fltflt
     }
-    auto *rtm_bytes = reinterpret_cast<unsigned char *>(h_range_to_mcp);
-    for (size_t i = 0; i < static_cast<size_t>(num_pulses); i++) {
-      unsigned char *slot = rtm_bytes + i * sizeof(double);
-      double d;
-      std::memcpy(&d, slot, sizeof(double));
-      const matx::fltflt ff(d);
-      std::memcpy(slot, &ff, sizeof(matx::fltflt));
+    if (!apply_bulk_mocomp) {
+      auto *rtm_bytes = reinterpret_cast<unsigned char *>(h_range_to_mcp);
+      for (size_t i = 0; i < static_cast<size_t>(num_pulses); i++) {
+        unsigned char *slot = rtm_bytes + i * sizeof(double);
+        double d;
+        std::memcpy(&d, slot, sizeof(double));
+        const matx::fltflt ff(d);
+        std::memcpy(slot, &ff, sizeof(matx::fltflt));
+      }
     }
   }
 
   // -------------------------------------------------------------------
   // Compute range compression / upsampling parameters
   // -------------------------------------------------------------------
-  const index_t num_samples_raw = hdr.num_samples_raw > 0
-      ? static_cast<index_t>(hdr.num_samples_raw) : num_range_bins;
   const index_t fft_size = is_fx_domain
       ? (upsample_factor > 1
           ? cuda::next_power_of_two(static_cast<index_t>(num_samples_raw) * static_cast<index_t>(upsample_factor))
@@ -1281,6 +1415,13 @@ int main(int argc, char **argv) {
   }
   std::cout << std::endl;
   std::cout << "Pixel-z mode     : " << pixel_z_arg << std::endl;
+  std::cout << "Bulk mocomp      : ";
+  if (apply_bulk_mocomp) {
+    std::cout << "enabled";
+  } else {
+    std::cout << "disabled";
+  }
+  std::cout << std::endl;
   std::cout << "Image tiles      : " << image_tiles << " x " << image_tiles
             << std::endl;
 
@@ -1295,9 +1436,10 @@ int main(int argc, char **argv) {
   // range-to-mcp tensors are allocated below with a type that matches
   // `use_fltflt_platform_inputs`: `tensor<double3>` / `tensor<double>` for the
   // standard paths, or `tensor<fltflt>` / `tensor<fltflt>` for the FloatFloat
-  // path. In the fltflt case we already converted the pinned host buffers
-  // in-place from double to fltflt right after the file read above (same byte
-  // layout, no extra storage). The kernel
+  // path. In the fltflt case, platform positions are converted in-place after
+  // the file read. Range-to-MCP values are also converted there unless bulk
+  // mocomp is enabled; that combination retains double RTM through mocomp and
+  // converts each device block to fltflt before backprojection. The kernel
   // template (`SarBp<...>`) already handles both rank-1 (vector-of-double3
   // / -fltflt3-style) and rank-2 (matrix of [pulses, 3]) layouts for
   // platform_positions, so run_bp_device() branches internally only on the
@@ -1319,6 +1461,7 @@ int main(int argc, char **argv) {
       .is_fx_domain          = is_fx_domain,
       .is_int16_mode         = is_int16_mode,
       .apply_window          = apply_window,
+      .apply_bulk_mocomp     = apply_bulk_mocomp,
       .taylor_fast_add_third_order = taylor_fast_add_third_order,
       .pixel_z_mode          = pixel_z_mode,
       .sgn                   = sgn,
@@ -1327,6 +1470,7 @@ int main(int argc, char **argv) {
       .gold_file             = gold_file,
       .cmap_file             = cmap_file,
       .del_r                 = del_r,
+      .bulk_mocomp_params    = bulk_mocomp_params,
       .params                = params,
       .h_positions           = h_positions,
       .h_range_to_mcp        = h_range_to_mcp,

@@ -37,6 +37,7 @@
 #include "gtest/gtest.h"
 #include "prerun_tester.h"
 #include <cuda/std/complex>
+#include <cuda/std/numbers>
 
 using namespace matx;
 
@@ -456,7 +457,9 @@ TYPED_TEST(SarBpTestDoubleType, PointTarget)
       (h_antenna_phase_centers[i].z) * (h_antenna_phase_centers[i].z));
     const double ideal_dR = R_to_target - h_range_to_mcp[i];
     const double ideal_bin = ideal_dR / bp_params.del_r + bin_offset;
-    const double ideal_phase = -4.0 * M_PI * ideal_dR * (bp_params.center_frequency / SPEED_OF_LIGHT);
+    const double ideal_phase =
+        -4.0 * cuda::std::numbers::pi * ideal_dR *
+        (bp_params.center_frequency / matx::constants::speed_of_light);
     double sinx, cosx;
     ::sincos(ideal_phase, &sinx, &cosx);
     const cuda::std::complex<double> sample = cuda::std::complex<double>{cosx, sinx};
@@ -775,7 +778,9 @@ TYPED_TEST(SarBpTestDoubleType, PixelZIsFixedNonZeroHeight)
       (h_apc[i].z - pixel_z) * (h_apc[i].z - pixel_z));
     const double dR = R - h_rtm[i];
     const double ideal_bin = dR / bp_params.del_r + bin_offset;
-    const double ideal_phase = -4.0 * M_PI * dR * (bp_params.center_frequency / SPEED_OF_LIGHT);
+    const double ideal_phase =
+        -4.0 * cuda::std::numbers::pi * dR *
+        (bp_params.center_frequency / matx::constants::speed_of_light);
     double sinx, cosx;
     ::sincos(ideal_phase, &sinx, &cosx);
     const cuda::std::complex<double> sample{cosx, sinx};

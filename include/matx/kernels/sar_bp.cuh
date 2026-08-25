@@ -34,12 +34,14 @@
 
 #include <complex>
 #include <cuda.h>
+#include <cuda/std/numbers>
 #include <iomanip>
 #include <memory>
 #include <stdint.h>
 #include <stdio.h>
 #include <vector>
 
+#include "matx/core/constants.h"
 #include "matx/core/utils.h"
 #include "matx/core/type_utils.h"
 #include "matx/core/tensor_utils.h"
@@ -50,9 +52,9 @@
 
 namespace matx {
 
-// SI-defined speed of light in m/s. The speed of light through the atmosphere will be roughly 0.03% slower
-// than this, but it is assumed that any corrections for atmospheric propagation will be done elsewhere.
-static constexpr double SPEED_OF_LIGHT = 299792458.0;
+// Backward-compatibility alias; remove when sar_bp is promoted from experimental.
+[[deprecated("Use matx::constants::speed_of_light instead")]]
+inline constexpr double SPEED_OF_LIGHT = matx::constants::speed_of_light;
 
 #ifdef __CUDACC__
 
@@ -128,7 +130,9 @@ __global__ void SarBpFillPhaseLUT(cuda::std::complex<StorageType> *phase_lut, Co
 {
     const int tid = blockIdx.x * blockDim.x + threadIdx.x;
     if (tid >= num_range_bins) return;
-    constexpr ComputeType four_pi_over_c = static_cast<ComputeType>(4.0 * M_PI / SPEED_OF_LIGHT);
+    constexpr ComputeType four_pi_over_c =
+        static_cast<ComputeType>(4.0 * cuda::std::numbers::pi /
+                                 matx::constants::speed_of_light);
     // fftshift places zero differential range at floor(N/2). For even N,
     // this is index N/2, the higher-indexed of the two bins adjacent to
     // the array's geometric midpoint (N-1)/2.

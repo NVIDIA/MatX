@@ -34,9 +34,11 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <cuda/std/numbers>
 #include <type_traits>
 
 #include "matx/core/cache.h"
+#include "matx/core/constants.h"
 #include "matx/core/error.h"
 #include "matx/core/nvtx.h"
 #include "matx/core/tensor.h"
@@ -177,7 +179,9 @@ inline void sar_bp_impl(OutImageType &out, const InitialImageType &initial_image
     constexpr bool NoTaylorFastThirdOrder = false;
     if (phase_lut_optimization) {
       constexpr bool PhaseLUT = true;
-      const double phase_correction_partial = 4.0 * M_PI * params.del_r * (params.center_frequency / SPEED_OF_LIGHT);
+      const double phase_correction_partial =
+          4.0 * cuda::std::numbers::pi * params.del_r *
+          (params.center_frequency / matx::constants::speed_of_light);
 
       const size_t workspace_elem_size = (params.compute_type == SarBpComputeType::Double) ?
         sizeof(cuda::std::complex<double>) : sizeof(cuda::std::complex<float>);
@@ -214,7 +218,9 @@ inline void sar_bp_impl(OutImageType &out, const InitialImageType &initial_image
       }
     } else {
       constexpr bool PhaseLUT = false;
-      const double phase_correction_partial = 4.0 * M_PI * (params.center_frequency / SPEED_OF_LIGHT);
+      const double phase_correction_partial =
+          4.0 * cuda::std::numbers::pi *
+          (params.center_frequency / matx::constants::speed_of_light);
       if (params.compute_type == SarBpComputeType::Double) {
         SarBp<SarBpComputeType::Double, OutImageType, InitialImageType, RangeProfilesType, PlatPosType, VoxLocType, RangeToMcpType, PhaseLUT, IsUnitStride, NoTaylorFastThirdOrder, PixelZMode, IdxT><<<grid, block, 0, stream>>>(
           out, initial_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, dr_inv, phase_correction_partial, nullptr);

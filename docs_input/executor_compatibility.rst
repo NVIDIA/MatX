@@ -190,6 +190,7 @@ existing operators do not implicitly become distributed operations.
    "round", "|yes|", "|yes|", "|yes|", "|no|", "Element-wise expression."
    "rsqrt", "|yes|", "|yes|", "|yes|", "|no|", "Element-wise expression."
    "sar_bp", "|no|", "|yes|", "|no|", "|no|", "CUDA-only SAR backprojection transform."
+   "sar_bulk_mocomp", "|yes|", "|yes|", "|yes|", "|no|", "Experimental element-wise SAR bulk motion-compensation expression."
    "select", "|yes|", "|yes|", "|yes|", "|no|", "Selection expression."
    "shift", "|yes|", "|yes|", "|yes|", "|no|", "View/reindex expression."
    "sign", "|yes|", "|yes|", "|yes|", "|no|", "Element-wise expression."
