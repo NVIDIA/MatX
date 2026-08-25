@@ -365,13 +365,15 @@ __MATX_INLINE__ bool IsAllocated(void *ptr) {
  * Get the kind of pointer based on an address
  *
  * Returns the memory kind of the pointer (device, host, managed, etc) based on
- *a pointer address. This function should not be used in the data path since it
- *takes a mutex and possibly loops through a std::map. Since Views can modify
- *the address of the data pointer, the base pointer may not be what is passed in
- * to this function, and therefore would not be in the map. However, finding the
- *next lowest address that is in the map is a good enough approximation since we
- *also offset in a positive direction from the base, and generally if you're in
- *a specific address range the type of pointer is obvious anyways.
+ * a pointer address. This function should not be used in the data path since it
+ * takes a mutex. Since Views can modify the address of the data pointer, the 
+ * base pointer needs to be passed in to this function.
+ * This function uses an exact lookup, and a offset pointer therefore would not 
+ * be in the (unordered) map.
+ *
+ * Note:
+ * This function previously used a std::map and searched for the next lowest address
+ * as an approximation. This is NOT supported anymore!
  **/
 __MATX_INLINE__ matxMemorySpace_t GetPointerKind(void *ptr)
 {
