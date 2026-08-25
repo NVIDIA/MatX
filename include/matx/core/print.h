@@ -567,7 +567,8 @@ namespace matx {
         // If the user is printing a tensor with a const pointer underlying the data, we need to do the lookup
         // as if it's not const. This is because the ownership decision is done at runtime instead of compile-time,
         // so even though the lookup will never be done, the compilation path happens.
-        auto ptr_strip = const_cast<typename matx::remove_cvref_t<typename Op::value_type>*>(op.Data());
+        // Pass in the base pointer, not a potentially offset pointer returned by op.Data()
+        auto ptr_strip = const_cast<typename matx::remove_cvref_t<typename Op::value_type>*>(op.GetStorage().data());
         auto kind = GetPointerKind(ptr_strip);
 
         // Try to get pointer from cuda
