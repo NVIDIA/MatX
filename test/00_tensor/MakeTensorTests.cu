@@ -488,6 +488,31 @@ TEST(MakeTensorTests, RejectsMdspanValuesOutsideMatXIndexRange)
   MATX_EXIT_HANDLER();
 }
 
+// Checks that MatX can create a tensor
+// using C++23 std::mdspan
+#if defined(__cpp_lib_mdspan) && (__cpp_lib_mdspan >= 202207L)
+TEST(MakeTensorTests, CreatesStdMdspanView)
+{
+  MATX_ENTER_HANDLER();
+
+  int data[6]{};
+
+  using extents_type = std::extents<index_t, 2, 3>;
+  std::mdspan<int, extents_type> span{data};
+
+  auto tensor = make_tensor(span);
+
+  EXPECT_EQ(tensor.Data(), data);
+  EXPECT_EQ(tensor.Size(0), 2);
+  EXPECT_EQ(tensor.Size(1), 3);
+
+  tensor(1, 2) = 42;
+  EXPECT_EQ(data[5], 42);
+
+  MATX_EXIT_HANDLER();
+}
+#endif
+
 TEST(MakeTensorTests, CreatesDescriptorBackedTensors)
 {
   MATX_ENTER_HANDLER();

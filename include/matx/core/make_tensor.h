@@ -44,7 +44,74 @@
 #include "matx/core/tensor_desc.h"
 #include "matx/core/dlpack.h"
 #include "matx/core/log.h"
+
+#if __has_include(<mdspan>)
+  #include <mdspan>
+#endif
 namespace matx {
+
+namespace detail {
+
+template <typename T>
+struct mdspan_traits {
+  static constexpr bool is_mdspan = false;
+};
+
+// If the type is a CUDA mdspan, check whether its layout and accessor
+// can be used with MatX
+template <typename ElementType,
+          typename Extents,
+          typename LayoutPolicy,
+          typename AccessorPolicy>
+struct mdspan_traits<
+    cuda::std::mdspan<
+        ElementType,
+        Extents,
+        LayoutPolicy,
+        AccessorPolicy>> {
+  static constexpr bool is_mdspan = true;
+
+  // Checks whether the mdspan layout is supported by MatX
+  static constexpr bool has_supported_layout =
+      std::is_same_v<LayoutPolicy, cuda::std::layout_right> ||
+      std::is_same_v<LayoutPolicy, cuda::std::layout_left> ||
+      std::is_same_v<LayoutPolicy, cuda::std::layout_stride>;
+
+  // Rejects custom accessor functions
+  static constexpr bool has_default_accessor =
+      std::is_same_v<
+          AccessorPolicy,
+          cuda::std::default_accessor<ElementType>>;
+};
+
+// Type checker for the official C++23 std::mdspan
+#if defined(__cpp_lib_mdspan) && (__cpp_lib_mdspan >= 202207L)
+template <typename ElementType,
+          typename Extents,
+          typename LayoutPolicy,
+          typename AccessorPolicy>
+struct mdspan_traits<
+    std::mdspan<
+        ElementType,
+        Extents,
+        LayoutPolicy,
+        AccessorPolicy>> {
+  static constexpr bool is_mdspan = true;
+
+  static constexpr bool has_supported_layout =
+      std::is_same_v<LayoutPolicy, std::layout_right> ||
+      std::is_same_v<LayoutPolicy, std::layout_left> ||
+      std::is_same_v<LayoutPolicy, std::layout_stride>;
+
+  static constexpr bool has_default_accessor =
+      std::is_same_v<
+          AccessorPolicy,
+          std::default_accessor<ElementType>>;
+};
+#endif
+
+} 
+
 
 /**
  * Create a tensor with a C array for the shape using implicitly-allocated memory
@@ -632,43 +699,38 @@ auto make_tensor( T* const data,
  * using strides
  * @return A MatX tensor that uses the existing data
  */
-template <typename ElementType,
-          typename Extents,
-          typename LayoutPolicy,
-          typename AccessorPolicy>
-  // Ensures users can only use layout_right, layout_left, and layout_stride
-  requires(
-    std::is_same_v<LayoutPolicy, cuda::std::layout_right> ||
-    std::is_same_v<LayoutPolicy, cuda::std::layout_left> ||
-    std::is_same_v<LayoutPolicy, cuda::std::layout_stride>)
-auto make_tensor(
-  const cuda::std::mdspan<
-    ElementType,
-    Extents,
-    LayoutPolicy,
-    AccessorPolicy>&span
-    ){
-    MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-    using mdspan_type = cuda::std::mdspan<ElementType, Extents, LayoutPolicy, AccessorPolicy>;
-    
-    static_assert(
-    !std::is_const_v<ElementType>,
-    "make_tensor does not support mdspan with const elements");
-    
-  // Do not allow custom accessors that might have special behavior
-  // that MatX does not understand
-    static_assert(
-    std::is_same_v<
-        AccessorPolicy,
-        cuda::std::default_accessor<ElementType>>,
-    "make_tensor only supports mdspan with cuda::std::default_accessor");
+template <typename Mdspan>
   
-    static_assert(
-    std::is_same_v<
-        typename mdspan_type::data_handle_type,
-        ElementType *>,
-    "make_tensor requires an mdspan with an ElementType* data handle");
+  // Only allow either CUDA mdspan or C++23 mdspan
+  requires detail::mdspan_traits<remove_cvref_t<Mdspan>>::is_mdspan
+  auto make_tensor(const Mdspan &span)
+  {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
+    using mdspan_type = remove_cvref_t<Mdspan>;
+    using mdspan_traits = detail::mdspan_traits<mdspan_type>;
+    using ElementType = typename mdspan_type::element_type;
+    using Extents = typename mdspan_type::extents_type;
+
+    static_assert(
+        mdspan_traits::has_supported_layout,
+        "make_tensor only supports layout_right, layout_left, and layout_stride");
+
+    static_assert(
+        !std::is_const_v<ElementType>,
+        "make_tensor does not support mdspan with const elements");
+
+    static_assert(
+        mdspan_traits::has_default_accessor,
+        "make_tensor only supports mdspan with its default_accessor");
+
+    // Checks whether the mdspan uses a normal pointer for its data
+    static_assert(
+        std::is_same_v<
+            typename mdspan_type::data_handle_type,
+            ElementType *>,
+        "make_tensor requires mdspan to use a regular pointer for its data");
+        
     constexpr int RANK = static_cast<int>(Extents::rank());
 
     cuda::std::array<index_t, RANK> shape{};
