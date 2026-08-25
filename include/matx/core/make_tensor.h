@@ -43,7 +43,6 @@
 #include "matx/core/tensor_desc.h"
 #include "matx/core/dlpack.h"
 #include "matx/core/log.h"
-#include "matx/core/type_utils.h"
 
 
 namespace matx {
