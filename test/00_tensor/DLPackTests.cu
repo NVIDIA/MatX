@@ -190,6 +190,110 @@ void SetVersionedManagedTensorShapeAndStrides(
   mt->dl_tensor.strides = ctx->strides;
 }
 
+// Verifies that a view whose data pointer is offset from the start of its base
+// allocation still exports the memory space of that allocation. GetPointerKind()
+// is an exact-key lookup into the allocation map, so a view's offset pointer is
+// never found there and ToDlPack must classify the memory from the base pointer
+// held by the storage. Both the legacy and versioned paths are checked since
+// they funnel through the same ToDlPackImpl.
+template <typename ViewType>
+void CheckOffsetViewDLPackExport(ViewType &v, const void *base,
+                                 DLDeviceType expected_device_type)
+{
+  using TestType = typename ViewType::value_type;
+
+  auto *data_ptr = const_cast<void *>(static_cast<const void *>(v.Data()));
+  ASSERT_NE(data_ptr, base) << "view must start at a non-zero offset into its allocation";
+
+  auto check_dl_tensor = [&](auto *dl) {
+    ASSERT_EQ(dl->dl_tensor.ndim, v.Rank());
+
+    // The view's offset pointer is exported as-is, with no additional byte offset
+    ASSERT_EQ(dl->dl_tensor.data, data_ptr);
+    ASSERT_EQ(dl->dl_tensor.byte_offset, 0U);
+
+    ASSERT_EQ(dl->dl_tensor.device.device_type, expected_device_type);
+
+    auto dlt = detail::TypeToDLPackType<TestType>();
+    ASSERT_EQ(dl->dl_tensor.dtype.code, dlt.code);
+    ASSERT_EQ(dl->dl_tensor.dtype.bits, dlt.bits);
+    ASSERT_EQ(dl->dl_tensor.dtype.lanes, dlt.lanes);
+
+    for (int32_t r = 0; r < v.Rank(); r++) {
+      ASSERT_EQ(dl->dl_tensor.shape[r], v.Size(r));
+      ASSERT_EQ(dl->dl_tensor.strides[r], v.Stride(r));
+    }
+  };
+
+  // A view shares its storage with the tensor it came from, so compare the
+  // reference count against what it was before the export rather than to 1
+  const auto ref_count = v.GetRefCount();
+
+  {
+    auto *dl = v.ToDlPack();
+    ASSERT_EQ(v.GetRefCount(), ref_count + 1);
+    ASSERT_NO_FATAL_FAILURE(check_dl_tensor(dl));
+    dl->deleter(dl);
+    ASSERT_EQ(v.GetRefCount(), ref_count);
+  }
+
+  {
+    auto *dlv = v.ToDlPackVersioned();
+    ASSERT_EQ(v.GetRefCount(), ref_count + 1);
+    ASSERT_NO_FATAL_FAILURE(check_dl_tensor(dlv));
+    dlv->deleter(dlv);
+    ASSERT_EQ(v.GetRefCount(), ref_count);
+  }
+}
+
+// Calls check(tensor, expected_device_type) once for a {5, 10, 20} tensor in
+// each memory space a tensor can be exported from. Shared by the full-tensor
+// and offset-view export tests so the list of spaces lives in one place
+template <typename TestType, typename CheckFunc>
+void ForEachExportableMemorySpace(CheckFunc &&check)
+{
+  {
+    // Default memory space -> exercises whatever the allocator handed back. On
+    // devices where cudaDevAttrConcurrentManagedAccess == 0 (e.g. Jetson), the
+    // allocator falls back to host pinned memory, so derive the expected device
+    // type from the base allocation
+    auto t = make_tensor<TestType>({5, 10, 20});
+    auto kind = GetPointerKind(t.GetStorage().data());
+
+    // Default allocation can only be MATX_MANAGED_MEMORY or MATX_HOST_MEMORY.
+    // Assert that explicitly so a future allocator change can't silently
+    // produce a wrong expectation below
+    ASSERT_TRUE(kind == MATX_MANAGED_MEMORY || kind == MATX_HOST_MEMORY);
+    ASSERT_NO_FATAL_FAILURE(check(t, kind == MATX_HOST_MEMORY ? kDLCUDAHost : kDLCUDA));
+  }
+
+  {
+    // Explicit host pinned memory. This is the case that separates a base
+    // pointer lookup from the cuPointerGetAttributes fallback: the fallback
+    // cannot tell pinned memory from plain host memory and reports kDLCPU
+    auto t = make_tensor<TestType>({5, 10, 20}, MATX_HOST_MEMORY);
+    ASSERT_NO_FATAL_FAILURE(check(t, kDLCUDAHost));
+  }
+
+  {
+    // Explicit plain malloc host memory -> kDLCPU
+    auto t = make_tensor<TestType>({5, 10, 20}, MATX_HOST_MALLOC_MEMORY);
+    ASSERT_NO_FATAL_FAILURE(check(t, kDLCPU));
+  }
+
+  {
+    // Explicit device memory -> kDLCUDA
+    auto t = make_tensor<TestType>({5, 10, 20}, MATX_DEVICE_MEMORY);
+    ASSERT_NO_FATAL_FAILURE(check(t, kDLCUDA));
+  }
+
+  {
+    // Async device memory on the default stream -> kDLCUDA
+    auto t = make_tensor<TestType>({5, 10, 20}, MATX_ASYNC_DEVICE_MEMORY);
+    ASSERT_NO_FATAL_FAILURE(check(t, kDLCUDA));
+  }
+}
+
 template <typename TensorType>
 class DLPackTestsAll : public ::testing::Test {
 };
@@ -228,39 +332,67 @@ TYPED_TEST(DLPackTestsAll, ExportLegacyDLPack)
     ASSERT_EQ(t.GetRefCount(), 1);
   };
 
-  {
-    // Default memory space -> exercises whatever the allocator handed
-    // back. On devices where cudaDevAttrConcurrentManagedAccess == 0 (e.g.
-    // Jetson), the allocator falls back to host pinned memory. This test
-    // derives the expected device type from GetPointerKind
-    auto t = make_tensor<TestType>({5, 10, 20});
-    auto kind = GetPointerKind(t.GetStorage().data());
-    
-    // Default allocation can only be MATX_MANAGED_MEMORY or MATX_HOST_MEMORY.
-    // Assert that explicitly so a future allocator change can't silently
-    // produce a wrong expectation below
-    ASSERT_TRUE(kind == MATX_MANAGED_MEMORY || kind == MATX_HOST_MEMORY);
-    auto expected_device_type = (kind == MATX_HOST_MEMORY ? kDLCUDAHost : kDLCUDA);
-    ASSERT_NO_FATAL_FAILURE(check_dl_export(t, expected_device_type));
-  }
+  ASSERT_NO_FATAL_FAILURE(ForEachExportableMemorySpace<TestType>(check_dl_export));
 
-  {
-    // Explicit device memory -> should resolve to kDLCUDA
-    auto t = make_tensor<TestType>({5, 10, 20}, MATX_DEVICE_MEMORY);
-    ASSERT_NO_FATAL_FAILURE(check_dl_export(t, kDLCUDA));
-  }
+  MATX_EXIT_HANDLER();
+}
 
-  {
-    // Explicit host pinned memory -> should resolve to kDLCUDAHost
-    auto t = make_tensor<TestType>({5, 10, 20}, MATX_HOST_MEMORY);
-    ASSERT_NO_FATAL_FAILURE(check_dl_export(t, kDLCUDAHost));
-  }
+TYPED_TEST(DLPackTestsAll, ExportOffsetSlice)
+{
+  MATX_ENTER_HANDLER();
 
-  {
-    // Explicit plain malloc host memory -> should resolve to kDLCPU
-    auto t = make_tensor<TestType>({5, 10, 20}, MATX_HOST_MALLOC_MEMORY);
-    ASSERT_NO_FATAL_FAILURE(check_dl_export(t, kDLCPU));
-  }
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+
+  auto check_offset_slice = [](auto &t, DLDeviceType expected_device_type) {
+    const void *base = static_cast<const void *>(t.GetStorage().data());
+
+    // Starts partway into the allocation, so Data() is no longer the base
+    // pointer the allocator recorded
+    auto s = t.Slice({1, 2, 3}, {4, 8, 15});
+
+    ASSERT_EQ(s.Size(0), 3);
+    ASSERT_EQ(s.Size(1), 6);
+    ASSERT_EQ(s.Size(2), 12);
+
+    // Pin the absolute layout of the view. CheckOffsetViewDLPackExport compares
+    // the exported shape and strides against the view's own accessors, so
+    // without this a regression in Slice would move both sides together
+    ASSERT_EQ(s.Stride(0), 200);
+    ASSERT_EQ(s.Stride(1), 20);
+    ASSERT_EQ(s.Stride(2), 1);
+    ASSERT_EQ(s.Data() - static_cast<const TestType *>(base), 1 * 200 + 2 * 20 + 3);
+
+    ASSERT_NO_FATAL_FAILURE(CheckOffsetViewDLPackExport(s, base, expected_device_type));
+  };
+
+  ASSERT_NO_FATAL_FAILURE(ForEachExportableMemorySpace<TestType>(check_offset_slice));
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(DLPackTestsAll, ExportPermutedOffsetSlice)
+{
+  MATX_ENTER_HANDLER();
+
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+
+  auto check_permuted_offset_slice = [](auto &t, DLDeviceType expected_device_type) {
+    const void *base = static_cast<const void *>(t.GetStorage().data());
+    auto s = t.Slice({1, 2, 3}, {4, 8, 15});
+    auto p = s.Permute({2, 0, 1});
+
+    // Permuting reorders sizes and strides but keeps the slice's offset pointer
+    ASSERT_EQ(p.Data(), s.Data());
+    ASSERT_EQ(p.Size(0), s.Size(2));
+    ASSERT_EQ(p.Size(1), s.Size(0));
+    ASSERT_EQ(p.Size(2), s.Size(1));
+    ASSERT_EQ(p.Stride(0), s.Stride(2));
+    ASSERT_EQ(p.Stride(1), s.Stride(0));
+    ASSERT_EQ(p.Stride(2), s.Stride(1));
+    ASSERT_NO_FATAL_FAILURE(CheckOffsetViewDLPackExport(p, base, expected_device_type));
+  };
+
+  ASSERT_NO_FATAL_FAILURE(ForEachExportableMemorySpace<TestType>(check_permuted_offset_slice));
 
   MATX_EXIT_HANDLER();
 }
