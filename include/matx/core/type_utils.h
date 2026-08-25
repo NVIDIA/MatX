@@ -35,6 +35,13 @@
 #include "matx/core/operator_options.h"
 #include "matx/core/type_utils_both.h"
 
+#include <cuda/std/mdspan>
+
+#if __has_include(<mdspan>)
+  #include <mdspan>
+#endif
+
+
 #include <memory>
 #include <cublas_v2.h>
 #include <cusparse.h>
@@ -201,6 +208,66 @@ inline constexpr bool has_index_cmp_op_v = requires {
 
 
 namespace detail {
+
+// Checks for cuda::std::mdspan and std::mdspan types
+template <typename T>
+struct mdspan_traits {
+  static constexpr bool is_mdspan = false;
+};
+
+// If the type is a CUDA mdspan, check whether its layout and accessor
+// can be used with MatX
+template <typename ElementType,
+          typename Extents,
+          typename LayoutPolicy,
+          typename AccessorPolicy>
+struct mdspan_traits<
+    cuda::std::mdspan<
+        ElementType,
+        Extents,
+        LayoutPolicy,
+        AccessorPolicy>> {
+  static constexpr bool is_mdspan = true;
+
+  // Checks whether the mdspan layout is supported by MatX
+  static constexpr bool has_supported_layout =
+      std::is_same_v<LayoutPolicy, cuda::std::layout_right> ||
+      std::is_same_v<LayoutPolicy, cuda::std::layout_left> ||
+      std::is_same_v<LayoutPolicy, cuda::std::layout_stride>;
+
+  // Checks whether the mdspan uses the default accessor
+  static constexpr bool has_default_accessor =
+      std::is_same_v<
+          AccessorPolicy,
+          cuda::std::default_accessor<ElementType>>;
+};
+
+// Type checker for the official C++23 std::mdspan
+#if defined(__cpp_lib_mdspan) && (__cpp_lib_mdspan >= 202207L)
+template <typename ElementType,
+          typename Extents,
+          typename LayoutPolicy,
+          typename AccessorPolicy>
+struct mdspan_traits<
+    std::mdspan<
+        ElementType,
+        Extents,
+        LayoutPolicy,
+        AccessorPolicy>> {
+  static constexpr bool is_mdspan = true;
+
+  static constexpr bool has_supported_layout =
+      std::is_same_v<LayoutPolicy, std::layout_right> ||
+      std::is_same_v<LayoutPolicy, std::layout_left> ||
+      std::is_same_v<LayoutPolicy, std::layout_stride>;
+
+  static constexpr bool has_default_accessor =
+      std::is_same_v<
+          AccessorPolicy,
+          std::default_accessor<ElementType>>;
+};
+#endif
+
 
 // Supported MatX data types. This enum helps translate types into integers for
 // hashing purposes
