@@ -956,7 +956,7 @@ MATX_LOOP_UNROLL
    *   Shape of tensor
    */
   template <typename ShapeType>
-    requires (!std::is_pointer_v<remove_cvref_t<ShapeType>>)
+    requires (!cuda::std::is_pointer_v<remove_cvref_t<ShapeType>>)
   __MATX_HOST__ __MATX_INLINE__ void
   Reset(T *const data, ShapeType &&shape) noexcept
   {
@@ -1545,7 +1545,7 @@ MATX_LOOP_UNROLL
       mt->version.major = DLPACK_MAJOR_VERSION;
       mt->version.minor = DLPACK_MINOR_VERSION;
       mt->flags = 0;
-      if constexpr (std::is_const_v<T>) {
+      if constexpr (cuda::std::is_const_v<T>) {
         mt->flags |= DLPACK_FLAG_BITMASK_READ_ONLY;
       }
     }

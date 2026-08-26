@@ -78,10 +78,10 @@ concept CanAssignRegularToDistributed = requires(
 static_assert(!CanAssignRegularToDistributed<
               distributed_tensor_t<float, 1, block_distribution_t<1>>,
               tensor_t<float, 1>>);
-static_assert(!std::is_constructible_v<
+static_assert(!cuda::std::is_constructible_v<
               local_fragment_t<float, 1>, tensor_t<double, 1>, size_t,
               distributed_endpoint_t, std::shared_ptr<void>>);
-static_assert(!std::is_constructible_v<
+static_assert(!cuda::std::is_constructible_v<
               local_fragment_t<float, 1>, tensor_t<float, 2>, size_t,
               distributed_endpoint_t, std::shared_ptr<void>>);
 

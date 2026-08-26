@@ -38,7 +38,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Abs2)
     x() = static_cast<TestType>(2);
     (y = abs2(x)).run(exec);
     exec.sync();
-    if constexpr (std::is_integral_v<inner_type>) {
+    if constexpr (cuda::std::is_integral_v<inner_type>) {
       ASSERT_EQ(y(), static_cast<inner_type>(4));
     }
     else {
@@ -64,7 +64,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Abs2)
       for (int j = 0; j < 3; j++) {
         for (int k = 0; k < 3; k++) {
           TestType v = static_cast<TestType>(i*9 + j*3 + k);
-          if constexpr (std::is_integral_v<inner_type>) {
+          if constexpr (cuda::std::is_integral_v<inner_type>) {
             ASSERT_EQ(y3(i,j,k), static_cast<inner_type>(v*v));
           }
           else {

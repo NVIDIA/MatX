@@ -63,7 +63,7 @@ namespace matx
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {
           return T::Rank();
-        }        
+        }
 
         static_assert(Rank() > 0, "UpsampleOp: Rank of operator must be greater than 0.");
 
@@ -118,7 +118,7 @@ namespace matx
                 func_name, dim_, n_, actual_rank, detail::array_to_string(out_dims_, actual_rank))
           );
         }
-#endif 
+#endif
 
         __MATX_INLINE__ std::string str() const { return "upsample(" + op_.str() + ")"; }
 
@@ -127,11 +127,11 @@ namespace matx
         };
 
         template <typename CapType, typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
         {
           if constexpr (CapType::ept == ElementsPerThread::ONE) {
               static_assert(sizeof...(Is)==Rank());
-              static_assert((std::is_convertible_v<Is, index_t> && ... ));
+              static_assert((cuda::std::is_convertible_v<Is, index_t> && ... ));
 
               // convert variadic type to tuple so we can read/update
               cuda::std::array<index_t, Rank()> ind{indices...};
@@ -147,7 +147,7 @@ namespace matx
         }
 
         template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
         {
           return this->operator()<DefaultCapabilities>(indices...);
         }
@@ -230,13 +230,13 @@ namespace matx
 
         ~UpsampleOp() = default;
         UpsampleOp(const UpsampleOp &rhs) = default;
-        
+
         __MATX_INLINE__ auto operator=(const self_type &rhs) {
           return set(*this, rhs);
         }
 
-        template<typename R> __MATX_INLINE__ auto operator=(const R &rhs) { 
-          return set(*this, rhs); 
+        template<typename R> __MATX_INLINE__ auto operator=(const R &rhs) {
+          return set(*this, rhs);
         }
     };
   }

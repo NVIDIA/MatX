@@ -59,7 +59,7 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
 
   size_t filter_bytes = filter_len * sizeof(ftype_strip);
   // pad bytes to alignmetn of InType
-  int align = std::alignment_of_v<intype_strip>;
+  int align = cuda::std::alignment_of_v<intype_strip>;
   filter_bytes = (filter_bytes + align - 1) / align * align;
 
   intype_strip *s_data = reinterpret_cast<intype_strip*>(&s_exch1d[filter_bytes]);

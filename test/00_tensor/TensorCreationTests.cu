@@ -438,7 +438,7 @@ TYPED_TEST(TensorCreationTestsAll, StaticTensorDescriptor)
 
 TEST(TensorCreationTests, CArrayDescriptorConstructors)
 {
-  static_assert(std::is_default_constructible_v<DefaultDescriptor<0>>);
+  static_assert(cuda::std::is_default_constructible_v<DefaultDescriptor<0>>);
 
   index_t shape[2] = {2, 3};
   index_t strides[2] = {3, 1};

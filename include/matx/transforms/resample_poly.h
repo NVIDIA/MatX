@@ -73,7 +73,7 @@ inline void matxResamplePoly1DInternal(OutType &o, const InType &i,
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-  
+
   using filter_t = typename FilterType::value_type;
   using output_t = typename OutType::value_type;
   using shape_type = typename OutType::shape_type;
@@ -112,7 +112,7 @@ inline void matxResamplePoly1DInternal(OutType &o, const InType &i,
   } kernel = ResampleKernel::ElemBlock;
 
   // The WarpCentric kernel currently uses cg::reduce(), which requires trivially-copyable types.
-  if constexpr (std::is_trivially_copyable_v<output_t>) {
+  if constexpr (cuda::std::is_trivially_copyable_v<output_t>) {
     // There are a couple cases where a warp-centric resampler tends to be faster:
     // 1. When we have a small number of output points, handling one or a few points per warp is an effective
     // way to achieve higher occupancy.
@@ -180,7 +180,7 @@ inline void matxResamplePoly1DInternal(OutType &o, const InType &i,
     } else {
       // We only select the WarpCentric kernel for trivially copyable types, but we need this
       // constexpr if to avoid instantiating the kernel with inappropriate types.
-      if constexpr (std::is_trivially_copyable_v<output_t>) {
+      if constexpr (cuda::std::is_trivially_copyable_v<output_t>) {
         const size_t filter_sz_bytes = (filter_len % 2 == 0) ? sizeof(filter_t)*(filter_len+1) : sizeof(filter_t)*filter_len;
         const size_t smemBytes = (filter_sz_bytes <= MATX_RESAMPLE_POLY_MAX_SMEM_BYTES) ? filter_sz_bytes : 0;
         static_assert(THREADS % WARP_SIZE == 0);
@@ -286,7 +286,7 @@ inline void matxResamplePoly1DInternal(OutType &o, const InType &i,
 
 /**
  * @brief 1D polyphase resampler
- * 
+ *
  * @tparam OutType Type of output
  * @tparam InType Type of input
  * @tparam FilterType Type of filter

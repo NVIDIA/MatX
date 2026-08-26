@@ -81,7 +81,7 @@ auto make_tensor( const index_t (&shape)[RANK],
  * @returns New tensor
  **/
 template <typename T, typename ShapeType>
-  requires (!is_matx_descriptor<ShapeType> && !std::is_array_v<remove_cvref_t<ShapeType>>)
+  requires (!is_matx_descriptor<ShapeType> && !cuda::std::is_array_v<remove_cvref_t<ShapeType>>)
 auto make_tensor(Storage<T> storage, ShapeType &&shape) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
@@ -165,7 +165,7 @@ auto make_tensor_p( const index_t (&shape)[RANK],
 template <typename T, typename ShapeType>
   requires (!is_matx_shape<ShapeType> &&
             !is_matx_descriptor<ShapeType> &&
-            !std::is_array_v<remove_cvref_t<ShapeType>>)
+            !cuda::std::is_array_v<remove_cvref_t<ShapeType>>)
 auto make_tensor( ShapeType &&shape,
                   matxMemorySpace_t space = MATX_MANAGED_MEMORY,
                   cudaStream_t stream = 0) {
@@ -198,7 +198,7 @@ auto make_tensor( ShapeType &&shape,
  *
  **/
 template <typename TensorType, typename ShapeType>
-  requires (is_tensor<TensorType> && !is_dynamic_tensor_v<TensorType> && !std::is_array_v<remove_cvref_t<ShapeType>>)
+  requires (is_tensor<TensorType> && !is_dynamic_tensor_v<TensorType> && !cuda::std::is_array_v<remove_cvref_t<ShapeType>>)
 auto make_tensor( TensorType &tensor,
                   ShapeType &&shape,
                   matxMemorySpace_t space = MATX_MANAGED_MEMORY,
@@ -226,7 +226,7 @@ auto make_tensor( TensorType &tensor,
  **/
 template <typename T, typename ShapeType>
   requires (!is_matx_shape<ShapeType> &&
-            !std::is_array_v<remove_cvref_t<ShapeType>>)
+            !cuda::std::is_array_v<remove_cvref_t<ShapeType>>)
 auto make_tensor_p( ShapeType &&shape,
                     matxMemorySpace_t space = MATX_MANAGED_MEMORY,
                     cudaStream_t stream = 0) {
@@ -378,7 +378,7 @@ auto make_tensor( TensorType &tensor,
  **/
 template <typename T, typename ShapeType>
   requires (!is_matx_descriptor<ShapeType> &&
-            !std::is_array_v<remove_cvref_t<ShapeType>> &&
+            !cuda::std::is_array_v<remove_cvref_t<ShapeType>> &&
             is_tuple_c<remove_cvref_t<ShapeType>>)
 auto make_tensor( T *data,
                   ShapeType &&shape,
@@ -472,7 +472,7 @@ auto make_tensor( TensorType &tensor,
  **/
 template <typename T, typename ShapeType>
   requires (!is_matx_descriptor<ShapeType> &&
-            !std::is_array_v<remove_cvref_t<ShapeType>> &&
+            !cuda::std::is_array_v<remove_cvref_t<ShapeType>> &&
             is_tuple_c<remove_cvref_t<ShapeType>>)
 auto make_tensor_p( T *const data,
                     ShapeType &&shape,
@@ -527,7 +527,7 @@ auto make_tensor( const index_t (&shape)[RANK],
  **/
 template <typename T, typename ShapeType, typename Allocator>
   requires (!is_matx_shape<ShapeType> && !is_matx_descriptor<ShapeType> &&
-            !std::is_array_v<remove_cvref_t<ShapeType>>)
+            !cuda::std::is_array_v<remove_cvref_t<ShapeType>>)
 auto make_tensor( ShapeType &&shape,
                   Allocator&& alloc) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
@@ -581,7 +581,7 @@ void make_tensor( TensorType &tensor,
  **/
 template <typename TensorType, typename ShapeType, typename Allocator>
   requires (is_tensor<TensorType> && !is_dynamic_tensor_v<TensorType> &&
-            !std::is_array_v<remove_cvref_t<ShapeType>>)
+            !cuda::std::is_array_v<remove_cvref_t<ShapeType>>)
 void make_tensor( TensorType &tensor,
                   ShapeType &&shape,
                   Allocator&& alloc) {
@@ -1082,7 +1082,7 @@ auto make_dlpack_tensor_view(std::shared_ptr<Owner> owner,
 template <typename TensorType>
 void validate_dlpack_read_only_import(uint64_t flags) {
   if ((flags & DLPACK_FLAG_BITMASK_READ_ONLY) != 0U) {
-    validate_dlpack_condition(std::is_const_v<typename TensorType::value_type>, matxInvalidType,
+    validate_dlpack_condition(cuda::std::is_const_v<typename TensorType::value_type>, matxInvalidType,
                               "Read-only DLPack tensors must be imported as const MatX tensors");
   }
 }

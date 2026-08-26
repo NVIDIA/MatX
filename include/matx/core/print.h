@@ -63,7 +63,7 @@ namespace matx {
         const auto fmt_s = ("% ."s + prec + "e ");
         fprintf(fp, fmt_s.c_str(), static_cast<float>(val));
       }
-      else if constexpr (std::is_floating_point_v<T>) {
+      else if constexpr (cuda::std::is_floating_point_v<T>) {
         const auto prec = std::to_string(PRINT_PRECISION);
         const auto fmt_s = ("% ."s + prec + "e ");
         fprintf(fp, fmt_s.c_str(), val);
@@ -486,7 +486,7 @@ namespace matx {
     }
 
     template <typename Op, typename... Args>
-      requires (((std::is_integral_v<Args>)&&...) &&
+      requires (((cuda::std::is_integral_v<Args>)&&...) &&
                 (Op::Rank() == 0 || sizeof...(Args) > 0))
     void DevicePrint(FILE*fp, [[maybe_unused]] const Op &op, [[maybe_unused]] Args... dims) {
   #ifdef __CUDACC__
@@ -524,7 +524,7 @@ namespace matx {
      * @param dims Number of values to print for each dimension
      */
     template <typename Op, typename... Args>
-      requires (((std::is_integral_v<Args>)&&...) &&
+      requires (((cuda::std::is_integral_v<Args>)&&...) &&
                 (Op::Rank() == 0 || sizeof...(Args) > 0))
     void PrintData(FILE* fp, const Op &op, Args... dims) {
       MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
@@ -660,7 +660,7 @@ namespace matx {
    */
   #ifndef DOXYGEN_ONLY
   template <typename Op, typename... Args>
-    requires (((std::is_integral_v<Args>)&&...) &&
+    requires (((cuda::std::is_integral_v<Args>)&&...) &&
               (Op::Rank() == 0 || sizeof...(Args) > 0))
   #else
   template <typename Op, typename... Args>

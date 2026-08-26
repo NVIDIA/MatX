@@ -483,7 +483,7 @@ namespace detail {
 
       static __MATX_INLINE__ std::string JITValueLiteral(inner_t value)
       {
-        if constexpr (std::is_floating_point_v<inner_t>) {
+        if constexpr (cuda::std::is_floating_point_v<inner_t>) {
           std::ostringstream oss;
           oss << std::setprecision(std::numeric_limits<inner_t>::max_digits10) << value;
           auto out = oss.str();
@@ -979,7 +979,7 @@ namespace detail {
       __MATX_INLINE__ __MATX_HOST__ bool CanDirectFill(const Out &out) const noexcept
       {
         using out_t = remove_cvref_t<Out>;
-        if constexpr (!std::is_assignable_v<typename out_t::value_type &, T> || out_t::Rank() != RANK) {
+        if constexpr (!cuda::std::is_assignable_v<typename out_t::value_type &, T> || out_t::Rank() != RANK) {
           return false;
         }
         else {

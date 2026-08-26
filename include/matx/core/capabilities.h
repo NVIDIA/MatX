@@ -99,7 +99,7 @@ namespace detail {
 
   template <typename T>
   __MATX_INLINE__ __MATX_HOST__ void HashJITCacheValue(JITCacheKey &key, const T &value) {
-    static_assert(std::is_trivially_copyable_v<T>, "JIT cache key values must be trivially copyable");
+    static_assert(cuda::std::is_trivially_copyable_v<T>, "JIT cache key values must be trivially copyable");
     HashJITCacheBytes(key, &value, sizeof(T));
     HashJITCacheByte(key, 0xfe);
   }

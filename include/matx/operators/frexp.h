@@ -144,7 +144,7 @@ namespace detail {
       __MATX_INLINE__ std::string str() const { return "frexp()"; }
       __MATX_INLINE__ FrexpOp(const OpA &a) : a_(a) {
         MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
-        static_assert(std::is_floating_point_v<input_type> ||
+        static_assert(cuda::std::is_floating_point_v<input_type> ||
                       is_cuda_complex_v<input_type>, "frexp() must take a floating point input");
 
       };

@@ -65,7 +65,7 @@ private:
   template <typename F, typename U>
   static constexpr bool compute()
   {
-    if constexpr (std::is_void_v<F> || std::is_void_v<U> || cuda::std::is_same_v<F, U>) {
+    if constexpr (cuda::std::is_void_v<F> || cuda::std::is_void_v<U> || cuda::std::is_same_v<F, U>) {
       return false;
     }
     else if constexpr (is_vector_v<F>) {
@@ -83,7 +83,7 @@ private:
     else if constexpr (is_complex_v<F> && !is_complex_v<U>) {
       return false;
     }
-    else if constexpr (!std::is_assignable_v<U &, F>) {
+    else if constexpr (!cuda::std::is_assignable_v<U &, F>) {
       return false;
     }
     else {
