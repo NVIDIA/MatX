@@ -34,13 +34,28 @@
 #include "gtest/gtest.h"
 
 #include <cuda/std/array>
+#include <cuda/std/mdspan>
 #include <cstdlib>
+#include <cstdint>
 #include <memory>
+#include <type_traits>
+#include <limits>
+
 
 using namespace matx;
 
 namespace {
 
+// This kernel helps test operator[] on the GPU
+// Since GoogleTests tests run on CPU, the GPU code is placed in 
+// a CUDA kernel and launched from the test
+#if defined(__cpp_multidimensional_subscript) && (__cpp_multidimensional_subscript >= 202211L)
+  __global__ void TestMultidimensionalSubscriptKernel(detail::tensor_impl_t<int, 2> tensor)
+  {
+    tensor[1, 2] = 27;
+  }
+#endif
+  
 struct CountingAllocator {
   static inline size_t allocations = 0;
   static inline size_t deallocations = 0;
@@ -213,6 +228,291 @@ TEST(MakeTensorTests, CreatesPointerBackedViews)
   MATX_EXIT_HANDLER();
 }
 
+// Checks whether make_tensor(span) creates a correct MatX
+// view of the same memory described by the mdspan
+// 1. Checks tensor type
+// 2. Same memory for the MatX tensor and mdspan
+// 3. Same dimensions 
+// 4. Changes through either view are visible through the other
+TEST(MakeTensorTests, CreatesLayoutRightStaticMdspanView)
+{
+  MATX_ENTER_HANDLER();
+
+  using extents_type = cuda::std::extents<index_t, 2, 3>;
+
+  int data[6] = {};
+  cuda::std::mdspan<int, extents_type, cuda::std::layout_right> span{data};
+
+  auto tensor = make_tensor(span);
+
+  // Verify the mdspan overload returns the expected tensor type
+  static_assert(decltype(tensor)::Rank() == 2);
+  static_assert(
+      std::is_same_v<typename decltype(tensor)::value_type, int>);
+
+  // MatX must use the original pointer without copying the data
+  EXPECT_EQ(tensor.Data(), span.data_handle());
+
+  // Checks the dimensions
+  ExpectShape2(tensor, 2, 3);
+
+  // Checks if MatX can access different elements
+  // Check that MatX row stride matches the mdspan’s row stride
+  EXPECT_EQ(tensor.Stride(0), span.mapping().stride(0)); 
+ 
+  // Check that MatX column stride matches the mdspan’s column stride
+  EXPECT_EQ(tensor.Stride(1), span.mapping().stride(1)); 
+
+  // If you write through MatX tensor, it will change the original memory
+  tensor(1, 2) = 71;
+  EXPECT_EQ(data[5], 71);
+
+  // Writing to the original memory must be visible through MatX.
+  data[1] = 72;
+  EXPECT_EQ(tensor(0, 1), 72);
+
+  MATX_EXIT_HANDLER();
+}
+
+// Test for row-major dynamic tensors
+TEST(MakeTensorTests, CreatesLayoutRightDynamicMdspanView)
+{
+  MATX_ENTER_HANDLER();
+
+  // This says the mdspan has 2 dimensions, but their sizes are given later.
+  using extents_type = cuda::std::dextents<index_t, 2>;
+
+  int data[6] = {};
+
+  // Passing 2 and 3 provides the dimension sizes at runtime
+  cuda::std::mdspan<int, extents_type, cuda::std::layout_right> span{
+      data, 2, 3};
+
+  auto tensor = make_tensor(span);
+
+  // Verify the mdspan overload returns the expected tensor type
+  static_assert(decltype(tensor)::Rank() == 2);
+  static_assert(
+      std::is_same_v<typename decltype(tensor)::value_type, int>);
+
+  // MatX must use the original pointer without copying the data
+  EXPECT_EQ(tensor.Data(), span.data_handle());
+
+  // Checks the dimensions
+  ExpectShape2(tensor, 2, 3);
+
+  // Checks if MatX can access different elements
+  // Check that MatX row stride matches the mdspan's row stride
+  EXPECT_EQ(tensor.Stride(0), span.mapping().stride(0));
+
+  // Check that MatX column stride matches the mdspan's column stride
+  EXPECT_EQ(tensor.Stride(1), span.mapping().stride(1));
+
+  // Writing through the MatX tensor changes the original memory
+  // Writing to the original memory is visible through MatX
+  tensor(1, 2) = 71;
+  EXPECT_EQ(data[5], 71);
+
+  // If you write on the original memory, it must be visible through MatX
+  data[1] = 72;
+  EXPECT_EQ(tensor(0, 1), 72);
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(MakeTensorTests, CreatesLayoutLeftDynamicMdspanView)
+{
+  MATX_ENTER_HANDLER();
+
+  // This says the mdspan has 2 dimensions, but their sizes are given later.
+  using extents_type = cuda::std::dextents<index_t, 2>;
+
+  int data[6] = {};
+
+  // Passing 2 and 3 here gives this mdspan its dimensions at runtime.
+  cuda::std::mdspan<int, extents_type, cuda::std::layout_left> span{
+      data, 2, 3};
+
+  auto tensor = make_tensor(span);
+
+  // Verify the mdspan overload returns the expected tensor type
+  static_assert(decltype(tensor)::Rank() == 2);
+  static_assert(
+      std::is_same_v<typename decltype(tensor)::value_type, int>);
+
+  // MatX must use the original pointer without copying the data
+  EXPECT_EQ(tensor.Data(), span.data_handle());
+
+  // Checks the dimensions
+  ExpectShape2(tensor, 2, 3);
+
+  // Checks if MatX can access different elements
+  // Check that MatX row stride matches the mdspan's row stride
+  EXPECT_EQ(tensor.Stride(0), span.mapping().stride(0));
+
+  // Check that MatX column stride matches the mdspan's column stride
+  EXPECT_EQ(tensor.Stride(1), span.mapping().stride(1));
+
+  // If you write on the MatX tensor, it will change the original memory
+  tensor(1, 2) = 81;
+  EXPECT_EQ(data[5], 81);
+
+  // If you write on the original memory, it must be visible through MatX
+  data[2] = 82;
+  EXPECT_EQ(tensor(0, 1), 82);
+
+  MATX_EXIT_HANDLER();
+}
+
+
+// Checks whether make_tensor(span) preserves custom strides
+// that are neither row-major nor column-major
+TEST(MakeTensorTests, CreatesLayoutStrideMdspanView)
+{
+  MATX_ENTER_HANDLER();
+
+  using extents_type = cuda::std::extents<index_t, 2, 3>;
+
+  // Allows custom strides
+  using mapping_type =
+      cuda::std::layout_stride::mapping<extents_type>;
+
+  // The largest accessed position is 1 * 4 + 2 * 1 = 6
+  int data[7] = {};
+
+  // Move 4 positions for each row and 1 for each column
+  const mapping_type mapping{
+      extents_type{},
+      cuda::std::array<index_t, 2>{4, 1}};
+
+  cuda::std::mdspan<int, extents_type, cuda::std::layout_stride> span{
+      data, mapping};
+
+  auto tensor = make_tensor(span);
+
+  static_assert(decltype(tensor)::Rank() == 2);
+  static_assert(
+      std::is_same_v<typename decltype(tensor)::value_type, int>);
+
+  // Checks that MatX uses the same memory
+  EXPECT_EQ(tensor.Data(), span.data_handle());
+
+  // Checks the dimensions
+  ExpectShape2(tensor, 2, 3);
+
+  // Checks that MatX keeps the custom strides
+  EXPECT_EQ(tensor.Stride(0), span.mapping().stride(0));
+  EXPECT_EQ(tensor.Stride(1), span.mapping().stride(1));
+
+  // Position (1, 2) maps to data[6]
+  tensor(1, 2) = 91;
+  EXPECT_EQ(data[6], 91);
+
+  // Position (1, 0) maps to data[4]
+  data[4] = 92;
+  EXPECT_EQ(tensor(1, 0), 92);
+
+  MATX_EXIT_HANDLER();
+}
+
+// Checks that destroying the MatX tensor does not destroy
+// original data's memory 
+TEST(MakeTensorTests, MdspanViewDoesNotOwnData)
+{
+  MATX_ENTER_HANDLER();
+
+  // This unique pointer owns the original memory
+  auto data = std::make_unique<int[]>(6);
+  int *const original_data = data.get();
+
+  {
+    // The mdspan and MatX tensor only borrow the original memory
+    cuda::std::mdspan<int, cuda::std::dextents<index_t, 2>> span{
+        original_data, 2, 3};
+
+    auto tensor = make_tensor(span);
+
+    // Checks that MatX uses the original memory
+    EXPECT_EQ(tensor.Data(), original_data);
+
+    // Writes a value before the tensor is destroyed
+    tensor(1, 2) = 101;
+  }
+
+  // The original memory must still exist after the tensor is destroyed
+  EXPECT_EQ(data.get(), original_data);
+  EXPECT_EQ(original_data[5], 101);
+
+  MATX_EXIT_HANDLER();
+}
+
+// Checks that an mdspan extent or stride that is too large for MatX
+// index_t throws an error instead of being converted to a smaller value.
+TEST(MakeTensorTests, RejectsMdspanValuesOutsideMatXIndexRange)
+{
+  MATX_ENTER_HANDLER();
+
+  int data = 0;
+  const uint64_t oversized =
+      static_cast<uint64_t>(std::numeric_limits<index_t>::max()) + 1ULL;
+
+  // Checks an extent that is too large for MatX index_t
+  {
+    using extents_type = cuda::std::dextents<uint64_t, 1>;
+
+    cuda::std::mdspan<int, extents_type> span{&data, oversized};
+
+    EXPECT_THROW(
+        { [[maybe_unused]] auto tensor = make_tensor(span); },
+        matx::detail::matxException);
+  }
+
+  // Checks a stride that is too large for MatX index_t
+  {
+    using extents_type = cuda::std::extents<uint64_t, 1, 1>;
+    using mapping_type =
+        cuda::std::layout_stride::mapping<extents_type>;
+
+    const mapping_type mapping{
+        extents_type{},
+        cuda::std::array<uint64_t, 2>{oversized, 1}};
+
+    cuda::std::mdspan<int, extents_type, cuda::std::layout_stride> span{
+        &data, mapping};
+
+    EXPECT_THROW(
+        { [[maybe_unused]] auto tensor = make_tensor(span); },
+        matx::detail::matxException);
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+// Checks that MatX can create a tensor
+// using C++23 std::mdspan
+#if defined(__cpp_lib_mdspan) && (__cpp_lib_mdspan >= 202207L)
+TEST(MakeTensorTests, CreatesStdMdspanView)
+{
+  MATX_ENTER_HANDLER();
+
+  int data[6]{};
+
+  using extents_type = std::extents<index_t, 2, 3>;
+  std::mdspan<int, extents_type> span{data};
+
+  auto tensor = make_tensor(span);
+
+  EXPECT_EQ(tensor.Data(), data);
+  EXPECT_EQ(tensor.Size(0), 2);
+  EXPECT_EQ(tensor.Size(1), 3);
+
+  tensor(1, 2) = 42;
+  EXPECT_EQ(data[5], 42);
+
+  MATX_EXIT_HANDLER();
+}
+#endif
+
 TEST(MakeTensorTests, CreatesDescriptorBackedTensors)
 {
   MATX_ENTER_HANDLER();
@@ -294,3 +594,50 @@ TEST(MakeTensorTests, CreatesCustomAllocatorTensors)
 
   MATX_EXIT_HANDLER();
 }
+
+#if defined(__cpp_multidimensional_subscript) && (__cpp_multidimensional_subscript >= 202211L)
+  
+  // Tests if operator[] works on CPU
+  TEST(MakeTensorTests, MultidimensionalSubscriptHost)
+  {
+    MATX_ENTER_HANDLER();
+
+    auto tensor = make_tensor<int>({2, 3}, MATX_MANAGED_MEMORY);
+
+    tensor[1, 2] = 17;
+
+
+    // Checks if the new operator[] can read 
+    // the value we wrote using operator[]
+    EXPECT_EQ((tensor[1, 2]), 17);
+
+    // Checks if the old operator() refers to the
+    // same element as new operator[]
+    EXPECT_EQ((tensor(1, 2)), 17);
+
+    // Reads the tensor using the const reference to the tensor
+    const auto &const_tensor = tensor;
+    EXPECT_EQ((const_tensor[1, 2]), 17);
+
+    MATX_EXIT_HANDLER();
+  }
+
+  // Tests if operator[] works on GPU
+  TEST(MakeTensorTests, MultidimensionalSubscriptDevice)
+  {
+    MATX_ENTER_HANDLER();
+
+    auto tensor = make_tensor<int>({2, 3}, MATX_MANAGED_MEMORY);
+
+    detail::tensor_impl_t<int, 2> tensor_impl = tensor;
+    TestMultidimensionalSubscriptKernel<<<1, 1>>>(tensor_impl);
+
+    ASSERT_EQ(cudaDeviceSynchronize(), cudaSuccess);
+
+    EXPECT_EQ((tensor[1, 2]), 27);
+    EXPECT_EQ((tensor(1, 2)), 27);
+
+    MATX_EXIT_HANDLER();
+  }
+
+#endif

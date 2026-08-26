@@ -1269,6 +1269,41 @@ MATX_IGNORE_WARNING_POP_GCC
       return this->template operator()<DefaultCapabilities>(indices...);
     }
 
+    /*
+      * Checks whether the compiler supports C++23 multidimensional operator[]    
+      */
+    #if defined(__cpp_multidimensional_subscript) && (__cpp_multidimensional_subscript >= 202211L)
+
+      /**
+        * Gets a tensor value using C++23 multidimensional indexing
+        *
+        * @returns Value at the specified indices
+        */
+      template <typename... Is> requires (RANK > 0 &&
+          sizeof...(Is) == RANK &&
+          cuda::std::conjunction_v<cuda::std::is_integral<Is>...>)
+      __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator[](Is... indices) const noexcept
+      {
+        return this->template operator()<DefaultCapabilities>(indices...);
+      }
+
+      /**
+      * Accesses a tensor value using C++23 multidimensional indexing
+      *
+      * The returned value can be modified
+      *
+      * @returns Value at the specified indices      
+      */
+      template <typename... Is>
+        requires (RANK > 0 &&
+                  sizeof...(Is) == RANK &&
+                  cuda::std::conjunction_v<cuda::std::is_integral<Is>...>)
+      __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator[](Is... indices) noexcept
+      {
+        return this->template operator()<DefaultCapabilities>(indices...);
+      }
+    #endif
+
     template <typename CapType>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(const cuda::std::array<index_t, RANK> &idx) const noexcept
     {

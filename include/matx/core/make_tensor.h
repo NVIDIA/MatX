@@ -43,6 +43,8 @@
 #include "matx/core/tensor_desc.h"
 #include "matx/core/dlpack.h"
 #include "matx/core/log.h"
+
+
 namespace matx {
 
 /**
@@ -620,6 +622,82 @@ auto make_tensor( T* const data,
   return tensor_t<T, Dstrip::Rank(), Dstrip>{std::move(storage), std::forward<D>(desc)};
 }
 
+
+/**
+ * Takes an mdspan and creates a MatX tensor that looks at the same data.
+ * The returned tensor does not copy the underlying data but uses the same
+ * dimensions, strides, and data pointer as the mdspan.
+ * MatX will not delete the underlying data.
+ *
+ * @param span Tells us the data location, dimensions, and how it is arranged
+ * using strides
+ * @return A MatX tensor that uses the existing data
+ */
+template <typename Mdspan>
+  
+  // Only allow either CUDA mdspan or C++23 mdspan
+  requires detail::mdspan_traits<remove_cvref_t<Mdspan>>::is_mdspan
+  auto make_tensor(const Mdspan &span)
+  {
+    MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+
+    using mdspan_type = remove_cvref_t<Mdspan>;
+    using mdspan_traits = detail::mdspan_traits<mdspan_type>;
+    using ElementType = typename mdspan_type::element_type;
+    using Extents = typename mdspan_type::extents_type;
+
+    static_assert(
+        mdspan_traits::has_supported_layout,
+        "make_tensor only supports layout_right, layout_left, and layout_stride");
+
+    static_assert(
+        !std::is_const_v<ElementType>,
+        "make_tensor does not support mdspan with const elements");
+
+    static_assert(
+        mdspan_traits::has_default_accessor,
+        "make_tensor only supports mdspan with its default_accessor");
+
+    // Checks whether the mdspan uses a normal pointer for its data
+    static_assert(
+        std::is_same_v<
+            typename mdspan_type::data_handle_type,
+            ElementType *>,
+        "make_tensor requires mdspan to use a regular pointer for its data");
+        
+    constexpr int RANK = static_cast<int>(Extents::rank());
+
+    cuda::std::array<index_t, RANK> shape{};
+    cuda::std::array<index_t, RANK> strides{};
+
+    // Finds largest number MatX's index_t can store
+    constexpr auto max_index = static_cast<uint64_t>(std::numeric_limits<index_t>::max());
+    for (int r = 0; r < RANK; r++) {
+      const auto extent = span.extent(r);
+      const auto stride = span.mapping().stride(r);      
+
+      // Checks is the mdspan dimensions larger than the biggest
+      // number MatX can store
+      if (static_cast<uint64_t>(extent) > max_index) {
+        MATX_THROW(
+            matxInvalidSize,
+            "mdspan extent is too large for MatX index_t");
+      }
+      // Same check for stride
+      if (static_cast<uint64_t>(stride) > max_index) {
+        MATX_THROW(
+            matxInvalidSize,
+            "mdspan stride is too large for MatX index_t");
+      }
+      //Converts mdspan's dimension size and 
+      //stride into MatX's index_t
+      shape[r] = static_cast<index_t>(extent);
+      strides[r] = static_cast<index_t>(stride);
+    }
+
+    DefaultDescriptor<RANK> desc{std::move(shape), std::move(strides)};
+    return make_tensor(span.data_handle(), std::move(desc), false);
+ }
 /**
  * Create a tensor with user-defined memory and an existing descriptor
  *

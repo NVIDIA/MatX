@@ -38,6 +38,44 @@ Custom Allocator Support
 .. doxygenfunction:: make_tensor( TensorType &tensor, const index_t (&shape)[TensorType::Rank()], Allocator&& alloc)
 .. doxygenfunction:: make_tensor( TensorType &tensor, ShapeType &&shape, Allocator&& alloc)
 
+mdspan Support
+~~~~~~~~~~~~~~
+
+MatX can create non-owning tensors from ``cuda::std::mdspan`` and, when
+available, ``std::mdspan``.
+
+For C++20 and CUDA mdspan:
+
+.. code-block:: cpp
+
+    #include <cuda/std/mdspan>
+
+    int data[6]{};
+    using extents_type = cuda::std::extents<matx::index_t, 2, 3>;
+    cuda::std::mdspan<int, extents_type> span{data};
+
+    auto tensor = matx::make_tensor(span);
+
+When C++23 ``std::mdspan`` is available,
+it can be used in the same way:
+
+.. code-block:: cpp
+
+    #include <mdspan>
+
+    int data[6]{};
+    using extents_type = std::extents<matx::index_t, 2, 3>;
+    std::mdspan<int, extents_type> span{data};
+
+    auto tensor = matx::make_tensor(span);
+
+The tensor uses the mdspan's original data, dimensions, and strides without
+copying the data. The original data must remain valid while the tensor is being
+used. Static and dynamic extents are supported with ``layout_right``,
+``layout_left``, and ``layout_stride``.
+
+.. doxygenfunction:: make_tensor(const Mdspan &span)
+
 DLPack Support
 ~~~~~~~~~~~~~~
 .. versionadded:: 1.1.0

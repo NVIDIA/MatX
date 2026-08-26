@@ -71,6 +71,17 @@ The same operator can be used to get values:
     auto f0 = t0();  // t0 is a rank-0 tensor (scalar)
     auto f1 = t1(5); // t1 is a rank-1 tensor (scalar)
 
+When compiling in C++23 mode with multidimensional subscript support, tensors
+can also be indexed using ``operator[]``:
+
+.. code-block:: cpp
+
+    t[2, 2] = 5.5;
+    float value = t[2, 2];
+
+This has the same indexing behavior as ``operator()``. The ``operator()``
+syntax is still available in C++23 and can be used with C++20.
+
 Tensors can also be initialized using initializer list syntax using the ``SetVals`` function:
 
 .. code-block:: cpp
