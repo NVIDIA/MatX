@@ -366,14 +366,15 @@ __MATX_INLINE__ bool IsAllocated(void *ptr) {
  *
  * Returns the memory kind of the pointer (device, host, managed, etc) based on
  * a pointer address. This function should not be used in the data path since it
- * takes a mutex. Since Views can modify the address of the data pointer, the 
- * base pointer needs to be passed in to this function.
- * This function uses an exact lookup, and a offset pointer therefore would not 
- * be in the (unordered) map.
+ * takes a mutex.
  *
- * Note:
- * This function previously used a std::map and searched for the next lowest address
- * as an approximation. This is NOT supported anymore!
+ * The lookup is an exact match against the address the allocator recorded, so the
+ * base pointer of the allocation must be passed in. Views can offset their data
+ * pointer into the allocation, and such a pointer is never found in the map, so
+ * MATX_INVALID_MEMORY is returned for it.
+ *
+ * Note: an earlier version of this comment described an approximate lookup that
+ * fell back to the next lowest recorded address. No such fallback exists here.
  **/
 __MATX_INLINE__ matxMemorySpace_t GetPointerKind(void *ptr)
 {
