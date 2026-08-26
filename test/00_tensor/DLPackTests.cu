@@ -300,9 +300,13 @@ class DLPackTestsAll : public ::testing::Test {
 template <typename TensorType>
 class DLPackTestsFloatNonComplex : public ::testing::Test {
 };
+template <typename TensorType>
+class DLPackTestsComplex : public ::testing::Test {
+};
 
 TYPED_TEST_SUITE(DLPackTestsAll, MatXAllTypesCUDAExec);
 TYPED_TEST_SUITE(DLPackTestsFloatNonComplex, MatXFloatNonComplexTypesCUDAExec);
+TYPED_TEST_SUITE(DLPackTestsComplex, MatXComplexTypesCUDAExec);
 
 TYPED_TEST(DLPackTestsAll, ExportLegacyDLPack)
 {
@@ -393,6 +397,48 @@ TYPED_TEST(DLPackTestsAll, ExportPermutedOffsetSlice)
   };
 
   ASSERT_NO_FATAL_FAILURE(ForEachExportableMemorySpace<TestType>(check_permuted_offset_slice));
+
+  MATX_EXIT_HANDLER();
+}
+
+// ToDlPackImpl() needs to classify Real/ImagView via cuPointerGetAttributes
+//
+// Slicing first guarantees an offset for both RealView() and ImagView(),
+// since RealView() alone on an un-sliced tensor keeps the same address as
+// the base allocation and wouldn't exercise the fallback path at all.
+TYPED_TEST(DLPackTestsComplex, ExportRealImagViewOfOffsetSlice)
+{
+  MATX_ENTER_HANDLER();
+
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+
+  auto check_real_imag_view = [](auto &t, DLDeviceType expected_device_type) {
+    const void *base = static_cast<const void *>(t.GetStorage().data());
+    auto s = t.Slice({1, 2, 3}, {4, 8, 15});
+
+    auto rv = s.RealView();
+    auto iv = s.ImagView();
+
+    ASSERT_EQ(static_cast<const void *>(rv.GetStorage().data()), static_cast<const void *>(rv.Data()));
+    ASSERT_EQ(static_cast<const void *>(iv.GetStorage().data()), static_cast<const void *>(iv.Data()));
+    ASSERT_NE(static_cast<const void *>(rv.Data()), base);
+    ASSERT_NE(static_cast<const void *>(iv.Data()), base);
+
+    auto check_export = [&](auto &v) {
+      auto *dl = v.ToDlPack();
+      ASSERT_EQ(dl->dl_tensor.device.device_type, expected_device_type);
+      dl->deleter(dl);
+
+      auto *dlv = v.ToDlPackVersioned();
+      ASSERT_EQ(dlv->dl_tensor.device.device_type, expected_device_type);
+      dlv->deleter(dlv);
+    };
+
+    ASSERT_NO_FATAL_FAILURE(check_export(rv));
+    ASSERT_NO_FATAL_FAILURE(check_export(iv));
+  };
+
+  ASSERT_NO_FATAL_FAILURE(ForEachExportableMemorySpace<TestType>(check_real_imag_view));
 
   MATX_EXIT_HANDLER();
 }
