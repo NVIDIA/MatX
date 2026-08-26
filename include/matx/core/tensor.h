@@ -1473,8 +1473,8 @@ MATX_LOOP_UNROLL
 
   template <typename ManagedType>
   ManagedType *ToDlPackImpl() const {
-    static_assert(std::is_same_v<ManagedType, DLManagedTensorVersioned> ||
-      std::is_same_v<ManagedType, DLManagedTensor>,
+    static_assert(cuda::std::is_same_v<ManagedType, DLManagedTensorVersioned> ||
+      cuda::std::is_same_v<ManagedType, DLManagedTensor>,
       "Unsupported DLPack managed tensor type");
 
     auto *mt = new ManagedType;
@@ -1541,7 +1541,7 @@ MATX_LOOP_UNROLL
     mt->manager_ctx = t_copy;
     mt->deleter = &self_type::template FreeDLPackCommon_<ManagedType>;
 
-    if constexpr (std::is_same_v<ManagedType, DLManagedTensorVersioned>) {
+    if constexpr (cuda::std::is_same_v<ManagedType, DLManagedTensorVersioned>) {
       mt->version.major = DLPACK_MAJOR_VERSION;
       mt->version.minor = DLPACK_MINOR_VERSION;
       mt->flags = 0;

@@ -263,11 +263,11 @@ void sparse_solve_impl(TensorTypeC &C, const TensorTypeA &a,
   // Restrictions.
   static_assert(RANKA == 2 && RANKB == 2 && RANKC == 2,
                 "tensors must have rank-2");
-  static_assert(std::is_same_v<TC, TA> && std::is_same_v<TC, TB>,
+  static_assert(cuda::std::is_same_v<TC, TA> && cuda::std::is_same_v<TC, TB>,
                 "tensors must have the same data type");
-  static_assert(std::is_same_v<TC, float> || std::is_same_v<TC, double> ||
-                    std::is_same_v<TC, cuda::std::complex<float>> ||
-                    std::is_same_v<TC, cuda::std::complex<double>>,
+  static_assert(cuda::std::is_same_v<TC, float> || cuda::std::is_same_v<TC, double> ||
+                    cuda::std::is_same_v<TC, cuda::std::complex<float>> ||
+                    cuda::std::is_same_v<TC, cuda::std::complex<double>>,
                 "unsupported data type");
   MATX_ASSERT( // Note: B,C transposed!
       a.Size(RANKA - 1) == b.Size(RANKB - 1) &&
@@ -276,8 +276,8 @@ void sparse_solve_impl(TensorTypeC &C, const TensorTypeA &a,
       matxInvalidSize);
   MATX_ASSERT(b.Stride(RANKB - 1) == 1 && c.Stride(RANKC - 1) == 1,
               matxInvalidParameter);
-  static_assert(std::is_same_v<typename atype::pos_type, int32_t> &&
-                    std::is_same_v<typename atype::crd_type, int32_t>,
+  static_assert(cuda::std::is_same_v<typename atype::pos_type, int32_t> &&
+                    cuda::std::is_same_v<typename atype::crd_type, int32_t>,
                 "unsupported index type");
 
   // Get parameters required by these tensors (for caching).

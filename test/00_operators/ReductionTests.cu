@@ -505,7 +505,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, PermutedReduce)
     }
   }
 
-  if constexpr (std::is_same_v<TestType, bool>)
+  if constexpr (cuda::std::is_same_v<TestType, bool>)
   {
     // example-begin any-test-2
     // Reduce a 4D tensor into a 2D tensor by collapsing the inner two dimensions. Both
@@ -523,7 +523,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, PermutedReduce)
     }
   }
 
-  if constexpr (std::is_same_v<TestType, bool>)
+  if constexpr (cuda::std::is_same_v<TestType, bool>)
   {
     // example-begin all-test-2
     // Reduce a 4D tensor into a 2D tensor by collapsing the inner two dimensions. Both

@@ -13,7 +13,7 @@ TYPED_TEST(OperatorTestsComplexNonHalfTypesAllExecs, Frexpc)
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
   using InnerType = typename TestType::value_type;
 
-  ExecType exec{}; 
+  ExecType exec{};
 
   // example-begin frexpc-test-1
   // Input data
@@ -42,36 +42,36 @@ TYPED_TEST(OperatorTestsComplexNonHalfTypesAllExecs, Frexpc)
   (toint_imag = oint_imag).run(exec);
   // example-end frexpc-test-1
 
-  static_assert(std::is_same_v<typename decltype(ofrac_real)::value_type,
+  static_assert(cuda::std::is_same_v<typename decltype(ofrac_real)::value_type,
                                InnerType>);
-  static_assert(std::is_same_v<typename decltype(oint_real)::value_type, int>);
-  static_assert(std::is_same_v<typename decltype(ofrac_imag)::value_type,
+  static_assert(cuda::std::is_same_v<typename decltype(oint_real)::value_type, int>);
+  static_assert(cuda::std::is_same_v<typename decltype(ofrac_imag)::value_type,
                                InnerType>);
-  static_assert(std::is_same_v<typename decltype(oint_imag)::value_type, int>);
+  static_assert(cuda::std::is_same_v<typename decltype(oint_imag)::value_type, int>);
   (tofrac_real_scaled = ofrac_real * InnerType{2}).run(exec);
 
   exec.sync();
-  int texp_real, texp_imag;  
+  int texp_real, texp_imag;
   for (int i = 0; i < tiv0.Size(0); i++) {
-    if constexpr (std::is_same_v<TypeParam, cuda::std::complex<float>>) {
+    if constexpr (cuda::std::is_same_v<TypeParam, cuda::std::complex<float>>) {
       float tfrac_real = cuda::std::frexpf(tiv0(i).real(), &texp_real);
       float tfrac_imag = cuda::std::frexpf(tiv0(i).imag(), &texp_imag);
-      ASSERT_EQ(tfrac_real, tofrac_real(i)); 
-      ASSERT_EQ(texp_real,  toint_real(i)); 
-      ASSERT_EQ(tfrac_imag, tofrac_imag(i)); 
+      ASSERT_EQ(tfrac_real, tofrac_real(i));
+      ASSERT_EQ(texp_real,  toint_real(i));
+      ASSERT_EQ(tfrac_imag, tofrac_imag(i));
       ASSERT_EQ(texp_imag,  toint_imag(i));
       ASSERT_EQ(tfrac_real * 2.0f, tofrac_real_scaled(i));
     }
     else {
       double tfrac_real = cuda::std::frexp(tiv0(i).real(), &texp_real);
       double tfrac_imag = cuda::std::frexp(tiv0(i).imag(), &texp_imag);
-      ASSERT_EQ(tfrac_real, tofrac_real(i)); 
-      ASSERT_EQ(texp_real,  toint_real(i)); 
-      ASSERT_EQ(tfrac_imag, tofrac_imag(i)); 
+      ASSERT_EQ(tfrac_real, tofrac_real(i));
+      ASSERT_EQ(texp_real,  toint_real(i));
+      ASSERT_EQ(tfrac_imag, tofrac_imag(i));
       ASSERT_EQ(texp_imag,  toint_imag(i));
       ASSERT_EQ(tfrac_real * 2.0, tofrac_real_scaled(i));
     }
   }
 
   MATX_EXIT_HANDLER();
-} 
+}

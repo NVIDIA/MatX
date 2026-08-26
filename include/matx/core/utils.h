@@ -208,7 +208,7 @@ __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ auto madd( const T1 &x, const T2 &
     Z.imag(Z.imag() + xr*yi);
 
     return Z;
-  } else if constexpr (std::is_same_v<T4, matxFp16Complex>) {
+  } else if constexpr (cuda::std::is_same_v<T4, matxFp16Complex>) {
     //__half2 X = make_half2(x.real(), x.imag());
     //__half2 Y = make_half2(y.real(), y.imag());
     //__half2 Z = make_half2(z.real(), z.imag());
@@ -299,80 +299,80 @@ template <typename T>
 __MATX_INLINE__ __MATX_HOST__  std::string type_to_string()
 {
   // Handle standard POD types
-  if constexpr (std::is_same_v<T, float>) {
+  if constexpr (cuda::std::is_same_v<T, float>) {
     return "float";
   }
-  else if constexpr (std::is_same_v<T, double>) {
+  else if constexpr (cuda::std::is_same_v<T, double>) {
     return "double";
   }
-  else if constexpr (std::is_same_v<T, int>) {
+  else if constexpr (cuda::std::is_same_v<T, int>) {
     return "int";
   }
-  else if constexpr (std::is_same_v<T, unsigned int>) {
+  else if constexpr (cuda::std::is_same_v<T, unsigned int>) {
     return "unsigned int";
   }
-  else if constexpr (std::is_same_v<T, long>) {
+  else if constexpr (cuda::std::is_same_v<T, long>) {
     return "long";
   }
-  else if constexpr (std::is_same_v<T, unsigned long>) {
+  else if constexpr (cuda::std::is_same_v<T, unsigned long>) {
     return "unsigned long";
   }
-  else if constexpr (std::is_same_v<T, long long>) {
+  else if constexpr (cuda::std::is_same_v<T, long long>) {
     return "long long";
   }
-  else if constexpr (std::is_same_v<T, unsigned long long>) {
+  else if constexpr (cuda::std::is_same_v<T, unsigned long long>) {
     return "unsigned long long";
   }
-  else if constexpr (std::is_same_v<T, short>) {
+  else if constexpr (cuda::std::is_same_v<T, short>) {
     return "short";
   }
-  else if constexpr (std::is_same_v<T, unsigned short>) {
+  else if constexpr (cuda::std::is_same_v<T, unsigned short>) {
     return "unsigned short";
   }
-  else if constexpr (std::is_same_v<T, char>) {
+  else if constexpr (cuda::std::is_same_v<T, char>) {
     return "char";
   }
-  else if constexpr (std::is_same_v<T, signed char>) {
+  else if constexpr (cuda::std::is_same_v<T, signed char>) {
     return "signed char";
   }
-  else if constexpr (std::is_same_v<T, unsigned char>) {
+  else if constexpr (cuda::std::is_same_v<T, unsigned char>) {
     return "unsigned char";
   }
-  else if constexpr (std::is_same_v<T, bool>) {
+  else if constexpr (cuda::std::is_same_v<T, bool>) {
     return "bool";
   }
-  else if constexpr (std::is_same_v<T, __half>) {
+  else if constexpr (cuda::std::is_same_v<T, __half>) {
     return "__half";
   }
-  else if constexpr (std::is_same_v<T, __nv_bfloat16>) {
+  else if constexpr (cuda::std::is_same_v<T, __nv_bfloat16>) {
     return "__nv_bfloat16";
   }
-  else if constexpr (std::is_same_v<T, matxFp16>) {
+  else if constexpr (cuda::std::is_same_v<T, matxFp16>) {
     return "matx::matxFp16";
   }
-  else if constexpr (std::is_same_v<T, matxBf16>) {
+  else if constexpr (cuda::std::is_same_v<T, matxBf16>) {
     return "matx::matxBf16";
   }
-  else if constexpr (std::is_same_v<T, matxFp16Complex>) {
+  else if constexpr (cuda::std::is_same_v<T, matxFp16Complex>) {
     return "matx::matxFp16Complex";
   }
-  else if constexpr (std::is_same_v<T, matxBf16Complex>) {
+  else if constexpr (cuda::std::is_same_v<T, matxBf16Complex>) {
     return "matx::matxBf16Complex";
   }
-  else if constexpr (std::is_same_v<T, matxFp16ComplexPlanar>) {
+  else if constexpr (cuda::std::is_same_v<T, matxFp16ComplexPlanar>) {
     return "matx::matxFp16ComplexPlanar";
   }
-  else if constexpr (std::is_same_v<T, matxBf16ComplexPlanar>) {
+  else if constexpr (cuda::std::is_same_v<T, matxBf16ComplexPlanar>) {
     return "matx::matxBf16ComplexPlanar";
   }
   // CCCL complex types
-  else if constexpr (std::is_same_v<T, cuda::std::complex<float>>) {
+  else if constexpr (cuda::std::is_same_v<T, cuda::std::complex<float>>) {
     return "cuda::std::complex<float>";
   }
-  else if constexpr (std::is_same_v<T, cuda::std::complex<double>>) {
+  else if constexpr (cuda::std::is_same_v<T, cuda::std::complex<double>>) {
     return "cuda::std::complex<double>";
   }
-  else if constexpr (std::is_same_v<T, index_t>) {
+  else if constexpr (cuda::std::is_same_v<T, index_t>) {
     return "index_t";
   }
   // fallback: use typeid if available, or unknown
@@ -385,49 +385,49 @@ __MATX_INLINE__ __MATX_HOST__  std::string type_to_string()
 template <typename T>
 __MATX_INLINE__ __MATX_HOST__  std::string type_to_string_c_name()
 {
-  if constexpr (std::is_same_v<T, cuda::std::complex<float>>) {
+  if constexpr (cuda::std::is_same_v<T, cuda::std::complex<float>>) {
     return "cuda_std_complex_float";
   }
-  else if constexpr (std::is_same_v<T, cuda::std::complex<double>>) {
+  else if constexpr (cuda::std::is_same_v<T, cuda::std::complex<double>>) {
     return "cuda_std_complex_double";
   }
-  else if constexpr (std::is_same_v<T, unsigned int>) {
+  else if constexpr (cuda::std::is_same_v<T, unsigned int>) {
     return "unsigned_int";
   }
-  else if constexpr (std::is_same_v<T, unsigned long>) {
+  else if constexpr (cuda::std::is_same_v<T, unsigned long>) {
     return "unsigned_long";
   }
-  else if constexpr (std::is_same_v<T, unsigned long long>) {
+  else if constexpr (cuda::std::is_same_v<T, unsigned long long>) {
     return "unsigned_long_long";
   }
-  else if constexpr (std::is_same_v<T, unsigned short>) {
+  else if constexpr (cuda::std::is_same_v<T, unsigned short>) {
     return "unsigned_short";
   }
-  else if constexpr (std::is_same_v<T, unsigned char>) {
+  else if constexpr (cuda::std::is_same_v<T, unsigned char>) {
     return "unsigned_char";
   }
-  else if constexpr (std::is_same_v<T, signed char>) {
+  else if constexpr (cuda::std::is_same_v<T, signed char>) {
     return "signed_char";
   }
-  else if constexpr (std::is_same_v<T, long long>) {
+  else if constexpr (cuda::std::is_same_v<T, long long>) {
     return "long_long";
   }
-  else if constexpr (std::is_same_v<T, matxFp16>) {
+  else if constexpr (cuda::std::is_same_v<T, matxFp16>) {
     return "matx_matxFp16";
   }
-  else if constexpr (std::is_same_v<T, matxBf16>) {
+  else if constexpr (cuda::std::is_same_v<T, matxBf16>) {
     return "matx_matxBf16";
-  }  
-  else if constexpr (std::is_same_v<T, matxFp16Complex>) {
+  }
+  else if constexpr (cuda::std::is_same_v<T, matxFp16Complex>) {
     return "matx_matxFp16Complex";
   }
-  else if constexpr (std::is_same_v<T, matxBf16Complex>) {
+  else if constexpr (cuda::std::is_same_v<T, matxBf16Complex>) {
     return "matx_matxBf16Complex";
   }
-  else if constexpr (std::is_same_v<T, matxFp16ComplexPlanar>) {
+  else if constexpr (cuda::std::is_same_v<T, matxFp16ComplexPlanar>) {
     return "matx_matxFp16ComplexPlanar";
   }
-  else if constexpr (std::is_same_v<T, matxBf16ComplexPlanar>) {
+  else if constexpr (cuda::std::is_same_v<T, matxBf16ComplexPlanar>) {
     return "matx_matxBf16ComplexPlanar";
   }
   else {
@@ -449,17 +449,17 @@ auto get_jit_class_or_pod_name(const T& op)
 
 /**
  * @brief Convert a number to a valid C++ symbol/identifier string
- * 
+ *
  * Formats a numeric value as a string that can be used in C++ variable names.
  * For complex numbers, the format is "r{real}_i{imag}".
  * For non-complex numbers, the format is the string representation of the value.
- * Special characters like '.' and '-' are replaced with 'p' (for point) and 
+ * Special characters like '.' and '-' are replaced with 'p' (for point) and
  * 'n' (for negative) respectively.
- * 
+ *
  * @tparam T Numeric type (can be complex or non-complex)
  * @param val Numeric value to convert
  * @return String representation safe for use in C++ identifiers
- * 
+ *
  * @example
  * number_to_symbol(cuda::std::complex<float>{1.5, -2.3}) returns "r1p5_in2p3"
  * number_to_symbol(3.14f) returns "3p14"

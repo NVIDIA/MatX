@@ -77,7 +77,7 @@ namespace detail {
         for (int i = 0; i < actual_rank; ++i) {
           out_dims_[i] = Size(i);
         }
-        
+
         return cuda::std::make_tuple(
           func_name,
           std::format("template <typename OpA> struct {} {{\n"
@@ -150,12 +150,12 @@ namespace detail {
       };
 
       template <typename CapType, typename... Is>
-      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
       {
         auto get_scalar = [](const auto &x){
-          [[maybe_unused]] int rexp;        
+          [[maybe_unused]] int rexp;
           if constexpr (is_cuda_complex_v<input_type>) {
-            if constexpr (std::is_same_v<float, typename input_type::value_type>) {
+            if constexpr (cuda::std::is_same_v<float, typename input_type::value_type>) {
               if constexpr (WHICH == 0) { // real fractional
                 const auto frac = cuda::std::frexpf(x.real(), &rexp);
                 return frac;
@@ -187,7 +187,7 @@ namespace detail {
             }
           }
           else {
-            if constexpr (std::is_same_v<float, input_type>) {
+            if constexpr (cuda::std::is_same_v<float, input_type>) {
               [[maybe_unused]] const float frac = cuda::std::frexpf(x, &rexp);
               if constexpr (WHICH == 0) { // fractional
                 return frac;

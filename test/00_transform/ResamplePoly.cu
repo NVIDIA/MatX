@@ -142,7 +142,7 @@ void AssertNearResampleValue(const T &actual, const T &expected, double thresh)
 template <typename T>
 class ResamplePolyTest : public ::testing::Test {
   using GTestType = cuda::std::tuple_element_t<0, T>;
-  using GExecType = cuda::std::tuple_element_t<1, T>;  
+  using GExecType = cuda::std::tuple_element_t<1, T>;
 
 protected:
   void SetUp() override
@@ -152,7 +152,7 @@ protected:
 
     if constexpr (is_complex_half_v<GTestType> || is_matx_half_v<GTestType>) {
       thresh = 1.0e-1;
-    } else if constexpr (std::is_same_v<GTestType, double>) {
+    } else if constexpr (cuda::std::is_same_v<GTestType, double>) {
       thresh = 1.0e-10;
     } else {
       // Revisit this tolerance. We should likely use a relative tolerance
@@ -319,7 +319,7 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, SimpleOddLength)
     { 3501, 62501, 384, 3125 },
     // Filter shorter than upsampling factor
     { 137103, 137, 384, 3125 },
-    { 137104, 137, 384, 3125 },    
+    { 137104, 137, 384, 3125 },
     // Upsampling only (down=1)
     { 7173, 173, 7, 1 },
     // Downsampling only (up=1)
@@ -351,7 +351,7 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, SimpleOddLength)
 
     this->exec.sync();
 
-    MATX_TEST_ASSERT_COMPARE(this->pb, b, "b_random", this->thresh);    
+    MATX_TEST_ASSERT_COMPARE(this->pb, b, "b_random", this->thresh);
 
     // Now test with a multiplicative operator on the input. The resampler is linear,
     // so we can inverse-scale the output to compare against the golden outputs.
@@ -413,7 +413,7 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, SimpleEvenLength)
 
     this->exec.sync();
 
-    MATX_TEST_ASSERT_COMPARE(this->pb, b, "b_random", this->thresh);    
+    MATX_TEST_ASSERT_COMPARE(this->pb, b, "b_random", this->thresh);
 
     // Now test with a multiplicative operator on the input. The resampler is linear,
     // so we can inverse-scale the output to compare against the golden outputs.
@@ -552,7 +552,7 @@ TYPED_TEST(ResamplePolyTestNonHalfFloatTypes, Batched)
     [[maybe_unused]] const index_t b_len = up_len / down + ((up_len % down) ? 1 : 0);
     this->pb->template InitAndRunTVGenerator<TestType>(
       "00_transforms", "resample_poly_operators", "resample", {a_len, f_len, up, down});
-   
+
     const int nA = 16;
     const int nB = 37;
     const int nC = 55;

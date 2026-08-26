@@ -51,7 +51,7 @@ namespace matx {
   #define MATX_EN_CPU_MATMUL 1
 #else
   #define MATX_EN_CPU_MATMUL 0
-#endif  
+#endif
 
 // Solver
 #if defined(MATX_EN_NVPL) || defined(MATX_EN_OPENBLAS_LAPACK)
@@ -104,10 +104,10 @@ constexpr bool Check2DConvSupport() {
 template <typename Exec, typename T>
 constexpr bool CheckMatMulSupport() {
   if constexpr (is_host_executor_v<Exec>) {
-    if constexpr (std::is_same_v<T, float> ||
-                  std::is_same_v<T, double> ||
-                  std::is_same_v<T, cuda::std::complex<float>> ||
-                  std::is_same_v<T, cuda::std::complex<double>>) {
+    if constexpr (cuda::std::is_same_v<T, float> ||
+                  cuda::std::is_same_v<T, double> ||
+                  cuda::std::is_same_v<T, cuda::std::complex<float>> ||
+                  cuda::std::is_same_v<T, cuda::std::complex<double>>) {
       return MATX_EN_CPU_MATMUL;
     } else {
       return false;

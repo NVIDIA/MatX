@@ -640,10 +640,10 @@ public:
 
     // Type checks
     MATX_STATIC_ASSERT_STR(!is_half_v<T1>, matxInvalidType, "SVD solver does not support half precision");
-    MATX_STATIC_ASSERT_STR((std::is_same_v<T1, T2>), matxInavlidType, "A and U types must match");
-    MATX_STATIC_ASSERT_STR((std::is_same_v<T1, T4>), matxInavlidType, "A and VT types must match");
+    MATX_STATIC_ASSERT_STR((cuda::std::is_same_v<T1, T2>), matxInavlidType, "A and U types must match");
+    MATX_STATIC_ASSERT_STR((cuda::std::is_same_v<T1, T4>), matxInavlidType, "A and VT types must match");
     MATX_STATIC_ASSERT_STR(!is_complex_v<T3>, matxInvalidType, "S type must be real");
-    MATX_STATIC_ASSERT_STR((std::is_same_v<typename inner_op_type_t<T1>::type, T3>), matxInvalidType, "A and S inner types must match");
+    MATX_STATIC_ASSERT_STR((cuda::std::is_same_v<typename inner_op_type_t<T1>::type, T3>), matxInvalidType, "A and S inner types must match");
 
     params        = GetSVDParams(u, s, vt, a, jobz, exec);
     params.method = method;
@@ -681,7 +681,7 @@ public:
       int i_dspace = 0;
       const cusolverEigMode_t eig_mode = params.jobz == 'N' ? CUSOLVER_EIG_MODE_NOVECTOR : CUSOLVER_EIG_MODE_VECTOR;
 
-      if constexpr (std::is_same_v<float, T1>) {
+      if constexpr (cuda::std::is_same_v<float, T1>) {
         ret = cusolverDnSgesvdjBatched_bufferSize(
                 this->handle, eig_mode, static_cast<int>(params.m), static_cast<int>(params.n),
                 reinterpret_cast<const float *>(params.A), static_cast<int>(params.m),
@@ -689,7 +689,7 @@ public:
                 reinterpret_cast<const float *>(params.VT), static_cast<int>(params.n),
                 &i_dspace, batch_params, static_cast<int>(params.batch_size));
       }
-      else if constexpr (std::is_same_v<double, T1>) {
+      else if constexpr (cuda::std::is_same_v<double, T1>) {
         ret = cusolverDnDgesvdjBatched_bufferSize(
                 this->handle, eig_mode, static_cast<int>(params.m), static_cast<int>(params.n),
                 reinterpret_cast<const double *>(params.A), static_cast<int>(params.m),
@@ -697,7 +697,7 @@ public:
                 static_cast<int>(params.m), reinterpret_cast<const double *>(params.VT), static_cast<int>(params.n),
                 &i_dspace, batch_params, static_cast<int>(params.batch_size));
       }
-      else if constexpr (std::is_same_v<cuda::std::complex<float>, T1>) {
+      else if constexpr (cuda::std::is_same_v<cuda::std::complex<float>, T1>) {
         ret = cusolverDnCgesvdjBatched_bufferSize(
                 this->handle, eig_mode, static_cast<int>(params.m), static_cast<int>(params.n),
                 reinterpret_cast<const cuComplex *>(params.A), static_cast<int>(params.m),
@@ -705,7 +705,7 @@ public:
                 static_cast<int>(params.m), reinterpret_cast<const cuComplex *>(params.VT), static_cast<int>(params.n),
                 &i_dspace, batch_params, static_cast<int>(params.batch_size));
       }
-      else if constexpr (std::is_same_v<cuda::std::complex<double>, T1>) {
+      else if constexpr (cuda::std::is_same_v<cuda::std::complex<double>, T1>) {
         ret = cusolverDnZgesvdjBatched_bufferSize(
                 this->handle, eig_mode, static_cast<int>(params.m), static_cast<int>(params.n),
                 reinterpret_cast<const cuDoubleComplex *>(params.A), static_cast<int>(params.m),
@@ -805,7 +805,7 @@ public:
     }
     else if (params.method == SVDMethod::GESVDJ_BATCHED) {
       const cusolverEigMode_t eig_mode = jobz == 'N' ? CUSOLVER_EIG_MODE_NOVECTOR : CUSOLVER_EIG_MODE_VECTOR;
-      if constexpr (std::is_same_v<float, T1>) {
+      if constexpr (cuda::std::is_same_v<float, T1>) {
         ret = cusolverDnSgesvdjBatched(
                 this->handle, eig_mode, static_cast<int>(params.m), static_cast<int>(params.n),
                 reinterpret_cast<float *>(params.A), static_cast<int>(params.m),
@@ -814,7 +814,7 @@ public:
                 reinterpret_cast<float *>(this->d_workspace), static_cast<int>(this->dspace),
                 this->d_info, batch_params, static_cast<int>(params.batch_size));
       }
-      else if constexpr (std::is_same_v<double, T1>) {
+      else if constexpr (cuda::std::is_same_v<double, T1>) {
         ret = cusolverDnDgesvdjBatched(
                 this->handle, eig_mode, static_cast<int>(params.m), static_cast<int>(params.n),
                 reinterpret_cast<double *>(params.A), static_cast<int>(params.m),
@@ -823,7 +823,7 @@ public:
                 reinterpret_cast<double *>(this->d_workspace), static_cast<int>(this->dspace),
                 this->d_info, batch_params, static_cast<int>(params.batch_size));
       }
-      else if constexpr (std::is_same_v<cuda::std::complex<float>, T1>) {
+      else if constexpr (cuda::std::is_same_v<cuda::std::complex<float>, T1>) {
         ret = cusolverDnCgesvdjBatched(
                 this->handle, eig_mode, static_cast<int>(params.m), static_cast<int>(params.n),
                 reinterpret_cast<cuComplex *>(params.A), static_cast<int>(params.m),
@@ -832,7 +832,7 @@ public:
                 reinterpret_cast<cuComplex *>(this->d_workspace), static_cast<int>(this->dspace),
                 this->d_info, batch_params, static_cast<int>(params.batch_size));
       }
-      else if constexpr (std::is_same_v<cuda::std::complex<double>, T1>) {
+      else if constexpr (cuda::std::is_same_v<cuda::std::complex<double>, T1>) {
         ret = cusolverDnZgesvdjBatched(
                 this->handle, eig_mode, static_cast<int>(params.m), static_cast<int>(params.n),
                 reinterpret_cast<cuDoubleComplex *>(params.A), static_cast<int>(params.m),

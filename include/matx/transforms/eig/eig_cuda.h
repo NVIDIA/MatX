@@ -111,17 +111,17 @@ public:
 
     // Type checks
     MATX_STATIC_ASSERT_STR(!is_half_v<T1>, matxInvalidType, "Eigen solver does not support half precision");
-    MATX_STATIC_ASSERT_STR((std::is_same_v<T1, typename OutTensor_t::value_type>), matxInavlidType, "Input and output types must match");
+    MATX_STATIC_ASSERT_STR((cuda::std::is_same_v<T1, typename OutTensor_t::value_type>), matxInavlidType, "Input and output types must match");
     MATX_STATIC_ASSERT_STR(!is_complex_v<T2>, matxInvalidType, "W type must be real");
-    MATX_STATIC_ASSERT_STR((std::is_same_v<typename inner_op_type_t<T1>::type, T2>), matxInvalidType, "Out and W inner types must match");
+    MATX_STATIC_ASSERT_STR((cuda::std::is_same_v<typename inner_op_type_t<T1>::type, T2>), matxInvalidType, "Out and W inner types must match");
 
     params = GetEigParams(w, a, jobz, uplo, exec);
     this->GetWorkspaceSize();
-#if CUSOLVER_VERSION > 11701 || (CUSOLVER_VERSION == 11701 && CUSOLVER_VER_BUILD >= 2)    
+#if CUSOLVER_VERSION > 11701 || (CUSOLVER_VERSION == 11701 && CUSOLVER_VER_BUILD >= 2)
     this->AllocateWorkspace(params.batch_size, true, exec);
-#else    
+#else
     this->AllocateWorkspace(params.batch_size, false, exec);
-#endif    
+#endif
   }
 
   void GetWorkspaceSize() override
@@ -129,19 +129,19 @@ public:
 #if CUSOLVER_VERSION > 11701 || (CUSOLVER_VERSION == 11701 && CUSOLVER_VER_BUILD >=2)
     // Use vector mode for a larger workspace size that works for both modes
     [[maybe_unused]] cusolverStatus_t ret = cusolverDnXsyevBatched_bufferSize(
-                    this->handle, this->dn_params, CUSOLVER_EIG_MODE_VECTOR, 
+                    this->handle, this->dn_params, CUSOLVER_EIG_MODE_VECTOR,
                     params.uplo, params.n, MatXTypeToCudaType<T1>(), params.A,
                     params.n, MatXTypeToCudaType<T2>(), params.W,
                     MatXTypeToCudaType<T1>(), &this->dspace,
                     &this->hspace, params.batch_size);
 #else
     [[maybe_unused]] cusolverStatus_t ret = cusolverDnXsyevd_bufferSize(
-                    this->handle, this->dn_params, CUSOLVER_EIG_MODE_VECTOR, 
+                    this->handle, this->dn_params, CUSOLVER_EIG_MODE_VECTOR,
                     params.uplo, params.n, MatXTypeToCudaType<T1>(), params.A,
                     params.n, MatXTypeToCudaType<T2>(), params.W,
                     MatXTypeToCudaType<T1>(), &this->dspace,
                     &this->hspace);
-#endif                    
+#endif
 
     MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
   }
@@ -159,7 +159,7 @@ public:
     params.W = w.Data();
     params.jobz = jobz;
     params.uplo = uplo;
-    params.exec = exec;    
+    params.exec = exec;
 
     params.dtype = TypeToInt<T1>();
 
@@ -191,7 +191,7 @@ public:
     const auto stream = exec.getStream();
     cusolverDnSetStream(this->handle, stream);
 
-#if CUSOLVER_VERSION > 11701 || ( CUSOLVER_VERSION == 11701 && CUSOLVER_VER_BUILD >=2)   
+#if CUSOLVER_VERSION > 11701 || ( CUSOLVER_VERSION == 11701 && CUSOLVER_VER_BUILD >=2)
     [[maybe_unused]] auto ret = cusolverDnXsyevBatched(
         this->handle, this->dn_params, jobz, uplo, params.n, MatXTypeToCudaType<T1>(),
         out.Data(), params.n, MatXTypeToCudaType<T2>(), w.Data(),
@@ -207,8 +207,8 @@ public:
     cudaMemcpyAsync(h_info.data(), this->d_info, sizeof(int) * params.batch_size, cudaMemcpyDeviceToHost, stream);
 #else
     SetBatchPointers<BatchType::MATRIX>(out, this->batch_a_ptrs);
-    SetBatchPointers<BatchType::VECTOR>(w, this->batch_w_ptrs); 
-    
+    SetBatchPointers<BatchType::VECTOR>(w, this->batch_w_ptrs);
+
     // Older cuSolver versions do not support batching with cusolverDnXsyevd
     for (size_t i = 0; i < this->batch_a_ptrs.size(); i++) {
       [[maybe_unused]] auto ret = cusolverDnXsyevd(
@@ -225,7 +225,7 @@ public:
 
     std::vector<int> h_info(this->batch_a_ptrs.size());
     cudaMemcpyAsync(h_info.data(), this->d_info, sizeof(int) * this->batch_a_ptrs.size(), cudaMemcpyDeviceToHost, stream);
-#endif        
+#endif
 
     // This will block. Figure this out later
     cudaStreamSynchronize(stream);
@@ -235,7 +235,7 @@ public:
         MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
           ("Parameter " + std::to_string(-info) + " had an illegal value in cuSolver Xsyevd").c_str());
       } else {
-        MATX_ASSERT_STR_EXP(info, 0, matxSolverError, 
+        MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
             (std::to_string(info) + " off-diagonal elements of an intermediate tridiagonal form did not converge to zero in cuSolver Xsyevd").c_str());
       }
     }
@@ -338,7 +338,7 @@ void eig_impl(OutputTensor &&out, WTensor &&w,
   matxAlloc(reinterpret_cast<void **>(&tp), a_new.Bytes(), MATX_ASYNC_DEVICE_MEMORY,
               exec.getStream());
   auto tv = TransposeCopy(tp, a_new, exec);
-  
+
   cusolverEigMode_t jobz_cusolver = (jobz == EigenMode::VECTOR) ? CUSOLVER_EIG_MODE_VECTOR : CUSOLVER_EIG_MODE_NOVECTOR;
   cublasFillMode_t uplo_cusolver = (uplo == SolverFillMode::UPPER) ? CUBLAS_FILL_MODE_UPPER : CUBLAS_FILL_MODE_LOWER;
 

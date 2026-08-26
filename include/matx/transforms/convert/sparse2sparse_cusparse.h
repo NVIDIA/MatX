@@ -186,7 +186,7 @@ struct Sparse2SparseParamsKeyEq {
     return l.dtype == t.dtype && l.ptype == t.ptype && l.ctype == t.ctype &&
            l.stream == t.stream && l.nse == t.nse && l.m == t.m && l.n == t.n &&
            l.ptrO1 == t.ptrO1 && l.ptrA0 == t.ptrA0 && l.ptrA1 == t.ptrA1 &&
-           l.ptrA2 == t.ptrA2 && l.ptrA3 == t.ptrA3 && 
+           l.ptrA2 == t.ptrA2 && l.ptrA3 == t.ptrA3 &&
            l.format_hash_in == t.format_hash_in && l.format_hash_out == t.format_hash_out;
   }
 };
@@ -214,10 +214,10 @@ void sparse2sparse_impl(OutputTensorType &o, const InputTensorType &a,
 
   // Restrictions.
   static_assert(RANKA == 2 && RANKO == 2, "tensors must have rank-2");
-  static_assert(std::is_same_v<TA, TO>, "tensors must have the same data type");
-  static_assert(std::is_same_v<typename atype::crd_type, int32_t> &&
-                    std::is_same_v<typename otype::pos_type, int32_t> &&
-                    std::is_same_v<typename otype::crd_type, int32_t>,
+  static_assert(cuda::std::is_same_v<TA, TO>, "tensors must have the same data type");
+  static_assert(cuda::std::is_same_v<typename atype::crd_type, int32_t> &&
+                    cuda::std::is_same_v<typename otype::pos_type, int32_t> &&
+                    cuda::std::is_same_v<typename otype::crd_type, int32_t>,
                 "unsupported index type");
 
   // Get parameters required by these tensors (for caching).

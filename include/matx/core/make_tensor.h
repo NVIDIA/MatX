@@ -840,17 +840,17 @@ void validate_dlpack_tensor_type(const DLTensor &dt) {
     case kDLComplex: {
       switch (dt.dtype.bits) {
         case 128: {
-          validate_dlpack_dtype<std::is_same_v<ScalarT, cuda::std::complex<double>>>(
+          validate_dlpack_dtype<cuda::std::is_same_v<ScalarT, cuda::std::complex<double>>>(
               "DLPack dtype mismatch: code=kDLComplex bits=128 requires MatX base scalar type cuda::std::complex<double>");
           break;
         }
         case 64: {
-          validate_dlpack_dtype<std::is_same_v<ScalarT, cuda::std::complex<float>>>(
+          validate_dlpack_dtype<cuda::std::is_same_v<ScalarT, cuda::std::complex<float>>>(
               "DLPack dtype mismatch: code=kDLComplex bits=64 requires MatX base scalar type cuda::std::complex<float>");
           break;
         }
         case 32: {
-          validate_dlpack_dtype<std::is_same_v<ScalarT, matxFp16Complex>>(
+          validate_dlpack_dtype<cuda::std::is_same_v<ScalarT, matxFp16Complex>>(
               "DLPack dtype mismatch: code=kDLComplex bits=32 requires MatX base scalar type matxFp16Complex");
           break;
         }
@@ -863,17 +863,17 @@ void validate_dlpack_tensor_type(const DLTensor &dt) {
     case kDLFloat: {
       switch (dt.dtype.bits) {
         case 64: {
-          validate_dlpack_dtype<std::is_same_v<ScalarT, double>>(
+          validate_dlpack_dtype<cuda::std::is_same_v<ScalarT, double>>(
               "DLPack dtype mismatch: code=kDLFloat bits=64 requires MatX base scalar type double");
           break;
         }
         case 32: {
-          validate_dlpack_dtype<std::is_same_v<ScalarT, float>>(
+          validate_dlpack_dtype<cuda::std::is_same_v<ScalarT, float>>(
               "DLPack dtype mismatch: code=kDLFloat bits=32 requires MatX base scalar type float");
           break;
         }
         case 16: {
-          validate_dlpack_dtype<std::is_same_v<ScalarT, matxFp16>>(
+          validate_dlpack_dtype<cuda::std::is_same_v<ScalarT, matxFp16>>(
               "DLPack dtype mismatch: code=kDLFloat bits=16 requires MatX base scalar type matxFp16");
           break;
         }
@@ -885,7 +885,7 @@ void validate_dlpack_tensor_type(const DLTensor &dt) {
     case kDLBfloat: {
       switch (dt.dtype.bits) {
         case 16: {
-          validate_dlpack_dtype<std::is_same_v<ScalarT, matxBf16>>(
+          validate_dlpack_dtype<cuda::std::is_same_v<ScalarT, matxBf16>>(
               "DLPack dtype mismatch: code=kDLBfloat bits=16 requires MatX base scalar type matxBf16");
           break;
         }
@@ -897,22 +897,22 @@ void validate_dlpack_tensor_type(const DLTensor &dt) {
     case kDLInt: {
       switch (dt.dtype.bits) {
         case 64: {
-          validate_dlpack_dtype<std::is_same_v<ScalarT, int64_t>>(
+          validate_dlpack_dtype<cuda::std::is_same_v<ScalarT, int64_t>>(
               "DLPack dtype mismatch: code=kDLInt bits=64 requires MatX base scalar type int64_t");
           break;
         }
         case 32: {
-          validate_dlpack_dtype<std::is_same_v<ScalarT, int32_t>>(
+          validate_dlpack_dtype<cuda::std::is_same_v<ScalarT, int32_t>>(
               "DLPack dtype mismatch: code=kDLInt bits=32 requires MatX base scalar type int32_t");
           break;
         }
         case 16: {
-          validate_dlpack_dtype<std::is_same_v<ScalarT, int16_t>>(
+          validate_dlpack_dtype<cuda::std::is_same_v<ScalarT, int16_t>>(
               "DLPack dtype mismatch: code=kDLInt bits=16 requires MatX base scalar type int16_t");
           break;
         }
         case 8: {
-          validate_dlpack_dtype<std::is_same_v<ScalarT, int8_t>>(
+          validate_dlpack_dtype<cuda::std::is_same_v<ScalarT, int8_t>>(
               "DLPack dtype mismatch: code=kDLInt bits=8 requires MatX base scalar type int8_t");
           break;
         }
@@ -924,22 +924,22 @@ void validate_dlpack_tensor_type(const DLTensor &dt) {
     case kDLUInt: {
       switch (dt.dtype.bits) {
         case 64: {
-          validate_dlpack_dtype<std::is_same_v<ScalarT, uint64_t>>(
+          validate_dlpack_dtype<cuda::std::is_same_v<ScalarT, uint64_t>>(
               "DLPack dtype mismatch: code=kDLUInt bits=64 requires MatX base scalar type uint64_t");
           break;
         }
         case 32: {
-          validate_dlpack_dtype<std::is_same_v<ScalarT, uint32_t>>(
+          validate_dlpack_dtype<cuda::std::is_same_v<ScalarT, uint32_t>>(
               "DLPack dtype mismatch: code=kDLUInt bits=32 requires MatX base scalar type uint32_t");
           break;
         }
         case 16: {
-          validate_dlpack_dtype<std::is_same_v<ScalarT, uint16_t>>(
+          validate_dlpack_dtype<cuda::std::is_same_v<ScalarT, uint16_t>>(
               "DLPack dtype mismatch: code=kDLUInt bits=16 requires MatX base scalar type uint16_t");
           break;
         }
         case 8: {
-          validate_dlpack_dtype<std::is_same_v<ScalarT, uint8_t>>(
+          validate_dlpack_dtype<cuda::std::is_same_v<ScalarT, uint8_t>>(
               "DLPack dtype mismatch: code=kDLUInt bits=8 requires MatX base scalar type uint8_t");
           break;
         }
@@ -949,7 +949,7 @@ void validate_dlpack_tensor_type(const DLTensor &dt) {
       break;
     }
     case kDLBool: {
-      validate_dlpack_dtype<std::is_same_v<ScalarT, bool>>(
+      validate_dlpack_dtype<cuda::std::is_same_v<ScalarT, bool>>(
           "DLPack dtype mismatch: code=kDLBool requires MatX base scalar type bool");
       break;
     }

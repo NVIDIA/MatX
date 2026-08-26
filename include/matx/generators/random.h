@@ -216,16 +216,16 @@ namespace detail {
       mutable bool init_ = false;
 
       static constexpr bool is_float_random_v =
-        std::is_same_v<T, float> ||
-        std::is_same_v<T, double> ||
-        std::is_same_v<T, cuda::std::complex<float>> ||
-        std::is_same_v<T, cuda::std::complex<double>>;
+        cuda::std::is_same_v<T, float> ||
+        cuda::std::is_same_v<T, double> ||
+        cuda::std::is_same_v<T, cuda::std::complex<float>> ||
+        cuda::std::is_same_v<T, cuda::std::complex<double>>;
 
       static constexpr bool is_integral_random_v =
-        std::is_same_v<T, uint32_t> ||
-        std::is_same_v<T,  int32_t> ||
-        std::is_same_v<T, uint64_t> ||
-        std::is_same_v<T,  int64_t>;
+        cuda::std::is_same_v<T, uint32_t> ||
+        cuda::std::is_same_v<T,  int32_t> ||
+        cuda::std::is_same_v<T, uint64_t> ||
+        cuda::std::is_same_v<T,  int64_t>;
 
       union{
         randFloatParams<inner_t> fParams_;
@@ -263,7 +263,7 @@ namespace detail {
       {
         using out_t = remove_cvref_t<Out>;
         if constexpr (RANK > 0 && is_float_random_v && requires { typename out_t::value_type; }) {
-          return std::is_same_v<typename out_t::value_type, T> &&
+          return cuda::std::is_same_v<typename out_t::value_type, T> &&
                  requires(out_t &o) {
                    o.IsContiguous();
                    o.Data();
@@ -370,7 +370,7 @@ namespace detail {
 
         index_t gen_count = count;
         const bool has_tail = fParams_.dist_ == NORMAL &&
-                              (std::is_same_v<T, float> || std::is_same_v<T, double>) &&
+                              (cuda::std::is_same_v<T, float> || cuda::std::is_same_v<T, double>) &&
                               ((gen_count % 2) != 0);
         if (has_tail) {
           // cuRAND normal generation requires an even count; the odd tail is filled below.
@@ -378,7 +378,7 @@ namespace detail {
         }
 
         if (gen_count > 0) {
-          if constexpr (std::is_same_v<T, float>) {
+          if constexpr (cuda::std::is_same_v<T, float>) {
             if (fParams_.dist_ == UNIFORM) {
               ret = curandGenerateUniform(gen.Get(), data, static_cast<size_t>(gen_count));
             }
@@ -386,7 +386,7 @@ namespace detail {
               ret = curandGenerateNormal(gen.Get(), data, static_cast<size_t>(gen_count), 0.0f, 1.0f);
             }
           }
-          else if constexpr (std::is_same_v<T, double>) {
+          else if constexpr (cuda::std::is_same_v<T, double>) {
             if (fParams_.dist_ == UNIFORM) {
               ret = curandGenerateUniformDouble(gen.Get(), data, static_cast<size_t>(gen_count));
             }
@@ -394,7 +394,7 @@ namespace detail {
               ret = curandGenerateNormalDouble(gen.Get(), data, static_cast<size_t>(gen_count), 0.0, 1.0);
             }
           }
-          else if constexpr (std::is_same_v<T, cuda::std::complex<float>>) {
+          else if constexpr (cuda::std::is_same_v<T, cuda::std::complex<float>>) {
             auto *real_data = reinterpret_cast<float *>(data);
             if (fParams_.dist_ == UNIFORM) {
               ret = curandGenerateUniform(gen.Get(), real_data, static_cast<size_t>(gen_count) * 2);
@@ -403,7 +403,7 @@ namespace detail {
               ret = curandGenerateNormal(gen.Get(), real_data, static_cast<size_t>(gen_count) * 2, 0.0f, 1.0f);
             }
           }
-          else if constexpr (std::is_same_v<T, cuda::std::complex<double>>) {
+          else if constexpr (cuda::std::is_same_v<T, cuda::std::complex<double>>) {
             auto *real_data = reinterpret_cast<double *>(data);
             if (fParams_.dist_ == UNIFORM) {
               ret = curandGenerateUniformDouble(gen.Get(), real_data, static_cast<size_t>(gen_count) * 2);
@@ -674,7 +674,7 @@ namespace detail {
         for (int i = RANK - 2; i >= 0; i--) {
           strides_[i] = strides_[i+1] * s[i+1];
         }
-        
+
         MATX_LOG_TRACE("RandomOp constructor: rank={}, total_size={}, seed={}", RANK, total_size_, seed);
       }
 
@@ -682,7 +682,7 @@ namespace detail {
       __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
         if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
           return cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
-        } 
+        }
         else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
 #ifdef MATX_EN_JIT
           return CanUseJITRandom();
@@ -735,8 +735,8 @@ namespace detail {
           }
 #endif
           return false;
-        }  
-        else {        
+        }
+        else {
           auto self_has_cap = capability_attributes<Cap>::default_value;
           return self_has_cap;
         }
@@ -888,24 +888,24 @@ namespace detail {
 
 #else
         if constexpr (
-                     std::is_same_v<T, float>  ||
-                     std::is_same_v<T, double> ||
-                     std::is_same_v<T, cuda::std::complex<float>> ||
-                     std::is_same_v<T, cuda::std::complex<double>>
+                     cuda::std::is_same_v<T, float>  ||
+                     cuda::std::is_same_v<T, double> ||
+                     cuda::std::is_same_v<T, cuda::std::complex<float>> ||
+                     cuda::std::is_same_v<T, cuda::std::complex<double>>
                      )
         {
 
           if (fParams_.dist_ == UNIFORM) {
-            if constexpr (std::is_same_v<T, float>) {
+            if constexpr (cuda::std::is_same_v<T, float>) {
               curandGenerateUniform(gen_, &val.data[0], static_cast<int>(CapType::ept));
             }
-            else if constexpr (std::is_same_v<T, double>) {
+            else if constexpr (cuda::std::is_same_v<T, double>) {
               curandGenerateUniformDouble(gen_, &val.data[0], static_cast<int>(CapType::ept));
             }
-            else if constexpr (std::is_same_v<T, cuda::std::complex<float>>) {
+            else if constexpr (cuda::std::is_same_v<T, cuda::std::complex<float>>) {
               curandGenerateUniform(gen_, reinterpret_cast<float*>(&val.data[0]), static_cast<int>(CapType::ept) * 2);
             }
-            else if constexpr (std::is_same_v<T, cuda::std::complex<double>>) {
+            else if constexpr (cuda::std::is_same_v<T, cuda::std::complex<double>>) {
               curandGenerateUniformDouble(gen_, reinterpret_cast<double*>(&val.data[0]), static_cast<int>(CapType::ept) * 2);
             }
 
@@ -915,16 +915,16 @@ namespace detail {
             }
           }
           else if (fParams_.dist_ == NORMAL) {
-            if constexpr (std::is_same_v<T, float>) {
+            if constexpr (cuda::std::is_same_v<T, float>) {
               curandGenerateNormal(gen_, &val.data[0], static_cast<int>(CapType::ept), 0.0f, 1.0f);
             }
-            else if constexpr (std::is_same_v<T, double>) {
+            else if constexpr (cuda::std::is_same_v<T, double>) {
               curandGenerateNormalDouble(gen_, &val.data[0], static_cast<int>(CapType::ept), 0.0, 1.0);
             }
-            else if constexpr (std::is_same_v<T, cuda::std::complex<float>>) {
+            else if constexpr (cuda::std::is_same_v<T, cuda::std::complex<float>>) {
               curandGenerateNormal(gen_, reinterpret_cast<float*>(&val.data[0]), static_cast<int>(CapType::ept) * 2, 0.0f, 1.0f);
             }
-            else if constexpr (std::is_same_v<T, cuda::std::complex<double>>) {
+            else if constexpr (cuda::std::is_same_v<T, cuda::std::complex<double>>) {
               curandGenerateNormalDouble(gen_, reinterpret_cast<double*>(&val.data[0]), static_cast<int>(CapType::ept) * 2, 0.0, 1.0);
             }
 
@@ -941,10 +941,10 @@ namespace detail {
           }
         }
         else if constexpr(
-                         std::is_same_v<T, uint32_t> ||
-                         std::is_same_v<T,  int32_t> ||
-                         std::is_same_v<T, uint64_t> ||
-                         std::is_same_v<T,  int64_t>
+                         cuda::std::is_same_v<T, uint32_t> ||
+                         cuda::std::is_same_v<T,  int32_t> ||
+                         cuda::std::is_same_v<T, uint64_t> ||
+                         cuda::std::is_same_v<T,  int64_t>
                          )
         {
           MATX_LOOP_UNROLL
@@ -1092,10 +1092,10 @@ namespace detail {
   __MATX_INLINE__ auto random(ShapeType &&s, Distribution_t dist, uint64_t seed = 0, LowerType alpha = 1, LowerType beta = 0)
   {
     static_assert(
-                  std::is_same_v<T, float> ||
-                  std::is_same_v<T, double> ||
-                  std::is_same_v<T, cuda::std::complex<float>> ||
-                  std::is_same_v<T, cuda::std::complex<double>>,
+                  cuda::std::is_same_v<T, float> ||
+                  cuda::std::is_same_v<T, double> ||
+                  cuda::std::is_same_v<T, cuda::std::complex<float>> ||
+                  cuda::std::is_same_v<T, cuda::std::complex<double>>,
                   "random only supports floating point or complex floating point data types"
 
                  );
@@ -1148,10 +1148,10 @@ namespace detail {
   __MATX_INLINE__ auto randomi(ShapeType &&s, uint64_t seed = 0, LowerType min = 0, LowerType max = 100)
   {
     static_assert(
-                  std::is_same_v<T, uint32_t> ||
-                  std::is_same_v<T,  int32_t> ||
-                  std::is_same_v<T, uint64_t> ||
-                  std::is_same_v<T,  int64_t> ,
+                  cuda::std::is_same_v<T, uint32_t> ||
+                  cuda::std::is_same_v<T,  int32_t> ||
+                  cuda::std::is_same_v<T, uint64_t> ||
+                  cuda::std::is_same_v<T,  int64_t> ,
                   "randomi only supports signed and unsigned integral types"
                  );
 

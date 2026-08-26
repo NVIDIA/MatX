@@ -65,7 +65,7 @@ private:
   template <typename F, typename U>
   static constexpr bool compute()
   {
-    if constexpr (std::is_void_v<F> || std::is_void_v<U> || std::is_same_v<F, U>) {
+    if constexpr (std::is_void_v<F> || std::is_void_v<U> || cuda::std::is_same_v<F, U>) {
       return false;
     }
     else if constexpr (is_vector_v<F>) {
@@ -87,8 +87,8 @@ private:
       return false;
     }
     else {
-      // List initialization will reject narrowing conversions, so we can check if the conversion is narrowing by 
-      // testing if F can be list-initialized into U. We also check that the types are not the same, as some 
+      // List initialization will reject narrowing conversions, so we can check if the conversion is narrowing by
+      // testing if F can be list-initialized into U. We also check that the types are not the same, as some
       // types (e.g. half) have non-narrowing implicit conversions to the same type that are not accepted by list initialization.
       return !requires(F from) { U{from}; };
     }
@@ -272,12 +272,12 @@ public:
       }
       return in_val;
     }
-  } 
-  
+  }
+
 #ifdef MATX_EN_JIT
   struct JIT_Storage {
     mutable typename detail::inner_storage_or_self_t<detail::base_type_t<T>> out_;
-    mutable typename detail::inner_storage_or_self_t<detail::base_type_t<Op>> op_;  
+    mutable typename detail::inner_storage_or_self_t<detail::base_type_t<Op>> op_;
   };
 
   JIT_Storage ToJITStorage() const {
@@ -372,12 +372,12 @@ public:
            "   }\n" +
            "};\n"
     );
-  }      
-#endif  
+  }
+#endif
 
 
   template <typename... Is>
-  __MATX_DEVICE__ __MATX_HOST__ inline decltype(auto) operator()(Is... indices) const noexcept  
+  __MATX_DEVICE__ __MATX_HOST__ inline decltype(auto) operator()(Is... indices) const noexcept
   {
     return (*this).template operator()<DefaultCapabilities>(indices...);
   }
@@ -407,7 +407,7 @@ public:
   template <detail::OperatorCapability Cap, typename InType>
   __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
     if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
-#ifdef MATX_EN_JIT       
+#ifdef MATX_EN_JIT
       // No need to use combine_capabilities here since we're just returning a string.
       const auto lhs_jit_name = detail::get_operator_capability<Cap>(out_, in);
       const auto rhs_jit_name = detail::get_operator_capability<Cap>(op_, in);
@@ -415,7 +415,7 @@ public:
 #else
       return "";
 #endif
-    }  
+    }
     else if constexpr (Cap == OperatorCapability::JIT_CACHE_KEY) {
 #ifdef MATX_EN_JIT
       auto key = detail::MakeJITCacheKeyForType<set<T, Op>>("JITSetOp");
@@ -442,16 +442,16 @@ public:
 #ifdef MATX_EN_JIT
       // Get the key/value pair from get_jit_op_str()
       const auto [key, value] = get_jit_op_str();
-      
+
       // Insert into the map if the key doesn't exist
       if (in.find(key) == in.end()) {
         in[key] = value;
       }
-      
+
       // Also handle child operators
       detail::get_operator_capability<Cap>(out_, in);
       detail::get_operator_capability<Cap>(op_, in);
-      
+
       // Always return true for now
       return true;
 #else
@@ -460,7 +460,7 @@ public:
         }
         else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
           if constexpr (ContainsBlockReduction<Op>()) {
-            if constexpr (std::is_same_v<remove_cvref_t<InType>, EPTQueryInput>) {
+            if constexpr (cuda::std::is_same_v<remove_cvref_t<InType>, EPTQueryInput>) {
               if (!in.jit) {
                 return cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE,
                                                               ElementsPerThread::ONE};
@@ -490,7 +490,7 @@ public:
         else {
           auto self_has_cap = capability_attributes<Cap>::default_value;
 
-      return combine_capabilities<Cap>(self_has_cap, 
+      return combine_capabilities<Cap>(self_has_cap,
                                       detail::get_operator_capability<Cap>(out_, in),
                                       detail::get_operator_capability<Cap>(op_, in));
     }

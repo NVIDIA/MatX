@@ -433,7 +433,7 @@ namespace detail {
   template <OperatorCapability Cap, typename OperatorType, typename InType>
   __MATX_INLINE__ __MATX_HOST__ typename capability_attributes<Cap>::type
   get_operator_capability(const OperatorType& op, InType& in) {
-    static_assert(std::is_same_v<remove_cvref_t<InType>, typename capability_attributes<Cap>::input_type>, "Input type mismatch");
+    static_assert(cuda::std::is_same_v<remove_cvref_t<InType>, typename capability_attributes<Cap>::input_type>, "Input type mismatch");
     if constexpr (is_matx_jit_class<OperatorType>) {
       if constexpr (requires { op.template get_capability<Cap, InType>(in); }) {
         return op.template get_capability<Cap, InType>(in);
@@ -533,9 +533,9 @@ namespace detail {
       ChildCapTypes... child_vals) // These will also be capability_attributes<Cap>::type
   {
     using CapType = typename capability_attributes<Cap>::type;
-    static_assert(std::is_same_v<SelfCapType, CapType>, "Self capability type mismatch.");
+    static_assert(cuda::std::is_same_v<SelfCapType, CapType>, "Self capability type mismatch.");
     // Ensure all child_vals are also CapType (checked by caller context or can add static_asserts here too)
-    // ( (static_assert(std::is_same_v<ChildCapTypes, CapType>,"Child capability type mismatch.")), ...); // C++17 fold for static_assert
+    // ( (static_assert(cuda::std::is_same_v<ChildCapTypes, CapType>,"Child capability type mismatch.")), ...); // C++17 fold for static_assert
 
     CapabilityQueryType query_type = get_query_type(Cap);
     CapType children_aggregated_val{};
@@ -543,11 +543,11 @@ namespace detail {
     // Step 1: Aggregate children capabilities
     if constexpr (sizeof...(ChildCapTypes) == 0) {
       // No children: result is the identity for the query type.
-      if constexpr (std::is_same_v<CapType, bool>) {
+      if constexpr (cuda::std::is_same_v<CapType, bool>) {
         children_aggregated_val = (query_type == CapabilityQueryType::AND_QUERY) ?
                                   capability_attributes<Cap>::and_identity :
                                   capability_attributes<Cap>::or_identity;
-      } else if constexpr (std::is_same_v<CapType, int> || is_scoped_enum_v<CapType>) {
+      } else if constexpr (cuda::std::is_same_v<CapType, int> || is_scoped_enum_v<CapType>) {
         MATX_IGNORE_WARNING_PUSH_GCC("-Wduplicated-branches")
         if (query_type == CapabilityQueryType::MIN_QUERY) {
           children_aggregated_val = capability_attributes<Cap>::min_identity;
@@ -561,16 +561,16 @@ namespace detail {
           children_aggregated_val = capability_attributes<Cap>::default_value; // Fallback
         }
         MATX_IGNORE_WARNING_POP_GCC
-      } else if constexpr (std::is_same_v<CapType, std::string>) {
+      } else if constexpr (cuda::std::is_same_v<CapType, std::string>) {
         children_aggregated_val = capability_attributes<Cap>::default_value;
-      } else if constexpr (std::is_same_v<CapType, JITCacheKey>) {
+      } else if constexpr (cuda::std::is_same_v<CapType, JITCacheKey>) {
         children_aggregated_val = MakeJITCacheKeyForType<void>("children");
       } else {
         // Fallback for other types, should be defined in capability_attributes
         children_aggregated_val = capability_attributes<Cap>::default_value;
       }
     } else { // One or more children
-      if constexpr (std::is_same_v<CapType, bool>) {
+      if constexpr (cuda::std::is_same_v<CapType, bool>) {
           if (query_type == CapabilityQueryType::OR_QUERY) {
               children_aggregated_val = capability_attributes<Cap>::or_identity;
               ((children_aggregated_val = children_aggregated_val || child_vals), ...);
@@ -578,7 +578,7 @@ namespace detail {
               children_aggregated_val = capability_attributes<Cap>::and_identity;
               ((children_aggregated_val = children_aggregated_val && child_vals), ...);
           }
-      } else if constexpr (std::is_same_v<CapType, int> || is_scoped_enum_v<CapType>) {
+      } else if constexpr (cuda::std::is_same_v<CapType, int> || is_scoped_enum_v<CapType>) {
           if (query_type == CapabilityQueryType::MIN_QUERY) {
               children_aggregated_val = capability_attributes<Cap>::min_identity;
               // C++17 way to apply cuda::std::min over a parameter pack
@@ -600,14 +600,14 @@ namespace detail {
               // Not implemented for other query types.
               MATX_ASSERT_STR(false, matxInvalidParameter, "Not implemented for other query types.");
           }
-      } else if constexpr (std::is_same_v<CapType, std::string>) {
+      } else if constexpr (cuda::std::is_same_v<CapType, std::string>) {
         if (query_type == CapabilityQueryType::STR_CAT_QUERY) {
           children_aggregated_val = capability_attributes<Cap>::default_value;
           ((children_aggregated_val += child_vals), ...);
         } else {
           children_aggregated_val = capability_attributes<Cap>::default_value;
         }
-      } else if constexpr (std::is_same_v<CapType, JITCacheKey>) {
+      } else if constexpr (cuda::std::is_same_v<CapType, JITCacheKey>) {
         if (query_type == CapabilityQueryType::HASH_QUERY) {
           children_aggregated_val = MakeJITCacheKeyForType<void>("children");
           ((children_aggregated_val = CombineJITCacheKeys(children_aggregated_val, child_vals)), ...);
@@ -651,7 +651,7 @@ namespace detail {
     }
 
     // Step 2: Combine self's capability with the children's combined result.
-    if constexpr (std::is_same_v<CapType, bool>) {
+    if constexpr (cuda::std::is_same_v<CapType, bool>) {
         // Optimize when identity values make the operation redundant
         if (query_type == CapabilityQueryType::OR_QUERY) {
             // self_val || or_identity
@@ -667,7 +667,7 @@ namespace detail {
             }
             return self_val && children_aggregated_val;
         }
-    } else if constexpr (std::is_same_v<CapType, int> || is_scoped_enum_v<CapType>) {
+    } else if constexpr (cuda::std::is_same_v<CapType, int> || is_scoped_enum_v<CapType>) {
         if (query_type == CapabilityQueryType::MIN_QUERY) {
             return static_cast<CapType>(cuda::std::min(static_cast<int>(self_val), static_cast<int>(children_aggregated_val)));
         } else if (query_type == CapabilityQueryType::MAX_QUERY) {
@@ -678,14 +678,14 @@ namespace detail {
             MATX_ASSERT_STR(false, matxInvalidParameter, "Not implemented for other query types.");
             return self_val;
         }
-    } else if constexpr (std::is_same_v<CapType, std::string>) {
+    } else if constexpr (cuda::std::is_same_v<CapType, std::string>) {
         if (query_type == CapabilityQueryType::STR_CAT_QUERY) {
             return self_val + children_aggregated_val;
         } else {
             MATX_ASSERT_STR(false, matxInvalidParameter, "Not implemented for other query types.");
             return self_val;
         }
-    } else if constexpr (std::is_same_v<CapType, JITCacheKey>) {
+    } else if constexpr (cuda::std::is_same_v<CapType, JITCacheKey>) {
         if (query_type == CapabilityQueryType::HASH_QUERY) {
           return CombineJITCacheKeys(self_val, children_aggregated_val);
         } else {

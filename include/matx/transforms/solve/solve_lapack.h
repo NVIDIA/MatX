@@ -56,16 +56,16 @@ __MATX_INLINE__ void DenseSolveGesvDispatch(lapack_int_t *n,
                                             lapack_int_t *ldb,
                                             lapack_int_t *info)
 {
-  if constexpr (std::is_same_v<T, float>) {
+  if constexpr (cuda::std::is_same_v<T, float>) {
     LAPACK_CALL(sgesv)(n, nrhs, a, lda, piv, b, ldb, info);
   }
-  else if constexpr (std::is_same_v<T, double>) {
+  else if constexpr (cuda::std::is_same_v<T, double>) {
     LAPACK_CALL(dgesv)(n, nrhs, a, lda, piv, b, ldb, info);
   }
-  else if constexpr (std::is_same_v<T, cuda::std::complex<float>>) {
+  else if constexpr (cuda::std::is_same_v<T, cuda::std::complex<float>>) {
     LAPACK_CALL(cgesv)(n, nrhs, a, lda, piv, b, ldb, info);
   }
-  else if constexpr (std::is_same_v<T, cuda::std::complex<double>>) {
+  else if constexpr (cuda::std::is_same_v<T, cuda::std::complex<double>>) {
     LAPACK_CALL(zgesv)(n, nrhs, a, lda, piv, b, ldb, info);
   }
 }

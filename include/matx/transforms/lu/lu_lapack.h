@@ -102,8 +102,8 @@ public:
 
     // Type checks
     MATX_STATIC_ASSERT_STR(!is_half_v<T1>, matxInvalidType, "LU solver does not support half precision");
-    MATX_STATIC_ASSERT_STR((std::is_same_v<T1, typename OutTensor_t::value_type>), matxInavlidType, "Input and Output types must match");
-    MATX_STATIC_ASSERT_STR((std::is_same_v<T2, lapack_int_t>), matxInavlidType,
+    MATX_STATIC_ASSERT_STR((cuda::std::is_same_v<T1, typename OutTensor_t::value_type>), matxInavlidType, "Input and Output types must match");
+    MATX_STATIC_ASSERT_STR((cuda::std::is_same_v<T2, lapack_int_t>), matxInavlidType,
                             "Pivot tensor type must match the LAPACK host library integer type");
 
     params = GetLUParams(piv, a);
@@ -155,7 +155,7 @@ public:
         MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
           ("Parameter " + std::to_string(-info) + " had an illegal value in LAPACK getrf").c_str());
       } else {
-        MATX_ASSERT_STR_EXP(info, 0, matxSolverError, 
+        MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
           ("U is singular: U(" + std::to_string(info) + "," + std::to_string(info) + ") = 0 in LAPACK getrf").c_str());
       }
     }
@@ -174,13 +174,13 @@ private:
   void getrf_dispatch(const lapack_int_t* m, const lapack_int_t* n, T1* a,
                       const lapack_int_t* lda, lapack_int_t* piv, lapack_int_t* info)
   {
-    if constexpr (std::is_same_v<T1, float>) {
+    if constexpr (cuda::std::is_same_v<T1, float>) {
       LAPACK_CALL(sgetrf)(m, n, a, lda, piv, info);
-    } else if constexpr (std::is_same_v<T1, double>) {
+    } else if constexpr (cuda::std::is_same_v<T1, double>) {
       LAPACK_CALL(dgetrf)(m, n, a, lda, piv, info);
-    } else if constexpr (std::is_same_v<T1, cuda::std::complex<float>>) {
+    } else if constexpr (cuda::std::is_same_v<T1, cuda::std::complex<float>>) {
       LAPACK_CALL(cgetrf)(m, n, a, lda, piv, info);
-    } else if constexpr (std::is_same_v<T1, cuda::std::complex<double>>) {
+    } else if constexpr (cuda::std::is_same_v<T1, cuda::std::complex<double>>) {
       LAPACK_CALL(zgetrf)(m, n, a, lda, piv, info);
     }
   }
@@ -202,7 +202,7 @@ private:
  * library by deducing all parameters needed to perform an LU decomposition from
  * only the matrix A. The input and output parameters may be the same tensor. In
  * that case, the input is destroyed and the output is stored in-place.
- * 
+ *
  * No caching as LAPACK allocation/setup is not needed.
  *
  * @tparam T1

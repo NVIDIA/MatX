@@ -228,7 +228,7 @@ private:
         // There are an implicit num_recursive columns prior to
         // the actual coefficients beginning that are needed for computation
         FilterType res;
-        if constexpr (std::is_same_v<FilterType, COMPLEX_TYPE>) {
+        if constexpr (cuda::std::is_same_v<FilterType, COMPLEX_TYPE>) {
           res.x = 0;
           res.y = 0;
         }
@@ -240,7 +240,7 @@ private:
           int offs = col - k - 1;
           if (offs < 0) {
             // We're in the implicit coefficients
-            if constexpr (std::is_same_v<FilterType, COMPLEX_TYPE>) {
+            if constexpr (cuda::std::is_same_v<FilterType, COMPLEX_TYPE>) {
               res = (static_cast<int>(row) + 1 == -offs)
                         ? cuCaddf(res, coeffs[k])
                         : res;
@@ -250,7 +250,7 @@ private:
             }
           }
           else {
-            if constexpr (std::is_same_v<FilterType, COMPLEX_TYPE>) {
+            if constexpr (cuda::std::is_same_v<FilterType, COMPLEX_TYPE>) {
               res = cuCaddf(
                   res, cuCmulf(coeffs[k], out[row * CORR_COLS + col - k - 1]));
             }

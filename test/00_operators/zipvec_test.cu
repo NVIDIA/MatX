@@ -24,7 +24,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexNonHalfAllExecsWithoutJIT, ZipVecOp)
     ASSERT_EQ(t(0).x, static_cast<TestType>(2));
   }
 
-  if constexpr (std::is_same_v<TestType, float>)
+  if constexpr (cuda::std::is_same_v<TestType, float>)
   { // 2D example for documentation
     // example-begin zipvec-test-1
     auto v = linspace<float>(0.25f, 1.0f, 4);
@@ -116,7 +116,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexNonHalfAllExecsWithoutJIT, ZipVecOp)
       (t3 = zipvec(t, t2)).run(exec);
       exec.sync();
       ASSERT_EQ(t3(0).x, static_cast<float>(1));
-      ASSERT_EQ(t3(0).y, static_cast<float>(1));  
+      ASSERT_EQ(t3(0).y, static_cast<float>(1));
     }
     {
       // float can be converted to double without narrowing
@@ -126,7 +126,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexNonHalfAllExecsWithoutJIT, ZipVecOp)
       (t3 = zipvec(t, t2)).run(exec);
       exec.sync();
       ASSERT_EQ(t3(0).x, static_cast<double>(1));
-      ASSERT_EQ(t3(0).y, static_cast<double>(1));  
+      ASSERT_EQ(t3(0).y, static_cast<double>(1));
     }
     {
       // int can be converted to double without narrowing
@@ -136,7 +136,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexNonHalfAllExecsWithoutJIT, ZipVecOp)
       (t3 = zipvec(t, t2)).run(exec);
       exec.sync();
       ASSERT_EQ(t3(0).x, static_cast<double>(1));
-      ASSERT_EQ(t3(0).y, static_cast<double>(1));  
+      ASSERT_EQ(t3(0).y, static_cast<double>(1));
     }
     // Note that some narrowing conversions like int -> float are currently allowed.
     // This is because std::common_type_t<int, float> is float, and the zipvec operator
@@ -144,4 +144,4 @@ TYPED_TEST(OperatorTestsFloatNonComplexNonHalfAllExecsWithoutJIT, ZipVecOp)
   }
 
   MATX_EXIT_HANDLER();
-} 
+}

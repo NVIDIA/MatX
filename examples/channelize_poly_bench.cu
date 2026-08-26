@@ -54,10 +54,10 @@ constexpr int NUM_ITERATIONS = 20;
 
 template <typename T>
 const char *TypeName() {
-  if constexpr (std::is_same_v<T, float>) return "float";
-  else if constexpr (std::is_same_v<T, double>) return "double";
-  else if constexpr (std::is_same_v<T, cuda::std::complex<float>>) return "complex<float>";
-  else if constexpr (std::is_same_v<T, cuda::std::complex<double>>) return "complex<double>";
+  if constexpr (cuda::std::is_same_v<T, float>) return "float";
+  else if constexpr (cuda::std::is_same_v<T, double>) return "double";
+  else if constexpr (cuda::std::is_same_v<T, cuda::std::complex<float>>) return "complex<float>";
+  else if constexpr (cuda::std::is_same_v<T, cuda::std::complex<double>>) return "complex<double>";
   else return "unknown";
 }
 

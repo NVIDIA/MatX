@@ -110,7 +110,7 @@ namespace detail {
     template <OperatorCapability Cap, typename InType> \
     __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const { \
       if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) { \
-        static_assert(std::is_same_v<InType, std::unordered_map<std::string, std::string>>, \
+        static_assert(cuda::std::is_same_v<InType, std::unordered_map<std::string, std::string>>, \
                       "JIT_CLASS_QUERY capability requires std::unordered_map<std::string, std::string> as input type"); \
         const auto [key, value] = get_jit_op_str(); \
         if (in.find(key) == in.end()) { \
@@ -182,7 +182,7 @@ namespace detail {
     template <OperatorCapability Cap, typename InType> \
     __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const { \
       if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) { \
-        static_assert(std::is_same_v<InType, std::unordered_map<std::string, std::string>>, \
+        static_assert(cuda::std::is_same_v<InType, std::unordered_map<std::string, std::string>>, \
                       "JIT_CLASS_QUERY capability requires std::unordered_map<std::string, std::string> as input type"); \
         const auto [key, value] = get_jit_op_str(); \
         if (in.find(key) == in.end()) { \
@@ -262,7 +262,7 @@ namespace detail {
     template <OperatorCapability Cap, typename InType> \
     __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const { \
       if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) { \
-        static_assert(std::is_same_v<InType, std::unordered_map<std::string, std::string>>, \
+        static_assert(cuda::std::is_same_v<InType, std::unordered_map<std::string, std::string>>, \
                       "JIT_CLASS_QUERY capability requires std::unordered_map<std::string, std::string> as input type"); \
         const auto [key, value] = get_jit_op_str(); \
         if (in.find(key) == in.end()) { \
@@ -336,7 +336,7 @@ namespace detail {
     template <OperatorCapability Cap, typename InType> \
     __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const { \
       if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) { \
-        static_assert(std::is_same_v<InType, std::unordered_map<std::string, std::string>>, \
+        static_assert(cuda::std::is_same_v<InType, std::unordered_map<std::string, std::string>>, \
                       "JIT_CLASS_QUERY capability requires std::unordered_map<std::string, std::string> as input type"); \
         const auto [key, value] = get_jit_op_str(); \
         if (in.find(key) == in.end()) { \
@@ -408,7 +408,7 @@ namespace detail {
     template <OperatorCapability Cap, typename InType> \
     __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const { \
       if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) { \
-        static_assert(std::is_same_v<InType, std::unordered_map<std::string, std::string>>, \
+        static_assert(cuda::std::is_same_v<InType, std::unordered_map<std::string, std::string>>, \
                       "JIT_CLASS_QUERY capability requires std::unordered_map<std::string, std::string> as input type"); \
         const auto [key, value] = get_jit_op_str(); \
         if (in.find(key) == in.end()) { \

@@ -117,26 +117,26 @@ namespace detail {
       (R = A).run(stream);
 
       // we will slice X directly from R.
-      cuda::std::array<index_t, RANK> xSliceB, xSliceE;   
+      cuda::std::array<index_t, RANK> xSliceB, xSliceE;
       xSliceB.fill(0); xSliceE.fill(matxEnd);
       xSliceE[RANK-1] = matxDropDim; // drop last dim to make a vector
 
 
       // v is of size m x 1.  Instead of allocating additional memory we will just reuse a row of Qin
-      cuda::std::array<index_t, RANK> vSliceB, vSliceE;   
+      cuda::std::array<index_t, RANK> vSliceB, vSliceE;
       vSliceB.fill(0); vSliceE.fill(matxEnd);
       // select a single row of Q to alias as v
-      vSliceE[RANK-2] = matxDropDim; 
+      vSliceE[RANK-2] = matxDropDim;
       auto v = slice<RANK-1>(Qin, vSliceB, vSliceE);
-      auto xz = v; // alias 
+      auto xz = v; // alias
 
 
       // N is of size 1.  Instead of allocating additional memory we will just reuse an entry of Qin
-      cuda::std::array<index_t, RANK> nSliceB, nSliceE;   
+      cuda::std::array<index_t, RANK> nSliceB, nSliceE;
       nSliceB.fill(0); nSliceE.fill(matxEnd);
       // select a single row of Q to alias as v
-      nSliceE[RANK-2] = matxDropDim; 
-      nSliceE[RANK-1] = matxDropDim; 
+      nSliceE[RANK-2] = matxDropDim;
+      nSliceE[RANK-1] = matxDropDim;
 
       auto N = slice<RANK-2>(wwt, nSliceB, nSliceE);
 
@@ -147,9 +147,9 @@ namespace detail {
       auto nc = clone<RANK-1>(N,ncShape);
 
       // aliasing some memory here to share storage and provide clarity in the code below
-      auto s = N; // alias 
+      auto s = N; // alias
       auto sc = nc; // alias
-      auto w = v; // alias 
+      auto w = v; // alias
 
       for(int i = 0 ; i < k ; i++) {
 
@@ -160,11 +160,11 @@ namespace detail {
         // operator which zeros out values above current index in matrix
         (xz = as_type<typename inner_op_type_t<ATypeS>::type >(index(x.Rank()-1) >= i) * x).run(stream);
 
-        // compute L2 norm without sqrt. 
+        // compute L2 norm without sqrt.
         (N = sum(abs2(xz))).run(stream);
         //(N = sqrt(N)).run(stream);  // sqrt folded into next op
 
-        (v = xz + as_type<typename inner_op_type_t<ATypeS>::type >(index(v.Rank()-1) == i) * sign(xz) * sqrt(nc)).run(stream); 
+        (v = xz + as_type<typename inner_op_type_t<ATypeS>::type >(index(v.Rank()-1) == i) * sign(xz) * sqrt(nc)).run(stream);
 
         auto r = x;  // alias column of R happens to be the same as x
 
@@ -173,7 +173,7 @@ namespace detail {
 
         // IFELSE to avoid nans when dividing by zero
         using v_type = typename decltype(v)::value_type;
-        (IFELSE(sc != v_type(0), 
+        (IFELSE(sc != v_type(0),
                 w = (v / sqrt(sc)),
                 w = v_type(0))).run(stream);
 
@@ -186,7 +186,7 @@ namespace detail {
 
         (wwt = outer(w, conj(w))).run(stream);
 
-        (Qin = Q).run(stream);  // save input 
+        (Qin = Q).run(stream);  // save input
         matmul_impl(Q, Qin, wwt, exec, -2, 1);
 
       }
@@ -294,8 +294,8 @@ public:
 
     // Type checks
     MATX_STATIC_ASSERT_STR(!is_half_v<T1>, matxInvalidType, "QR solver does not support half precision");
-    MATX_STATIC_ASSERT_STR((std::is_same_v<T1, typename OutTensor_t::value_type>), matxInavlidType, "Input and Output types must match");
-    MATX_STATIC_ASSERT_STR((std::is_same_v<T1, T2>), matxInavlidType, "A and Tau types must match");
+    MATX_STATIC_ASSERT_STR((cuda::std::is_same_v<T1, typename OutTensor_t::value_type>), matxInavlidType, "Input and Output types must match");
+    MATX_STATIC_ASSERT_STR((cuda::std::is_same_v<T1, T2>), matxInavlidType, "A and Tau types must match");
 
     params = GetQRParams(tau, a, exec);
     this->GetWorkspaceSize();
@@ -549,9 +549,9 @@ public:
 
     // Type checks
     MATX_STATIC_ASSERT_STR(!is_half_v<T1>, matxInvalidType, "QR solver does not support half precision");
-    MATX_STATIC_ASSERT_STR((std::is_same_v<T1, typename OutTensor_t::value_type>), matxInavlidType, "Input and Output types must match");
-    MATX_STATIC_ASSERT_STR((std::is_same_v<T1, typename RTensor_t::value_type>), matxInavlidType, "Input and Output types must match");
-    MATX_STATIC_ASSERT_STR((std::is_same_v<T1, T2>), matxInavlidType, "A and Tau types must match");
+    MATX_STATIC_ASSERT_STR((cuda::std::is_same_v<T1, typename OutTensor_t::value_type>), matxInavlidType, "Input and Output types must match");
+    MATX_STATIC_ASSERT_STR((cuda::std::is_same_v<T1, typename RTensor_t::value_type>), matxInavlidType, "Input and Output types must match");
+    MATX_STATIC_ASSERT_STR((cuda::std::is_same_v<T1, T2>), matxInavlidType, "A and Tau types must match");
 
     params = GetQRParams(tau, a, exec);
     this->GetWorkspaceSize();
@@ -632,7 +632,7 @@ public:
 
       MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
 
-      
+
     }
 
     std::vector<int> h_info(this->batch_a_ptrs.size());
@@ -649,19 +649,19 @@ public:
     // at this point, R is stored in the upper triangular part of out
     // so copy it out into memory assigned by user.
     // Per the cuSolver documentation (quoted):
-    // The matrix R is overwritten in upper triangular part of A, 
+    // The matrix R is overwritten in upper triangular part of A,
     // including diagonal elements
-    cuda::std::array<index_t, RANK> rSliceB, rSliceE;   
+    cuda::std::array<index_t, RANK> rSliceB, rSliceE;
     rSliceB.fill(0); rSliceE.fill(matxEnd);
     rSliceE[RANK-2] = matxDropDim;
-    rSliceE[RANK-1] = params.n; // taking upper triangular portion of out    
+    rSliceE[RANK-1] = params.n; // taking upper triangular portion of out
 
     for (int i = 0; i < std::min(params.m, params.n); i++){
       rSliceB[RANK-2] = i;
       (slice<RANK-1>(out_r, rSliceB, rSliceE) = as_type<typename OutTensor_t::value_type>(index(RANK-2) >= i)*slice<RANK-1>(out, rSliceB, rSliceE)).run(exec);
     }
 
-    // Intentionally looping AGAIN, so we can reuse h_info and d_info without 
+    // Intentionally looping AGAIN, so we can reuse h_info and d_info without
     // having to copy to host with each iteration of the loop
     for (size_t i = 0; i < this->batch_a_ptrs.size(); i++) {
       [[maybe_unused]] auto ret = orgqr_dispatch(
@@ -693,40 +693,40 @@ public:
   ~matxDnEconQRCUDAPlan_t() {}
 
 private:
-  
+
   cusolverStatus_t orgqr_bufferSize_dispatch(
     int64_t m64, int64_t n64, int64_t k64,
     void* A, int64_t lda64,
     void* tau,
     int* lwork){
-    
+
     int m = static_cast<int>(m64);
     int n = static_cast<int>(n64);
     int k = static_cast<int>(k64);
     int lda = static_cast<int>(lda64);
 
-    if constexpr (std::is_same_v<T1, float>) {
-      return cusolverDnSorgqr_bufferSize(handle, m, n, k, 
-              reinterpret_cast<T1*>(A), lda, 
-              reinterpret_cast<T1*>(tau), 
+    if constexpr (cuda::std::is_same_v<T1, float>) {
+      return cusolverDnSorgqr_bufferSize(handle, m, n, k,
+              reinterpret_cast<T1*>(A), lda,
+              reinterpret_cast<T1*>(tau),
               lwork);
-    } 
-    else if constexpr (std::is_same_v<T1, double>) {
-      return cusolverDnDorgqr_bufferSize(handle, m, n, k, 
-        reinterpret_cast<T1*>(A), lda, 
-        reinterpret_cast<T1*>(tau), 
+    }
+    else if constexpr (cuda::std::is_same_v<T1, double>) {
+      return cusolverDnDorgqr_bufferSize(handle, m, n, k,
+        reinterpret_cast<T1*>(A), lda,
+        reinterpret_cast<T1*>(tau),
               lwork);
-    } 
-    else if constexpr (std::is_same_v<T1, cuda::std::complex<float>>) {
-      return cusolverDnCungqr_bufferSize(handle, m, n, k, 
-              reinterpret_cast<cuComplex*>(A), lda, 
-              reinterpret_cast<cuComplex*>(tau), 
+    }
+    else if constexpr (cuda::std::is_same_v<T1, cuda::std::complex<float>>) {
+      return cusolverDnCungqr_bufferSize(handle, m, n, k,
+              reinterpret_cast<cuComplex*>(A), lda,
+              reinterpret_cast<cuComplex*>(tau),
               lwork);
-    } 
-    else if constexpr (std::is_same_v<T1, cuda::std::complex<double>>) {
-      return cusolverDnZungqr_bufferSize(handle, m, n, k, 
-        reinterpret_cast<cuDoubleComplex*>(A), lda, 
-        reinterpret_cast<cuDoubleComplex*>(tau), 
+    }
+    else if constexpr (cuda::std::is_same_v<T1, cuda::std::complex<double>>) {
+      return cusolverDnZungqr_bufferSize(handle, m, n, k,
+        reinterpret_cast<cuDoubleComplex*>(A), lda,
+        reinterpret_cast<cuDoubleComplex*>(tau),
               lwork);
     }
     else{
@@ -750,28 +750,28 @@ private:
     int lda = static_cast<int>(lda64);
     int lwork = static_cast<int>(lwork64);
 
-    if constexpr (std::is_same_v<T1, float>) {
-      return cusolverDnSorgqr(handle, m, n, k, 
-              reinterpret_cast<T1*>(A), lda, 
-              reinterpret_cast<T1*>(tau), 
+    if constexpr (cuda::std::is_same_v<T1, float>) {
+      return cusolverDnSorgqr(handle, m, n, k,
+              reinterpret_cast<T1*>(A), lda,
+              reinterpret_cast<T1*>(tau),
               reinterpret_cast<T1*>(work), lwork, info);
-    } 
-    else if constexpr (std::is_same_v<T1, double>) {
-      return cusolverDnDorgqr(handle, m, n, k, 
-              reinterpret_cast<T1*>(A), lda, 
-              reinterpret_cast<T1*>(tau), 
+    }
+    else if constexpr (cuda::std::is_same_v<T1, double>) {
+      return cusolverDnDorgqr(handle, m, n, k,
+              reinterpret_cast<T1*>(A), lda,
+              reinterpret_cast<T1*>(tau),
               reinterpret_cast<T1*>(work), lwork, info);
-    } 
-    else if constexpr (std::is_same_v<T1, cuda::std::complex<float>>) {
-      return cusolverDnCungqr(handle, m, n, k, 
-              reinterpret_cast<cuComplex*>(A), lda, 
-              reinterpret_cast<cuComplex*>(tau), 
+    }
+    else if constexpr (cuda::std::is_same_v<T1, cuda::std::complex<float>>) {
+      return cusolverDnCungqr(handle, m, n, k,
+              reinterpret_cast<cuComplex*>(A), lda,
+              reinterpret_cast<cuComplex*>(tau),
               reinterpret_cast<cuComplex*>(work), lwork, info);
-    } 
-    else if constexpr (std::is_same_v<T1, cuda::std::complex<double>>) {
-      return cusolverDnZungqr(handle, m, n, k, 
-              reinterpret_cast<cuDoubleComplex*>(A), lda, 
-              reinterpret_cast<cuDoubleComplex*>(tau), 
+    }
+    else if constexpr (cuda::std::is_same_v<T1, cuda::std::complex<double>>) {
+      return cusolverDnZungqr(handle, m, n, k,
+              reinterpret_cast<cuDoubleComplex*>(A), lda,
+              reinterpret_cast<cuDoubleComplex*>(tau),
               reinterpret_cast<cuDoubleComplex*>(work), lwork, info);
     }
     else{
@@ -828,7 +828,7 @@ void qr_econ_impl(OutTensor &&out, RTensor &&out_r,
 
   auto tau_new = make_tensor<T1>(tau_shape);
   auto a_new = OpToTensor(a, exec);
-  
+
   if(!is_matx_transform_op<ATensor>() && !a_new.isSameView(a)) {
     (a_new = a).run(exec);
   }
@@ -866,7 +866,7 @@ void qr_econ_impl(OutTensor &&out, RTensor &&out_r,
 
   /* Temporary WAR
    * Copy and free async buffer for transpose */
-  cuda::std::array<index_t, RANK> rSliceB, rSliceE;   
+  cuda::std::array<index_t, RANK> rSliceB, rSliceE;
   rSliceB.fill(0); rSliceE.fill(matxEnd);
   rSliceE[RANK-2] = params.m;
   rSliceE[RANK-1] = std::min(params.m, params.n);

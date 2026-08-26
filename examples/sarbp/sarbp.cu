@@ -395,7 +395,7 @@ static int run_bp_device(PosTensor blk_positions, RtmTensor blk_rtm,
                          const VoxLocOp &voxel_locations, const BpRunCtx &ctx)
 {
   using PosT = typename std::decay_t<decltype(blk_positions)>::value_type;
-  constexpr bool pos_is_fltflt = std::is_same_v<PosT, matx::fltflt>;
+  constexpr bool pos_is_fltflt = cuda::std::is_same_v<PosT, matx::fltflt>;
 
   // The host position buffer contains fltflt-encoded bytes for the FloatFloat
   // path. The range-to-MCP buffer normally follows the same convention, but

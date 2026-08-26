@@ -55,7 +55,7 @@ namespace matx
         cuda::std::array<index_t, 2> out_dims_;
         mutable detail::tensor_impl_t<typename remove_cvref_t<OpX>::value_type, 2> tmp_out_;
         mutable typename remove_cvref_t<OpX>::value_type *ptr = nullptr;
-        mutable bool prerun_done_ = false;         
+        mutable bool prerun_done_ = false;
 
       public:
         using matxop = bool;
@@ -63,8 +63,8 @@ namespace matx
         using matx_transform_op = bool;
         using ambgfun_xform_op = bool;
 
-        __MATX_INLINE__ std::string str() const { 
-          if constexpr (std::is_same_v<OpY, EmptyY>) {
+        __MATX_INLINE__ std::string str() const {
+          if constexpr (cuda::std::is_same_v<OpY, EmptyY>) {
             return "ambgfun(" + get_type_str(x_) + ")";
           }
           else {
@@ -72,21 +72,21 @@ namespace matx
           }
         }
 
-        __MATX_INLINE__ AmbgFunOp(const OpX &x, const OpY &y, double fs, AMBGFunCutType_t cut, float cut_val) : 
+        __MATX_INLINE__ AmbgFunOp(const OpX &x, const OpY &y, double fs, AMBGFunCutType_t cut, float cut_val) :
               x_(x), y_(y), fs_(fs), cut_(cut), cut_val_(cut_val) {
           MATX_LOG_TRACE("{} constructor: fs={}, cut={}", str(), fs, static_cast<int>(cut));
-          static_assert(OpX::Rank() == 1, "Input to ambgfun must be rank 1");                
+          static_assert(OpX::Rank() == 1, "Input to ambgfun must be rank 1");
           if (cut == AMBGFUN_CUT_TYPE_2D) {
             out_dims_[0] = 2 * x_.Size(0) - 1;
             out_dims_[1] = (index_t)cuda::std::pow(2.0, (double)std::ceil(std::log2(2 * x_.Size(0) - 1)));
           }
           else if (cut == AMBGFUN_CUT_TYPE_DELAY) {
             out_dims_[0] = 1;
-            out_dims_[1] = (index_t)cuda::std::pow(2.0, (double)std::ceil(std::log2(2 * x_.Size(0) - 1)));            
+            out_dims_[1] = (index_t)cuda::std::pow(2.0, (double)std::ceil(std::log2(2 * x_.Size(0) - 1)));
           }
           else if (cut == AMBGFUN_CUT_TYPE_DOPPLER) {
             out_dims_[0] = 1;
-            out_dims_[1] = 2 * x_.Size(0) - 1;               
+            out_dims_[1] = 2 * x_.Size(0) - 1;
           }
           else {
             MATX_ASSERT_STR(false, matxInvalidParameter, "Invalid cut type in ambgfun()");
@@ -105,19 +105,19 @@ namespace matx
         {
           return tmp_out_.template operator()<DefaultCapabilities>(indices...);
         }
-        
+
         template <OperatorCapability Cap, typename InType>
         __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
           // No specific capabilities enforced
           auto self_has_cap = capability_attributes<Cap>::default_value;
-          if constexpr (std::is_same_v<OpY, EmptyY>) {
+          if constexpr (cuda::std::is_same_v<OpY, EmptyY>) {
             // Single-input ambgfun: only combine capabilities from x_
             return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(x_, in));
           } else {
             // Two-input ambgfun: combine capabilities from both x_ and y_
             return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(x_, in), detail::get_operator_capability<Cap>(y_, in));
           }
-        }          
+        }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {
@@ -128,7 +128,7 @@ namespace matx
           return out_dims_[dim];
         }
 
-        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }   
+        __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
 
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
@@ -142,12 +142,12 @@ namespace matx
         {
           if constexpr (is_matx_op<OpX>()) {
             x_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-          }     
+          }
 
           if constexpr (is_matx_op<OpY>()) {
             y_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-          }             
-        }      
+          }
+        }
 
         template <typename ShapeType, typename Executor>
         __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
@@ -156,7 +156,7 @@ namespace matx
             return;
           }
 
-          InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));         
+          InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
 
           detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
 
@@ -251,7 +251,7 @@ __MATX_INLINE__ auto ambgfun(const XTensor &x,
                     double fs, AMBGFunCutType_t cut, float cut_val = 0.0)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  
+
   detail::EmptyY nil;
   return detail::AmbgFunOp(x, nil, fs, cut, cut_val);
 }

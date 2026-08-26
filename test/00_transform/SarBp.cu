@@ -53,7 +53,7 @@ protected:
 
     if constexpr (is_complex_half_v<GTestType> || is_matx_half_v<GTestType>) {
       thresh = 1.0e-1;
-    } else if constexpr (std::is_same_v<GTestType, double>) {
+    } else if constexpr (cuda::std::is_same_v<GTestType, double>) {
       thresh = 1.0e-12;
     } else {
       // Revisit this tolerance. We should likely use a relative tolerance
@@ -90,7 +90,7 @@ TYPED_TEST(SarBpTestNonComplexNonHalfFloatTypes, NonMixedTypes)
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
   using complex_t = cuda::std::complex<TestType>;
-  using apc_t = std::conditional_t<std::is_same_v<TestType, double>, double3, float3>;
+  using apc_t = std::conditional_t<cuda::std::is_same_v<TestType, double>, double3, float3>;
 
   const index_t num_range_bins = 128;
   const index_t num_pulses = 128;
@@ -108,9 +108,9 @@ TYPED_TEST(SarBpTestNonComplexNonHalfFloatTypes, NonMixedTypes)
   auto pix_coords_xclone = matx::clone<2>(pix_coords_x, {image_height, matx::matxKeepDim});
   auto voxel_locations = matx::zipvec(
     pix_coords_xclone, pix_coords_yclone, matx::zeros<TestType>({image_height, image_width}));
-  
+
   auto range_profiles = matx::ones<complex_t>({num_pulses, num_range_bins});
-  auto range_to_mcp = matx::make_tensor<TestType>({num_pulses});  
+  auto range_to_mcp = matx::make_tensor<TestType>({num_pulses});
   auto platform_positions = matx::make_tensor<apc_t>({num_pulses});
   auto image = matx::make_tensor<complex_t>({image_height, image_width});
   const TestType plat_dx = (max_x - min_x) / num_pulses;
@@ -123,7 +123,7 @@ TYPED_TEST(SarBpTestNonComplexNonHalfFloatTypes, NonMixedTypes)
   }
 
   SarBpParams params;
-  if constexpr (std::is_same_v<TestType, double>) {
+  if constexpr (cuda::std::is_same_v<TestType, double>) {
     params.compute_type = SarBpComputeType::Double;
   } else {
     params.compute_type = SarBpComputeType::Float;
@@ -150,7 +150,7 @@ TYPED_TEST(SarBpTestDoubleType, MixedPrecision)
   using complex_t = cuda::std::complex<float>;
   using loose_compute_t = float;
   using strict_compute_t = double;
-  using apc_t = double3;  
+  using apc_t = double3;
 
   const index_t num_range_bins = 128;
   const index_t num_pulses = 128;
@@ -168,9 +168,9 @@ TYPED_TEST(SarBpTestDoubleType, MixedPrecision)
   auto pix_coords_xclone = matx::clone<2>(pix_coords_x, {image_height, matx::matxKeepDim});
   auto voxel_locations = matx::zipvec(
     pix_coords_xclone, pix_coords_yclone, matx::zeros<loose_compute_t>({image_height, image_width}));
-  
+
   auto range_profiles = matx::ones<complex_t>({num_pulses, num_range_bins});
-  auto range_to_mcp = matx::make_tensor<strict_compute_t>({num_pulses});  
+  auto range_to_mcp = matx::make_tensor<strict_compute_t>({num_pulses});
   auto platform_positions = matx::make_tensor<apc_t>({num_pulses});
   auto image = matx::make_tensor<complex_t>({image_height, image_width});
   const strict_compute_t plat_dx = (max_x - min_x) / num_pulses;
@@ -442,7 +442,7 @@ TYPED_TEST(SarBpTestDoubleType, PointTarget)
 
   for (matx::index_t i = 0; i < num_pulses; i++) {
     h_antenna_phase_centers[i] = double3{
-      plat_x_min + 
+      plat_x_min +
       plat_dx * static_cast<double>(i),
       plat_y,
       plat_z
@@ -908,7 +908,7 @@ TYPED_TEST(SarBpTestNonComplexNonHalfFloatTypes, RangeToMcpOperatorInput)
 
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using complex_t = cuda::std::complex<TestType>;
-  using apc_t = std::conditional_t<std::is_same_v<TestType, double>, double3, float3>;
+  using apc_t = std::conditional_t<cuda::std::is_same_v<TestType, double>, double3, float3>;
 
   const index_t num_range_bins = 64;
   const index_t num_pulses = 64;
@@ -938,7 +938,7 @@ TYPED_TEST(SarBpTestNonComplexNonHalfFloatTypes, RangeToMcpOperatorInput)
   }
 
   SarBpParams params;
-  if constexpr (std::is_same_v<TestType, double>) {
+  if constexpr (cuda::std::is_same_v<TestType, double>) {
     params.compute_type = SarBpComputeType::Double;
   } else {
     params.compute_type = SarBpComputeType::Float;

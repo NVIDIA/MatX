@@ -15,8 +15,8 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Abs2)
 
   ExecType exec{};
 
-  if constexpr (std::is_same_v<TestType, cuda::std::complex<float>> &&
-    std::is_same_v<ExecType,cudaExecutor>) {
+  if constexpr (cuda::std::is_same_v<TestType, cuda::std::complex<float>> &&
+    cuda::std::is_same_v<ExecType,cudaExecutor>) {
     // example-begin abs2-test-1
     auto x = make_tensor<cuda::std::complex<float>>({});
     auto y = make_tensor<float>({});
@@ -69,7 +69,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Abs2)
           }
           else {
             ASSERT_NEAR(y3(i,j,k), static_cast<inner_type>(v*v), 1.0e-6);
-          }          
+          }
         }
       }
     }

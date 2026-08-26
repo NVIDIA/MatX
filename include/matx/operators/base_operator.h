@@ -45,7 +45,7 @@ namespace matx
   namespace detail {
     /**
      * @brief Helper to get memory range from a tensor/lvalue for aliasing check
-     * 
+     *
      * @tparam T Type of the lvalue
      * @param lval The lvalue to get memory range from
      * @return AliasedMemoryQueryInput with start and end pointers
@@ -55,19 +55,19 @@ namespace matx
       // Handle both direct tensor views and operators with lvalue capability (like reshape, slice, etc.)
       if constexpr ((is_tensor_view_v<T> || is_matx_op_lvalue<T>()) && T::Rank() > 0) {
         using value_type = typename T::value_type;
-        
+
         // Get address of first element using operator()(0, 0, ...)
         auto get_first = [&lval]<size_t... Is>(cuda::std::index_sequence<Is...>) {
           return &(const_cast<T&>(lval)(static_cast<index_t>(Is*0)...));
         };
         auto* start = static_cast<void*>(const_cast<value_type*>(get_first(cuda::std::make_index_sequence<T::Rank()>{})));
-        
+
         // Get address of last element using operator()(Size(0)-1, Size(1)-1, ...)
         auto get_last = [&lval]<size_t... Is>(cuda::std::index_sequence<Is...>) {
           return &(const_cast<T&>(lval)(static_cast<index_t>(lval.Size(Is)-1)...));
         };
         auto* end = static_cast<void*>(const_cast<value_type*>(get_last(cuda::std::make_index_sequence<T::Rank()>{})) + 1);
-        
+
         return AliasedMemoryQueryInput{false, is_prerun, start, end};
       }
       else {
@@ -78,7 +78,7 @@ namespace matx
 
     /**
      * @brief Check if RHS operator aliases with LHS memory range
-     * 
+     *
      * @tparam RHS Type of the right-hand side operator
      * @tparam LHS Type of the left-hand side operator
      * @param rhs The right-hand side operator
@@ -88,14 +88,14 @@ namespace matx
      */
     template <typename LHS, typename RHS>
     __MATX_INLINE__ __MATX_HOST__ bool check_aliased_memory([[maybe_unused]] const LHS& lhs, [[maybe_unused]] const RHS& rhs, [[maybe_unused]] bool is_prerun) {
-#ifdef MATX_EN_UNSAFE_ALIAS_DETECTION      
+#ifdef MATX_EN_UNSAFE_ALIAS_DETECTION
       auto mem_range = get_memory_range(lhs, is_prerun);
-      
+
       // If we got null pointers, no aliasing is possible
       if (mem_range.start_ptr == nullptr || mem_range.end_ptr == nullptr) {
         return false;
       }
-      
+
       // Query the RHS operator to see if it uses aliased memory
       return get_operator_capability<OperatorCapability::ALIASED_MEMORY>(rhs, mem_range);
 #else
@@ -105,21 +105,21 @@ namespace matx
 
     /**
      * @brief Check if mtie operation has aliased memory between LHS elements and RHS
-     * 
+     *
      * @tparam MtieType Type of the mtie object
      * @param mtie_obj The mtie object to check
      */
     template <typename MtieType>
     __MATX_INLINE__ __MATX_HOST__ void check_mtie_aliased_memory([[maybe_unused]] const MtieType& mtie_obj) {
-#ifdef MATX_EN_UNSAFE_ALIAS_DETECTION      
+#ifdef MATX_EN_UNSAFE_ALIAS_DETECTION
       constexpr size_t tuple_size = cuda::std::tuple_size_v<decltype(mtie_obj.ts_)>;
-      
+
       // Get the RHS (last element of the tuple)
       auto& rhs = cuda::std::get<tuple_size - 1>(mtie_obj.ts_);
-      
+
       // Check each LHS element (all elements except the last one)
       bool has_alias = false;
-      
+
       // Use C++20 template lambda with index_sequence
       [&]<size_t... Is>(cuda::std::index_sequence<Is...>) {
         ([&] {
@@ -131,17 +131,17 @@ namespace matx
           }
         }(), ...);
       }(cuda::std::make_index_sequence<tuple_size>{});
-      
+
       if (has_alias) {
         MATX_THROW(matxInvalidParameter, "Aliased memory detected: One or more LHS tensors overlap with RHS memory");
       }
-#endif      
+#endif
     }
   } // namespace detail
 
   /**
    * @brief Provides a base class with functions common to all operators
-   * 
+   *
    * @tparam T Type of operator
    */
   template <typename T>
@@ -173,7 +173,7 @@ namespace matx
       public:
         /**
          * @brief Launch work in an arbitrary executor
-         * 
+         *
          * @tparam Ex Executor type
          * @param ex Executor
          */
@@ -214,7 +214,7 @@ namespace matx
             }
             else if constexpr (is_matx_transform_op<typename T::op_type>() && is_tensor_view_v<typename T::tensor_type>) {
               // If we're doing a simple set operation from a transform we take a shorcut to avoid the extra
-              // async allocation we'd normally have to do   
+              // async allocation we'd normally have to do
               if (!can_alias<decltype(tp->get_rhs())>() && detail::check_aliased_memory(tp->get_lhs(), tp->get_rhs(), false)) {
                 MATX_THROW(matxInvalidParameter, "Possible aliased memory detected: LHS and RHS memory ranges overlap");
               }
@@ -246,7 +246,7 @@ namespace matx
 
               using lhs_value_type = remove_cvref_t<typename T::tensor_type::value_type>;
               using rhs_value_type = remove_cvref_t<typename T::op_type::value_type>;
-              constexpr bool same_value_type = std::is_same_v<lhs_value_type, rhs_value_type>;
+              constexpr bool same_value_type = cuda::std::is_same_v<lhs_value_type, rhs_value_type>;
 
               if (same_value_type &&
                   tp->get_lhs().IsContiguous() &&
@@ -275,16 +275,16 @@ namespace matx
               if constexpr (is_matx_op<T>()) {
                 tp->PreRun(tp->Shape(), ex);
               }
-              
+
               ex.Exec(*tp);
 
               if constexpr (is_matx_op<T>()) {
                 tp->PostRun(tp->Shape(), ex);
-              }              
+              }
             }
           }
           else {
-            // These can be operators like custom operators that take an output as a parameter. In those cases we cannot 
+            // These can be operators like custom operators that take an output as a parameter. In those cases we cannot
             // check for aliasing since we don't control the operator.
 
             if constexpr (is_matx_op<T>()) {
@@ -296,12 +296,12 @@ namespace matx
             if constexpr (is_matx_op<T>()) {
               tp->PostRun(tp->Shape(), ex);
             }
-          }  
+          }
         }
 
         /**
          * @brief Launch kernel in a GPU stream
-         * 
+         *
          * @param stream CUDA stream
          */
         __MATX_INLINE__ void run(cudaStream_t stream = 0)
@@ -312,7 +312,7 @@ namespace matx
 
         /**
          * @brief Launch work in a GPU stream and record an event
-         * 
+         *
          * @param ev CUDA event
          * @param stream CUDA stream
          */
@@ -326,7 +326,7 @@ namespace matx
 
         /**
          * @brief Function to run before the executor
-         * 
+         *
          * @tparam ShapeType Type of shape
          * @tparam Executor Executor type
          * @param shape Shape
@@ -339,7 +339,7 @@ namespace matx
 
         /**
          * @brief Function to run before the executor
-         * 
+         *
          * @tparam ShapeType Type of shape
          * @tparam Executor Executor type
          * @param shape Shape
@@ -384,7 +384,7 @@ namespace matx
    * @brief Pprovides a base class for reducing the boilerplate code needed
    * when defining an operator. This is particularly useful in user code with
    * many custom operators that don't want to repeat the Size and Rank functions.
-   * 
+   *
    * @tparam T Type of operator
    * @tparam RankOp Type of operator providing rank information
    */
@@ -400,7 +400,7 @@ namespace matx
 
       /**
        * @brief Construct a new Base Op Custom object
-       * 
+       *
        * @param size Size of each dimension
        */
       __MATX_INLINE__ BaseOpCustom(const cuda::std::array<index_t, RankOp::Rank()> &size) :
@@ -408,17 +408,17 @@ namespace matx
 
       /**
        * @brief Return rank of operator
-       * 
+       *
        * @return Operator rank
        */
       static __MATX_INLINE__ constexpr int32_t Rank()
       {
         return RankOp::Rank();
-      }  
+      }
 
       /**
        * @brief Return size of operator on a given dimension
-       * 
+       *
        * @return Operator size on dimension dim
        */
       index_t __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ Size(int dim) const

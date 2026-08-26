@@ -14,7 +14,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Concatenate)
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
-  ExecType exec{}; 
+  ExecType exec{};
   index_t i, j;
 
   // example-begin concat-test-1
@@ -40,7 +40,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Concatenate)
   }
 
   // Test contcat with nested transforms
-  if constexpr (is_cuda_non_jit_executor<ExecType> && (std::is_same_v<TestType, float> || std::is_same_v<TestType, double>)) {
+  if constexpr (is_cuda_non_jit_executor<ExecType> && (cuda::std::is_same_v<TestType, float> || cuda::std::is_same_v<TestType, double>)) {
     auto delta = make_tensor<TestType>({1});
     delta.SetVals({static_cast<TestType>(1)});
 
@@ -64,8 +64,8 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Concatenate)
   auto t22 = make_tensor<TestType>({3, 4});
   auto t23 = make_tensor<TestType>({4, 3});
 
-  auto t2o1 = make_tensor<TestType>({7,4});  
-  auto t2o2 = make_tensor<TestType>({4,7});  
+  auto t2o1 = make_tensor<TestType>({7,4});
+  auto t2o2 = make_tensor<TestType>({4,7});
   t21.SetVals({{1,2,3,4},
                {2,3,4,5},
                {3,4,5,6},
@@ -92,9 +92,9 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Concatenate)
     }
   }
 
-  (t2o2 = concat(1, t21, t23)).run(exec); 
+  (t2o2 = concat(1, t21, t23)).run(exec);
   exec.sync();
-  
+
   for (j = 0; j < t21.Size(1) + t23.Size(1); j++) {
     for (i = 0; i < t21.Size(0); i++) {
       if (j < t21.Size(1)) {
@@ -104,9 +104,9 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Concatenate)
         ASSERT_EQ(t23(i, j - t21.Size(1)), t2o2(i,j));
       }
     }
-  }  
+  }
 
-  auto t1o1 = make_tensor<TestType>({30});  
+  auto t1o1 = make_tensor<TestType>({30});
 
   // Concatenating 3 tensors
   (t1o1 = concat(0, t11, t11, t11)).run(exec);
@@ -123,13 +123,13 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Concatenate)
     auto b = matx::make_tensor<float>({10});
     auto c = matx::make_tensor<float>({10});
     auto d = matx::make_tensor<float>({10});
-    
+
     auto result = matx::make_tensor<float>({40});
     a.SetVals({1,2,3,4,5,6,7,8,9,10});
     b.SetVals({11,12,13,14,15,16,17,18,19,20});
     c.SetVals({21,22,23,24,25,26,27,28,29,30});
     d.SetVals({31,32,33,34,35,36,37,38,39,40});
-    
+
     auto tempConcat1 = matx::concat(0, a, b);
     auto tempConcat2 = matx::concat(0, c, d);
     (result = matx::concat(0, tempConcat1, tempConcat2 )).run(exec);
@@ -137,8 +137,8 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Concatenate)
     exec.sync();
     for (int cnt = 0; cnt < result.Size(0); cnt++) {
       ASSERT_EQ(result(cnt), cnt + 1);
-    }    
-  }  
-  
+    }
+  }
+
   MATX_EXIT_HANDLER();
 }

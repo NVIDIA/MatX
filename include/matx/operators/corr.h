@@ -46,7 +46,7 @@ namespace matx
     class CorrOp : public BaseOp<CorrOp<OpA, OpB, PermDims>>
     {
       private:
-        using out_t = std::conditional_t<is_complex_v<typename OpA::value_type>, 
+        using out_t = std::conditional_t<is_complex_v<typename OpA::value_type>,
               typename OpA::value_type, typename OpB::value_type>;
         constexpr static int max_rank = cuda::std::max(OpA::Rank(), OpB::Rank());
         typename detail::base_type_t<OpA> a_;
@@ -57,7 +57,7 @@ namespace matx
         cuda::std::array<index_t, max_rank> out_dims_;
         mutable detail::tensor_impl_t<out_t, max_rank> tmp_out_;
         mutable out_t *ptr = nullptr;
-        mutable bool prerun_done_ = false; 
+        mutable bool prerun_done_ = false;
 
       public:
         using matxop = bool;
@@ -65,21 +65,21 @@ namespace matx
         using matx_transform_op = bool;
         using conv_xform_op = bool;
 
-        __MATX_INLINE__ std::string str() const { 
+        __MATX_INLINE__ std::string str() const {
           return "conv1d(" + get_type_str(a_) + "," + get_type_str(b_)  + ")";
         }
 
-        __MATX_INLINE__ CorrOp(const OpA &A, const OpB &B, matxConvCorrMode_t mode, [[maybe_unused]] matxConvCorrMethod_t method, PermDims perm) : 
+        __MATX_INLINE__ CorrOp(const OpA &A, const OpB &B, matxConvCorrMode_t mode, [[maybe_unused]] matxConvCorrMethod_t method, PermDims perm) :
               a_(A), b_(B), mode_(mode), method_(method), perm_(perm) {
           MATX_LOG_TRACE("{} constructor: mode={}, method={}", str(), static_cast<int>(mode), static_cast<int>(method));
           // Currently when using the axis parameter the rank of inputs must be equal
-          if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
+          if constexpr (!cuda::std::is_same_v<PermDims, no_permute_t>) {
             for (int r = 0; r < Rank(); r++) {
               const int axis = perm[r];
               if (axis == Rank() - 1) {
                 const auto max_axis = cuda::std::max(a_.Size(r), b_.Size(r));
                 const auto min_axis = cuda::std::min(a_.Size(r), b_.Size(r));
-              
+
                 if (mode_ == MATX_C_MODE_FULL) {
                   out_dims_[axis] = a_.Size(r) + b_.Size(r) - 1;
                 }
@@ -88,12 +88,12 @@ namespace matx
                 }
                 else if (mode_ == MATX_C_MODE_VALID) {
                   out_dims_[axis] = max_axis - min_axis + 1;
-                }                  
+                }
               }
               else {
                 out_dims_[axis] = b_.Size(r);
               }
-            }                      
+            }
           }
           else {
             if constexpr (OpA::Rank() > OpB::Rank()) {
@@ -117,7 +117,7 @@ namespace matx
             }
             else if (mode_ == MATX_C_MODE_VALID) {
               out_dims_[max_rank-1] = max_axis - min_axis + 1;
-            }                
+            }
           }
         }
 
@@ -142,7 +142,7 @@ namespace matx
           // However, the reference example for conv1d had direct EPT=1 for direct method.
           // For now, using the standard combine for a_ and b_.
           // If specific EPT handling for method_ (direct/FFT) is needed, it can be added.
-          return combine_capabilities<Cap>(self_has_cap, 
+          return combine_capabilities<Cap>(self_has_cap,
                                            detail::get_operator_capability<Cap>(a_, in),
                                            detail::get_operator_capability<Cap>(b_, in));
         }
@@ -158,9 +158,9 @@ namespace matx
 
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
-          MATX_STATIC_ASSERT_STR((Rank() == cuda::std::tuple_element_t<0, remove_cvref_t<Out>>::Rank()), 
+          MATX_STATIC_ASSERT_STR((Rank() == cuda::std::tuple_element_t<0, remove_cvref_t<Out>>::Rank()),
                 matxInvalidParameter, "corr: inputs and outputs must have same rank to use corr with axis parameter");
-          if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
+          if constexpr (!cuda::std::is_same_v<PermDims, no_permute_t>) {
             corr_impl(permute(cuda::std::get<0>(out), perm_), a_, b_, mode_, method_, ex);
           }
           else {
@@ -173,12 +173,12 @@ namespace matx
         {
           if constexpr (is_matx_op<OpA>()) {
             a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-          }     
+          }
 
           if constexpr (is_matx_op<OpB>()) {
             b_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-          }           
-        }      
+          }
+        }
 
         template <typename ShapeType, typename Executor>
         __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
@@ -187,7 +187,7 @@ namespace matx
             return;
           }
 
-          InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));        
+          InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
 
           detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
 
@@ -204,18 +204,18 @@ namespace matx
 
           if constexpr (is_matx_op<OpB>()) {
             b_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-          } 
+          }
 
           matxFree(ptr);
           ptr = nullptr;
           prerun_done_ = false;
-        }          
+        }
     };
   }
 
 /**
  * @brief Correlate two input operators
- * 
+ *
  * @tparam In1Type Type of first input
  * @tparam In2Type Type of second input
  * @param i1 First input operator
@@ -226,13 +226,13 @@ namespace matx
 template <typename In1Type, typename In2Type>
 __MATX_INLINE__ auto corr(const In1Type &i1, const In2Type &i2,
                    matxConvCorrMode_t mode, [[maybe_unused]] matxConvCorrMethod_t method) {
-  return detail::CorrOp(i1, i2, mode, method, detail::no_permute_t{});     
-}  
+  return detail::CorrOp(i1, i2, mode, method, detail::no_permute_t{});
+}
 
 
 /**
  * @brief Correlate two input operators
- * 
+ *
  * @tparam In1Type Type of first input
  * @tparam In2Type Type of second input
  * @param i1 First input operator
@@ -250,7 +250,7 @@ __MATX_INLINE__ auto corr(const In1Type &i1, const In2Type &i2,
   auto perm = detail::getPermuteDims<std::max(In1Type::Rank(), In2Type::Rank())>(axis);
 
   auto in1 = permute(i1, perm);
-  auto in2 = permute(i2, perm);                    
+  auto in2 = permute(i2, perm);
   return detail::CorrOp(in1, in2, mode, method, perm);
 }
 

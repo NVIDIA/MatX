@@ -64,7 +64,7 @@ namespace cpoly {
 } // namespace cpoly
 } // namespace detail
 
-#ifdef __CUDACC__ 
+#ifdef __CUDACC__
 
 namespace detail {
 
@@ -977,7 +977,7 @@ __global__ void ChannelizePoly1D_FusedChan(OutType output, InType input, FilterT
     for (int t = tid; t < NUM_CHAN*NUM_CHAN; t += THREADS) {
         const int i = t / NUM_CHAN;
         const int j = t % NUM_CHAN;
-        if constexpr (std::is_same_v<AccumType, double>) {
+        if constexpr (cuda::std::is_same_v<AccumType, double>) {
             const double arg = 2.0 * M_PI * j * i / NUM_CHAN;
             double sinx, cosx;
             sincos(arg, &sinx, &cosx);

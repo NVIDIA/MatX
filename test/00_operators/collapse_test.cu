@@ -12,7 +12,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, CollapseOp)
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
   using inner_type = typename inner_op_type_t<TestType>::type;
 
-  ExecType exec{}; 
+  ExecType exec{};
 
   int N = 10;
   int M = 12;
@@ -32,7 +32,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, CollapseOp)
 
   { // rcollapse 2
     auto tov = make_tensor<TestType>({N,M*K});
-  
+
     // example-begin rcollapse-test-1
     // Collapse two right-most dimensions together
     auto op = rcollapse<2>(tiv);
@@ -54,10 +54,10 @@ TYPED_TEST(OperatorTestsNumericAllExecs, CollapseOp)
       }
     }
   }
-  
+
   { // lcollapse 12
     auto tov = make_tensor<TestType>({N*M,K});
-  
+
     // example-begin lcollapse-test-1
     // Collapse two left-most dimensions together
     auto op = lcollapse<2>(tiv);
@@ -66,8 +66,8 @@ TYPED_TEST(OperatorTestsNumericAllExecs, CollapseOp)
     EXPECT_TRUE(op.Rank() == 2);
     EXPECT_TRUE(op.Size(0) == N*M);
     EXPECT_TRUE(op.Size(1) == K);
-    
-    
+
+
     (tov = (TestType)0).run(exec);
     (tov = op).run(exec);
     exec.sync();
@@ -80,10 +80,10 @@ TYPED_TEST(OperatorTestsNumericAllExecs, CollapseOp)
       }
     }
   }
-  
+
   { // rcollapse 3
     auto tov = make_tensor<TestType>({N*M*K});
-  
+
     auto op = rcollapse<3>(tiv);
 
     EXPECT_TRUE(op.Rank() == 1);
@@ -102,9 +102,9 @@ TYPED_TEST(OperatorTestsNumericAllExecs, CollapseOp)
     }
   }
 
-  { // lcollapse 3 
+  { // lcollapse 3
     auto tov = make_tensor<TestType>({N*M*K});
-  
+
     auto op = lcollapse<3>(tiv);
 
     EXPECT_TRUE(op.Rank() == 1);
@@ -123,7 +123,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, CollapseOp)
     }
   }
 
-  if constexpr (is_cuda_non_jit_executor<ExecType> && (std::is_same_v<TestType, float> || std::is_same_v<TestType, double>))
+  if constexpr (is_cuda_non_jit_executor<ExecType> && (cuda::std::is_same_v<TestType, float> || cuda::std::is_same_v<TestType, double>))
   { // rcollapse with nested transform operator
     auto tov = make_tensor<TestType>({N,M*K});
     auto delta = make_tensor<TestType>({1,1});
@@ -148,7 +148,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, CollapseOp)
     }
   }
 
-  if constexpr (is_cuda_non_jit_executor<ExecType> && (std::is_same_v<TestType, float> || std::is_same_v<TestType, double>))
+  if constexpr (is_cuda_non_jit_executor<ExecType> && (cuda::std::is_same_v<TestType, float> || cuda::std::is_same_v<TestType, double>))
   { // lcollapse with nested transform operator
     auto tov = make_tensor<TestType>({N*M,K});
     auto delta = make_tensor<TestType>({1,1});
@@ -173,4 +173,4 @@ TYPED_TEST(OperatorTestsNumericAllExecs, CollapseOp)
     }
   }
   MATX_EXIT_HANDLER();
-} 
+}

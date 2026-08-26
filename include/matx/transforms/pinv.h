@@ -81,14 +81,14 @@ void pinv_impl(OutputTensor &out,
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   MATX_ASSERT_STR(!(is_host_executor_v<Executor> && !MATX_EN_CPU_SOLVER), matxInvalidExecutor,
     "Trying to run a host Solver executor but host Solver support is not configured");
-  
+
   using T1 = typename InputTensor::value_type;
   using inner_type = typename inner_op_type_t<T1>::type;
   constexpr int RANK = InputTensor::Rank();
 
   MATX_STATIC_ASSERT_STR(OutputTensor::Rank() == InputTensor::Rank(), matxInvalidDim, "Output and input tensors must have same rank for pinv()");
   MATX_STATIC_ASSERT_STR(RANK >= 2, matxInvalidDim, "Input/Output tensor must be rank 2 or higher");
-  MATX_STATIC_ASSERT_STR((std::is_same_v<T1, typename OutputTensor::value_type>), matxInavlidType, "A and Out types must match");
+  MATX_STATIC_ASSERT_STR((cuda::std::is_same_v<T1, typename OutputTensor::value_type>), matxInavlidType, "A and Out types must match");
 
   const index_t m = a.Size(RANK-2); // rows
   const index_t n = a.Size(RANK-1); // cols
@@ -101,11 +101,11 @@ void pinv_impl(OutputTensor &out,
 
   MATX_ASSERT_STR((out.Size(RANK-1) == m) && (out.Size(RANK-2) == n), matxInvalidSize,
       "Out must be ... x n x m for A ... x m x n");
-  
-  /* 
+
+  /*
     Need to perform pinv = V * S^-1 * U^H where svd(A) = U * S * V^H.
     Alternatively, can run svd(A^H) to get V, S, U^H
-  */ 
+  */
 
   // Allocate v, s, ut
   auto aShape = a.Shape();
@@ -157,7 +157,7 @@ void pinv_impl(OutputTensor &out,
   // Need to explicitly run before inverting s since the mask needs to be created
   // based on original singular values.
   (s_mask = s > cutoff_add_axis).run(exec);
-  
+
   // IF required to avoid nans when singular value is 0
   (IF(s != inner_type(0), s = inner_type(1) / s)).run(exec);
   (s *= s_mask).run(exec);
@@ -168,7 +168,7 @@ void pinv_impl(OutputTensor &out,
   dShape[RANK-2] = n;
   auto d = clone<RANK>(s, dShape);
   (v = v * d).run(exec);
-  
+
   // (V * S-1) * UT
   matmul_impl(out, v, ut, exec);
 }

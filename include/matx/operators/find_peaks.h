@@ -58,9 +58,9 @@ namespace detail {
       using find_peaks_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "find_peaks(" + get_type_str(a_) + ")"; }
-      __MATX_INLINE__ FindPeaksOp(const OpA &a, value_type height, 
-                                                value_type threshold) : 
-                                                a_(a), height_(height), threshold_(threshold) { 
+      __MATX_INLINE__ FindPeaksOp(const OpA &a, value_type height,
+                                                value_type threshold) :
+                                                a_(a), height_(height), threshold_(threshold) {
         MATX_LOG_TRACE("{} constructor: height={}, threshold={}", str(), height, threshold);
       }
 
@@ -75,11 +75,11 @@ namespace detail {
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
-        static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 2 outputs on find_peaks(). ie: (mtie(O, num_found) = find_peaks(A, height, threshold))");     
+        static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 2 outputs on find_peaks(). ie: (mtie(O, num_found) = find_peaks(A, height, threshold))");
         static_assert(remove_cvref_t<decltype(cuda::std::get<1>(out))>::Rank() == 0 &&
-                      std::is_same_v<typename remove_cvref_t<decltype(cuda::std::get<1>(out))>::value_type, int>, 
+                      cuda::std::is_same_v<typename remove_cvref_t<decltype(cuda::std::get<1>(out))>::value_type, int>,
                       "Num elements output must be a scalar integer tensor");
-        static_assert(std::is_same_v<typename remove_cvref_t<decltype(cuda::std::get<0>(out))>::value_type, index_t>, 
+        static_assert(cuda::std::is_same_v<typename remove_cvref_t<decltype(cuda::std::get<0>(out))>::value_type, index_t>,
                       "Peak indices output must be a 1D matx::index_t tensor");
         find_peaks_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), a_, height_, threshold_, ex);
       }
@@ -94,13 +94,13 @@ namespace detail {
       {
         if constexpr (is_matx_op<OpA>()) {
           a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-        }          
-      }      
+        }
+      }
 
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
       {
-        InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));    
+        InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
       }
 
       template <typename ShapeType, typename Executor>
@@ -124,7 +124,7 @@ namespace detail {
  * Compute peak search of input
  *
  * Returns a tensor representing the indices of peaks found in the input operator. The first output parameter holds the indices
- * while the second holds the number of indices/peaks found. The output index tensor must be large enough to hold all of the peaks 
+ * while the second holds the number of indices/peaks found. The output index tensor must be large enough to hold all of the peaks
  * found or the behavior is undefined.
  *
  * @tparam InType

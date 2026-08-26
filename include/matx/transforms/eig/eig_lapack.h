@@ -109,9 +109,9 @@ public:
 
     // Type checks
     MATX_STATIC_ASSERT_STR(!is_half_v<T1>, matxInvalidType, "Eigen solver does not support half precision");
-    MATX_STATIC_ASSERT_STR((std::is_same_v<T1, typename OutTensor_t::value_type>), matxInavlidType, "Input and output types must match");
+    MATX_STATIC_ASSERT_STR((cuda::std::is_same_v<T1, typename OutTensor_t::value_type>), matxInavlidType, "Input and output types must match");
     MATX_STATIC_ASSERT_STR(!is_complex_v<T2>, matxInvalidType, "W type must be real");
-    MATX_STATIC_ASSERT_STR((std::is_same_v<typename inner_op_type_t<T1>::type, T2>), matxInvalidType, "Out and W inner types must match");
+    MATX_STATIC_ASSERT_STR((cuda::std::is_same_v<typename inner_op_type_t<T1>::type, T2>), matxInvalidType, "Out and W inner types must match");
 
     params = GetEigParams(w, a, jobz, uplo);
     this->GetWorkspaceSize();
@@ -126,10 +126,10 @@ public:
     // Due to a LAPACK bug which gives incorrect workspace size calculations for single-precision
     // routines at large matrix sizes from to float-to-int conversions, should use double-precision
     // for the query. Only an issue in routines which may need O(n^2) memory.
-    using WorkQuery = std::conditional_t<std::is_same_v<T1, float>, double,
-                      std::conditional_t<std::is_same_v<T1, cuda::std::complex<float>>,
+    using WorkQuery = std::conditional_t<cuda::std::is_same_v<T1, float>, double,
+                      std::conditional_t<cuda::std::is_same_v<T1, cuda::std::complex<float>>,
                                         cuda::std::complex<double>, T1>>;
-    using RworkQuery = std::conditional_t<std::is_same_v<T2, float>, double, T2>;
+    using RworkQuery = std::conditional_t<cuda::std::is_same_v<T2, float>, double, T2>;
     WorkQuery work_query;
     RworkQuery rwork_query;
     lapack_int_t iwork_query;
@@ -232,13 +232,13 @@ private:
   {
     // TODO: remove warning suppression once syevd is optimized in NVPL LAPACK
 MATX_IGNORE_WARNING_PUSH_GCC("-Wdeprecated-declarations")
-    if constexpr (std::is_same_v<AType, float>) {
+    if constexpr (cuda::std::is_same_v<AType, float>) {
       LAPACK_CALL(ssyevd)(jobz, uplo, n, a, lda, w, work_in, lwork_in, iwork_in, liwork_in, info);
-    } else if constexpr (std::is_same_v<AType, double>) {
+    } else if constexpr (cuda::std::is_same_v<AType, double>) {
       LAPACK_CALL(dsyevd)(jobz, uplo, n, a, lda, w, work_in, lwork_in, iwork_in, liwork_in, info);
-    } else if constexpr (std::is_same_v<AType, cuda::std::complex<float>>) {
+    } else if constexpr (cuda::std::is_same_v<AType, cuda::std::complex<float>>) {
       LAPACK_CALL(cheevd)(jobz, uplo, n, a, lda, w, work_in, lwork_in, rwork_in, lrwork_in, iwork_in, liwork_in, info);
-    } else if constexpr (std::is_same_v<AType, cuda::std::complex<double>>) {
+    } else if constexpr (cuda::std::is_same_v<AType, cuda::std::complex<double>>) {
       LAPACK_CALL(zheevd)(jobz, uplo, n, a, lda, w, work_in, lwork_in, rwork_in, lrwork_in, iwork_in, liwork_in, info);
     }
 MATX_IGNORE_WARNING_POP_GCC

@@ -60,18 +60,18 @@ __MATX_INLINE__ cublasStatus_t DenseSolveGetrfBatched(cublasHandle_t handle,
                                                       int *info,
                                                       int batch_size)
 {
-  if constexpr (std::is_same_v<T, float>) {
+  if constexpr (cuda::std::is_same_v<T, float>) {
     return cublasSgetrfBatched(handle, n, a_array, lda, piv, info, batch_size);
   }
-  else if constexpr (std::is_same_v<T, double>) {
+  else if constexpr (cuda::std::is_same_v<T, double>) {
     return cublasDgetrfBatched(handle, n, a_array, lda, piv, info, batch_size);
   }
-  else if constexpr (std::is_same_v<T, cuda::std::complex<float>>) {
+  else if constexpr (cuda::std::is_same_v<T, cuda::std::complex<float>>) {
     return cublasCgetrfBatched(handle, n,
                                reinterpret_cast<cuComplex *const *>(a_array),
                                lda, piv, info, batch_size);
   }
-  else if constexpr (std::is_same_v<T, cuda::std::complex<double>>) {
+  else if constexpr (cuda::std::is_same_v<T, cuda::std::complex<double>>) {
     return cublasZgetrfBatched(handle, n,
                                reinterpret_cast<cuDoubleComplex *const *>(a_array),
                                lda, piv, info, batch_size);
@@ -93,21 +93,21 @@ __MATX_INLINE__ cublasStatus_t DenseSolveGetrsBatched(cublasHandle_t handle,
                                                       int *info,
                                                       int batch_size)
 {
-  if constexpr (std::is_same_v<T, float>) {
+  if constexpr (cuda::std::is_same_v<T, float>) {
     return cublasSgetrsBatched(handle, CUBLAS_OP_N, n, nrhs, a_array, lda,
                                piv, b_array, ldb, info, batch_size);
   }
-  else if constexpr (std::is_same_v<T, double>) {
+  else if constexpr (cuda::std::is_same_v<T, double>) {
     return cublasDgetrsBatched(handle, CUBLAS_OP_N, n, nrhs, a_array, lda,
                                piv, b_array, ldb, info, batch_size);
   }
-  else if constexpr (std::is_same_v<T, cuda::std::complex<float>>) {
+  else if constexpr (cuda::std::is_same_v<T, cuda::std::complex<float>>) {
     return cublasCgetrsBatched(
         handle, CUBLAS_OP_N, n, nrhs,
         reinterpret_cast<const cuComplex *const *>(a_array), lda, piv,
         reinterpret_cast<cuComplex *const *>(b_array), ldb, info, batch_size);
   }
-  else if constexpr (std::is_same_v<T, cuda::std::complex<double>>) {
+  else if constexpr (cuda::std::is_same_v<T, cuda::std::complex<double>>) {
     return cublasZgetrsBatched(
         handle, CUBLAS_OP_N, n, nrhs,
         reinterpret_cast<const cuDoubleComplex *const *>(a_array), lda, piv,

@@ -70,7 +70,7 @@ struct RandomOperatorIterator {
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorIterator(const OperatorBaseType &t, stride_type offset) : t_(t), offset_(offset) {}
 
   template<typename T = OperatorType>
-    requires (!std::is_same_v<T, OperatorBaseType>)
+    requires (!cuda::std::is_same_v<T, OperatorBaseType>)
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ RandomOperatorIterator(OperatorBaseType &&t, stride_type offset) : t_(t), offset_(offset) {}
 
   /**

@@ -94,12 +94,12 @@ public:
     params_ = GetGemmParams(c, a, b, stream, alpha, beta);
 
     // Properly typed alpha, beta.
-    if constexpr (std::is_same_v<TCOMP, cuda::std::complex<float>> ||
-                  std::is_same_v<TCOMP, cuda::std::complex<double>>) {
+    if constexpr (cuda::std::is_same_v<TCOMP, cuda::std::complex<float>> ||
+                  cuda::std::is_same_v<TCOMP, cuda::std::complex<double>>) {
       salpha_ = {alpha, 0};
       sbeta_ = {beta, 0};
-    } else if constexpr (std::is_same_v<TCOMP, float> ||
-                         std::is_same_v<TCOMP, double>) {
+    } else if constexpr (cuda::std::is_same_v<TCOMP, float> ||
+                         cuda::std::is_same_v<TCOMP, double>) {
       salpha_ = alpha;
       sbeta_ = beta;
     } else {
@@ -298,13 +298,13 @@ void sparse_matmul_impl(TensorTypeC &C, const TensorTypeA &a,
   // Restrictions.
   static_assert(RANKA == 2 && RANKB == 2 && RANKC == 2,
                 "tensors must have rank-2");
-  static_assert(std::is_same_v<TC, TA> && std::is_same_v<TC, TB>,
+  static_assert(cuda::std::is_same_v<TC, TA> && cuda::std::is_same_v<TC, TB>,
                 "tensors must have the same data type");
-  static_assert(std::is_same_v<TC, matx::matxFp16> ||
-                    std::is_same_v<TC, matx::matxBf16> ||
-                    std::is_same_v<TC, float> || std::is_same_v<TC, double> ||
-                    std::is_same_v<TC, cuda::std::complex<float>> ||
-                    std::is_same_v<TC, cuda::std::complex<double>>,
+  static_assert(cuda::std::is_same_v<TC, matx::matxFp16> ||
+                    cuda::std::is_same_v<TC, matx::matxBf16> ||
+                    cuda::std::is_same_v<TC, float> || cuda::std::is_same_v<TC, double> ||
+                    cuda::std::is_same_v<TC, cuda::std::complex<float>> ||
+                    cuda::std::is_same_v<TC, cuda::std::complex<double>>,
                 "unsupported data type");
   MATX_ASSERT(a.Size(RANKA - 1) == b.Size(RANKB - 2) &&
                   c.Size(RANKC - 1) == b.Size(RANKB - 1) &&

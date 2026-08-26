@@ -104,8 +104,8 @@ public:
 
     // Type checks
     MATX_STATIC_ASSERT_STR(!is_half_v<T1>, matxInvalidType, "LU solver does not support half precision");
-    MATX_STATIC_ASSERT_STR((std::is_same_v<T1, typename OutTensor_t::value_type>), matxInavlidType, "Input and Output types must match");
-    MATX_STATIC_ASSERT_STR((std::is_same_v<T2, int64_t>), matxInavlidType, "Pivot tensor type must be int64_t");
+    MATX_STATIC_ASSERT_STR((cuda::std::is_same_v<T1, typename OutTensor_t::value_type>), matxInavlidType, "Input and Output types must match");
+    MATX_STATIC_ASSERT_STR((cuda::std::is_same_v<T2, int64_t>), matxInavlidType, "Pivot tensor type must be int64_t");
 
     params = GetLUParams(piv, a, exec);
     this->GetWorkspaceSize();
@@ -187,7 +187,7 @@ public:
         MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
           ("Parameter " + std::to_string(-info) + " had an illegal value in cuSolver Xgetrf").c_str());
       } else {
-        MATX_ASSERT_STR_EXP(info, 0, matxSolverError, 
+        MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
           ("U is singular: U(" + std::to_string(info) + "," + std::to_string(info) + ") = 0 in cuSolver Xgetrf").c_str());
       }
     }
@@ -265,7 +265,7 @@ void lu_impl(OutputTensor &&out, PivotTensor &&piv,
         const ATensor &a, const cudaExecutor &exec)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-    
+
   using T1 = typename remove_cvref_t<OutputTensor>::value_type;
 
   auto piv_new = OpToTensor(piv, exec);

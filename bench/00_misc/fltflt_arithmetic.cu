@@ -325,7 +325,7 @@ __global__ void iterative_fma_kernel(T* __restrict__ result, int64_t size, int32
     for (int32_t i = 0; i < iterations; i++) {
       #pragma unroll
       for (int ilp = 0; ilp < ILP_FACTOR; ilp++) {
-        if constexpr (std::is_same_v<T, fltflt>) {
+        if constexpr (cuda::std::is_same_v<T, fltflt>) {
           acc[ilp] = fltflt_fma(val_a, acc[ilp], val_b);
         } else {
           acc[ilp] = val_a * acc[ilp] + val_b;
@@ -525,7 +525,7 @@ __global__ void iterative_sqrt_fast_kernel(T* __restrict__ result, int64_t size,
 
     #pragma unroll
     for (int ilp = 0; ilp < ILP_FACTOR; ilp++) {
-      if constexpr (std::is_same_v<T, fltflt>) {
+      if constexpr (cuda::std::is_same_v<T, fltflt>) {
         val[ilp] = fltflt_sqrt_fast(init_val);
       } else {
         val[ilp] = sqrt(init_val);
@@ -536,7 +536,7 @@ __global__ void iterative_sqrt_fast_kernel(T* __restrict__ result, int64_t size,
     for (int32_t i = 1; i < iterations; i++) {
       #pragma unroll
       for (int ilp = 0; ilp < ILP_FACTOR; ilp++) {
-        if constexpr (std::is_same_v<T, fltflt>) {
+        if constexpr (cuda::std::is_same_v<T, fltflt>) {
           val[ilp] = fltflt_sqrt_fast(val[ilp]);
         } else {
           val[ilp] = sqrt(val[ilp]);
@@ -607,7 +607,7 @@ __global__ void iterative_norm3d_kernel(T* __restrict__ result, int64_t size, in
       #pragma unroll
       for (int ilp = 0; ilp < ILP_FACTOR; ilp++) {
         T norm;
-        if constexpr (std::is_same_v<T, fltflt>) {
+        if constexpr (cuda::std::is_same_v<T, fltflt>) {
           norm = fltflt_norm3d(dx[ilp], dy, dz);
         } else {
           norm = sqrt(dx[ilp] * dx[ilp] + dy * dy + dz * dz);
@@ -616,7 +616,7 @@ __global__ void iterative_norm3d_kernel(T* __restrict__ result, int64_t size, in
         // Add the computed norm and subtract off the approximate
         // expected norm to keep dx in a stable range while preventing
         // the compiler from optimizing away the computation.
-        if constexpr (std::is_same_v<T, fltflt>) {
+        if constexpr (cuda::std::is_same_v<T, fltflt>) {
           // fltflt addition/subtraction is expensive and we do not want to bias the benchmark
           // too much, so at least keep the expected norm as a float rather than fltflt to
           // reduce the cost of the subtraction.
@@ -754,7 +754,7 @@ __global__ void iterative_fma_approx_kernel(T* __restrict__ result, int64_t size
     for (int32_t i = 0; i < iterations; i++) {
       #pragma unroll
       for (int ilp = 0; ilp < ILP_FACTOR; ilp++) {
-        if constexpr (std::is_same_v<T, fltflt>) {
+        if constexpr (cuda::std::is_same_v<T, fltflt>) {
           acc[ilp] = fltflt_fma_approx(val_a, acc[ilp], val_b);
         } else {
           acc[ilp] = val_a * acc[ilp] + val_b;
@@ -820,7 +820,7 @@ __global__ void iterative_madd_kernel(T* __restrict__ result, int64_t size, int3
     for (int32_t i = 0; i < iterations; i++) {
       #pragma unroll
       for (int ilp = 0; ilp < ILP_FACTOR; ilp++) {
-        if constexpr (std::is_same_v<T, fltflt>) {
+        if constexpr (cuda::std::is_same_v<T, fltflt>) {
           // Explicitly separate multiply and add for fltflt
           acc[ilp] = fltflt_add(fltflt_mul(val_a, acc[ilp]), val_b);
         } else {
@@ -881,9 +881,9 @@ __global__ void iterative_round_kernel(T* __restrict__ result, int64_t size, int
 
     #pragma unroll
     for (int ilp = 0; ilp < ILP_FACTOR; ilp++) {
-      if constexpr (std::is_same_v<T, fltflt>) {
+      if constexpr (cuda::std::is_same_v<T, fltflt>) {
         val[ilp] = fltflt_round_to_nearest(init_val);
-      } else if constexpr (std::is_same_v<T, float>) {
+      } else if constexpr (cuda::std::is_same_v<T, float>) {
         val[ilp] = nearbyintf(init_val);
       } else {
         val[ilp] = nearbyint(init_val);
@@ -895,9 +895,9 @@ __global__ void iterative_round_kernel(T* __restrict__ result, int64_t size, int
     for (int32_t i = 1; i < iterations; i++) {
       #pragma unroll
       for (int ilp = 0; ilp < ILP_FACTOR; ilp++) {
-        if constexpr (std::is_same_v<T, fltflt>) {
+        if constexpr (cuda::std::is_same_v<T, fltflt>) {
           val[ilp] = fltflt_round_to_nearest(val[ilp]);
-        } else if constexpr (std::is_same_v<T, float>) {
+        } else if constexpr (cuda::std::is_same_v<T, float>) {
           val[ilp] = nearbyintf(val[ilp]);
         } else {
           val[ilp] = nearbyint(val[ilp]);
@@ -957,9 +957,9 @@ __global__ void iterative_fmod_kernel(T* __restrict__ result, int64_t size, int3
 
     #pragma unroll
     for (int ilp = 0; ilp < ILP_FACTOR; ilp++) {
-      if constexpr (std::is_same_v<T, fltflt>) {
+      if constexpr (cuda::std::is_same_v<T, fltflt>) {
         val[ilp] = fltflt_fmod(init_val, divisor);
-      } else if constexpr (std::is_same_v<T, float>) {
+      } else if constexpr (cuda::std::is_same_v<T, float>) {
         val[ilp] = fmodf(init_val, divisor);
       } else {
         val[ilp] = fmod(init_val, divisor);
@@ -970,10 +970,10 @@ __global__ void iterative_fmod_kernel(T* __restrict__ result, int64_t size, int3
     for (int32_t i = 1; i < iterations; i++) {
       #pragma unroll
       for (int ilp = 0; ilp < ILP_FACTOR; ilp++) {
-        if constexpr (std::is_same_v<T, fltflt>) {
+        if constexpr (cuda::std::is_same_v<T, fltflt>) {
           val[ilp] = val[ilp].hi + fltflt_fmod(init_val, divisor);
           asm volatile("" : "+f"(val[ilp].hi), "+f"(val[ilp].lo));
-        } else if constexpr (std::is_same_v<T, float>) {
+        } else if constexpr (cuda::std::is_same_v<T, float>) {
           val[ilp] = val[ilp] + fmodf(init_val, divisor);
           asm volatile("" : "+f"(val[ilp]));
         } else {
@@ -981,7 +981,7 @@ __global__ void iterative_fmod_kernel(T* __restrict__ result, int64_t size, int3
           asm volatile("" : "+d"(val[ilp]));
         }
       }
-      if constexpr (std::is_same_v<T, float>) {
+      if constexpr (cuda::std::is_same_v<T, float>) {
         // fp32 add is full-rate, no benefit from a bit-twiddle here.
         init_val += 2048.0f;
       } else {
@@ -1042,9 +1042,9 @@ __global__ void iterative_trunc_kernel(T* __restrict__ result, int64_t size, int
 
     #pragma unroll
     for (int ilp = 0; ilp < ILP_FACTOR; ilp++) {
-      if constexpr (std::is_same_v<T, fltflt>) {
+      if constexpr (cuda::std::is_same_v<T, fltflt>) {
         val[ilp] = fltflt_round_toward_zero(init_val);
-      } else if constexpr (std::is_same_v<T, float>) {
+      } else if constexpr (cuda::std::is_same_v<T, float>) {
         val[ilp] = truncf(init_val);
       } else {
         val[ilp] = trunc(init_val);
@@ -1055,10 +1055,10 @@ __global__ void iterative_trunc_kernel(T* __restrict__ result, int64_t size, int
     for (int32_t i = 1; i < iterations; i++) {
       #pragma unroll
       for (int ilp = 0; ilp < ILP_FACTOR; ilp++) {
-        if constexpr (std::is_same_v<T, fltflt>) {
+        if constexpr (cuda::std::is_same_v<T, fltflt>) {
           val[ilp] = val[ilp].hi + fltflt_round_toward_zero(init_val);
           asm volatile("" : "+f"(val[ilp].hi), "+f"(val[ilp].lo));
-        } else if constexpr (std::is_same_v<T, float>) {
+        } else if constexpr (cuda::std::is_same_v<T, float>) {
           val[ilp] = val[ilp] + truncf(init_val);
           asm volatile("" : "+f"(val[ilp]));
         } else {
@@ -1066,7 +1066,7 @@ __global__ void iterative_trunc_kernel(T* __restrict__ result, int64_t size, int
           asm volatile("" : "+d"(val[ilp]));
         }
       }
-      if constexpr (std::is_same_v<T, float>) {
+      if constexpr (cuda::std::is_same_v<T, float>) {
         // fp32 add is full-rate, no benefit from a bit-twiddle here.
         init_val += 2048.0f;
       } else {
@@ -1127,9 +1127,9 @@ __global__ void iterative_floor_kernel(T* __restrict__ result, int64_t size, int
 
     #pragma unroll
     for (int ilp = 0; ilp < ILP_FACTOR; ilp++) {
-      if constexpr (std::is_same_v<T, fltflt>) {
+      if constexpr (cuda::std::is_same_v<T, fltflt>) {
         val[ilp] = fltflt_floor(init_val);
-      } else if constexpr (std::is_same_v<T, float>) {
+      } else if constexpr (cuda::std::is_same_v<T, float>) {
         val[ilp] = floorf(init_val);
       } else {
         val[ilp] = floor(init_val);
@@ -1140,10 +1140,10 @@ __global__ void iterative_floor_kernel(T* __restrict__ result, int64_t size, int
     for (int32_t i = 1; i < iterations; i++) {
       #pragma unroll
       for (int ilp = 0; ilp < ILP_FACTOR; ilp++) {
-        if constexpr (std::is_same_v<T, fltflt>) {
+        if constexpr (cuda::std::is_same_v<T, fltflt>) {
           val[ilp] = val[ilp].hi + fltflt_floor(init_val);
           asm volatile("" : "+f"(val[ilp].hi), "+f"(val[ilp].lo));
-        } else if constexpr (std::is_same_v<T, float>) {
+        } else if constexpr (cuda::std::is_same_v<T, float>) {
           val[ilp] = val[ilp] + floorf(init_val);
           asm volatile("" : "+f"(val[ilp]));
         } else {
@@ -1151,7 +1151,7 @@ __global__ void iterative_floor_kernel(T* __restrict__ result, int64_t size, int
           asm volatile("" : "+d"(val[ilp]));
         }
       }
-      if constexpr (std::is_same_v<T, float>) {
+      if constexpr (cuda::std::is_same_v<T, float>) {
         // fp32 add is full-rate, no benefit from a bit-twiddle here.
         init_val += 2048.0f;
       } else {
@@ -1222,7 +1222,7 @@ __global__ void iterative_cast2dbl_kernel(double* __restrict__ result, int64_t s
         acc[ilp] = static_cast<double>(src_val);
         asm volatile("" : "+d"(acc[ilp]));
       }
-      if constexpr (std::is_same_v<T, float>) {
+      if constexpr (cuda::std::is_same_v<T, float>) {
         // fp32 add is full-rate, no benefit from a bit-twiddle here.
         src_val = src_val + static_cast<T>(0.0001);
       } else {
@@ -1294,7 +1294,7 @@ __global__ void iterative_cast2fltflt_kernel(fltflt* __restrict__ result, int64_
         acc[ilp] = static_cast<fltflt>(src_val);
         asm volatile("" : "+f"(acc[ilp].hi), "+f"(acc[ilp].lo));
       }
-      if constexpr (std::is_same_v<T, float>) {
+      if constexpr (cuda::std::is_same_v<T, float>) {
         // fp32 add is full-rate, no benefit from a bit-twiddle here.
         src_val = src_val + static_cast<T>(0.0001);
       } else {

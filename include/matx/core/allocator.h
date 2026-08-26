@@ -53,7 +53,7 @@ namespace matx {
 
 /**
  * @brief Space where memory is stored (also called Kind in some contexts)
- * 
+ *
  */
 enum matxMemorySpace_t {
   MATX_MANAGED_MEMORY,      ///< CUDA managed memory or CUDA Unified Memory (UM) from cudaMallocManaged
@@ -117,13 +117,13 @@ struct MemTracker {
       // these cases if they know the issue.
       MATX_THROW(matxInvalidParameter, "Couldn't find pointer in allocation cache");
   #else
-      return;      
-  #endif    
+      return;
+  #endif
     }
 
     size_t bytes = iter->second.size;
 
-    MATX_LOG_DEBUG("Deallocating memory: ptr={}, {} bytes, space={}, remaining={} bytes", 
+    MATX_LOG_DEBUG("Deallocating memory: ptr={}, {} bytes, space={}, remaining={} bytes",
                    ptr, bytes, static_cast<int>(iter->second.kind), matxMemoryStats.currentBytesAllocated - bytes);
 
     matxMemoryStats.currentBytesAllocated -= bytes;
@@ -151,7 +151,7 @@ struct MemTracker {
       break;
     case MATX_ASYNC_DEVICE_MEMORY:
       if (is_cuda_free()) {
-        if constexpr (std::is_same_v<no_stream_t, StreamType>) {
+        if constexpr (cuda::std::is_same_v<no_stream_t, StreamType>) {
           cudaFreeAsync(ptr, iter->second.stream);
         }
         else {
@@ -163,7 +163,7 @@ struct MemTracker {
       MATX_THROW(matxInvalidType, "Invalid memory type");
     }
 
-    allocationMap.erase(ptr);    
+    allocationMap.erase(ptr);
   }
 
   struct no_stream_t{};
@@ -177,13 +177,13 @@ struct MemTracker {
   auto deallocate(void *ptr, cudaStream_t stream) {
     [[maybe_unused]] std::unique_lock lck(memory_mtx);
     deallocate_internal(ptr, valid_stream_t{stream});
-  }    
+  }
 
   void allocate(void **ptr, size_t bytes,
                       matxMemorySpace_t space = MATX_MANAGED_MEMORY,
                       cudaStream_t stream = 0) {
     [[maybe_unused]] cudaError_t err = cudaSuccess;
-    
+
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
     if (ptr == nullptr) {
@@ -203,9 +203,9 @@ struct MemTracker {
         space = MATX_HOST_MEMORY;
       }
     }
-    
+
     MATX_LOG_DEBUG("Allocating memory: {} bytes, space={}, stream={}", bytes, static_cast<int>(space), reinterpret_cast<void*>(stream));
-    
+
     switch (space) {
     case MATX_MANAGED_MEMORY:
       err = cudaMallocManaged(ptr, bytes);
@@ -226,7 +226,7 @@ struct MemTracker {
       MATX_THROW(matxInvalidType, "Invalid memory kind when allocating!");
     };
 
-    MATX_ASSERT_STR_EXP(err, cudaSuccess, matxOutOfMemory, 
+    MATX_ASSERT_STR_EXP(err, cudaSuccess, matxOutOfMemory,
       "Failed to allocate memory. May be an asynchronous error from another CUDA call");
 
     if (*ptr == nullptr) {
@@ -251,7 +251,7 @@ struct MemTracker {
     [[maybe_unused]] std::unique_lock lck(memory_mtx);
     auto iter = allocationMap.find(ptr);
 
-    return iter != allocationMap.end();    
+    return iter != allocationMap.end();
   }
 
   matxMemorySpace_t get_pointer_kind(void *ptr) {
@@ -311,9 +311,9 @@ __MATX_INLINE__ void FreeAllocations() {
 
 /**
  * @brief Determine if a pointer is printable by the host
- * 
+ *
  * Pointers are printable if they're either a managed or pinned memory pointer
- * 
+ *
  * @param mem Memory space
  * @return True is pointer can be printed from the host
  */
@@ -324,9 +324,9 @@ __MATX_INLINE__ bool HostPrintable(matxMemorySpace_t mem)
 
 /**
  * @brief Determine if a pointer is printable by the device
- * 
+ *
  * Pointers are printable if they're either a managed or device memory pointer
- * 
+ *
  * @param mem Memory space
  * @return True is pointer can be printed from the device
  */
@@ -338,7 +338,7 @@ __MATX_INLINE__ bool DevicePrintable(matxMemorySpace_t mem)
 
 /**
  * @brief Get memory statistics
- * 
+ *
  * @param current Current memory usage
  * @param total Total memory usage
  * @param max Maximum memory usage
@@ -353,7 +353,7 @@ __MATX_INLINE__ void matxGetMemoryStats(size_t *current, size_t *total, size_t *
 
 /**
  * @brief Check if a pointer was allocated
- * 
+ *
  * @param ptr Pointer
  * @return True if allocator
  */
@@ -380,7 +380,7 @@ __MATX_INLINE__ matxMemorySpace_t GetPointerKind(void *ptr)
 
 /**
  * @brief Print memory statistics to stdout
- * 
+ *
  */
 __MATX_INLINE__ void matxPrintMemoryStatistics()
 {
@@ -396,9 +396,9 @@ __MATX_INLINE__ void matxPrintMemoryStatistics()
 
 /**
  * @brief Allocate memory
- * 
+ *
  * Can be used for managed, pinned, malloced, device, and async device allocations
- * 
+ *
  * @param ptr Pointer to store allocated pointer
  * @param bytes Bytes to allocate
  * @param space Memory space
@@ -409,7 +409,7 @@ __MATX_INLINE__ void matxAlloc(void **ptr, size_t bytes,
                       cudaStream_t stream = 0)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-  
+
   return GetAllocMap().allocate(ptr, bytes, space, stream);
 }
 
@@ -417,7 +417,7 @@ __MATX_INLINE__ void matxAlloc(void **ptr, size_t bytes,
 __MATX_INLINE__ void matxFree(void *ptr)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-  
+
   return GetAllocMap().deallocate(ptr);
 }
 
@@ -429,7 +429,7 @@ __MATX_INLINE__ void matxFree(void *ptr, cudaStream_t stream)
 }
 
 /**
-  Update the stream a pointer in the cache is using. This should be used when the call wants to use 
+  Update the stream a pointer in the cache is using. This should be used when the call wants to use
   memory that was allocated in stream A inside of stream B. The caller must ensure that the pointer
   and stream being used are valid.
 */
@@ -441,15 +441,15 @@ __MATX_INLINE__ void update_stream(void *ptr, cudaStream_t stream)
 
 /**
  * @brief Allocator following the PMR interface using the internal MatX allocator/deallocator
- * 
+ *
  */
 template <typename T>
 struct matx_allocator {
-  friend void swap([[maybe_unused]] matx_allocator<T> &lhs, [[maybe_unused]] matx_allocator<T> &rhs) noexcept  { }   
+  friend void swap([[maybe_unused]] matx_allocator<T> &lhs, [[maybe_unused]] matx_allocator<T> &rhs) noexcept  { }
 
   /**
    * @brief Allocate memory of at least ``size`` bytes
-   * 
+   *
    * @param size Size of allocation in bytes
    * @return Pointer to allocated memory, or nullptr on error
    */
@@ -462,14 +462,14 @@ struct matx_allocator {
 
   /**
    * @brief Deallocate memory of at least ``size`` bytes
-   * 
+   *
    * @param ptr Pointer to allocated data
    * @param size Size of previously-allocated memory in bytes
    */
   __MATX_INLINE__ void deallocate(void *ptr, [[maybe_unused]] size_t size)
   {
     matxFree(ptr);
-  }  
+  }
 };
 
 __MATX_INLINE__ std::string SpaceString(matxMemorySpace_t space) {

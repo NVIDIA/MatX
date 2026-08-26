@@ -2759,7 +2759,7 @@ void hist_impl(OutputTensor &a_out, const InputOperator &a,
           int num_levels,
           const cudaStream_t stream = 0)
 {
-  static_assert(std::is_same_v<typename OutputTensor::value_type, int>, "Output histogram operator must use int type");
+  static_assert(cuda::std::is_same_v<typename OutputTensor::value_type, int>, "Output histogram operator must use int type");
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   const cudaExecutor exec{stream};

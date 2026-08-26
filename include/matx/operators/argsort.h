@@ -56,7 +56,7 @@ namespace detail {
       cuda::std::array<index_t, OpA::Rank()> out_dims_;
       mutable detail::tensor_impl_t<index_t, OpA::Rank()> tmp_out_;
       mutable index_t *ptr = nullptr;
-      mutable bool prerun_done_ = false; 
+      mutable bool prerun_done_ = false;
       mutable ElementsPerThread current_ept_ = ElementsPerThread::ONE;
       mutable int current_groups_per_block_ = 1;
 
@@ -68,7 +68,7 @@ namespace detail {
       using sort_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "argsort()"; }
-      __MATX_INLINE__ ArgsortOp(const OpA &a, const SortDirection_t dir) : a_(a), dir_(dir) { 
+      __MATX_INLINE__ ArgsortOp(const OpA &a, const SortDirection_t dir) : a_(a), dir_(dir) {
         MATX_LOG_TRACE("{} constructor: rank={}, dir={}", str(), Rank(), static_cast<int>(dir));
         for (int r = 0; r < Rank(); r++) {
           out_dims_[r] = a_.Size(r);
@@ -180,7 +180,7 @@ namespace detail {
         }
         else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
 #ifdef MATX_EN_JIT
-          static_assert(std::is_same_v<InType, std::unordered_map<std::string, std::string>>,
+          static_assert(cuda::std::is_same_v<InType, std::unordered_map<std::string, std::string>>,
                         "JIT_CLASS_QUERY capability requires std::unordered_map<std::string, std::string> as input type");
           const auto [key, value] = get_jit_op_str();
           if (in.find(key) == in.end()) {
@@ -193,7 +193,7 @@ namespace detail {
 #endif
         }
         else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-          static_assert(std::is_same_v<remove_cvref_t<InType>, EPTQueryInput>, "ELEMENTS_PER_THREAD capability requires EPTQueryInput as input type");
+          static_assert(cuda::std::is_same_v<remove_cvref_t<InType>, EPTQueryInput>, "ELEMENTS_PER_THREAD capability requires EPTQueryInput as input type");
 #if defined(MATX_EN_JIT) && defined(__CUDACC__)
           if (in.jit) {
             const auto max_ept = static_cast<ElementsPerThread>(MaxJitElementsPerThread());
@@ -286,7 +286,7 @@ namespace detail {
       {
         return out_dims_[dim];
       }
-      
+
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
         argsort_impl(cuda::std::get<0>(out), a_, dir_, ex);
@@ -298,8 +298,8 @@ namespace detail {
       {
         if constexpr (is_matx_op<OpA>()) {
           a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-        }          
-      }      
+        }
+      }
 
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
@@ -308,7 +308,7 @@ namespace detail {
           return;
         }
 
-        InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));     
+        InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
 
         detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
 
