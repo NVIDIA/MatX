@@ -828,9 +828,26 @@ MATX_LOOP_UNROLL
   /**
    * @brief Return the storage container from the tensor
    *
+   * Returns a copy, which shares ownership of the buffer with this tensor. Use
+   * this overload to hand storage to something that keeps it, such as
+   * make_tensor() or a sparse tensor constructor.
+   *
    * @return storage container
    */
-  __MATX_INLINE__ auto GetStorage() const noexcept {
+  __MATX_INLINE__ auto GetStorage() noexcept {
+    return storage_;
+  }
+
+  /**
+   * @brief Return the storage container from the tensor
+   *
+   * Returns a reference, so reading through it costs no reference count update.
+   * The buffer is kept alive by this tensor, not by the returned reference, so
+   * do not hold it past the lifetime of the tensor.
+   *
+   * @return const reference to the storage container
+   */
+  __MATX_INLINE__ const auto &GetStorage() const noexcept {
     return storage_;
   }
 
