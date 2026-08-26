@@ -126,10 +126,10 @@ public:
     // Due to a LAPACK bug which gives incorrect workspace size calculations for single-precision
     // routines at large matrix sizes from to float-to-int conversions, should use double-precision
     // for the query. Only an issue in routines which may need O(n^2) memory.
-    using WorkQuery = std::conditional_t<cuda::std::is_same_v<T1, float>, double,
-                      std::conditional_t<cuda::std::is_same_v<T1, cuda::std::complex<float>>,
+    using WorkQuery = cuda::std::conditional_t<cuda::std::is_same_v<T1, float>, double,
+                      cuda::std::conditional_t<cuda::std::is_same_v<T1, cuda::std::complex<float>>,
                                         cuda::std::complex<double>, T1>>;
-    using RworkQuery = std::conditional_t<cuda::std::is_same_v<T2, float>, double, T2>;
+    using RworkQuery = cuda::std::conditional_t<cuda::std::is_same_v<T2, float>, double, T2>;
     WorkQuery work_query;
     RworkQuery rwork_query;
     lapack_int_t iwork_query;

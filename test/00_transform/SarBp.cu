@@ -90,7 +90,7 @@ TYPED_TEST(SarBpTestNonComplexNonHalfFloatTypes, NonMixedTypes)
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
   using complex_t = cuda::std::complex<TestType>;
-  using apc_t = std::conditional_t<cuda::std::is_same_v<TestType, double>, double3, float3>;
+  using apc_t = cuda::std::conditional_t<cuda::std::is_same_v<TestType, double>, double3, float3>;
 
   const index_t num_range_bins = 128;
   const index_t num_pulses = 128;
@@ -908,7 +908,7 @@ TYPED_TEST(SarBpTestNonComplexNonHalfFloatTypes, RangeToMcpOperatorInput)
 
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using complex_t = cuda::std::complex<TestType>;
-  using apc_t = std::conditional_t<cuda::std::is_same_v<TestType, double>, double3, float3>;
+  using apc_t = cuda::std::conditional_t<cuda::std::is_same_v<TestType, double>, double3, float3>;
 
   const index_t num_range_bins = 64;
   const index_t num_pulses = 64;

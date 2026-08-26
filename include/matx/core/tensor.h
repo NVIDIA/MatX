@@ -799,7 +799,7 @@ public:
     using Type = typename U::value_type;
     // Static descriptors have no runtime constructor, so fall back to a
     // dynamic descriptor whose shape/stride types match the original.
-    using OutDesc = std::conditional_t<
+    using OutDesc = cuda::std::conditional_t<
       is_matx_static_descriptor<Desc>,
       tensor_desc_cr_ds_t<typename Desc::shape_type, typename Desc::stride_type, RANK>,
       Desc>;
@@ -852,7 +852,7 @@ MATX_LOOP_UNROLL
     using Type = typename U::value_type;
     // Static descriptors have no runtime constructor, so fall back to a
     // dynamic descriptor whose shape/stride types match the original.
-    using OutDesc = std::conditional_t<
+    using OutDesc = cuda::std::conditional_t<
       is_matx_static_descriptor<Desc>,
       tensor_desc_cr_ds_t<typename Desc::shape_type, typename Desc::stride_type, RANK>,
       Desc>;

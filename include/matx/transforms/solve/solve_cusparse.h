@@ -212,9 +212,9 @@ void sparse_dia_solve_impl(TensorTypeC &C, const TensorTypeA &a,
   [[maybe_unused]] const index_t numD = a.crdSize(0);
   // TODO: we should also check that offsets = {-1,0,1} (host and device)?
   MATX_ASSERT(numD == 3, matxInvalidParameter);
-  using T = std::conditional_t<
+  using T = cuda::std::conditional_t<
       cuda::std::is_same_v<TA, cuda::std::complex<double>>, cuDoubleComplex,
-      std::conditional_t<cuda::std::is_same_v<TA, cuda::std::complex<float>>,
+      cuda::std::conditional_t<cuda::std::is_same_v<TA, cuda::std::complex<float>>,
                          cuFloatComplex, TA>>;
   T *AD = reinterpret_cast<T *>(a.Data());
   T *BD = reinterpret_cast<T *>(b.Data());
@@ -281,9 +281,9 @@ void sparse_batched_dia_solve_impl(TensorTypeC &C, const TensorTypeA &a,
   [[maybe_unused]] const index_t numD = a.crdSize(0);
   // TODO: we should also check that offsets = {-1,0,1} (host and device)?
   MATX_ASSERT(numD == 3, matxInvalidParameter);
-  using T = std::conditional_t<
+  using T = cuda::std::conditional_t<
       cuda::std::is_same_v<TA, cuda::std::complex<double>>, cuDoubleComplex,
-      std::conditional_t<cuda::std::is_same_v<TA, cuda::std::complex<float>>,
+      cuda::std::conditional_t<cuda::std::is_same_v<TA, cuda::std::complex<float>>,
                          cuFloatComplex, TA>>;
   T *AD = reinterpret_cast<T *>(a.Data());
   T *BD = reinterpret_cast<T *>(b.Data());

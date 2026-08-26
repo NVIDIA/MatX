@@ -100,7 +100,7 @@ struct SortParams_t {
 template <typename Op, typename I>
 struct ReduceParams_t {
   Op reduce_op;
-  std::decay_t<I> init;
+  cuda::std::decay_t<I> init;
 };
 
 template <typename SelectOp, typename CountTensor>

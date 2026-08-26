@@ -62,7 +62,7 @@ namespace matx
 
         __MATX_INLINE__ auto get_jit_op_str() const {
           std::string func_name = get_jit_class_name();
-          
+
           return cuda::std::make_tuple(
             func_name,
             std::format("template <typename RangeOp> struct {} {{\n"
@@ -91,7 +91,7 @@ namespace matx
 #endif
 
         __MATX_INLINE__ std::string str() const { return "logspace"; }
-	
+
         inline Logspace(T first, T last, index_t count)
         {
 #ifdef __CUDA_ARCH__
@@ -129,7 +129,7 @@ namespace matx
             }
           };
 
-          return detail::ApplyVecFunc<CapType, value_type>(log_func, range_val); 
+          return detail::ApplyVecFunc<CapType, value_type>(log_func, range_val);
         }
 
         template <OperatorCapability Cap, typename InType>
@@ -167,11 +167,11 @@ namespace matx
           else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
             const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
             return my_cap;
-          } else {          
+          } else {
             auto self_has_cap = detail::capability_attributes<Cap>::default_value;
             return self_has_cap;
           }
-        }       
+        }
 
 
         __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(index_t idx) const
@@ -194,20 +194,20 @@ namespace matx
    * Creates a set of values using a start and end that are log10-
    * spaced apart over the set of values. Distance is determined
    * by the shape and selected dimension.
-   * 
+   *
    * @tparam T Operator type
    * @tparam Dim Dimension to operate over
    * @tparam ShapeType Shape type
    * @param s Shape object
    * @param first First value
    * @param last Last value
-   * @return Operator with log10-spaced values 
+   * @return Operator with log10-spaced values
    */
   template <int Dim, typename ShapeType, typename T = float>
     requires (!cuda::std::is_array_v<remove_cvref_t<ShapeType>>)
   inline auto logspace(ShapeType &&s, T first, T last)
              {
-               constexpr int RANK = cuda::std::tuple_size<std::decay_t<ShapeType>>::value;
+               constexpr int RANK = cuda::std::tuple_size<cuda::std::decay_t<ShapeType>>::value;
                static_assert(RANK > Dim);
                auto count = *(s.begin() + Dim);
                detail::Logspace<T> l(first, last, count);
@@ -220,14 +220,14 @@ namespace matx
    * Creates a set of values using a start and end that are log10-
    * spaced apart over the set of values. Distance is determined
    * by the shape and selected dimension.
-   * 
+   *
    * @tparam T Operator type
    * @tparam Dim Dimension to operate over
    * @tparam ShapeType Shape type
    * @param s Shape object
    * @param first First value
    * @param last Last value
-   * @return Operator with log10-spaced values 
+   * @return Operator with log10-spaced values
    */
   template <int Dim, int RANK, typename T = float>
     inline auto logspace(const index_t (&s)[RANK], T first, T last)

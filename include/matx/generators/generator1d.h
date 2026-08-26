@@ -36,13 +36,13 @@
 namespace matx
 {
   namespace detail {
-    template <typename Generator1D, int Dim, typename ShapeType> 
+    template <typename Generator1D, int Dim, typename ShapeType>
     class matxGenerator1D_t : public BaseOp<matxGenerator1D_t<Generator1D, Dim, ShapeType>>{
       public:
         // dummy type to signal this is a matxop
         using matxop = bool;
         using value_type = typename Generator1D::value_type;
-        static constexpr int RANK = cuda::std::tuple_size<std::decay_t<ShapeType>>::value;
+        static constexpr int RANK = cuda::std::tuple_size<cuda::std::decay_t<ShapeType>>::value;
 
         __MATX_INLINE__ std::string str() const { return "gen1d"; }
 
@@ -58,14 +58,14 @@ namespace matx
             else {
               return detail::capability_attributes<Cap>::default_value;
             }
-          } 
-          else if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY || 
+          }
+          else if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY ||
                              Cap == OperatorCapability::JIT_CLASS_QUERY ||
                              Cap == OperatorCapability::SUPPORTS_JIT) {
             // Forward JIT-related capabilities to the generator
             return f_.template get_capability<Cap>(in);
           }
-          else {          
+          else {
             return detail::capability_attributes<Cap>::default_value;
           }
         }

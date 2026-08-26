@@ -46,7 +46,7 @@ namespace matx
     class CorrOp : public BaseOp<CorrOp<OpA, OpB, PermDims>>
     {
       private:
-        using out_t = std::conditional_t<is_complex_v<typename OpA::value_type>,
+        using out_t = cuda::std::conditional_t<is_complex_v<typename OpA::value_type>,
               typename OpA::value_type, typename OpB::value_type>;
         constexpr static int max_rank = cuda::std::max(OpA::Rank(), OpB::Rank());
         typename detail::base_type_t<OpA> a_;

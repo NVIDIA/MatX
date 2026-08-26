@@ -64,7 +64,7 @@ namespace matx
         PermDims perm_;
         FFTNorm norm_;
         cuda::std::array<index_t, OpA::Rank()> out_dims_;
-        using ttype = std::conditional_t<is_complex_v<typename OpA::value_type>,
+        using ttype = cuda::std::conditional_t<is_complex_v<typename OpA::value_type>,
                                           typename OpA::value_type,
                                           typename scalar_to_complex<typename OpA::value_type>::ctype>;
         // This should be tensor_impl_t, but need to work around issues with temp types returned in fft
@@ -78,7 +78,7 @@ namespace matx
       public:
         using matxop = bool;
         using input_type = typename OpA::value_type;
-        using value_type = std::conditional_t<is_complex_v<input_type>,
+        using value_type = cuda::std::conditional_t<is_complex_v<input_type>,
           input_type,
           typename scalar_to_complex<input_type>::ctype>;
         using matx_transform_op = bool;
@@ -547,7 +547,7 @@ namespace matx
                     "Distributed FFT requires a batch dimension followed by "
                     "the transform dimension");
       using input_type = typename remove_cvref_t<OpA>::value_type;
-      using output_type = std::conditional_t<
+      using output_type = cuda::std::conditional_t<
           is_complex_v<input_type>, input_type,
           typename detail::scalar_to_complex<input_type>::ctype>;
       auto local_fft = [fft_size_, norm](const auto &local_a) {
@@ -776,7 +776,7 @@ namespace matx
         PermDims perm_;
         FFTNorm norm_;
         cuda::std::array<index_t, OpA::Rank()> out_dims_;
-        using ttype = std::conditional_t<is_complex_v<typename OpA::value_type>,
+        using ttype = cuda::std::conditional_t<is_complex_v<typename OpA::value_type>,
                                           typename OpA::value_type,
                                           typename scalar_to_complex<typename OpA::value_type>::ctype>;
         // This should be tensor_impl_t, but need to work around issues with temp types returned in fft

@@ -316,7 +316,7 @@ private:
 template<typename OutTensorType, typename InTensorType> class matxFFTWPlan_t {
 public:
   using out_value_type = typename OutTensorType::value_type;
-  using plan_type = std::conditional_t<is_fp32_inner_type_v<out_value_type>, fftwf_plan, fftw_plan>;
+  using plan_type = cuda::std::conditional_t<is_fp32_inner_type_v<out_value_type>, fftwf_plan, fftw_plan>;
 
   template <ThreadsMode MODE>
   matxFFTWPlan_t(OutTensorType &o,

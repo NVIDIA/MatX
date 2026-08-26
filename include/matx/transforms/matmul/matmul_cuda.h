@@ -1015,13 +1015,13 @@ private:
     if constexpr (RANK == 2) {
       if constexpr (PROV == PROVIDER_TYPE_CUTLASS) {
 #ifdef MATX_ENABLE_CUTLASS
-        using CutlassAOrder = std::conditional_t<OrderA == MEM_ORDER_ROW_MAJOR,
+        using CutlassAOrder = cuda::std::conditional_t<OrderA == MEM_ORDER_ROW_MAJOR,
                                                  cutlass::layout::RowMajor,
                                                  cutlass::layout::ColumnMajor>;
-        using CutlassBOrder = std::conditional_t<OrderB == MEM_ORDER_ROW_MAJOR,
+        using CutlassBOrder = cuda::std::conditional_t<OrderB == MEM_ORDER_ROW_MAJOR,
                                                  cutlass::layout::RowMajor,
                                                  cutlass::layout::ColumnMajor>;
-        using CutlassCOrder = std::conditional_t<OrderC == MEM_ORDER_ROW_MAJOR,
+        using CutlassCOrder = cuda::std::conditional_t<OrderC == MEM_ORDER_ROW_MAJOR,
                                                  cutlass::layout::RowMajor,
                                                  cutlass::layout::ColumnMajor>;
         using CutlassGemm =
@@ -1059,13 +1059,13 @@ private:
     else {
       static_assert(RANK > 2);
 #ifdef MATX_ENABLE_CUTLASS
-      using CutlassAOrder = std::conditional_t<OrderA == MEM_ORDER_ROW_MAJOR,
+      using CutlassAOrder = cuda::std::conditional_t<OrderA == MEM_ORDER_ROW_MAJOR,
                                                cutlass::layout::RowMajor,
                                                cutlass::layout::ColumnMajor>;
-      using CutlassBOrder = std::conditional_t<OrderB == MEM_ORDER_ROW_MAJOR,
+      using CutlassBOrder = cuda::std::conditional_t<OrderB == MEM_ORDER_ROW_MAJOR,
                                                cutlass::layout::RowMajor,
                                                cutlass::layout::ColumnMajor>;
-      using CutlassCOrder = std::conditional_t<OrderC == MEM_ORDER_ROW_MAJOR,
+      using CutlassCOrder = cuda::std::conditional_t<OrderC == MEM_ORDER_ROW_MAJOR,
                                                cutlass::layout::RowMajor,
                                                cutlass::layout::ColumnMajor>;
       using CutlassGemm = cutlass::gemm::device::GemmBatched<

@@ -43,7 +43,7 @@ constexpr int n = 50;
 template <typename T> class LUSolverTest : public ::testing::Test {
 protected:
   using GTestType = cuda::std::tuple_element_t<0, T>;
-  using GExecType = cuda::std::tuple_element_t<1, T>;   
+  using GExecType = cuda::std::tuple_element_t<1, T>;
   void SetUp() override
   {
     if constexpr (!detail::CheckSolverSupport<GExecType>()) {
@@ -435,7 +435,7 @@ TYPED_TEST(LUSolverTestFloatTypes, LUBasic)
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
-  using piv_value_type = std::conditional_t<is_cuda_executor_v<ExecType>, int64_t, lapack_int_t>;
+  using piv_value_type = cuda::std::conditional_t<is_cuda_executor_v<ExecType>, int64_t, lapack_int_t>;
 
   auto Av = make_tensor<TestType>({m, n});
   auto PivV = make_tensor<piv_value_type>({std::min(m, n)});
@@ -476,7 +476,7 @@ TYPED_TEST(LUSolverTestFloatTypes, LUBasicBatched)
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
-  using piv_value_type = std::conditional_t<is_cuda_executor_v<ExecType>, int64_t, lapack_int_t>;
+  using piv_value_type = cuda::std::conditional_t<is_cuda_executor_v<ExecType>, int64_t, lapack_int_t>;
   constexpr int batches = 10;
 
   auto Av = make_tensor<TestType>({batches, m, n});
@@ -518,7 +518,7 @@ TYPED_TEST(LUSolverTestFloatTypes, ProjectionAPI)
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
   using value_type = typename inner_op_type_t<TestType>::type;
-  using piv_value_type = std::conditional_t<is_cuda_executor_v<ExecType>, int64_t, lapack_int_t>;
+  using piv_value_type = cuda::std::conditional_t<is_cuda_executor_v<ExecType>, int64_t, lapack_int_t>;
 
   constexpr index_t rows = 8;
   constexpr index_t cols = 5;

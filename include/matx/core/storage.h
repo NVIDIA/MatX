@@ -106,13 +106,13 @@ namespace matx
 
     // Owning constructor with any allocator that has allocate/deallocate methods
     template<typename Allocator>
-      requires has_allocator_interface_any<std::decay_t<Allocator>>
+      requires has_allocator_interface_any<cuda::std::decay_t<Allocator>>
     Storage(size_t size, Allocator&& alloc)
       : size_(size) {
       if (size == 0) {
         // For zero size, create empty storage without allocation
         data_ = std::shared_ptr<T>();
-      } else if constexpr (cuda::std::is_pointer_v<std::decay_t<Allocator>>) {
+      } else if constexpr (cuda::std::is_pointer_v<cuda::std::decay_t<Allocator>>) {
         // Handle allocator pointers (any pointer to object with allocate/deallocate methods)
         T* ptr = static_cast<T*>(alloc->allocate(size * sizeof(T)));
         data_ = std::shared_ptr<T>(ptr, [size, alloc](T* p) {

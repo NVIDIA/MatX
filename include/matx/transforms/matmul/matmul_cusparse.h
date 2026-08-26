@@ -80,7 +80,7 @@ public:
   using TC = typename TensorTypeC::value_type;
 
   // Mixed-precision compute type.
-  using TCOMP = std::conditional_t<is_matx_half_v<TC>, float, TC>;
+  using TCOMP = cuda::std::conditional_t<is_matx_half_v<TC>, float, TC>;
 
   /**
    * Construct a sparse GEMM handle

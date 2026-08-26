@@ -139,7 +139,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexNonHalfAllExecsWithoutJIT, ZipVecOp)
       ASSERT_EQ(t3(0).y, static_cast<double>(1));
     }
     // Note that some narrowing conversions like int -> float are currently allowed.
-    // This is because std::common_type_t<int, float> is float, and the zipvec operator
+    // This is because cuda::std::common_type_t<int, float> is float, and the zipvec operator
     // uses std::common_type for its value_type.
   }
 

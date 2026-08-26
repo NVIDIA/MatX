@@ -55,7 +55,7 @@ namespace matx
         using dynamic_tensor_expr = cuda::std::bool_constant<
           is_dynamic_tensor_v<T1> || is_dynamic_rank_op_v<T1>>;
 
-        using complex_type = std::conditional_t<is_matx_half_v<value_type>,
+        using complex_type = cuda::std::conditional_t<is_matx_half_v<value_type>,
               matxHalfComplex<value_type>,
               cuda::std::complex<value_type>>;
 
@@ -80,7 +80,7 @@ namespace matx
           for (int i = 0; i < actual_rank; ++i) {
             out_dims_[i] = Size(i);
           }
-          
+
           return cuda::std::make_tuple(
             func_name,
             std::format("template <typename T> struct {} {{\n"
@@ -125,10 +125,10 @@ namespace matx
           static_assert(!is_complex_v<extract_value_type_t<T1>>, "Complex interleaved op only works on scalar input types");
           static_assert(Rank() > 0);
         };
- 
+
 
         template <typename CapType, typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
         {
           if constexpr (CapType::ept == ElementsPerThread::ONE) {
             auto real = get_value<DefaultCapabilities>(op_, indices...);
@@ -145,7 +145,7 @@ namespace matx
         }
 
         template <typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const
         {
           return this->operator()<DefaultCapabilities>(indices...);
         }

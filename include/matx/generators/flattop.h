@@ -48,7 +48,7 @@ namespace matx
         static constexpr T a1 = static_cast<T>(0.41663158);
         static constexpr T a2 = static_cast<T>(0.277263158);
         static constexpr T a3 = static_cast<T>(0.083578947);
-        static constexpr T a4 = static_cast<T>(0.006947368);  
+        static constexpr T a4 = static_cast<T>(0.006947368);
 
       public:
         using value_type = T;
@@ -69,7 +69,7 @@ namespace matx
 
         __MATX_INLINE__ auto get_jit_op_str() const {
           std::string func_name = get_jit_class_name();
-          
+
           return cuda::std::make_tuple(
             func_name,
             std::string("template <typename T> struct " + func_name + " {\n") +
@@ -109,7 +109,7 @@ namespace matx
         {
           return detail::ApplyGeneratorVecFunc<CapType, T>([this](index_t idx) {
             static constexpr T tmp_pi = cuda::std::numbers::pi;
-            return  a0  
+            return  a0
               - a1 * cuda::std::cos(static_cast<T>(2)*tmp_pi*idx / (size_ - 1))
               + a2 * cuda::std::cos(static_cast<T>(4)*tmp_pi*idx / (size_ - 1))
               - a3 * cuda::std::cos(static_cast<T>(6)*tmp_pi*idx / (size_ - 1))
@@ -182,7 +182,7 @@ namespace matx
     requires (!cuda::std::is_array_v<remove_cvref_t<ShapeType>>)
   inline auto flattop(ShapeType &&s)
              {
-               constexpr int RANK = cuda::std::tuple_size<std::decay_t<ShapeType>>::value;
+               constexpr int RANK = cuda::std::tuple_size<cuda::std::decay_t<ShapeType>>::value;
                static_assert(RANK > Dim);
                detail::FlatTop<T> h( *(s.begin() + Dim));
                return detail::matxGenerator1D_t<detail::FlatTop<T>, Dim, ShapeType>(std::forward<ShapeType>(s), h);

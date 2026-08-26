@@ -824,7 +824,7 @@ void validate_dlpack_dtype(const char *message)
 
 template <typename T, index_t Rank>
 void validate_dlpack_tensor_type(const DLTensor &dt) {
-  using BaseT = std::remove_cv_t<T>;
+  using BaseT = cuda::std::remove_cv_t<T>;
   using LaneInfo = detail::DLPackLaneInfo<BaseT>;
   using ScalarT = typename LaneInfo::scalar_type;
   constexpr uint16_t lanes = LaneInfo::lanes;
@@ -961,7 +961,7 @@ void validate_dlpack_tensor_type(const DLTensor &dt) {
 template <typename T>
 T *dlpack_data_pointer(const DLTensor &dt)
 {
-  using BaseT = std::remove_cv_t<T>;
+  using BaseT = cuda::std::remove_cv_t<T>;
 
   validate_dlpack_condition(dt.data != nullptr, matxInvalidParameter,
                             "DLPack data cannot be null for MatX tensors");
@@ -979,7 +979,7 @@ constexpr uint64_t dlpack_max_addressable_elements()
 {
   const auto index_max = static_cast<uint64_t>(std::numeric_limits<index_t>::max());
   const auto storage_max = static_cast<uint64_t>(
-      std::numeric_limits<size_t>::max() / sizeof(std::remove_cv_t<T>));
+      std::numeric_limits<size_t>::max() / sizeof(cuda::std::remove_cv_t<T>));
   return index_max < storage_max ? index_max : storage_max;
 }
 

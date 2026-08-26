@@ -189,7 +189,7 @@ namespace matx
 
     template <typename T> constexpr DLDataType TypeToDLPackType()
     {
-      using BaseT = std::remove_cv_t<T>;
+      using BaseT = cuda::std::remove_cv_t<T>;
       using LaneInfo = DLPackLaneInfo<BaseT>;
       using ScalarT = typename LaneInfo::scalar_type;
       constexpr uint16_t lanes = LaneInfo::lanes;

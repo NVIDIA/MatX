@@ -36,7 +36,7 @@
 #include "matx/operators/base_operator.h"
 #include "matx/transforms/normalize.h"
 
-namespace matx 
+namespace matx
 {
   namespace detail
   {
@@ -50,8 +50,8 @@ namespace matx
         float p_ = -1.0f;
         float a_ = 0.0f;
         float b_ = 1.0f;
-        using ttype = std::conditional_t<is_complex_v<typename OpA::value_type>, 
-                                      typename OpA::value_type, 
+        using ttype = cuda::std::conditional_t<is_complex_v<typename OpA::value_type>,
+                                      typename OpA::value_type,
                                       typename scalar_to_complex<typename OpA::value_type>::ctype>;
         mutable ::matx::detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, OpA::Rank()> tmp_out_;
         mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr;
@@ -67,7 +67,7 @@ namespace matx
 
       public:
         using matxop = bool;
-        using matx_transform_op = bool; 
+        using matx_transform_op = bool;
         using value_type = typename OpA::value_type;
         using self_type = NormalizeOp<OpA, DIM>;
 

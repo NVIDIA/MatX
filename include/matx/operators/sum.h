@@ -65,7 +65,7 @@ namespace detail {
       using sum_xform_op = bool;
       using matx_jit_block_reduction = bool;
       using matx_jit_contains_block_reduction = cuda::std::true_type;
-      static constexpr int InRank = std::remove_reference_t<OpA>::Rank();
+      static constexpr int InRank = cuda::std::remove_reference_t<OpA>::Rank();
       static_assert(ORank < InRank, "SumOp output rank must be less than input rank");
 
       __MATX_INLINE__ std::string str() const { return "sum(" + get_type_str(a_) + ")"; }

@@ -237,7 +237,7 @@ auto make_tensor_dia(ValTensor &val, CrdTensor &off,
   Storage<POS> tp = makeZeroStorage<POS>(2, space);
   setVal(tp.data() + 1, static_cast<POS>(off.Size(0)), space);
   // Construct DIA-I/J.
-  using DIA = std::conditional_t<cuda::std::is_same_v<IDX, DIA_INDEX_I>, DIAI, DIAJ>;
+  using DIA = cuda::std::conditional_t<cuda::std::is_same_v<IDX, DIA_INDEX_I>, DIAI, DIAJ>;
   return sparse_tensor_t<VAL, CRD, POS, DIA>(
       shape, val.GetStorage(),
       {off.GetStorage(), makeEmptyStorage<CRD>()},
@@ -277,7 +277,7 @@ auto make_tensor_uniform_batched_dia(ValTensor &val, CrdTensor &off,
   Storage<POS> tp = makeZeroStorage<POS>(2, space);
   setVal(tp.data() + 1, static_cast<POS>(off.Size(0)), space);
   // Construct Batched DIA-I/J.
-  using DIA = std::conditional_t<cuda::std::is_same_v<IDX, DIA_INDEX_I>,
+  using DIA = cuda::std::conditional_t<cuda::std::is_same_v<IDX, DIA_INDEX_I>,
                                  BatchedDIAIUniform, BatchedDIAJUniform>;
   return sparse_tensor_t<VAL, CRD, POS, DIA>(
       shape, val.GetStorage(),
@@ -316,7 +316,7 @@ auto make_tensor_uniform_batched_tri_dia(ValTensor &val,
   Storage<POS> tp = makeZeroStorage<POS>(2, space);
   setVal(tp.data() + 1, static_cast<POS>(3), space);
   // Construct Batched DIA-I/J.
-  using DIA = std::conditional_t<cuda::std::is_same_v<IDX, DIA_INDEX_I>,
+  using DIA = cuda::std::conditional_t<cuda::std::is_same_v<IDX, DIA_INDEX_I>,
                                  BatchedDIAIUniform, BatchedDIAJUniform>;
   return sparse_tensor_t<VAL, CRD, POS, DIA>(
       shape, val.GetStorage(), {std::move(off), makeEmptyStorage<CRD>()},

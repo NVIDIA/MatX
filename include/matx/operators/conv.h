@@ -54,7 +54,7 @@ namespace matx
     class Conv1DOp : public BaseOp<Conv1DOp<OpA, OpB, PermDims>>
     {
       private:
-        using out_t = std::conditional_t<is_complex_v<typename OpA::value_type>,
+        using out_t = cuda::std::conditional_t<is_complex_v<typename OpA::value_type>,
               typename OpA::value_type, typename OpB::value_type>;
         constexpr static int max_rank = cuda::std::max(OpA::Rank(), OpB::Rank());
         typename detail::base_type_t<OpA> a_;
@@ -286,7 +286,7 @@ namespace detail {
   class Conv2DOp : public BaseOp<Conv2DOp<OpA, OpB, PermDims>>
   {
     private:
-      using out_t = std::conditional_t<is_complex_v<typename OpA::value_type>,
+      using out_t = cuda::std::conditional_t<is_complex_v<typename OpA::value_type>,
             typename OpA::value_type, typename OpB::value_type>;
       constexpr static int max_rank = cuda::std::max(OpA::Rank(), OpB::Rank());
       OpA a_;
