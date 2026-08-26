@@ -503,6 +503,30 @@ namespace matx {
 
 
     /**
+     * @brief Return the base pointer of the storage backing a tensor, when available 
+     *
+     * GetPointerKind() is an exact-address lookup into the allocation map, so it only ever
+     * resolves the base pointer the allocator recorded. A view's Data() may point partway
+     * into that allocation and would never be found there. Tensor types that carry their
+     * storage can hand back its base pointer; tensor_impl_t and dynamic_tensor_t only know
+     * Data(). Either way the caller must tolerate a miss, since the storage base is itself
+     * an offset pointer for a non-owning view such as RealView()/ImagView()
+     *
+     * @param op input Operator
+     * @return base pointer of the storage, or op.Data() if the type does not carry storage
+     */
+    template <typename Op>
+    __MATX_INLINE__ auto GetStorageBasePointer(const Op &op) noexcept {
+      using ptr_type = const typename Op::value_type *;
+      if constexpr (requires { op.GetStorage(); }) {
+        return static_cast<ptr_type>(op.GetStorage().data());
+      }
+      else {
+        return static_cast<ptr_type>(op.Data());
+      }
+    }
+
+    /**
      * @brief Print a tensor's values to output file stream
      *
      * This is the interal `Print()` takes integral values for each index, and prints that as many values
@@ -567,7 +591,8 @@ namespace matx {
         // If the user is printing a tensor with a const pointer underlying the data, we need to do the lookup
         // as if it's not const. This is because the ownership decision is done at runtime instead of compile-time,
         // so even though the lookup will never be done, the compilation path happens.
-        auto ptr_strip = const_cast<typename matx::remove_cvref_t<typename Op::value_type>*>(op.Data());
+        // Pass in the base pointer, not a potentially offset pointer returned by op.Data()
+        auto ptr_strip = const_cast<typename matx::remove_cvref_t<typename Op::value_type>*>(GetStorageBasePointer(op));
         auto kind = GetPointerKind(ptr_strip);
 
         // Try to get pointer from cuda

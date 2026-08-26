@@ -786,6 +786,12 @@ public:
    *
    * Only available on complex data types.
    *
+   * This view builds its own non-owning storage at the reinterpreted pointer
+   * rather than sharing the tensor's storage_, so GetStorage().data() on the
+   * result is that same offset pointer, not the original allocation's base.
+   * GetPointerKind()'s exact-match lookup misses on it, so classify it via
+   * the cuPointerGetAttributes fallback instead of the allocator map.
+   * 
    * @returns tensor view of only real-valued components
    *
    */
@@ -828,6 +834,10 @@ MATX_LOOP_UNROLL
   /**
    * @brief Return the storage container from the tensor
    *
+   * Returns a copy, which shares ownership of the buffer with this tensor. Use
+   * this overload to hand storage to something that keeps it, such as
+   * make_tensor() or a sparse tensor constructor.
+   *
    * @return storage container
    */
   __MATX_INLINE__ auto GetStorage() noexcept {
@@ -835,9 +845,28 @@ MATX_LOOP_UNROLL
   }
 
   /**
+   * @brief Return the storage container from the tensor
+   *
+   * Returns a reference, so reading through it costs no reference count update.
+   * The buffer is kept alive by this tensor, not by the returned reference, so
+   * do not hold it past the lifetime of the tensor.
+   *
+   * @return const reference to the storage container
+   */
+  __MATX_INLINE__ const auto &GetStorage() const noexcept {
+    return storage_;
+  }
+
+  /**
    * Create a view of only imaginary-valued components of a complex array
    *
    * Only available on complex data types.
+   *
+   * This view builds its own non-owning storage at the reinterpreted pointer
+   * rather than sharing the tensor's storage_, so GetStorage().data() on the
+   * result is that same offset pointer, not the original allocation's base.
+   * GetPointerKind()'s exact-match lookup misses on it, so classify it via
+   * the cuPointerGetAttributes fallback instead of the allocator map.
    *
    * @returns tensor view of only imaginary-valued components
    *
@@ -1479,10 +1508,11 @@ MATX_LOOP_UNROLL
 
     auto *mt = new ManagedType;
     DLTensor *t = &mt->dl_tensor;
-    CUpointer_attribute attr[] = {CU_POINTER_ATTRIBUTE_MEMORY_TYPE, CU_POINTER_ATTRIBUTE_DEVICE_ORDINAL};
+    CUpointer_attribute attr[] = {CU_POINTER_ATTRIBUTE_MEMORY_TYPE, CU_POINTER_ATTRIBUTE_DEVICE_ORDINAL, CU_POINTER_ATTRIBUTE_IS_MANAGED};
     CUmemorytype mem_type;
     int dev_ord;
-    void *data[2]       = {&mem_type, &dev_ord};
+    int is_managed;
+    void *data[3]       = {&mem_type, &dev_ord, &is_managed};
 
     // DLPack carries mutability via flags (versioned API), not via pointer type.
     // Preserve const-export semantics by marking versioned tensors read-only below.
@@ -1490,13 +1520,26 @@ MATX_LOOP_UNROLL
     t->device.device_id = 0;
 
     // Determine where this memory resides
-    void *data_ptr = const_cast<void *>(static_cast<const void *>(this->Data()));
+    // Pass in the base pointer, not a potentially offset pointer
+    // returned by this->Data()
+    void *data_ptr = const_cast<void *>(static_cast<const void *>(this->GetStorage().data()));
     auto kind = GetPointerKind(data_ptr);
     [[maybe_unused]] auto mem_res = cuPointerGetAttributes(sizeof(attr)/sizeof(attr[0]), attr, data, reinterpret_cast<CUdeviceptr>(data_ptr));
     MATX_ASSERT_STR_EXP(mem_res, CUDA_SUCCESS, matxCudaError, "Error returned from cuPointerGetAttributes");
     if (kind == MATX_INVALID_MEMORY) {
-      if (mem_type == CU_MEMORYTYPE_DEVICE) {
+      // GetStorage().data() is only guaranteed to be the true allocation base
+      // for storage that still shares its owning tensor's buffer (e.g. Slice()/
+      // Permute()). A view with its own non-owning storage at an offset/
+      // reinterpreted address (e.g. RealView()/ImagView()) lands here instead,
+      // so classify it from the driver's own record of that address.
+      // CU_POINTER_ATTRIBUTE_MEMORY_TYPE alone can't tell managed memory from
+      // pinned host memory, so check CU_POINTER_ATTRIBUTE_IS_MANAGED too.
+      if (mem_type == CU_MEMORYTYPE_DEVICE || is_managed) {
         t->device.device_type = kDLCUDA;
+        t->device.device_id = dev_ord;
+      }
+      else if (mem_type == CU_MEMORYTYPE_HOST) {
+        t->device.device_type = kDLCUDAHost;
         t->device.device_id = dev_ord;
       }
       else {

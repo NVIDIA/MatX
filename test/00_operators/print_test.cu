@@ -32,3 +32,38 @@ TYPED_TEST(OperatorTestsFloatAllExecs, Print)
 
   MATX_EXIT_HANDLER();
 }
+
+// Compile coverage for the two shapes of operator PrintData() has to
+// classify memory for: a view whose data pointer is offset into its allocation,
+// and the tensor_impl_t base class, which carries no storage to take a base
+// pointer from and so must fall back to Data(). The second case is a build
+// regression guard.
+//
+// This asserts no printed output. Both spellings print correctly
+// either way: an unresolved pointer falls through to cuPointerGetAttributes,
+// which classifies offset pointers fine wherever the driver knows the
+// allocation. The fix removes the dependency on that fallback.
+TYPED_TEST(OperatorTestsFloatAllExecs, PrintOffsetViewAndTensorImpl)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+
+  ExecType exec{};
+
+  auto t = make_tensor<TestType>({5, 10, 20});
+  (t = zeros<TestType>(t.Shape())).run(exec);
+  exec.sync();
+
+  // A slice starting partway into the allocation, so Data() is not the base pointer
+  auto s = t.Slice({1, 2, 3}, {4, 8, 15});
+  ASSERT_NE(static_cast<const void *>(s.Data()),
+            static_cast<const void *>(t.GetStorage().data()));
+  print(s, 1, 1, 2);
+
+  // print() is also instantiated on the tensor_impl_t base class
+  const detail::tensor_impl_t<TestType, 3> &ti = t;
+  print(ti, 1, 1, 2);
+
+  MATX_EXIT_HANDLER();
+}
