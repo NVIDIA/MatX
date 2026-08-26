@@ -299,7 +299,7 @@ auto make_tensor_p( [[maybe_unused]] const std::initializer_list<detail::no_size
   MATX_LOG_DEBUG("make_tensor_p<T>(0D, space, stream): space={}, stream={}",
                  static_cast<int>(space), reinterpret_cast<void*>(stream));
 
-  cuda::std::array<index_t, 0> shape;
+  cuda::std::array<index_t, 0> shape{};
   return make_tensor_p<T, decltype(shape)>(std::move(shape), space, stream);
 }
 

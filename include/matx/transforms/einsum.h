@@ -508,13 +508,14 @@ public:
     // to tensor rank. Therefore, ellipsis tokens are validated with EllipsisRank()
 
     i = 0;
-    [[maybe_unused]] auto check_rank = [&](const std::string &tok, int32_t rank) {
+    auto check_rank = [&](const std::string &tok, int32_t rank) {
       bool ok =
         tok.find("...") != std::string::npos ||
         tok.length() == static_cast<size_t>(rank);
         i++;
         return ok;
     };
+    (void)check_rank;
 
     MATX_ASSERT_STR(
     (check_rank(tokens[i], tensors.Rank()) && ...),
