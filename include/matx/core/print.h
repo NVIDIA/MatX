@@ -600,11 +600,10 @@ namespace matx {
           CUmemorytype mtype;
           void *data[] = {&mtype};
           CUpointer_attribute attrs[] = {CU_POINTER_ATTRIBUTE_MEMORY_TYPE};
-          [[maybe_unused]] auto ret = cuPointerGetAttributes(1,
+          MATX_CUDA_DRIVER_CHECK(cuPointerGetAttributes(1,
                                             &attrs[0],
                                             data,
-                                            reinterpret_cast<CUdeviceptr>(op.Data()));
-          MATX_ASSERT_STR_EXP(ret, CUDA_SUCCESS, matxCudaError, "Failed to get memory type");
+                                            reinterpret_cast<CUdeviceptr>(op.Data())));
           MATX_ASSERT_STR(mtype == CU_MEMORYTYPE_HOST || mtype == 0 || mtype == CU_MEMORYTYPE_DEVICE,
             matxNotSupported, "Invalid memory type for printing");
 
