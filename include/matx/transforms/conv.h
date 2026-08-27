@@ -198,7 +198,7 @@ inline void matxDirectConv1DInternal(OutputType &o, const InType &i,
   size_t signal_shm = sizeof(strip_input_t) * (CONV1D_ELEMENTS_PER_BLOCK + filter_len);
 
   // align filter size to signal size
-  size_t align = std::alignment_of_v<InType>;
+  size_t align = cuda::std::alignment_of_v<InType>;
   filter_shm = (filter_shm + align - 1) / align * align;
 
   size_t shmsize = filter_shm + signal_shm;

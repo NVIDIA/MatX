@@ -37,7 +37,7 @@
 namespace matx
 {
   namespace detail {
-    template <typename T, typename ShapeType> 
+    template <typename T, typename ShapeType>
       class Diag : public BaseOp<Diag<T, ShapeType>>{
       static constexpr int RANK = shape_rank_t<ShapeType>::value;
 
@@ -61,7 +61,7 @@ namespace matx
 
       __MATX_INLINE__ std::string get_jit_class_name() const {
         std::string val_str;
-        if constexpr (std::is_floating_point_v<T>) {
+        if constexpr (cuda::std::is_floating_point_v<T>) {
           val_str = std::format("{}", val_);
         } else {
           val_str = std::to_string(val_);
@@ -75,7 +75,7 @@ namespace matx
         for (int i = 0; i < Rank(); ++i) {
           out_dims_[i] = Size(i);
         }
-        
+
         return cuda::std::make_tuple(
           func_name,
           std::format("template <typename T> struct {} {{\n"
@@ -138,7 +138,7 @@ namespace matx
         else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
           const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
           return my_cap;
-        } else {        
+        } else {
           return detail::capability_attributes<Cap>::default_value;
         }
       }
@@ -168,7 +168,7 @@ namespace matx
           return index_t(0);
         }
       }
-      static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { 
+      static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() {
         if constexpr (!is_noshape_v<ShapeType>) {
           return RANK;
         }
@@ -190,7 +190,7 @@ namespace matx
    * can be deduced by other contexts.
    *
    * @tparam T Data type
-   * 
+   *
    * @param val Value to return
    *
    */
@@ -229,7 +229,7 @@ namespace matx
    *
    * @tparam T Data type
    * @tparam RANK Rank of input
-   * 
+   *
    * @param s Array of operator dimensions
    * @param val Value to return
    *
@@ -280,7 +280,7 @@ namespace matx
    *
    * eye() returns 1 on all elements on the diagonals of a tensor, and 0 otherwise.
    * In other words, if the index of every dimension is the same, a 1 is returned,
-   * otherwise a zero is returned. This version of eye() is shapeless and can be indexed 
+   * otherwise a zero is returned. This version of eye() is shapeless and can be indexed
    * using any input dimension and it will return a valid value. It is preferred to use
    * it over the shaped versions if the shape can be deduced by other contexts.
    *

@@ -89,7 +89,7 @@ namespace matx
         }
 
         __MATX_INLINE__ std::string get_jit_stride_type_name() const {
-          if constexpr (std::is_same_v<StrideType, NoStride>) {
+          if constexpr (cuda::std::is_same_v<StrideType, NoStride>) {
             return "matx::detail::NoStride";
           }
           else {
@@ -162,7 +162,7 @@ namespace matx
 
             starts_[i] = start;
 
-            if constexpr (!std::is_same_v<NoStride, StrideType>) {
+            if constexpr (!cuda::std::is_same_v<NoStride, StrideType>) {
               strides_[i] = strides[i];
             }
 
@@ -179,7 +179,7 @@ namespace matx
               }
 
               //adjust size by stride
-              if constexpr (!std::is_same_v<NoStride, StrideType>) {
+              if constexpr (!cuda::std::is_same_v<NoStride, StrideType>) {
                 sizes_[d] = (shape_type)std::ceil(static_cast<double>(sizes_[d])/ static_cast<double>(strides_[d]));
               }
 
@@ -197,11 +197,11 @@ namespace matx
             const decltype(strides_) &strides,
             const decltype(dims_) &dims,
             Is... indices)
-        {   
+        {
           if constexpr (CapType::ept == ElementsPerThread::ONE) {
             static_assert(sizeof...(Is)==Rank());
             static_assert((cuda::std::is_convertible_v<Is, index_t> && ... ));
-        
+
             // convert variadic type to tuple so we can read/update
             cuda::std::array<index_t, T::Rank()> ind = starts;
             cuda::std::array<index_t, Rank()> inds{indices...};
@@ -219,8 +219,8 @@ namespace matx
                   }
                 }
               }
-            }       
-                
+            }
+
             return get_value<CapType>(cuda::std::forward<Op>(op), ind);
           } else {
             return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
@@ -263,7 +263,7 @@ namespace matx
           // to the tensor's EPT logic if the input is a tensor
           else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
             const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
-            return combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(op_, in));          
+            return combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(op_, in));
           } else {
             auto self_has_cap = capability_attributes<Cap>::default_value;
             return combine_capabilities<Cap>(self_has_cap, detail::get_operator_capability<Cap>(op_, in));
@@ -271,7 +271,7 @@ namespace matx
         }
 
         template <typename CapType, typename... Is>
-        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const 
+        __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
           return get_impl<CapType>(cuda::std::as_const(op_), starts_, strides_, dims_, indices...);
         }
@@ -292,7 +292,7 @@ namespace matx
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
           return this->operator()<DefaultCapabilities>(indices...);
-        }        
+        }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {

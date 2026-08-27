@@ -712,7 +712,7 @@ inline void UnpackDFT(DataType inout, cudaStream_t stream)
  * constituent channels, each corresponding to a band of the input signal bandwidth. Supports both
  * maximally decimated (critically sampled, decimation_factor == num_channels) and oversampled
  * (decimation_factor < num_channels) cases, including rational oversampling ratios.
- * 
+ *
  * @tparam OutType Type of output
  * @tparam InType Type of input
  * @tparam FilterType Type of filter
@@ -742,9 +742,9 @@ inline void channelize_poly_impl(OutType out, const InType &in, const FilterType
                    index_t num_channels, index_t decimation_factor, cudaStream_t stream = 0,
                    index_t out_elem_offset = 0) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  using OutputOp = std::remove_cv_t<std::remove_reference_t<OutType>>;
-  using InputOp = std::remove_cv_t<std::remove_reference_t<InType>>;
-  using FilterOp = std::remove_cv_t<std::remove_reference_t<FilterType>>;
+  using OutputOp = cuda::std::remove_cv_t<cuda::std::remove_reference_t<OutType>>;
+  using InputOp = cuda::std::remove_cv_t<cuda::std::remove_reference_t<InType>>;
+  using FilterOp = cuda::std::remove_cv_t<cuda::std::remove_reference_t<FilterType>>;
   using input_t = typename InputOp::value_type;
   using filter_t = typename FilterOp::value_type;
   using output_t = typename OutputOp::value_type;
@@ -908,9 +908,9 @@ inline void channelize_poly_impl(OutType out, const InType &in, const FilterType
                    [[maybe_unused]] const HostExecutor<MODE> &exec,
                    index_t out_elem_offset = 0) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  using OutputOp = std::remove_cv_t<std::remove_reference_t<OutType>>;
-  using InputOp = std::remove_cv_t<std::remove_reference_t<InType>>;
-  using FilterOp = std::remove_cv_t<std::remove_reference_t<FilterType>>;
+  using OutputOp = cuda::std::remove_cv_t<cuda::std::remove_reference_t<OutType>>;
+  using InputOp = cuda::std::remove_cv_t<cuda::std::remove_reference_t<InType>>;
+  using FilterOp = cuda::std::remove_cv_t<cuda::std::remove_reference_t<FilterType>>;
   using input_t = typename InputOp::value_type;
   using filter_t = typename FilterOp::value_type;
   using output_t = typename OutputOp::value_type;

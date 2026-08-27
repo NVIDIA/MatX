@@ -106,8 +106,8 @@ public:
 
     // Type checks
     MATX_STATIC_ASSERT_STR(!is_half_v<T1>, matxInvalidType, "QR solver does not support half precision");
-    MATX_STATIC_ASSERT_STR((std::is_same_v<T1, typename OutTensor_t::value_type>), matxInavlidType, "Input and Output types must match");
-    MATX_STATIC_ASSERT_STR((std::is_same_v<T1, T2>), matxInavlidType, "A and Tau types must match");
+    MATX_STATIC_ASSERT_STR((cuda::std::is_same_v<T1, typename OutTensor_t::value_type>), matxInavlidType, "Input and Output types must match");
+    MATX_STATIC_ASSERT_STR((cuda::std::is_same_v<T1, T2>), matxInavlidType, "A and Tau types must match");
 
     params = GetQRParams(tau, a);
     this->GetWorkspaceSize();
@@ -125,7 +125,7 @@ public:
                     &work_query, &this->lwork, &info);
       MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
         ("Parameter " + std::to_string(-info) + " had an illegal value in LAPACK geqrf workspace query").c_str());
-    
+
     // the real part of the first elem of work holds the optimal lwork
     if constexpr (is_complex_v<T1>) {
       this->lwork = static_cast<lapack_int_t>(work_query.real());
@@ -196,17 +196,17 @@ private:
                       const lapack_int_t* lda, T1* tau, T1* work_in,
                       const lapack_int_t* lwork_in, lapack_int_t* info)
   {
-    if constexpr (std::is_same_v<T1, float>) {
+    if constexpr (cuda::std::is_same_v<T1, float>) {
       LAPACK_CALL(sgeqrf)(m, n, a, lda, tau, work_in, lwork_in, info);
-    } else if constexpr (std::is_same_v<T1, double>) {
+    } else if constexpr (cuda::std::is_same_v<T1, double>) {
       LAPACK_CALL(dgeqrf)(m, n, a, lda, tau, work_in, lwork_in, info);
-    } else if constexpr (std::is_same_v<T1, cuda::std::complex<float>>) {
+    } else if constexpr (cuda::std::is_same_v<T1, cuda::std::complex<float>>) {
       LAPACK_CALL(cgeqrf)(m, n, a, lda, tau, work_in, lwork_in, info);
-    } else if constexpr (std::is_same_v<T1, cuda::std::complex<double>>) {
+    } else if constexpr (cuda::std::is_same_v<T1, cuda::std::complex<double>>) {
       LAPACK_CALL(zgeqrf)(m, n, a, lda, tau, work_in, lwork_in, info);
     }
   }
-  
+
   std::vector<T2 *> batch_tau_ptrs;
   DnQRHostParams_t params;
 };
@@ -273,7 +273,7 @@ void qr_solver_impl([[maybe_unused]] OutTensor &&out,
   MATX_ASSERT_STR(MATX_EN_CPU_SOLVER, matxInvalidExecutor,
     "Trying to run a host Solver executor but host Solver support is not configured");
 #if MATX_EN_CPU_SOLVER
-  
+
   using T1 = typename remove_cvref_t<OutTensor>::value_type;
 
   auto tau_new = OpToTensor(tau, exec);

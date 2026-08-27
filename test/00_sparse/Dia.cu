@@ -67,7 +67,7 @@ template <typename T, typename IDX> static auto makeDIA() {
   D(10) = static_cast<T>(1);
   D(11) = static_cast<T>(1);
   // FIX DL/DU ///////////////
-  if constexpr (std::is_same_v<IDX, experimental::DIA_INDEX_I>) {
+  if constexpr (cuda::std::is_same_v<IDX, experimental::DIA_INDEX_I>) {
     D(0) = static_cast<T>(0);
     D(11) = static_cast<T>(0);
   } else {

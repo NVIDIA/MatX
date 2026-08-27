@@ -63,39 +63,39 @@ namespace matx {
         const auto fmt_s = ("% ."s + prec + "e ");
         fprintf(fp, fmt_s.c_str(), static_cast<float>(val));
       }
-      else if constexpr (std::is_floating_point_v<T>) {
+      else if constexpr (cuda::std::is_floating_point_v<T>) {
         const auto prec = std::to_string(PRINT_PRECISION);
         const auto fmt_s = ("% ."s + prec + "e ");
         fprintf(fp, fmt_s.c_str(), val);
       }
-      else if constexpr (std::is_same_v<T, long long int>) {
+      else if constexpr (cuda::std::is_same_v<T, long long int>) {
         fprintf(fp, "% lld ", val);
       }
-      else if constexpr (std::is_same_v<T, int64_t>) {
+      else if constexpr (cuda::std::is_same_v<T, int64_t>) {
         fprintf(fp, "% " PRId64 " ", val);
       }
-      else if constexpr (std::is_same_v<T, int32_t>) {
+      else if constexpr (cuda::std::is_same_v<T, int32_t>) {
         fprintf(fp, "% " PRId32 " ", val);
       }
-      else if constexpr (std::is_same_v<T, int16_t>) {
+      else if constexpr (cuda::std::is_same_v<T, int16_t>) {
         fprintf(fp, "% " PRId16 " ", val);
       }
-      else if constexpr (std::is_same_v<T, int8_t>) {
+      else if constexpr (cuda::std::is_same_v<T, int8_t>) {
         fprintf(fp, "% " PRId8 " ", val);
       }
-      else if constexpr (std::is_same_v<T, uint64_t>) {
+      else if constexpr (cuda::std::is_same_v<T, uint64_t>) {
         fprintf(fp, "+%" PRIu64 " ", val);
       }
-      else if constexpr (std::is_same_v<T, uint32_t>) {
+      else if constexpr (cuda::std::is_same_v<T, uint32_t>) {
         fprintf(fp, "+%" PRIu32 " ", val);
       }
-      else if constexpr (std::is_same_v<T, uint16_t>) {
+      else if constexpr (cuda::std::is_same_v<T, uint16_t>) {
         fprintf(fp, "+%" PRIu16 " ", val);
       }
-      else if constexpr (std::is_same_v<T, uint8_t>) {
+      else if constexpr (cuda::std::is_same_v<T, uint8_t>) {
         fprintf(fp, "+%" PRIu8 " ", val);
       }
-      else if constexpr (std::is_same_v<T, bool>) {
+      else if constexpr (cuda::std::is_same_v<T, bool>) {
         fprintf(fp, "% d ", val);
       }
     }
@@ -108,31 +108,31 @@ namespace matx {
      */
     template <typename T> static std::string GetTensorTypeString()
     {
-      if constexpr (std::is_same_v<T, bool>)
+      if constexpr (cuda::std::is_same_v<T, bool>)
         return "bool";
-      if constexpr (std::is_same_v<T, int32_t>)
+      if constexpr (cuda::std::is_same_v<T, int32_t>)
         return "int32_t";
-      if constexpr (std::is_same_v<T, uint32_t>)
+      if constexpr (cuda::std::is_same_v<T, uint32_t>)
         return "uint32_t";
-      if constexpr (std::is_same_v<T, int64_t>)
+      if constexpr (cuda::std::is_same_v<T, int64_t>)
         return "int64_t";
-      if constexpr (std::is_same_v<T, uint64_t>)
+      if constexpr (cuda::std::is_same_v<T, uint64_t>)
         return "uint64_t";
-      if constexpr (std::is_same_v<T, float> )
+      if constexpr (cuda::std::is_same_v<T, float> )
         return "float";
-      if constexpr (std::is_same_v<T, matxFp16>)
+      if constexpr (cuda::std::is_same_v<T, matxFp16>)
         return "float16";
-      if constexpr (std::is_same_v<T, matxBf16>)
+      if constexpr (cuda::std::is_same_v<T, matxBf16>)
         return "bfloat16";
-      if constexpr (std::is_same_v<T, double>)
+      if constexpr (cuda::std::is_same_v<T, double>)
         return "double";
-      if constexpr (std::is_same_v<T, cuda::std::complex<double>> || std::is_same_v<T, std::complex<double>>)
+      if constexpr (cuda::std::is_same_v<T, cuda::std::complex<double>> || cuda::std::is_same_v<T, std::complex<double>>)
         return "complex<double>";
-      if constexpr (std::is_same_v<T, cuda::std::complex<float>> || std::is_same_v<T, std::complex<float>>)
+      if constexpr (cuda::std::is_same_v<T, cuda::std::complex<float>> || cuda::std::is_same_v<T, std::complex<float>>)
         return "complex<float>";
-      if constexpr (std::is_same_v<T, matxFp16Complex>)
+      if constexpr (cuda::std::is_same_v<T, matxFp16Complex>)
         return "complex<float16>";
-      if constexpr (std::is_same_v<T, matxBf16Complex>)
+      if constexpr (cuda::std::is_same_v<T, matxBf16Complex>)
         return "complex<bfloat16>";
 
       return "unknown";
@@ -486,7 +486,7 @@ namespace matx {
     }
 
     template <typename Op, typename... Args>
-      requires (((std::is_integral_v<Args>)&&...) &&
+      requires (((cuda::std::is_integral_v<Args>)&&...) &&
                 (Op::Rank() == 0 || sizeof...(Args) > 0))
     void DevicePrint(FILE*fp, [[maybe_unused]] const Op &op, [[maybe_unused]] Args... dims) {
   #ifdef __CUDACC__
@@ -548,7 +548,7 @@ namespace matx {
      * @param dims Number of values to print for each dimension
      */
     template <typename Op, typename... Args>
-      requires (((std::is_integral_v<Args>)&&...) &&
+      requires (((cuda::std::is_integral_v<Args>)&&...) &&
                 (Op::Rank() == 0 || sizeof...(Args) > 0))
     void PrintData(FILE* fp, const Op &op, Args... dims) {
       MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
@@ -685,7 +685,7 @@ namespace matx {
    */
   #ifndef DOXYGEN_ONLY
   template <typename Op, typename... Args>
-    requires (((std::is_integral_v<Args>)&&...) &&
+    requires (((cuda::std::is_integral_v<Args>)&&...) &&
               (Op::Rank() == 0 || sizeof...(Args) > 0))
   #else
   template <typename Op, typename... Args>

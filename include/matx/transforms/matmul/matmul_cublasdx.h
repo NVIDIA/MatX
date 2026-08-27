@@ -65,7 +65,7 @@ namespace matx {
   int max_size = 0;
 
   // Real, half or bfloat16
-  if constexpr (std::is_same_v<T, matxFp16> || std::is_same_v<T, matxBf16>) {
+  if constexpr (cuda::std::is_same_v<T, matxFp16> || cuda::std::is_same_v<T, matxBf16>) {
     if (compute_capability == 700 || compute_capability == 720) max_size = 128;
     else if (compute_capability == 750) max_size = 104;
     else if (compute_capability == 800 || compute_capability == 870) max_size = 166;
@@ -73,7 +73,7 @@ namespace matx {
       else if (compute_capability == 900 || compute_capability == 1000 || compute_capability == 1010 || compute_capability == 1030 || compute_capability == 1100) max_size = 196;
   }
     // Real, float OR Complex, half/bf16
-  else if constexpr (std::is_same_v<T, float> || std::is_same_v<T, matxFp16Complex> || std::is_same_v<T, cuda::std::complex<matxBf16>>) {
+  else if constexpr (cuda::std::is_same_v<T, float> || cuda::std::is_same_v<T, matxFp16Complex> || cuda::std::is_same_v<T, cuda::std::complex<matxBf16>>) {
     if (compute_capability == 700 || compute_capability == 720) max_size = 90;
     else if (compute_capability == 750) max_size = 73;
     else if (compute_capability == 800 || compute_capability == 870) max_size = 117;
@@ -81,7 +81,7 @@ namespace matx {
       else if (compute_capability == 900 || compute_capability == 1000 || compute_capability == 1010 || compute_capability == 1030 || compute_capability == 1100) max_size = 139;
   }
   // Real, double OR Complex, float
-  else if constexpr (std::is_same_v<T, double> || std::is_same_v<T, cuda::std::complex<float>>) {
+  else if constexpr (cuda::std::is_same_v<T, double> || cuda::std::is_same_v<T, cuda::std::complex<float>>) {
     if (compute_capability == 700 || compute_capability == 720) max_size = 64;
     else if (compute_capability == 750) max_size = 52;
     else if (compute_capability == 800 || compute_capability == 870) max_size = 83;
@@ -89,7 +89,7 @@ namespace matx {
       else if (compute_capability == 900 || compute_capability == 1000 || compute_capability == 1010 || compute_capability == 1030 || compute_capability == 1100) max_size = 98;
   }
   // Complex, double
-  else if constexpr (std::is_same_v<T, cuda::std::complex<double>>) {
+  else if constexpr (cuda::std::is_same_v<T, cuda::std::complex<double>>) {
     if (compute_capability == 700 || compute_capability == 720) max_size = 45;
     else if (compute_capability == 750) max_size = 36;
     else if (compute_capability == 800 || compute_capability == 870) max_size = 58;
@@ -163,20 +163,20 @@ namespace matx {
 
         // Set precision for A, B, C matrices (all same precision for now)
         commondxPrecision precision;
-        if constexpr (std::is_same_v<InputType, matxFp16> || std::is_same_v<InputType, matxFp16Complex>) {
+        if constexpr (cuda::std::is_same_v<InputType, matxFp16> || cuda::std::is_same_v<InputType, matxFp16Complex>) {
           precision = COMMONDX_PRECISION_F16;
-        } else if constexpr (std::is_same_v<InputType, matxBf16> || std::is_same_v<InputType, cuda::std::complex<matxBf16>>) {
+        } else if constexpr (cuda::std::is_same_v<InputType, matxBf16> || cuda::std::is_same_v<InputType, cuda::std::complex<matxBf16>>) {
           precision = COMMONDX_PRECISION_BF16;
-        } else if constexpr (std::is_same_v<InputType, float> || std::is_same_v<InputType, cuda::std::complex<float>>) {
+        } else if constexpr (cuda::std::is_same_v<InputType, float> || cuda::std::is_same_v<InputType, cuda::std::complex<float>>) {
           precision = COMMONDX_PRECISION_F32;
-        } else if constexpr (std::is_same_v<InputType, double> || std::is_same_v<InputType, cuda::std::complex<double>>) {
+        } else if constexpr (cuda::std::is_same_v<InputType, double> || cuda::std::is_same_v<InputType, cuda::std::complex<double>>) {
           precision = COMMONDX_PRECISION_F64;
         } else {
           MATX_THROW(matxInvalidParameter, "Unsupported input type for cuBLASDx");
         }
 
-        long long int precisions[3] = {static_cast<long long int>(precision), 
-                                       static_cast<long long int>(precision), 
+        long long int precisions[3] = {static_cast<long long int>(precision),
+                                       static_cast<long long int>(precision),
                                        static_cast<long long int>(precision)};
         LIBCUBLASDX_CHECK(cublasdxSetOperatorInt64s(h_, CUBLASDX_OPERATOR_PRECISION, 3, precisions));
 
@@ -188,8 +188,8 @@ namespace matx {
         LIBCUBLASDX_CHECK(cublasdxSetOperatorInt64(h_, CUBLASDX_OPERATOR_SM, cc_));
 
         // Set arrangement - row major for all matrices (MatX default)
-        long long int arrangements[3] = {CUBLASDX_ARRANGEMENT_ROW_MAJOR, 
-                                         CUBLASDX_ARRANGEMENT_ROW_MAJOR, 
+        long long int arrangements[3] = {CUBLASDX_ARRANGEMENT_ROW_MAJOR,
+                                         CUBLASDX_ARRANGEMENT_ROW_MAJOR,
                                          CUBLASDX_ARRANGEMENT_ROW_MAJOR};
         LIBCUBLASDX_CHECK(cublasdxSetOperatorInt64s(h_, CUBLASDX_OPERATOR_ARRANGEMENT, 3, arrangements));
 
@@ -209,13 +209,13 @@ namespace matx {
         symbol_name += std::to_string(cc_);
 
         // Add precision identifier
-        if constexpr (std::is_same_v<InputType, matxFp16> || std::is_same_v<InputType, matxFp16Complex>) {
+        if constexpr (cuda::std::is_same_v<InputType, matxFp16> || cuda::std::is_same_v<InputType, matxFp16Complex>) {
           symbol_name += "_F16";
-        } else if constexpr (std::is_same_v<InputType, matxBf16> || std::is_same_v<InputType, cuda::std::complex<matxBf16>>) {
+        } else if constexpr (cuda::std::is_same_v<InputType, matxBf16> || cuda::std::is_same_v<InputType, cuda::std::complex<matxBf16>>) {
           symbol_name += "_BF16";
-        } else if constexpr (std::is_same_v<InputType, float> || std::is_same_v<InputType, cuda::std::complex<float>>) {
+        } else if constexpr (cuda::std::is_same_v<InputType, float> || cuda::std::is_same_v<InputType, cuda::std::complex<float>>) {
           symbol_name += "_F32";
-        } else if constexpr (std::is_same_v<InputType, double> || std::is_same_v<InputType, cuda::std::complex<double>>) {
+        } else if constexpr (cuda::std::is_same_v<InputType, double> || cuda::std::is_same_v<InputType, cuda::std::complex<double>>) {
           symbol_name += "_F64";
         }
 
@@ -226,7 +226,7 @@ namespace matx {
 #else
         symbol_name += "_CUDAUNKNOWN";
 #endif
-        
+
         return symbol_name;
       }
 
@@ -247,13 +247,13 @@ namespace matx {
 
         // For now, only support float and double (and their complex variants)
         // Half and bf16 support can be added later
-        if constexpr (std::is_same_v<InputType, float> || 
-                      std::is_same_v<InputType, double> ||
-                      std::is_same_v<InputType, cuda::std::complex<float>> ||
-                      std::is_same_v<InputType, cuda::std::complex<double>>) {
+        if constexpr (cuda::std::is_same_v<InputType, float> ||
+                      cuda::std::is_same_v<InputType, double> ||
+                      cuda::std::is_same_v<InputType, cuda::std::complex<float>> ||
+                      cuda::std::is_same_v<InputType, cuda::std::complex<double>>) {
           return true;
         }
-        
+
         return false;
       }
 
@@ -261,20 +261,20 @@ namespace matx {
       bool CheckJITSizeAndTypeRequirements() const {
         using OpAType = typename OpA::value_type;
         using OpBType = typename OpB::value_type;
-        
+
         // A and B must have same type
-        if constexpr (!std::is_same_v<OpAType, OpBType>) {
+        if constexpr (!cuda::std::is_same_v<OpAType, OpBType>) {
           return false;
         }
-        
+
         // Check supported types for JIT
-        if constexpr (!(std::is_same_v<OpAType, float> || 
-                        std::is_same_v<OpAType, double> ||
-                        std::is_same_v<OpAType, cuda::std::complex<float>> ||
-                        std::is_same_v<OpAType, cuda::std::complex<double>>)) {
+        if constexpr (!(cuda::std::is_same_v<OpAType, float> ||
+                        cuda::std::is_same_v<OpAType, double> ||
+                        cuda::std::is_same_v<OpAType, cuda::std::complex<float>> ||
+                        cuda::std::is_same_v<OpAType, cuda::std::complex<double>>)) {
           return false;
         }
-        
+
         // Check size constraints
         return IscuBLASDxSupported<OpAType>(m_, n_, k_, cc_);
       }
@@ -287,7 +287,7 @@ namespace matx {
 
         // Total shared memory requirement
         size_t total_shm = a_size + b_size + c_size;
-        
+
         MATX_LOG_DEBUG("cuBLASDx shared memory: A={}, B={}, C={}, Total={}", a_size, b_size, c_size, total_shm);
         return static_cast<int>(total_shm);
       }
@@ -299,11 +299,11 @@ namespace matx {
         LIBCUBLASDX_CHECK(
             cublasdxGetTraitInt64s(handle, CUBLASDX_TRAIT_SUGGESTED_BLOCK_DIM, 3, block_dim.data()));
         MATX_LOG_DEBUG("cuBLASDx suggested block dim: {} {} {}", block_dim[0], block_dim[1], block_dim[2]);
-        
+
         cublasdxDestroyDescriptor(handle);
-        
-        return cuda::std::array<int, 3>{static_cast<int>(block_dim[0]), 
-                                         static_cast<int>(block_dim[1]), 
+
+        return cuda::std::array<int, 3>{static_cast<int>(block_dim[0]),
+                                         static_cast<int>(block_dim[1]),
                                          static_cast<int>(block_dim[2])};
       }
 
@@ -314,18 +314,18 @@ namespace matx {
         LIBCUBLASDX_CHECK(
             cublasdxGetTraitInt64s(handle, CUBLASDX_TRAIT_SUGGESTED_LEADING_DIMENSION, 3, ld.data()));
         MATX_LOG_DEBUG("cuBLASDx suggested leading dimensions: {} {} {}", ld[0], ld[1], ld[2]);
-        
+
         cublasdxDestroyDescriptor(handle);
-        
-        return cuda::std::array<int, 3>{static_cast<int>(ld[0]), 
-                                         static_cast<int>(ld[1]), 
+
+        return cuda::std::array<int, 3>{static_cast<int>(ld[0]),
+                                         static_cast<int>(ld[1]),
                                          static_cast<int>(ld[2])};
       }
 
       bool GenerateLTOIR(std::set<std::string> &ltoir_symbols) {
         LTOIRData ltoir;
         const auto symbol_name = std::string(GEMM_DX_FUNC_PREFIX) + "_" + GetSymbolName();
-        ltoir_symbols.insert(symbol_name);        
+        ltoir_symbols.insert(symbol_name);
 
         if (detail::GetCache().GetLTOIRCachedBytes(symbol_name) != nullptr) {
           MATX_LOG_DEBUG("cuBLASDx LTOIR found in cache with size {}", detail::GetCache().GetLTOIRCachedBytes(symbol_name)->length);
@@ -334,7 +334,7 @@ namespace matx {
 
         auto handle = GeneratePlan();
 
-        LIBCUBLASDX_CHECK(cublasdxSetOptionStr(handle, COMMONDX_OPTION_SYMBOL_NAME, symbol_name.c_str())); 
+        LIBCUBLASDX_CHECK(cublasdxSetOptionStr(handle, COMMONDX_OPTION_SYMBOL_NAME, symbol_name.c_str()));
 
         commondxCode code;
         LIBCUBLASDX_CHECK(commondxCreateCode(&code));
@@ -348,22 +348,22 @@ namespace matx {
 
         LIBCUBLASDX_CHECK(commondxGetCodeLTOIR(code, ltoir.length, ltoir.data));
 
-        MATX_LOG_DEBUG("cuBLASDx Function {}", symbol_name);        
+        MATX_LOG_DEBUG("cuBLASDx Function {}", symbol_name);
         MATX_LOG_DEBUG("cuBLASDx LTOIR size {}", ltoir.length);
-        
+
         if (!detail::GetCache().StoreLTOIRCachedBytes(symbol_name, ltoir.data, ltoir.length)) {
           free(ltoir.data);
           MATX_LOG_ERROR("Failed to store cuBLASDx LTOIR cached bytes for: {}", symbol_name);
           return false;
         }
-        
+
         // CRITICAL: Set to nullptr after transferring ownership to cache to prevent double-free
         ltoir.data = nullptr;
         ltoir.length = 0;
-        
+
         LIBCUBLASDX_CHECK(commondxDestroyCode(code));
         LIBCUBLASDX_CHECK(cublasdxDestroyDescriptor(handle));
-    
+
         return true;
       }
 
@@ -372,11 +372,11 @@ namespace matx {
           using value_type = )";
         result += detail::type_to_string<InputType>();
         result += R"(;
-          
+
           // cuBLASDx requires block-level cooperation, so all threads in the block
           // must participate in loading data and executing the GEMM
           extern __shared__ __align__(16) char smem[];
-          
+
           // Partition shared memory for A, B, C matrices
           constexpr size_t a_size = )";
         result += std::to_string(static_cast<int>(m_ * k_));
@@ -385,11 +385,11 @@ namespace matx {
         result += std::to_string(static_cast<int>(k_ * n_));
 
         result += R"( * sizeof(value_type);
-          
+
           value_type* smem_a = reinterpret_cast<value_type*>(smem);
           value_type* smem_b = reinterpret_cast<value_type*>(smem + a_size);
           value_type* smem_c = reinterpret_cast<value_type*>(smem + a_size + b_size);
-          
+
           // Cooperatively load A and B from global to shared memory using operator()
           // Batch indices are already preset in the operators, so we only need 2D matrix indices
           const int tid = threadIdx.x + threadIdx.y * blockDim.x + threadIdx.z * blockDim.x * blockDim.y;
@@ -405,7 +405,7 @@ namespace matx {
             const index_t col = i % a_cols;
             smem_a[row * a_cols + col] = a_.template operator()<CapType>(row, col);
           }
-          
+
           // Load B matrix (k x n) - each thread loads multiple elements strided by total_threads
           constexpr index_t b_cols = )";
         result += std::to_string(static_cast<int>(n_));
@@ -417,23 +417,23 @@ namespace matx {
             const index_t col = i % b_cols;
             smem_b[row * b_cols + col] = b_.template operator()<CapType>(row, col);
           }
-          
+
           __syncthreads();
-          
+
           // Call the cuBLASDx generated GEMM function
           // Signature: void func(value_type* alpha, value_type* a, value_type* b, value_type* beta, value_type* c)
         )";
         using literal_type = cuda::std::conditional_t<
-            std::is_same_v<InputType, double> || std::is_same_v<InputType, cuda::std::complex<double>>,
+            cuda::std::is_same_v<InputType, double> || cuda::std::is_same_v<InputType, cuda::std::complex<double>>,
             double,
             float>;
         result += "value_type alpha_val = static_cast<value_type>(" + FormatScalarLiteral(static_cast<literal_type>(alpha)) + ");\n";
         result += "value_type beta_val = static_cast<value_type>(" + FormatScalarLiteral(static_cast<literal_type>(beta)) + ");\n";
         result += gemm_func_name;
         result += R"((&alpha_val, smem_a, smem_b, &beta_val, smem_c);
-          
+
           __syncthreads();
-          
+
           // Each thread returns its portion of the result
           // For vectorized execution, return a Vector; for scalar, return scalar
           static_assert(CapType::ept == ElementsPerThread::ONE, "cuBLASDx only supports ONE elements per thread");
@@ -463,7 +463,7 @@ namespace matx {
 
   // Stub implementation when MathDx is not enabled
   template <typename T>
-  __MATX_INLINE__ bool IscuBLASDxSupported([[maybe_unused]] index_t m, [[maybe_unused]] index_t n, 
+  __MATX_INLINE__ bool IscuBLASDxSupported([[maybe_unused]] index_t m, [[maybe_unused]] index_t n,
                                            [[maybe_unused]] index_t k, [[maybe_unused]] int compute_capability)
   {
     return false;

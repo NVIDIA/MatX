@@ -61,7 +61,7 @@ namespace matx
    * @return Product result
    */
   template <typename T, typename S>
-    requires (!std::is_same_v<T, S> && std::is_arithmetic_v<S>)
+    requires (!cuda::std::is_same_v<T, S> && cuda::std::is_arithmetic_v<S>)
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__
   auto operator*(const cuda::std::complex<T> &c, S n) -> cuda::std::complex<T>
   {
@@ -78,7 +78,7 @@ namespace matx
    * @return Product result
    */
   template <typename T, typename S>
-    requires (!std::is_same_v<T, S> && std::is_arithmetic_v<S>)
+    requires (!cuda::std::is_same_v<T, S> && cuda::std::is_arithmetic_v<S>)
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__
   auto operator*(S n, const cuda::std::complex<T> &c) -> cuda::std::complex<T>
   {

@@ -56,7 +56,7 @@ TYPED_TEST(CopyTestsAll, CopyOutParam)
 
   const int SZ = 5;
   TestType DEFAULT, TEST_VAL;
-  if constexpr (std::is_same_v<TestType, bool>) {
+  if constexpr (cuda::std::is_same_v<TestType, bool>) {
     DEFAULT = true;
     TEST_VAL = false;
   } else {
@@ -126,7 +126,7 @@ TYPED_TEST(CopyTestsAll, CopyOutParam)
     ASSERT_EQ(out(0), DEFAULT);
   }
 
-  if constexpr (std::is_same_v<ExecType,cudaExecutor>) {
+  if constexpr (cuda::std::is_same_v<ExecType,cudaExecutor>) {
     ASSERT_EQ(cudaGetLastError(), cudaSuccess);
   }
 
@@ -144,7 +144,7 @@ TYPED_TEST(CopyTestsAll, CopyReturn)
 
   const int SZ = 5;
   TestType DEFAULT, TEST_VAL;
-  if constexpr (std::is_same_v<TestType, bool>) {
+  if constexpr (cuda::std::is_same_v<TestType, bool>) {
     DEFAULT = true;
     TEST_VAL = false;
   } else {
@@ -211,7 +211,7 @@ TYPED_TEST(CopyTestsAll, CopyReturn)
     ASSERT_EQ(out(0), DEFAULT);
   }
 
-  if constexpr (std::is_same_v<ExecType,cudaExecutor>) {
+  if constexpr (cuda::std::is_same_v<ExecType,cudaExecutor>) {
     ASSERT_EQ(cudaGetLastError(), cudaSuccess);
   }
 

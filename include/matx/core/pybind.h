@@ -163,24 +163,24 @@ public:
   template <typename T> static auto GetNumpyDtype()
   {
     auto np = pybind11::module_::import("numpy");
-    if constexpr (std::is_same_v<T, int32_t>)
+    if constexpr (cuda::std::is_same_v<T, int32_t>)
       return np.attr("dtype")("i4");
-    if constexpr (std::is_same_v<T, uint32_t>)
+    if constexpr (cuda::std::is_same_v<T, uint32_t>)
       return np.attr("dtype")("u4");
-    if constexpr (std::is_same_v<T, int64_t>)
+    if constexpr (cuda::std::is_same_v<T, int64_t>)
       return np.attr("dtype")("i8");
-    if constexpr (std::is_same_v<T, uint64_t>)
+    if constexpr (cuda::std::is_same_v<T, uint64_t>)
       return np.attr("dtype")("u8");
-    if constexpr (std::is_same_v<T, float> || is_matx_half_v<T>)
+    if constexpr (cuda::std::is_same_v<T, float> || is_matx_half_v<T>)
       return np.attr("dtype")("float32");
-    if constexpr (std::is_same_v<T, double>)
+    if constexpr (cuda::std::is_same_v<T, double>)
       return np.attr("dtype")("float64");
-    if constexpr (std::is_same_v<T, cuda::std::complex<double>> ||
-                  std::is_same_v<T, std::complex<double>>) {
+    if constexpr (cuda::std::is_same_v<T, cuda::std::complex<double>> ||
+                  cuda::std::is_same_v<T, std::complex<double>>) {
       return np.attr("dtype")("complex128");
     }
-    if constexpr (std::is_same_v<T, cuda::std::complex<float>> ||
-                  std::is_same_v<T, std::complex<float>> ||
+    if constexpr (cuda::std::is_same_v<T, cuda::std::complex<float>> ||
+                  cuda::std::is_same_v<T, std::complex<float>> ||
                   is_complex_half_v<T>) {
       return np.attr("dtype")("complex64");
     }
@@ -350,7 +350,7 @@ public:
 
   /**
    * @brief Converts an absolute (flat) index to multi-dimensional indices
-   * 
+   *
    * Local utility function to avoid circular header dependencies
    *
    * @param op Operator or tensor
@@ -435,7 +435,7 @@ public:
       // Iterate through all elements
       for (index_t i = 0; i < ten.TotalSize(); i++) {
         auto indices = AbsToIdx(ten, i);
-        
+
         // Use cuda::std::apply to expand indices and access both arrays
         cuda::std::apply([&](auto&&... idx) {
           ten(idx...) = ConvertComplex(ften.at(idx...));
@@ -480,14 +480,14 @@ public:
       // Iterate through all elements
       for (index_t i = 0; i < ten.TotalSize(); i++) {
         auto indices = AbsToIdx(ten, i);
-        
+
         // Use cuda::std::apply to expand indices and access both arrays
         cuda::std::apply([&](auto&&... idx) {
           ften.mutable_at(idx...) = ConvertComplex(ten(idx...));
         }, indices);
       }
 
-      return ften;      
+      return ften;
     }
     else {
       const auto tshape = ten.Shape();
@@ -496,10 +496,10 @@ public:
       std::vector<pybind11::ssize_t> strides{tstrides.begin(), tstrides.end()};
       std::for_each(strides.begin(), strides.end(), [](pybind11::ssize_t &x) {
         x *= sizeof(tensor_type);
-      });      
+      });
 
       auto buf = pybind11::buffer_info(
-          ten.Data(), 
+          ten.Data(),
           sizeof(tensor_type),
           pybind11::format_descriptor<ntype>::format(),
           RANK,
@@ -507,7 +507,7 @@ public:
           strides
       );
 
-      return pybind11::array_t<ntype, pybind11::array::c_style | pybind11::array::forcecast>(buf);      
+      return pybind11::array_t<ntype, pybind11::array::c_style | pybind11::array::forcecast>(buf);
     }
   }
 
@@ -518,7 +518,7 @@ public:
   CompareOutput(const TensorType &ten,
                 const std::string fname, double thresh, bool debug = false)
   {
-    using raw_type = typename TensorType::value_type;    
+    using raw_type = typename TensorType::value_type;
     using ntype = matx_convert_complex_type<raw_type>;
     using ctype = matx_convert_cuda_complex_type<raw_type>;
     auto resobj = res_dict[fname.c_str()];
@@ -539,19 +539,19 @@ public:
       // Iterate through all elements
       for (index_t i = 0; i < ten.TotalSize(); i++) {
         auto indices = AbsToIdx(ten, i);
-        
+
         // Use cuda::std::apply to expand indices and compare values
         auto comparison_failed = cuda::std::apply([&](auto&&... idx) {
           auto file_val = ften.at(idx...);
           auto ten_val = ConvertComplex(ten(idx...));
-          return !CompareVals(ten_val, file_val, thresh, fname, debug) ? 
-                 std::make_optional(std::make_pair(ten_val, file_val)) : 
+          return !CompareVals(ten_val, file_val, thresh, fname, debug) ?
+                 std::make_optional(std::make_pair(ten_val, file_val)) :
                  std::nullopt;
         }, indices);
-        
+
         if (comparison_failed) {
-          return TestFailResult<ctype>{Index2Str(indices), fname, 
-                                       comparison_failed->first, 
+          return TestFailResult<ctype>{Index2Str(indices), fname,
+                                       comparison_failed->first,
                                        comparison_failed->second,
                                        thresh};
         }

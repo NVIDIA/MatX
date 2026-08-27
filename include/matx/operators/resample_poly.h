@@ -46,8 +46,8 @@ namespace detail {
   class ResamplePolyOp : public BaseOp<ResamplePolyOp<OpA, FilterType>>
   {
     private:
-      using out_t = std::conditional_t<is_complex_v<typename OpA::value_type>, 
-            typename FilterType::value_type, typename FilterType::value_type>;          
+      using out_t = cuda::std::conditional_t<is_complex_v<typename OpA::value_type>,
+            typename FilterType::value_type, typename FilterType::value_type>;
       typename detail::base_type_t<OpA> a_;
       typename detail::base_type_t<FilterType> f_;
       index_t up_;
@@ -55,19 +55,19 @@ namespace detail {
       cuda::std::array<index_t, OpA::Rank()> out_dims_;
       mutable detail::tensor_impl_t<out_t, OpA::Rank()> tmp_out_;
       mutable out_t *ptr = nullptr;
-      mutable bool prerun_done_ = false;       
+      mutable bool prerun_done_ = false;
 
     public:
       using matxop = bool;
       using matx_transform_op = bool;
       using resample_poly_xform_op = bool;
-      using value_type = out_t;            
+      using value_type = out_t;
 
       __MATX_INLINE__ std::string str() const { return "resample_poly(" + get_type_str(a_) + "," + get_type_str(f_) + ")";}
-      __MATX_INLINE__ ResamplePolyOp(const OpA &a, const FilterType &f, index_t up, index_t down) : 
-          a_(a), f_(f), up_(up), down_(down) 
+      __MATX_INLINE__ ResamplePolyOp(const OpA &a, const FilterType &f, index_t up, index_t down) :
+          a_(a), f_(f), up_(up), down_(down)
       {
-        MATX_LOG_TRACE("{} constructor: up={}, down={}", str(), up, down); 
+        MATX_LOG_TRACE("{} constructor: up={}, down={}", str(), up, down);
         const index_t up_len = a_.Size(OpA::Rank() - 1) * up_;
         const index_t b_len = up_len / down_ + ((up_len % down_) ? 1 : 0);
 
@@ -92,7 +92,7 @@ namespace detail {
       template <OperatorCapability Cap, typename InType>
       __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const {
         auto self_has_cap = capability_attributes<Cap>::default_value;
-        return combine_capabilities<Cap>(self_has_cap, 
+        return combine_capabilities<Cap>(self_has_cap,
                                            detail::get_operator_capability<Cap>(a_, in),
                                            detail::get_operator_capability<Cap>(f_, in));
       }
@@ -100,7 +100,7 @@ namespace detail {
       constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const
       {
         return out_dims_[dim];
-      }      
+      }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
       {
@@ -127,8 +127,8 @@ namespace detail {
 
         if constexpr (is_matx_op<FilterType>()) {
           f_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-        }              
-      } 
+        }
+      }
 
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
@@ -137,7 +137,7 @@ namespace detail {
           return;
         }
 
-        InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));         
+        InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
 
         if constexpr (is_host_executor_v<Executor>) {
           detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr,
@@ -160,25 +160,25 @@ namespace detail {
 
         if constexpr (is_matx_op<FilterType>()) {
           f_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-        } 
+        }
 
         matxFree(ptr);
         ptr = nullptr;
         prerun_done_ = false;
-      }             
+      }
   };
 }
 
 /**
  * @brief 1D polyphase resampler
- * 
+ *
  * @tparam InType Type of input
  * @tparam FilterType Type of filter
  * @param in Input operator
  * @param f Filter operator
  * @param up Factor by which to upsample
  * @param down Factor by which to downsample
- * 
+ *
  * @returns Operator representing the filtered inputs
  */
 template <typename InType, typename FilterType>

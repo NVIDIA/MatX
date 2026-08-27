@@ -150,7 +150,7 @@ struct FftFFTWParams_t {
     }
 
     params.is_fp32 = is_fp32_inner_type_v<typename OutTensorType::value_type>;
-    if constexpr (std::is_same_v<typename OutTensorType::value_type,
+    if constexpr (cuda::std::is_same_v<typename OutTensorType::value_type,
                                 typename InTensorType::value_type>) {
       params.in_place = o.Data() == i.Data();
     } else {
@@ -177,7 +177,7 @@ struct FftFFTWParams_t {
         }
       }
       else {
-        if (!is_complex_v<T2> || !is_complex_v<T1> || !std::is_same_v<T1, T2>) {
+        if (!is_complex_v<T2> || !is_complex_v<T1> || !cuda::std::is_same_v<T1, T2>) {
           MATX_THROW(matxInvalidType, "FFT types inconsistent with C2C transform");
         }
         if (params.n[0] != o.Size(OutTensorType::Rank()-1) ||
@@ -200,7 +200,7 @@ struct FftFFTWParams_t {
                     matxInvalidType);
       }
       else {
-        MATX_ASSERT((std::is_same_v<T1, T2>), matxInvalidType);
+        MATX_ASSERT((cuda::std::is_same_v<T1, T2>), matxInvalidType);
         MATX_ASSERT(is_complex_v<T2> && is_complex_v<T1>, matxInvalidType);
         MATX_ASSERT(o.Size(RANK-2) * o.Size(RANK-1) == i.Size(RANK-2) * i.Size(RANK-1),
                     matxInvalidSize);
@@ -316,7 +316,7 @@ private:
 template<typename OutTensorType, typename InTensorType> class matxFFTWPlan_t {
 public:
   using out_value_type = typename OutTensorType::value_type;
-  using plan_type = std::conditional_t<is_fp32_inner_type_v<out_value_type>, fftwf_plan, fftw_plan>;
+  using plan_type = cuda::std::conditional_t<is_fp32_inner_type_v<out_value_type>, fftwf_plan, fftw_plan>;
 
   template <ThreadsMode MODE>
   matxFFTWPlan_t(OutTensorType &o,
@@ -377,9 +377,9 @@ public:
     else {
       FFTWPlanManager::InitFFTW();
       fftw_plan_with_nthreads(exec.GetNumThreads());
-      if constexpr (DeduceFFTTransformType<OutTensorType, InTensorType>() == FFTType::C2C && 
-                    std::is_same_v<typename InTensorType::value_type, cuda::std::complex<double>> &&
-                    std::is_same_v<typename OutTensorType::value_type, cuda::std::complex<double>>) {
+      if constexpr (DeduceFFTTransformType<OutTensorType, InTensorType>() == FFTType::C2C &&
+                    cuda::std::is_same_v<typename InTensorType::value_type, cuda::std::complex<double>> &&
+                    cuda::std::is_same_v<typename OutTensorType::value_type, cuda::std::complex<double>>) {
         plan_  = fftw_plan_many_dft( params_.fft_rank,
                                     params_.n,
                                     params_.batch,
@@ -394,9 +394,9 @@ public:
                                     fft_dir,
                                     FFTW_ESTIMATE);
       }
-      else if constexpr (DeduceFFTTransformType<OutTensorType, InTensorType>() == FFTType::C2R && 
-                         std::is_same_v<typename InTensorType::value_type, cuda::std::complex<double>> &&
-                         std::is_same_v<typename OutTensorType::value_type, double>) {
+      else if constexpr (DeduceFFTTransformType<OutTensorType, InTensorType>() == FFTType::C2R &&
+                         cuda::std::is_same_v<typename InTensorType::value_type, cuda::std::complex<double>> &&
+                         cuda::std::is_same_v<typename OutTensorType::value_type, double>) {
         plan_  = fftw_plan_many_dft_c2r( params_.fft_rank,
                                     params_.n,
                                     params_.batch,
@@ -410,9 +410,9 @@ public:
                                     params_.odist,
                                     FFTW_ESTIMATE);
       }
-      else if constexpr (DeduceFFTTransformType<OutTensorType, InTensorType>() == FFTType::R2C && 
-                         std::is_same_v<typename InTensorType::value_type, double> &&
-                         std::is_same_v<typename OutTensorType::value_type, cuda::std::complex<double>>) {
+      else if constexpr (DeduceFFTTransformType<OutTensorType, InTensorType>() == FFTType::R2C &&
+                         cuda::std::is_same_v<typename InTensorType::value_type, double> &&
+                         cuda::std::is_same_v<typename OutTensorType::value_type, cuda::std::complex<double>>) {
         plan_  = fftw_plan_many_dft_r2c( params_.fft_rank,
                                     params_.n,
                                     params_.batch,
@@ -474,23 +474,23 @@ public:
       }
     }
     else {
-      if constexpr (DeduceFFTTransformType<OutTensorType, InTensorType>() == FFTType::C2C && 
-                    std::is_same_v<typename InTensorType::value_type, cuda::std::complex<double>> &&
-                    std::is_same_v<typename OutTensorType::value_type, cuda::std::complex<double>>) {
+      if constexpr (DeduceFFTTransformType<OutTensorType, InTensorType>() == FFTType::C2C &&
+                    cuda::std::is_same_v<typename InTensorType::value_type, cuda::std::complex<double>> &&
+                    cuda::std::is_same_v<typename OutTensorType::value_type, cuda::std::complex<double>>) {
         fftw_execute_dft(plan_,
                           reinterpret_cast<fftw_complex*>(in),
                           reinterpret_cast<fftw_complex*>(out));
       }
-      else if constexpr (DeduceFFTTransformType<OutTensorType, InTensorType>() == FFTType::C2R && 
-                         std::is_same_v<typename InTensorType::value_type, cuda::std::complex<double>> &&
-                         std::is_same_v<typename OutTensorType::value_type, double>) {
+      else if constexpr (DeduceFFTTransformType<OutTensorType, InTensorType>() == FFTType::C2R &&
+                         cuda::std::is_same_v<typename InTensorType::value_type, cuda::std::complex<double>> &&
+                         cuda::std::is_same_v<typename OutTensorType::value_type, double>) {
         fftw_execute_dft_c2r(plan_,
                           reinterpret_cast<fftw_complex*>(in),
                           out);
       }
-      else if constexpr (DeduceFFTTransformType<OutTensorType, InTensorType>() == FFTType::R2C && 
-                         std::is_same_v<typename InTensorType::value_type, double> &&
-                         std::is_same_v<typename OutTensorType::value_type, cuda::std::complex<double>>) {
+      else if constexpr (DeduceFFTTransformType<OutTensorType, InTensorType>() == FFTType::R2C &&
+                         cuda::std::is_same_v<typename InTensorType::value_type, double> &&
+                         cuda::std::is_same_v<typename OutTensorType::value_type, cuda::std::complex<double>>) {
         fftw_execute_dft_r2c(plan_,
                           in,
                           reinterpret_cast<fftw_complex*>(out));

@@ -70,7 +70,7 @@ namespace matx
 
         __MATX_INLINE__ auto get_jit_op_str() const {
           std::string func_name = get_jit_class_name();
-          
+
           return cuda::std::make_tuple(
             func_name,
             std::format("template <typename T> struct {} {{\n"
@@ -179,7 +179,7 @@ MATX_IGNORE_WARNING_POP_GCC
     requires (!cuda::std::is_array_v<remove_cvref_t<ShapeType>>)
   inline auto range(ShapeType &&s, T first, T step)
              {
-               constexpr int RANK = cuda::std::tuple_size<std::decay_t<ShapeType>>::value;
+               constexpr int RANK = cuda::std::tuple_size<cuda::std::decay_t<ShapeType>>::value;
                static_assert(RANK > Dim);
                detail::Range<T> r(first, step);
                return detail::matxGenerator1D_t<detail::Range<T>, Dim, ShapeType>(std::forward<ShapeType>(s), r);

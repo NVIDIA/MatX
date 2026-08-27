@@ -111,7 +111,7 @@ public:
             detail::get_operator_capability<Cap>(ynorm_, in),
             detail::get_operator_capability<Cap>(out_, in));
     }
-  }     
+  }
 };
 
 template <class O, class I1>
@@ -144,7 +144,7 @@ public:
   __MATX_DEVICE__ inline void operator()(index_t idx)
   {
     return this->template operator()<DefaultCapabilities>(idx);
-  } 
+  }
 
   template <OperatorCapability Cap, typename InType>
   __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType& in) const {
@@ -160,7 +160,7 @@ public:
             detail::get_operator_capability<Cap>(out_, in),
             detail::get_operator_capability<Cap>(x_, in));
     }
-  }       
+  }
 
   constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
   {
@@ -214,7 +214,7 @@ public:
             detail::get_operator_capability<Cap>(out_, in),
             detail::get_operator_capability<Cap>(x_, in));
     }
-  }           
+  }
 
   constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
   {
@@ -233,7 +233,7 @@ void ambgfun_impl(AMFTensor &amf, XTensor &x,
                      [[maybe_unused]] float cut_val, cudaStream_t stream = 0)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-  
+
   constexpr int RANK = XTensor::Rank();
   using T1 = typename XTensor::value_type;
 
@@ -250,7 +250,7 @@ void ambgfun_impl(AMFTensor &amf, XTensor &x,
 
   auto y_normdiv_v = x_normdiv_v.View();
 
-  if constexpr (!std::is_same_v<YTensor, EmptyY>) {
+  if constexpr (!cuda::std::is_same_v<YTensor, EmptyY>) {
     ry.Reset(y.Data(), y.Shape());
     y_normdiv_v.Shallow(make_tensor<T1>(y_normdiv_v.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream));
     auto y_norm_v = make_tensor<float>({}, MATX_ASYNC_DEVICE_MEMORY, stream);
@@ -265,7 +265,7 @@ void ambgfun_impl(AMFTensor &amf, XTensor &x,
   index_t xlen = x_normdiv_v.Size(RANK - 1);
 
   if (cut == ::matx::AMBGFUN_CUT_TYPE_2D) {
-          
+
     auto new_ynorm_v = make_tensor<T1>({len_seq - 1, xlen}, MATX_ASYNC_DEVICE_MEMORY, stream);
 
     newYNorm(new_ynorm_v, x_normdiv_v, y_normdiv_v).run(stream);

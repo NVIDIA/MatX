@@ -75,11 +75,11 @@ namespace detail {
 
 #ifdef __CUDACC__
 template <typename T> constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T maxVal() {
-  if constexpr (std::is_same_v<convert_matx_type_t<T>, __half>) {
+  if constexpr (cuda::std::is_same_v<convert_matx_type_t<T>, __half>) {
     constexpr HalfBits tmp{0x7BFF};
     return tmp.h;
   }
-  if constexpr (std::is_same_v<convert_matx_type_t<T>, __nv_bfloat16>) {
+  if constexpr (cuda::std::is_same_v<convert_matx_type_t<T>, __nv_bfloat16>) {
     constexpr HalfBits tmp{0x7F7F};
     return tmp.b;
   }
@@ -89,11 +89,11 @@ template <typename T> constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T 
 }
 
 template <typename T> constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T minVal() {
-  if constexpr (std::is_same_v<convert_matx_type_t<T>, __half>) {
+  if constexpr (cuda::std::is_same_v<convert_matx_type_t<T>, __half>) {
     constexpr HalfBits tmp{0x0400};
     return tmp.h;
   }
-  if constexpr (std::is_same_v<convert_matx_type_t<T>, __nv_bfloat16>) {
+  if constexpr (cuda::std::is_same_v<convert_matx_type_t<T>, __nv_bfloat16>) {
     constexpr HalfBits tmp{0x0080};
     return tmp.b;
   }

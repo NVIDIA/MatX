@@ -67,7 +67,7 @@ enum class MemoryLayout {
 
 /**
  * @brief Determine if a type is NoShape
- * 
+ *
  * @tparam T Type to test
  */
 template <class T>
@@ -96,16 +96,10 @@ struct shape_rank_t<detail::NoShape> {
 
 /**
  * @brief Removes cv and reference qualifiers on a type
- * 
+ *
  * @tparam T Type to remove qualifiers
  */
-template< class T >
-struct remove_cvref {
-    using type = cuda::std::remove_cv_t<cuda::std::remove_reference_t<T>>; ///< Type after removal
-};  
-
-template <typename T>
-using remove_cvref_t = typename remove_cvref<T>::type;
+using cuda::std::remove_cvref_t;
 
 template <typename T, int RANK, typename Desc, typename Data> class tensor_impl_t;
 template <typename T, int RANK, typename Desc> class tensor_t;
@@ -141,16 +135,16 @@ inline constexpr bool is_dynamic_rank_op_v =
 
 /**
  * @brief Determine if a type is a MatX tie type
- * 
+ *
  * @tparam T Type to test
  */
-template <typename T> 
+template <typename T>
 concept is_mtie_c = requires {
   typename remove_cvref_t<T>::mtie_type;
 };
 
 // Legacy function for backwards compatibility
-template <typename T> 
+template <typename T>
 constexpr __MATX_HOST__ __MATX_DEVICE__ bool is_mtie()
 {
   return requires { typename remove_cvref_t<T>::mtie_type; };
@@ -159,16 +153,16 @@ constexpr __MATX_HOST__ __MATX_DEVICE__ bool is_mtie()
 
 /**
  * @brief Determine if a type is a MatX operator
- * 
+ *
  * @tparam T Type to test
  */
-template <typename T> 
+template <typename T>
 concept is_matx_op_c = requires {
   typename remove_cvref_t<T>::matxop;
 };
 
 // Legacy function for backwards compatibility
-template <typename T> 
+template <typename T>
 constexpr __MATX_HOST__ __MATX_DEVICE__ bool is_matx_op()
 {
   return requires { typename remove_cvref_t<T>::matxop; };
@@ -176,36 +170,36 @@ constexpr __MATX_HOST__ __MATX_DEVICE__ bool is_matx_op()
 
 /**
  * @brief Determine if a type is a MatX tensor set operator
- * 
+ *
  * @tparam T Type to test
  */
-template <typename T> 
+template <typename T>
 concept is_matx_tensor_set_op = requires {
   typename remove_cvref_t<T>::tensor_type::tensor_view;
 };
 
 /**
  * @brief Determine if a type is a MatX transform set operator
- * 
+ *
  * @tparam T Type to test
  */
-template <typename T> 
+template <typename T>
 concept is_matx_transform_set_op = requires {
   typename remove_cvref_t<T>::op_type::matx_transform_op;
 };
 
 /**
  * @brief Determine if a type is a MatX transform operator
- * 
+ *
  * @tparam T Type to test
  */
-template <typename T> 
+template <typename T>
 concept is_matx_transform_op_c = requires {
   typename remove_cvref_t<T>::matx_transform_op;
 };
 
 // Legacy function for backwards compatibility
-template <typename T> 
+template <typename T>
 constexpr __MATX_HOST__ __MATX_DEVICE__ bool is_matx_transform_op()
 {
   return requires { typename remove_cvref_t<T>::matx_transform_op; };
@@ -213,22 +207,22 @@ constexpr __MATX_HOST__ __MATX_DEVICE__ bool is_matx_transform_op()
 
 /**
  * @brief Determine if a type has can_alias trait
- * 
+ *
  * @tparam T Type to test
  */
-template <typename T> 
+template <typename T>
 concept has_can_alias_c = requires {
   typename remove_cvref_t<T>::can_alias;
 };
 
 /**
  * @brief Determine if operator can alias
- * 
+ *
  * Returns true if the type is a transform operator and has the can_alias trait set
- * 
+ *
  * @tparam T Type to test
  */
-template <typename T> 
+template <typename T>
 constexpr __MATX_HOST__ __MATX_DEVICE__ bool can_alias()
 {
   return is_matx_transform_op<T>() && (requires { typename remove_cvref_t<T>::can_alias; });
@@ -236,10 +230,10 @@ constexpr __MATX_HOST__ __MATX_DEVICE__ bool can_alias()
 
 /**
  * @brief Determine if a type has op_type member
- * 
+ *
  * @tparam T Type to test
  */
-template <typename T> 
+template <typename T>
 concept has_matx_op_type = requires {
   typename T::op_type;
 };
@@ -248,16 +242,16 @@ concept has_matx_op_type = requires {
 
 /**
  * @brief Determine if a type is a MatX set operator
- * 
+ *
  * @tparam T Type to test
  */
-template <typename T> 
+template <typename T>
 concept is_matx_set_op_c = requires {
   typename remove_cvref_t<T>::matx_setop;
 };
 
 // Legacy function for backwards compatibility
-template <typename T> 
+template <typename T>
 constexpr __MATX_HOST__ __MATX_DEVICE__ bool is_matx_set_op()
 {
   return requires { typename remove_cvref_t<T>::matx_setop; };
@@ -267,16 +261,16 @@ constexpr __MATX_HOST__ __MATX_DEVICE__ bool is_matx_set_op()
 
 /**
  * @brief Determine if a type is a left hand side operator
- * 
+ *
  * @tparam T Type to test
  */
-template <typename T> 
+template <typename T>
 concept is_matx_op_lvalue_c = requires {
   typename T::matxoplvalue;
 };
 
 // Legacy function for backwards compatibility
-template <typename T> 
+template <typename T>
 constexpr __MATX_HOST__ __MATX_DEVICE__ bool is_matx_op_lvalue()
 {
   return requires { typename T::matxoplvalue; };
@@ -284,7 +278,7 @@ constexpr __MATX_HOST__ __MATX_DEVICE__ bool is_matx_op_lvalue()
 
 /**
  * @brief Determine if a type is a MatX tensor_t
- * 
+ *
  * @tparam T Type to test
  */
 template< class T >
@@ -298,7 +292,7 @@ inline constexpr bool is_tensor_t_v = requires { typename remove_cvref_t<T>::ten
 
 /**
  * @brief Determine if a type is a MatX tensor_impl_t
- * 
+ *
  * @tparam T Type to test
  */
 template< class T >
@@ -312,7 +306,7 @@ inline constexpr bool is_tensor_impl_v = requires { typename remove_cvref_t<T>::
 
 /**
  * @brief Determine if a type is a MatX tensor
- * 
+ *
  * @tparam T Type to test
  */
 template< class T >
@@ -330,7 +324,7 @@ inline constexpr bool is_tensor_view_v = is_tensor_v<T>;
 
 /**
  * @brief Determine if a type is a cuda::std::tuple
- * 
+ *
  * @tparam T Type to test
  */
 template <typename T>
@@ -344,7 +338,7 @@ template <typename> struct is_tuple: cuda::std::false_type {};
 template <typename ...T> struct is_tuple<cuda::std::tuple<T...>>: cuda::std::true_type {};
 
 template <typename T>
-inline constexpr bool is_settable_xform_v = (requires { typename remove_cvref_t<T>::matx_setop; }) && 
+inline constexpr bool is_settable_xform_v = (requires { typename remove_cvref_t<T>::matx_setop; }) &&
                                              (requires { typename remove_cvref_t<T>::op_type::matx_transform_op; });
 
 
@@ -352,7 +346,7 @@ inline constexpr bool is_settable_xform_v = (requires { typename remove_cvref_t<
 
 /**
  * @brief Determine if a type is a MatX reduction
- * 
+ *
  * @tparam T Type to test
  */
 template <typename T>
@@ -366,7 +360,7 @@ inline constexpr bool is_matx_reduction_v = requires { typename T::matx_reduce; 
 
 /**
  * @brief Determine if a type is a MatX index reduction type
- * 
+ *
  * @tparam T Type to test
  */
 template <typename T>
@@ -380,7 +374,7 @@ inline constexpr bool is_matx_index_reduction_v = requires { typename T::matx_re
 
 /**
  * @brief Determine if a type is not allowed to use CUB for reductions
- * 
+ *
  * @tparam T Type to test
  */
 template <typename T>
@@ -397,7 +391,7 @@ inline constexpr bool is_matx_no_cub_reduction_v = requires { typename T::matx_n
 
 /**
  * @brief Determine if a type is a cuda::std::complex variant
- * 
+ *
  * @tparam T Type to test
  */
 template <class T>
@@ -416,10 +410,10 @@ inline constexpr bool is_cuda_complex_v = requires {
 
 /**
  * @brief Determine if a type is a device executor
- * 
+ *
  * @tparam T Type to test
  */
-template <typename T> 
+template <typename T>
 concept is_cuda_executor = requires {
   typename remove_cvref_t<T>::cuda_executor;
 };
@@ -437,7 +431,7 @@ inline constexpr bool is_distributed_executor_v =
 
 /**
  * @brief Determine if a type is a CUDA executor but NOT a JIT CUDA executor
- * 
+ *
  * @tparam T Type to test
  */
 template <typename T>
@@ -463,10 +457,10 @@ inline constexpr bool is_cuda_jit_executor_v = requires { typename remove_cvref_
 
 /**
  * @brief Determine if a type is a complex type (any type supported)
- * 
+ *
  * @tparam T Type to test
  */
-template <class T> 
+template <class T>
 concept is_complex = cuda::std::is_same_v<remove_cvref_t<T>, cuda::std::complex<float>> ||
                      cuda::std::is_same_v<remove_cvref_t<T>, cuda::std::complex<double>> ||
                      cuda::std::is_same_v<remove_cvref_t<T>, matxFp16Complex> ||
@@ -475,7 +469,7 @@ concept is_complex = cuda::std::is_same_v<remove_cvref_t<T>, cuda::std::complex<
                      cuda::std::is_same_v<remove_cvref_t<T>, matxBf16ComplexPlanar>;
 
 // Legacy variable for backwards compatibility
-template <class T> 
+template <class T>
 inline constexpr bool is_complex_v = cuda::std::is_same_v<remove_cvref_t<T>, cuda::std::complex<float>> ||
                                      cuda::std::is_same_v<remove_cvref_t<T>, cuda::std::complex<double>> ||
                                      cuda::std::is_same_v<remove_cvref_t<T>, matxFp16Complex> ||
@@ -550,46 +544,46 @@ struct inner_op_type_t {
 };
 
 template <is_complex T>
-struct inner_op_type_t<T> { 
+struct inner_op_type_t<T> {
   using type = typename T::value_type;
 };
 
 
 /**
  * @brief Determine if a type is a BF16 type
- * 
+ *
  * @tparam T Type to test
  */
-template <class T> 
+template <class T>
 concept is_bf16_type = cuda::std::is_same_v<T, matxBf16Complex> ||
                        cuda::std::is_same_v<T, matxBf16ComplexPlanar> ||
                        cuda::std::is_same_v<T, matxBf16>;
 
 // Legacy variable for backwards compatibility
-template <class T> 
+template <class T>
 inline constexpr bool is_bf16_type_v = cuda::std::is_same_v<T, matxBf16Complex> ||
                                        cuda::std::is_same_v<T, matxBf16ComplexPlanar> ||
                                        cuda::std::is_same_v<T, matxBf16>;
 
 /**
  * @brief Determine if a type is an FP16 type
- * 
+ *
  * @tparam T Type to test
  */
-template <class T> 
+template <class T>
 concept is_fp16_type = cuda::std::is_same_v<T, matxFp16Complex> ||
                        cuda::std::is_same_v<T, matxFp16ComplexPlanar> ||
                        cuda::std::is_same_v<T, matxFp16>;
 
 // Legacy variable for backwards compatibility
-template <class T> 
+template <class T>
 inline constexpr bool is_fp16_type_v = cuda::std::is_same_v<T, matxFp16Complex> ||
                                        cuda::std::is_same_v<T, matxFp16ComplexPlanar> ||
                                        cuda::std::is_same_v<T, matxFp16>;
 
 /**
  * @brief Determine if the inner type is an FP32 type
- * 
+ *
  * @tparam T Type to test
  */
 template<typename T>
@@ -597,7 +591,7 @@ inline constexpr bool is_fp32_inner_type_v = cuda::std::is_same_v<typename inner
 
 /**
  * @brief Determine if the inner type is an FP64 type
- * 
+ *
  * @tparam T Type to test
  */
 template<typename T>
@@ -605,7 +599,7 @@ inline constexpr bool is_fp64_inner_type_v = cuda::std::is_same_v<typename inner
 
 /**
  * @brief Determine if a type is a MatX shape type
- * 
+ *
  * @tparam T Type to test
  */
 template <typename T>
@@ -616,11 +610,11 @@ concept is_matx_shape = requires {
 // Legacy variable for backwards compatibility
 template <typename T>
 inline constexpr bool is_matx_shape_v = requires { typename remove_cvref_t<T>::matx_shape; };
- 
+
 
 /**
  * @brief Determine if a type is a complex half precision type
- * 
+ *
  * @tparam T Type to test
  */
 template <class T>
@@ -643,7 +637,7 @@ inline constexpr bool is_planar_complex_v =
 
 /**
  * @brief Tests if a type is a half precision floating point
- * 
+ *
  * @tparam T Type to test
  * @return True if half precision floating point
  */
@@ -654,7 +648,7 @@ template <typename T> constexpr inline __MATX_HOST__ __MATX_DEVICE__ bool IsHalf
 
 /**
  * @brief Determine if a type is a MatX half precision wrapper (either matxFp16 or matxBf16)
- * 
+ *
  * @tparam T Type to test
  */
 template <class T>
@@ -668,21 +662,21 @@ inline constexpr bool is_matx_half_v = cuda::std::is_same_v<cuda::std::remove_cv
 
 /**
  * @brief Determine if a type is half precision (either __half or __nv_bfloat16)
- * 
+ *
  * @tparam T Type to test
  */
-template <class T> 
+template <class T>
 concept is_half = cuda::std::is_same_v<cuda::std::remove_cv_t<T>, __half> ||
                   cuda::std::is_same_v<cuda::std::remove_cv_t<T>, __nv_bfloat16>;
 
 // Legacy variable for backwards compatibility
-template <class T> 
+template <class T>
 inline constexpr bool is_half_v = cuda::std::is_same_v<cuda::std::remove_cv_t<T>, __half> ||
                                   cuda::std::is_same_v<cuda::std::remove_cv_t<T>, __nv_bfloat16>;
 
 /**
  * @brief Determine if a type is a MatX custom type (half precision wrappers)
- * 
+ *
  * @tparam T Type to test
  */
 template <class T>
@@ -716,7 +710,7 @@ struct extract_value_type_impl<T> {
 
 /**
  * @brief Extract the value_type type
- * 
+ *
  * @tparam T Type to extract from
  */
 template <typename T>
@@ -724,7 +718,7 @@ using extract_value_type_t = typename detail::extract_value_type_impl<cuda::std:
 
 /**
  * @brief Promote half precision floating point value to fp32, or leave untouched if not half
- * 
+ *
  * @tparam T Type to convert
  */
 template <typename T>
@@ -732,7 +726,7 @@ using promote_half_t = typename cuda::std::conditional_t<is_half_v<T> || is_matx
 
 /**
  * @brief Determine if a type is a MatX descriptor
- * 
+ *
  * @tparam T Type to test
  */
 template <typename T>
@@ -746,7 +740,7 @@ inline constexpr bool is_matx_descriptor_v = requires { typename remove_cvref_t<
 
 /**
  * @brief Determine if a type is a MatX static descriptor
- * 
+ *
  * @tparam T Type to test
  */
 template <typename T>
@@ -760,43 +754,43 @@ inline constexpr bool is_matx_static_descriptor_v = requires { typename remove_c
 
 
 namespace detail {
-  
-template <typename T> 
+
+template <typename T>
 struct convert_matx_type {
   using type = T;
 };
 
-template <> 
+template <>
 struct convert_matx_type<matxFp16> {
   using type = __half;
 };
 
-template <> 
+template <>
 struct convert_matx_type<matxBf16> {
   using type = __nv_bfloat16;
 };
 
 
 
-template <typename T> 
+template <typename T>
 using convert_matx_type_t = typename convert_matx_type<T>::type;
 
-template <typename T> 
+template <typename T>
 struct convert_half_to_matx_half {
   using type = T;
 };
 
-template <> 
+template <>
 struct convert_half_to_matx_half<__half> {
   using type = matxFp16;
 };
 
-template <> 
+template <>
 struct convert_half_to_matx_half<__nv_bfloat16> {
   using type = matxBf16;
 };
 
-template <typename T> 
+template <typename T>
 using convert_half_to_matx_half_t = typename convert_half_to_matx_half<T>::type;
 
 
@@ -816,24 +810,24 @@ constexpr __MATX_HOST__ __MATX_DEVICE__ cuda::std::array<cuda::std::remove_cv_t<
 
 
 
-template <typename T> 
+template <typename T>
 struct complex_from_scalar {
   using type = T;
 };
 
-template <typename T> 
+template <typename T>
   requires (cuda::std::is_same_v<float, T> || cuda::std::is_same_v<double, T>)
 struct complex_from_scalar<T> {
   using type = cuda::std::complex<T>;
 };
 
-template <typename T> 
+template <typename T>
   requires (is_matx_half<T> || is_half<T>)
 struct complex_from_scalar<T> {
   using type = matxHalfComplex<typename convert_half_to_matx_half<T>::type>;
 };
 
-template <typename T> using complex_from_scalar_t = typename complex_from_scalar<typename remove_cvref<T>::type>::type;
+template <typename T> using complex_from_scalar_t = typename complex_from_scalar<remove_cvref_t<T>>::type;
 
 
 
@@ -853,7 +847,7 @@ struct cuda_complex_type_of
 template <class C>
 using matx_convert_cuda_complex_type =
     typename cuda::std::conditional_t<!is_complex_v<C>, identity<C>,
-                                cuda_complex_type_of<C>>::type;                                
+                                cuda_complex_type_of<C>>::type;
 
 #ifndef __CUDACC_RTC__
 template <class C>
@@ -865,7 +859,7 @@ struct complex_type_of
 template <class C>
 using matx_convert_complex_type =
     typename cuda::std::conditional_t<!is_complex_v<C>, identity<C>,
-                                complex_type_of<C>>::type;                         
+                                complex_type_of<C>>::type;
 #endif
 
 template <class T, class = void> struct value_type {
@@ -935,30 +929,30 @@ struct permute_rank {
 template <typename T1>
 struct permute_rank<T1, no_permute_t> {
   static const int rank = 0;
-};  
+};
 
 
 
 template <typename T, int RANK, typename Storage, typename Desc> class tensor_t;
 template <typename T, int RANK, typename Desc, typename Data> class tensor_impl_t;
 // Traits for casting down to impl tensor conditionally
-template <typename T> 
+template <typename T>
 struct base_type {
   using type = T;
 };
 
-template <is_tensor_t T> 
+template <is_tensor_t T>
 struct base_type<T> {
   using type = tensor_impl_t<typename T::value_type, T::Rank(), typename T::desc_type, typename T::data_type>;
 };
 
-template <typename T> using base_type_t = typename base_type<typename remove_cvref<T>::type>::type;
+template <typename T> using base_type_t = typename base_type<remove_cvref_t<T>>::type;
 
 }
 
 /**
  * @brief Determine if a type is a MatX sparse data type
- * 
+ *
  * @tparam T Type to test
  */
 template <typename T>
@@ -971,7 +965,7 @@ template <typename T>
 inline constexpr bool is_sparse_data_v = requires { typename remove_cvref_t<T>::sparse_data; };
 /**
  * @brief Determine if a type is a MatX sparse tensor type
- * 
+ *
  * @tparam T Type to test
  */
 template <typename T>
@@ -994,7 +988,7 @@ namespace detail {
 
 /**
  * @brief Determine if a type is std::array or cuda::std::array
- * 
+ *
  * @tparam T Type to test
  */
 template<typename T>
@@ -1007,14 +1001,14 @@ concept is_std_array_c = requires {
 namespace detail {
   template<typename T> struct is_std_array : cuda::std::false_type {};
   template<typename T, size_t N> struct is_std_array<cuda::std::array<T, N>> : cuda::std::true_type {};
-#ifndef __CUDACC_RTC__  
+#ifndef __CUDACC_RTC__
   template<typename T, size_t N> struct is_std_array<std::array<T, N>> : cuda::std::true_type {};
 #endif
   template <typename T> inline constexpr bool is_std_array_v = is_std_array_c<T>;
 
 /**
  * @brief Determine if a type is a MatX JIT class
- * 
+ *
  * @tparam T Type to test
  */
 template <typename T>
@@ -1031,56 +1025,56 @@ struct is_matx_jit_class_impl<T, cuda::std::void_t<typename remove_cvref_t<T>::e
     : cuda::std::true_type {};
 
 template <typename T>
-inline constexpr bool is_matx_jit_class_v = (requires { typename remove_cvref_t<T>::matxop; }) || 
+inline constexpr bool is_matx_jit_class_v = (requires { typename remove_cvref_t<T>::matxop; }) ||
                                             (requires { typename remove_cvref_t<T>::emits_jit_str; });
-  
-}  
+
+}
 
 namespace detail {
-  template <typename T> 
+  template <typename T>
   struct inner_precision {
     using type = T;
   };
 
-  template <> 
+  template <>
   struct inner_precision<cuda::std::complex<float>> {
     using type = float;
-  };  
+  };
 
-  template <> 
+  template <>
   struct inner_precision<cuda::std::complex<double>> {
     using type = double;
-  };  
-  
-  template <> 
+  };
+
+  template <>
   struct inner_precision<matxFp16> {
     using type = __half;
   };
-  
-  template <> 
+
+  template <>
   struct inner_precision<matxBf16> {
     using type = __nv_bfloat16;
   };
-  
-  template <> 
+
+  template <>
   struct inner_precision<matxFp16Complex> {
     using type = __half;
   };
-  
-  template <> 
+
+  template <>
   struct inner_precision<matxFp16ComplexPlanar> {
     using type = __half;
   };
-  
-  template <> 
+
+  template <>
   struct inner_precision<matxBf16Complex> {
     using type = __nv_bfloat16;
   };
-  
-  template <> 
+
+  template <>
   struct inner_precision<matxBf16ComplexPlanar> {
     using type = __nv_bfloat16;
-  };  
+  };
 }
 
 namespace detail {
@@ -1089,16 +1083,16 @@ namespace detail {
   struct VecTypeSelector {
     // Helper to make static_assert dependent on template parameters
     static constexpr bool always_false = sizeof(T) == 0;
-  
+
     static_assert(N >= 1 && N <= 4, "VecTypeSelector only supports vector sizes 1, 2, 3, and 4");
     static_assert(always_false, "VecTypeSelector: No specialization available for this type and size combination. Check the documentation for supported types.");
   };
-  
+
   template <> struct VecTypeSelector<float, 1> { using type = float1; };
   template <> struct VecTypeSelector<float, 2> { using type = float2; };
   template <> struct VecTypeSelector<float, 3> { using type = float3; };
   template <> struct VecTypeSelector<float, 4> { using type = float4; };
-  
+
   template <> struct VecTypeSelector<double, 1> { using type = double1; };
   template <> struct VecTypeSelector<double, 2> { using type = double2; };
   template <> struct VecTypeSelector<double, 3> { using type = double3; };
@@ -1107,37 +1101,37 @@ namespace detail {
   #else
   template <> struct VecTypeSelector<double, 4> { using type = double4; };
   #endif
-  
+
   template <> struct VecTypeSelector<char, 1> { using type = char1; };
   template <> struct VecTypeSelector<char, 2> { using type = char2; };
   template <> struct VecTypeSelector<char, 3> { using type = char3; };
   template <> struct VecTypeSelector<char, 4> { using type = char4; };
-  
+
   template <> struct VecTypeSelector<unsigned char, 1> { using type = uchar1; };
   template <> struct VecTypeSelector<unsigned char, 2> { using type = uchar2; };
   template <> struct VecTypeSelector<unsigned char, 3> { using type = uchar3; };
   template <> struct VecTypeSelector<unsigned char, 4> { using type = uchar4; };
-  
+
   template <> struct VecTypeSelector<short, 1> { using type = short1; };
   template <> struct VecTypeSelector<short, 2> { using type = short2; };
   template <> struct VecTypeSelector<short, 3> { using type = short3; };
   template <> struct VecTypeSelector<short, 4> { using type = short4; };
-  
+
   template <> struct VecTypeSelector<unsigned short, 1> { using type = ushort1; };
   template <> struct VecTypeSelector<unsigned short, 2> { using type = ushort2; };
   template <> struct VecTypeSelector<unsigned short, 3> { using type = ushort3; };
   template <> struct VecTypeSelector<unsigned short, 4> { using type = ushort4; };
-  
+
   template <> struct VecTypeSelector<int, 1> { using type = int1; };
   template <> struct VecTypeSelector<int, 2> { using type = int2; };
   template <> struct VecTypeSelector<int, 3> { using type = int3; };
   template <> struct VecTypeSelector<int, 4> { using type = int4; };
-  
+
   template <> struct VecTypeSelector<unsigned int, 1> { using type = uint1; };
   template <> struct VecTypeSelector<unsigned int, 2> { using type = uint2; };
   template <> struct VecTypeSelector<unsigned int, 3> { using type = uint3; };
   template <> struct VecTypeSelector<unsigned int, 4> { using type = uint4; };
-  
+
   template <> struct VecTypeSelector<long, 1> { using type = long1; };
   template <> struct VecTypeSelector<long, 2> { using type = long2; };
   template <> struct VecTypeSelector<long, 3> { using type = long3; };
@@ -1146,7 +1140,7 @@ namespace detail {
   #else
   template <> struct VecTypeSelector<long, 4> { using type = long4; };
   #endif
-  
+
   template <> struct VecTypeSelector<unsigned long, 1> { using type = ulong1; };
   template <> struct VecTypeSelector<unsigned long, 2> { using type = ulong2; };
   template <> struct VecTypeSelector<unsigned long, 3> { using type = ulong3; };
@@ -1155,7 +1149,7 @@ namespace detail {
   #else
   template <> struct VecTypeSelector<unsigned long, 4> { using type = ulong4; };
   #endif
-  
+
   template <> struct VecTypeSelector<long long, 1> { using type = longlong1; };
   template <> struct VecTypeSelector<long long, 2> { using type = longlong2; };
   template <> struct VecTypeSelector<long long, 3> { using type = longlong3; };
@@ -1164,7 +1158,7 @@ namespace detail {
   #else
   template <> struct VecTypeSelector<long long, 4> { using type = longlong4; };
   #endif
-  
+
   template <> struct VecTypeSelector<unsigned long long, 1> { using type = ulonglong1; };
   template <> struct VecTypeSelector<unsigned long long, 2> { using type = ulonglong2; };
   template <> struct VecTypeSelector<unsigned long long, 3> { using type = ulonglong3; };
@@ -1173,25 +1167,25 @@ namespace detail {
   #else
   template <> struct VecTypeSelector<unsigned long long, 4> { using type = ulonglong4; };
   #endif
-  
+
   template <typename... Ts>
   struct AggregateToVec {
     static_assert(sizeof...(Ts) > 0, "AggregateToVec requires at least one type");
-  
+
   private:
     static constexpr bool any_half = ((is_half_v<Ts> || is_matx_half_v<Ts>) || ...);
-  
+
   public:
     using common_type = cuda::std::common_type_t<Ts...>;
-  
+
     static_assert(!cuda::std::is_void_v<common_type>, "Types must have a common type");
     static_assert(!any_half,  "zipvec does not support input operators with half types");
-  
+
     using type = typename VecTypeSelector<common_type, sizeof...(Ts)>::type;
   };
-  
+
   template <typename... Ts>
-  using AggregateToVecType = typename AggregateToVec<Ts...>::type;  
+  using AggregateToVecType = typename AggregateToVec<Ts...>::type;
 
   template <typename T>
   struct DLPackLaneInfo {

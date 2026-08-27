@@ -100,7 +100,7 @@ public:
 
     // Type checks
     MATX_STATIC_ASSERT_STR(!is_half_v<T1>, matxInvalidType, "Cholesky solver does not support half precision");
-    MATX_STATIC_ASSERT_STR((std::is_same_v<T1, typename OutTensor_t::value_type>), matxInavlidType, "Input and Output types must match");
+    MATX_STATIC_ASSERT_STR((cuda::std::is_same_v<T1, typename OutTensor_t::value_type>), matxInavlidType, "Input and Output types must match");
 
     params = GetCholParams(a, uplo);
   }
@@ -148,7 +148,7 @@ public:
         MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
           ("Parameter " + std::to_string(-info) + " had an illegal value in LAPACK potrf").c_str());
       } else {
-        MATX_ASSERT_STR_EXP(info, 0, matxSolverError, 
+        MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
           (std::to_string(info) + "-th leading minor is not positive definite in LAPACK potrf").c_str());
       }
     }
@@ -167,17 +167,17 @@ private:
   void potrf_dispatch(const char* uplo, const lapack_int_t* n, T1* a,
                       const lapack_int_t* lda, lapack_int_t* info)
   {
-    if constexpr (std::is_same_v<T1, float>) {
+    if constexpr (cuda::std::is_same_v<T1, float>) {
       LAPACK_CALL(spotrf)(uplo, n, a, lda, info);
-    } else if constexpr (std::is_same_v<T1, double>) {
+    } else if constexpr (cuda::std::is_same_v<T1, double>) {
       LAPACK_CALL(dpotrf)(uplo, n, a, lda, info);
-    } else if constexpr (std::is_same_v<T1, cuda::std::complex<float>>) {
+    } else if constexpr (cuda::std::is_same_v<T1, cuda::std::complex<float>>) {
       LAPACK_CALL(cpotrf)(uplo, n, a, lda, info);
-    } else if constexpr (std::is_same_v<T1, cuda::std::complex<double>>) {
+    } else if constexpr (cuda::std::is_same_v<T1, cuda::std::complex<double>>) {
       LAPACK_CALL(zpotrf)(uplo, n, a, lda, info);
     }
   }
-  
+
   DnCholHostParams_t params;
 };
 
@@ -195,7 +195,7 @@ private:
  * from only the matrix A. The input and output parameters may be the same
  * tensor. In that case, the input is destroyed and the output is stored
  * in-place. Input must be a positive-definite Hermitian or real symmetric matrix.
- * 
+ *
  * No caching as LAPACK allocation/setup is not needed.
  *
  * @tparam T1
@@ -222,7 +222,7 @@ void chol_impl([[maybe_unused]] OutputTensor &&out,
   MATX_ASSERT_STR(MATX_EN_CPU_SOLVER, matxInvalidExecutor,
     "Trying to run a host Solver executor but host Solver support is not configured");
 #if MATX_EN_CPU_SOLVER
-    
+
   using OutputTensor_t = remove_cvref_t<OutputTensor>;
   using T1 = typename OutputTensor_t::value_type;
   constexpr int RANK = ATensor::Rank();

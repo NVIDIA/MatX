@@ -115,47 +115,47 @@ namespace matx
 
     template <typename T> __MATX_INLINE__ std::string to_short_str() {
       if constexpr (!is_complex_v<T>) {
-        if constexpr (std::is_same_v<T, bool>)
+        if constexpr (cuda::std::is_same_v<T, bool>)
           return "b";
-        if constexpr (std::is_same_v<T, int32_t>)
+        if constexpr (cuda::std::is_same_v<T, int32_t>)
           return "i32";
-        if constexpr (std::is_same_v<T, uint32_t>)
+        if constexpr (cuda::std::is_same_v<T, uint32_t>)
           return "u32";
-        if constexpr (std::is_same_v<T, int64_t>)
+        if constexpr (cuda::std::is_same_v<T, int64_t>)
           return "i64";
-        if constexpr (std::is_same_v<T, uint64_t>)
+        if constexpr (cuda::std::is_same_v<T, uint64_t>)
           return "u64";
-        if constexpr (std::is_same_v<T, float>)
+        if constexpr (cuda::std::is_same_v<T, float>)
           return "f32";
-        if constexpr (std::is_same_v<T, double>)
+        if constexpr (cuda::std::is_same_v<T, double>)
           return "f64";
-        if constexpr (std::is_same_v<T, matxFp16>)
+        if constexpr (cuda::std::is_same_v<T, matxFp16>)
           return "f16";
-        if constexpr (std::is_same_v<T, matxBf16>)
+        if constexpr (cuda::std::is_same_v<T, matxBf16>)
           return "bf16";
         else
           return "x" + std::to_string(sizeof(T)*8);
       }
       else {
-        if constexpr (std::is_same_v<T, matxFp16ComplexPlanar>)
+        if constexpr (cuda::std::is_same_v<T, matxFp16ComplexPlanar>)
           return "f16cp";
-        if constexpr (std::is_same_v<T, matxBf16ComplexPlanar>)
+        if constexpr (cuda::std::is_same_v<T, matxBf16ComplexPlanar>)
           return "bf16cp";
-        if constexpr (std::is_same_v<T, matxFp16Complex>)
+        if constexpr (cuda::std::is_same_v<T, matxFp16Complex>)
           return "f16c";
-        if constexpr (std::is_same_v<T, matxBf16Complex>)
+        if constexpr (cuda::std::is_same_v<T, matxBf16Complex>)
           return "bf16c";
-        if constexpr (std::is_same_v<typename T::value_type, int32_t>)
+        if constexpr (cuda::std::is_same_v<typename T::value_type, int32_t>)
           return "i32c";
-        if constexpr (std::is_same_v<typename T::value_type, uint32_t>)
+        if constexpr (cuda::std::is_same_v<typename T::value_type, uint32_t>)
           return "u32c";
-        if constexpr (std::is_same_v<typename T::value_type, int64_t>)
+        if constexpr (cuda::std::is_same_v<typename T::value_type, int64_t>)
           return "i64c";
-        if constexpr (std::is_same_v<typename T::value_type, uint64_t>)
+        if constexpr (cuda::std::is_same_v<typename T::value_type, uint64_t>)
           return "u64c";
-        if constexpr (std::is_same_v<typename T::value_type, float>)
+        if constexpr (cuda::std::is_same_v<typename T::value_type, float>)
           return "f32c";
-        if constexpr (std::is_same_v<typename T::value_type, double>)
+        if constexpr (cuda::std::is_same_v<typename T::value_type, double>)
           return "f64c";
         else
           return "x" + std::to_string(sizeof(typename T::value_type)*8) + "c";
@@ -189,50 +189,50 @@ namespace matx
 
     template <typename T> constexpr DLDataType TypeToDLPackType()
     {
-      using BaseT = std::remove_cv_t<T>;
+      using BaseT = cuda::std::remove_cv_t<T>;
       using LaneInfo = DLPackLaneInfo<BaseT>;
       using ScalarT = typename LaneInfo::scalar_type;
       constexpr uint16_t lanes = LaneInfo::lanes;
 
-      if constexpr (std::is_same_v<ScalarT, cuda::std::complex<float>> ||
-                    std::is_same_v<ScalarT, std::complex<float>>)
+      if constexpr (cuda::std::is_same_v<ScalarT, cuda::std::complex<float>> ||
+                    cuda::std::is_same_v<ScalarT, std::complex<float>>)
         return {kDLComplex, 64, lanes};
-      if constexpr (std::is_same_v<ScalarT, cuda::std::complex<double>> ||
-                    std::is_same_v<ScalarT, std::complex<double>>)
+      if constexpr (cuda::std::is_same_v<ScalarT, cuda::std::complex<double>> ||
+                    cuda::std::is_same_v<ScalarT, std::complex<double>>)
         return {kDLComplex, 128, lanes};
-      if constexpr (std::is_same_v<ScalarT, matxFp16>)
+      if constexpr (cuda::std::is_same_v<ScalarT, matxFp16>)
         return {kDLFloat, 16, lanes};
-      if constexpr (std::is_same_v<ScalarT, matxBf16>)
+      if constexpr (cuda::std::is_same_v<ScalarT, matxBf16>)
         return {kDLBfloat, 16, lanes};
-      if constexpr (std::is_same_v<ScalarT, matxFp16Complex>)
+      if constexpr (cuda::std::is_same_v<ScalarT, matxFp16Complex>)
         return {kDLComplex, 32, lanes};
-      if constexpr (std::is_same_v<ScalarT, matxBf16Complex>)
+      if constexpr (cuda::std::is_same_v<ScalarT, matxBf16Complex>)
         return {kDLComplex, 32, lanes}; // Wrong, but no other choice
-      if constexpr (std::is_same_v<ScalarT, matxFp16ComplexPlanar>)
+      if constexpr (cuda::std::is_same_v<ScalarT, matxFp16ComplexPlanar>)
         return {kDLComplex, 32, lanes};
-      if constexpr (std::is_same_v<ScalarT, matxBf16ComplexPlanar>)
+      if constexpr (cuda::std::is_same_v<ScalarT, matxBf16ComplexPlanar>)
         return {kDLComplex, 32, lanes}; // Wrong, but no other choice
-      if constexpr (std::is_same_v<ScalarT, float>)
+      if constexpr (cuda::std::is_same_v<ScalarT, float>)
         return {kDLFloat, 32, lanes};
-      if constexpr (std::is_same_v<ScalarT, double>)
+      if constexpr (cuda::std::is_same_v<ScalarT, double>)
         return {kDLFloat, 64, lanes};
-      if constexpr (std::is_same_v<ScalarT, int8_t>)
+      if constexpr (cuda::std::is_same_v<ScalarT, int8_t>)
         return {kDLInt, 8, lanes};
-      if constexpr (std::is_same_v<ScalarT, int16_t>)
+      if constexpr (cuda::std::is_same_v<ScalarT, int16_t>)
         return {kDLInt, 16, lanes};
-      if constexpr (std::is_same_v<ScalarT, int32_t>)
+      if constexpr (cuda::std::is_same_v<ScalarT, int32_t>)
         return {kDLInt, 32, lanes};
-      if constexpr (std::is_same_v<ScalarT, int64_t>)
+      if constexpr (cuda::std::is_same_v<ScalarT, int64_t>)
         return {kDLInt, 64, lanes};
-      if constexpr (std::is_same_v<ScalarT, uint8_t>)
+      if constexpr (cuda::std::is_same_v<ScalarT, uint8_t>)
         return {kDLUInt, 8, lanes};
-      if constexpr (std::is_same_v<ScalarT, uint16_t>)
+      if constexpr (cuda::std::is_same_v<ScalarT, uint16_t>)
         return {kDLUInt, 16, lanes};
-      if constexpr (std::is_same_v<ScalarT, uint32_t>)
+      if constexpr (cuda::std::is_same_v<ScalarT, uint32_t>)
         return {kDLUInt, 32, lanes};
-      if constexpr (std::is_same_v<ScalarT, uint64_t>)
+      if constexpr (cuda::std::is_same_v<ScalarT, uint64_t>)
         return {kDLUInt, 64, lanes};
-      if constexpr (std::is_same_v<ScalarT, bool>)
+      if constexpr (cuda::std::is_same_v<ScalarT, bool>)
   #if DLPACK_VERSION >= 80
         return {kDLBool, 8, lanes};
   #else
@@ -249,12 +249,12 @@ namespace matx
       // We can assume that if a transform is passed to the input then PreRun has already completed
       // on the transform and we can use the internal pointer
       return make_tensor<typename Op::value_type>(op.Data(), Shape(op));
-    }    
+    }
     else if constexpr (!is_tensor_view_v<Op>) {
       if constexpr (is_cuda_executor_v<Executor>) {
-        return make_tensor<typename remove_cvref<Op>::value_type>(op.Shape(), MATX_ASYNC_DEVICE_MEMORY, exec.getStream());
+        return make_tensor<remove_cvref_t<Op>>(op.Shape(), MATX_ASYNC_DEVICE_MEMORY, exec.getStream());
       } else {
-        return make_tensor<typename remove_cvref<Op>::value_type>(op.Shape(), MATX_HOST_MALLOC_MEMORY);
+        return make_tensor<remove_cvref_t<Op>>(op.Shape(), MATX_HOST_MALLOC_MEMORY);
       }
     } else {
       return op;

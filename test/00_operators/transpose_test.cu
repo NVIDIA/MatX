@@ -13,7 +13,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Transpose3D)
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
-  ExecType exec{};     
+  ExecType exec{};
 
   index_t num_rows = 5998;
   index_t num_cols = 64;
@@ -30,7 +30,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Transpose3D)
   (t3t = transpose_matrix(t3)).run(exec);
   exec.sync();
 
-  if constexpr (std::is_same_v<ExecType,cudaExecutor>) {
+  if constexpr (cuda::std::is_same_v<ExecType,cudaExecutor>) {
     ASSERT_EQ(cudaGetLastError(), cudaSuccess);
   }
 
@@ -74,7 +74,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, TransposeVsTransposeMatrix)
   (t3tm = transpose_matrix(t3)).run(exec);
 
   exec.sync();
-  if constexpr (std::is_same_v<ExecType,cudaExecutor>) {
+  if constexpr (cuda::std::is_same_v<ExecType,cudaExecutor>) {
     ASSERT_EQ(cudaGetLastError(), cudaSuccess);
   }
 
@@ -100,7 +100,7 @@ TYPED_TEST(OperatorTestsComplexTypesAllExecs, HermitianTranspose)
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
-  ExecType exec{};   
+  ExecType exec{};
   index_t count0 = 100;
   index_t count1 = 200;
   tensor_t<TestType, 2> t2({count0, count1});

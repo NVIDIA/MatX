@@ -54,7 +54,7 @@ protected:
 
     if constexpr (is_complex_half_v<GTestType> || is_matx_half_v<GTestType>) {
       thresh = 1.0e-1;
-    } else if constexpr (std::is_same_v<GTestType, double>) {
+    } else if constexpr (cuda::std::is_same_v<GTestType, double>) {
       thresh = 1.0e-12;
     } else {
       // Revisit this tolerance. We should likely use a relative tolerance
@@ -353,7 +353,7 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, Simple)
     // example-end channelize_poly-test-1
 
     this->exec.sync();
-    MATX_TEST_ASSERT_COMPARE(this->pb, b, "b_random", this->thresh);    
+    MATX_TEST_ASSERT_COMPARE(this->pb, b, "b_random", this->thresh);
 
     // Now test with a multiplicative operator on the input. The channelizer is linear,
     // so we can inverse-scale the output to compare against the golden outputs.
@@ -711,7 +711,7 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, Batched)
 
     this->exec.sync();
 
-    MATX_TEST_ASSERT_COMPARE(this->pb, b, "b_random", this->thresh);    
+    MATX_TEST_ASSERT_COMPARE(this->pb, b, "b_random", this->thresh);
 
     // Now test with a multiplicative operator on the input. The channelizer is linear,
     // so we can inverse-scale the output to compare against the golden outputs.
@@ -1091,7 +1091,7 @@ TYPED_TEST(ChannelizePolyTestDoubleType, Harris2003)
 
   for (auto chan = 0; chan < num_channels; chan++) {
     for (auto k = 0; k < b_elem_per_channel; k++) {
-      ComplexType gold { output[chan*b_elem_per_channel+k] };      
+      ComplexType gold { output[chan*b_elem_per_channel+k] };
       ComplexType test { b(k,chan) };
       ASSERT_NEAR(test.real(), gold.real(), this->thresh);
       ASSERT_NEAR(test.imag(), gold.imag(), this->thresh);

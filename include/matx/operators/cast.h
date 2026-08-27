@@ -139,10 +139,10 @@ namespace matx
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
           auto cast_func = [](const auto &val) {
-            return static_cast<NewType>(val);   
+            return static_cast<NewType>(val);
           };
 
-          return ApplyVecFunc<CapType, NewType>(cast_func, get_value<CapType>(op_, indices...));        
+          return ApplyVecFunc<CapType, NewType>(cast_func, get_value<CapType>(op_, indices...));
         }
 
         template <typename... Is>
@@ -314,7 +314,7 @@ namespace matx
         {
           auto cast_func = [](const auto &real, const auto &imag) {
             using inner_type = typename inner_op_type_t<NewType>::type;
-            return NewType(static_cast<inner_type>(real),static_cast<inner_type>(imag));            
+            return NewType(static_cast<inner_type>(real),static_cast<inner_type>(imag));
           };
 
           const auto real_val = get_value<CapType>(real_op_, indices...);
@@ -363,7 +363,7 @@ namespace matx
 #endif
           }
           else if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
-            return 
+            return
               detail::get_operator_capability<Cap>(real_op_, in) +
               detail::get_operator_capability<Cap>(imag_op_, in);
           }
@@ -433,7 +433,7 @@ namespace matx
   template <typename NewType, typename T>
     auto __MATX_INLINE__ as_type(T t)
     {
-      if constexpr (std::is_same_v<NewType, typename T::value_type>) {
+      if constexpr (cuda::std::is_same_v<NewType, typename T::value_type>) {
         // optimized path when type is the same to avoid creating unecessary operators
         return t;
       } else {

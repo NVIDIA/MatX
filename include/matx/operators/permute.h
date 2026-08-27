@@ -220,7 +220,7 @@ namespace matx
         {
           if constexpr (CapType::ept == ElementsPerThread::ONE) {
             static_assert(sizeof...(Is)==Rank());
-            static_assert((std::is_convertible_v<Is, index_t> && ... ));
+            static_assert((cuda::std::is_convertible_v<Is, index_t> && ... ));
 
             const cuda::std::array<index_t, Rank()> inds{indices...};
             return apply_permuted_<CapType>(cuda::std::forward<Op>(op),

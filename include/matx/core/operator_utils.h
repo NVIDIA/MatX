@@ -101,7 +101,7 @@ namespace matx {
         matxMemorySpace_t host_memory_space = MATX_HOST_MEMORY) {
 
       const auto ttl_size = cuda::std::accumulate(shape.begin(), shape.end(), static_cast<index_t>(1),
-                                  cuda::std::multiplies<index_t>()) * sizeof(typename TensorType::value_type);      
+                                  cuda::std::multiplies<index_t>()) * sizeof(typename TensorType::value_type);
 
       if constexpr (is_cuda_executor_v<Executor>) {
         matxAlloc((void**)ptr, ttl_size, MATX_ASYNC_DEVICE_MEMORY, ex.getStream());
@@ -149,9 +149,9 @@ namespace matx {
         return val;
       }
     }
-    #endif  
+    #endif
   }
-}; 
+};
 #endif
 
 // RTC and nvcc
@@ -194,8 +194,8 @@ namespace matx {
       else {
         return Vector<ValueType, static_cast<size_t>(CapType::ept)>{};
       }
-    }   
-  
+    }
+
 
     /**
       * @brief Returns an N-D coordinate as an array corresponding to the absolute index abs
@@ -355,7 +355,7 @@ namespace matx {
         using seq = offset_sequence_t<sizeof...(Is) - RANK, cuda::std::make_index_sequence<RANK>>;
         auto tup = cuda::std::make_tuple(indices...);
         auto sliced_tup = select_tuple(std::forward<decltype(tup)>(tup), seq{});
-        return cuda::std::apply([&] (auto... args) {                 
+        return cuda::std::apply([&] (auto... args) {
           return cuda::std::forward<T>(i).template operator()<CapType>(args...);
         }, sliced_tup);
       }
@@ -369,7 +369,7 @@ namespace matx {
         // If we're only indexing with the same number of arguments as the rank of the operator, just return operator()
         return cuda::std::apply([&i](auto... args) -> decltype(auto) {
           return cuda::std::forward<T>(i).template operator()<CapType>(args...);
-        }, idx);        
+        }, idx);
       }
       else
       {
@@ -379,7 +379,7 @@ namespace matx {
           return cuda::std::forward<T>(i).template operator()<CapType>(args...);
         }, nbc_idx);
       }
-    }    
+    }
 
 
     template <typename CapType, typename T, typename... Is>
@@ -418,19 +418,19 @@ namespace matx {
       {
         return i;
       }
-    }   
+    }
 
     // Returns an address of a pointer of type T aligned to new address
     template <typename T>
     constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T *AlignAddr(uint8_t *addr)
     {
-      if (((uint64_t)addr % std::alignment_of_v<T>) != 0) {
+      if (((uint64_t)addr % cuda::std::alignment_of_v<T>) != 0) {
         return reinterpret_cast<T *>(
-            ((uint64_t)addr + (std::alignment_of_v<T> - 1)) /
-            std::alignment_of_v<T> * std::alignment_of_v<T>);
+            ((uint64_t)addr + (cuda::std::alignment_of_v<T> - 1)) /
+            cuda::std::alignment_of_v<T> * cuda::std::alignment_of_v<T>);
       }
 
       return reinterpret_cast<T *>(addr);
-    }    
+    }
   }
 }

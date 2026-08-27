@@ -183,7 +183,7 @@ namespace detail {
         }
         else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
 #ifdef MATX_EN_JIT
-          static_assert(std::is_same_v<InType, std::unordered_map<std::string, std::string>>,
+          static_assert(cuda::std::is_same_v<InType, std::unordered_map<std::string, std::string>>,
                         "JIT_CLASS_QUERY capability requires std::unordered_map<std::string, std::string> as input type");
           const auto [key, value] = get_jit_op_str();
           if (in.find(key) == in.end()) {

@@ -241,13 +241,13 @@ void sparse2dense_impl(OutputTensorType &O, const InputTensorType &a,
 
   // Restrictions.
   static_assert(RANKA == RANKO, "tensors must have same rank");
-  static_assert(std::is_same_v<TA, TO>, "tensors must have the same data type");
-  static_assert(std::is_same_v<TO, int8_t> ||
-                    std::is_same_v<TO, matx::matxFp16> ||
-                    std::is_same_v<TO, matx::matxBf16> ||
-                    std::is_same_v<TO, float> || std::is_same_v<TO, double> ||
-                    std::is_same_v<TO, cuda::std::complex<float>> ||
-                    std::is_same_v<TO, cuda::std::complex<double>>,
+  static_assert(cuda::std::is_same_v<TA, TO>, "tensors must have the same data type");
+  static_assert(cuda::std::is_same_v<TO, int8_t> ||
+                    cuda::std::is_same_v<TO, matx::matxFp16> ||
+                    cuda::std::is_same_v<TO, matx::matxBf16> ||
+                    cuda::std::is_same_v<TO, float> || cuda::std::is_same_v<TO, double> ||
+                    cuda::std::is_same_v<TO, cuda::std::complex<float>> ||
+                    cuda::std::is_same_v<TO, cuda::std::complex<double>>,
                 "unsupported data type");
 
   // cuSPARSE sparse-to-dense conversion requires unit innermost stride.

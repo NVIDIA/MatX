@@ -15,8 +15,8 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Abs2)
 
   ExecType exec{};
 
-  if constexpr (std::is_same_v<TestType, cuda::std::complex<float>> &&
-    std::is_same_v<ExecType,cudaExecutor>) {
+  if constexpr (cuda::std::is_same_v<TestType, cuda::std::complex<float>> &&
+    cuda::std::is_same_v<ExecType,cudaExecutor>) {
     // example-begin abs2-test-1
     auto x = make_tensor<cuda::std::complex<float>>({});
     auto y = make_tensor<float>({});
@@ -38,7 +38,7 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Abs2)
     x() = static_cast<TestType>(2);
     (y = abs2(x)).run(exec);
     exec.sync();
-    if constexpr (std::is_integral_v<inner_type>) {
+    if constexpr (cuda::std::is_integral_v<inner_type>) {
       ASSERT_EQ(y(), static_cast<inner_type>(4));
     }
     else {
@@ -64,12 +64,12 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Abs2)
       for (int j = 0; j < 3; j++) {
         for (int k = 0; k < 3; k++) {
           TestType v = static_cast<TestType>(i*9 + j*3 + k);
-          if constexpr (std::is_integral_v<inner_type>) {
+          if constexpr (cuda::std::is_integral_v<inner_type>) {
             ASSERT_EQ(y3(i,j,k), static_cast<inner_type>(v*v));
           }
           else {
             ASSERT_NEAR(y3(i,j,k), static_cast<inner_type>(v*v), 1.0e-6);
-          }          
+          }
         }
       }
     }
