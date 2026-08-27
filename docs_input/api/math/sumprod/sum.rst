@@ -10,6 +10,10 @@ transposing the final two dimensions uses a tiled fast path. This keeps reads
 coalesced without materializing the transpose. Other permutations and strided
 views continue to use the general reduction path.
 
+Fixed-size reductions over the innermost dimensions of a random-access
+expression are evaluated without an intermediate tensor when the CUDA backend
+supports fixed-size segmented reductions.
+
 .. versionadded:: 0.6.0
 
 .. doxygenfunction:: sum(const InType &in, const int (&dims)[D])

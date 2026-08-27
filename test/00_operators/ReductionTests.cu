@@ -1198,6 +1198,99 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, SegmentedSum)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(ReductionTestsComplexNonHalfTypes, FixedSizeExpressionSum)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  using ValueType = typename inner_op_type_t<TestType>::type;
+
+  ExecType exec{};
+  auto input = make_tensor<TestType>({4, 3, 5});
+  auto inner_output = make_tensor<ValueType>({4, 3});
+  auto outer_output = make_tensor<ValueType>({3, 5});
+
+  for (index_t batch = 0; batch < input.Size(0); ++batch) {
+    for (index_t row = 0; row < input.Size(1); ++row) {
+      for (index_t col = 0; col < input.Size(2); ++col) {
+        input(batch, row, col) = TestType(static_cast<ValueType>(batch + 1),
+                                          static_cast<ValueType>(row + col + 1));
+      }
+    }
+  }
+  (inner_output = sum(abs2(input), {2})).run(exec);
+  (outer_output = sum(abs2(input), {0})).run(exec);
+  exec.sync();
+
+  for (index_t batch = 0; batch < inner_output.Size(0); ++batch) {
+    for (index_t row = 0; row < inner_output.Size(1); ++row) {
+      ValueType expected{};
+      for (index_t col = 0; col < input.Size(2); ++col) {
+        expected += static_cast<ValueType>((batch + 1) * (batch + 1) +
+                                           (row + col + 1) * (row + col + 1));
+      }
+      ASSERT_TRUE(MatXUtils::MatXTypeCompare(inner_output(batch, row), expected));
+    }
+  }
+
+  for (index_t row = 0; row < outer_output.Size(0); ++row) {
+    for (index_t col = 0; col < outer_output.Size(1); ++col) {
+      ValueType expected{};
+      for (index_t batch = 0; batch < input.Size(0); ++batch) {
+        expected += static_cast<ValueType>((batch + 1) * (batch + 1) +
+                                           (row + col + 1) * (row + col + 1));
+      }
+      ASSERT_TRUE(MatXUtils::MatXTypeCompare(outer_output(row, col), expected));
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(ReductionTestsFloatNonComplexNonHalf, FixedSizeExpressionReductions)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+
+  ExecType exec{};
+  auto input = make_tensor<TestType>({4, 3, 5});
+  auto minimum = make_tensor<TestType>({4, 3});
+  auto maximum = make_tensor<TestType>({4, 3});
+  auto product = make_tensor<TestType>({4, 3});
+
+  for (index_t batch = 0; batch < input.Size(0); ++batch) {
+    for (index_t row = 0; row < input.Size(1); ++row) {
+      for (index_t col = 0; col < input.Size(2); ++col) {
+        input(batch, row, col) = static_cast<TestType>(batch + row + col + 1);
+      }
+    }
+  }
+
+  auto expression = input + static_cast<TestType>(1);
+  (minimum = min(expression, {2})).run(exec);
+  (maximum = max(expression, {2})).run(exec);
+  (product = prod(expression, {2})).run(exec);
+  exec.sync();
+
+  for (index_t batch = 0; batch < input.Size(0); ++batch) {
+    for (index_t row = 0; row < input.Size(1); ++row) {
+      const auto first = static_cast<TestType>(batch + row + 2);
+      const auto last = static_cast<TestType>(batch + row + 6);
+      TestType expected_product = static_cast<TestType>(1);
+      for (index_t col = 0; col < input.Size(2); ++col) {
+        expected_product *= static_cast<TestType>(batch + row + col + 2);
+      }
+
+      ASSERT_TRUE(MatXUtils::MatXTypeCompare(minimum(batch, row), first));
+      ASSERT_TRUE(MatXUtils::MatXTypeCompare(maximum(batch, row), last));
+      ASSERT_TRUE(MatXUtils::MatXTypeCompare(product(batch, row), expected_product));
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, SegmentedMin)
 {
   MATX_ENTER_HANDLER();

@@ -849,6 +849,9 @@ inline void ExecSort(OutputTensor &a_out,
     // type of reduction where there's not a single output, since any type of reduction can be generalized
     // to a segmented type
     if constexpr (OutputTensor::Rank() > 0) {
+      if (TotalSize(out_base) == 0) {
+        return;
+      }
 #if CUB_MAJOR_VERSION > 3 || (CUB_MAJOR_VERSION == 3 && CUB_MINOR_VERSION >= 2)
       [[maybe_unused]] cudaError_t err;
       if constexpr(is_tensor_view_v<InputOperator>) {
@@ -861,11 +864,23 @@ inline void ExecSort(OutputTensor &a_out,
         }
       }
 
-      auto ft = [&](auto &&in, auto &&out, auto &&begin, auto &&end) {
-        return cub::DeviceSegmentedReduce::Reduce(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(out_base)), begin, end, Params().reduce_op,
-                                  Params().init, stream);
-      };
-      err = ReduceInput(ft, out_base, in_base);
+      if (IsFixedSizeReductionCompatible(a)) {
+        auto fixed_size_ft = [&](auto &&in, auto &&out) {
+          const int seg_size = static_cast<int>(TotalSize(a) / TotalSize(out_base));
+          return cub::DeviceSegmentedReduce::Reduce(d_temp, temp_storage_bytes, in, out,
+            static_cast<cuda::std::int64_t>(TotalSize(out_base)), seg_size, Params().reduce_op,
+            Params().init, stream);
+        };
+        err = ReduceInputFixed(fixed_size_ft, out_base, in_base);
+      }
+      else {
+        auto ft = [&](auto &&in, auto &&out, auto &&begin, auto &&end) {
+          return cub::DeviceSegmentedReduce::Reduce(d_temp, temp_storage_bytes, in, out,
+            static_cast<int>(TotalSize(out_base)), begin, end, Params().reduce_op,
+            Params().init, stream);
+        };
+        err = ReduceInput(ft, out_base, in_base);
+      }
       MATX_ASSERT_STR_EXP(err, cudaSuccess, matxCudaError, "Error in cub::DeviceSegmentedReduce::Reduce");
 #else
       auto ft = [&](auto &&in, auto &&out, auto &&begin, auto &&end) {
@@ -920,6 +935,9 @@ inline void ExecSort(OutputTensor &a_out,
     // type of reduction where there's not a single output, since any type of reduction can be generalized
     // to a segmented type
     if constexpr (OutputTensor::Rank() > 0) {
+      if (TotalSize(out_base) == 0) {
+        return;
+      }
       // Check if fixed-size reductions are supported
 #if CUB_MAJOR_VERSION > 3 || (CUB_MAJOR_VERSION == 3 && CUB_MINOR_VERSION >= 2)
       [[maybe_unused]] cudaError_t err;
@@ -932,10 +950,21 @@ inline void ExecSort(OutputTensor &a_out,
         }
       }
 
-      auto ft = [&](auto &&in, auto &&out, auto &&begin, auto &&end) {
-          return cub::DeviceSegmentedReduce::Sum(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(out_base)), begin, end, stream);
-      };
-      err = ReduceInput(ft, out_base, in_base);
+      if (IsFixedSizeReductionCompatible(a)) {
+        auto fixed_size_ft = [&](auto &&in, auto &&out) {
+          const int seg_size = static_cast<int>(TotalSize(a) / TotalSize(out_base));
+          return cub::DeviceSegmentedReduce::Sum(d_temp, temp_storage_bytes, in, out,
+            static_cast<cuda::std::int64_t>(TotalSize(out_base)), seg_size, stream);
+        };
+        err = ReduceInputFixed(fixed_size_ft, out_base, in_base);
+      }
+      else {
+        auto ft = [&](auto &&in, auto &&out, auto &&begin, auto &&end) {
+          return cub::DeviceSegmentedReduce::Sum(d_temp, temp_storage_bytes, in, out,
+            static_cast<int>(TotalSize(out_base)), begin, end, stream);
+        };
+        err = ReduceInput(ft, out_base, in_base);
+      }
       MATX_ASSERT_STR_EXP(err, cudaSuccess, matxCudaError, "Error in cub::DeviceSegmentedReduce::Sum");
 #else
       auto ft = [&](auto &&in, auto &&out, auto &&begin, auto &&end) {
@@ -985,6 +1014,9 @@ inline void ExecSort(OutputTensor &a_out,
     // type of reduction where there's not a single output, since any type of reduction can be generalized
     // to a segmented type
     if constexpr (OutputTensor::Rank() > 0) {
+      if (TotalSize(out_base) == 0) {
+        return;
+      }
 #if CUB_MAJOR_VERSION > 3 || (CUB_MAJOR_VERSION == 3 && CUB_MINOR_VERSION >= 2)
       [[maybe_unused]] cudaError_t err;
       if constexpr (is_tensor_view_v<InputOperator>) {
@@ -996,10 +1028,21 @@ inline void ExecSort(OutputTensor &a_out,
         }
       }
 
-      auto ft = [&](auto &&in, auto &&out, auto &&begin, auto &&end) {
-          return cub::DeviceSegmentedReduce::Min(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(out_base)), begin, end, stream);
-      };
-      err = ReduceInput(ft, out_base, in_base);
+      if (IsFixedSizeReductionCompatible(a)) {
+        auto fixed_size_ft = [&](auto &&in, auto &&out) {
+          const int seg_size = static_cast<int>(TotalSize(a) / TotalSize(out_base));
+          return cub::DeviceSegmentedReduce::Min(d_temp, temp_storage_bytes, in, out,
+            static_cast<cuda::std::int64_t>(TotalSize(out_base)), seg_size, stream);
+        };
+        err = ReduceInputFixed(fixed_size_ft, out_base, in_base);
+      }
+      else {
+        auto ft = [&](auto &&in, auto &&out, auto &&begin, auto &&end) {
+          return cub::DeviceSegmentedReduce::Min(d_temp, temp_storage_bytes, in, out,
+            static_cast<int>(TotalSize(out_base)), begin, end, stream);
+        };
+        err = ReduceInput(ft, out_base, in_base);
+      }
       MATX_ASSERT_STR_EXP(err, cudaSuccess, matxCudaError, "Error in cub::DeviceSegmentedReduce::Min");
 #else
       auto ft = [&](auto &&in, auto &&out, auto &&begin, auto &&end) {
@@ -1049,6 +1092,9 @@ inline void ExecSort(OutputTensor &a_out,
     // type of reduction where there's not a single output, since any type of reduction can be generalized
     // to a segmented type
     if constexpr (OutputTensor::Rank() > 0) {
+      if (TotalSize(out_base) == 0) {
+        return;
+      }
 #if CUB_MAJOR_VERSION > 3 || (CUB_MAJOR_VERSION == 3 && CUB_MINOR_VERSION >= 2)
       [[maybe_unused]] cudaError_t err;
       if constexpr (is_tensor_view_v<InputOperator>) {
@@ -1060,10 +1106,21 @@ inline void ExecSort(OutputTensor &a_out,
         }
       }
 
-      auto ft = [&](auto &&in, auto &&out, auto &&begin, auto &&end) {
-          return cub::DeviceSegmentedReduce::Max(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(out_base)), begin, end, stream);
-      };
-      err = ReduceInput(ft, out_base, in_base);
+      if (IsFixedSizeReductionCompatible(a)) {
+        auto fixed_size_ft = [&](auto &&in, auto &&out) {
+          const int seg_size = static_cast<int>(TotalSize(a) / TotalSize(out_base));
+          return cub::DeviceSegmentedReduce::Max(d_temp, temp_storage_bytes, in, out,
+            static_cast<cuda::std::int64_t>(TotalSize(out_base)), seg_size, stream);
+        };
+        err = ReduceInputFixed(fixed_size_ft, out_base, in_base);
+      }
+      else {
+        auto ft = [&](auto &&in, auto &&out, auto &&begin, auto &&end) {
+          return cub::DeviceSegmentedReduce::Max(d_temp, temp_storage_bytes, in, out,
+            static_cast<int>(TotalSize(out_base)), begin, end, stream);
+        };
+        err = ReduceInput(ft, out_base, in_base);
+      }
       MATX_ASSERT_STR_EXP(err, cudaSuccess, matxCudaError, "Error in cub::DeviceSegmentedReduce::Max");
 #else
       auto ft = [&](auto &&in, auto &&out, auto &&begin, auto &&end) {

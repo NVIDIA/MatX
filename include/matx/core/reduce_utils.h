@@ -41,6 +41,14 @@
 
 namespace matx {
 
+  template <typename InputOp>
+  __MATX_HOST__ __MATX_INLINE__ bool IsFixedSizeReductionCompatible(const InputOp &in) {
+    if constexpr (requires { in.IsIdentityPermutation(); }) {
+      return in.IsIdentityPermutation();
+    }
+    return true;
+  }
+
   
   template <bool ConvertType, typename Func, typename OutputOp, typename InputOp, typename BeginIter, typename EndIter>
   __MATX_HOST__ __MATX_INLINE__ auto ReduceOutput(Func &&func, OutputOp &&out, InputOp &&in, BeginIter &&bi, EndIter &&ei) {
@@ -65,6 +73,26 @@ namespace matx {
     auto iter = RandomOperatorOutputIterator<decltype(out_base), ConvertType>{out_base};
     return func(in, iter, bi, ei);
   }  
+
+  template <bool ConvertType, typename Func, typename OutputOp, typename InputOp>
+  __MATX_HOST__ __MATX_INLINE__ auto ReduceOutputFixed(Func &&func, OutputOp &&out, InputOp &&in) {
+    if constexpr (is_tensor_view_v<OutputOp>) {
+      if (out.IsContiguous()) {
+        if constexpr(ConvertType) {
+          return func(in,
+                      reinterpret_cast<detail::convert_matx_type_t<typename remove_cvref_t<OutputOp>::value_type> *>(out.Data()));
+        }
+        else {
+          return func(in,
+                      reinterpret_cast<typename remove_cvref_t<OutputOp>::value_type *>(out.Data()));
+        }
+      }
+    }
+
+    detail::base_type_t<OutputOp> out_base = out;
+    auto iter = RandomOperatorOutputIterator<decltype(out_base), ConvertType>{out_base};
+    return func(in, iter);
+  }
 
   template <typename Func, typename OutputOp, typename InputOp, bool ConvertType = true>
   __MATX_HOST__ __MATX_INLINE__ auto ReduceInput(Func &&func, OutputOp &&out, InputOp &&in) {
@@ -95,6 +123,15 @@ namespace matx {
     const auto &iter = matx::RandomOperatorIterator<decltype(collapsed), ConvertType>{collapsed};
     return ReduceOutput<ConvertType>(std::forward<Func>(func), std::forward<OutputOp>(out), iter, BeginOffset{iter}, EndOffset{iter});   
   } 
+
+  template <typename Func, typename OutputOp, typename InputOp, bool ConvertType = true>
+  __MATX_HOST__ __MATX_INLINE__ auto ReduceInputFixed(Func &&func, OutputOp &&out, InputOp &&in) {
+    typename detail::base_type_t<InputOp> in_base = in;
+    auto collapsed = matx::lcollapse<remove_cvref_t<decltype(out)>::Rank()>(rcollapse<remove_cvref_t<decltype(in)>::Rank() -
+                                                                                      remove_cvref_t<decltype(out)>::Rank()>(in_base));
+    const auto &iter = matx::RandomOperatorIterator<decltype(collapsed), ConvertType>{collapsed};
+    return ReduceOutputFixed<ConvertType>(std::forward<Func>(func), std::forward<OutputOp>(out), iter);
+  }
 
   template <typename Func, typename OutputOp, typename InputOp>
   __MATX_HOST__ __MATX_INLINE__ auto ReduceInputNoConvert(Func &&func, OutputOp &&out, InputOp &&in) {
