@@ -265,6 +265,19 @@ namespace matx
     MATX_CUDA_CHECK(e);                \
   }
 
+// Macro for checking CUDA driver API (CUresult) errors
+#define MATX_CUDA_DRIVER_CHECK(e)                                          \
+  do {                                                                     \
+    const CUresult e_ = (e);                                               \
+    if (e_ != CUDA_SUCCESS)                                                \
+    {                                                                      \
+      const char *err_str = nullptr;                                       \
+      cuGetErrorString(e_, &err_str);                                      \
+      MATX_LOG_ERROR("{}:{} CUDA Driver Error: {} ({})", __FILE__, __LINE__, err_str != nullptr ? err_str : "unknown", static_cast<int>(e_)); \
+      MATX_THROW(matx::matxCudaError, err_str != nullptr ? err_str : "unknown"); \
+    }                                                                      \
+  } while (0)
+
 // This macro asserts compatible dimensions of current class to an operator.
 #define MATX_ASSERT_COMPATIBLE_OP_SIZES(op)                          \
   if constexpr (Rank() > 0) {                                        \
