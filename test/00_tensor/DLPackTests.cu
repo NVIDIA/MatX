@@ -508,6 +508,54 @@ TEST(DLPackFallbackTests, ExportImportedManagedMemory)
   MATX_EXIT_HANDLER();
 }
 
+// ToDlPackImpl() must still classify ordinary, unregistered CPU memory as
+// kDLCPU via the same cuPointerGetAttributes fallback used for managed
+// memory.
+TEST(DLPackFallbackTests, ExportUnregisteredHostMemory)
+{
+  MATX_ENTER_HANDLER();
+
+  // Plain new[]'d memory: never touched by cudaMallocHost, cudaHostRegister,
+  // or any other CUDA API, so CUDA has no record of it at all.
+  auto *raw = new float[8];
+
+  auto *dl = new DLManagedTensor{};
+  auto *shape = new int64_t[1]{8};
+  auto *strides = new int64_t[1]{1};
+  dl->dl_tensor.data = raw;
+  dl->dl_tensor.device.device_type = kDLCPU;
+  dl->dl_tensor.device.device_id = 0;
+  dl->dl_tensor.ndim = 1;
+  dl->dl_tensor.dtype = detail::TypeToDLPackType<float>();
+  dl->dl_tensor.shape = shape;
+  dl->dl_tensor.strides = strides;
+  dl->dl_tensor.byte_offset = 0;
+  dl->manager_ctx = raw;
+  dl->deleter = [](DLManagedTensor *mt) {
+    delete[] static_cast<float *>(mt->manager_ctx);
+    delete[] mt->dl_tensor.shape;
+    delete[] mt->dl_tensor.strides;
+    delete mt;
+  };
+
+  tensor_t<float, 1> t;
+  make_tensor(t, dl);
+
+  // Confirm this import indeed lands in the fallback path this test targets,
+  // rather than the allocator-map exact-match path
+  ASSERT_EQ(GetPointerKind(t.GetStorage().data()), MATX_INVALID_MEMORY);
+
+  auto *dl_out = t.ToDlPack();
+  ASSERT_EQ(dl_out->dl_tensor.device.device_type, kDLCPU);
+  dl_out->deleter(dl_out);
+
+  auto *dlv_out = t.ToDlPackVersioned();
+  ASSERT_EQ(dlv_out->dl_tensor.device.device_type, kDLCPU);
+  dlv_out->deleter(dlv_out);
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(DLPackTestsFloatNonComplex, ExportVersionedConstTensorSetsReadOnlyFlag)
 {
   MATX_ENTER_HANDLER();
