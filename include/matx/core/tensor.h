@@ -1508,11 +1508,6 @@ MATX_LOOP_UNROLL
 
     auto *mt = new ManagedType;
     DLTensor *t = &mt->dl_tensor;
-    CUpointer_attribute attr[] = {CU_POINTER_ATTRIBUTE_MEMORY_TYPE, CU_POINTER_ATTRIBUTE_DEVICE_ORDINAL, CU_POINTER_ATTRIBUTE_IS_MANAGED};
-    CUmemorytype mem_type;
-    int dev_ord;
-    int is_managed;
-    void *data[3]       = {&mem_type, &dev_ord, &is_managed};
 
     // DLPack carries mutability via flags (versioned API), not via pointer type.
     // Preserve const-export semantics by marking versioned tensors read-only below.
@@ -1521,20 +1516,30 @@ MATX_LOOP_UNROLL
 
     // Determine where this memory resides
     // Pass in the base pointer, not a potentially offset pointer
-    // returned by this->Data()
     void *data_ptr = const_cast<void *>(static_cast<const void *>(this->GetStorage().data()));
     auto kind = GetPointerKind(data_ptr);
-    [[maybe_unused]] auto mem_res = cuPointerGetAttributes(sizeof(attr)/sizeof(attr[0]), attr, data, reinterpret_cast<CUdeviceptr>(data_ptr));
-    MATX_ASSERT_STR_EXP(mem_res, CUDA_SUCCESS, matxCudaError, "Error returned from cuPointerGetAttributes");
+    auto cu_ptr = reinterpret_cast<CUdeviceptr>(data_ptr);
+
     if (kind == MATX_INVALID_MEMORY) {
       // GetStorage().data() is only guaranteed to be the true allocation base
       // for storage that still shares its owning tensor's buffer (e.g. Slice()/
       // Permute()). A view with its own non-owning storage at an offset/
       // reinterpreted address (e.g. RealView()/ImagView()) lands here instead,
       // so classify it from the driver's own record of that address.
-      // CU_POINTER_ATTRIBUTE_MEMORY_TYPE alone can't tell managed memory from
-      // pinned host memory, so check CU_POINTER_ATTRIBUTE_IS_MANAGED too.
-      if (mem_type == CU_MEMORYTYPE_DEVICE || is_managed) {
+      // Managed memory is reported separately from plain device memory since
+      // DLPack defines a distinct kDLCUDAManaged device type for it.
+      CUpointer_attribute attr[] = {CU_POINTER_ATTRIBUTE_MEMORY_TYPE, CU_POINTER_ATTRIBUTE_DEVICE_ORDINAL, CU_POINTER_ATTRIBUTE_IS_MANAGED};
+      CUmemorytype mem_type;
+      int dev_ord;
+      int is_managed;
+      void *data[3] = {&mem_type, &dev_ord, &is_managed};
+      MATX_CUDA_DRIVER_CHECK(cuPointerGetAttributes(sizeof(attr)/sizeof(attr[0]), attr, data, cu_ptr));
+
+      if (is_managed) {
+        t->device.device_type = kDLCUDAManaged;
+        t->device.device_id = dev_ord;
+      }
+      else if (mem_type == CU_MEMORYTYPE_DEVICE) {
         t->device.device_type = kDLCUDA;
         t->device.device_id = dev_ord;
       }
@@ -1546,26 +1551,36 @@ MATX_LOOP_UNROLL
         t->device.device_type = kDLCPU;
       }
     }
+    else if (kind == MATX_HOST_MALLOC_MEMORY) {
+      // Plain malloc'd memory has no device ordinal to query
+      t->device.device_type = kDLCPU;
+    }
     else {
-      // We have a record of this pointer and can map it from the record
+      // We have a record of this pointer's memory space; only the device
+      // ordinal still needs to come from the driver
+      CUpointer_attribute attr = CU_POINTER_ATTRIBUTE_DEVICE_ORDINAL;
+      int dev_ord;
+      void *data = &dev_ord;
+      MATX_CUDA_DRIVER_CHECK(cuPointerGetAttributes(1, &attr, &data, cu_ptr));
+
       switch (kind) {
         case MATX_MANAGED_MEMORY:
+          // DLPack defines a distinct device type for cudaMallocManaged
+          // memory rather than folding it into plain device memory.
+          t->device.device_type = kDLCUDAManaged;
+          break;
         case MATX_DEVICE_MEMORY:
         case MATX_ASYNC_DEVICE_MEMORY:
           t->device.device_type = kDLCUDA;
-          t->device.device_id = dev_ord;
           break;
         case MATX_HOST_MEMORY:
           t->device.device_type = kDLCUDAHost;
-          t->device.device_id = dev_ord;
-          break;
-        case MATX_HOST_MALLOC_MEMORY:
-          t->device.device_type = kDLCPU;
           break;
         default:
           MATX_ASSERT_STR(false, matxCudaError, "Cannot determine kind of memory");
           break;
       }
+      t->device.device_id = dev_ord;
     }
 
     t->ndim         = RANK;
