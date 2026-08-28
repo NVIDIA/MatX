@@ -150,9 +150,10 @@ public:
 
   ~distributed_device_guard() {
     if (changed_) {
-      // Destructors must not throw.  A later CUDA call will report a failure to
-      // restore the original device if the context has become unusable.
-      (void)cudaSetDevice(previous_);
+      // Destructors must not throw. Log and drain the sticky error here
+      // instead of letting a failure to restore the original device leak
+      // into an unrelated later call.
+      MATX_CUDA_CHECK_NOEXCEPT(cudaSetDevice(previous_));
     }
   }
 
@@ -260,11 +261,11 @@ private:
     const bool restore_device = cudaGetDevice(&previous_device) == cudaSuccess;
     for (const auto &entry : streams_) {
       if (cudaSetDevice(entry.device_id) == cudaSuccess) {
-        (void)cudaStreamDestroy(entry.stream);
+        MATX_CUDA_CHECK_NOEXCEPT(cudaStreamDestroy(entry.stream));
       }
     }
     if (restore_device) {
-      (void)cudaSetDevice(previous_device);
+      MATX_CUDA_CHECK_NOEXCEPT(cudaSetDevice(previous_device));
     }
     streams_.clear();
   }
