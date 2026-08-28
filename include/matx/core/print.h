@@ -554,7 +554,7 @@ namespace matx {
       MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
     #ifdef __CUDACC__
-      cudaDeviceSynchronize();
+      MATX_CUDA_CHECK(cudaDeviceSynchronize());
       if constexpr (is_sparse_tensor_v<Op>) {
         using Format = typename Op::Format;
         fprintf(fp, "format = ");
@@ -631,7 +631,7 @@ namespace matx {
             for (int i = 0; i < R; i++) shape[i] = op.Size(i);
             auto tmpv = make_tensor<typename Op::value_type>(shape);
             (tmpv = op).run(CUDAJITExecutor{});
-            cudaStreamSynchronize(0);
+            MATX_CUDA_CHECK(cudaStreamSynchronize(0));
             detail::InternalPrint(fp, tmpv, dims...);
           };
           switch (r) {
@@ -649,7 +649,7 @@ namespace matx {
         } else {
           auto tmpv = make_tensor<typename Op::value_type>(op.Shape());
           (tmpv = op).run();
-          cudaStreamSynchronize(0);
+          MATX_CUDA_CHECK(cudaStreamSynchronize(0));
           detail::InternalPrint(fp, tmpv, dims...);
         }
       }
