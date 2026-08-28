@@ -34,6 +34,7 @@
 
 #include "matx/transforms/reduce.h"
 #include "matx/core/nvtx.h"
+#include "matx/core/resource_guard.h"
 #include "matx/core/type_utils.h"
 #include "matx/operators/all.h"
 #include "matx/operators/if.h"
@@ -70,13 +71,19 @@ namespace matx
       MATX_ASSERT_STR(A.Rank() -1 == X.Rank(), matxInvalidDim, "cgsolve:  A rank must be one larger than X rank");
       MATX_ASSERT_STR(X.Rank() == B.Rank(), matxInvalidDim, "cgsole: X rank and B rank must match");
 
-      cudaStream_t d2h = nullptr;
-      cudaEvent_t event = nullptr;
-      
+      // Declared in this order so, if tol>0.0f, event_guard (destructed
+      // first) is torn down before the stream it may still be queued on.
+      detail::CudaStreamGuard d2h_guard;
+      detail::CudaEventGuard event_guard;
 
       if(tol>0.0f) {
-        MATX_CUDA_CHECK(cudaStreamCreateWithFlags(&d2h,cudaStreamNonBlocking));
-        MATX_CUDA_CHECK(cudaEventCreate(&event));
+        cudaStream_t d2h_handle;
+        MATX_CUDA_CHECK(cudaStreamCreateWithFlags(&d2h_handle,cudaStreamNonBlocking));
+        d2h_guard.reset(d2h_handle);
+
+        cudaEvent_t event_handle;
+        MATX_CUDA_CHECK(cudaEventCreate(&event_handle));
+        event_guard.reset(event_handle);
       }
 
       int converged_host = false;
@@ -129,8 +136,8 @@ namespace matx
       if(tol>0.0f) {
         (converged = matx::all(as_int(sqrt(r0r0) < tol))).run(stream);
 
-        MATX_CUDA_CHECK(cudaEventRecord(event, stream));
-        MATX_CUDA_CHECK(cudaStreamWaitEvent(d2h, event));
+        MATX_CUDA_CHECK(cudaEventRecord(event_guard.get(), stream));
+        MATX_CUDA_CHECK(cudaStreamWaitEvent(d2h_guard.get(), event_guard.get()));
       }
 
       int i;
@@ -165,8 +172,8 @@ MATX_IGNORE_WARNING_POP_MSVC
           // copy convergence criteria to host.  
           // This is in unpinned memory and cannot on most systems run asynchronously.  
           // We do this here to hide the copy/sync behind prior launch latency/execution.
-          MATX_CUDA_CHECK(cudaMemcpyAsync(&converged_host, converged.Data(), sizeof(int), cudaMemcpyDeviceToHost, d2h));
-          MATX_CUDA_CHECK(cudaStreamSynchronize(d2h));
+          MATX_CUDA_CHECK(cudaMemcpyAsync(&converged_host, converged.Data(), sizeof(int), cudaMemcpyDeviceToHost, d2h_guard.get()));
+          MATX_CUDA_CHECK(cudaStreamSynchronize(d2h_guard.get()));
 
           if(converged_host != 0) {  // != 0 instead of == true: converged_host is int (CUDA device copy); mixing int and bool triggers MSVC C4805 as an error under /WX
             break;
@@ -174,8 +181,8 @@ MATX_IGNORE_WARNING_POP_MSVC
 
           (converged = matx::all(as_int(sqrt(r1r1) < tol))).run(stream);
 
-          MATX_CUDA_CHECK(cudaEventRecord(event, stream));
-          MATX_CUDA_CHECK(cudaStreamWaitEvent(d2h, event));
+          MATX_CUDA_CHECK(cudaEventRecord(event_guard.get(), stream));
+          MATX_CUDA_CHECK(cudaStreamWaitEvent(d2h_guard.get(), event_guard.get()));
         }
         
         // p = r1 + b * p 
@@ -183,13 +190,8 @@ MATX_IGNORE_WARNING_POP_MSVC
         (IF( pApc != value_type(0), updateP)).run(stream);
 
         // Advance residual
-        swap(r0r0, r1r1);  
+        swap(r0r0, r1r1);
         swap(r0r0c, r1r1c);
-      }
-
-      if(tol>0.0f) {
-        MATX_CUDA_CHECK(cudaEventDestroy(event));
-        MATX_CUDA_CHECK(cudaStreamDestroy(d2h));
       }
     }
 

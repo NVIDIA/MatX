@@ -37,6 +37,7 @@
 
 #include "matx/core/error.h"
 #include "matx/core/nvtx.h"
+#include "matx/core/resource_guard.h"
 #include "matx/core/tensor.h"
 #include "matx/core/cache.h"
 #include "matx/operators/slice.h"
@@ -422,11 +423,20 @@ inline void svdbpi_impl(UType &U, SType &S, VTType &VT, const AType &A, int max_
   MATX_ASSERT_STR(S.Size(RANK-2) == d, matxInvalidDim, "svdbpi:  S must have Size(RANK-2) == d");
 
   int converged_host = false;
-  cudaStream_t d2h = nullptr;
-  cudaEvent_t event = nullptr;
+
+  // Declared in this order so, if tol>0.0f, event_guard (destructed first)
+  // is torn down before the stream it may still be queued on.
+  detail::CudaStreamGuard d2h_guard;
+  detail::CudaEventGuard event_guard;
+
   if(tol>0.0f) {
-    MATX_CUDA_CHECK(cudaStreamCreateWithFlags(&d2h,cudaStreamNonBlocking));
-    MATX_CUDA_CHECK(cudaEventCreate(&event));
+    cudaStream_t d2h_handle;
+    MATX_CUDA_CHECK(cudaStreamCreateWithFlags(&d2h_handle,cudaStreamNonBlocking));
+    d2h_guard.reset(d2h_handle);
+
+    cudaEvent_t event_handle;
+    MATX_CUDA_CHECK(cudaEventCreate(&event_handle));
+    event_guard.reset(event_handle);
   }
 
   auto [AT, Q, Qold, R, Z, l2Norm, converged] = detail::svdbpi_impl_workspace(A, stream);
@@ -461,7 +471,7 @@ inline void svdbpi_impl(UType &U, SType &S, VTType &VT, const AType &A, int max_
 
     if(tol!=0.0f) {
 
-      MATX_CUDA_CHECK(cudaStreamSynchronize(d2h));  // wait for d2h transfer to finish
+      MATX_CUDA_CHECK(cudaStreamSynchronize(d2h_guard.get()));  // wait for d2h transfer to finish
       if(converged_host != 0) {
         // if converged exit loop
         break;
@@ -479,14 +489,14 @@ inline void svdbpi_impl(UType &U, SType &S, VTType &VT, const AType &A, int max_
       }
 
       // event to record when converged is ready in stream
-      MATX_CUDA_CHECK(cudaEventRecord(event, stream));
+      MATX_CUDA_CHECK(cudaEventRecord(event_guard.get(), stream));
       // wait for d2h transfer until converged is ready
-      MATX_CUDA_CHECK(cudaStreamWaitEvent(d2h, event));
+      MATX_CUDA_CHECK(cudaStreamWaitEvent(d2h_guard.get(), event_guard.get()));
 
       // copy convergence criteria to host.
       // This is in unpinned memory and cannot on most systems run asynchronously.
       // We do this here to hide the copy/sync behind prior launch latency/execution of next iteration.
-      MATX_CUDA_CHECK(cudaMemcpyAsync(&converged_host, converged.Data(), sizeof(int), cudaMemcpyDeviceToHost, d2h));
+      MATX_CUDA_CHECK(cudaMemcpyAsync(&converged_host, converged.Data(), sizeof(int), cudaMemcpyDeviceToHost, d2h_guard.get()));
     }
   }
 
@@ -517,11 +527,6 @@ inline void svdbpi_impl(UType &U, SType &S, VTType &VT, const AType &A, int max_
     // normalize VT by singular values
     // IF required to avoid nans when singular value is 0
     (IF(D != STypeS(0), VT = VT / D)).run(stream);
-  }
-
-  if(tol>0.0f) {
-    MATX_CUDA_CHECK(cudaEventDestroy(event));
-    MATX_CUDA_CHECK(cudaStreamDestroy(d2h));
   }
 }
 
