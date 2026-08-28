@@ -141,10 +141,10 @@ struct MemTracker {
     case MATX_MANAGED_MEMORY:
       [[fallthrough]];
     case MATX_DEVICE_MEMORY:
-      if (is_cuda_free()) cudaFree(ptr);
+      if (is_cuda_free()) MATX_CUDA_CHECK_NOEXCEPT(cudaFree(ptr));
       break;
     case MATX_HOST_MEMORY:
-      if (is_cuda_free()) cudaFreeHost(ptr);
+      if (is_cuda_free()) MATX_CUDA_CHECK_NOEXCEPT(cudaFreeHost(ptr));
       break;
     case MATX_HOST_MALLOC_MEMORY:
       free(ptr);
@@ -152,10 +152,10 @@ struct MemTracker {
     case MATX_ASYNC_DEVICE_MEMORY:
       if (is_cuda_free()) {
         if constexpr (std::is_same_v<no_stream_t, StreamType>) {
-          cudaFreeAsync(ptr, iter->second.stream);
+          MATX_CUDA_CHECK_NOEXCEPT(cudaFreeAsync(ptr, iter->second.stream));
         }
         else {
-          cudaFreeAsync(ptr, st.stream);
+          MATX_CUDA_CHECK_NOEXCEPT(cudaFreeAsync(ptr, st.stream));
         }
       }
       break;
