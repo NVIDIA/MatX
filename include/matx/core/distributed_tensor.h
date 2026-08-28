@@ -503,7 +503,7 @@ public:
     static_assert(Out::Rank() == RANK,
                   "Regular and distributed tensor ranks must match");
     static_assert(
-        std::is_same_v<remove_cvref_t<typename Out::value_type>,
+        cuda::std::is_same_v<remove_cvref_t<typename Out::value_type>,
                        remove_cvref_t<T>>,
         "Distributed-to-regular assignment requires identical element types");
 
@@ -523,7 +523,7 @@ public:
     const auto out_location = PointerLocation(out.Data());
     bool copied_replica = false;
     for (const auto &fragment : local_fragments_) {
-      if constexpr (std::is_same_v<Distribution,
+      if constexpr (cuda::std::is_same_v<Distribution,
                                    replicated_distribution_t<RANK>>) {
         if (copied_replica) {
           continue;
@@ -619,7 +619,7 @@ public:
     static_assert(
         is_distributed_tensor_v<Out>,
         "Distributed copies require a distributed tensor destination");
-    static_assert(std::is_same_v<typename Out::value_type, T>,
+    static_assert(cuda::std::is_same_v<typename Out::value_type, T>,
                   "Distributed copies require identical element types");
     ValidateCompatibleOutput(out, executor);
 
@@ -707,7 +707,7 @@ private:
     static_assert(Other::Rank() == RANK,
                   "Distributed operands must have the same rank");
     static_assert(
-        std::is_same_v<typename Other::distribution_type, Distribution>,
+        cuda::std::is_same_v<typename Other::distribution_type, Distribution>,
         "Distributed operands must use the same distribution type");
     matx::detail::DistributedCheck(
         context_id_ == other.ContextId() && context_id_ == executor.ContextId(),
@@ -814,7 +814,7 @@ public:
                  ...),
                 "Distributed apply inputs must have the same rank");
   static_assert(
-      (std::is_same_v<typename remove_cvref_t<Inputs>::distribution_type,
+      (cuda::std::is_same_v<typename remove_cvref_t<Inputs>::distribution_type,
                       distribution_type> &&
        ...),
       "Distributed apply inputs must use the same distribution type");
@@ -834,10 +834,10 @@ public:
     static_assert(Out::Rank() == Rank(),
                   "Distributed apply output rank must match its inputs");
     static_assert(
-        std::is_same_v<typename Out::value_type, value_type>,
+        cuda::std::is_same_v<typename Out::value_type, value_type>,
         "Distributed apply result and output types must match exactly");
     static_assert(
-        std::is_same_v<typename Out::distribution_type, distribution_type>,
+        cuda::std::is_same_v<typename Out::distribution_type, distribution_type>,
         "Distributed apply output distribution type must match its inputs");
 
     matx::detail::DistributedCheck(
@@ -857,7 +857,7 @@ public:
           out_fragment.endpoint, [&](cudaExecutor &local_executor) {
             auto local_op = MakeLocalOp(out_fragment.distribution_index);
             static_assert(
-                std::is_same_v<
+                cuda::std::is_same_v<
                     remove_cvref_t<typename decltype(local_op)::value_type>,
                     remove_cvref_t<typename Out::value_type>>,
                 "Distributed apply callable result must exactly match the "
@@ -959,7 +959,7 @@ public:
     static_assert(Out::Rank() == first_input_type::Rank(),
                   "First-pass distributed local transforms preserve rank");
     static_assert(
-        std::is_same_v<remove_cvref_t<typename Out::value_type>,
+        cuda::std::is_same_v<remove_cvref_t<typename Out::value_type>,
                        remove_cvref_t<ValueType>>,
         "Distributed local transform output type does not match");
 

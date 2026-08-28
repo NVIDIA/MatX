@@ -63,7 +63,7 @@ namespace matx
 
         __MATX_INLINE__ auto get_jit_op_str() const {
           std::string func_name = get_jit_class_name();
-          
+
           std::string steps_init = "{ ";
           std::string firsts_init = "{ ";
           for (int i = 0; i < NUM_RC; i++) {
@@ -76,7 +76,7 @@ namespace matx
           }
           steps_init += " }";
           firsts_init += " }";
-          
+
           return cuda::std::make_tuple(
             func_name,
             std::format("template <typename T> struct {} {{\n"
@@ -115,16 +115,16 @@ namespace matx
 
         __MATX_INLINE__ std::string str() const { return "linspace"; }
 
-        static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() { 
+        static inline constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() {
           if constexpr (NUM_RC == 1) {
-            return 1; 
+            return 1;
           }
           else {
             return 2;
           }
-        }  
+        }
 
-        inline LinspaceOp(const T (&firsts)[NUM_RC], const T (&lasts)[NUM_RC], index_t count, int axis) 
+        inline LinspaceOp(const T (&firsts)[NUM_RC], const T (&lasts)[NUM_RC], index_t count, int axis)
         {
           MATX_LOG_TRACE("LinspaceOp constructor: NUM_RC={}, count={}, axis={}", NUM_RC, count, axis);
           axis_ = axis;
@@ -165,14 +165,14 @@ namespace matx
           else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
             const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::ONE, ElementsPerThread::ONE};
             return my_cap;
-          } else {          
+          } else {
             auto self_has_cap = detail::capability_attributes<Cap>::default_value;
             return self_has_cap;
           }
         }
 
         template <typename CapType, typename... Is>
-        __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(Is... indices) const { 
+        __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(Is... indices) const {
           static_assert(sizeof...(indices) == Rank(), "Number of indices incorrect in linspace");
           cuda::std::array idx{indices...};
           if constexpr (sizeof...(indices) == 1) {
@@ -187,7 +187,7 @@ namespace matx
         }
 
         template <typename... Is>
-        __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(Is... indices) const { 
+        __MATX_DEVICE__ __MATX_HOST__ __MATX_INLINE__ auto operator()(Is... indices) const {
           return this->operator()<DefaultCapabilities>(indices...);
         }
 
@@ -202,7 +202,7 @@ namespace matx
             return count_;
           }
         }
-      }        
+      }
     };
   }
 
@@ -213,20 +213,20 @@ namespace matx
    * Creates a set of values using starts and stops that are linearly-
    * spaced apart over the set of values. Distance is determined
    * by the count parameter
-   * 
+   *
    * @tparam NUM_RC Number of rows or columns, depending on the axis
    * @tparam T Type of the values
    * @param firsts First values
    * @param lasts Last values
    * @param count Number of values in a row or column, depending on the axis
    * @param axis Axis to operate over
-   * @return Operator with linearly-spaced values 
+   * @return Operator with linearly-spaced values
    */
   template <int NUM_RC, typename T = float>
   inline auto linspace(const T (&firsts)[NUM_RC], const T (&lasts)[NUM_RC], index_t count, int axis = 0)
   {
     return detail::LinspaceOp<T, NUM_RC>(firsts, lasts, count, axis);
-  }   
+  }
 
   /**
    * @brief Create a linearly-spaced vector of values
@@ -234,13 +234,13 @@ namespace matx
    * Creates a set of values using startsand stop that are linearly-
    * spaced apart over the set of values. Distance is determined
    * by the count parameter
-   * 
+   *
    * @tparam T Type of the values
    * @param first First value
    * @param last Last value
    * @param count Number of values in a row or column, depending on the axis
    * @param axis Axis to operate over
-   * @return Operator with linearly-spaced values 
+   * @return Operator with linearly-spaced values
    */
   template <typename T = float>
   inline auto linspace(T first, T last, index_t count, int axis = 0)
@@ -256,23 +256,23 @@ namespace matx
    * Creates a set of values using a start and end that are linearly-
    * spaced apart over the set of values. Distance is determined
    * by the shape and selected dimension.
-   * 
+   *
    * @tparam Dim Dimension to operate over
    * @tparam NUM_RC Rank of shape
    * @tparam T Operator type
    * @param s Array of sizes
    * @param first First value
    * @param last Last value
-   * @return Operator with linearly-spaced values 
+   * @return Operator with linearly-spaced values
    */
   template <int Dim, int NUM_RC, typename T>
-  [[deprecated("Use matx::linspace(T first, T last, index_t count, int axis = 0) instead.")]]  
+  [[deprecated("Use matx::linspace(T first, T last, index_t count, int axis = 0) instead.")]]
   inline auto linspace([[maybe_unused]]const index_t (&s)[NUM_RC], T first, T last)
   {
     const T firsts[] = {first};
-    const T lasts[] = {last};   
+    const T lasts[] = {last};
     return linspace(firsts, lasts, NUM_RC, 0);
-  }  
+  }
 
   /**
    * @brief Create a linearly-spaced range of values
@@ -280,25 +280,25 @@ namespace matx
    * Creates a set of values using a start and end that are linearly-
    * spaced apart over the set of values. Distance is determined
    * by the shape and selected dimension.
-   * 
+   *
    * @tparam T Operator type
    * @tparam Dim Dimension to operate over
    * @tparam ShapeType Shape type
    * @param s Shape object
    * @param first First value
    * @param last Last value
-   * @return Operator with linearly-spaced values 
+   * @return Operator with linearly-spaced values
    */
   template <int Dim, typename ShapeType, typename T>
     requires (!cuda::std::is_array_v<remove_cvref_t<ShapeType>>)
-  [[deprecated("Use matx::linspace(T first, T last, index_t count, int axis = 0) instead.")]]           
+  [[deprecated("Use matx::linspace(T first, T last, index_t count, int axis = 0) instead.")]]
   inline auto linspace(ShapeType &&s, T first, T last)
   {
-    constexpr int NUM_RC = cuda::std::tuple_size<std::decay_t<ShapeType>>::value;
+    constexpr int NUM_RC = cuda::std::tuple_size<cuda::std::decay_t<ShapeType>>::value;
     static_assert(NUM_RC > Dim);
     auto count =  *(s.begin() + Dim);
     const T firsts[] = {first};
-    const T lasts[] = {last};       
+    const T lasts[] = {last};
     return linspace(firsts, lasts, count, 0);
-  }  
+  }
 } // end namespace matx

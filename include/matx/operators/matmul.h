@@ -61,7 +61,7 @@ namespace matx
         typename detail::base_type_t<OpB> b_;
         float alpha_;
         float beta_;
-        PermDims perm_; 
+        PermDims perm_;
         static constexpr int out_rank = cuda::std::max(OpA::Rank(), OpB::Rank());
         cuda::std::array<index_t, out_rank> out_dims_;
         // This should be tensor_impl_t, but need to work around issues with temp types returned in matmul
@@ -70,7 +70,7 @@ namespace matx
         mutable bool prerun_done_ = false;
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
         mutable cuBLASDxHelper<typename OpA::value_type> dx_gemm_helper_;
-#endif 
+#endif
 
       public:
         using matxop = bool;
@@ -84,7 +84,7 @@ namespace matx
           is_dynamic_tensor_v<OpA> || is_dynamic_rank_op_v<OpA> ||
           is_dynamic_tensor_v<OpB> || is_dynamic_rank_op_v<OpB>>;
 
-        __MATX_INLINE__ std::string str() const { 
+        __MATX_INLINE__ std::string str() const {
             return "matmul(" + get_type_str(a_) + "," + get_type_str(b_) + ")";
         }
 
@@ -97,7 +97,7 @@ namespace matx
         JIT_Storage ToJITStorage() const {
           return JIT_Storage{detail::to_jit_storage(a_), detail::to_jit_storage(b_)};
         }
-#endif           
+#endif
 
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
         __MATX_INLINE__ std::string get_jit_class_name() const {
@@ -148,16 +148,16 @@ namespace matx
                  "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const\n" +
                  "  {\n" +
                  "    return out_dims_[dim];\n" +
-                 "  }\n" +    
+                 "  }\n" +
                  "};\n")
           );
         }
 #endif
 
-        __MATX_INLINE__ MatMulOp(const OpA &a, const OpB &b, float alpha, float beta, PermDims perm) : 
+        __MATX_INLINE__ MatMulOp(const OpA &a, const OpB &b, float alpha, float beta, PermDims perm) :
               a_(a), b_(b), alpha_(alpha), beta_(beta), perm_(perm) {
           MATX_LOG_TRACE("{} constructor: alpha={}, beta={}", str(), alpha, beta);
-          if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
+          if constexpr (!cuda::std::is_same_v<PermDims, no_permute_t>) {
             for (int r = 0; r < Rank(); r++) {
               if (r == Rank() - 2) {
                 out_dims_[perm_[r]] = a_.Size(r);
@@ -186,7 +186,7 @@ namespace matx
           // n = cols of output (from B's last dim)
           // k = inner dimension (A's last dim = B's second-to-last dim)
           const int cc = GetComputeCapability();  // Compute capability as __CUDA_ARCH__ digits (e.g., 890 for SM 8.9)
-          
+
           dx_gemm_helper_.set_m(a_.Size(OpA::Rank() - 2));
           dx_gemm_helper_.set_n(b_.Size(OpB::Rank() - 1));
           dx_gemm_helper_.set_k(a_.Size(OpA::Rank() - 1));
@@ -217,7 +217,7 @@ namespace matx
             return combine_capabilities<Cap>(detail::get_operator_capability<Cap>(a_, in_copy), detail::get_operator_capability<Cap>(b_, in_copy));
           }
           else if constexpr (Cap == OperatorCapability::ELEMENTS_PER_THREAD) {
-#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)            
+#if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
             auto result = ElementsPerThread::ONE;
             MATX_LOG_DEBUG("cuBLASDx ELEMENTS_PER_THREAD: {}", static_cast<int>(result));
             return cuda::std::array<ElementsPerThread, 2>{result, result};
@@ -226,17 +226,17 @@ namespace matx
 #endif
           }
           else if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
-            auto result = combine_capabilities<Cap>(dx_gemm_helper_.GetShmRequired(), 
+            auto result = combine_capabilities<Cap>(dx_gemm_helper_.GetShmRequired(),
                                                     detail::get_operator_capability<Cap>(a_, in),
                                                     detail::get_operator_capability<Cap>(b_, in));
             MATX_LOG_DEBUG("cuBLASDx DYN_SHM_SIZE: {}", result);
             return result;
           }
           else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
-            bool supported = dx_gemm_helper_.template CheckJITSizeAndTypeRequirements<OpA, OpB>() && 
+            bool supported = dx_gemm_helper_.template CheckJITSizeAndTypeRequirements<OpA, OpB>() &&
                              dx_gemm_helper_.IsSupported();
 
-            auto result = combine_capabilities<Cap>(supported, 
+            auto result = combine_capabilities<Cap>(supported,
                                                     detail::get_operator_capability<Cap>(a_, in),
                                                     detail::get_operator_capability<Cap>(b_, in));
             MATX_LOG_DEBUG("cuBLASDx SUPPORTS_JIT: {}", result);
@@ -245,12 +245,12 @@ namespace matx
           else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
             // Get the capability string and add to map
             const auto [key, value] = get_jit_op_str();
-      
+
             // Insert into the map if the key doesn't exist
             if (in.find(key) == in.end()) {
               in[key] = value;
             }
-            
+
             // Also handle child operators
             detail::get_operator_capability<Cap>(a_, in);
             detail::get_operator_capability<Cap>(b_, in);
@@ -263,13 +263,13 @@ namespace matx
             MATX_LOG_DEBUG("cuBLASDx block dim: {} {} {}", block_dims[0], block_dims[1], block_dims[2]);
             // Use the first dimension as the primary block size (similar to FFT)
             const auto my_block = cuda::std::array<int, 2>{block_dims[0], block_dims[0]};
-            return combine_capabilities<Cap>(my_block, 
+            return combine_capabilities<Cap>(my_block,
                                              detail::get_operator_capability<Cap>(a_, in),
                                              detail::get_operator_capability<Cap>(b_, in));
           }
           else if constexpr (Cap == OperatorCapability::GENERATE_LTOIR) {
             auto result = combine_capabilities<Cap>(
-                dx_gemm_helper_.GenerateLTOIR(in.ltoir_symbols), 
+                dx_gemm_helper_.GenerateLTOIR(in.ltoir_symbols),
                 detail::get_operator_capability<Cap>(a_, in),
                 detail::get_operator_capability<Cap>(b_, in));
             MATX_LOG_DEBUG("cuBLASDx GENERATE_LTOIR: {}", result);
@@ -321,13 +321,13 @@ namespace matx
           else if constexpr (Cap == OperatorCapability::GROUPS_PER_BLOCK) {
             // 2D block operators only support one group per block
             const auto my_cap = cuda::std::array<int, 2>{1, 1};
-            return combine_capabilities<Cap>(my_cap, 
+            return combine_capabilities<Cap>(my_cap,
                                              detail::get_operator_capability<Cap>(a_, in),
                                              detail::get_operator_capability<Cap>(b_, in));
           }
           else {
             auto self_has_cap = capability_attributes<Cap>::default_value;
-            return combine_capabilities<Cap>(self_has_cap, 
+            return combine_capabilities<Cap>(self_has_cap,
                                              detail::get_operator_capability<Cap>(a_, in),
                                              detail::get_operator_capability<Cap>(b_, in));
           }
@@ -340,7 +340,7 @@ namespace matx
           }
           else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
             bool supported = false;
-            auto result = combine_capabilities<Cap>(supported, 
+            auto result = combine_capabilities<Cap>(supported,
                                                     detail::get_operator_capability<Cap>(a_, in),
                                                     detail::get_operator_capability<Cap>(b_, in));
             MATX_LOG_DEBUG("SUPPORTS_JIT (no cuBLASDx): {}", result);
@@ -352,13 +352,13 @@ namespace matx
           }
           else {
             auto self_has_cap = capability_attributes<Cap>::default_value;
-            return combine_capabilities<Cap>(self_has_cap, 
+            return combine_capabilities<Cap>(self_has_cap,
                                              detail::get_operator_capability<Cap>(a_, in),
                                              detail::get_operator_capability<Cap>(b_, in));
           }
 #endif
         }
-   
+
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {
           return out_rank;
@@ -384,14 +384,14 @@ namespace matx
           // Perform SpMM or otherwise GEMM.
           static_assert(!is_sparse_tensor_v<OpB>, "sparse rhs not implemented");
           if constexpr (is_sparse_tensor_v<OpA>) {
-            if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
+            if constexpr (!cuda::std::is_same_v<PermDims, no_permute_t>) {
               sparse_matmul_impl(permute(cuda::std::get<0>(out), perm_), a_, b_, ex, alpha_, beta_);
             }
             else {
               sparse_matmul_impl(cuda::std::get<0>(out), a_, b_, ex, alpha_, beta_);
             }
           }
-          else if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
+          else if constexpr (!cuda::std::is_same_v<PermDims, no_permute_t>) {
             bool perm_is_identity = true;
             for (int32_t i = 0; i < Rank(); i++) {
               if (perm_[static_cast<size_t>(i)] != i) {
@@ -416,12 +416,12 @@ namespace matx
         {
           if constexpr (is_matx_op<OpA>()) {
             a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-          }     
+          }
 
           if constexpr (is_matx_op<OpB>()) {
             b_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-          }           
-        }      
+          }
+        }
 
         template <typename ShapeType, typename Executor>
         __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
@@ -430,7 +430,7 @@ namespace matx
             return;
           }
 
-          InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));  
+          InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
 
           detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
 
@@ -479,8 +479,8 @@ namespace matx
    *   Scalar multiplier to apply to operator A
    * @param beta
    *   Scalar multiplier to apply to operator C on input
-   * 
-   * @return 
+   *
+   * @return
    *   Operator that produces the output tensor C of shape `... x m x n`
    */
   template<typename OpA, typename OpB>
@@ -535,8 +535,8 @@ namespace matx
    *   Scalar multiplier to apply to operator A
    * @param beta
    *   Scalar multiplier to apply to operator C on input
-   * 
-   * @return 
+   *
+   * @return
    *   Operator that produces the output tensor C of shape `... x m x n`
    */
   template<typename OpA, typename OpB>
@@ -553,5 +553,5 @@ namespace matx
     auto in2 = permute(B, perm);
 
     return detail::MatMulOp(in1, in2, alpha, beta, perm);
-  }  
+  }
 }

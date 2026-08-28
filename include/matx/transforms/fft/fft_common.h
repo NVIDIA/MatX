@@ -35,14 +35,14 @@
 namespace matx {
 
 namespace detail {
-    
+
   template <typename OutputTensor, typename InputTensor, typename Executor>
   __MATX_INLINE__ auto  GetFFTInputView([[maybe_unused]] OutputTensor &o,
                       const InputTensor &i, index_t fft_size,
                       [[maybe_unused]] const Executor &exec)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-    
+
     using index_type = typename OutputTensor::shape_type;
     using T1    = typename OutputTensor::value_type;
     using T2    = typename InputTensor::value_type;
@@ -58,28 +58,28 @@ namespace detail {
 
     // Auto-detect FFT size
     if (fft_size == 0) {
-      act_fft_size = o.Lsize();   
+      act_fft_size = o.Lsize();
 
       // If R2C transform, set length of FFT appropriately
-      if constexpr ((std::is_same_v<T2, float> &&
-                    std::is_same_v<T1, cuda::std::complex<float>>) ||
-                    (std::is_same_v<T2, double> &&
-                    std::is_same_v<T1, cuda::std::complex<double>>) ||
-                    (std::is_same_v<T2, matxBf16> &&
-                    std::is_same_v<T1, matxBf16Complex>) ||
-                    (std::is_same_v<T2, matxFp16> &&
-                    std::is_same_v<T1, matxFp16Complex>)) { // R2C
+      if constexpr ((cuda::std::is_same_v<T2, float> &&
+                    cuda::std::is_same_v<T1, cuda::std::complex<float>>) ||
+                    (cuda::std::is_same_v<T2, double> &&
+                    cuda::std::is_same_v<T1, cuda::std::complex<double>>) ||
+                    (cuda::std::is_same_v<T2, matxBf16> &&
+                    cuda::std::is_same_v<T1, matxBf16Complex>) ||
+                    (cuda::std::is_same_v<T2, matxFp16> &&
+                    cuda::std::is_same_v<T1, matxFp16Complex>)) { // R2C
         nom_fft_size = in_size;
         act_fft_size = in_size;
       }
-      else if constexpr ((std::is_same_v<T1, float> &&
-                          std::is_same_v<T2, cuda::std::complex<float>>) ||
-                        (std::is_same_v<T1, double> &&
-                          std::is_same_v<T2, cuda::std::complex<double>>) ||
-                        (std::is_same_v<T1, matxBf16> &&
-                          std::is_same_v<T2, matxBf16Complex>) ||
-                        (std::is_same_v<T1, matxFp16> &&
-                          std::is_same_v<T2, matxFp16Complex>)) { // C2R
+      else if constexpr ((cuda::std::is_same_v<T1, float> &&
+                          cuda::std::is_same_v<T2, cuda::std::complex<float>>) ||
+                        (cuda::std::is_same_v<T1, double> &&
+                          cuda::std::is_same_v<T2, cuda::std::complex<double>>) ||
+                        (cuda::std::is_same_v<T1, matxBf16> &&
+                          cuda::std::is_same_v<T2, matxBf16Complex>) ||
+                        (cuda::std::is_same_v<T1, matxFp16> &&
+                          cuda::std::is_same_v<T2, matxFp16Complex>)) { // C2R
         nom_fft_size = (in_size - 1) * 2;
         act_fft_size = (o.Lsize() / 2) + 1;
       }
@@ -131,13 +131,13 @@ namespace detail {
 
           (i_new = static_cast<promote_half_t<T2>>(0)).run(exec);
           matx::copy(i_pad_part_v, i, exec);
-          return i_new;        
+          return i_new;
         }
       }
     }
 
     return i;
-  }  
+  }
 
   template <typename InType>
   constexpr __MATX_INLINE__ FFTType ComplexInType()
@@ -159,14 +159,14 @@ namespace detail {
 
     // Deduce plan type from view types
     // Check if input is complex and output is real -> C2R
-    if constexpr ((std::is_same_v<T1, cuda::std::complex<float>> && std::is_same_v<T2, float>) ||
-                  (std::is_same_v<T1, cuda::std::complex<double>> && std::is_same_v<T2, double>) ||
+    if constexpr ((cuda::std::is_same_v<T1, cuda::std::complex<float>> && cuda::std::is_same_v<T2, float>) ||
+                  (cuda::std::is_same_v<T1, cuda::std::complex<double>> && cuda::std::is_same_v<T2, double>) ||
                   (is_complex_half_v<T1> && (is_half_v<T2> || is_matx_half_v<T2>))) {
       return FFTType::R2C;
     }
-    // Check if input is real and output is complex -> R2C  
-    else if constexpr ((std::is_same_v<T1, float> && std::is_same_v<T2, cuda::std::complex<float>>) ||
-                       (std::is_same_v<T1, double> && std::is_same_v<T2, cuda::std::complex<double>>) ||
+    // Check if input is real and output is complex -> R2C
+    else if constexpr ((cuda::std::is_same_v<T1, float> && cuda::std::is_same_v<T2, cuda::std::complex<float>>) ||
+                       (cuda::std::is_same_v<T1, double> && cuda::std::is_same_v<T2, cuda::std::complex<double>>) ||
                        ((is_half_v<T1> || is_matx_half_v<T1>) && is_complex_half_v<T2>)) {
       return FFTType::C2R;
     }

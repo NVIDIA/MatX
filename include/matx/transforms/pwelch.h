@@ -55,7 +55,7 @@ namespace matx
       index_t batches = x_with_overlaps.Shape()[0];
       auto X_with_overlaps = make_tensor<cuda::std::complex<typename PxxType::value_type>>({batches,static_cast<index_t>(nfft)},MATX_ASYNC_DEVICE_MEMORY,stream);
 
-      if constexpr (std::is_same_v<wType, std::nullopt_t>) {
+      if constexpr (cuda::std::is_same_v<wType, std::nullopt_t>) {
         (X_with_overlaps = fft(x_with_overlaps,nfft)).run(stream);
       }
       else {

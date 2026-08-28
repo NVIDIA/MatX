@@ -13,7 +13,6 @@ Type Manipulation
 =================
 
 .. doxygentypedef:: matx::promote_half_t
-.. doxygenstruct:: matx::remove_cvref
 
 Concepts (C++20)
 ================

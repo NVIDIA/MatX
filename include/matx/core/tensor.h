@@ -805,7 +805,7 @@ public:
     using Type = typename U::value_type;
     // Static descriptors have no runtime constructor, so fall back to a
     // dynamic descriptor whose shape/stride types match the original.
-    using OutDesc = std::conditional_t<
+    using OutDesc = cuda::std::conditional_t<
       is_matx_static_descriptor<Desc>,
       tensor_desc_cr_ds_t<typename Desc::shape_type, typename Desc::stride_type, RANK>,
       Desc>;
@@ -881,7 +881,7 @@ MATX_LOOP_UNROLL
     using Type = typename U::value_type;
     // Static descriptors have no runtime constructor, so fall back to a
     // dynamic descriptor whose shape/stride types match the original.
-    using OutDesc = std::conditional_t<
+    using OutDesc = cuda::std::conditional_t<
       is_matx_static_descriptor<Desc>,
       tensor_desc_cr_ds_t<typename Desc::shape_type, typename Desc::stride_type, RANK>,
       Desc>;
@@ -985,7 +985,7 @@ MATX_LOOP_UNROLL
    *   Shape of tensor
    */
   template <typename ShapeType>
-    requires (!std::is_pointer_v<remove_cvref_t<ShapeType>>)
+    requires (!cuda::std::is_pointer_v<remove_cvref_t<ShapeType>>)
   __MATX_HOST__ __MATX_INLINE__ void
   Reset(T *const data, ShapeType &&shape) noexcept
   {
@@ -1502,8 +1502,8 @@ MATX_LOOP_UNROLL
 
   template <typename ManagedType>
   ManagedType *ToDlPackImpl() const {
-    static_assert(std::is_same_v<ManagedType, DLManagedTensorVersioned> ||
-      std::is_same_v<ManagedType, DLManagedTensor>,
+    static_assert(cuda::std::is_same_v<ManagedType, DLManagedTensorVersioned> ||
+      cuda::std::is_same_v<ManagedType, DLManagedTensor>,
       "Unsupported DLPack managed tensor type");
 
     auto *mt = new ManagedType;
@@ -1584,11 +1584,11 @@ MATX_LOOP_UNROLL
     mt->manager_ctx = t_copy;
     mt->deleter = &self_type::template FreeDLPackCommon_<ManagedType>;
 
-    if constexpr (std::is_same_v<ManagedType, DLManagedTensorVersioned>) {
+    if constexpr (cuda::std::is_same_v<ManagedType, DLManagedTensorVersioned>) {
       mt->version.major = DLPACK_MAJOR_VERSION;
       mt->version.minor = DLPACK_MINOR_VERSION;
       mt->flags = 0;
-      if constexpr (std::is_const_v<T>) {
+      if constexpr (cuda::std::is_const_v<T>) {
         mt->flags |= DLPACK_FLAG_BITMASK_READ_ONLY;
       }
     }

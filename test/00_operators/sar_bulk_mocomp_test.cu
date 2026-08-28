@@ -166,7 +166,7 @@ void RunRank2ReferenceCase(ExecType &exec, index_t num_samples, int sgn) {
   // example-end sar-bulk-mocomp-1
   exec.sync();
 
-  const double tolerance = std::is_same_v<RangeType, float> ? 2.0e-5 : 1.0e-12;
+  const double tolerance = cuda::std::is_same_v<RangeType, float> ? 2.0e-5 : 1.0e-12;
   for (index_t pulse = 0; pulse < num_pulses; ++pulse) {
     for (index_t sample = 0; sample < num_samples; ++sample) {
       const auto expected = ExpectedCorrection(
@@ -264,7 +264,7 @@ TYPED_TEST(SarBulkMocompTests, TransformBackedRangeOffset) {
       .run(exec);
   exec.sync();
 
-  const double tolerance = std::is_same_v<RangeType, float> ? 2.0e-5 : 1.0e-12;
+  const double tolerance = cuda::std::is_same_v<RangeType, float> ? 2.0e-5 : 1.0e-12;
   for (index_t pulse = 0; pulse < pulses; ++pulse) {
     RangeType range_offset = static_cast<RangeType>(0);
     for (index_t term = 0; term < range_terms; ++term) {
@@ -331,7 +331,7 @@ TYPED_TEST(SarBulkMocompTests, BatchedReferenceChangeAndComposition) {
       .run(exec);
   exec.sync();
 
-  const double tolerance = std::is_same_v<RangeType, float> ? 3.0e-5 : 2.0e-12;
+  const double tolerance = cuda::std::is_same_v<RangeType, float> ? 3.0e-5 : 2.0e-12;
   for (index_t batch = 0; batch < batches; ++batch) {
     for (index_t pulse = 0; pulse < pulses; ++pulse) {
       for (index_t sample = 0; sample < samples; ++sample) {

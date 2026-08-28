@@ -101,7 +101,7 @@ public:
 
     // Type checks
     MATX_STATIC_ASSERT_STR(!is_half_v<T1>, matxInvalidType, "Cholesky solver does not support half precision");
-    MATX_STATIC_ASSERT_STR((std::is_same_v<T1, typename OutTensor_t::value_type>), matxInavlidType, "Input and Output types must match");
+    MATX_STATIC_ASSERT_STR((cuda::std::is_same_v<T1, typename OutTensor_t::value_type>), matxInavlidType, "Input and Output types must match");
 
     params = GetCholParams(a, uplo, exec);
 
@@ -128,7 +128,7 @@ public:
     params.n = a.Size(RANK - 1);
     params.A = a.Data();
     params.uplo = uplo;
-    params.stream = exec.getStream();    
+    params.stream = exec.getStream();
     params.dtype = TypeToInt<T1>();
 
     return params;
@@ -170,7 +170,7 @@ public:
 
     std::vector<int> h_info(this->batch_a_ptrs.size());
     cudaMemcpyAsync(h_info.data(), this->d_info, sizeof(int) * this->batch_a_ptrs.size(), cudaMemcpyDeviceToHost, stream);
-    
+
     // This will block. Figure this out later
     cudaStreamSynchronize(stream);
 
@@ -179,7 +179,7 @@ public:
         MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
           ("Parameter " + std::to_string(-info) + " had an illegal value in cuSolver Xpotrf").c_str());
       } else {
-        MATX_ASSERT_STR_EXP(info, 0, matxSolverError, 
+        MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
           (std::to_string(info) + "-th leading minor is not positive definite in cuSolver Xpotrf").c_str());
       }
     }
@@ -206,8 +206,8 @@ private:
 struct DnCholCUDAParamsKeyHash {
   std::size_t operator()(const DnCholCUDAParams_t &k) const noexcept
   {
-    return  (std::hash<uint64_t>()(k.n)) + 
-            (std::hash<uint64_t>()(k.batch_size)) + 
+    return  (std::hash<uint64_t>()(k.n)) +
+            (std::hash<uint64_t>()(k.batch_size)) +
             (std::hash<uint64_t>()((uint64_t)(k.stream)));
   }
 };
@@ -220,8 +220,8 @@ struct DnCholCUDAParamsKeyEq {
   bool operator()(const DnCholCUDAParams_t &l, const DnCholCUDAParams_t &t) const
       noexcept
   {
-    return  l.n == t.n && 
-            l.batch_size == t.batch_size && 
+    return  l.n == t.n &&
+            l.batch_size == t.batch_size &&
             l.dtype == t.dtype &&
             l.stream == t.stream;
   }
@@ -262,7 +262,7 @@ void chol_impl(OutputTensor &&out, const ATensor &a,
           SolverFillMode uplo = SolverFillMode::UPPER)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-    
+
   using OutputTensor_t = remove_cvref_t<OutputTensor>;
   using T1 = typename OutputTensor_t::value_type;
   constexpr int RANK = ATensor::Rank();
@@ -286,7 +286,7 @@ void chol_impl(OutputTensor &&out, const ATensor &a,
   T1 *out_ptr = nullptr;
   detail::tensor_impl_t<T1, RANK> tmp_out;
   const bool allContiguous = a_new.IsContiguous() && out.IsContiguous();
-  
+
   if (allContiguous) {
     make_tensor(tmp_out, out.Data(), out.Shape());
     (out = a_new).run(exec);

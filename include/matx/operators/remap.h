@@ -157,7 +157,7 @@ namespace matx
         {
           if constexpr (CapType::ept == ElementsPerThread::ONE) {
             static_assert(sizeof...(Is) == Rank());
-            static_assert((std::is_convertible_v<Is, index_t> && ... ));
+            static_assert((cuda::std::is_convertible_v<Is, index_t> && ... ));
 
             cuda::std::array ind{indices...};
 
@@ -307,7 +307,7 @@ namespace matx
 
         __MATX_INLINE__ auto operator=(const self_type &rhs) {
           return set(*this, rhs);
-        }        
+        }
 
         template<typename R>
         __MATX_INLINE__ auto operator=(const R &rhs) {

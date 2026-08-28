@@ -47,11 +47,11 @@ namespace matx
         using out_type = typename inner_op_type_t<typename remove_cvref_t<OpA>::value_type>::type;
         typename detail::base_type_t<OpA> a_;
         NormOrder order_;
-        static constexpr int ORank = std::is_same_v<NormType, detail::NormTypeVector> ? OpA::Rank() - 1 : OpA::Rank() - 2;
+        static constexpr int ORank = cuda::std::is_same_v<NormType, detail::NormTypeVector> ? OpA::Rank() - 1 : OpA::Rank() - 2;
         cuda::std::array<index_t, ORank> out_dims_;
         mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, ORank> tmp_out_;
         mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr;
-        mutable bool prerun_done_ = false; 
+        mutable bool prerun_done_ = false;
 
       public:
         using matxop = bool;
@@ -60,9 +60,9 @@ namespace matx
         using norm_xform_op = bool;
         using matx_inner_op_impl = bool; // Indicates this operator uses matx operators for its implementation
 
-      __MATX_INLINE__ std::string str() const { 
-        if constexpr (std::is_same_v<NormType, detail::NormTypeVector>) {
-          return "vector_norm()"; 
+      __MATX_INLINE__ std::string str() const {
+        if constexpr (cuda::std::is_same_v<NormType, detail::NormTypeVector>) {
+          return "vector_norm()";
         }
         else {
           return "matrix_norm";
@@ -71,7 +71,7 @@ namespace matx
 
       __MATX_INLINE__ NormOp(const OpA &op, NormOrder order) : a_(op), order_(order) {
         MATX_LOG_TRACE("{} constructor: order={}", str(), static_cast<int>(order));
-        if constexpr (std::is_same_v<NormType, detail::NormTypeVector>) {
+        if constexpr (cuda::std::is_same_v<NormType, detail::NormTypeVector>) {
           MATX_ASSERT_STR(order == NormOrder::NONE || order == NormOrder::L1 || order == NormOrder::L2, matxInvalidParameter,
             "Invalid norm order used for vector mode");
         }
@@ -114,7 +114,7 @@ namespace matx
         if constexpr (is_matx_op<OpA>()) {
           a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
-      } 
+      }
 
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
@@ -175,7 +175,7 @@ namespace matx
    *
    * @tparam Op Type of input values to evaluate
    * @param op Input values to evaluate
-   * @param dims Dimensions to perform norm over   
+   * @param dims Dimensions to perform norm over
    * @param order Order of norm
    * @return norm operator
    */
@@ -211,7 +211,7 @@ namespace matx
    *
    * @tparam Op Type of input values to evaluate
    * @param op Input values to evaluate
-   * @param dims Dimensions to perform norm over   
+   * @param dims Dimensions to perform norm over
    * @param order Order of norm
    * @return norm operator
    */
@@ -221,5 +221,5 @@ namespace matx
     auto perm = detail::getPermuteDims<Op::Rank()>(dims);
     auto permop = permute(op, perm);
     return detail::NormOp<Op, detail::NormTypeMatrix>(permop, order);
-  }  
+  }
 } // end namespace matx

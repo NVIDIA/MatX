@@ -78,10 +78,10 @@ private:
 
 template <typename T>
 inline constexpr bool is_dense_solve_supported_type_v =
-    std::is_same_v<T, float> ||
-    std::is_same_v<T, double> ||
-    std::is_same_v<T, cuda::std::complex<float>> ||
-    std::is_same_v<T, cuda::std::complex<double>>;
+    cuda::std::is_same_v<T, float> ||
+    cuda::std::is_same_v<T, double> ||
+    cuda::std::is_same_v<T, cuda::std::complex<float>> ||
+    cuda::std::is_same_v<T, cuda::std::complex<double>>;
 
 template <typename ATensor, typename BTensor>
 static constexpr bool IsDenseSolveVectorRHS()
@@ -108,9 +108,9 @@ __MATX_INLINE__ void ValidateDenseSolve([[maybe_unused]] OutputTensor &&out,
                 "Dense solve B must have rank A.Rank() or A.Rank() - 1");
   static_assert(ORANK == BRANK,
                 "Dense solve output rank must match B rank");
-  static_assert(std::is_same_v<T, typename BTensor_t::value_type>,
+  static_assert(cuda::std::is_same_v<T, typename BTensor_t::value_type>,
                 "Dense solve A and B value types must match");
-  static_assert(std::is_same_v<T, typename OutTensor_t::value_type>,
+  static_assert(cuda::std::is_same_v<T, typename OutTensor_t::value_type>,
                 "Dense solve output value type must match A and B");
   static_assert(is_dense_solve_supported_type_v<T>,
                 "Dense solve supports float, double, complex<float>, and complex<double>");

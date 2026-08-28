@@ -93,7 +93,7 @@ TYPED_TEST(BasicGeneratorTestsFloatNonComplex, Windows)
   MATX_ENTER_HANDLER();
 
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;  
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
   ExecType exec{};
 
   auto pb = std::make_unique<detail::MatXPybind>();
@@ -134,13 +134,13 @@ TYPED_TEST(BasicGeneratorTestsFloatNonComplex, Windows)
   MATX_TEST_ASSERT_COMPARE(pb, ov, "flattop", 0.01);
 
 
-  MATX_EXIT_HANDLER();  
+  MATX_EXIT_HANDLER();
 }
 
 TYPED_TEST(BasicGeneratorTestsAll, Diag)
 {
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;  
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
   ExecType exec{};
 
   MATX_ENTER_HANDLER();
@@ -203,7 +203,7 @@ TYPED_TEST(BasicGeneratorTestsAll, Diag)
       for (int i = 0; i < tdk.Size(0); i++) {
         MATX_ASSERT_EQ(tdk(i), tc(i + 6, i));
       }
-    }    
+    }
 
     {
       auto wide = make_tensor<TestType>({3, 5});
@@ -236,7 +236,7 @@ TYPED_TEST(BasicGeneratorTestsAll, Diag)
 
     // Test with a nested transform. Restrict to floating point types for
     // the convolution
-    if constexpr (std::is_same_v<TestType,float> || std::is_same_v<TestType,double>)
+    if constexpr (cuda::std::is_same_v<TestType,float> || cuda::std::is_same_v<TestType,double>)
     {
       auto delta = make_tensor<TestType>({1});
       delta(0) = static_cast<TestType>(1.0);
@@ -262,8 +262,8 @@ TYPED_TEST(BasicGeneratorTestsFloat, Alternate)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;  
-  ExecType exec{};  
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  ExecType exec{};
 
   // example-begin alternate-gen-test-1
   auto td = make_tensor<TestType>({10});
@@ -285,7 +285,7 @@ TEST(OperatorTests, Kron)
 {
   MATX_ENTER_HANDLER();
 
-  cudaExecutor exec{};    
+  cudaExecutor exec{};
   using dtype = int;
   auto pb = std::make_unique<detail::MatXPybind>();
   pb->InitTVGenerator<dtype>("00_operators", "kron_operator", {});
@@ -305,10 +305,10 @@ TEST(OperatorTests, Kron)
   tensor_t<dtype, 2> ov2({4, 6});
   av.SetVals({{1, 2, 3}, {4, 5, 6}});
 
-  // example-begin ones-gen-test-2 
+  // example-begin ones-gen-test-2
   // Explicit shape specified in ones()
   (ov2 = kron(av, ones({2, 2}))).run(exec);
-  // example-end ones-gen-test-2  
+  // example-end ones-gen-test-2
   exec.sync();
   MATX_TEST_ASSERT_COMPARE(pb, ov2, "rect", 0);
 
@@ -318,8 +318,8 @@ TEST(OperatorTests, Kron)
 TEST(OperatorTests, MeshGrid)
 {
   MATX_ENTER_HANDLER();
-  
-  cudaExecutor exec{};  
+
+  cudaExecutor exec{};
   using dtype = int;
   auto pb = std::make_unique<detail::MatXPybind>();
   constexpr dtype xd = 3;
@@ -351,7 +351,7 @@ TYPED_TEST(BasicGeneratorTestsFloatNonComplex, FFTFreq)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;  
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
   ExecType exec{};
 
   auto pb = std::make_unique<detail::MatXPybind>();
@@ -378,7 +378,7 @@ TYPED_TEST(BasicGeneratorTestsFloatNonComplex, FFTFreq)
   (t1 = fftfreq(t1.Size(0), 0.5)).run(exec);
   // example-end fftfreq-gen-test-2
   exec.sync();
-  MATX_TEST_ASSERT_COMPARE(pb, t1, "F3", 0.1);  
+  MATX_TEST_ASSERT_COMPARE(pb, t1, "F3", 0.1);
 
   MATX_EXIT_HANDLER();
 }
@@ -388,9 +388,9 @@ TYPED_TEST(BasicGeneratorTestsAll, Zeros)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;  
-  ExecType exec{};    
-  // example-begin zeros-gen-test-1    
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  ExecType exec{};
+  // example-begin zeros-gen-test-1
   index_t count = 100;
 
   cuda::std::array<index_t, 1> s({count});
@@ -416,15 +416,15 @@ TYPED_TEST(BasicGeneratorTestsAll, Ones)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;  
-  ExecType exec{};    
-  // example-begin ones-gen-test-1    
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  ExecType exec{};
+  // example-begin ones-gen-test-1
   index_t count = 100;
   cuda::std::array<index_t, 1> s({count});
   auto t1 = make_tensor<TestType>(s);
 
   (t1 = ones<TestType>()).run(exec);
-  // example-end ones-gen-test-1    
+  // example-end ones-gen-test-1
   exec.sync();
 
   for (index_t i = 0; i < count; i++) {
@@ -484,7 +484,7 @@ TYPED_TEST(BasicGeneratorTestsAll, FillNoShape)
   const TestType value = static_cast<TestType>(11);
   // Shapeless fill() broadcasts as a scalar across `src`. The result's
   // shape comes from `src`, so fill needs no shape of its own.
-  if constexpr (std::is_same_v<TestType, bool>) {
+  if constexpr (cuda::std::is_same_v<TestType, bool>) {
     (t1 = src || fill<TestType>(value)).run(exec);
   }
   else {
@@ -931,8 +931,8 @@ TYPED_TEST(BasicGeneratorTestsNumericNonComplex, Range)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;  
-  ExecType exec{};   
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  ExecType exec{};
 
   // example-begin range-gen-test-1
   index_t count = 100;
@@ -940,7 +940,7 @@ TYPED_TEST(BasicGeneratorTestsNumericNonComplex, Range)
 
   // Generate a sequence of 100 numbers starting at 1 and spaced by 1
   (t1 = range<0>(t1.Shape(), static_cast<TestType>(1), static_cast<TestType>(1))).run(exec);
-  // example-end range-gen-test-1  
+  // example-end range-gen-test-1
   exec.sync();
 
   TestType one = 1;
@@ -991,15 +991,15 @@ TYPED_TEST(BasicGeneratorTestsNumericNonComplex, Linspace)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;  
-  ExecType exec{};   
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  ExecType exec{};
 
   {
     // example-begin linspace-gen-test-1
     index_t count = 100;
     auto t1 = make_tensor<TestType>({count});
 
-    // Create a set of linearly-spaced numbers starting at 1, ending at 100, and 
+    // Create a set of linearly-spaced numbers starting at 1, ending at 100, and
     // with `count` points in between
     (t1 = linspace((TestType)1, (TestType)100, count)).run(exec);
     // example-end linspace-gen-test-1
@@ -1048,7 +1048,7 @@ TYPED_TEST(BasicGeneratorTestsNumericNonComplex, Linspace)
         EXPECT_TRUE(MatXUtils::MatXTypeCompare(ls(row, col), expected));
       }
     }
-  }    
+  }
 
   {
     index_t count = 100;
@@ -1160,8 +1160,8 @@ TYPED_TEST(BasicGeneratorTestsFloatNonComplex, Logspace)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;  
-  ExecType exec{};   
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  ExecType exec{};
 
   // example-begin logspace-gen-test-1
   index_t count = 20;
@@ -1244,8 +1244,8 @@ TYPED_TEST(BasicGeneratorTestsNumeric, Eye)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;  
-  ExecType exec{};   
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  ExecType exec{};
 
   // example-begin eye-gen-test-1
   index_t count = 10;
@@ -1308,8 +1308,8 @@ TYPED_TEST(BasicGeneratorTestsNumeric, Diag)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;  
-  ExecType exec{};     
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  ExecType exec{};
   index_t count = 10;
   TestType c = GenerateData<TestType>();
 
@@ -1371,17 +1371,17 @@ TYPED_TEST(BasicGeneratorTestsFloatNonComplexNonHalf, Chirp)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;  
-  ExecType exec{};   
-    
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  ExecType exec{};
+
   index_t count = 1500;
   TestType end = 10;
   TestType f0 = -200;
   TestType f1 = 300;
-  
+
   auto pb = std::make_unique<detail::MatXPybind>();
   pb->template InitAndRunTVGenerator<TestType>(
-      "01_signal", "chirp", "run", {count, static_cast<index_t>(end), static_cast<index_t>(f0), static_cast<index_t>(f1)});  
+      "01_signal", "chirp", "run", {count, static_cast<index_t>(end), static_cast<index_t>(f0), static_cast<index_t>(f1)});
 
   // example-begin chirp-gen-test-1
   auto t1 = make_tensor<TestType>({count});

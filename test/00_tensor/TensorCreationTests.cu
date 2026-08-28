@@ -40,7 +40,7 @@ using namespace matx;
 
 template <typename T> struct TensorCreationTestsData {
   using GTestType = cuda::std::tuple_element_t<0, T>;
-  using GExecType = cuda::std::tuple_element_t<1, T>;     
+  using GExecType = cuda::std::tuple_element_t<1, T>;
   tensor_t<GTestType, 0> t0{{}};
   tensor_t<GTestType, 1> t1{{10}};
   tensor_t<GTestType, 2> t2{{20, 10}};
@@ -97,7 +97,7 @@ TYPED_TEST(TensorCreationTestsAll, MakeShape)
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
-  ExecType exec{};  
+  ExecType exec{};
   auto mt2 = make_tensor<TestType>({2, 2});
   ASSERT_EQ(mt2.Size(0), 2);
   ASSERT_EQ(mt2.Size(1), 2);
@@ -114,7 +114,7 @@ TYPED_TEST(TensorCreationTestsAll, MakeShape)
   ASSERT_EQ(mt4.Size(0), 10);
   ASSERT_EQ(mt4.Size(1), 5);
   ASSERT_EQ(mt4.Size(2), 4);
-  ASSERT_EQ(mt4.Size(3), 3);  
+  ASSERT_EQ(mt4.Size(3), 3);
 }
 
 TYPED_TEST(TensorCreationTestsAll, MakeStaticShape)
@@ -308,7 +308,7 @@ TYPED_TEST(TensorCreationTestsAll, StaticTensorArithmetic)
 
   (a = ones<TestType>()).run(exec);
   (b = ones<TestType>()).run(exec);
-  if constexpr (std::is_same_v<TestType, bool>) {
+  if constexpr (cuda::std::is_same_v<TestType, bool>) {
     (c = a || b).run(exec);
   }
   else {
@@ -316,7 +316,7 @@ TYPED_TEST(TensorCreationTestsAll, StaticTensorArithmetic)
   }
   exec.sync();
 
-  const TestType expected = std::is_same_v<TestType, bool> ? TestType(true) : TestType(2);
+  const TestType expected = cuda::std::is_same_v<TestType, bool> ? TestType(true) : TestType(2);
   for (index_t i = 0; i < 4; i++) {
     ASSERT_EQ(c(i), expected);
   }
@@ -334,7 +334,7 @@ TYPED_TEST(TensorCreationTestsAll, StaticTensorArithmetic2D)
 
   (a = ones<TestType>()).run(exec);
   (b = ones<TestType>()).run(exec);
-  if constexpr (std::is_same_v<TestType, bool>) {
+  if constexpr (cuda::std::is_same_v<TestType, bool>) {
     (c = a || b).run(exec);
   }
   else {
@@ -342,7 +342,7 @@ TYPED_TEST(TensorCreationTestsAll, StaticTensorArithmetic2D)
   }
   exec.sync();
 
-  const TestType expected = std::is_same_v<TestType, bool> ? TestType(true) : TestType(2);
+  const TestType expected = cuda::std::is_same_v<TestType, bool> ? TestType(true) : TestType(2);
   for (index_t i = 0; i < 3; i++) {
     for (index_t j = 0; j < 4; j++) {
       ASSERT_EQ(c(i, j), expected);
@@ -362,7 +362,7 @@ TYPED_TEST(TensorCreationTestsAll, StaticTensorArithmetic3D)
 
   (a = ones<TestType>()).run(exec);
   (b = ones<TestType>()).run(exec);
-  if constexpr (std::is_same_v<TestType, bool>) {
+  if constexpr (cuda::std::is_same_v<TestType, bool>) {
     (c = a || b).run(exec);
   }
   else {
@@ -370,7 +370,7 @@ TYPED_TEST(TensorCreationTestsAll, StaticTensorArithmetic3D)
   }
   exec.sync();
 
-  const TestType expected = std::is_same_v<TestType, bool> ? TestType(true) : TestType(2);
+  const TestType expected = cuda::std::is_same_v<TestType, bool> ? TestType(true) : TestType(2);
   for (index_t i = 0; i < 2; i++) {
     for (index_t j = 0; j < 3; j++) {
       for (index_t k = 0; k < 4; k++) {
@@ -392,7 +392,7 @@ TYPED_TEST(TensorCreationTestsAll, StaticTensorArithmetic4D)
 
   (a = ones<TestType>()).run(exec);
   (b = ones<TestType>()).run(exec);
-  if constexpr (std::is_same_v<TestType, bool>) {
+  if constexpr (cuda::std::is_same_v<TestType, bool>) {
     (c = a || b).run(exec);
   }
   else {
@@ -400,7 +400,7 @@ TYPED_TEST(TensorCreationTestsAll, StaticTensorArithmetic4D)
   }
   exec.sync();
 
-  const TestType expected = std::is_same_v<TestType, bool> ? TestType(true) : TestType(2);
+  const TestType expected = cuda::std::is_same_v<TestType, bool> ? TestType(true) : TestType(2);
   for (index_t i = 0; i < 2; i++) {
     for (index_t j = 0; j < 3; j++) {
       for (index_t k = 0; k < 4; k++) {
@@ -438,7 +438,7 @@ TYPED_TEST(TensorCreationTestsAll, StaticTensorDescriptor)
 
 TEST(TensorCreationTests, CArrayDescriptorConstructors)
 {
-  static_assert(std::is_default_constructible_v<DefaultDescriptor<0>>);
+  static_assert(cuda::std::is_default_constructible_v<DefaultDescriptor<0>>);
 
   index_t shape[2] = {2, 3};
   index_t strides[2] = {3, 1};

@@ -63,7 +63,7 @@ namespace matx
 
         __MATX_INLINE__ auto get_jit_op_str() const {
           std::string func_name = get_jit_class_name();
-          
+
           return cuda::std::make_tuple(
             func_name,
             std::string("template <typename T> struct " + func_name + " {\n") +
@@ -83,7 +83,7 @@ namespace matx
 #endif
 
         __MATX_INLINE__ std::string str() const { return "hamming"; }
-	
+
         inline __MATX_HOST__ __MATX_DEVICE__ Hamming(index_t size) : size_(size){
 #ifndef __CUDA_ARCH__
           MATX_LOG_TRACE("Hamming constructor: size={}", size);
@@ -91,12 +91,12 @@ namespace matx
         };
 
         template <typename CapType>
-        inline __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const 
+        inline __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
         {
           return detail::ApplyGeneratorVecFunc<CapType, T>([this](index_t idx) { return T(.54) - T(.46) * cuda::std::cos(T(2 * M_PI) * T(idx) / T(size_ - 1)); }, i);
         }
 
-        inline __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const 
+        inline __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
         {
           return this->operator()<DefaultCapabilities>(i);
         }
@@ -162,7 +162,7 @@ namespace matx
     requires (!cuda::std::is_array_v<remove_cvref_t<ShapeType>>)
   inline auto hamming(ShapeType &&s)
              {
-               constexpr int RANK = cuda::std::tuple_size<std::decay_t<ShapeType>>::value;
+               constexpr int RANK = cuda::std::tuple_size<cuda::std::decay_t<ShapeType>>::value;
                static_assert(RANK > Dim);
                detail::Hamming<T> h( *(s.begin() + Dim));
                return detail::matxGenerator1D_t<detail::Hamming<T>, Dim, ShapeType>(std::forward<ShapeType>(s), h);

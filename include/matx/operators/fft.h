@@ -44,7 +44,7 @@
 #include "matx/transforms/fft/fft_cuda.h"
 #ifdef MATX_EN_CPU_FFT
   #include "matx/transforms/fft/fft_fftw.h"
-#endif  
+#endif
 
 #if defined(MATX_EN_MATHDX) && defined (__CUDACC__)
   #include "cuComplex.h"
@@ -64,8 +64,8 @@ namespace matx
         PermDims perm_;
         FFTNorm norm_;
         cuda::std::array<index_t, OpA::Rank()> out_dims_;
-        using ttype = std::conditional_t<is_complex_v<typename OpA::value_type>, 
-                                          typename OpA::value_type, 
+        using ttype = cuda::std::conditional_t<is_complex_v<typename OpA::value_type>,
+                                          typename OpA::value_type,
                                           typename scalar_to_complex<typename OpA::value_type>::ctype>;
         // This should be tensor_impl_t, but need to work around issues with temp types returned in fft
         mutable detail::tensor_impl_t<ttype, OpA::Rank()> tmp_out_;
@@ -78,7 +78,7 @@ namespace matx
       public:
         using matxop = bool;
         using input_type = typename OpA::value_type;
-        using value_type = std::conditional_t<is_complex_v<input_type>,
+        using value_type = cuda::std::conditional_t<is_complex_v<input_type>,
           input_type,
           typename scalar_to_complex<input_type>::ctype>;
         using matx_transform_op = bool;
@@ -98,9 +98,9 @@ namespace matx
         JIT_Storage ToJITStorage() const {
           return JIT_Storage{detail::to_jit_storage(a_)};
         }
-#endif             
-        
-        __MATX_INLINE__ std::string str() const { 
+#endif
+
+        __MATX_INLINE__ std::string str() const {
           if constexpr (Direction == detail::FFTDirection::FORWARD) {
             return "fft(" + get_type_str(a_) + ")";
           }
@@ -121,7 +121,7 @@ namespace matx
 
           if (fft_size_ != 0) {
             if constexpr (Type == detail::FFTType::C2C) {
-              if constexpr (std::is_same_v<PermDims, no_permute_t>) {
+              if constexpr (cuda::std::is_same_v<PermDims, no_permute_t>) {
                 out_dims_[rt_rank - 1] = fft_size_;
               }
               else {
@@ -130,7 +130,7 @@ namespace matx
             }
             else if constexpr (Type == detail::FFTType::R2C) {
               // R2C transforms pack the results in fft_size_/2 + 1 complex elements
-              if constexpr (std::is_same_v<PermDims, no_permute_t>) {
+              if constexpr (cuda::std::is_same_v<PermDims, no_permute_t>) {
                 out_dims_[rt_rank - 1] = fft_size_ / 2 + 1;
               }
               else {
@@ -138,7 +138,7 @@ namespace matx
               }
             }
             else {
-              if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
+              if constexpr (!cuda::std::is_same_v<PermDims, no_permute_t>) {
                 out_dims_[perm_[rt_rank-1]] = 2 * (fft_size_ - 1);
               }
               else {
@@ -158,14 +158,14 @@ namespace matx
             // create a temporary, then this will be a C2C transform and the output length
             // will match the input length.
             if constexpr (Type == detail::FFTType::C2C) {
-              if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
+              if constexpr (!cuda::std::is_same_v<PermDims, no_permute_t>) {
                 fft_size_ = a.Size(perm_[rt_rank-1]);
               } else {
                 fft_size_ = a.Size(rt_rank - 1);
               }
             }
             else if constexpr (Type == detail::FFTType::R2C) { // R2C is N/2+1
-              if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
+              if constexpr (!cuda::std::is_same_v<PermDims, no_permute_t>) {
                 out_dims_[perm_[rt_rank-1]] = out_dims_[perm_[rt_rank-1]] / 2 + 1;
               }
               else {
@@ -174,7 +174,7 @@ namespace matx
             }
             else {
               // C2R is 2*(N-1) unless overridden
-              if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
+              if constexpr (!cuda::std::is_same_v<PermDims, no_permute_t>) {
                 out_dims_[perm_[rt_rank-1]] = 2 * (out_dims_[perm_[rt_rank-1]] - 1);
               }
               else {
@@ -189,7 +189,7 @@ namespace matx
             dx_fft_helper_.set_fft_type(DeduceFFTTransformType<typename scalar_to_complex<typename OpA::value_type>::ctype, value_type>());
             dx_fft_helper_.set_direction(Direction);
             dx_fft_helper_.set_cc(cc);
-            dx_fft_helper_.set_method(cuFFTDxMethod::SHARED);           
+            dx_fft_helper_.set_method(cuFFTDxMethod::SHARED);
 
             bool contiguous = false;
             if constexpr (is_tensor_view_v<OpA>) {
@@ -227,7 +227,7 @@ namespace matx
                  "  using value_type = cuda::std::conditional_t<is_complex_v<input_type>, input_type, typename scalar_to_complex<input_type>::ctype>;\n" +
                  "  typename detail::inner_storage_or_self_t<detail::base_type_t<OpA>> a_;\n" +
                  "  constexpr static cuda::std::array<index_t, " + std::to_string(actual_rank) + "> out_dims_ = { " +
-                 detail::array_to_string(out_dims_, actual_rank) + " };\n" +             
+                 detail::array_to_string(out_dims_, actual_rank) + " };\n" +
                  "  template <typename CapType, typename... Is>\n" +
                  "  __MATX_INLINE__ __MATX_DEVICE__  decltype(auto) operator()(Is... indices) const\n" +
                  "  {\n" +
@@ -243,7 +243,7 @@ namespace matx
                  "  }\n" +
                  "};\n")
           );
-        }     
+        }
 #endif
 
         template <typename CapType, typename... Is>
@@ -289,24 +289,24 @@ namespace matx
             bool supported = true;
             if (!dx_fft_helper_.template CheckJITSizeAndTypeRequirements<OpA>()) {
               supported = false;
-            } 
+            }
             else {
               supported = dx_fft_helper_.IsSupported();
             }
 
             auto result = combine_capabilities<Cap>(supported, detail::get_operator_capability<Cap>(a_, in));
             MATX_LOG_DEBUG("SUPPORTS_JIT: {}", result);
-            return result;      
+            return result;
           }
           else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
             // Get the capability string and add to map
             const auto [key, value] = get_jit_op_str();
-      
+
             // Insert into the map if the key doesn't exist
             if (in.find(key) == in.end()) {
               in[key] = value;
             }
-            
+
             // Also handle child operators
             detail::get_operator_capability<Cap>(a_, in);
 
@@ -331,7 +331,7 @@ namespace matx
                 const auto my_cap = cuda::std::array<ElementsPerThread, 2>{ElementsPerThread::INVALID, ElementsPerThread::INVALID};
                 auto result = combine_capabilities<Cap>(my_cap, detail::get_operator_capability<Cap>(a_, in));
                 MATX_LOG_DEBUG("ELEMENTS_PER_THREAD (JIT unsupported): [{},{}]", static_cast<int>(result[0]), static_cast<int>(result[1]));
-                return result;                
+                return result;
               }
             }
             else {
@@ -358,7 +358,7 @@ namespace matx
             else {
               ffts_per_block_candidate = 1;
             }
-            
+
             cuda::std::array<int, 2> groups_per_block = {1, ffts_per_block_candidate};
             auto result = combine_capabilities<Cap>(groups_per_block, detail::get_operator_capability<Cap>(a_, in));
             MATX_LOG_DEBUG("GROUPS_PER_BLOCK: [{},{}]", result[0], result[1]);
@@ -372,7 +372,7 @@ namespace matx
           }
           else if constexpr (Cap == OperatorCapability::GLOBAL_KERNEL) {
             // If MathDx is enabled we always return false. Other checks on size and type may prevent JIT compilation.
-            MATX_LOG_DEBUG("GLOBAL_KERNEL: false");            
+            MATX_LOG_DEBUG("GLOBAL_KERNEL: false");
             return false;
           }
           else if constexpr (Cap == OperatorCapability::SET_GROUPS_PER_BLOCK) {
@@ -389,11 +389,11 @@ namespace matx
           }
           else if constexpr (Cap == OperatorCapability::GENERATE_LTOIR) {
             auto result = combine_capabilities<Cap>(
-                dx_fft_helper_.GenerateLTOIR(in.ltoir_symbols), 
+                dx_fft_helper_.GenerateLTOIR(in.ltoir_symbols),
                 detail::get_operator_capability<Cap>(a_, in));
             MATX_LOG_DEBUG("GENERATE_LTOIR: {}", result);
             return result;
-          }    
+          }
           else if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
             // No need to use combine_capabilities here since we're just returning a string.
             const auto inner_op_jit_name = detail::get_operator_capability<Cap>(a_, in);
@@ -402,7 +402,7 @@ namespace matx
             return result;
           }
           else if constexpr (Cap == OperatorCapability::ASYNC_LOADS_REQUESTED) {
-            // If this is a contiguous tensor input we want to do an async load so that we decrease register pressure. 
+            // If this is a contiguous tensor input we want to do an async load so that we decrease register pressure.
             // and increase bandwidth on newer architectures
             bool async_loads_requested = false;
             if constexpr (is_tensor_view_v<OpA>) {
@@ -425,15 +425,15 @@ namespace matx
             bool supported = false;
             auto result = combine_capabilities<Cap>(supported, detail::get_operator_capability<Cap>(a_, in));
             MATX_LOG_DEBUG("SUPPORTS_JIT (no cuFFTDx): {}", result);
-            return result;      
-          } 
+            return result;
+          }
           else if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
             MATX_LOG_DEBUG("JIT_TYPE_QUERY (no cuFFTDx): \"\"");
             return "";
           }
           else if constexpr (Cap == OperatorCapability::ALIASED_MEMORY) {
             MATX_LOG_DEBUG("ALIASED_MEMORY (no cuFFTDx): false");
-            // FFTs with cuFFT cannot have aliased memory errors since they allow the same input and output. Do not 
+            // FFTs with cuFFT cannot have aliased memory errors since they allow the same input and output. Do not
             // pass this property on to the child operators.
             return false;
           }
@@ -450,7 +450,7 @@ namespace matx
 
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
-          if constexpr (std::is_same_v<PermDims, no_permute_t>) {
+          if constexpr (cuda::std::is_same_v<PermDims, no_permute_t>) {
             if constexpr (Direction == detail::FFTDirection::FORWARD) {
               fft_impl(cuda::std::get<0>(out), a_, fft_size_, norm_, ex);
             }
@@ -480,7 +480,7 @@ namespace matx
                 ifft_impl(permute(tout, perm_), permute(a_, perm_), fft_size_, norm_, ex);
               }
             }
-          }        
+          }
         }
 
         template <typename ShapeType, typename Executor>
@@ -488,8 +488,8 @@ namespace matx
         {
           if constexpr (is_matx_op<OpA>()) {
             a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-          }         
-        }      
+          }
+        }
 
         template <typename ShapeType, typename Executor>
         __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
@@ -498,9 +498,9 @@ namespace matx
             return;
           }
 
-          InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));  
+          InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
 
-          detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);         
+          detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
           prerun_done_ = true;
           Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
         }
@@ -526,7 +526,7 @@ namespace matx
    * Creates a new FFT plan in the cache if none exists, and uses that to execute
    * the 1D FFT. Note that FFTs and IFFTs share the same plans if all dimensions
    * match
-   * Note: fft_size must be unsigned so that the axis overload does not match both 
+   * Note: fft_size must be unsigned so that the axis overload does not match both
    * prototypes with index_t. However, the value of fft_size must still fit into an index_t.
    *
    * @tparam OpA
@@ -547,7 +547,7 @@ namespace matx
                     "Distributed FFT requires a batch dimension followed by "
                     "the transform dimension");
       using input_type = typename remove_cvref_t<OpA>::value_type;
-      using output_type = std::conditional_t<
+      using output_type = cuda::std::conditional_t<
           is_complex_v<input_type>, input_type,
           typename detail::scalar_to_complex<input_type>::ctype>;
       auto local_fft = [fft_size_, norm](const auto &local_a) {
@@ -574,7 +574,7 @@ namespace matx
    * Creates a new FFT plan in the cache if none exists, and uses that to execute
    * the 1D FFT. Note that FFTs and IFFTs share the same plans if all dimensions
    * match
-   * Note: fft_size must be unsigned so that the axis overload does not match both 
+   * Note: fft_size must be unsigned so that the axis overload does not match both
    * prototypes with index_t. However, the value of fft_size must still fit into an index_t.
    *
    * @tparam OpA
@@ -625,7 +625,7 @@ namespace matx
      const index_t fft_size_ = static_cast<index_t>(fft_size);
      return detail::FFTOp<OpA, detail::no_permute_t, detail::FFTDirection::FORWARD, detail::FFTType::R2C>(a, fft_size_, detail::no_permute_t{}, norm);
    }
- 
+
    /**
     * R2C FFT
     *
@@ -654,7 +654,7 @@ namespace matx
        const index_t fft_size_ = static_cast<index_t>(fft_size);
        return detail::FFTOp<OpA, decltype(perm), detail::FFTDirection::FORWARD, detail::FFTType::R2C>(a, fft_size_, perm, norm);
      }
-   }  
+   }
 
   /**
    * Run a 1D IFFT with a cached plan
@@ -665,8 +665,8 @@ namespace matx
    *
    * @tparam OpA
    *   Input tensor or operator type
-   * 
-   * Note: fft_size must be unsigned so that the axis overload does not match both 
+   *
+   * Note: fft_size must be unsigned so that the axis overload does not match both
    * prototypes with index_t. However, the value of fft_size must still fit into an index_t.
    * @param a
    *   input tensor or operator
@@ -687,7 +687,7 @@ namespace matx
    * Creates a new FFT Iplan in the cache if none exists, and uses that to execute
    * the 1D IFFT. Note that FFTs and IFFTs share the same plans if all dimensions
    * match
-   * Note: fft_size must be unsigned so that the axis overload does not match both 
+   * Note: fft_size must be unsigned so that the axis overload does not match both
    * prototypes with index_t. However, the value of fft_size must still fit into an index_t.
    *
    * @tparam OpA
@@ -721,8 +721,8 @@ namespace matx
    *
    * @tparam OpA
    *   Input tensor or operator type
-   * 
-   * Note: fft_size must be unsigned so that the axis overload does not match both 
+   *
+   * Note: fft_size must be unsigned so that the axis overload does not match both
    * prototypes with index_t. However, the value of fft_size must still fit into an index_t.
    * @param a
    *   input tensor or operator
@@ -736,7 +736,7 @@ namespace matx
      const index_t fft_size_ = static_cast<index_t>(fft_size);
      return detail::FFTOp<OpA, detail::no_permute_t, detail::FFTDirection::BACKWARD, detail::FFTType::C2R>(a, fft_size_, detail::no_permute_t{} , norm);
    }
- 
+
    /**
     * C2R inverse FFT
     *
@@ -764,7 +764,7 @@ namespace matx
        const index_t fft_size_ = static_cast<index_t>(fft_size);
        return detail::FFTOp<OpA, decltype(perm), detail::FFTDirection::BACKWARD, detail::FFTType::C2R>(a, fft_size_, perm, norm);
      }
-   }    
+   }
 
 
   namespace detail {
@@ -776,13 +776,13 @@ namespace matx
         PermDims perm_;
         FFTNorm norm_;
         cuda::std::array<index_t, OpA::Rank()> out_dims_;
-        using ttype = std::conditional_t<is_complex_v<typename OpA::value_type>, 
-                                          typename OpA::value_type, 
+        using ttype = cuda::std::conditional_t<is_complex_v<typename OpA::value_type>,
+                                          typename OpA::value_type,
                                           typename scalar_to_complex<typename OpA::value_type>::ctype>;
         // This should be tensor_impl_t, but need to work around issues with temp types returned in fft
-        mutable detail::tensor_impl_t<ttype, OpA::Rank()> tmp_out_; 
+        mutable detail::tensor_impl_t<ttype, OpA::Rank()> tmp_out_;
         mutable ttype *ptr = nullptr;
-        mutable bool prerun_done_ = false;                                                
+        mutable bool prerun_done_ = false;
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
         mutable cuFFTDx2DHelper<typename OpA::value_type> dx_fft2_helper_;
         bool jit_axes_supported_ = true;
@@ -809,7 +809,7 @@ namespace matx
         }
 #endif
 
-        __MATX_INLINE__ std::string str() const { 
+        __MATX_INLINE__ std::string str() const {
           if constexpr (Direction == detail::FFTDirection::FORWARD) {
             return "fft2(" + get_type_str(a_) + ")";
           }
@@ -825,13 +825,13 @@ namespace matx
           }
 
           if constexpr (Type == detail::FFTType::C2C) {
-            if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
+            if constexpr (!cuda::std::is_same_v<PermDims, no_permute_t>) {
               out_dims_[perm_[0]] = out_dims_[perm_[0]];
               out_dims_[perm_[1]] = out_dims_[perm_[1]];
             }
           }
           else if constexpr (Type == detail::FFTType::R2C) {
-            if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
+            if constexpr (!cuda::std::is_same_v<PermDims, no_permute_t>) {
               out_dims_[perm_[0]] = out_dims_[perm_[0]] / 2 + 1;
               out_dims_[perm_[1]] = out_dims_[perm_[1]];
             }
@@ -841,7 +841,7 @@ namespace matx
             }
           }
           else {
-            if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
+            if constexpr (!cuda::std::is_same_v<PermDims, no_permute_t>) {
               out_dims_[perm_[0]] = 2 * (out_dims_[perm_[0]] - 1);
               out_dims_[perm_[1]] = out_dims_[perm_[1]];
             }
@@ -852,7 +852,7 @@ namespace matx
           }
 
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
-          if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
+          if constexpr (!cuda::std::is_same_v<PermDims, no_permute_t>) {
             for (int32_t i = 0; i < Rank(); i++) {
               if (perm_[static_cast<size_t>(i)] != i) {
                 jit_axes_supported_ = false;
@@ -943,7 +943,7 @@ namespace matx
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
           return tmp_out_.template operator()<DefaultCapabilities>(indices...);
-        }        
+        }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank() {
           return OpA::Rank();
@@ -965,8 +965,8 @@ namespace matx
 
         template <typename Out, typename Executor>
         void Exec(Out &&out, Executor &&ex) const {
-          if constexpr (std::is_same_v<PermDims, no_permute_t>) {
-            if constexpr (Direction == detail::FFTDirection::FORWARD) { 
+          if constexpr (cuda::std::is_same_v<PermDims, no_permute_t>) {
+            if constexpr (Direction == detail::FFTDirection::FORWARD) {
               fft2_impl(cuda::std::get<0>(out), a_, norm_, ex);
             }
             else {
@@ -1144,8 +1144,8 @@ namespace matx
         {
           if constexpr (is_matx_op<OpA>()) {
             a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-          }         
-        }      
+          }
+        }
 
         template <typename ShapeType, typename Executor>
         __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
@@ -1154,9 +1154,9 @@ namespace matx
             return;
           }
 
-          InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));  
+          InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
 
-          detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);          
+          detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
 
           prerun_done_ = true;
           Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
@@ -1172,8 +1172,8 @@ namespace matx
           matxFree(ptr);
           ptr = nullptr;
           prerun_done_ = false;
-        }    
-    };    
+        }
+    };
   }
 
 /**
@@ -1215,7 +1215,7 @@ namespace matx
   template<typename OpA>
   __MATX_INLINE__ auto fft2(const OpA &a, const int32_t (&axis)[2], FFTNorm norm = FFTNorm::BACKWARD) {
     constexpr auto fft_type = detail::ComplexInType<OpA>();
-    auto perm = detail::getPermuteDims<remove_cvref_t<OpA>::Rank()>(axis);  
+    auto perm = detail::getPermuteDims<remove_cvref_t<OpA>::Rank()>(axis);
     return detail::FFT2Op<OpA, decltype(perm), detail::FFTDirection::FORWARD, fft_type>(a, perm, norm);
   }
 
@@ -1258,9 +1258,9 @@ namespace matx
   template<typename OpA>
   __MATX_INLINE__ auto ifft2(const OpA &a, const int32_t (&axis)[2], FFTNorm norm = FFTNorm::BACKWARD) {
     constexpr auto fft_type = detail::ComplexInType<OpA>();
-    auto perm = detail::getPermuteDims<remove_cvref_t<OpA>::Rank()>(axis);  
+    auto perm = detail::getPermuteDims<remove_cvref_t<OpA>::Rank()>(axis);
     return detail::FFT2Op<OpA, decltype(perm), detail::FFTDirection::BACKWARD, fft_type>(a, perm, norm);
-  }  
+  }
 
 
   /**

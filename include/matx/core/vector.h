@@ -151,7 +151,7 @@ struct is_vector<T, cuda::std::void_t<typename T::matx_vec>>
 
 
 template< class T >
-inline constexpr bool is_vector_v = detail::is_vector<typename remove_cvref<T>::type>::value;
+inline constexpr bool is_vector_v = detail::is_vector<remove_cvref_t<T>>::value;
 
 
 

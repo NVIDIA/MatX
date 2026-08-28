@@ -83,7 +83,7 @@ __MATX_INLINE__ auto getEinsumSupportedTensor( const Op &in, cudaStream_t stream
       return true;
     }
   };
-  
+
   return GetSupportedTensor(in, support_func, MATX_ASYNC_DEVICE_MEMORY, stream);
 }
 
@@ -309,7 +309,7 @@ public:
 
   /**
    * @brief Splits a string on "," into a vector of substrings
-   * 
+   *
    * @param str string to split
    * @param out vector to append each comma-separated substring to
    */
@@ -330,7 +330,7 @@ public:
 
   /**
    * @brief Infers the output subscript for implicit mode einsum without "->"
-   * 
+   *
    * If any input token contains a broadcast ellipsis ("..."), it represents
    * the other remaining dimensions
    */
@@ -345,7 +345,7 @@ public:
       has_ellipsis = has_ellipsis || (epos != std::string::npos);
 
       for (size_t pos = 0; pos < tok.size(); pos++){
-        if (epos != std::string::npos 
+        if (epos != std::string::npos
         && pos >= epos
         && pos < epos +3){
           continue;
@@ -355,14 +355,14 @@ public:
     }
 
     std::string implicit_out = has_ellipsis ? "..." : "";
-    
+
     for (int32_t c=0; c< 256; c++){
       if (counts[c]==1){
         implicit_out.push_back(static_cast<char>(c));
       }
     }
     return implicit_out;
- 
+
   }
 
   /**
@@ -371,7 +371,7 @@ public:
    * Supports both explicit mode, where subscripts contain "->", and
    * implicit mode (no "->"), where the output subscript is inferred using NumPy's
    * implicit-output rule. See InferImplicitOutput().
-   * 
+   *
    * @param str einsum string
    * @param out tokenized vector
    * @return true if tokenized successfully, or false otherwise
@@ -392,7 +392,7 @@ public:
     }
 
     SplitOnCommas(str.substr(0, iout), out);
-    
+
     // Nothing after the output separator -> indicates this is a 0D output
     out.push_back(str.substr(iout + 2));
 
@@ -416,10 +416,10 @@ public:
     }
   return pos;
 }
- 
+
 /**
  * @brief Returns how many tensor dimensions are represented by "..."
- * 
+ *
  * @param token subscript token for one einsum operand
  * @param rank number of dimensions in that operand's tensor
  * @return number of dimensions "..." represents for this operand
@@ -433,9 +433,9 @@ public:
     if (epos == std::string::npos){
       return 0;
     }
-    
-  
-    auto ellipsis_rank = rank - static_cast<int32_t>(token.length() - 3); 
+
+
+    auto ellipsis_rank = rank - static_cast<int32_t>(token.length() - 3);
     MATX_ASSERT_STR(ellipsis_rank >=0,
       matxInvalidDim,
       "einsum operand rank is too small for the explicit subscripts given alongside \"...\""
@@ -487,7 +487,7 @@ public:
         modes_out.push_back(static_cast<int32_t>(c));
       }
     }
-  
+
   static EinsumParams_t<InT...> GetEinsumParams(OutputTensor &out, const std::string &subscripts, const InT&... tensors)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
@@ -515,12 +515,13 @@ public:
         i++;
         return ok;
     };
+    (void)check_rank;
 
     MATX_ASSERT_STR(
     (check_rank(tokens[i], tensors.Rank()) && ...),
     matxInvalidDim,
     "Tensor rank must match number of einsum subscripts");
-    
+
     i = 0;
     int32_t max_ellipsis_rank = 0;
 
@@ -535,11 +536,11 @@ public:
     // Ellipsis-covered batch dimensions must match exactly across every operand
     // cuTensorNet requires tensors share the same modeID to have identical dimension
     // size. Therefore, MatX does not support NumPy-style size-1 broadcasting for
-    // "..." batch dimensions. 
-    
+    // "..." batch dimensions.
+
     if (max_ellipsis_rank > 0) {
       std::vector<int64_t> ellipsis_sizes(max_ellipsis_rank, -1);
-      
+
       i = 0;
       auto check_ellipsis_sizes = [&](const auto &t, const std::string &tok) {
         auto epos = FindEllipsis(tok);
@@ -573,7 +574,7 @@ public:
     };
     (expand_modes(tokens[i], tensors.Rank(), params.modes_[i]), ...);
     ExpandTokenModes(tokens[sizeof...(InT)], out.Rank(), params.modes_[sizeof...(InT)]); // output tensor
-  
+
 
     auto set_sizes = [](auto &t, std::vector<int64_t> &sizes) {
       for (int32_t s = 0; s < t.Rank(); s++) {
@@ -777,9 +778,9 @@ namespace cutensor {
       detail::cutensor::EinsumParamsKeyEq<decltype(detail::cutensor::getEinsumSupportedTensor(tensors, stream))...>
     >;
 
-    detail::assign_tuple_tensors<0, cudaStream_t>(stream, in_t, tensors...); 
+    detail::assign_tuple_tensors<0, cudaStream_t>(stream, in_t, tensors...);
 
-    using cache_val_type = matx::detail::cutensor::matxEinsumHandle_t<decltype(out_n), 
+    using cache_val_type = matx::detail::cutensor::matxEinsumHandle_t<decltype(out_n),
             decltype(detail::cutensor::getEinsumSupportedTensor(tensors, stream))...>;
 
     // Get parameters required by these tensors
@@ -788,7 +789,7 @@ namespace cutensor {
             return cache_val_type::GetEinsumParams(out_n, subscripts, args...);
         },
         in_t
-    );    
+    );
 
     params.stream = stream;
 

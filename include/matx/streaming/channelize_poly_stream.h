@@ -234,7 +234,7 @@ public:
   index_t feed(const InOp &new_samples, OutTensor &out)
   {
     static_assert(InOp::Rank() == 1, "ChannelizePolyStream::feed expects a 1D segment");
-    static_assert(std::is_same_v<typename InOp::value_type, InType>,
+    static_assert(cuda::std::is_same_v<typename InOp::value_type, InType>,
         "ChannelizePolyStream::feed: input operator value_type must match the stream's "
         "InType (wrap the input in an explicit cast operator to convert)");
     static_assert(OutTensor::Rank() == 2, "ChannelizePolyStream::feed expects a 2D [blocks, M] output");

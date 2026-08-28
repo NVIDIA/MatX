@@ -127,10 +127,10 @@ public:
 
     // Type checks
     MATX_STATIC_ASSERT_STR(!is_half_v<T1>, matxInvalidType, "SVD solver does not support half precision");
-    MATX_STATIC_ASSERT_STR((std::is_same_v<T1, T2>), matxInavlidType, "A and U types must match");
-    MATX_STATIC_ASSERT_STR((std::is_same_v<T1, T4>), matxInavlidType, "A and VT types must match");
+    MATX_STATIC_ASSERT_STR((cuda::std::is_same_v<T1, T2>), matxInavlidType, "A and U types must match");
+    MATX_STATIC_ASSERT_STR((cuda::std::is_same_v<T1, T4>), matxInavlidType, "A and VT types must match");
     MATX_STATIC_ASSERT_STR(!is_complex_v<T3>, matxInvalidType, "S type must be real");
-    MATX_STATIC_ASSERT_STR((std::is_same_v<typename inner_op_type_t<T1>::type, T3>), matxInvalidType, "A and S inner types must match");
+    MATX_STATIC_ASSERT_STR((cuda::std::is_same_v<typename inner_op_type_t<T1>::type, T3>), matxInvalidType, "A and S inner types must match");
 
     params = GetSVDParams(u, s, vt, a, jobz, algo);
     this->GetWorkspaceSize();
@@ -168,10 +168,10 @@ public:
       // Due to a LAPACK bug which gives incorrect workspace size calculations for single-precision
       // routines at large matrix sizes from to float-to-int conversions, should use double-precision
       // for the query. Only an issue in routines which may need O(n^2) memory.
-      using WorkQuery = std::conditional_t<std::is_same_v<T1, float>, double,
-                          std::conditional_t<std::is_same_v<T1, cuda::std::complex<float>>,
+      using WorkQuery = cuda::std::conditional_t<cuda::std::is_same_v<T1, float>, double,
+                          cuda::std::conditional_t<cuda::std::is_same_v<T1, cuda::std::complex<float>>,
                                             cuda::std::complex<double>, T1>>;
-      using RworkQuery = std::conditional_t<std::is_same_v<T3, float>, double, T3>;
+      using RworkQuery = cuda::std::conditional_t<cuda::std::is_same_v<T3, float>, double, T3>;
       WorkQuery work_query;
 
       gesdd_dispatch<WorkQuery, RworkQuery>("A", &params.m, &params.n, nullptr, &params.m, nullptr,
@@ -309,13 +309,13 @@ private:
   {
     // TODO: remove warning suppression once gesvd is optimized in NVPL LAPACK
 MATX_IGNORE_WARNING_PUSH_GCC("-Wdeprecated-declarations")
-    if constexpr (std::is_same_v<T1, float>) {
+    if constexpr (cuda::std::is_same_v<T1, float>) {
       LAPACK_CALL(sgesvd)(jobu, jobvt, m, n, a, lda, s, u, ldu, vt, ldvt, work_in, lwork_in, info);
-    } else if constexpr (std::is_same_v<T1, double>) {
+    } else if constexpr (cuda::std::is_same_v<T1, double>) {
       LAPACK_CALL(dgesvd)(jobu, jobvt, m, n, a, lda, s, u, ldu, vt, ldvt, work_in, lwork_in, info);
-    } else if constexpr (std::is_same_v<T1, cuda::std::complex<float>>) {
+    } else if constexpr (cuda::std::is_same_v<T1, cuda::std::complex<float>>) {
       LAPACK_CALL(cgesvd)(jobu, jobvt, m, n, a, lda, s, u, ldu, vt, ldvt, work_in, lwork_in, rwork_in, info);
-    } else if constexpr (std::is_same_v<T1, cuda::std::complex<double>>) {
+    } else if constexpr (cuda::std::is_same_v<T1, cuda::std::complex<double>>) {
       LAPACK_CALL(zgesvd)(jobu, jobvt, m, n, a, lda, s, u, ldu, vt, ldvt, work_in, lwork_in, rwork_in, info);
     }
 MATX_IGNORE_WARNING_POP_GCC
@@ -330,13 +330,13 @@ MATX_IGNORE_WARNING_POP_GCC
                       T *vt, const lapack_int_t *ldvt, T *work_in, const lapack_int_t *lwork_in,
                       [[maybe_unused]] S *rwork_in, lapack_int_t *iwork_in, lapack_int_t *info)
   {
-    if constexpr (std::is_same_v<T, float>) {
+    if constexpr (cuda::std::is_same_v<T, float>) {
       LAPACK_CALL(sgesdd)(jobz, m, n, a, lda, s, u, ldu, vt, ldvt, work_in, lwork_in, iwork_in, info);
-    } else if constexpr (std::is_same_v<T, double>) {
+    } else if constexpr (cuda::std::is_same_v<T, double>) {
       LAPACK_CALL(dgesdd)(jobz, m, n, a, lda, s, u, ldu, vt, ldvt, work_in, lwork_in, iwork_in, info);
-    } else if constexpr (std::is_same_v<T, cuda::std::complex<float>>) {
+    } else if constexpr (cuda::std::is_same_v<T, cuda::std::complex<float>>) {
       LAPACK_CALL(cgesdd)(jobz, m, n, a, lda, s, u, ldu, vt, ldvt, work_in, lwork_in, rwork_in, iwork_in, info);
-    } else if constexpr (std::is_same_v<T, cuda::std::complex<double>>)  {
+    } else if constexpr (cuda::std::is_same_v<T, cuda::std::complex<double>>)  {
       LAPACK_CALL(zgesdd)(jobz, m, n, a, lda, s, u, ldu, vt, ldvt, work_in, lwork_in, rwork_in, iwork_in, info);
     }
   }

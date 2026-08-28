@@ -77,7 +77,7 @@ namespace matx
 
         __MATX_INLINE__ auto get_jit_op_str() const {
           std::string func_name = get_jit_class_name();
-          
+
           return cuda::std::make_tuple(
             func_name,
             std::format("template <typename Op> struct {} {{\n"
@@ -206,7 +206,7 @@ namespace matx
 
 #ifndef DOXYGEN_ONLY
   template <typename Op, typename... Is>
-    requires ((std::is_integral_v<Is>) && ...)
+    requires ((cuda::std::is_integral_v<Is>) && ...)
 #else
   template <typename Op, typename... Is>
 #endif

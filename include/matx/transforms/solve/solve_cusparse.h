@@ -59,16 +59,16 @@ inline void SolveTridiagonalSystem(int m, int n, VAL *dl, VAL *dm, VAL *du,
   size_t workspaceSize = 0;
   void *workspace = nullptr;
 
-  if constexpr (std::is_same_v<VAL, float>) {
+  if constexpr (cuda::std::is_same_v<VAL, float>) {
     ret = cusparseSgtsv2_bufferSizeExt(handle, m, n, dl, dm, du, x, /*ldb*/ m,
                                        &workspaceSize);
-  } else if constexpr (std::is_same_v<VAL, double>) {
+  } else if constexpr (cuda::std::is_same_v<VAL, double>) {
     ret = cusparseDgtsv2_bufferSizeExt(handle, m, n, dl, dm, du, x, /*ldb*/ m,
                                        &workspaceSize);
-  } else if constexpr (std::is_same_v<VAL, cuFloatComplex>) {
+  } else if constexpr (cuda::std::is_same_v<VAL, cuFloatComplex>) {
     ret = cusparseCgtsv2_bufferSizeExt(handle, m, n, dl, dm, du, x, /*ldb*/ m,
                                        &workspaceSize);
-  } else if constexpr (std::is_same_v<VAL, cuDoubleComplex>) {
+  } else if constexpr (cuda::std::is_same_v<VAL, cuDoubleComplex>) {
     ret = cusparseZgtsv2_bufferSizeExt(handle, m, n, dl, dm, du, x, /*ldb*/ m,
                                        &workspaceSize);
   } else {
@@ -78,13 +78,13 @@ inline void SolveTridiagonalSystem(int m, int n, VAL *dl, VAL *dm, VAL *du,
 
   matxAlloc((void **)&workspace, workspaceSize, MATX_DEVICE_MEMORY, stream);
 
-  if constexpr (std::is_same_v<VAL, float>) {
+  if constexpr (cuda::std::is_same_v<VAL, float>) {
     ret = cusparseSgtsv2(handle, m, n, dl, dm, du, x, /*ldb*/ m, workspace);
-  } else if constexpr (std::is_same_v<VAL, double>) {
+  } else if constexpr (cuda::std::is_same_v<VAL, double>) {
     ret = cusparseDgtsv2(handle, m, n, dl, dm, du, x, /*ldb*/ m, workspace);
-  } else if constexpr (std::is_same_v<VAL, cuFloatComplex>) {
+  } else if constexpr (cuda::std::is_same_v<VAL, cuFloatComplex>) {
     ret = cusparseCgtsv2(handle, m, n, dl, dm, du, x, /*ldb*/ m, workspace);
-  } else if constexpr (std::is_same_v<VAL, cuDoubleComplex>) {
+  } else if constexpr (cuda::std::is_same_v<VAL, cuDoubleComplex>) {
     ret = cusparseZgtsv2(handle, m, n, dl, dm, du, x, /*ldb*/ m, workspace);
   }
   MATX_ASSERT(ret == CUSPARSE_STATUS_SUCCESS, matxSolverError);
@@ -107,16 +107,16 @@ inline void SolveBatchedTridiagonalSystem(int m, int b, VAL *dl, VAL *dm,
   size_t workspaceSize = 0;
   void *workspace = nullptr;
 
-  if constexpr (std::is_same_v<VAL, float>) {
+  if constexpr (cuda::std::is_same_v<VAL, float>) {
     ret = cusparseSgtsv2StridedBatch_bufferSizeExt(handle, m, dl, dm, du, x, b,
                                                    m, &workspaceSize);
-  } else if constexpr (std::is_same_v<VAL, double>) {
+  } else if constexpr (cuda::std::is_same_v<VAL, double>) {
     ret = cusparseDgtsv2StridedBatch_bufferSizeExt(handle, m, dl, dm, du, x, b,
                                                    m, &workspaceSize);
-  } else if constexpr (std::is_same_v<VAL, cuFloatComplex>) {
+  } else if constexpr (cuda::std::is_same_v<VAL, cuFloatComplex>) {
     ret = cusparseCgtsv2StridedBatch_bufferSizeExt(handle, m, dl, dm, du, x, b,
                                                    m, &workspaceSize);
-  } else if constexpr (std::is_same_v<VAL, cuDoubleComplex>) {
+  } else if constexpr (cuda::std::is_same_v<VAL, cuDoubleComplex>) {
     ret = cusparseZgtsv2StridedBatch_bufferSizeExt(handle, m, dl, dm, du, x, b,
                                                    m, &workspaceSize);
   } else {
@@ -126,13 +126,13 @@ inline void SolveBatchedTridiagonalSystem(int m, int b, VAL *dl, VAL *dm,
 
   matxAlloc((void **)&workspace, workspaceSize, MATX_DEVICE_MEMORY, stream);
 
-  if constexpr (std::is_same_v<VAL, float>) {
+  if constexpr (cuda::std::is_same_v<VAL, float>) {
     ret = cusparseSgtsv2StridedBatch(handle, m, dl, dm, du, x, b, m, workspace);
-  } else if constexpr (std::is_same_v<VAL, double>) {
+  } else if constexpr (cuda::std::is_same_v<VAL, double>) {
     ret = cusparseDgtsv2StridedBatch(handle, m, dl, dm, du, x, b, m, workspace);
-  } else if constexpr (std::is_same_v<VAL, cuFloatComplex>) {
+  } else if constexpr (cuda::std::is_same_v<VAL, cuFloatComplex>) {
     ret = cusparseCgtsv2StridedBatch(handle, m, dl, dm, du, x, b, m, workspace);
-  } else if constexpr (std::is_same_v<VAL, cuDoubleComplex>) {
+  } else if constexpr (cuda::std::is_same_v<VAL, cuDoubleComplex>) {
     ret = cusparseZgtsv2StridedBatch(handle, m, dl, dm, du, x, b, m, workspace);
   }
   MATX_ASSERT(ret == CUSPARSE_STATUS_SUCCESS, matxSolverError);
@@ -188,11 +188,11 @@ void sparse_dia_solve_impl(TensorTypeC &C, const TensorTypeA &a,
                 "Tridiagonal solve requires I-index DIAG");
   static_assert(RANKA == 2 && RANKB == 2 && RANKC == 2,
                 "tensors must have rank-2");
-  static_assert(std::is_same_v<TC, TA> && std::is_same_v<TC, TB>,
+  static_assert(cuda::std::is_same_v<TC, TA> && cuda::std::is_same_v<TC, TB>,
                 "tensors must have the same data type");
-  static_assert(std::is_same_v<TC, float> || std::is_same_v<TC, double> ||
-                    std::is_same_v<TC, cuda::std::complex<float>> ||
-                    std::is_same_v<TC, cuda::std::complex<double>>,
+  static_assert(cuda::std::is_same_v<TC, float> || cuda::std::is_same_v<TC, double> ||
+                    cuda::std::is_same_v<TC, cuda::std::complex<float>> ||
+                    cuda::std::is_same_v<TC, cuda::std::complex<double>>,
                 "unsupported data type");
   MATX_ASSERT(                                  // Note: B,C transposed!
       a.Size(RANKA - 1) == a.Size(RANKA - 2) && // square
@@ -212,9 +212,9 @@ void sparse_dia_solve_impl(TensorTypeC &C, const TensorTypeA &a,
   [[maybe_unused]] const index_t numD = a.crdSize(0);
   // TODO: we should also check that offsets = {-1,0,1} (host and device)?
   MATX_ASSERT(numD == 3, matxInvalidParameter);
-  using T = std::conditional_t<
-      std::is_same_v<TA, cuda::std::complex<double>>, cuDoubleComplex,
-      std::conditional_t<std::is_same_v<TA, cuda::std::complex<float>>,
+  using T = cuda::std::conditional_t<
+      cuda::std::is_same_v<TA, cuda::std::complex<double>>, cuDoubleComplex,
+      cuda::std::conditional_t<cuda::std::is_same_v<TA, cuda::std::complex<float>>,
                          cuFloatComplex, TA>>;
   T *AD = reinterpret_cast<T *>(a.Data());
   T *BD = reinterpret_cast<T *>(b.Data());
@@ -259,11 +259,11 @@ void sparse_batched_dia_solve_impl(TensorTypeC &C, const TensorTypeA &a,
                 "Tridiagonal solve requires I-index DIAG");
   static_assert(RANKA == 3 && RANKB == 1 && RANKC == 1,
                 "tensors must define batched system");
-  static_assert(std::is_same_v<TC, TA> && std::is_same_v<TC, TB>,
+  static_assert(cuda::std::is_same_v<TC, TA> && cuda::std::is_same_v<TC, TB>,
                 "tensors must have the same data type");
-  static_assert(std::is_same_v<TC, float> || std::is_same_v<TC, double> ||
-                    std::is_same_v<TC, cuda::std::complex<float>> ||
-                    std::is_same_v<TC, cuda::std::complex<double>>,
+  static_assert(cuda::std::is_same_v<TC, float> || cuda::std::is_same_v<TC, double> ||
+                    cuda::std::is_same_v<TC, cuda::std::complex<float>> ||
+                    cuda::std::is_same_v<TC, cuda::std::complex<double>>,
                 "unsupported data type");
   MATX_ASSERT(a.Size(RANKA - 1) == a.Size(RANKA - 2) && // square after batch
                   a.Size(RANKA - 3) * a.Size(RANKA - 2) == b.Size(RANKB - 1) &&
@@ -281,9 +281,9 @@ void sparse_batched_dia_solve_impl(TensorTypeC &C, const TensorTypeA &a,
   [[maybe_unused]] const index_t numD = a.crdSize(0);
   // TODO: we should also check that offsets = {-1,0,1} (host and device)?
   MATX_ASSERT(numD == 3, matxInvalidParameter);
-  using T = std::conditional_t<
-      std::is_same_v<TA, cuda::std::complex<double>>, cuDoubleComplex,
-      std::conditional_t<std::is_same_v<TA, cuda::std::complex<float>>,
+  using T = cuda::std::conditional_t<
+      cuda::std::is_same_v<TA, cuda::std::complex<double>>, cuDoubleComplex,
+      cuda::std::conditional_t<cuda::std::is_same_v<TA, cuda::std::complex<float>>,
                          cuFloatComplex, TA>>;
   T *AD = reinterpret_cast<T *>(a.Data());
   T *BD = reinterpret_cast<T *>(b.Data());

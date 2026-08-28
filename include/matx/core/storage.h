@@ -55,7 +55,7 @@ namespace matx
    * @brief Concept to detect duck-typed allocator pointer interface
    */
   template<typename T>
-  concept has_allocator_ptr_interface_c = std::is_pointer_v<T> && requires(T alloc, size_t sz, void* ptr) {
+  concept has_allocator_ptr_interface_c = cuda::std::is_pointer_v<T> && requires(T alloc, size_t sz, void* ptr) {
     { alloc->allocate(sz) } -> std::convertible_to<void*>;
     { alloc->deallocate(ptr, sz) } -> std::same_as<void>;
   };
@@ -72,7 +72,7 @@ namespace matx
 
   /**
    * @brief Unified storage class for both owning and non-owning pointers
-   * 
+   *
    * Supports duck-typed custom allocators while avoiding virtual functions
    * and pointer members in tensors.
    */
@@ -87,11 +87,11 @@ namespace matx
     Storage() : size_(0), data_() {}
 
     // Non-owning constructor - wraps existing pointer
-    Storage(T* ptr, size_t size) 
+    Storage(T* ptr, size_t size)
       : size_(size), data_(ptr, [](T*){}) {}
-    
+
     // Owning constructor with default allocator
-    Storage(size_t size) 
+    Storage(size_t size)
       : size_(size) {
       if (size == 0) {
         // For zero size, create empty storage without allocation
@@ -103,16 +103,16 @@ namespace matx
         });
       }
     }
-    
+
     // Owning constructor with any allocator that has allocate/deallocate methods
     template<typename Allocator>
-      requires has_allocator_interface_any<std::decay_t<Allocator>>
+      requires has_allocator_interface_any<cuda::std::decay_t<Allocator>>
     Storage(size_t size, Allocator&& alloc)
       : size_(size) {
       if (size == 0) {
         // For zero size, create empty storage without allocation
         data_ = std::shared_ptr<T>();
-      } else if constexpr (std::is_pointer_v<std::decay_t<Allocator>>) {
+      } else if constexpr (cuda::std::is_pointer_v<cuda::std::decay_t<Allocator>>) {
         // Handle allocator pointers (any pointer to object with allocate/deallocate methods)
         T* ptr = static_cast<T*>(alloc->allocate(size * sizeof(T)));
         data_ = std::shared_ptr<T>(ptr, [size, alloc](T* p) {
@@ -126,11 +126,11 @@ namespace matx
         });
       }
     }
-    
+
     // Constructor from existing shared_ptr
     Storage(std::shared_ptr<T> ptr, size_t size)
       : size_(size), data_(ptr) {}
-    
+
     // Owning constructor with memory space
     Storage(size_t size, matxMemorySpace_t space, cudaStream_t stream = 0)
       : size_(size) {
@@ -152,7 +152,7 @@ namespace matx
     size_t size() const noexcept { return size_; }
     size_t capacity() const noexcept { return size_; }
     size_t use_count() const noexcept { return data_.use_count(); }
-    
+
     // Iterator interface
     iterator begin() noexcept { return data(); }
     iterator end() noexcept { return data() + size(); }

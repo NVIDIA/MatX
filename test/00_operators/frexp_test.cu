@@ -12,7 +12,7 @@ TYPED_TEST(OperatorTestsFloatNonComplexNonHalfAllExecs, Frexp)
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
-  ExecType exec{}; 
+  ExecType exec{};
 
   // example-begin frexp-test-1
   // Input data
@@ -35,28 +35,28 @@ TYPED_TEST(OperatorTestsFloatNonComplexNonHalfAllExecs, Frexp)
   MATX_IGNORE_WARNING_POP_MSVC
   // example-end frexp-test-1
 
-  static_assert(std::is_same_v<typename decltype(ofrac)::value_type,
+  static_assert(cuda::std::is_same_v<typename decltype(ofrac)::value_type,
                                TestType>);
-  static_assert(std::is_same_v<typename decltype(oint)::value_type, int>);
+  static_assert(cuda::std::is_same_v<typename decltype(oint)::value_type, int>);
   (toexp_parity = oint & 1).run(exec);
 
   exec.sync();
 
-  int texp;  
+  int texp;
   for (int i = 0; i < tiv0.Size(0); i++) {
-    if constexpr (std::is_same_v<TypeParam, float>) {
+    if constexpr (cuda::std::is_same_v<TypeParam, float>) {
       float tfrac = cuda::std::frexpf(tiv0(i), &texp);
-      ASSERT_EQ(tfrac, tofrac(i)); 
-      ASSERT_EQ(texp,  toint(i)); 
+      ASSERT_EQ(tfrac, tofrac(i));
+      ASSERT_EQ(texp,  toint(i));
       ASSERT_EQ(texp & 1, toexp_parity(i));
     }
     else {
       double tfrac = cuda::std::frexp(tiv0(i), &texp);
-      ASSERT_EQ(tfrac, tofrac(i)); 
-      ASSERT_EQ(texp,  toint(i));   
+      ASSERT_EQ(tfrac, tofrac(i));
+      ASSERT_EQ(texp,  toint(i));
       ASSERT_EQ(texp & 1, toexp_parity(i));
     }
   }
 
   MATX_EXIT_HANDLER();
-} 
+}

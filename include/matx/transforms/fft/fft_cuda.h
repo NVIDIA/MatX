@@ -74,7 +74,7 @@
       std::cout << #a ": " << "(" << tmp << " != " << expected << "): " << fft_str << "\n";\
       MATX_THROW(matxCufftError, "");  \
     }                                  \
-  }  
+  }
 
 namespace matx {
 
@@ -211,9 +211,9 @@ public:
                         : i.Size(RANK - 1);
 
       if (i.IsContiguous() && o.IsContiguous()) {
-        // Previously we used cudaMemGetInfo to get free memory to determine batch size. This can be very slow, 
-        // and for small FFTs this call can create extra latency. For now we'll just assume the user knows what 
-        // they're doing and not try to batch FFTs that are too small        
+        // Previously we used cudaMemGetInfo to get free memory to determine batch size. This can be very slow,
+        // and for small FFTs this call can create extra latency. For now we'll just assume the user knows what
+        // they're doing and not try to batch FFTs that are too small
         const auto shape = i.Shape();
         params.batch = std::accumulate(std::begin(shape), std::end(shape) - 1, static_cast<index_t>(1), std::multiplies<index_t>());
         params.batch_dims = i.Rank() - 1;
@@ -328,7 +328,7 @@ protected:
   cufftHandle plan_;
   FftCUDAParams_t params_;
   void *workspace_;
-  size_t workspaceSize;  
+  size_t workspaceSize;
   int fftrank_ = 0;
   std::mutex mutex_;
 };
@@ -400,7 +400,7 @@ matxCUDAFFTPlan1D_t(OutTensorType &o, const InTensorType &i)
     }
   }
   else {
-    if (!is_complex_v<T2> || !is_complex_v<T1> || !std::is_same_v<T1, T2>) {
+    if (!is_complex_v<T2> || !is_complex_v<T1> || !cuda::std::is_same_v<T1, T2>) {
       MATX_THROW(matxInvalidType, "FFT types inconsistent with C2C transform");
     }
     if (this->params_.n[0] != o.Size(InTensorType::Rank()-1) ||
@@ -527,7 +527,7 @@ public:
                   matxInvalidType);
     }
     else {
-      MATX_ASSERT((std::is_same_v<T1, T2>), matxInvalidType);
+      MATX_ASSERT((cuda::std::is_same_v<T1, T2>), matxInvalidType);
       MATX_ASSERT(is_complex_v<T2> && is_complex_v<T1>, matxInvalidType);
       MATX_ASSERT(o.Size(RANK-2) * o.Size(RANK-1) == i.Size(RANK-2) * i.Size(RANK-1),
                   matxInvalidSize);
@@ -541,7 +541,7 @@ public:
 
     // We allocate our own workspace
     cufftSetAutoAllocation(this->plan_, false);
-        
+
     [[maybe_unused]] cufftResult error;
     error = cufftXtGetSizeMany(this->plan_, 2, this->params_.n, this->params_.inembed,
                        this->params_.istride, this->params_.idist,
@@ -549,7 +549,7 @@ public:
                        this->params_.ostride, this->params_.odist,
                        this->params_.output_type, this->params_.batch,
                        &this->workspaceSize, this->params_.exec_type);
-    MATX_CUFFT_ASSERT_STR_EXP(error, CUFFT_SUCCESS);                       
+    MATX_CUFFT_ASSERT_STR_EXP(error, CUFFT_SUCCESS);
 
     error = cufftXtMakePlanMany(
         this->plan_, 2, this->params_.n, this->params_.inembed,
@@ -650,7 +650,7 @@ __MATX_INLINE__ auto getCufft1DSupportedTensor( const Op &in, cudaStream_t strea
   const auto support_func = []() {
     return true;
   };
-  
+
   return GetSupportedTensor(in, support_func, MATX_ASYNC_DEVICE_MEMORY, stream);
 }
 
@@ -672,7 +672,7 @@ __MATX_INLINE__ auto getCufft2DSupportedTensor( const Op &in, cudaStream_t strea
       return true;
     }
   };
-  
+
   return GetSupportedTensor(in, support_func, MATX_ASYNC_DEVICE_MEMORY, stream);
 }
 

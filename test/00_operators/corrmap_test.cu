@@ -208,11 +208,11 @@ void for_each_mode(F &&fn) {
 template <typename InnerT>
 constexpr double tolerance_for()
 {
-  if constexpr (std::is_same_v<InnerT, matxBf16>) {
+  if constexpr (cuda::std::is_same_v<InnerT, matxBf16>) {
     return 3.0e-2;
-  } else if constexpr (std::is_same_v<InnerT, matxFp16>) {
+  } else if constexpr (cuda::std::is_same_v<InnerT, matxFp16>) {
     return 5.0e-3;
-  } else if constexpr (std::is_same_v<InnerT, float>) {
+  } else if constexpr (cuda::std::is_same_v<InnerT, float>) {
     return 5.0e-5;
   } else {
     return 1.0e-12; // double
@@ -224,11 +224,11 @@ constexpr double tolerance_for()
 template <typename InnerT>
 constexpr double tolerance_magnitude_for()
 {
-  if constexpr (std::is_same_v<InnerT, matxBf16>) {
+  if constexpr (cuda::std::is_same_v<InnerT, matxBf16>) {
     return 2.0e-2;
-  } else if constexpr (std::is_same_v<InnerT, matxFp16>) {
+  } else if constexpr (cuda::std::is_same_v<InnerT, matxFp16>) {
     return 2.0e-3;
-  } else if constexpr (std::is_same_v<InnerT, float>) {
+  } else if constexpr (cuda::std::is_same_v<InnerT, float>) {
     return 1.0e-6;
   } else {
     return 1.0e-14; // double
@@ -239,11 +239,11 @@ constexpr double tolerance_magnitude_for()
 template <typename InnerT>
 constexpr double tolerance_zncc_affine_for()
 {
-  if constexpr (std::is_same_v<InnerT, matxBf16>) {
+  if constexpr (cuda::std::is_same_v<InnerT, matxBf16>) {
     return 5.0e-2;
-  } else if constexpr (std::is_same_v<InnerT, matxFp16>) {
+  } else if constexpr (cuda::std::is_same_v<InnerT, matxFp16>) {
     return 5.0e-3;
-  } else if constexpr (std::is_same_v<InnerT, float>) {
+  } else if constexpr (cuda::std::is_same_v<InnerT, float>) {
     return 5.0e-6;
   } else {
     return 1.0e-12; // double

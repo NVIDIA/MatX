@@ -78,7 +78,7 @@ void det_impl(OutputTensor &out, const InputTensor &a,
   static_assert(OutputTensor::Rank() == InputTensor::Rank() - 2, "Output tensor rank must be 2 less than input for det()");
   constexpr int RANK = InputTensor::Rank();
   using value_type = typename OutputTensor::value_type;
-  using piv_value_type = std::conditional_t<is_cuda_executor_v<Executor>, int64_t, lapack_int_t>;
+  using piv_value_type = cuda::std::conditional_t<is_cuda_executor_v<Executor>, int64_t, lapack_int_t>;
 
   // Get parameters required by these tensors
   cuda::std::array<index_t, RANK - 1> s;
@@ -111,7 +111,7 @@ void det_impl(OutputTensor &out, const InputTensor &a,
   pIdxShape[RANK-2] = matxKeepDim;
   auto idx = range<0, 1, piv_value_type>({piv_len}, 1, 1);  // piv has 1-based indexing
   auto piv_idx = clone(idx, pIdxShape);
-  
+
   // Calculate number of swaps for each matrix in the batch
   auto swap_count = sum(as_type<piv_value_type>(piv != piv_idx), {RANK-2});
 

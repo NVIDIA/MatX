@@ -53,7 +53,7 @@ void RunIIRRegressionCase(cudaExecutor &exec, index_t batches, index_t num_sampl
   (out = filter(in, h_rec, h_nonrec)).run(exec);
   exec.sync();
 
-  const double tol = std::is_same_v<TestType, float> ? 1.0e-2 : 1.0e-8;
+  const double tol = cuda::std::is_same_v<TestType, float> ? 1.0e-2 : 1.0e-8;
   for (index_t b = 0; b < batches; b++) {
     for (index_t i = 0; i < num_samples; i++) {
       ASSERT_NEAR(static_cast<double>(out(b, i)),
@@ -68,7 +68,7 @@ TYPED_TEST(FilterTestsFloatNonComplexNonHalfCUDA, IIRNonMultipleOfChunkSize)
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
-  static_assert(std::is_same_v<ExecType, cudaExecutor>);
+  static_assert(cuda::std::is_same_v<ExecType, cudaExecutor>);
 
   ExecType exec{};
   constexpr index_t kRecursiveChunkSize = 1024 * 8;

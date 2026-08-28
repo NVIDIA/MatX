@@ -79,37 +79,37 @@ typedef enum {
 
 template <typename OpA, typename OpB, typename OpC, MatMulCUDAProvider_t PROV = PROVIDER_TYPE_CUBLASLT>
 constexpr bool CompatibleGemmCUDATypes() {
-  if constexpr (!std::is_same_v<typename OpA::value_type, typename OpB::value_type> &&
-                !std::is_same_v<typename OpB::value_type, typename OpC::value_type> &&
-                !std::is_same_v<typename OpA::value_type, typename OpC::value_type>) {
+  if constexpr (!cuda::std::is_same_v<typename OpA::value_type, typename OpB::value_type> &&
+                !cuda::std::is_same_v<typename OpB::value_type, typename OpC::value_type> &&
+                !cuda::std::is_same_v<typename OpA::value_type, typename OpC::value_type>) {
     return false;
   }
 
   if constexpr (PROV == PROVIDER_TYPE_CUBLASLT) {
-    if constexpr (std::is_same_v<typename OpA::value_type, typename OpB::value_type> &&
-                  std::is_same_v<typename OpB::value_type, typename OpC::value_type>) {
+    if constexpr (cuda::std::is_same_v<typename OpA::value_type, typename OpB::value_type> &&
+                  cuda::std::is_same_v<typename OpB::value_type, typename OpC::value_type>) {
       // List of accepted types when A/B/C match
-      return  std::is_same_v<typename OpA::value_type, matxFp16> ||
-              std::is_same_v<typename OpA::value_type, matxBf16> ||
-              std::is_same_v<typename OpA::value_type, float> ||
-              std::is_same_v<typename OpA::value_type, double> ||
-              std::is_same_v<typename OpA::value_type, cuda::std::complex<float>> ||
-              std::is_same_v<typename OpA::value_type, cuda::std::complex<double>> ||
-              std::is_same_v<typename OpA::value_type, int8_t> ||
-              std::is_same_v<typename OpA::value_type, matxFp16Complex> ||
-              std::is_same_v<typename OpA::value_type, matxBf16Complex> ||
-              std::is_same_v<typename OpA::value_type, matxFp16ComplexPlanar> ||
-              std::is_same_v<typename OpA::value_type, matxBf16ComplexPlanar>;
+      return  cuda::std::is_same_v<typename OpA::value_type, matxFp16> ||
+              cuda::std::is_same_v<typename OpA::value_type, matxBf16> ||
+              cuda::std::is_same_v<typename OpA::value_type, float> ||
+              cuda::std::is_same_v<typename OpA::value_type, double> ||
+              cuda::std::is_same_v<typename OpA::value_type, cuda::std::complex<float>> ||
+              cuda::std::is_same_v<typename OpA::value_type, cuda::std::complex<double>> ||
+              cuda::std::is_same_v<typename OpA::value_type, int8_t> ||
+              cuda::std::is_same_v<typename OpA::value_type, matxFp16Complex> ||
+              cuda::std::is_same_v<typename OpA::value_type, matxBf16Complex> ||
+              cuda::std::is_same_v<typename OpA::value_type, matxFp16ComplexPlanar> ||
+              cuda::std::is_same_v<typename OpA::value_type, matxBf16ComplexPlanar>;
 
     }
     // Accumulator type different from A/B
-    else if constexpr (  std::is_same_v<typename OpA::value_type, typename OpB::value_type> &&
-                        !std::is_same_v<typename OpB::value_type, typename OpC::value_type>) {
-      return (std::is_same_v<typename OpA::value_type, int8_t> && std::is_same_v<typename OpC::value_type, int32_t>) ||
-              (std::is_same_v<typename OpA::value_type, int8_t> && std::is_same_v<typename OpC::value_type, float>) ||
-              (std::is_same_v<typename OpA::value_type, matxBf16> && std::is_same_v<typename OpC::value_type, float>) ||
-              (std::is_same_v<typename OpA::value_type, matxFp16> && std::is_same_v<typename OpC::value_type, float>) ||
-              (std::is_same_v<typename OpA::value_type, int8_t> && std::is_same_v<typename OpC::value_type, float>);
+    else if constexpr (  cuda::std::is_same_v<typename OpA::value_type, typename OpB::value_type> &&
+                        !cuda::std::is_same_v<typename OpB::value_type, typename OpC::value_type>) {
+      return (cuda::std::is_same_v<typename OpA::value_type, int8_t> && cuda::std::is_same_v<typename OpC::value_type, int32_t>) ||
+              (cuda::std::is_same_v<typename OpA::value_type, int8_t> && cuda::std::is_same_v<typename OpC::value_type, float>) ||
+              (cuda::std::is_same_v<typename OpA::value_type, matxBf16> && cuda::std::is_same_v<typename OpC::value_type, float>) ||
+              (cuda::std::is_same_v<typename OpA::value_type, matxFp16> && cuda::std::is_same_v<typename OpC::value_type, float>) ||
+              (cuda::std::is_same_v<typename OpA::value_type, int8_t> && cuda::std::is_same_v<typename OpC::value_type, float>);
     }
   }
 
@@ -305,27 +305,27 @@ public:
                            [[maybe_unused]] float const beta)
   {
     // For now we don't give much flexibility on compute type/alpha
-    if constexpr (std::is_same_v<InputType, cuda::std::complex<float>> ||
+    if constexpr (cuda::std::is_same_v<InputType, cuda::std::complex<float>> ||
                   is_complex_half_v<InputType>) {
       cuComplex *calpha = reinterpret_cast<cuComplex *>(palpha);
       cuComplex *cbeta = reinterpret_cast<cuComplex *>(pbeta);
       *calpha = {alpha, 0};
       *cbeta = {beta, 0};
     }
-    else if constexpr (std::is_same_v<InputType, cuda::std::complex<double>>) {
+    else if constexpr (cuda::std::is_same_v<InputType, cuda::std::complex<double>>) {
       cuDoubleComplex *dalpha = reinterpret_cast<cuDoubleComplex *>(palpha);
       cuDoubleComplex *dbeta = reinterpret_cast<cuDoubleComplex *>(pbeta);
       *dalpha = {alpha, 0};
       *dbeta = {beta, 0};
     }
-    else if constexpr (std::is_same_v<InputType, double>) {
+    else if constexpr (cuda::std::is_same_v<InputType, double>) {
       double *dalpha = reinterpret_cast<double *>(palpha);
       double *dbeta = reinterpret_cast<double *>(pbeta);
       *dalpha = alpha;
       *dbeta = beta;
     }
     else if constexpr (is_matx_half_v<InputType> ||
-                       std::is_same_v<InputType, float>) {
+                       cuda::std::is_same_v<InputType, float>) {
       float *talpha = reinterpret_cast<float *>(palpha);
       float *tbeta = reinterpret_cast<float *>(pbeta);
       *talpha = alpha;
@@ -676,14 +676,14 @@ private:
 
     // Update this later when we're more flexible on compute type
     int32_t scaleType;
-    if constexpr (std::is_same_v<T1, float> || is_matx_half_v<T1>) {
+    if constexpr (cuda::std::is_same_v<T1, float> || is_matx_half_v<T1>) {
       scaleType = CUDA_R_32F;
     }
     else if constexpr (is_complex_half_v<T1> ||
-                       std::is_same_v<T1, cuda::std::complex<float>>) {
+                       cuda::std::is_same_v<T1, cuda::std::complex<float>>) {
       scaleType = CUDA_C_32F;
     }
-    else if constexpr (std::is_same_v<T1, cuda::std::complex<double>>) {
+    else if constexpr (cuda::std::is_same_v<T1, cuda::std::complex<double>>) {
       scaleType = CUDA_C_64F;
     }
     else {
@@ -959,20 +959,20 @@ private:
       memset(&salpha, 0, sizeof(salpha));
       memset(&sbeta, 0, sizeof(sbeta));
 
-      if constexpr (std::is_same_v<T1, cuda::std::complex<float>> ||
+      if constexpr (cuda::std::is_same_v<T1, cuda::std::complex<float>> ||
                     is_complex_half_v<T1>) {
         salpha.cf32[0] = alpha;
         sbeta.cf32[0] = beta;
       }
-      else if constexpr (std::is_same_v<T1, cuda::std::complex<double>>) {
+      else if constexpr (cuda::std::is_same_v<T1, cuda::std::complex<double>>) {
         salpha.cf64[0] = alpha;
         sbeta.cf64[0] = beta;
       }
-      else if constexpr (std::is_same_v<T1, float> || is_matx_half_v<T1>) {
+      else if constexpr (cuda::std::is_same_v<T1, float> || is_matx_half_v<T1>) {
         salpha.f32 = alpha;
         sbeta.f32 = beta;
       }
-      else if constexpr (std::is_same_v<T1, double>) {
+      else if constexpr (cuda::std::is_same_v<T1, double>) {
         salpha.f64 = alpha;
         sbeta.f64 = beta;
       }
@@ -988,7 +988,7 @@ private:
       }
       else {
         // When rank exceeds threshold, we loop over the outer dimensions where each iteration
-        // of cublasLtMatMul processes the innermost 'threshold' number of dimensions        
+        // of cublasLtMatMul processes the innermost 'threshold' number of dimensions
         for (size_t iter = 0; iter < total_iter; iter++) {
           // Get pointers into A/B/C for this round
           auto ap = cuda::std::apply([&a_adj](auto... param) { return a_adj.GetPointer(param...); }, a_idx);
@@ -1015,13 +1015,13 @@ private:
     if constexpr (RANK == 2) {
       if constexpr (PROV == PROVIDER_TYPE_CUTLASS) {
 #ifdef MATX_ENABLE_CUTLASS
-        using CutlassAOrder = std::conditional_t<OrderA == MEM_ORDER_ROW_MAJOR,
+        using CutlassAOrder = cuda::std::conditional_t<OrderA == MEM_ORDER_ROW_MAJOR,
                                                  cutlass::layout::RowMajor,
                                                  cutlass::layout::ColumnMajor>;
-        using CutlassBOrder = std::conditional_t<OrderB == MEM_ORDER_ROW_MAJOR,
+        using CutlassBOrder = cuda::std::conditional_t<OrderB == MEM_ORDER_ROW_MAJOR,
                                                  cutlass::layout::RowMajor,
                                                  cutlass::layout::ColumnMajor>;
-        using CutlassCOrder = std::conditional_t<OrderC == MEM_ORDER_ROW_MAJOR,
+        using CutlassCOrder = cuda::std::conditional_t<OrderC == MEM_ORDER_ROW_MAJOR,
                                                  cutlass::layout::RowMajor,
                                                  cutlass::layout::ColumnMajor>;
         using CutlassGemm =
@@ -1059,13 +1059,13 @@ private:
     else {
       static_assert(RANK > 2);
 #ifdef MATX_ENABLE_CUTLASS
-      using CutlassAOrder = std::conditional_t<OrderA == MEM_ORDER_ROW_MAJOR,
+      using CutlassAOrder = cuda::std::conditional_t<OrderA == MEM_ORDER_ROW_MAJOR,
                                                cutlass::layout::RowMajor,
                                                cutlass::layout::ColumnMajor>;
-      using CutlassBOrder = std::conditional_t<OrderB == MEM_ORDER_ROW_MAJOR,
+      using CutlassBOrder = cuda::std::conditional_t<OrderB == MEM_ORDER_ROW_MAJOR,
                                                cutlass::layout::RowMajor,
                                                cutlass::layout::ColumnMajor>;
-      using CutlassCOrder = std::conditional_t<OrderC == MEM_ORDER_ROW_MAJOR,
+      using CutlassCOrder = cuda::std::conditional_t<OrderC == MEM_ORDER_ROW_MAJOR,
                                                cutlass::layout::RowMajor,
                                                cutlass::layout::ColumnMajor>;
       using CutlassGemm = cutlass::gemm::device::GemmBatched<
@@ -1304,7 +1304,7 @@ __MATX_INLINE__ void WithMatmulOperand(const Op &op, cudaStream_t stream,
   using OpType = remove_cvref_t<Op>;
   constexpr bool can_use_metadata_op =
       PROV == PROVIDER_TYPE_CUBLASLT &&
-      std::is_same_v<typename OpType::value_type, ValueType> &&
+      cuda::std::is_same_v<typename OpType::value_type, ValueType> &&
       CanUseCublasLtConjTransposeOp<ValueType>();
 
   if constexpr (can_use_metadata_op && is_hermitian_trans_op_v<OpType>) {

@@ -63,21 +63,21 @@ __MATX_INLINE__ void norm_impl(OutputOp out, const InputOp &in,
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-  if constexpr (std::is_same_v<NormType, detail::NormTypeVector>) {
+  if constexpr (cuda::std::is_same_v<NormType, detail::NormTypeVector>) {
     if (order == NormOrder::NONE || order == NormOrder::L2) {
       // This is really just:
       // (out = sqrt(sum(abs2(in), {InputOp::Rank() - 1}))).run(exec);
       // But we need to force the output rank here to avoid a no-op permute using the {} syntax on sum
       auto tOp = abs2(in);
       auto sumOp = sum<decltype(tOp), 1>(tOp);
-      (out = sqrt(sumOp)).run(exec);      
+      (out = sqrt(sumOp)).run(exec);
     }
     else if (order == NormOrder::L1) {
       // This is really just:
       // (out = sum(abs(in), {InputOp::Rank() - 1})).run(exec);
-      // But we need to force the output rank here to avoid a no-op permute using the {} syntax on sum      
+      // But we need to force the output rank here to avoid a no-op permute using the {} syntax on sum
       auto tOp = abs(in);
-      (out = sum<decltype(tOp), 1>(tOp)).run(exec);      
+      (out = sum<decltype(tOp), 1>(tOp)).run(exec);
     }
     else {
       MATX_ASSERT_STR(false, matxInvalidParameter, "Invalid order type for vector norm");
@@ -89,7 +89,7 @@ __MATX_INLINE__ void norm_impl(OutputOp out, const InputOp &in,
       // Same as (out = sqrt(sum(abs2(in), {InputOp::Rank() - 2, InputOp::Rank() - 1}))).run(exec);
       auto tOp = abs2(in);
       auto sumOp = sum<decltype(tOp), 2>(tOp);
-      (out = sqrt(sumOp)).run(exec);      
+      (out = sqrt(sumOp)).run(exec);
     }
     else if (order == NormOrder::L1) {
       // See comment above

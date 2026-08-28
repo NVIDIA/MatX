@@ -79,7 +79,7 @@ namespace matx
           index_t size1 = 0, size2 = 0;
           if constexpr (is_matx_op<T1>()) size1 = op1_.Size(0);
           if constexpr (is_matx_op<T2>()) size2 = op2_.Size(0);
-          
+
           return cuda::std::make_tuple(
             func_name,
             std::format("template <typename T1, typename T2> struct {} {{\n"
@@ -110,7 +110,7 @@ namespace matx
         }
 #endif
 
-      __MATX_INLINE__ std::string str() const { 
+      __MATX_INLINE__ std::string str() const {
         std::string top1;
         if constexpr (is_matx_op<T1>()) {
           top1 = op1_.str();
@@ -125,9 +125,9 @@ namespace matx
         }
         else {
           top2 = "array";
-        }        
+        }
 
-        return "toeplitz(" + top1 + "," + top2 + ")"; 
+        return "toeplitz(" + top1 + "," + top2 + ")";
       }
 
         __MATX_INLINE__ ToeplitzOp(const T1 &op1, const T2 &op2) : op1_(op1), op2_(op2)
@@ -137,13 +137,13 @@ namespace matx
           static_assert(T1::Rank() == 1, "toeplitz() operator input rank must be 1");
         }
 
-        if constexpr (!std::is_same_v<T2, EmptyOp>) {
-          static_assert(std::is_same_v<typename T1::value_type, 
+        if constexpr (!cuda::std::is_same_v<T2, EmptyOp>) {
+          static_assert(cuda::std::is_same_v<typename T1::value_type,
                                        typename T2::value_type>, "Input types to toeplitz() must match");
           if constexpr (is_matx_op<T2>()) {
             static_assert(T2::Rank() == 1, "toeplitz() operator input rank must be 1");
           }
-        }        
+        }
       }
 
         template <typename CapType>
@@ -168,7 +168,7 @@ namespace matx
               else {
                 auto val = op1_[i - j];
                 return val;
-              }          
+              }
             }
           } else {
             return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
@@ -193,7 +193,7 @@ namespace matx
           }
           else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
 #ifdef MATX_EN_JIT
-            return combine_capabilities<Cap>(true, 
+            return combine_capabilities<Cap>(true,
               detail::get_operator_capability<Cap>(op1_, in),
               detail::get_operator_capability<Cap>(op2_, in));
 #else
@@ -223,7 +223,7 @@ namespace matx
             auto op1_cap = detail::get_operator_capability<Cap>(op1_, in);
             auto op2_cap = detail::get_operator_capability<Cap>(op2_, in);
             return combine_capabilities<Cap>(my_cap, op1_cap, op2_cap);
-          } 
+          }
           else if constexpr (Cap == OperatorCapability::ALIASED_MEMORY) {
             auto in_copy = in;
             in_copy.permutes_input_output = true;
@@ -246,7 +246,7 @@ namespace matx
 
           if constexpr (is_matx_op<T2>()) {
             op2_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-          }          
+          }
         }
 
         template <typename ShapeType, typename Executor>
@@ -258,8 +258,8 @@ namespace matx
 
           if constexpr (is_matx_op<T2>()) {
             op2_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-          } 
-        }          
+          }
+        }
 
         static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
         {
@@ -309,7 +309,7 @@ namespace matx
     if constexpr (is_complex_v<T>) {
       cuda::std::array<T, D> r_conj = op;
       cuda::std::transform(r_conj.begin(), r_conj.end(), r_conj.begin(), [](T val){ return _internal_conj(val); } );
-      op2 = r_conj;      
+      op2 = r_conj;
     }
     return detail::ToeplitzOp(op, op2);
   };
@@ -337,7 +337,7 @@ namespace matx
     else {
       return detail::ToeplitzOp(c, c);
     }
-  };  
+  };
 
   /**
    * Toeplitz operator
@@ -362,7 +362,7 @@ namespace matx
   auto __MATX_INLINE__ toeplitz(const T (&c)[D1], const T (&r)[D2])
   {
     const auto cop = detail::to_array(c);
-    const auto rop = detail::to_array(r);    
+    const auto rop = detail::to_array(r);
     return detail::ToeplitzOp(cop, rop);
   };
 
@@ -374,7 +374,7 @@ namespace matx
    * @tparam COp
    *   Operator type of c
    * @tparam ROp
-   *   Operator type of r 
+   *   Operator type of r
    * @param c
    *   First column of the matrix
    * @param r
@@ -384,10 +384,10 @@ namespace matx
    *   New operator of the kronecker product
    */
   template <typename COp, typename ROp>
-    requires (!cuda::std::is_array_v<remove_cvref_t<COp>> && 
+    requires (!cuda::std::is_array_v<remove_cvref_t<COp>> &&
               !cuda::std::is_array_v<remove_cvref_t<ROp>>)
   auto __MATX_INLINE__ toeplitz(const COp &c, const ROp &r)
   {
     return detail::ToeplitzOp<COp, ROp>(c, r);
-  };    
+  };
 } // end namespace matx

@@ -49,7 +49,7 @@ namespace matx
         cuda::std::array<index_t, OpA::Rank()> out_dims_;
         mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, OpA::Rank()> tmp_out_;
         mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr;
-        mutable bool prerun_done_ = false; 
+        mutable bool prerun_done_ = false;
 
       public:
         using matxop = bool;
@@ -57,16 +57,16 @@ namespace matx
         using matx_transform_op = bool;
         using softmax_xform_op = bool;
 
-        __MATX_INLINE__ std::string str() const { 
+        __MATX_INLINE__ std::string str() const {
           return "softmax(" + get_type_str(a_) + ")";
         }
 
-        __MATX_INLINE__ SoftmaxOp(const OpA &A, PermDims perm) : 
+        __MATX_INLINE__ SoftmaxOp(const OpA &A, PermDims perm) :
               a_(A), perm_(perm) {
           MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
           for (int r = 0; r < OpA::Rank(); r++) {
             out_dims_[r] = a_.Size(r);
-          }          
+          }
         }
 
         template <typename CapType, typename... Is>
@@ -101,7 +101,7 @@ namespace matx
         void Exec(Out &&out, Executor &&ex) const {
           static_assert(is_cuda_executor_v<Executor>, "softmax() only supports the CUDA executor currently");
 
-          if constexpr (!std::is_same_v<PermDims, no_permute_t>) {
+          if constexpr (!cuda::std::is_same_v<PermDims, no_permute_t>) {
             softmax_impl(cuda::std::get<0>(out), a_, perm_, ex.getStream());
           }
           else {
@@ -114,8 +114,8 @@ namespace matx
         {
           if constexpr (is_matx_op<OpA>()) {
             a_.PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-          }         
-        }      
+          }
+        }
 
         template <typename ShapeType, typename Executor>
         __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
@@ -124,7 +124,7 @@ namespace matx
             return;
           }
 
-          InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));          
+          InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
 
           detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
 
@@ -142,7 +142,7 @@ namespace matx
           matxFree(ptr);
           ptr = nullptr;
           prerun_done_ = false;
-        }   
+        }
     };
   }
 
@@ -152,21 +152,21 @@ namespace matx
  * softmax computes the exponential of each value divided by the sum of the exponentials
  * of items in the reduced set. The axes in which to perform the softmax over determine
  * which axes the sum will be computed over, but the input tensor rank and sizes match
- * between input and output. Note that traditional definitions of softmax are simply 
- * exp(x)/sum(exp(x)), but this is not how most libraries are implemented. Instead, x 
+ * between input and output. Note that traditional definitions of softmax are simply
+ * exp(x)/sum(exp(x)), but this is not how most libraries are implemented. Instead, x
  * is biased by a correction factor of max(x).
  *
  * @tparam InType
  *   Input data type
  *
  * @param in
- *   Input data to compute the softmax 
+ *   Input data to compute the softmax
  */
 template <typename InType>
 __MATX_INLINE__ auto softmax(const InType &in)
 {
-  return detail::SoftmaxOp(in, detail::no_permute_t{});     
-}  
+  return detail::SoftmaxOp(in, detail::no_permute_t{});
+}
 
 
 
@@ -176,8 +176,8 @@ __MATX_INLINE__ auto softmax(const InType &in)
  * softmax computes the exponential of each value divided by the sum of the exponentials
  * of items in the reduced set. The axes in which to perform the softmax over determine
  * which axes the sum will be computed over, but the input tensor rank and sizes match
- * between input and output. Note that traditional definitions of softmax are simply 
- * exp(x)/sum(exp(x)), but this is not how most libraries are implemented. Instead, x 
+ * between input and output. Note that traditional definitions of softmax are simply
+ * exp(x)/sum(exp(x)), but this is not how most libraries are implemented. Instead, x
  * is biased by a correction factor of max(x).
  *
  * @tparam InType
@@ -186,7 +186,7 @@ __MATX_INLINE__ auto softmax(const InType &in)
  *   Rank of dimension array
  *
  * @param in
- *   Input data to compute the softmax 
+ *   Input data to compute the softmax
  * @param dims
  *   C-style array containing the dimensions to sum over
  */
@@ -195,11 +195,11 @@ __MATX_INLINE__ auto softmax(const InType &in, const int (&dims)[D])
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("softmax(" + get_type_str(in) + ")", matx::MATX_NVTX_LOG_API)
-  
+
   static_assert(D < InType::Rank(), "softmax dimensions must be <= Rank of input");
 
   return detail::SoftmaxOp(in, detail::to_array(dims));
-#endif  
+#endif
 }
 
 

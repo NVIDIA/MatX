@@ -23,7 +23,7 @@ TYPED_TEST(OperatorTestsNumericNonComplexAllExecs, AtOp)
   t1.SetVals({10, 20, 30, 40, 50, 60, 70, 80, 90, 100});
   (t2 = t1).run(exec);
 
-  // Select the fourth element from `t1` as part of the execution. Value should match 
+  // Select the fourth element from `t1` as part of the execution. Value should match
   // `t1(3)` after execution
   (t0 = at(t1, 3)).run(exec);
   // example-end at-test-1
@@ -34,9 +34,9 @@ TYPED_TEST(OperatorTestsNumericNonComplexAllExecs, AtOp)
   (t0 = at(t2, 1, 4)).run(exec);
   exec.sync();
 
-  ASSERT_EQ(t0(), t2(1, 4));  
+  ASSERT_EQ(t0(), t2(1, 4));
 
-  if constexpr (is_cuda_non_jit_executor_v<ExecType> && (std::is_same_v<TestType, float> || std::is_same_v<TestType, double>)) {
+  if constexpr (is_cuda_non_jit_executor_v<ExecType> && (cuda::std::is_same_v<TestType, float> || cuda::std::is_same_v<TestType, double>)) {
     using ComplexType = detail::complex_from_scalar_t<TestType>;
     auto c0 = make_tensor<ComplexType>({});
     (c0 = at(fft(t1), 0)).run(exec);
@@ -49,4 +49,4 @@ TYPED_TEST(OperatorTestsNumericNonComplexAllExecs, AtOp)
   }
 
   MATX_EXIT_HANDLER();
-} 
+}
