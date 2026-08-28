@@ -204,7 +204,7 @@ public:
       ("cusolverDnXsyevBatched failed with error " + std::to_string(ret)).c_str());
 
     std::vector<int> h_info(params.batch_size);
-    cudaMemcpyAsync(h_info.data(), this->d_info, sizeof(int) * params.batch_size, cudaMemcpyDeviceToHost, stream);
+    MATX_CUDA_CHECK(cudaMemcpyAsync(h_info.data(), this->d_info, sizeof(int) * params.batch_size, cudaMemcpyDeviceToHost, stream));
 #else
     SetBatchPointers<BatchType::MATRIX>(out, this->batch_a_ptrs);
     SetBatchPointers<BatchType::VECTOR>(w, this->batch_w_ptrs);
@@ -224,11 +224,11 @@ public:
     }
 
     std::vector<int> h_info(this->batch_a_ptrs.size());
-    cudaMemcpyAsync(h_info.data(), this->d_info, sizeof(int) * this->batch_a_ptrs.size(), cudaMemcpyDeviceToHost, stream);
+    MATX_CUDA_CHECK(cudaMemcpyAsync(h_info.data(), this->d_info, sizeof(int) * this->batch_a_ptrs.size(), cudaMemcpyDeviceToHost, stream));
 #endif
 
     // This will block. Figure this out later
-    cudaStreamSynchronize(stream);
+    MATX_CUDA_CHECK(cudaStreamSynchronize(stream));
 
     for (const auto& info : h_info) {
       if (info < 0) {

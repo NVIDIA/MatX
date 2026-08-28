@@ -255,11 +255,11 @@ namespace matx
                 MATX_ASSERT_STR(tp->get_lhs().Bytes() >= tp->get_rhs().Bytes(), matxInvalidSize, "LHS tensor is smaller than RHS tensor in assignment");
                 MATX_LOG_TRACE("Copying {} bytes from {} to {} using cudaMemcpyAsync",
                   tp->get_lhs().Bytes(), reinterpret_cast<void*>(tp->get_rhs().Data()), reinterpret_cast<void*>(tp->get_lhs().Data()));
-                cudaMemcpyAsync(reinterpret_cast<void*>(tp->get_lhs().Data()),
+                MATX_CUDA_CHECK(cudaMemcpyAsync(reinterpret_cast<void*>(tp->get_lhs().Data()),
                                 reinterpret_cast<void*>(tp->get_rhs().Data()),
                                 tp->get_rhs().Bytes(),
                                 cudaMemcpyDefault,
-                                ex.getStream());
+                                ex.getStream()));
               }
               else {
                 MATX_LOG_TRACE("Copying {} bytes from {} to {} using kernel",
@@ -321,7 +321,7 @@ namespace matx
           MATX_NVTX_START(static_cast<T *>(this)->str(), matx::MATX_NVTX_LOG_API)
 
           run(cudaExecutor{stream, false});
-          cudaEventRecord(ev, stream);
+          MATX_CUDA_CHECK(cudaEventRecord(ev, stream));
         }
 
         /**

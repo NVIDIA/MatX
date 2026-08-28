@@ -425,8 +425,8 @@ inline void svdbpi_impl(UType &U, SType &S, VTType &VT, const AType &A, int max_
   cudaStream_t d2h = nullptr;
   cudaEvent_t event = nullptr;
   if(tol>0.0f) {
-    cudaStreamCreateWithFlags(&d2h,cudaStreamNonBlocking);
-    cudaEventCreate(&event);
+    MATX_CUDA_CHECK(cudaStreamCreateWithFlags(&d2h,cudaStreamNonBlocking));
+    MATX_CUDA_CHECK(cudaEventCreate(&event));
   }
 
   auto [AT, Q, Qold, R, Z, l2Norm, converged] = detail::svdbpi_impl_workspace(A, stream);
@@ -461,7 +461,7 @@ inline void svdbpi_impl(UType &U, SType &S, VTType &VT, const AType &A, int max_
 
     if(tol!=0.0f) {
 
-      cudaStreamSynchronize(d2h);  // wait for d2h transfer to finish
+      MATX_CUDA_CHECK(cudaStreamSynchronize(d2h));  // wait for d2h transfer to finish
       if(converged_host != 0) {
         // if converged exit loop
         break;
@@ -479,14 +479,14 @@ inline void svdbpi_impl(UType &U, SType &S, VTType &VT, const AType &A, int max_
       }
 
       // event to record when converged is ready in stream
-      cudaEventRecord(event, stream);
+      MATX_CUDA_CHECK(cudaEventRecord(event, stream));
       // wait for d2h transfer until converged is ready
-      cudaStreamWaitEvent(d2h, event);
+      MATX_CUDA_CHECK(cudaStreamWaitEvent(d2h, event));
 
       // copy convergence criteria to host.
       // This is in unpinned memory and cannot on most systems run asynchronously.
       // We do this here to hide the copy/sync behind prior launch latency/execution of next iteration.
-      cudaMemcpyAsync(&converged_host, converged.Data(), sizeof(int), cudaMemcpyDeviceToHost, d2h);
+      MATX_CUDA_CHECK(cudaMemcpyAsync(&converged_host, converged.Data(), sizeof(int), cudaMemcpyDeviceToHost, d2h));
     }
   }
 
@@ -520,8 +520,8 @@ inline void svdbpi_impl(UType &U, SType &S, VTType &VT, const AType &A, int max_
   }
 
   if(tol>0.0f) {
-    cudaEventDestroy(event);
-    cudaStreamDestroy(d2h);
+    MATX_CUDA_CHECK(cudaEventDestroy(event));
+    MATX_CUDA_CHECK(cudaStreamDestroy(d2h));
   }
 }
 
@@ -852,10 +852,10 @@ public:
     }
 
     std::vector<int> h_info(this->batch_a_ptrs.size());
-    cudaMemcpyAsync(h_info.data(), this->d_info, sizeof(int) * this->batch_a_ptrs.size(), cudaMemcpyDeviceToHost, stream);
+    MATX_CUDA_CHECK(cudaMemcpyAsync(h_info.data(), this->d_info, sizeof(int) * this->batch_a_ptrs.size(), cudaMemcpyDeviceToHost, stream));
 
     // This will block. Figure this out later
-    cudaStreamSynchronize(stream);
+    MATX_CUDA_CHECK(cudaStreamSynchronize(stream));
 
     for (const auto& info : h_info) {
       if (info < 0) {

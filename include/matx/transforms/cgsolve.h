@@ -75,8 +75,8 @@ namespace matx
       
 
       if(tol>0.0f) {
-        cudaStreamCreateWithFlags(&d2h,cudaStreamNonBlocking);
-        cudaEventCreate(&event);
+        MATX_CUDA_CHECK(cudaStreamCreateWithFlags(&d2h,cudaStreamNonBlocking));
+        MATX_CUDA_CHECK(cudaEventCreate(&event));
       }
 
       int converged_host = false;
@@ -128,9 +128,9 @@ namespace matx
       
       if(tol>0.0f) {
         (converged = matx::all(as_int(sqrt(r0r0) < tol))).run(stream);
-      
-        cudaEventRecord(event, stream);
-        cudaStreamWaitEvent(d2h, event);
+
+        MATX_CUDA_CHECK(cudaEventRecord(event, stream));
+        MATX_CUDA_CHECK(cudaStreamWaitEvent(d2h, event));
       }
 
       int i;
@@ -165,17 +165,17 @@ MATX_IGNORE_WARNING_POP_MSVC
           // copy convergence criteria to host.  
           // This is in unpinned memory and cannot on most systems run asynchronously.  
           // We do this here to hide the copy/sync behind prior launch latency/execution.
-          cudaMemcpyAsync(&converged_host, converged.Data(), sizeof(int), cudaMemcpyDeviceToHost, d2h);
-          cudaStreamSynchronize(d2h);
+          MATX_CUDA_CHECK(cudaMemcpyAsync(&converged_host, converged.Data(), sizeof(int), cudaMemcpyDeviceToHost, d2h));
+          MATX_CUDA_CHECK(cudaStreamSynchronize(d2h));
 
           if(converged_host != 0) {  // != 0 instead of == true: converged_host is int (CUDA device copy); mixing int and bool triggers MSVC C4805 as an error under /WX
             break;
           }
 
           (converged = matx::all(as_int(sqrt(r1r1) < tol))).run(stream);
-        
-          cudaEventRecord(event, stream);
-          cudaStreamWaitEvent(d2h, event);
+
+          MATX_CUDA_CHECK(cudaEventRecord(event, stream));
+          MATX_CUDA_CHECK(cudaStreamWaitEvent(d2h, event));
         }
         
         // p = r1 + b * p 
@@ -188,9 +188,9 @@ MATX_IGNORE_WARNING_POP_MSVC
       }
 
       if(tol>0.0f) {
-        cudaEventDestroy(event);
-        cudaStreamDestroy(d2h);
+        MATX_CUDA_CHECK(cudaEventDestroy(event));
+        MATX_CUDA_CHECK(cudaStreamDestroy(d2h));
       }
     }
-  
+
 } // end namespace matx
