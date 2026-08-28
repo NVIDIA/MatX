@@ -265,6 +265,27 @@ namespace matx
     MATX_CUDA_CHECK(e);                \
   }
 
+// Macro for checking cuda errors in noexcept functions and destructors,
+// where MATX_CUDA_CHECK's throw would call std::terminate(). Logs the
+// error and drains the sticky CUDA error state via cudaGetLastError()
+// instead of throwing, so the failure is diagnosed here rather than
+// leaking into an unrelated later call. The logging call itself is
+// wrapped in try/catch so this macro can be used in noexcept contexts
+// (std::format can theoretically throw).
+#define MATX_CUDA_CHECK_NOEXCEPT(e)                                       \
+  do {                                                                    \
+    const auto e_ = (e);                                                  \
+    if (e_ != cudaSuccess)                                                \
+    {                                                                     \
+      try {                                                               \
+        MATX_LOG_ERROR("{}:{} CUDA Error (noexcept context): {} ({})",    \
+                        __FILE__, __LINE__, cudaGetErrorString(e_),       \
+                        static_cast<int>(e_));                            \
+      } catch (...) {}                                                    \
+      (void)cudaGetLastError();                                           \
+    }                                                                     \
+  } while (0)
+
 // This macro asserts compatible dimensions of current class to an operator.
 #define MATX_ASSERT_COMPATIBLE_OP_SIZES(op)                          \
   if constexpr (Rank() > 0) {                                        \
