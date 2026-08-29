@@ -182,33 +182,56 @@ using loose_compute_param_t = typename std::conditional<
 // Shared-memory layout for per-pulse-block cached state. Some compute modes
 // cache per-pulse antenna data or Taylor reference values once per pulse block,
 // amortizing global FP64 loads and FP64->compute-type casts across all threads.
-template <SarBpComputeType ComputeType, bool CacheEnabled>
+template <SarBpComputeType ComputeType, bool CacheEnabled, bool PixelZIsUniform = false,
+          bool TaylorFastAddThirdOrder = false>
 struct SarBpPulseBlockCache {};
 
-template <bool CacheEnabled>
-struct SarBpPulseBlockCache<SarBpComputeType::FloatFloat, CacheEnabled> {
+template <bool CacheEnabled, bool PixelZIsUniform, bool TaylorFastAddThirdOrder>
+struct SarBpPulseBlockCache<SarBpComputeType::FloatFloat, CacheEnabled, PixelZIsUniform,
+                            TaylorFastAddThirdOrder> {
     fltflt ant_pos[PULSE_BLOCK_SIZE][4];
 };
 
-template <>
-struct SarBpPulseBlockCache<SarBpComputeType::Float, true> {
+template <bool PixelZIsUniform, bool TaylorFastAddThirdOrder>
+struct SarBpPulseBlockCache<SarBpComputeType::Float, true, PixelZIsUniform,
+                            TaylorFastAddThirdOrder> {
     // Slots: [0..2] = ant_pos.x/y/z as float, [3] = bin_offset - rtm*dr_inv
     float ant_pos[PULSE_BLOCK_SIZE][4];
 };
 
-template <>
-struct SarBpPulseBlockCache<SarBpComputeType::Mixed, true> {
+template <bool PixelZIsUniform, bool TaylorFastAddThirdOrder>
+struct SarBpPulseBlockCache<SarBpComputeType::Mixed, true, PixelZIsUniform,
+                            TaylorFastAddThirdOrder> {
     // Same layout as Float, but with double elements so strict_compute_t (double)
     // arithmetic in the inner loop reads directly without up-casting.
     double ant_pos[PULSE_BLOCK_SIZE][4];
 };
 
-struct SarBpTaylorFastSharedMemory {
+template <bool PixelZIsUniform, bool TaylorFastAddThirdOrder>
+struct SarBpTaylorFastSharedMemory;
+
+template <bool TaylorFastAddThirdOrder>
+struct SarBpTaylorFastSharedMemory<false, TaylorFastAddThirdOrder> {
+    // Keep Variable-Z values consumed by each pulse together. This layout lets
+    // ptxas schedule the six vector loads for a four-pulse unrolled group close
+    // to their uses while meeting the six-CTA register constraint.
+    float4 geometry[PULSE_BLOCK_SIZE]; // ux, uy, uz, half_inv_R
+    int2 ref_bin[PULSE_BLOCK_SIZE];     // integer bin and fractional-bin bits
+    double ref_x;
+    double ref_y;
+    double ref_z;
+};
+
+template <>
+struct SarBpTaylorFastSharedMemory<true, false> {
+    // Uniform pixel z does not consume uz, so do not cache it. Store the five
+    // consumed values in separate arrays; across the four-way unrolled pulse
+    // loop, ptxas combines four adjacent entries from each array into five
+    // LDS.128 loads.
     int32_t ref_bin_int[PULSE_BLOCK_SIZE];
     float  ref_bin_frac[PULSE_BLOCK_SIZE];
     float  ux          [PULSE_BLOCK_SIZE];
     float  uy          [PULSE_BLOCK_SIZE];
-    float  uz          [PULSE_BLOCK_SIZE];
     float  half_inv_R  [PULSE_BLOCK_SIZE];
     double ref_x;
     double ref_y;
@@ -216,8 +239,20 @@ struct SarBpTaylorFastSharedMemory {
 };
 
 template <>
-struct SarBpPulseBlockCache<SarBpComputeType::TaylorFast, true> :
-    SarBpTaylorFastSharedMemory {};
+struct SarBpTaylorFastSharedMemory<true, true> {
+    // The third-order Uniform-Z path benefits from keeping each pulse's values
+    // together so its additional arithmetic does not extend vector live ranges.
+    float4 geometry[PULSE_BLOCK_SIZE]; // ux, uy, half_inv_R, ref_bin_frac
+    int32_t ref_bin[PULSE_BLOCK_SIZE];
+    double ref_x;
+    double ref_y;
+    double ref_z;
+};
+
+template <bool PixelZIsUniform, bool TaylorFastAddThirdOrder>
+struct SarBpPulseBlockCache<SarBpComputeType::TaylorFast, true, PixelZIsUniform,
+                            TaylorFastAddThirdOrder> :
+    SarBpTaylorFastSharedMemory<PixelZIsUniform, TaylorFastAddThirdOrder> {};
 
 template <SarBpComputeType ComputeType, bool PhaseLUT>
 struct SarBpThreadState {};
@@ -266,9 +301,9 @@ struct SarBpThreadState<SarBpComputeType::TaylorFast, true> {
 // Domain: at least one of dx/dy/dz must not fully cancel (sum of squared
 // distances must be strictly positive) -- three-way simultaneous
 // cancellation is not a meaningful SAR geometry and is not supported.
-template <bool UseCachedPz2 = false, typename IdxT = index_t>
+template <bool UseCachedPz2 = false, bool PixelZIsUniform = false, typename IdxT = index_t>
 __device__ inline SarBpBinAndWeight<float> ComputeBinWeightToPixelFloatFloat(
-    const SarBpPulseBlockCache<SarBpComputeType::FloatFloat, true> &sh_mem,
+    const SarBpPulseBlockCache<SarBpComputeType::FloatFloat, true, PixelZIsUniform> &sh_mem,
     IdxT ip,
     float px, float py, [[maybe_unused]] float pz,
     fltflt dr_inv)
@@ -375,9 +410,11 @@ __device__ inline SarBpBinAndWeight<float> ComputeBinWeightToPixelFloatFloat(
     };
 }
 
-template <bool TaylorFastAddThirdOrder = false, bool PixelZIsUniform = false, typename IdxT = index_t>
+template <bool TaylorFastAddThirdOrder = false, bool PixelZIsUniform = false,
+          typename IdxT = index_t>
 __device__ inline SarBpBinAndWeight<float> ComputeBinWeightToPixelTaylorFast(
-    const SarBpPulseBlockCache<SarBpComputeType::TaylorFast, true> &sh_mem,
+    const SarBpPulseBlockCache<SarBpComputeType::TaylorFast, true, PixelZIsUniform,
+                               TaylorFastAddThirdOrder> &sh_mem,
     const SarBpThreadState<SarBpComputeType::TaylorFast, true> &thread_state,
     IdxT ip)
 {
@@ -385,40 +422,66 @@ __device__ inline SarBpBinAndWeight<float> ComputeBinWeightToPixelTaylorFast(
     // the dot product of the along-range unit vector u=(ux, uy, uz) with the local offset d,
     // and q as the squared perpendicular distance from the local pixel
     // to the pulse-to-reference-pixel line. These calculations then map directly to the
-    // derivation. We split the reference bin b_0 from the writeup into ref_bin_int and
-    // ref_bin_frac to preserve the fractional interpolation weight: otherwise,
-    // b_0 can be large enough that storing it as a float loses low-order bin
-    // precision. The inner loop computes only ref_bin_frac + delta_bin in fp32;
-    // the integer component is added back after floorf(), relying on the exact
-    // identity floor(n + x) = n + floor(x) for integer n while avoiding the
-    // lossy fp32 computation of n + x. ref_bin_int and ref_bin_frac
-    // are per-pulse values that were populated in FillPulseBlockCache.
+    // derivation. We store the integer component of the reference bin b_0 in
+    // ref_bin.x for variable z and directly in a scalar array for uniform z.
+    // Its fractional component remains separate to preserve the interpolation
+    // weight: otherwise, b_0 can be large enough that storing it as a float
+    // loses low-order bin precision. Variable z stores the fractional
+    // component's bit pattern in ref_bin.y. Uniform z stores the float either
+    // in geometry.w or in its own array, depending on the selected layout. The
+    // inner loop adds delta_bin to that fraction in fp32, floors the sum, and
+    // then adds the reference integer component back. This relies on the exact
+    // identity
+    // floor(n + x) = n + floor(x) for integer n while avoiding the lossy fp32
+    // computation of n + x. Both packed components are per-pulse values
+    // populated in FillPulseBlockCache.
     // With PixelZIsUniform, every pixel shares the per-block reference's z
     // (z == 0 for Zero, or a common constant for Fixed), so ref_dz == 0 and the
     // uz term drops out of the dot product.
-    float s = sh_mem.ux[ip] * thread_state.ref_dx +
-              sh_mem.uy[ip] * thread_state.ref_dy;
-    if constexpr (!PixelZIsUniform) {
-        s += sh_mem.uz[ip] * thread_state.ref_dz;
+    float s;
+    float half_inv_R;
+    float ref_bin_frac;
+    int32_t ref_bin_int;
+    if constexpr (PixelZIsUniform && !TaylorFastAddThirdOrder) {
+        s = sh_mem.ux[ip] * thread_state.ref_dx +
+            sh_mem.uy[ip] * thread_state.ref_dy;
+        half_inv_R = sh_mem.half_inv_R[ip];
+        ref_bin_frac = sh_mem.ref_bin_frac[ip];
+        ref_bin_int = sh_mem.ref_bin_int[ip];
+    } else if constexpr (PixelZIsUniform) {
+        const float4 geometry = sh_mem.geometry[ip];
+        s = geometry.x * thread_state.ref_dx +
+            geometry.y * thread_state.ref_dy;
+        half_inv_R = geometry.z;
+        ref_bin_frac = geometry.w;
+        ref_bin_int = sh_mem.ref_bin[ip];
+    } else {
+        const float4 geometry = sh_mem.geometry[ip];
+        const int2 ref_bin = sh_mem.ref_bin[ip];
+        s = geometry.x * thread_state.ref_dx +
+            geometry.y * thread_state.ref_dy +
+            geometry.z * thread_state.ref_dz;
+        half_inv_R = geometry.w;
+        ref_bin_frac = __int_as_float(ref_bin.y);
+        ref_bin_int = ref_bin.x;
     }
     const float q = fmaf(-s, s, thread_state.ref_dsq);
-    const float half_inv_R = sh_mem.half_inv_R[ip];
     const float dR_2nd = fmaf(q, half_inv_R, s);
     float dR = dR_2nd;
     if constexpr (TaylorFastAddThirdOrder) {
         dR = fmaf(-2.0f * half_inv_R * half_inv_R * s, q, dR_2nd);
     }
-    const float bin_loc = fmaf(dR, thread_state.dr_inv_f32, sh_mem.ref_bin_frac[ip]);
+    const float bin_loc = fmaf(dR, thread_state.dr_inv_f32, ref_bin_frac);
     const float bin_floor = ::floorf(bin_loc);
     return SarBpBinAndWeight<float>{
         bin_loc - bin_floor,
-        sh_mem.ref_bin_int[ip] + static_cast<int32_t>(bin_floor)
+        ref_bin_int + static_cast<int32_t>(bin_floor)
     };
 }
 
-template <SarBpComputeType ComputeType, bool PixelZIsZero, bool UseCachedDz2, typename strict_compute_t, typename loose_compute_t, typename IdxT>
+template <SarBpComputeType ComputeType, bool PixelZIsZero, bool UseCachedDz2, bool PixelZIsUniform, typename strict_compute_t, typename loose_compute_t, typename IdxT>
 __device__ inline SarBpBinAndWeight<loose_compute_t> ComputeBinWeightToPixelPulseBlockCache(
-    const SarBpPulseBlockCache<ComputeType, true> &sh_mem,
+    const SarBpPulseBlockCache<ComputeType, true, PixelZIsUniform> &sh_mem,
     IdxT ip,
     loose_compute_t px,
     loose_compute_t py,
@@ -476,6 +539,7 @@ __device__ inline SarBpBinAndWeight<loose_compute_t> ComputeBinWeightToPixelPuls
 template <SarBpComputeType ComputeType, SarBpPixelZMode PixelZMode, bool TaylorFastAddThirdOrder>
 struct SarBpMinCtaCount { static constexpr int value = 5; };
 
+template <> struct SarBpMinCtaCount<SarBpComputeType::TaylorFast, SarBpPixelZMode::Variable, false> { static constexpr int value = 6; };
 template <> struct SarBpMinCtaCount<SarBpComputeType::TaylorFast, SarBpPixelZMode::Zero, false> { static constexpr int value = 6; };
 template <> struct SarBpMinCtaCount<SarBpComputeType::TaylorFast, SarBpPixelZMode::Fixed, false> { static constexpr int value = 6; };
 template <> struct SarBpMinCtaCount<SarBpComputeType::Float, SarBpPixelZMode::Zero, false> { static constexpr int value = 6; };
@@ -615,8 +679,11 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
         IsFloatFloat ||
         IsTaylorFast ||
         ((IsFloat || IsMixed) && PhaseLUT);
+    constexpr bool TaylorFastThirdOrderCache =
+        IsTaylorFast && TaylorFastAddThirdOrder;
 
-    __shared__ SarBpPulseBlockCache<ComputeType, UsePulseBlockCache> sh_mem;
+    __shared__ SarBpPulseBlockCache<ComputeType, UsePulseBlockCache, PixelZIsUniform,
+                                    TaylorFastThirdOrderCache> sh_mem;
 
     if constexpr (!UsePulseBlockCache) {
         // When the cache is enabled, keep all threads active so they can
@@ -845,12 +912,29 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
                     const strict_compute_t bin_floor = ::floor(ref_bin);
                     const strict_compute_t inv_R_d = static_cast<strict_compute_t>(1.0) / ref_range_pure;
 
-                    sh_mem.ref_bin_int [ip] = static_cast<int32_t>(bin_floor);
-                    sh_mem.ref_bin_frac[ip] = static_cast<float>(ref_bin - bin_floor);
-                    sh_mem.ux          [ip] = static_cast<float>(dxa * inv_R_d);
-                    sh_mem.uy          [ip] = static_cast<float>(dya * inv_R_d);
-                    sh_mem.uz          [ip] = static_cast<float>(dza * inv_R_d);
-                    sh_mem.half_inv_R  [ip] = static_cast<float>(static_cast<strict_compute_t>(0.5) * inv_R_d);
+                    const int32_t ref_bin_int = static_cast<int32_t>(bin_floor);
+                    const float ref_bin_frac = static_cast<float>(ref_bin - bin_floor);
+                    const float ux = static_cast<float>(dxa * inv_R_d);
+                    const float uy = static_cast<float>(dya * inv_R_d);
+                    const float half_inv_R = static_cast<float>(static_cast<strict_compute_t>(0.5) * inv_R_d);
+                    if constexpr (PixelZIsUniform && !TaylorFastAddThirdOrder) {
+                        sh_mem.ref_bin_int[ip] = ref_bin_int;
+                        sh_mem.ref_bin_frac[ip] = ref_bin_frac;
+                        sh_mem.ux[ip] = ux;
+                        sh_mem.uy[ip] = uy;
+                        sh_mem.half_inv_R[ip] = half_inv_R;
+                    } else if constexpr (PixelZIsUniform) {
+                        sh_mem.ref_bin[ip] = ref_bin_int;
+                        sh_mem.geometry[ip] = float4{ux, uy, half_inv_R, ref_bin_frac};
+                    } else {
+                        sh_mem.ref_bin[ip] = int2{ref_bin_int, __float_as_int(ref_bin_frac)};
+                        sh_mem.geometry[ip] = float4{
+                            ux,
+                            uy,
+                            static_cast<float>(dza * inv_R_d),
+                            half_inv_R
+                        };
+                    }
                 } else {
                     // Float / Mixed: cast inputs to strict_compute_t (float / double)
                     // once per pulse here, instead of once per pulse per pixel.
@@ -904,13 +988,14 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
             // thread_state.range_delta member for use in get_reference_phase_direct().
             SarBpBinAndWeight<loose_compute_t> bin_weight;
             if constexpr (IsFloatFloat) {
-                bin_weight = ComputeBinWeightToPixelFloatFloat<UseCachedPz2FF>(sh_mem, ip, px, py, pz, dr_inv);
+                bin_weight = ComputeBinWeightToPixelFloatFloat<UseCachedPz2FF, PixelZIsUniform>(sh_mem, ip, px, py, pz, dr_inv);
             } else if constexpr (IsTaylorFast) {
                 static_assert(PhaseLUT == true, "SarBp: TaylorFast compute type requires PhaseLUT optimization");
                 // Zero and Fixed both make ref_dz == 0, so PixelZIsUniform drives the elision.
-                bin_weight = ComputeBinWeightToPixelTaylorFast<TaylorFastAddThirdOrder, PixelZIsUniform>(sh_mem, thread_state, ip);
+                bin_weight = ComputeBinWeightToPixelTaylorFast<
+                    TaylorFastAddThirdOrder, PixelZIsUniform>(sh_mem, thread_state, ip);
             } else if constexpr (UsePulseBlockCache) {
-                bin_weight = ComputeBinWeightToPixelPulseBlockCache<ComputeType, PixelZIsZero, UseCachedDz2>(sh_mem, ip, px, py, pz, dr_inv);
+                bin_weight = ComputeBinWeightToPixelPulseBlockCache<ComputeType, PixelZIsZero, UseCachedDz2, PixelZIsUniform>(sh_mem, ip, px, py, pz, dr_inv);
             } else {
                 // Below is the most direct / standard path for backprojection. We compute the distance
                 // from the antenna phase center to the pixel for this pulse and from that the differential range
