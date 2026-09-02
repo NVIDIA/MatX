@@ -23,7 +23,7 @@ Conan index rather than creating a local package from this repository. For examp
 
 .. code-block:: shell
 
-  conan install matx/1.0.0
+  conan install --requires=matx/1.0.0
 
 After installing, use CMake to locate and link MatX:
 
@@ -454,7 +454,7 @@ internet-enabled system and transfer the Conan client cache to the offline envir
     # Or use a temporary consumer project to populate the cache via install
     mkdir /tmp/matx_consumer && cd /tmp/matx_consumer
     conan new hello/0.1 -t
-    conan install matx/1.0.0
+    conan install --requires=matx/1.0.0
 
 3. Archive the populated Conan cache (default: `~/.conan2` or `CONAN_USER_HOME`) for transfer:
 
@@ -478,4 +478,4 @@ internet-enabled system and transfer the Conan client cache to the offline envir
 
   .. code-block:: shell
 
-    conan install matx/1.0.0
+    conan install --requires=matx/1.0.0
