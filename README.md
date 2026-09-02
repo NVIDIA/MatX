@@ -270,7 +270,7 @@ MatX currently targets Linux and requires a C++20 build environment. GPU builds 
 MatX is available from the Conan Center Index. Install the appropriate package with:
 
 ```sh
-conan install matx/<version>  # e.g. matx/1.0.0
+conan install --requires=matx/<version>  # e.g. matx/1.0.0
 ```
 
 Then use CMake to locate and link MatX:
