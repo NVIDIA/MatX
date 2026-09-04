@@ -133,7 +133,7 @@ in an incorrect phase reference.
 The `--precision` flag controls the arithmetic used by the `sar_bp` operator. For spaceborne SAR, `float` does not provide enough precision to store fractional wavelengths at the range-to-MCP magnitudes (hundreds of km), so pure `float` is not sufficient to produce focused images. The available modes are:
 
 - `double` -- full double-precision arithmetic. Most accurate.
-- `mixed` -- double-precision for range computation, single-precision elsewhere. Default. Close to `double` in image quality with slightly higher throughput on GPUs with reduced double-precision throughput. Among the reference-quality modes it is the fastest on hardware with full-throughput double-precision (e.g., A100, H100/H200, B200); the approximate `taylor_fast` mode is faster still.
+- `mixed` -- double-precision for range computation, single-precision elsewhere. Close to `double` in image quality with slightly higher throughput on GPUs with reduced double-precision throughput. Among the reference-quality modes it is the fastest on hardware with full-throughput double-precision (e.g., A100, H100/H200, B200); the approximate `taylor_fast` mode is faster still.
 - `fltflt` -- float-float evaluation using two `float` values for the high-precision range math. Significantly higher throughput on GPUs where `double` throughput is reduced (e.g., RTX PROs, Jetson Orin/Thor, gaming GPUs).
 - `taylor_fast` -- local Taylor approximation of the pulse-to-pixel range about a centered per-thread-block reference point. Highest-throughput experimental mode for spaceborne SAR geometries where moderate approximation error is acceptable.
 - `float` -- single-precision throughout. Fastest but not accurate enough for most spaceborne data.
@@ -193,7 +193,7 @@ All results use the Umbra open-data collection referenced above, processed into 
 | 8192 x 8192 | ~5.73 km | 0.699 m | 1.0° | 11,566 | 776 |
 | 20800 x 20800 | ~8.22 km | 0.395 m | 2.0° | 23,178 | 10,028 |
 
-A backprojection is the unit of computation required for a single pixel-pulse contribution. For the "small" scene, there are 8192 x 8192 x 11566 = 776.18 billion backprojections, or ~776 giga backprojections. Both scenarios are X-band (9.6 GHz), ~770 km slant range, ~43° grazing angle. All runs use `--warmup` and `--pixel-z zero` (the image grid is planar at Z=0, so `zero` is exact here and is a few percent faster than `variable`). Throughput is reported with the optimal `--image-tiles` for each configuration and the default `-b auto`, which selects a 256-pulse block for this data on every GPU tested (see [Image Tiling](#image-tiling)). As the [Pulse-block size](#pulse-block-size) section shows, `-b` is itself a significant knob, so a manually tuned `(--image-tiles, -b)` pair can exceed these `-b auto` rates on some GPUs.
+A backprojection is the unit of computation required for a single pixel-pulse contribution. For the "small" scene, there are 8192 x 8192 x 11566 = 776.18 billion backprojections, or ~776 giga backprojections. Both scenarios are X-band (9.6 GHz), ~770 km slant range, ~43° grazing angle. All runs use `--warmup`, `--pixel-z zero` (the image grid is planar at Z=0, so `zero` is exact here and is a few percent faster than `variable`), a 256-pulse block (`-b 256`), and the optimal `--image-tiles` for each configuration.
 
 > **Note:** All compute types except `double` use the phase lookup-table (PhaseLUT) optimization, which precomputes the per-range-bin phase ramp once and then applies a per-pixel per-pulse correction. `double` runs without PhaseLUT as it operates as the reference for accuracy comparisons.
 
@@ -269,13 +269,13 @@ Because both compete for the same L2, the optimal block size depends on the tili
 - While pulse blocking alone may be sufficient for GPUs with more L2 cache, both image tiling and pulse blocking are beneficial for smaller L2 caches.
 - Sweeps on GH200 and DGX Spark did not show a benefit below 256 pulses. The backprojection kernel amortizes work in 256-pulse units, so automatic selection uses 256 pulses as both its minimum and its block-size granularity. If that minimum creates too much L2 pressure, the heuristic increases image tiling instead of selecting a smaller pulse block.
 
-By default, `-b auto` and `--image-tiles auto` select the two values together. For an N x N image grid, the heuristic estimates the reusable working set as `(phase lookup table + pulse-profile working set) / (N*N)`. It uses a soft cache target of half of L2, with a 16 MiB minimum target to avoid undersized blocks on GPUs with small L2 caches, and an 80%-of-L2 hard limit. The smallest image tile count that satisfies the hard limit is preferred because over-tiling adds kernel-launch overhead. An explicit value for either option is preserved while the other automatic option is selected around it.
+By default, `-b auto` and `--image-tiles auto` auto selects both values. For an N x N image grid, the heuristic estimates the reusable working set as `(phase lookup table + pulse-profile working set) / N`, since each tile covers approximately 1/N of the range-bin span. The automatic heuristic attempts to trade off working set sizes (smaller for better L2 hit rates) and kernel launch overhead (smaller for fewer launches). An explicit value for either option is preserved while the other automatic option is selected around it.
 
 The automatic pulse blocking / image tiling logic in the `sarbp` example may change over time, but users can always manually sweep using `--image-tiles` and `-b`.
 
 ## Appendix: Per-configuration run times
 
-Full-frame backprojection run times in seconds for every GPU and ComputeType, using the optimal `--image-tiles` per configuration and the default `-b auto` (see [Image Tiling](#image-tiling)). Each cell is `pixel-z variable / pixel-z zero`; `zero` is exact for this planar Z=0 grid and is the value plotted in the figure above. Throughput in Gbp/s can be recovered as (work) / (run time), where the work is 776.2 Gbp for the 8192 x 8192 frame and 10,027.7 Gbp for the 20800 x 20800 frame. `n/r` = not run (`double` at 20k on Thor would take ~3.5 hours).
+Full-frame backprojection run times in seconds for every GPU and ComputeType, using a 256-pulse block (`-b 256`) and the optimal `--image-tiles` per configuration (see [Image Tiling](#image-tiling)). Each cell is `pixel-z variable / pixel-z zero`; `zero` is exact for this planar Z=0 grid and is the value plotted in the figure above. Throughput in Gbp/s can be recovered as (work) / (run time), where the work is 776.2 Gbp for the 8192 x 8192 frame and 10,027.7 Gbp for the 20800 x 20800 frame. `n/r` = not run (`double` at 20k on Thor would take ~3.5 hours).
 
 <h4 align="center">8192 x 8192 pixels, 11,566 pulses</h4>
 

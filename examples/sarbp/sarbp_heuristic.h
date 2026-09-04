@@ -43,7 +43,8 @@ namespace matx::examples::sarbp {
 
 inline constexpr double AUTO_SOFT_L2_TARGET_MULTIPLIER = 0.50;
 inline constexpr double AUTO_HARD_L2_LIMIT_MULTIPLIER = 0.80;
-inline constexpr std::size_t AUTO_MIN_CACHE_TARGET_BYTES = 16ULL * 1024ULL * 1024ULL;
+inline constexpr std::size_t AUTO_PREFERRED_MIN_CACHE_TARGET_BYTES =
+    16ULL * 1024ULL * 1024ULL;
 inline constexpr index_t AUTO_BLOCK_GRANULARITY = 256;
 inline constexpr index_t AUTO_MIN_BLOCK_SIZE = 256;
 
@@ -64,8 +65,7 @@ inline double estimate_working_set_bytes(index_t block_size,
   const double profile_bytes =
       static_cast<double>(std::max<index_t>(block_size, 0)) *
       static_cast<double>(profile_bytes_per_pulse);
-  return (static_cast<double>(phase_lut_bytes) + profile_bytes) /
-      (tiles * tiles);
+  return (static_cast<double>(phase_lut_bytes) + profile_bytes) / tiles;
 }
 
 inline index_t round_to_nearest_multiple(double value, index_t multiple)
@@ -132,10 +132,11 @@ inline AutoConfig choose_auto_config(index_t num_pulses,
 
   const double l2_bytes = static_cast<double>(l2_cache_bytes);
   const double hard_limit = l2_bytes * AUTO_HARD_L2_LIMIT_MULTIPLIER;
-  const double soft_target = std::min(
+  const double preferred_min_target = std::min(
       hard_limit,
-      std::max(l2_bytes * AUTO_SOFT_L2_TARGET_MULTIPLIER,
-               static_cast<double>(AUTO_MIN_CACHE_TARGET_BYTES)));
+      static_cast<double>(AUTO_PREFERRED_MIN_CACHE_TARGET_BYTES));
+  const double soft_target = std::max(
+      l2_bytes * AUTO_SOFT_L2_TARGET_MULTIPLIER, preferred_min_target);
   result.hard_cache_limit_bytes = static_cast<std::size_t>(hard_limit);
   result.soft_cache_target_bytes = static_cast<std::size_t>(soft_target);
 
@@ -150,7 +151,7 @@ inline AutoConfig choose_auto_config(index_t num_pulses,
   if (auto_block) {
     const double tiles = static_cast<double>(result.image_tiles);
     const double profile_budget = std::max(
-        0.0, soft_target * tiles * tiles -
+        0.0, soft_target * tiles -
             static_cast<double>(phase_lut_bytes));
     const double raw_block_size =
         profile_budget / static_cast<double>(profile_bytes_per_pulse);

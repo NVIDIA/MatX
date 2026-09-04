@@ -191,7 +191,7 @@ static bool parse_image_tiles_arg(const std::string &arg, ImageTilesSelection &s
   return true;
 }
 
-static size_t get_phase_lut_bytes(index_t output_range_bins, const SarBpParams &params)
+static size_t get_phase_lut_bytes(index_t range_bins, const SarBpParams &params)
 {
   if (!has_feature(params.features, SarBpFeature::PhaseLUTOptimization)) {
     return 0;
@@ -200,7 +200,43 @@ static size_t get_phase_lut_bytes(index_t output_range_bins, const SarBpParams &
   const size_t elem_size = (params.compute_type == SarBpComputeType::Double)
       ? sizeof(cuda::std::complex<double>)
       : sizeof(cuda::std::complex<float>);
-  return static_cast<size_t>(output_range_bins) * elem_size;
+  return static_cast<size_t>(range_bins) * elem_size;
+}
+
+// Estimate the largest range interval touched by any pulse over the complete
+// image. The image is an axis-aligned rectangle, so the nearest point is found
+// by clamping the platform position to the rectangle and the farthest point is
+// one of its corners.
+static double estimate_max_image_range_span(const double3 *positions,
+                                            index_t num_pulses,
+                                            double image_x0, double image_x1,
+                                            double image_y0, double image_y1,
+                                            double image_z)
+{
+  const double min_x = std::min(image_x0, image_x1);
+  const double max_x = std::max(image_x0, image_x1);
+  const double min_y = std::min(image_y0, image_y1);
+  const double max_y = std::max(image_y0, image_y1);
+  double max_range_span = 0.0;
+
+  for (index_t pulse = 0; pulse < num_pulses; ++pulse) {
+    const double3 position = positions[pulse];
+    const double near_dx = position.x - std::clamp(position.x, min_x, max_x);
+    const double near_dy = position.y - std::clamp(position.y, min_y, max_y);
+    const double dz = position.z - image_z;
+    const double near_range = std::sqrt(
+        near_dx * near_dx + near_dy * near_dy + dz * dz);
+
+    const double far_dx = std::max(
+        std::abs(position.x - min_x), std::abs(position.x - max_x));
+    const double far_dy = std::max(
+        std::abs(position.y - min_y), std::abs(position.y - max_y));
+    const double far_range = std::sqrt(
+        far_dx * far_dx + far_dy * far_dy + dz * dz);
+    max_range_span = std::max(max_range_span, far_range - near_range);
+  }
+
+  return max_range_span;
 }
 
 // Aggregate of non-tensor state needed by run_bp_device(). Kept separate from
@@ -1252,6 +1288,14 @@ int main(int argc, char **argv) {
   fin.close();
   std::cout << "Loaded " << num_pulses << " pulses from .sarbp file" << std::endl;
 
+  const auto voxel_end_x = hdr.voxel_start_x +
+      hdr.voxel_stride_x * static_cast<double>(image_width - 1);
+  const auto voxel_end_y = hdr.voxel_start_y +
+      hdr.voxel_stride_y * static_cast<double>(image_height - 1);
+  const double max_image_range_span = estimate_max_image_range_span(
+      h_positions, num_pulses, hdr.voxel_start_x, voxel_end_x,
+      hdr.voxel_start_y, voxel_end_y, 0.0);
+
   // If the user selected fltflt precision, convert the platform positions
   // in-place from double to fltflt. Convert range_to_mcp here as well unless
   // bulk mocomp is enabled. In that case it remains double through upload and
@@ -1315,9 +1359,6 @@ int main(int argc, char **argv) {
   // -------------------------------------------------------------------
   // Construct voxel grid
   // -------------------------------------------------------------------
-  const auto voxel_end_x = hdr.voxel_start_x + hdr.voxel_stride_x * static_cast<double>(image_width - 1);
-  const auto voxel_end_y = hdr.voxel_start_y + hdr.voxel_stride_y * static_cast<double>(image_height - 1);
-
   auto pix_coords_x = matx::linspace<float>(
       static_cast<float>(hdr.voxel_start_x),
       static_cast<float>(voxel_end_x),
@@ -1363,9 +1404,12 @@ int main(int argc, char **argv) {
   // Block processing: range compression (if FX) + backprojection
   // -------------------------------------------------------------------
   size_t l2_cache_bytes = 0;
+  const index_t active_range_bins = std::min(
+      output_range_bins,
+      static_cast<index_t>(std::ceil(max_image_range_span / del_r)) + 2);
   const size_t profile_bytes_per_pulse =
-      static_cast<size_t>(output_range_bins) * sizeof(complex_t);
-  const size_t phase_lut_bytes = get_phase_lut_bytes(output_range_bins, params);
+      static_cast<size_t>(active_range_bins) * sizeof(complex_t);
+  const size_t phase_lut_bytes = get_phase_lut_bytes(active_range_bins, params);
 
   const bool auto_block_size = block_size_selection.mode == BlockSizeMode::Auto;
   const bool auto_image_tiles = image_tiles_selection.mode == ImageTilesMode::Auto;
@@ -1415,7 +1459,8 @@ int main(int argc, char **argv) {
               << static_cast<double>(auto_config.hard_cache_limit_bytes) / (1024.0 * 1024.0)
               << " MiB, profiles "
               << static_cast<double>(profile_bytes_per_pulse) / 1024.0
-              << " KiB/pulse, phase LUT "
+              << " KiB/pulse (" << active_range_bins << "/"
+              << output_range_bins << " range bins), phase LUT "
               << static_cast<double>(phase_lut_bytes) / (1024.0 * 1024.0)
               << " MiB" << std::endl;
     std::cout << "  Estimated set  : "
