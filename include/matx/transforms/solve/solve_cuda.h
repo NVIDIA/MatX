@@ -302,12 +302,12 @@ public:
       SetBatchPointers<BatchType::MATRIX>(b_col, h_b_array);
     }
 
-    cudaMemcpyAsync(d_a_array_.get(), h_a_array.data(),
+    MATX_CUDA_CHECK(cudaMemcpyAsync(d_a_array_.get(), h_a_array.data(),
                     h_a_array.size() * sizeof(T *), cudaMemcpyHostToDevice,
-                    stream);
-    cudaMemcpyAsync(d_b_array_.get(), h_b_array.data(),
+                    stream));
+    MATX_CUDA_CHECK(cudaMemcpyAsync(d_b_array_.get(), h_b_array.data(),
                     h_b_array.size() * sizeof(T *), cudaMemcpyHostToDevice,
-                    stream);
+                    stream));
 
     [[maybe_unused]] auto ret = cublasSetStream(handle_.get(), stream);
     MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxSolverError);
@@ -317,9 +317,9 @@ public:
     MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxSolverError);
 
     std::vector<int> h_info(batch_size);
-    cudaMemcpyAsync(h_info.data(), d_info_.get(), sizeof(int) * batch_size,
-                    cudaMemcpyDeviceToHost, stream);
-    cudaStreamSynchronize(stream);
+    MATX_CUDA_CHECK(cudaMemcpyAsync(h_info.data(), d_info_.get(), sizeof(int) * batch_size,
+                    cudaMemcpyDeviceToHost, stream));
+    MATX_CUDA_CHECK(cudaStreamSynchronize(stream));
     CheckDenseSolveInfos(h_info, "cuBLAS", "getrfBatched");
 
     int h_getrs_info = 0;
@@ -409,10 +409,10 @@ public:
     }
 
     std::vector<int> h_info(params_.batch_size);
-    cudaMemcpyAsync(h_info.data(), d_info_.get(),
+    MATX_CUDA_CHECK(cudaMemcpyAsync(h_info.data(), d_info_.get(),
                     sizeof(int) * params_.batch_size, cudaMemcpyDeviceToHost,
-                    stream);
-    cudaStreamSynchronize(stream);
+                    stream));
+    MATX_CUDA_CHECK(cudaStreamSynchronize(stream));
     CheckDenseSolveInfos(h_info, "cuSolver", "Xgetrf");
 
     for (uint32_t i = 0; i < params_.batch_size; i++) {
@@ -425,10 +425,10 @@ public:
       MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
     }
 
-    cudaMemcpyAsync(h_info.data(), d_info_.get(),
+    MATX_CUDA_CHECK(cudaMemcpyAsync(h_info.data(), d_info_.get(),
                     sizeof(int) * params_.batch_size, cudaMemcpyDeviceToHost,
-                    stream);
-    cudaStreamSynchronize(stream);
+                    stream));
+    MATX_CUDA_CHECK(cudaStreamSynchronize(stream));
     CheckDenseSolveInfos(h_info, "cuSolver", "Xgetrs");
   }
 
