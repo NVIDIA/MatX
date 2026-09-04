@@ -33,6 +33,15 @@ batch-sharded ``matmul``, ``chol``, and ``fft`` when their operation dimensions
 remain local. See :ref:`distributed-tensors` for its constraints. Other
 existing operators do not implicitly become distributed operations.
 
+The regular transform APIs select collective backends from the distributed
+input layout. Rank-2 block-cyclic ``matmul`` and ``chol`` expressions require a
+communicator-configured ``distributedCUDAExecutor`` and use cuBLASMp and
+cuSOLVERMp, respectively. A rank-1 complex ``fft`` or ``ifft`` whose transform
+dimension spans multiple local GPUs uses cuFFT Xt/Mg with the same executor
+type. The executor provides streams, communicator state, and backend handles;
+it does not choose the mathematical operation. These paths are collective or
+synchronizing boundaries and do not participate in JIT fusion.
+
 .. csv-table:: Operator Executor Compatibility Matrix
    :header: "Operator", "HostExecutor", "CUDAExecutor", "CUDAJITExecutor", "distributedCUDAExecutor", "Notes"
    :widths: 22 12 10 12 18 46
@@ -80,7 +89,7 @@ existing operators do not implicitly become distributed operations.
    "cgsolve", "|no|", "|yes|", "|no|", "|no|", "CUDA iterative solver path."
    "channelize_poly", "|yes|", "|yes|", "|no|", "|no|", "Polyphase channelizer; host path directly computes the per-branch FIR and DFT stages."
    "chirp", "|yes|", "|yes|", "|yes|", "|no|", "Generator expression."
-   "chol", "|yes|", "|yes|", "|yes|", "|partial|", "Host support requires the CPU solver backend. CUDAJITExecutor support uses cuSolverDx through MathDx for supported rank 2-4 square float, double, complex-float, and complex-double matrices. Experimental distributedCUDAExecutor support is limited to aligned batch sharding with fully local matrix dimensions."
+   "chol", "|yes|", "|yes|", "|yes|", "|partial|", "Host support requires the CPU solver backend. CUDAJITExecutor support uses cuSolverDx through MathDx for supported rank 2-4 square float, double, complex-float, and complex-double matrices. Experimental distributedCUDAExecutor support covers aligned batch sharding and communicator-backed rank-2 block-cyclic cuSOLVERMp execution."
    "clone", "|yes|", "|yes|", "|yes|", "|no|", "View expression."
    "concat", "|yes|", "|yes|", "|yes|", "|no|", "View/expression composition."
    "conj", "|yes|", "|yes|", "|yes|", "|no|", "Element-wise expression."
@@ -104,7 +113,7 @@ existing operators do not implicitly become distributed operations.
    "exp", "|yes|", "|yes|", "|yes|", "|no|", "Element-wise expression."
    "expj", "|yes|", "|yes|", "|yes|", "|no|", "Element-wise expression."
    "eye", "|yes|", "|yes|", "|yes|", "|no|", "Generator expression."
-   "fft", "|yes|", "|yes|", "|yes|", "|partial|", "Host support requires the CPU FFT backend. CUDAJITExecutor support uses cuFFTDx through MathDx for supported runtime shapes, precisions, and layouts. Experimental distributedCUDAExecutor support is limited to aligned batch sharding with a fully local transform dimension."
+   "fft", "|yes|", "|yes|", "|yes|", "|partial|", "Host support requires the CPU FFT backend. CUDAJITExecutor support uses cuFFTDx through MathDx for supported runtime shapes, precisions, and layouts. Experimental distributedCUDAExecutor support covers aligned batch sharding and rank-1 complex cuFFT Xt/Mg execution across local GPUs."
    "fft2", "|yes|", "|yes|", "|yes|", "|no|", "Host support requires the CPU FFT backend. CUDAJITExecutor support uses cuFFTDx through MathDx for supported 2D runtime shapes, precisions, and layouts."
    "fftfreq", "|yes|", "|yes|", "|yes|", "|no|", "Generator expression."
    "fftshift1D", "|yes|", "|yes|", "|yes|", "|no|", "View/reindex expression."
@@ -151,7 +160,7 @@ existing operators do not implicitly become distributed operations.
    "make_channelize_poly_stream", "|yes|", "|yes|", "|no|", "|no|", "Streaming (segmented) polyphase channelizer object; feeds segments through the one-shot channelize_poly over a retained history. Host and CUDA executors; the streaming object is a stateful driver, not a JIT-fusable expression."
    "make_conv1d_stream", "|yes|", "|yes|", "|no|", "|no|", "Streaming (segmented) 1D convolution object built on the direct conv1d; host and CUDA executors. The direct method limits the filter to 1024 taps. The streaming object is a stateful driver, not a JIT-fusable expression."
    "make_resample_poly_stream", "|yes|", "|yes|", "|no|", "|no|", "Streaming (segmented) polyphase resampler object; feeds segments through the one-shot resample_poly over a retained history. Host and CUDA executors; the streaming object is a stateful driver, not a JIT-fusable expression."
-   "matmul", "|yes|", "|yes|", "|yes|", "|partial|", "Host support requires the CPU BLAS backend and supported floating or complex types. CUDAJITExecutor support uses cuBLASDx through MathDx for supported runtime shapes, precisions, layouts, and block-size intersections. Experimental distributedCUDAExecutor support is limited to aligned batch sharding with fully local matrix dimensions."
+   "matmul", "|yes|", "|yes|", "|yes|", "|partial|", "Host support requires the CPU BLAS backend and supported floating or complex types. CUDAJITExecutor support uses cuBLASDx through MathDx for supported runtime shapes, precisions, layouts, and block-size intersections. Experimental distributedCUDAExecutor support covers aligned batch sharding and communicator-backed rank-2 block-cyclic cuBLASMp execution."
    "matrix_norm", "|partial|", "|yes|", "|no|", "|no|", "Reduction transform; host execution is available but reductions are not generally parallelized across host threads."
    "matvec", "|yes|", "|yes|", "|yes|", "|no|", "Host support requires the CPU BLAS backend and supported floating or complex types. CUDAJITExecutor support follows cuBLASDx matmul constraints."
    "max", "|partial|", "|yes|", "|no|", "|no|", "Reduction transform; host execution is available but reductions are not generally parallelized across host threads. Element-wise maximum through binary operators remains JIT-compatible."

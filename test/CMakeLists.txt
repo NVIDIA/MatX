@@ -26,6 +26,7 @@ set (test_sources
     00_tensor/DynamicTensorTests.cu
     00_tensor/DistributedTensorTests.cu
     00_tensor/DistributedTensorMultiGpuTests.cu
+    00_tensor/DistributedMpApiTests.cu
     ${OPERATOR_TEST_FILES}
     00_operators/GeneratorTests.cu
     00_operators/PWelch.cu
@@ -172,6 +173,39 @@ endfunction()
 foreach(test_file ${test_sources})
     create_test_executable(${test_file})
 endforeach()
+
+if(MATX_EN_CUBLASMP OR MATX_EN_CUSOLVERMP)
+    find_package(MPI REQUIRED COMPONENTS CXX)
+    add_executable(
+        test_00_tensor_DistributedMpIntegrationTests
+        00_tensor/DistributedMpIntegrationTests.cu
+    )
+    target_compile_options(
+        test_00_tensor_DistributedMpIntegrationTests
+        PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:${MATX_CUDA_FLAGS}>
+    )
+    target_include_directories(
+        test_00_tensor_DistributedMpIntegrationTests
+        PRIVATE "${target_inc}"
+        SYSTEM PRIVATE "${system_inc}"
+    )
+    target_link_libraries(
+        test_00_tensor_DistributedMpIntegrationTests
+        PRIVATE matx::matx gtest MPI::MPI_CXX
+    )
+    add_test(
+        NAME test_00_tensor_DistributedMpIntegrationTests
+        COMMAND
+            ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 2
+            ${MPIEXEC_PREFLAGS}
+            $<TARGET_FILE:test_00_tensor_DistributedMpIntegrationTests>
+            ${MPIEXEC_POSTFLAGS}
+    )
+    set_tests_properties(
+        test_00_tensor_DistributedMpIntegrationTests
+        PROPERTIES LABELS "multi_gpu;multi_node" RUN_SERIAL TRUE
+    )
+endif()
 
 # Create individual executables for proprietary tests
 foreach(test_file ${proprietary_sources})

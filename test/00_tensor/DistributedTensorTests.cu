@@ -235,6 +235,36 @@ TEST(DistributedTensor, BlockCyclicMapping) {
   EXPECT_EQ(distribution.LocalToGlobal(3, {0, 0})[1], 2);
   EXPECT_EQ(distribution.LocalToGlobal(0, {2, 2})[0], 4);
   EXPECT_EQ(distribution.LocalToGlobal(0, {2, 2})[1], 4);
+
+  block_cyclic_distribution_t column_major{
+      {8, 12},
+      {2, 2},
+      {2, 3},
+      {{0, 0}, {1, 0}, {2, 0}, {3, 0}, {4, 0}, {5, 0}},
+      distributed_grid_layout::column_major};
+  // Communicator rank 1 maps to process coordinate (1, 0), not (0, 1).
+  EXPECT_EQ(column_major.LocalToGlobal(1, {0, 0})[0], 2);
+  EXPECT_EQ(column_major.LocalToGlobal(1, {0, 0})[1], 0);
+}
+
+TEST(DistributedTensor, RegularOperatorsSelectBlockCyclicBackend) {
+  distributed_context context{{0}};
+  distributedCUDAExecutor executor{context};
+  block_cyclic_distribution_t distribution{
+      {4, 4}, {2, 2}, {1, 1}, {{0, 0}}};
+  auto a = make_distributed_tensor<float>(distribution, context);
+  auto b = make_distributed_tensor<float>(distribution, context);
+  auto output = make_distributed_tensor<float>(distribution, context);
+
+  auto matmul_op = matmul(a, b);
+  auto chol_op = chol(a);
+  static_assert(is_distributed_expression_v<decltype(matmul_op)>);
+  static_assert(is_distributed_expression_v<decltype(chol_op)>);
+
+  EXPECT_THROW((output = matmul_op).run(executor),
+               matx::detail::matxException);
+  EXPECT_THROW((output = chol_op).run(executor),
+               matx::detail::matxException);
 }
 
 TEST(DistributedTensor, PointwiseCopyAndMaterialize) {

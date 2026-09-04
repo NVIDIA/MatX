@@ -8,8 +8,10 @@ Status and goals
 
 ``experimental::distributed_tensor_t`` is a prototype for representing one
 logical tensor whose storage is split across CUDA devices and, eventually,
-processes. The prototype currently executes single-process, multi-GPU
-pointwise work, batch-local ``matmul``, ``chol``, and ``fft``, and gathers a
+processes. The prototype executes single-process, multi-GPU pointwise work,
+batch-local ``matmul``, ``chol``, and ``fft``, communicator-backed
+cuBLASMp and cuSOLVERMp execution selected by block-cyclic inputs, a cuFFT
+Xt/Mg transform selected when an FFT dimension spans local GPUs, and gathers a
 distributed tensor into a regular tensor. It is not yet a general distributed
 MatX operator system.
 
@@ -113,6 +115,80 @@ endpoints. The operation performs no communication, and each local call uses
 the same regular MatX accelerated path it would use for a non-distributed
 tensor.
 
+Collective MP linear algebra
+============================
+
+``block_cyclic_distribution_t`` describes the two-dimensional block-cyclic
+layout used by cuBLASMp and cuSOLVERMp. The endpoint vector is ordered by the
+selected process-grid layout and contains one endpoint per NCCL rank. The first
+collective configuration supports one local CUDA device per process:
+
+.. code-block:: cpp
+
+  #include <matx/distributed.h>
+
+  distributed_context context{{local_device}, mpi_rank, mpi_size};
+  block_cyclic_distribution_t layout{
+      {n, n}, {block_rows, block_columns}, {process_rows, process_columns},
+      endpoints};
+
+  // The application bootstraps and owns this NCCL communicator.
+  distributedCUDAExecutor exec{
+      context, nccl_communicator, process_rows, process_columns};
+  auto a = make_distributed_tensor<float>(layout, context);
+  auto b = make_distributed_tensor<float>(layout, context);
+  auto c = make_distributed_tensor<float>(layout, context);
+
+  (c = matmul(a, b)).run(exec);
+  (c = chol(a, SolverFillMode::LOWER)).run(exec);
+
+Both operations are collective: every rank in the process grid must enter them
+in the same order. The executor borrows the NCCL communicator, which must
+outlive the executor. MatX local views remain ordinary row-major tensors. The
+adapters pack them into the column-major local buffers required by the MP
+libraries and unpack the result, so the initial path favors correctness and
+interoperability over eliminating local layout conversions. The operations
+synchronize their local stream before returning because the libraries may
+retain host workspace during execution.
+
+Enable these paths with ``MATX_EN_CUBLASMP`` and ``MATX_EN_CUSOLVERMP``. They
+support rank-2 ``float``, ``double``, ``complex<float>``, and
+``complex<double>`` tensors. Batched MP operations, transpose modes, mixed
+precision, redistribution, and more solver factorizations remain future work.
+
+cuFFT multi-GPU
+===============
+
+The regular ``fft`` and ``ifft`` functions use the CUDA Toolkit's cuFFT Xt
+multi-GPU API when a single rank-1 complex transform is split across two or
+more GPUs in one process:
+
+.. code-block:: cpp
+
+  auto layout =
+      block_distribution_t<1>::Slab({fft_size}, {{0, 0}, {0, 1}});
+  auto input = make_distributed_tensor<complex<float>>(layout, context);
+  auto output = make_distributed_tensor<complex<float>>(layout, context);
+  (output = fft(input)).run(exec);
+
+The input distribution determines whether the trailing transform dimension is
+fully local. Fully local transforms keep using the batch-local path; a
+partitioned rank-1 transform selects Xt/Mg. The adapter stages through pinned
+host memory because the public cuFFT Xt copy API converts between a contiguous
+host array and its opaque multi-GPU descriptor. This also restores natural
+output order. It supports ``complex<float>`` and ``complex<double>`` and honors
+MatX ``FFTNorm`` modes. cuFFT itself determines which transform sizes and GPU
+counts its multi-GPU planner accepts.
+
+cuFFTMp is deliberately not treated as an interchangeable cuFFT Mg backend.
+It targets multi-process 2D/3D slab and pencil decompositions and requires
+NVSHMEM-compatible allocation, bootstrapping, and descriptor ownership.
+Ordinary ``make_distributed_tensor`` allocations do not satisfy that contract.
+Configure with ``MATX_EN_CUFFTMP`` to require and link compatible cuFFTMp and
+NVSHMEM installations. Transform execution still requires a cuFFTMp-owned
+tensor factory and reshape semantics rather than silently copying through a
+nominally distributed tensor.
+
 Materialization
 ===============
 
@@ -139,12 +215,13 @@ API rather than changing assignment semantics.
 Limitations and next steps
 ==========================
 
-* Only one process is executable today; no optional communication dependency is
-  introduced by the core type.
+* Pointwise execution and materialization remain single-process. Multi-process
+  execution is currently limited to block-cyclic ``matmul`` and ``chol``
+  collectives.
 * Pointwise operations require identical layouts. Batch-local transforms
   require aligned batch fragments and fully local operation dimensions.
   Redistribution and scattering will be explicit operations.
-* Other distributed BLAS, solver, reduction, DLPack, printing, and global
-  element-access paths are not provided yet.
+* Other distributed BLAS, solver, cuFFTMp, reduction, DLPack, printing, and
+  global element-access paths are not provided yet.
 * Materialization enqueues copies on the per-endpoint CUDA streams;
   ``distributedCUDAExecutor::sync`` is the completion boundary.
