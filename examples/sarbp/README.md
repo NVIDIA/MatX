@@ -116,10 +116,10 @@ real/imag, row-major), written to `output_image.raw` in this example.
 | `-u N` | Range upsample factor via zero-padding (default: 1) |
 | `-w {hamming,none}` | Window for range compression (default: hamming) |
 | `--bulk-mocomp` | Apply bulk motion compensation to FX-domain input using the per-pulse `range_to_mcp` values stored by the CPHD converter |
-| `-b {auto,all,0,N}` | Pulses per processing block. `auto` uses the GPU L2 cache size to choose a block size; `all` and `0` use all pulses (default: auto) |
-| `--image-tiles N` | Process the image as N x N tiles during backprojection (default: 1) |
+| `-b {auto,all,0,N}` | Pulses per processing block. `auto` jointly tunes pulse blocking and automatic image tiling for the GPU's L2 cache; `all` and `0` use all pulses (default: auto) |
+| `--image-tiles {auto,N}` | Process the image as an N x N grid. `auto` jointly tunes image tiling and automatic pulse blocking for the GPU's L2 cache (default: auto) |
 | `--taylor-fast-third-order` | Add the third-order range term when using `--precision taylor_fast` |
-| `--precision {double,float,fltflt,mixed,taylor_fast}` | Backprojection compute precision (default: mixed) |
+| `--precision {double,float,fltflt,mixed,taylor_fast}` | Backprojection compute precision (default: taylor_fast) |
 | `--pixel-z {variable,zero,fixed}` | Compile-time assumption for the pixel Z coordinate. `zero` skips per-pixel Z work and is valid (and faster) for a flat, Z=0 image grid like this example's (default: variable) |
 | `--warmup` | Warmup GPU kernels and FFT plans before timed run |
 | `--gold FILE` | Validate the output against a golden image (raw `complex<float>`, same format the example writes) and report accuracy metrics (3x3-window correlation and signal-to-error ratio) |
@@ -249,7 +249,7 @@ This makes the benefit a function of L2 size vs. scene size:
 ![Image-tiling speedup vs. tile count, taylor_fast 2nd order, across GPUs](tiling_performance.png)
 
 - Smaller L2 -> larger benefit. On the 20800 x 20800 scene, `taylor_fast` recovers about +61% on the DGX Spark (24 MiB L2) and +22% on Thor (32 MiB), a milder +11% on the H200 (60 MiB), and nothing on the RTX PRO 6000 (128 MiB).
-- The benefit also depends on scene size. The smaller 8192 x 8192 frame has a smaller working set, so only the DGX Spark (with the smallest L2 cache) gains from tiling there (+16%); Thor, H200, and PRO 6000 are flat because their larger L2 already holds it. Tiling matters most when the scene working set exceeds L2. Although the range profiles are most important in terms of L2 hit rates, note that `PhaseLUT` entries and image pixels will also be stored in L2 cache, so it is best to test multiple tiling factors on a given GPU rather than simply compute the range profile working set size and compare that to the L2 cache to determine optimal tiling.
+- The benefit also depends on scene size. The smaller 8192 x 8192 frame has a smaller working set, so only the DGX Spark (with the smallest L2 cache) gains from tiling there (+16%); Thor, H200, and PRO 6000 are flat because their larger L2 already holds it. Tiling matters most when the scene working set exceeds L2. The `PhaseLUT` has the same footprint as one per-pulse range profile, and tiling reduces the actively used range-bin span of both. Image pixels also occupy L2, so it is best to test multiple tiling factors on a given GPU rather than simply compare the estimated working set to the L2 size.
 - It only helps the memory-bound modes. `taylor_fast`, `float`, and (partly) `fltflt` benefit; the compute-bound `double`/`mixed` are flat because their FP64/extended-precision work already hides the memory latency.
 - Over-tiling hurts. Once L2 pressure is relieved, finer tiling only adds launch overhead and other inefficiencies.
 
@@ -267,7 +267,9 @@ Because both compete for the same L2, the optimal block size depends on the tili
 ![Pulse-block size sweep at several tiling factors on the DGX Spark](pulse_block_performance.png)
 
 - While pulse blocking alone may be sufficient for GPUs with more L2 cache, both image tiling and pulse blocking are beneficial for smaller L2 caches.
-- The current auto-blocking (`-b auto`) logic chooses a minimum of 256 pulses, but without image tiling 128 pulses would be more optimal on DGX Spark. The most optimal point in this sweep uses 4 x 4 image tiling and 256 pulses per pulse block.
+- Sweeps on GH200 and DGX Spark did not show a benefit below 256 pulses. The backprojection kernel amortizes work in 256-pulse units, so automatic selection uses 256 pulses as both its minimum and its block-size granularity. If that minimum creates too much L2 pressure, the heuristic increases image tiling instead of selecting a smaller pulse block.
+
+By default, `-b auto` and `--image-tiles auto` select the two values together. For an N x N image grid, the heuristic estimates the reusable working set as `(phase lookup table + pulse-profile working set) / (N*N)`. It uses a soft cache target of half of L2, with a 16 MiB minimum target to avoid undersized blocks on GPUs with small L2 caches, and an 80%-of-L2 hard limit. The smallest image tile count that satisfies the hard limit is preferred because over-tiling adds kernel-launch overhead. An explicit value for either option is preserved while the other automatic option is selected around it.
 
 The automatic pulse blocking / image tiling logic in the `sarbp` example may change over time, but users can always manually sweep using `--image-tiles` and `-b`.
 

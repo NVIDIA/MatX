@@ -93,6 +93,7 @@
  */
 
 #include "matx.h"
+#include "sarbp_heuristic.h"
 #include <cuda/std/complex>
 #include <cuda/cmath>
 #include <algorithm>
@@ -114,11 +115,6 @@ using namespace matx;
 
 using complex_t = cuda::std::complex<float>;
 
-// Use up to this fraction of L2 for range profiles and phase lookup table
-static constexpr double SARBP_AUTO_L2_TARGET_MULTIPLIER = 0.8;
-static constexpr index_t SARBP_AUTO_BLOCK_GRANULARITY = 256;
-static constexpr index_t SARBP_AUTO_MIN_BLOCK_SIZE = 256;
-
 enum class BlockSizeMode {
   Auto,
   All,
@@ -128,6 +124,16 @@ enum class BlockSizeMode {
 struct BlockSizeSelection {
   BlockSizeMode mode{BlockSizeMode::Auto};
   index_t manual_size{0};
+};
+
+enum class ImageTilesMode {
+  Auto,
+  Manual
+};
+
+struct ImageTilesSelection {
+  ImageTilesMode mode{ImageTilesMode::Auto};
+  index_t manual_count{0};
 };
 
 static bool parse_index_arg(const std::string &arg, index_t &value, index_t min_value)
@@ -169,12 +175,20 @@ static bool parse_block_size_arg(const std::string &arg, BlockSizeSelection &sel
   return true;
 }
 
-static index_t round_down_to_multiple(index_t value, index_t multiple)
+static bool parse_image_tiles_arg(const std::string &arg, ImageTilesSelection &selection)
 {
-  if (multiple <= 1) {
-    return value;
+  if (arg == "auto") {
+    selection = ImageTilesSelection{ImageTilesMode::Auto, 0};
+    return true;
   }
-  return (value / multiple) * multiple;
+
+  index_t parsed{};
+  if (!parse_index_arg(arg, parsed, 1)) {
+    return false;
+  }
+
+  selection = ImageTilesSelection{ImageTilesMode::Manual, parsed};
+  return true;
 }
 
 static size_t get_phase_lut_bytes(index_t output_range_bins, const SarBpParams &params)
@@ -187,35 +201,6 @@ static size_t get_phase_lut_bytes(index_t output_range_bins, const SarBpParams &
       ? sizeof(cuda::std::complex<double>)
       : sizeof(cuda::std::complex<float>);
   return static_cast<size_t>(output_range_bins) * elem_size;
-}
-
-static index_t choose_auto_block_size(index_t num_pulses, index_t output_range_bins,
-                                      const SarBpParams &params,
-                                      const cudaDeviceProp &device_prop)
-{
-  const size_t profile_bytes_per_pulse =
-      static_cast<size_t>(output_range_bins) * sizeof(complex_t);
-  if (num_pulses <= 0 || profile_bytes_per_pulse == 0 ||
-      device_prop.l2CacheSize <= 0) {
-    return num_pulses;
-  }
-
-  const size_t phase_lut_bytes = get_phase_lut_bytes(output_range_bins, params);
-  const double l2_target_bytes =
-      static_cast<double>(device_prop.l2CacheSize) * SARBP_AUTO_L2_TARGET_MULTIPLIER;
-  double profile_budget_bytes = l2_target_bytes - static_cast<double>(phase_lut_bytes);
-  const double min_profile_budget =
-      static_cast<double>(profile_bytes_per_pulse) *
-      static_cast<double>(SARBP_AUTO_MIN_BLOCK_SIZE);
-  if (profile_budget_bytes < min_profile_budget) {
-    profile_budget_bytes = min_profile_budget;
-  }
-
-  index_t block_size =
-      static_cast<index_t>(profile_budget_bytes / static_cast<double>(profile_bytes_per_pulse));
-  block_size = round_down_to_multiple(block_size, SARBP_AUTO_BLOCK_GRANULARITY);
-  block_size = std::max(block_size, SARBP_AUTO_MIN_BLOCK_SIZE);
-  return std::min(block_size, num_pulses);
 }
 
 // Aggregate of non-tensor state needed by run_bp_device(). Kept separate from
@@ -959,12 +944,12 @@ int main(int argc, char **argv) {
         << "  -w, --window <type>    Window for range compression: hamming, none (default: hamming)\n"
         << "  --bulk-mocomp         Apply bulk motion compensation using per-pulse range_to_mcp\n"
         << "  -b, --block-size <N|0|auto|all>\n"
-        << "                          Pulses per block; 0/all use all pulses, auto uses an L2-cache heuristic (default: auto)\n"
-        << "  --image-tiles <N>      Process image as N x N tiles (default: 1)\n"
+        << "                          Pulses per block; 0/all use all pulses, auto jointly tunes blocking and tiling for L2 (default: auto)\n"
+        << "  --image-tiles <N|auto> Process image as N x N tiles; auto jointly tunes tiling and pulse blocking for L2 (default: auto)\n"
         << "  --taylor-fast-third-order\n"
         << "                          Add the third-order term for --precision taylor_fast\n"
         << "  --warmup               Warmup GPU kernels and FFT plans before timed run\n"
-        << "  --precision <type>     Compute precision: double, float, fltflt, mixed, taylor_fast (default: mixed)\n"
+        << "  --precision <type>     Compute precision: double, float, fltflt, mixed, taylor_fast (default: taylor_fast)\n"
         << "  --pixel-z <mode>       Compile-time pixel-z assumption: variable, zero, fixed (default: variable)\n"
         << "  -h, --help             Print this help message and exit\n";
   };
@@ -981,11 +966,11 @@ int main(int argc, char **argv) {
   int upsample_factor = 1;
   std::string window_type = "hamming";
   std::string block_size_arg = "auto";
-  index_t image_tiles = 1;
+  std::string image_tiles_arg = "auto";
   bool do_warmup = false;
   bool apply_bulk_mocomp = false;
   bool taylor_fast_add_third_order = false;
-  std::string precision_type = "mixed";
+  std::string precision_type = "taylor_fast";
   std::string pixel_z_arg = "variable";
   SarBpPixelZMode pixel_z_mode = SarBpPixelZMode::Variable;
 
@@ -1022,12 +1007,7 @@ int main(int argc, char **argv) {
       block_size_arg = argv[++i];
     } else if (std::strcmp(argv[i], "--image-tiles") == 0) {
       if (!needs_value(i)) return 1;
-      if (!parse_index_arg(argv[++i], image_tiles, 1)) {
-        std::cerr << "ERROR: invalid image tile count '" << argv[i]
-                  << "' (use a positive integer)" << std::endl;
-        print_usage();
-        return 1;
-      }
+      image_tiles_arg = argv[++i];
     } else if (std::strcmp(argv[i], "--warmup") == 0) {
       do_warmup = true;
     } else if (std::strcmp(argv[i], "--bulk-mocomp") == 0) {
@@ -1065,6 +1045,14 @@ int main(int argc, char **argv) {
   if (!parse_block_size_arg(block_size_arg, block_size_selection)) {
     std::cerr << "ERROR: invalid block size '" << block_size_arg
               << "' (use a positive integer, 0, auto, or all)" << std::endl;
+    print_usage();
+    return 1;
+  }
+
+  ImageTilesSelection image_tiles_selection;
+  if (!parse_image_tiles_arg(image_tiles_arg, image_tiles_selection)) {
+    std::cerr << "ERROR: invalid image tile count '" << image_tiles_arg
+              << "' (use a positive integer or auto)" << std::endl;
     print_usage();
     return 1;
   }
@@ -1135,8 +1123,10 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  if (image_tiles > image_width || image_tiles > image_height) {
-    std::cerr << "ERROR: --image-tiles " << image_tiles
+  if (image_tiles_selection.mode == ImageTilesMode::Manual &&
+      (image_tiles_selection.manual_count > image_width ||
+       image_tiles_selection.manual_count > image_height)) {
+    std::cerr << "ERROR: --image-tiles " << image_tiles_selection.manual_count
               << " exceeds image dimensions " << image_height << " x "
               << image_width << std::endl;
     return 1;
@@ -1377,17 +1367,34 @@ int main(int argc, char **argv) {
       static_cast<size_t>(output_range_bins) * sizeof(complex_t);
   const size_t phase_lut_bytes = get_phase_lut_bytes(output_range_bins, params);
 
-  index_t block_size = num_pulses;
-  if (block_size_selection.mode == BlockSizeMode::Auto) {
+  const bool auto_block_size = block_size_selection.mode == BlockSizeMode::Auto;
+  const bool auto_image_tiles = image_tiles_selection.mode == ImageTilesMode::Auto;
+  if (auto_block_size || auto_image_tiles) {
     int device = 0;
-    cudaDeviceProp device_prop{};
+    int l2_cache_size = 0;
     MATX_CUDA_CHECK(cudaGetDevice(&device));
-    MATX_CUDA_CHECK(cudaGetDeviceProperties(&device_prop, device));
-    l2_cache_bytes = static_cast<size_t>(device_prop.l2CacheSize);
-    block_size = choose_auto_block_size(num_pulses, output_range_bins, params, device_prop);
-  } else if (block_size_selection.mode == BlockSizeMode::Manual) {
-    block_size = std::min(block_size_selection.manual_size, num_pulses);
+    MATX_CUDA_CHECK(cudaDeviceGetAttribute(
+        &l2_cache_size, cudaDevAttrL2CacheSize, device));
+    if (l2_cache_size > 0) {
+      l2_cache_bytes = static_cast<size_t>(l2_cache_size);
+    }
   }
+
+  const index_t requested_block_size = auto_block_size
+      ? 0
+      : (block_size_selection.mode == BlockSizeMode::Manual
+            ? std::min(block_size_selection.manual_size, num_pulses)
+            : num_pulses);
+  const index_t requested_image_tiles = auto_image_tiles
+      ? 0
+      : image_tiles_selection.manual_count;
+  const index_t max_image_tiles = std::min(image_width, image_height);
+  const auto auto_config = matx::examples::sarbp::choose_auto_config(
+      num_pulses, max_image_tiles,
+      profile_bytes_per_pulse, phase_lut_bytes, l2_cache_bytes,
+      requested_block_size, requested_image_tiles);
+  const index_t block_size = auto_config.block_size;
+  const index_t image_tiles = auto_config.image_tiles;
   const index_t num_blocks = (num_pulses + block_size - 1) / block_size;
 
   std::cout << "Block size       : " << block_size << " pulses ";
@@ -1399,15 +1406,21 @@ int main(int argc, char **argv) {
     std::cout << "(manual, ";
   }
   std::cout << num_blocks << " block" << (num_blocks > 1 ? "s" : "") << ")" << std::endl;
-  if (block_size_selection.mode == BlockSizeMode::Auto) {
+  if (auto_block_size || auto_image_tiles) {
     std::cout << "  Auto heuristic : L2 "
               << static_cast<double>(l2_cache_bytes) / (1024.0 * 1024.0)
-              << " MiB, target " << SARBP_AUTO_L2_TARGET_MULTIPLIER
-              << "x L2, profiles "
+              << " MiB, target "
+              << static_cast<double>(auto_config.soft_cache_target_bytes) / (1024.0 * 1024.0)
+              << " MiB, limit "
+              << static_cast<double>(auto_config.hard_cache_limit_bytes) / (1024.0 * 1024.0)
+              << " MiB, profiles "
               << static_cast<double>(profile_bytes_per_pulse) / 1024.0
               << " KiB/pulse, phase LUT "
               << static_cast<double>(phase_lut_bytes) / (1024.0 * 1024.0)
               << " MiB" << std::endl;
+    std::cout << "  Estimated set  : "
+              << auto_config.estimated_working_set_bytes / (1024.0 * 1024.0)
+              << " MiB after tiling" << std::endl;
   }
   std::cout << "BP precision     : " << precision_type;
   if (precision_type == "taylor_fast") {
@@ -1423,7 +1436,7 @@ int main(int argc, char **argv) {
   }
   std::cout << std::endl;
   std::cout << "Image tiles      : " << image_tiles << " x " << image_tiles
-            << std::endl;
+            << (auto_image_tiles ? " (auto)" : " (manual)") << std::endl;
 
   cudaStream_t stream;
   MATX_CUDA_CHECK(cudaStreamCreate(&stream));
