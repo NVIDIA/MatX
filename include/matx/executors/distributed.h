@@ -36,8 +36,23 @@
 #include <atomic>
 #include <cstdint>
 #include <memory>
+#include <string>
 #include <utility>
 #include <vector>
+
+#if defined(MATX_EN_CUBLASMP) || defined(MATX_EN_CUSOLVERMP)
+#include <nccl.h>
+#endif
+#ifdef MATX_EN_CUBLASMP
+#if __has_include(<cublasMp.h>)
+#include <cublasMp.h>
+#else
+#include <cublasmp.h>
+#endif
+#endif
+#ifdef MATX_EN_CUSOLVERMP
+#include <cusolverMp.h>
+#endif
 
 #include "matx/core/error.h"
 #include "matx/executors/cuda.h"
@@ -53,6 +68,33 @@ inline void DistributedCheck(bool condition, matxError_t error,
   }
 }
 
+inline void DistributedCheck(bool condition, matxError_t error,
+                             const std::string &message) {
+  if (!condition) {
+    MATX_THROW(error, message);
+  }
+}
+
+#ifdef MATX_EN_CUBLASMP
+inline void CublasMpCheck(cublasMpStatus_t status, const char *operation) {
+  if (status != CUBLASMP_STATUS_SUCCESS) {
+    MATX_THROW(matxMatMulError, std::string(operation) +
+                                    " failed with cuBLASMp status " +
+                                    std::to_string(static_cast<int>(status)));
+  }
+}
+#endif
+
+#ifdef MATX_EN_CUSOLVERMP
+inline void CusolverMpCheck(cusolverStatus_t status, const char *operation) {
+  if (status != CUSOLVER_STATUS_SUCCESS) {
+    MATX_THROW(matxSolverError, std::string(operation) +
+                                    " failed with cuSOLVERMp status " +
+                                    std::to_string(static_cast<int>(status)));
+  }
+}
+#endif
+
 } // namespace detail
 
 /** Identifies a CUDA device in a process participating in distributed work. */
@@ -64,12 +106,14 @@ struct distributed_endpoint_t {
                          const distributed_endpoint_t &) = default;
 };
 
+/** Ordering used to map communicator ranks onto a two-dimensional grid. */
+enum class distributed_grid_layout { row_major, column_major };
+
 /**
  * Lightweight topology identity shared by distributed tensors and executors.
  *
- * Communication-library handles intentionally do not live here.  A later
- * multi-process executor can attach MPI/NCCL state without changing the tensor
- * representation.
+ * Communication-library handles intentionally do not live here. An executor
+ * can attach collective state without changing the tensor representation.
  */
 class distributed_context {
 private:
@@ -161,13 +205,60 @@ private:
   bool changed_ = false;
 };
 
+#if defined(MATX_EN_CUBLASMP) || defined(MATX_EN_CUSOLVERMP)
+struct distributed_collective_state {
+  ~distributed_collective_state() {
+    int previous_device = 0;
+    const bool restore_device =
+        cudaGetDevice(&previous_device) == cudaSuccess && device_id >= 0;
+    if (device_id >= 0) {
+      (void)cudaSetDevice(device_id);
+    }
+#ifdef MATX_EN_CUSOLVERMP
+    if (cusolver_grid != nullptr) {
+      (void)cusolverMpDestroyGrid(cusolver_grid);
+    }
+    if (cusolver_handle != nullptr) {
+      (void)cusolverMpDestroy(cusolver_handle);
+    }
+#endif
+#ifdef MATX_EN_CUBLASMP
+    if (cublas_grid != nullptr) {
+      (void)cublasMpGridDestroy(cublas_grid);
+    }
+    if (cublas_handle != nullptr) {
+      (void)cublasMpDestroy(cublas_handle);
+    }
+#endif
+    if (restore_device) {
+      (void)cudaSetDevice(previous_device);
+    }
+  }
+
+  int device_id = -1;
+  ncclComm_t communicator = nullptr;
+  int process_rows = 0;
+  int process_columns = 0;
+  distributed_grid_layout grid_layout = distributed_grid_layout::row_major;
+#ifdef MATX_EN_CUBLASMP
+  cublasMpHandle_t cublas_handle = nullptr;
+  cublasMpGrid_t cublas_grid = nullptr;
+#endif
+#ifdef MATX_EN_CUSOLVERMP
+  cusolverMpHandle_t cusolver_handle = nullptr;
+  cusolverMpGrid_t cusolver_grid = nullptr;
+#endif
+};
+#endif
+
 } // namespace detail
 
 /**
- * Experimental single-process, multi-GPU executor.
+ * Experimental distributed CUDA executor.
  *
- * One non-blocking CUDA stream is owned per local endpoint.  Multi-process
- * collective support is deliberately left behind this executor boundary.
+ * One non-blocking CUDA stream is owned per local endpoint. When an NVIDIA MP
+ * backend is enabled, an optional constructor attaches a borrowed NCCL
+ * communicator and creates the backend handles needed for collective work.
  */
 class distributedCUDAExecutor {
 public:
@@ -192,23 +283,48 @@ public:
   }
 
   explicit distributedCUDAExecutor(std::vector<int> local_devices)
-      : distributedCUDAExecutor(
-            distributed_context{std::move(local_devices)}) {}
+      : distributedCUDAExecutor(distributed_context{std::move(local_devices)}) {
+  }
+
+#if defined(MATX_EN_CUBLASMP) || defined(MATX_EN_CUSOLVERMP)
+  distributedCUDAExecutor(
+      distributed_context context, ncclComm_t communicator, int process_rows,
+      int process_columns,
+      distributed_grid_layout layout = distributed_grid_layout::row_major)
+      : distributedCUDAExecutor(std::move(context)) {
+    try {
+      InitializeCollectives(communicator, process_rows, process_columns,
+                            layout);
+    } catch (...) {
+      DestroyStreams();
+      throw;
+    }
+  }
+#endif
 
   distributedCUDAExecutor(const distributedCUDAExecutor &) = delete;
-  distributedCUDAExecutor &
-  operator=(const distributedCUDAExecutor &) = delete;
+  distributedCUDAExecutor &operator=(const distributedCUDAExecutor &) = delete;
 
   distributedCUDAExecutor(distributedCUDAExecutor &&other) noexcept
-      : context_{std::move(other.context_)},
-        streams_{std::move(other.streams_)},
-        transfer_count_{other.transfer_count_.load(std::memory_order_relaxed)} {
+      : context_{std::move(other.context_)}, streams_{std::move(
+                                                 other.streams_)},
+        transfer_count_{other.transfer_count_.load(std::memory_order_relaxed)}
+#if defined(MATX_EN_CUBLASMP) || defined(MATX_EN_CUSOLVERMP)
+        ,
+        collectives_{std::move(other.collectives_)}
+#endif
+  {
     other.streams_.clear();
   }
 
   distributedCUDAExecutor &operator=(distributedCUDAExecutor &&) = delete;
 
-  ~distributedCUDAExecutor() { DestroyStreams(); }
+  ~distributedCUDAExecutor() {
+#if defined(MATX_EN_CUBLASMP) || defined(MATX_EN_CUSOLVERMP)
+    collectives_.reset();
+#endif
+    DestroyStreams();
+  }
 
   const distributed_context &Context() const noexcept { return context_; }
   uint64_t ContextId() const noexcept { return context_.Id(); }
@@ -249,6 +365,36 @@ public:
     return transfer_count_.load(std::memory_order_relaxed);
   }
 
+#if defined(MATX_EN_CUBLASMP) || defined(MATX_EN_CUSOLVERMP)
+  bool HasCollectiveResources() const noexcept {
+    return collectives_ != nullptr;
+  }
+  int ProcessRows() const noexcept { return collectives_->process_rows; }
+  int ProcessColumns() const noexcept { return collectives_->process_columns; }
+  distributed_grid_layout GridLayout() const noexcept {
+    return collectives_->grid_layout;
+  }
+#else
+  bool HasCollectiveResources() const noexcept { return false; }
+#endif
+
+#ifdef MATX_EN_CUBLASMP
+  cublasMpHandle_t CublasHandle() const noexcept {
+    return collectives_->cublas_handle;
+  }
+  cublasMpGrid_t CublasGrid() const noexcept {
+    return collectives_->cublas_grid;
+  }
+#endif
+#ifdef MATX_EN_CUSOLVERMP
+  cusolverMpHandle_t CusolverHandle() const noexcept {
+    return collectives_->cusolver_handle;
+  }
+  cusolverMpGrid_t CusolverGrid() const noexcept {
+    return collectives_->cusolver_grid;
+  }
+#endif
+
 private:
   struct stream_entry_t {
     int device_id;
@@ -269,9 +415,71 @@ private:
     streams_.clear();
   }
 
+#if defined(MATX_EN_CUBLASMP) || defined(MATX_EN_CUSOLVERMP)
+  void InitializeCollectives(ncclComm_t communicator, int process_rows,
+                             int process_columns,
+                             distributed_grid_layout layout) {
+    detail::DistributedCheck(
+        communicator != nullptr, matxInvalidExecutor,
+        "Collective execution requires an NCCL communicator");
+    detail::DistributedCheck(
+        context_.LocalDevices().size() == 1, matxNotSupported,
+        "NVIDIA MP execution currently supports one GPU per process");
+    detail::DistributedCheck(
+        process_rows > 0 && process_columns > 0 &&
+            process_rows * process_columns == context_.ProcessCount(),
+        matxInvalidSize,
+        "The MP process grid must contain every distributed process");
+
+    auto state = std::make_unique<detail::distributed_collective_state>();
+    state->device_id = context_.LocalDevices().front();
+    state->communicator = communicator;
+    state->process_rows = process_rows;
+    state->process_columns = process_columns;
+    state->grid_layout = layout;
+    const distributed_endpoint_t endpoint{context_.ProcessRank(),
+                                          context_.LocalDevices().front()};
+    auto local = LocalExecutor(endpoint);
+    detail::distributed_device_guard guard{endpoint.device_id};
+
+#ifdef MATX_EN_CUBLASMP
+    detail::CublasMpCheck(
+        cublasMpCreate(&state->cublas_handle, local.getStream()),
+        "cublasMpCreate");
+    detail::CublasMpCheck(
+        cublasMpGridCreate(state->process_rows, state->process_columns,
+                           state->grid_layout ==
+                                   distributed_grid_layout::column_major
+                               ? CUBLASMP_GRID_LAYOUT_COL_MAJOR
+                               : CUBLASMP_GRID_LAYOUT_ROW_MAJOR,
+                           state->communicator, &state->cublas_grid),
+        "cublasMpGridCreate");
+#endif
+
+#ifdef MATX_EN_CUSOLVERMP
+    detail::CusolverMpCheck(cusolverMpCreate(&state->cusolver_handle,
+                                             endpoint.device_id,
+                                             local.getStream()),
+                            "cusolverMpCreate");
+    detail::CusolverMpCheck(
+        cusolverMpCreateDeviceGrid(
+            state->cusolver_handle, &state->cusolver_grid, state->communicator,
+            state->process_rows, state->process_columns,
+            state->grid_layout == distributed_grid_layout::column_major
+                ? CUSOLVERMP_GRID_MAPPING_COL_MAJOR
+                : CUSOLVERMP_GRID_MAPPING_ROW_MAJOR),
+        "cusolverMpCreateDeviceGrid");
+#endif
+    collectives_ = std::move(state);
+  }
+#endif
+
   distributed_context context_;
   std::vector<stream_entry_t> streams_;
   mutable std::atomic<size_t> transfer_count_{0};
+#if defined(MATX_EN_CUBLASMP) || defined(MATX_EN_CUSOLVERMP)
+  std::unique_ptr<detail::distributed_collective_state> collectives_;
+#endif
 };
 
 } // namespace matx
