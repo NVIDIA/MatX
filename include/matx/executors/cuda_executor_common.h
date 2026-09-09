@@ -120,8 +120,8 @@ namespace detail
 
       ~CudaExecutorBase() {
         if (profiling_) {
-          cudaEventDestroy(start_);
-          cudaEventDestroy(stop_);
+          MATX_CUDA_CHECK_NOEXCEPT(cudaEventDestroy(start_));
+          MATX_CUDA_CHECK_NOEXCEPT(cudaEventDestroy(stop_));
         }
       }
 
@@ -134,14 +134,14 @@ namespace detail
        * @brief Synchronize the cuda executor's stream
        *
        */
-      void sync() { cudaStreamSynchronize(stream_); }
+      void sync() { MATX_CUDA_CHECK(cudaStreamSynchronize(stream_)); }
 
       /**
        * @brief Start a timer for profiling workload
        */
       void start_timer() {
         if (profiling_) {
-          cudaEventRecord(start_, stream_);
+          MATX_CUDA_CHECK(cudaEventRecord(start_, stream_));
         }
       }
 
@@ -150,7 +150,7 @@ namespace detail
        */
       void stop_timer() {
         if (profiling_) {
-          cudaEventRecord(stop_, stream_);
+          MATX_CUDA_CHECK(cudaEventRecord(stop_, stream_));
         }
       }
 
@@ -163,8 +163,8 @@ namespace detail
           MATX_THROW(matxInvalidParameter, "Profiling not enabled when using get_time_ms()");
         }
         float time;
-        cudaEventSynchronize(stop_);
-        cudaEventElapsedTime(&time, start_, stop_);
+        MATX_CUDA_CHECK(cudaEventSynchronize(stop_));
+        MATX_CUDA_CHECK(cudaEventElapsedTime(&time, start_, stop_));
         return time;
       }
 

@@ -367,10 +367,10 @@ public:
     }
 
     std::vector<int> h_info(this->batch_a_ptrs.size());
-    cudaMemcpyAsync(h_info.data(), this->d_info, sizeof(int) * this->batch_a_ptrs.size(), cudaMemcpyDeviceToHost, stream);
+    MATX_CUDA_CHECK(cudaMemcpyAsync(h_info.data(), this->d_info, sizeof(int) * this->batch_a_ptrs.size(), cudaMemcpyDeviceToHost, stream));
 
     // This will block. Figure this out later
-    cudaStreamSynchronize(stream);
+    MATX_CUDA_CHECK(cudaStreamSynchronize(stream));
 
     for ([[maybe_unused]] const auto& info : h_info) {
       MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
@@ -636,10 +636,10 @@ public:
     }
 
     std::vector<int> h_info(this->batch_a_ptrs.size());
-    cudaMemcpyAsync(h_info.data(), this->d_info, sizeof(int) * this->batch_a_ptrs.size(), cudaMemcpyDeviceToHost, stream);
+    MATX_CUDA_CHECK(cudaMemcpyAsync(h_info.data(), this->d_info, sizeof(int) * this->batch_a_ptrs.size(), cudaMemcpyDeviceToHost, stream));
 
     // This will block. Figure this out later
-    cudaStreamSynchronize(stream);
+    MATX_CUDA_CHECK(cudaStreamSynchronize(stream));
 
     for ([[maybe_unused]] const auto& info : h_info) {
       MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
@@ -671,10 +671,10 @@ public:
         MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
     }
 
-    cudaMemcpyAsync(h_info.data(), this->d_info, sizeof(int) * this->batch_a_ptrs.size(), cudaMemcpyDeviceToHost, stream);
+    MATX_CUDA_CHECK(cudaMemcpyAsync(h_info.data(), this->d_info, sizeof(int) * this->batch_a_ptrs.size(), cudaMemcpyDeviceToHost, stream));
 
     // This will block. Figure this out later
-    cudaStreamSynchronize(stream);
+    MATX_CUDA_CHECK(cudaStreamSynchronize(stream));
 
     for ([[maybe_unused]] const auto& info : h_info) {
       MATX_ASSERT_STR_EXP(info, 0, matxSolverError,

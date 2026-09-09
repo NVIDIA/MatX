@@ -42,7 +42,7 @@ template <typename T>
 __MATX_INLINE__ static void setZero(T *ptr, index_t sz,
                                     matxMemorySpace_t space) {
   if (space == MATX_DEVICE_MEMORY || space == MATX_ASYNC_DEVICE_MEMORY) {
-    cudaMemset(ptr, 0, sz * sizeof(T));
+    MATX_CUDA_CHECK(cudaMemset(ptr, 0, sz * sizeof(T)));
   } else {
     memset(ptr, 0, sz * sizeof(T));
   }
@@ -71,7 +71,7 @@ __MATX_INLINE__ Storage<T> makeEmptyStorage() {
 template <typename T>
 __MATX_INLINE__ static void setVal(T *ptr, T val, matxMemorySpace_t space) {
   if (space == MATX_DEVICE_MEMORY || space == MATX_ASYNC_DEVICE_MEMORY) {
-    cudaMemcpy(ptr, &val, sizeof(T), cudaMemcpyHostToDevice);
+    MATX_CUDA_CHECK(cudaMemcpy(ptr, &val, sizeof(T), cudaMemcpyHostToDevice));
   } else {
     memcpy(ptr, &val, sizeof(T));
   }

@@ -169,10 +169,10 @@ public:
     }
 
     std::vector<int> h_info(this->batch_a_ptrs.size());
-    cudaMemcpyAsync(h_info.data(), this->d_info, sizeof(int) * this->batch_a_ptrs.size(), cudaMemcpyDeviceToHost, stream);
+    MATX_CUDA_CHECK(cudaMemcpyAsync(h_info.data(), this->d_info, sizeof(int) * this->batch_a_ptrs.size(), cudaMemcpyDeviceToHost, stream));
 
     // This will block. Figure this out later
-    cudaStreamSynchronize(stream);
+    MATX_CUDA_CHECK(cudaStreamSynchronize(stream));
 
     for (const auto& info : h_info) {
       if (info < 0) {

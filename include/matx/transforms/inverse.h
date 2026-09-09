@@ -406,8 +406,8 @@ public:
 
         MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxInverseError);
 
-        cudaMemcpyAsync(h_info, d_info, sizeof(int) * params.batch_size, cudaMemcpyDeviceToHost, stream);
-        cudaStreamSynchronize(stream);
+        MATX_CUDA_CHECK(cudaMemcpyAsync(h_info, d_info, sizeof(int) * params.batch_size, cudaMemcpyDeviceToHost, stream));
+        MATX_CUDA_CHECK(cudaStreamSynchronize(stream));
         for (size_t i = 0; i < params.batch_size; i++) {
           if (h_info[i] != 0) {
             MATX_THROW(matxLUError, "inverse failed");
@@ -447,8 +447,8 @@ public:
         }
         MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxInverseError);
 
-        cudaMemcpyAsync(h_info, d_info, sizeof(int) * params.batch_size, cudaMemcpyDeviceToHost, stream);
-        cudaStreamSynchronize(stream);
+        MATX_CUDA_CHECK(cudaMemcpyAsync(h_info, d_info, sizeof(int) * params.batch_size, cudaMemcpyDeviceToHost, stream));
+        MATX_CUDA_CHECK(cudaStreamSynchronize(stream));
         for (size_t i = 0; i < params.batch_size; i++) {
           if (h_info[i] != 0) {
             MATX_THROW(matxLUError, "inverse failed");
@@ -479,8 +479,8 @@ public:
             d_info);
         MATX_ASSERT_STR_EXP(solver_ret, CUSOLVER_STATUS_SUCCESS, matxSolverError, "Error in cusolverDnXgetrf");
 
-        cudaMemcpyAsync(h_info, d_info, sizeof(int) * params.batch_size, cudaMemcpyDeviceToHost, stream);
-        cudaStreamSynchronize(stream);
+        MATX_CUDA_CHECK(cudaMemcpyAsync(h_info, d_info, sizeof(int) * params.batch_size, cudaMemcpyDeviceToHost, stream));
+        MATX_CUDA_CHECK(cudaStreamSynchronize(stream));
         for (size_t i = 0; i < params.batch_size; i++) {
           if (h_info[i] != 0) {
             MATX_THROW(matxLUError, "inverse failed");
