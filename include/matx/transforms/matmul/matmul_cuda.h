@@ -41,6 +41,7 @@
 
 #include <cstdio>
 #include <numeric>
+#include <string>
 
 #include "cublas_v2.h"
 #include "matx/core/cache.h"
@@ -150,6 +151,62 @@ struct MatMulCUDAParams_t {
   bool b_planar = false;
   bool c_planar = false;
 };
+
+// Treat cuBLAS errors as fatal. In most cases, an API error indicates that
+// the subsequent operation would fail if we proceed, which would lead to
+// silently producing incorrect results.
+static __MATX_INLINE__ void CheckCublasStatus(cublasStatus_t status,
+                                              const char *api)
+{
+  if (status != CUBLAS_STATUS_SUCCESS) {
+    MATX_THROW(matxMatMulError,
+               std::string(api) + " failed: " + cublasGetStatusName(status));
+  }
+}
+
+// Single source of truth for the memory order MatX reports to cuBLASLt for a
+// GEMM operand.
+//
+// Contract: `t` must be a tensor that has already passed through
+// getCublasSupportedTensor(), which guarantees that at least one of the last
+// two strides is 1. Under that invariant a last-dim stride > 1 implies the row
+// stride is 1, i.e., that the tensor is column major.
+//
+// The Size(Rank-1) != 1 clause handles shapes with a single column, such as
+// [N,1], whose strides are both 1. A single row or single column is both row
+// and column major in memory, so the classification is a tie-break rather than
+// a fact about the data: [N,1] is reported row-major (ld = Stride(Rank-2)),
+// while a [1,N] view with a unit row stride falls to column-major, where
+// ld = Stride(Rank-1) is the meaningful one.
+template <typename ValueType, typename TensorType>
+static __MATX_INLINE__ MemOrder_t CublasOperandMemOrder(const TensorType &t)
+{
+  using tensor_type = remove_cvref_t<TensorType>;
+  static_assert(is_tensor_view_v<tensor_type>,
+                "cuBLAS operand memory order is only defined for tensor views");
+  constexpr int Rank = tensor_type::Rank();
+
+  // Complex half operands are always described to cuBLASLt as row-major, and
+  // GetGemmParams correspondingly overrides lda/ldb/ldc with Size(Rank-1).
+  // For interleaved types MatMulLaunch converts to a freshly allocated
+  // row-major planar tensor before the call, so the original layout is gone.
+  // For types that are already planar that conversion is skipped, so the
+  // row-major description relies on an invariant established elsewhere:
+  // tensor_t::ValidatePlanarLayoutOnCreate_() requires planar complex tensors
+  // to be contiguous with unit innermost stride. That validation uses
+  // MATX_ASSERT_STR and therefore compiles out under NDEBUG, so in a release
+  // build a permuted planar operand can reach this point and be misdescribed.
+  if constexpr (is_complex_half_v<ValueType>) {
+    return MEM_ORDER_ROW_MAJOR;
+  } else {
+    if (t.Stride(Rank - 1) > 1 || // last stride > 1
+        (t.Stride(Rank - 1) == 1 && t.Stride(Rank - 2) == 1 &&
+         t.Size(Rank - 1) != 1)) { // last strides both 1 and size > 1
+      return MEM_ORDER_COL_MAJOR;
+    }
+    return MEM_ORDER_ROW_MAJOR;
+  }
+}
 
 static __MATX_INLINE__ index_t GemmOpRows(cublasOperation_t op, index_t rows,
                                           index_t cols)
@@ -290,13 +347,28 @@ public:
       constexpr size_t MiB = 1024*1024;
       workspaceSize = detail::IsHopperOrAbove() ? 32*MiB : 4*MiB;
 
+      // ConfigureCublasLt() throws on any cuBLAS failure, and an exception
+      // escaping a constructor means ~MatMulCUDAHandle_t() never runs. Release
+      // whatever was created so far rather than leaking the workspace (4-32 MiB)
+      // and the cuBLASLt descriptors.
+      ConstructionGuard guard{this};
+
       // Workspace buffer
       matxAlloc((void **)&workspace, workspaceSize, MATX_DEVICE_MEMORY);
 
       ConfigureCublasLt();
+
+      guard.handle = nullptr; // construction succeeded; the destructor owns these now
     }
 
   }
+
+  // This class owns a cuBLASLt handle, a workspace allocation and the matmul
+  // descriptors, all released in the destructor, so a shallow copy would
+  // double-destroy them. Nothing copies it today (the plan cache holds it via
+  // shared_ptr), so deleting these is purely to keep it that way.
+  MatMulCUDAHandle_t(const MatMulCUDAHandle_t &) = delete;
+  MatMulCUDAHandle_t &operator=(const MatMulCUDAHandle_t &) = delete;
 
   template <typename InputType>
   static void SetAlphaBeta([[maybe_unused]] char *const palpha,
@@ -451,25 +523,10 @@ public:
     }
     else {
       if constexpr (PROV == PROVIDER_TYPE_CUBLASLT) {
-        if constexpr (is_complex_half_v<typename TensorTypeA::value_type>) {
-          // For half complex we always copy to a new tensor so it is always cublas op N
-          params.orderA = MEM_ORDER_ROW_MAJOR;
-        } else if ( a.Stride(TensorTypeA::Rank()-1) > 1 // last stride > 1
-                  || (a.Stride(TensorTypeA::Rank()-1) == 1 && a.Stride(TensorTypeA::Rank()-2) == 1 && a.Size(TensorTypeA::Rank()-1) != 1)) { // last strides both equal 1 and size > 1
-          params.orderA = MEM_ORDER_COL_MAJOR;
-        } else { // otherwise row major
-          params.orderA = MEM_ORDER_ROW_MAJOR;
-        }
-
-        if constexpr (is_complex_half_v<typename TensorTypeB::value_type>) {
-          // For half complex we always copy to a new tensor so it is always cublas op N
-          params.orderB = MEM_ORDER_ROW_MAJOR;
-        } else if ( b.Stride(TensorTypeB::Rank()-1) > 1 // last stride > 1
-                  || (b.Stride(TensorTypeB::Rank()-1) == 1 && b.Stride(TensorTypeB::Rank()-2) == 1 && b.Size(TensorTypeB::Rank()-1) != 1)) { // last strides both equal 1 and size > 1
-          params.orderB = MEM_ORDER_COL_MAJOR;
-        } else { // otherwise row major
-          params.orderB = MEM_ORDER_ROW_MAJOR;
-        }
+        params.orderA =
+            CublasOperandMemOrder<typename TensorTypeA::value_type>(a);
+        params.orderB =
+            CublasOperandMemOrder<typename TensorTypeB::value_type>(b);
 
         params.opA = requestedOpA;
         params.opB = requestedOpB;
@@ -552,19 +609,7 @@ public:
    */
   ~MatMulCUDAHandle_t()
   {
-    matxFree(workspace);
-
-    if constexpr (PROV == PROVIDER_TYPE_CUBLASLT) {
-      cublasLtMatmulPreferenceDestroy(preference);
-      cublasLtMatrixLayoutDestroy(Cdesc);
-      cublasLtMatrixLayoutDestroy(Bdesc);
-      cublasLtMatrixLayoutDestroy(Adesc);
-      cublasLtMatmulDescDestroy(operationDesc);
-    }
-
-    matxFree(a_hp);
-    matxFree(b_hp);
-    matxFree(c_hp);
+    ReleaseResources();
   }
 
 /**
@@ -614,12 +659,79 @@ public:
   }
 
 private:
+  // Releases every resource the handle owns. Null-safe and idempotent so that it
+  // can run either from the destructor or from a partially built object when the
+  // constructor throws. Nothing here may throw: it runs from ~MatMulCUDAHandle_t
+  // and from ~ConstructionGuard during stack unwinding, so an exception would be
+  // std::terminate. In particular matxFree() throws on an untracked pointer when
+  // MATX_DISABLE_MEM_TRACK_CHECK is defined, hence the null checks.
+  void ReleaseResources()
+  {
+    if (workspace != nullptr) {
+      matxFree(workspace);
+      workspace = nullptr;
+    }
+
+    if constexpr (PROV == PROVIDER_TYPE_CUBLASLT) {
+      if (preference != nullptr) {
+        cublasLtMatmulPreferenceDestroy(preference);
+        preference = nullptr;
+      }
+      if (Cdesc != nullptr) {
+        cublasLtMatrixLayoutDestroy(Cdesc);
+        Cdesc = nullptr;
+      }
+      if (Bdesc != nullptr) {
+        cublasLtMatrixLayoutDestroy(Bdesc);
+        Bdesc = nullptr;
+      }
+      if (Adesc != nullptr) {
+        cublasLtMatrixLayoutDestroy(Adesc);
+        Adesc = nullptr;
+      }
+      if (operationDesc != nullptr) {
+        cublasLtMatmulDescDestroy(operationDesc);
+        operationDesc = nullptr;
+      }
+      // Destroyed last so it outlives everything created from it.
+      if (ltHandle != nullptr) {
+        cublasLtDestroy(ltHandle);
+        ltHandle = nullptr;
+      }
+    }
+
+    if (a_hp != nullptr) {
+      matxFree(a_hp);
+      a_hp = nullptr;
+    }
+    if (b_hp != nullptr) {
+      matxFree(b_hp);
+      b_hp = nullptr;
+    }
+    if (c_hp != nullptr) {
+      matxFree(c_hp);
+      c_hp = nullptr;
+    }
+  }
+
+  // Scope guard used only during construction. Disarmed by clearing `handle`
+  // once the constructor has run to completion.
+  struct ConstructionGuard {
+    MatMulCUDAHandle_t *handle;
+
+    ~ConstructionGuard()
+    {
+      if (handle != nullptr) {
+        handle->ReleaseResources();
+      }
+    }
+  };
+
   // Member variables
-  cublasLtHandle_t ltHandle;
+  cublasLtHandle_t ltHandle = nullptr;
   cublasStatus_t ret = CUBLAS_STATUS_SUCCESS;
 
   // cuBLASLt variables;
-  cublasHandle_t handle;
   cublasLtMatmulDesc_t operationDesc = nullptr;
   cublasLtMatrixLayout_t Adesc = nullptr;
   cublasLtMatrixLayout_t Bdesc = nullptr;
@@ -643,21 +755,21 @@ private:
 
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
     ret = cublasLtCreate(&ltHandle);
-    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
+    detail::CheckCublasStatus(ret, "cublasLtCreate");
 
     ret = cublasLtMatmulPreferenceCreate(&preference);
-    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
+    detail::CheckCublasStatus(ret, "cublasLtMatmulPreferenceCreate");
 
     ret = cublasLtMatmulDescCreate(
                     &operationDesc, MatXTypeToCudaComputeType<T1>(),
                     MatXTypeToCudaType<T1>());
-    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
+    detail::CheckCublasStatus(ret, "cublasLtMatmulDescCreate");
 
     ret = cublasLtMatmulPreferenceSetAttribute(
                     preference, CUBLASLT_MATMUL_PREF_MAX_WORKSPACE_BYTES,
                     &workspaceSize,
                     sizeof(workspaceSize));
-    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
+    detail::CheckCublasStatus(ret, "cublasLtMatmulPreferenceSetAttribute");
 
     cublasLtOrder_t rowOrder = CUBLASLT_ORDER_ROW;
     cublasLtOrder_t colOrder = CUBLASLT_ORDER_COL;
@@ -666,13 +778,13 @@ private:
     ret = cublasLtMatmulDescSetAttribute(
                     operationDesc, CUBLASLT_MATMUL_DESC_TRANSA, &params_.opA,
                     sizeof(params_.opA));
-    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
+    detail::CheckCublasStatus(ret, "cublasLtMatmulDescSetAttribute");
 
     // B operation
     ret = cublasLtMatmulDescSetAttribute(
                     operationDesc, CUBLASLT_MATMUL_DESC_TRANSB, &params_.opB,
                     sizeof(params_.opB));
-    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
+    detail::CheckCublasStatus(ret, "cublasLtMatmulDescSetAttribute");
 
     // Update this later when we're more flexible on compute type
     int32_t scaleType;
@@ -693,23 +805,23 @@ private:
     ret = cublasLtMatmulDescSetAttribute(
                     operationDesc, CUBLASLT_MATMUL_DESC_SCALE_TYPE, &scaleType,
                     sizeof(scaleType));
-    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
+    detail::CheckCublasStatus(ret, "cublasLtMatmulDescSetAttribute");
 
     // Matrix layouts
     ret = cublasLtMatrixLayoutCreate(
                     &Adesc, MatXTypeToCudaType<T2>(), params_.a_rows,
                     params_.a_cols, params_.lda);
-    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
+    detail::CheckCublasStatus(ret, "cublasLtMatrixLayoutCreate");
 
     ret = cublasLtMatrixLayoutCreate(
                     &Bdesc, MatXTypeToCudaType<T3>(), params_.b_rows,
                     params_.b_cols, params_.ldb);
-    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
+    detail::CheckCublasStatus(ret, "cublasLtMatrixLayoutCreate");
 
     ret = cublasLtMatrixLayoutCreate(
                     &Cdesc, MatXTypeToCudaType<T1>(), params_.c_rows,
                     params_.c_cols, params_.ldc);
-    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
+    detail::CheckCublasStatus(ret, "cublasLtMatrixLayoutCreate");
 
     // Matrix data order
     if (params_.orderA == MEM_ORDER_COL_MAJOR) {
@@ -722,7 +834,7 @@ private:
                       Adesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &rowOrder,
                       sizeof(rowOrder));
     }
-    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
+    detail::CheckCublasStatus(ret, "cublasLtMatrixLayoutSetAttribute");
 
     if (params_.orderB == MEM_ORDER_COL_MAJOR) {
       ret = cublasLtMatrixLayoutSetAttribute(
@@ -734,7 +846,7 @@ private:
                       Bdesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &rowOrder,
                       sizeof(rowOrder));
     }
-    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
+    detail::CheckCublasStatus(ret, "cublasLtMatrixLayoutSetAttribute");
 
     if (params_.orderC == MEM_ORDER_COL_MAJOR) {
       ret = cublasLtMatrixLayoutSetAttribute(
@@ -746,22 +858,22 @@ private:
                       Cdesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &rowOrder,
                       sizeof(rowOrder));
     }
-    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
+    detail::CheckCublasStatus(ret, "cublasLtMatrixLayoutSetAttribute");
 
     ret = cublasLtMatrixLayoutSetAttribute(
                     Adesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &params_.batch,
                     sizeof(params_.batch));
-    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
+    detail::CheckCublasStatus(ret, "cublasLtMatrixLayoutSetAttribute");
 
     ret = cublasLtMatrixLayoutSetAttribute(
                     Bdesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &params_.batch,
                     sizeof(params_.batch));
-    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
+    detail::CheckCublasStatus(ret, "cublasLtMatrixLayoutSetAttribute");
 
     ret = cublasLtMatrixLayoutSetAttribute(
                     Cdesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &params_.batch,
                     sizeof(params_.batch));
-    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
+    detail::CheckCublasStatus(ret, "cublasLtMatrixLayoutSetAttribute");
 
     int64_t stride;
 
@@ -782,7 +894,7 @@ private:
     ret = cublasLtMatrixLayoutSetAttribute(
                     Adesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &stride,
                     sizeof(stride));
-    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
+    detail::CheckCublasStatus(ret, "cublasLtMatrixLayoutSetAttribute");
 
     if constexpr (is_complex_half_v<T3>) {
       // for complex half we have copied to planar row major
@@ -801,7 +913,7 @@ private:
     ret = cublasLtMatrixLayoutSetAttribute(
                     Bdesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &stride,
                     sizeof(stride));
-    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
+    detail::CheckCublasStatus(ret, "cublasLtMatrixLayoutSetAttribute");
 
     if constexpr (is_complex_half_v<T1>) {
       // for complex half we have copied to planar row major
@@ -815,7 +927,7 @@ private:
     ret = cublasLtMatrixLayoutSetAttribute(
                     Cdesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &stride,
                     sizeof(stride));
-    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
+    detail::CheckCublasStatus(ret, "cublasLtMatrixLayoutSetAttribute");
 
     if constexpr (is_complex_half_v<T1> && is_complex_half_v<T2>) {
       // for complex half we have copied to planar row major
@@ -826,17 +938,17 @@ private:
       ret = cublasLtMatrixLayoutSetAttribute(
                       Adesc, CUBLASLT_MATRIX_LAYOUT_PLANE_OFFSET, &planarA,
                       sizeof(planarA));
-      MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
+      detail::CheckCublasStatus(ret, "cublasLtMatrixLayoutSetAttribute");
 
       ret = cublasLtMatrixLayoutSetAttribute(
                       Bdesc, CUBLASLT_MATRIX_LAYOUT_PLANE_OFFSET, &planarB,
                       sizeof(planarB));
-      MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
+      detail::CheckCublasStatus(ret, "cublasLtMatrixLayoutSetAttribute");
 
       ret = cublasLtMatrixLayoutSetAttribute(
                       Cdesc, CUBLASLT_MATRIX_LAYOUT_PLANE_OFFSET, &planarC,
                       sizeof(planarC));
-      MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
+      detail::CheckCublasStatus(ret, "cublasLtMatrixLayoutSetAttribute");
     }
 
     int res;
@@ -844,8 +956,12 @@ private:
                                                Bdesc, Cdesc, Cdesc, preference,
                                                1, &heuristicResult,
                                                &res);
-    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxMatMulError);
-    MATX_ASSERT(res > 0, matxMatMulError);
+    detail::CheckCublasStatus(ret, "cublasLtMatmulAlgoGetHeuristic");
+    if (res <= 0) {
+      MATX_THROW(matxMatMulError,
+                 "cublasLtMatmulAlgoGetHeuristic returned no algorithms for "
+                 "this operation/layout combination");
+    }
   }
 
   // TODO: Fix the unused parameters once we support mixes of col/row on cublas
@@ -979,12 +1095,12 @@ private:
 
       if constexpr (RANK <= MATMUL_BATCH_RANK_THRESHOLD) {
         // For ranks up to threshold, we can handle everything in a single batch operation
-        [[maybe_unused]] auto res = cublasLtMatmul(
+        auto res = cublasLtMatmul(
             ltHandle, operationDesc, &salpha, (void *)a_adj.Data(), Adesc,
             (void *)b_adj.Data(), Bdesc, &sbeta, (void *)c_adj.Data(), Cdesc,
             (void *)c_adj.Data(), Cdesc, &heuristicResult.algo, workspace,
             workspaceSize, stream);
-        MATX_ASSERT(res == CUBLAS_STATUS_SUCCESS, matxMatMulError);
+        detail::CheckCublasStatus(res, "cublasLtMatmul");
       }
       else {
         // When rank exceeds threshold, we loop over the outer dimensions where each iteration
@@ -995,14 +1111,14 @@ private:
           auto bp = cuda::std::apply([&b_adj](auto... param) { return b_adj.GetPointer(param...); }, b_idx);
           auto cp = cuda::std::apply([&c_adj](auto... param) { return c_adj.GetPointer(param...); }, c_idx);
 
-          [[maybe_unused]] auto res = cublasLtMatmul(
+          auto res = cublasLtMatmul(
                   ltHandle, operationDesc, &salpha, (void *)ap,
                   Adesc, (void *)bp, Bdesc, &sbeta,
                   (void *)cp, Cdesc, (void *)cp,
                   Cdesc, &heuristicResult.algo, workspace, workspaceSize,
                   stream);
 
-          MATX_ASSERT(res == CUBLAS_STATUS_SUCCESS, matxMatMulError);
+          detail::CheckCublasStatus(res, "cublasLtMatmul");
 
           // Update all but the last 4 indices (2 matrix dims + 2 batch dims)
           UpdateIndices<TensorTypeA, shape_type, TensorTypeA::Rank()>(a_adj, a_idx, MATMUL_BATCH_RANK_THRESHOLD);
@@ -1307,23 +1423,51 @@ __MATX_INLINE__ void WithMatmulOperand(const Op &op, cudaStream_t stream,
       cuda::std::is_same_v<typename OpType::value_type, ValueType> &&
       CanUseCublasLtConjTransposeOp<ValueType>();
 
+  // cuBLASLt only supports CUBLAS_OP_C on an operand whose memory order matches
+  // the memory order of C, and MatX always describes C to cuBLASLt as row-major.
+  // Thus, the metadata path is only valid when the operand is row-major.
+  // CUBLAS_OP_T (used for real types) has no such restriction.
+  [[maybe_unused]] constexpr bool metadata_op_needs_row_major =
+      MatMulConjTransposeOp<ValueType>() == CUBLAS_OP_C;
+
+  // Generic path, unchanged from before the metadata paths existed. Unlike those
+  // paths it does not look inside the expression: `op` still carries the
+  // conj()/hermitianT() wrapper, so getCublasSupportedTensor() allocates a
+  // row-major tensor of the operator's shape and CopyCublasInputIfNeeded()
+  // evaluates the operation into it. cuBLASLt then receives layout CUBLAS_OP_N.
+  const auto copy_operand = [&]() {
+    auto tensor = getCublasSupportedTensor(op, stream);
+    CopyCublasInputIfNeeded(tensor, op, stream);
+    func(tensor, CUBLAS_OP_N);
+  };
+
   if constexpr (can_use_metadata_op && is_hermitian_trans_op_v<OpType>) {
     const auto &input = op.Input();
     auto tensor = getCublasSupportedTensor(input, stream);
-    CopyCublasInputIfNeeded(tensor, input, stream);
-    func(tensor, MatMulConjTransposeOp<ValueType>());
+    if (!metadata_op_needs_row_major ||
+        CublasOperandMemOrder<ValueType>(tensor) == MEM_ORDER_ROW_MAJOR) {
+      CopyCublasInputIfNeeded(tensor, input, stream);
+      func(tensor, MatMulConjTransposeOp<ValueType>());
+    }
+    else {
+      copy_operand();
+    }
   }
   else if constexpr (can_use_metadata_op && is_conj_tensor_view_unary_op_v<OpType>) {
     const auto &input = op.Input();
     auto transposed = transpose_matrix(input);
     auto tensor = getCublasSupportedTensor(transposed, stream);
-    CopyCublasInputIfNeeded(tensor, transposed, stream);
-    func(tensor, MatMulConjTransposeOp<ValueType>());
+    if (!metadata_op_needs_row_major ||
+        CublasOperandMemOrder<ValueType>(tensor) == MEM_ORDER_ROW_MAJOR) {
+      CopyCublasInputIfNeeded(tensor, transposed, stream);
+      func(tensor, MatMulConjTransposeOp<ValueType>());
+    }
+    else {
+      copy_operand();
+    }
   }
   else {
-    auto tensor = getCublasSupportedTensor(op, stream);
-    CopyCublasInputIfNeeded(tensor, op, stream);
-    func(tensor, CUBLAS_OP_N);
+    copy_operand();
   }
 }
 

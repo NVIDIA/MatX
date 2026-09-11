@@ -340,6 +340,154 @@ TYPED_TEST(MatMulTestComplexNonHalfCUDA, SmallRectBHermitian)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(MatMulTestComplexNonHalfCUDA, SmallRectConjOperands)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  if constexpr (!detail::CheckMatMulSupport<ExecType, TestType>()) {
+    GTEST_SKIP();
+  } else {
+    constexpr index_t m = 5;
+    constexpr index_t k = 3;
+    constexpr index_t n = 4;
+    tensor_t<TestType, 2> a{{m, k}};
+    tensor_t<TestType, 2> b{{k, n}};
+    tensor_t<TestType, 2> c_conj_a{{m, n}};
+    tensor_t<TestType, 2> c_conj_b{{m, n}};
+    tensor_t<TestType, 2> c_conj_both{{m, n}};
+
+    for (index_t i = 0; i < m; i++) {
+      for (index_t j = 0; j < k; j++) {
+        a(i, j) = MatMulHermitianTestValue<TestType>(i, j);
+      }
+    }
+
+    for (index_t i = 0; i < k; i++) {
+      for (index_t j = 0; j < n; j++) {
+        b(i, j) = MatMulHermitianTestValue<TestType>(i + m, j);
+      }
+    }
+
+    // conj() of a row-major tensor view. matmul lowers conj(A) as (A^T)^H, so
+    // the operand handed to cuBLASLt is a transposed view, which for a
+    // row-major input is column major. cuBLASLt rejects CUBLAS_OP_C on an
+    // operand whose layout order differs from C's, and matmul always describes
+    // C as row major, so these exercise the fallback to an evaluated copy.
+    (c_conj_a = matmul(conj(a), b)).run(this->exec);
+    (c_conj_b = matmul(a, conj(b))).run(this->exec);
+    (c_conj_both = matmul(conj(a), conj(b))).run(this->exec);
+    this->exec.sync();
+
+    for (index_t i = 0; i < m; i++) {
+      for (index_t j = 0; j < n; j++) {
+        TestType expected_conj_a{};
+        TestType expected_conj_b{};
+        TestType expected_conj_both{};
+        for (index_t p = 0; p < k; p++) {
+          expected_conj_a += detail::scalar_internal_conj(a(i, p)) * b(p, j);
+          expected_conj_b += a(i, p) * detail::scalar_internal_conj(b(p, j));
+          expected_conj_both += detail::scalar_internal_conj(a(i, p)) *
+                                detail::scalar_internal_conj(b(p, j));
+        }
+        EXPECT_TRUE(MatXUtils::MatXTypeCompare(c_conj_a(i, j), expected_conj_a, this->thresh));
+        EXPECT_TRUE(MatXUtils::MatXTypeCompare(c_conj_b(i, j), expected_conj_b, this->thresh));
+        EXPECT_TRUE(MatXUtils::MatXTypeCompare(c_conj_both(i, j), expected_conj_both, this->thresh));
+      }
+    }
+  }
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(MatMulTestComplexNonHalfCUDA, SmallRectConjTimesTranspose)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  if constexpr (!detail::CheckMatMulSupport<ExecType, TestType>()) {
+    GTEST_SKIP();
+  } else {
+    constexpr index_t m = 5;
+    constexpr index_t k = 3;
+    tensor_t<TestType, 2> a{{m, k}};
+    tensor_t<TestType, 2> c{{m, m}};
+
+    for (index_t i = 0; i < m; i++) {
+      for (index_t j = 0; j < k; j++) {
+        a(i, j) = MatMulHermitianTestValue<TestType>(i, j);
+      }
+    }
+
+    // conj(A) * A^T with both operands aliasing the same row-major tensor.
+    (c = matmul(conj(a), transpose_matrix(a))).run(this->exec);
+    this->exec.sync();
+
+    for (index_t i = 0; i < m; i++) {
+      for (index_t j = 0; j < m; j++) {
+        TestType expected{};
+        for (index_t p = 0; p < k; p++) {
+          expected += detail::scalar_internal_conj(a(i, p)) * a(j, p);
+        }
+        EXPECT_TRUE(MatXUtils::MatXTypeCompare(c(i, j), expected, this->thresh));
+      }
+    }
+  }
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(MatMulTestComplexNonHalfCUDA, SmallRectHermitianOfTransposedView)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  if constexpr (!detail::CheckMatMulSupport<ExecType, TestType>()) {
+    GTEST_SKIP();
+  } else {
+    constexpr index_t m = 5;
+    constexpr index_t k = 3;
+    constexpr index_t n = 4;
+    tensor_t<TestType, 2> a{{m, k}};
+    tensor_t<TestType, 2> b{{k, n}};
+    tensor_t<TestType, 2> c_a_hermitian{{m, n}};
+    tensor_t<TestType, 2> c_b_hermitian{{m, n}};
+
+    for (index_t i = 0; i < m; i++) {
+      for (index_t j = 0; j < k; j++) {
+        a(i, j) = MatMulHermitianTestValue<TestType>(i, j);
+      }
+    }
+
+    for (index_t i = 0; i < k; i++) {
+      for (index_t j = 0; j < n; j++) {
+        b(i, j) = MatMulHermitianTestValue<TestType>(i + m, j);
+      }
+    }
+
+    // hermitianT() of a column-major (permuted) view. hermitianT needs no
+    // transpose of its own -- the operand is passed through as-is -- but it is
+    // already column major, so it mismatches the row-major C for the same
+    // reason and must also fall back to an evaluated copy. Contrast with
+    // hermitianT() of a row-major tensor, which does use CUBLAS_OP_C.
+    (c_a_hermitian = matmul(hermitianT(transpose_matrix(a)), b)).run(this->exec);
+    (c_b_hermitian = matmul(a, hermitianT(transpose_matrix(b)))).run(this->exec);
+    this->exec.sync();
+
+    for (index_t i = 0; i < m; i++) {
+      for (index_t j = 0; j < n; j++) {
+        TestType expected_a{};
+        TestType expected_b{};
+        for (index_t p = 0; p < k; p++) {
+          expected_a += detail::scalar_internal_conj(a(i, p)) * b(p, j);
+          expected_b += a(i, p) * detail::scalar_internal_conj(b(p, j));
+        }
+        EXPECT_TRUE(MatXUtils::MatXTypeCompare(c_a_hermitian(i, j), expected_a, this->thresh));
+        EXPECT_TRUE(MatXUtils::MatXTypeCompare(c_b_hermitian(i, j), expected_b, this->thresh));
+      }
+    }
+  }
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(MatMulTestComplexNonHalfCUDA, BatchedAHermitian)
 {
   MATX_ENTER_HANDLER();
@@ -497,7 +645,10 @@ TYPED_TEST(MatMulTestFloatTypes, SmallRectUserPointer)
 }
 
 
-TYPED_TEST(MatMulTestFloatTypes, DISABLED_SmallRectTranspose)
+// Covers the column-major C path: a permuted output view makes matmul_impl
+// rewrite the problem as C' = B'A' rather than describing C to cuBLASLt as
+// column major.
+TYPED_TEST(MatMulTestFloatTypes, SmallRectTranspose)
 {
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
@@ -524,7 +675,7 @@ TYPED_TEST(MatMulTestFloatTypes, DISABLED_SmallRectTranspose)
 
     (ct = matmul(bt, at)).run(this->exec);
 
-    MATX_TEST_ASSERT_COMPARE(this->pb, ct, "c", 0.01);
+    MATX_TEST_ASSERT_COMPARE(this->pb, ct, "c", this->thresh);
   }
   MATX_EXIT_HANDLER();
 }
