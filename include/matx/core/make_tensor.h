@@ -37,6 +37,7 @@
 #include <cstdint>
 #include <limits>
 #include <type_traits>
+#include <utility>
 
 #include "matx/core/nvtx.h"
 #include "matx/core/storage.h"
@@ -668,10 +669,12 @@ template <typename Mdspan>
     constexpr int RANK = static_cast<int>(Extents::rank());
 
     cuda::std::array<index_t, RANK> shape{};
-    cuda::std::array<index_t, RANK> strides{};
+    cuda::std::array<offset_t, RANK> strides{};
 
     // Finds largest number MatX's index_t can store
     constexpr auto max_index = static_cast<uint64_t>(std::numeric_limits<index_t>::max());
+
+    constexpr auto max_offset = static_cast<uint64_t>(std::numeric_limits<offset_t>::max());
     for (int r = 0; r < RANK; r++) {
       const auto extent = span.extent(r);
       const auto stride = span.mapping().stride(r);      
@@ -684,15 +687,15 @@ template <typename Mdspan>
             "mdspan extent is too large for MatX index_t");
       }
       // Same check for stride
-      if (static_cast<uint64_t>(stride) > max_index) {
+      if (static_cast<uint64_t>(stride) > max_offset) {
         MATX_THROW(
             matxInvalidSize,
-            "mdspan stride is too large for MatX index_t");
+            "mdspan stride is too large for MatX offset_t");
       }
       //Converts mdspan's dimension size and 
-      //stride into MatX's index_t
+      //stride into MatX's offset_t
       shape[r] = static_cast<index_t>(extent);
-      strides[r] = static_cast<index_t>(stride);
+      strides[r] = static_cast<offset_t>(stride);
     }
 
     DefaultDescriptor<RANK> desc{std::move(shape), std::move(strides)};
@@ -784,10 +787,11 @@ auto make_tensor( TensorType &&tensor,
  *    If this class owns memory of data
  * @returns New tensor
  **/
-template <typename T, int RANK>
+template <typename T, int RANK, typename StrideType>
+  requires (std::is_integral_v<StrideType> && !std::is_same_v<std::remove_cv_t<StrideType>, bool>)
 auto make_tensor( T *const data,
                   const index_t (&shape)[RANK],
-                  const index_t (&strides)[RANK],
+                  const StrideType (&strides)[RANK],
                   bool owning = false) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
@@ -803,13 +807,15 @@ auto make_tensor( T *const data,
   MATX_LOG_DEBUG("make_tensor<T,RANK>(data, shape, strides, owning): ptr={}, shape={}, strides={}, owning={}",
                  reinterpret_cast<const void*>(data), shape_str, strides_str, owning);
 
-#ifdef _MSC_VER
-  cuda::std::array<index_t, RANK> shape_arr, strides_arr;
-  for (int i = 0; i < RANK; i++) { shape_arr[i] = shape[i]; strides_arr[i] = strides[i]; }
+  cuda::std::array<index_t, RANK> shape_arr;
+  cuda::std::array<offset_t, RANK> strides_arr;
+  for (int i = 0; i < RANK; i++) {
+    MATX_ASSERT_STR(std::in_range<offset_t>(strides[i]), matxInvalidSize,
+                    "Tensor stride cannot be represented by offset_t");
+    shape_arr[i] = shape[i];
+    strides_arr[i] = static_cast<offset_t>(strides[i]);
+  }
   DefaultDescriptor<RANK>  desc{std::move(shape_arr), std::move(strides_arr)};
-#else
-  DefaultDescriptor<RANK>  desc{shape, strides};
-#endif
   auto storage = owning ? make_owning_storage<T>(desc.TotalSize()) : make_non_owning_storage<T>(data, desc.TotalSize());
   return tensor_t<T,RANK, decltype(desc)>{std::move(storage), std::move(desc), data};
 }
@@ -827,12 +833,13 @@ auto make_tensor( T *const data,
  *   Strides of tensor
  * @returns New tensor
  **/
-template <typename TensorType>
-  requires (is_tensor<TensorType> && !is_dynamic_tensor_v<TensorType>)
+template <typename TensorType, typename StrideType>
+  requires (is_tensor<TensorType> && !is_dynamic_tensor_v<TensorType> && std::is_integral_v<StrideType> &&
+            !std::is_same_v<std::remove_cv_t<StrideType>, bool>)
 auto make_tensor( TensorType &tensor,
                   typename TensorType::value_type *const data,
                   const index_t (&shape)[TensorType::Rank()],
-                  const index_t (&strides)[TensorType::Rank()]) {
+                  const StrideType (&strides)[TensorType::Rank()]) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
   std::string shape_str = "[";
@@ -1055,21 +1062,22 @@ T *dlpack_data_pointer(const DLTensor &dt)
 template <typename T>
 constexpr uint64_t dlpack_max_addressable_elements()
 {
-  const auto index_max = static_cast<uint64_t>(std::numeric_limits<index_t>::max());
+  const auto offset_max = static_cast<uint64_t>(std::numeric_limits<offset_t>::max());
   const auto storage_max = static_cast<uint64_t>(
       std::numeric_limits<size_t>::max() / sizeof(cuda::std::remove_cv_t<T>));
-  return index_max < storage_max ? index_max : storage_max;
+  return offset_max < storage_max ? offset_max : storage_max;
 }
 
 template <typename TensorType>
   requires is_tensor<TensorType>
 size_t dlpack_shape_and_strides(const DLTensor &dt,
                                 index_t (&shape)[TensorType::Rank()],
-                                index_t (&strides)[TensorType::Rank()]) {
+                                offset_t (&strides)[TensorType::Rank()]) {
   // DLPack does not expose the backing allocation length. These checks validate
   // producer metadata and MatX address arithmetic before the borrowed view is used.
   using T = typename TensorType::value_type;
   constexpr auto max_index = static_cast<uint64_t>(std::numeric_limits<index_t>::max());
+  constexpr auto max_stride = static_cast<uint64_t>(std::numeric_limits<offset_t>::max());
   constexpr auto max_addressable = dlpack_max_addressable_elements<T>();
   uint64_t logical_elements = 1;
 
@@ -1096,21 +1104,21 @@ size_t dlpack_shape_and_strides(const DLTensor &dt,
       const int64_t stride = dt.strides[r];
       validate_dlpack_condition(stride > 0, matxInvalidParameter,
                                 "DLPack strides must be positive for MatX import");
-      validate_dlpack_condition(static_cast<uint64_t>(stride) <= max_index, matxInvalidSize,
-                                "DLPack stride exceeds MatX index range");
-      strides[r] = static_cast<index_t>(stride);
+      validate_dlpack_condition(static_cast<uint64_t>(stride) <= max_stride, matxInvalidSize,
+                                "DLPack stride exceeds MatX offset range");
+      strides[r] = static_cast<offset_t>(stride);
     }
   }
   else {
     // Older DLPack producers may use null strides to indicate contiguous layout.
     if constexpr (TensorType::Rank() > 0) {
-      strides[TensorType::Rank() - 1] = 1;
+      strides[TensorType::Rank() - 1] = offset_t{1};
       for (int r = TensorType::Rank() - 2; r >= 0; r--) {
         const auto next_stride = static_cast<uint64_t>(strides[r + 1]);
         const auto next_shape = static_cast<uint64_t>(shape[r + 1]);
-        validate_dlpack_condition(next_stride <= max_index / next_shape, matxInvalidSize,
-                                  "DLPack contiguous stride calculation overflowed MatX index range");
-        strides[r] = static_cast<index_t>(next_stride * next_shape);
+        validate_dlpack_condition(next_stride <= max_stride / next_shape, matxInvalidSize,
+                                  "DLPack contiguous stride calculation overflowed MatX offset range");
+        strides[r] = static_cast<offset_t>(next_stride * next_shape);
       }
     }
   }
@@ -1136,7 +1144,7 @@ size_t dlpack_shape_and_strides(const DLTensor &dt,
 template <typename T, int RANK>
 auto make_dlpack_tensor_view(T *data_ptr,
                              const index_t (&shape)[RANK],
-                             const index_t (&strides)[RANK],
+                             const offset_t (&strides)[RANK],
                              size_t storage_elements) {
   DefaultDescriptor<RANK> desc{detail::to_array(shape), detail::to_array(strides)};
   auto storage = make_non_owning_storage<T>(data_ptr, storage_elements);
@@ -1148,7 +1156,7 @@ template <typename T, int RANK, typename Owner>
 auto make_dlpack_tensor_view(std::shared_ptr<Owner> owner,
                              T *data_ptr,
                              const index_t (&shape)[RANK],
-                             const index_t (&strides)[RANK],
+                             const offset_t (&strides)[RANK],
                              size_t storage_elements) {
   DefaultDescriptor<RANK> desc{detail::to_array(shape), detail::to_array(strides)};
   auto data = std::shared_ptr<T>(std::move(owner), data_ptr);
@@ -1192,7 +1200,7 @@ auto make_tensor( TensorType &tensor,
   const DLTensor &dt = dlp_tensor.dl_tensor;
   detail::validate_dlpack_tensor_type<T, TensorType::Rank()>(dt);
 
-  index_t strides[TensorType::Rank()];
+  offset_t strides[TensorType::Rank()];
   index_t shape[TensorType::Rank()];
   const auto storage_elements = detail::dlpack_shape_and_strides<TensorType>(dt, shape, strides);
   auto *data_ptr = detail::dlpack_data_pointer<T>(dt);
@@ -1233,7 +1241,7 @@ auto make_tensor( TensorType &tensor,
   const DLTensor &dt = owner->dl_tensor;
   detail::validate_dlpack_tensor_type<T, TensorType::Rank()>(dt);
 
-  index_t strides[TensorType::Rank()];
+  offset_t strides[TensorType::Rank()];
   index_t shape[TensorType::Rank()];
   const auto storage_elements = detail::dlpack_shape_and_strides<TensorType>(dt, shape, strides);
   auto *data_ptr = detail::dlpack_data_pointer<T>(dt);
@@ -1278,7 +1286,7 @@ auto make_tensor( TensorType &tensor,
   detail::validate_dlpack_tensor_type<T, TensorType::Rank()>(dt);
   detail::validate_dlpack_read_only_import<TensorType>(owner->flags);
 
-  index_t strides[TensorType::Rank()];
+  offset_t strides[TensorType::Rank()];
   index_t shape[TensorType::Rank()];
   const auto storage_elements = detail::dlpack_shape_and_strides<TensorType>(dt, shape, strides);
   auto *data_ptr = detail::dlpack_data_pointer<T>(dt);

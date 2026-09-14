@@ -114,7 +114,7 @@ inline void sar_bp_impl(OutImageType &out, const InitialImageType &initial_image
   // the selected kernel may also use IdxT for its pulse counters and indices.
   bool use_32bit = false;
   if constexpr (is_tensor_view_v<RangeProfilesType>) {
-    const index_t rp_stride = range_profiles.Stride(0);
+    const offset_t rp_stride = range_profiles.Stride(0);
     constexpr int64_t kMax = static_cast<int64_t>(cuda::std::numeric_limits<int32_t>::max());
     use_32bit = rp_stride > 0 &&
                 range_profiles.Size(1) <= kMax &&

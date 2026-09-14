@@ -180,7 +180,7 @@ namespace matx {
         {
           for (index_t dimIdx = 0; dimIdx < (op.Rank() ); dimIdx++ )
           {
-            fprintf(fp, "%" MATX_INDEX_T_FMT, op.Stride(static_cast<int>(dimIdx)) );
+            fprintf(fp, "%" MATX_OFFSET_T_FMT, op.Stride(static_cast<int>(dimIdx)) );
             if( dimIdx < (op.Rank() - 1) )
             {
               fprintf(fp, ",");

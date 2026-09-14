@@ -130,14 +130,14 @@ struct MatMulCUDAParams_t {
   index_t m = 0;
   index_t n = 0;
   index_t k = 0;
-  index_t lda;
-  index_t ldb;
-  index_t ldc;
+  offset_t lda;
+  offset_t ldb;
+  offset_t ldc;
   int rank;
   int32_t batch; // Must be int32_t for cuBLASLt
-  index_t astride; // batch stride
-  index_t bstride; // batch stride
-  index_t cstride; // batch stride
+  offset_t astride; // batch stride
+  offset_t bstride; // batch stride
+  offset_t cstride; // batch stride
   MatMulCUDAProvider_t prov;
   cudaStream_t stream;
   MatXDataType_t dtype;
@@ -444,9 +444,9 @@ public:
         params.m = params.a_rows;
         params.n = params.b_cols;
         params.k = params.a_cols; // Gemm Problem dimensions
-        params.lda = static_cast<int>(a.Stride(TensorTypeA::Rank() - 2));
-        params.ldb = static_cast<int>(b.Stride(TensorTypeB::Rank() - 2));
-        params.ldc = static_cast<int>(c.Stride(RANK - 1));
+        params.lda = a.Stride(TensorTypeA::Rank() - 2);
+        params.ldb = b.Stride(TensorTypeB::Rank() - 2);
+        params.ldc = c.Stride(RANK - 1);
       }
     }
     else {
@@ -534,9 +534,9 @@ public:
         params.m = params.a_rows;
         params.n = params.b_cols;
         params.k = params.a_cols; // Gemm Problem dimensions
-        params.lda = static_cast<int>(a.Stride(TensorTypeA::Rank() - 2));
-        params.ldb = static_cast<int>(b.Stride(TensorTypeB::Rank() - 2));
-        params.ldc = static_cast<int>(c.Stride(RANK - 2));
+        params.lda = a.Stride(TensorTypeA::Rank() - 2);
+        params.ldb = b.Stride(TensorTypeB::Rank() - 2);
+        params.ldc = c.Stride(RANK - 2);
       }
     }
 
@@ -769,14 +769,14 @@ private:
       // for complex half we have copied to planar row major
       // we know the layout of this matrix is compact
       if constexpr (TensorTypeA::Rank() == RANK) {
-        stride = params_.a_rows * params_.a_cols * 2;
+        stride = static_cast<int64_t>(static_cast<offset_t>(params_.a_rows) * static_cast<offset_t>(params_.a_cols) * offset_t{2});
       }
       else {
         stride = 0;
       }
     }
     else {
-      stride = params_.astride;
+      stride = static_cast<int64_t>(params_.astride);
     }
 
     ret = cublasLtMatrixLayoutSetAttribute(
@@ -788,14 +788,14 @@ private:
       // for complex half we have copied to planar row major
       // we know the layout of this matrix is compact
       if constexpr (TensorTypeB::Rank() == RANK) {
-        stride = params_.b_rows * params_.b_cols * 2;
+        stride = static_cast<int64_t>(static_cast<offset_t>(params_.b_rows) * static_cast<offset_t>(params_.b_cols) * offset_t{2});
       }
       else {
         stride = 0;
       }
     }
     else {
-      stride = params_.bstride;
+      stride = static_cast<int64_t>(params_.bstride);
     }
 
     ret = cublasLtMatrixLayoutSetAttribute(
@@ -806,10 +806,10 @@ private:
     if constexpr (is_complex_half_v<T1>) {
       // for complex half we have copied to planar row major
       // we know the layout of this matrix is compact
-      stride = params_.c_rows * params_.c_cols * 2;
+      stride = static_cast<int64_t>(static_cast<offset_t>(params_.c_rows) * static_cast<offset_t>(params_.c_cols) * offset_t{2});
     }
     else {
-      stride = params_.cstride;
+      stride = static_cast<int64_t>(params_.cstride);
     }
 
     ret = cublasLtMatrixLayoutSetAttribute(
@@ -1032,6 +1032,13 @@ private:
                                         T3,             // Data-type of C matrix
                                         CutlassCOrder>; // Layout of C matrix
 
+        MATX_ASSERT_STR(params_.m <= cuda::std::numeric_limits<int>::max() &&
+                        params_.n <= cuda::std::numeric_limits<int>::max() &&
+                        params_.k <= cuda::std::numeric_limits<int>::max() &&
+                        params_.lda >= 0 && params_.lda <= cuda::std::numeric_limits<int>::max() &&
+                        params_.ldb >= 0 && params_.ldb <= cuda::std::numeric_limits<int>::max() &&
+                        params_.ldc >= 0 && params_.ldc <= cuda::std::numeric_limits<int>::max(),
+                        matxInvalidSize, "CUTLASS matrix dimensions or strides exceed int range");
         typename CutlassGemm::Arguments args(
             {static_cast<int>(params_.m), static_cast<int>(params_.n),
              static_cast<int>(params_.k)}, // Gemm Problem dimensions
@@ -1086,6 +1093,13 @@ private:
           auto bp = cuda::std::apply([&b_adj](auto... param) { return b_adj.GetPointer(param...); }, idx);
           auto cp = cuda::std::apply([&c_adj](auto... param) { return c_adj.GetPointer(param...); }, idx);
 
+          MATX_ASSERT_STR(params_.m <= cuda::std::numeric_limits<int>::max() &&
+                          params_.n <= cuda::std::numeric_limits<int>::max() &&
+                          params_.k <= cuda::std::numeric_limits<int>::max() &&
+                          params_.lda >= 0 && params_.lda <= cuda::std::numeric_limits<int>::max() &&
+                          params_.ldb >= 0 && params_.ldb <= cuda::std::numeric_limits<int>::max() &&
+                          params_.ldc >= 0 && params_.ldc <= cuda::std::numeric_limits<int>::max(),
+                          matxInvalidSize, "CUTLASS matrix dimensions or strides exceed int range");
           typename CutlassGemm::Arguments args(
               {static_cast<int>(params_.m), static_cast<int>(params_.n),
                 static_cast<int>(params_.k)}, // Gemm Problem dimensions
@@ -1269,10 +1283,10 @@ __MATX_INLINE__ auto getCublasSupportedTensor( const Op &in, cudaStream_t stream
   const auto support_func = [&]() {
     if constexpr (is_tensor_view_v<Op>) {
       return !(
-        (in.Stride(Op::Rank()-1) != (index_t)1 && in.Stride(Op::Rank()-2) != (index_t)1) ||
+        (in.Stride(Op::Rank()-1) != offset_t{1} && in.Stride(Op::Rank()-2) != offset_t{1}) ||
         // cublas allows 0 strides, but verify that the corresponding size is 1
-        (in.Stride(Op::Rank()-1) == (index_t)0 && in.Size(Op::Rank()-1) != (index_t)1) ||
-        (in.Stride(Op::Rank()-2) == (index_t)0 && in.Size(Op::Rank()-2) != (index_t)1)
+        (in.Stride(Op::Rank()-1) == offset_t{0} && in.Size(Op::Rank()-1) != index_t{1}) ||
+        (in.Stride(Op::Rank()-2) == offset_t{0} && in.Size(Op::Rank()-2) != index_t{1})
       );
     }
     else {

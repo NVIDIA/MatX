@@ -499,11 +499,12 @@ __MATX_INLINE__ std::string number_to_symbol(const T& val)
  * Format: JITTensorImpl_<type_c_name>_R<rank>_SI_<s0>_<s1>_...ST_<st0>_<st1>_...
  * The shape/stride values use '_' as separator.
  */
+template <typename StrideType>
 __MATX_INLINE__ std::string make_jit_tensor_class_name_str(
     const std::string &type_c_name,
     int rank,
     const index_t *shape,
-    const index_t *strides)
+    const StrideType *strides)
 {
   std::string name = "JITTensorImpl_" + type_c_name + "_";
   name += "R" + std::to_string(rank) + "_";
@@ -542,16 +543,16 @@ __MATX_INLINE__ std::string make_jit_tensor_struct_str(
         "  using matxop = bool;\n" +
         "  using stride_type = " + stride_type_str + ";\n" +
         "  T *ldata_;\n" +
-        "  constexpr static cuda::std::array<index_t, " + rank_str + "> strides_ = { " + strides_str + " };\n" +
+        "  constexpr static cuda::std::array<stride_type, " + rank_str + "> strides_ = { " + strides_str + " };\n" +
         "  constexpr static cuda::std::array<index_t, " + rank_str + "> sizes_ = { " + sizes_str + " };\n" +
         "  template <detail::ElementsPerThread EPT, int I = 0, typename ...Is>\n" +
         "  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type GetVal([[maybe_unused]] cuda::std::tuple<Is...> tup)  {\n" +
         "    if constexpr (I < sizeof...(Is)) {\n" +
         "      if constexpr (EPT != detail::ElementsPerThread::ONE && I == sizeof...(Is) - 1) {\n" +
-        "        return GetVal<EPT, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(strides_[I] * static_cast<index_t>(EPT));\n" +
+        "        return GetVal<EPT, I+1, Is...>(tup) + static_cast<stride_type>(cuda::std::get<I>(tup)) * (strides_[I] * static_cast<stride_type>(EPT));\n" +
         "      }\n" +
         "      else {\n" +
-        "        return GetVal<EPT, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(strides_[I]);\n" +
+        "        return GetVal<EPT, I+1, Is...>(tup) + static_cast<stride_type>(cuda::std::get<I>(tup)) * strides_[I];\n" +
         "      }\n" +
         "    }\n" +
         "    else {\n" +
@@ -562,10 +563,10 @@ __MATX_INLINE__ std::string make_jit_tensor_struct_str(
         "  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type GetValC([[maybe_unused]] const cuda::std::tuple<Is...> tup) const {\n" +
         "    if constexpr (I < sizeof...(Is)) {\n" +
         "      if constexpr (EPT != detail::ElementsPerThread::ONE && I == sizeof...(Is) - 1) {\n" +
-        "        return GetValC<EPT, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(strides_[I] * static_cast<index_t>(EPT));\n" +
+        "        return GetValC<EPT, I+1, Is...>(tup) + static_cast<stride_type>(cuda::std::get<I>(tup)) * (strides_[I] * static_cast<stride_type>(EPT));\n" +
         "      }\n" +
         "      else {\n" +
-        "        return GetValC<EPT, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(strides_[I]);\n" +
+        "        return GetValC<EPT, I+1, Is...>(tup) + static_cast<stride_type>(cuda::std::get<I>(tup)) * strides_[I];\n" +
         "      }\n" +
         "    }\n" +
         "    else {\n" +
@@ -580,30 +581,30 @@ __MATX_INLINE__ std::string make_jit_tensor_struct_str(
         "    \n" +
         "    if constexpr (rank == 1) {\n" +
         "        if constexpr (EPT != detail::ElementsPerThread::ONE) {\n" +
-        "          return idx[0] * (strides_[0] * EPT_int);\n" +
+        "          return static_cast<stride_type>(idx[0]) * (strides_[0] * static_cast<stride_type>(EPT_int));\n" +
         "      } else {\n" +
-        "        return idx[0] * strides_[0];\n" +
+        "        return static_cast<stride_type>(idx[0]) * strides_[0];\n" +
         "      }\n" +
         "    }\n" +
         "    else if constexpr (rank == 2) {\n" +
         "      if constexpr (EPT != detail::ElementsPerThread::ONE) {\n" +
-        "        return idx[0] * strides_[0] + idx[1] * (strides_[1] * EPT_int);\n" +
+        "        return static_cast<stride_type>(idx[0]) * strides_[0] + static_cast<stride_type>(idx[1]) * (strides_[1] * static_cast<stride_type>(EPT_int));\n" +
         "      } else {\n" +
-        "        return idx[0] * strides_[0] + idx[1] * strides_[1];\n" +
+        "        return static_cast<stride_type>(idx[0]) * strides_[0] + static_cast<stride_type>(idx[1]) * strides_[1];\n" +
         "      }\n" +
         "    }\n" +
         "    else if constexpr (rank == 3) {\n" +
         "      if constexpr (EPT != detail::ElementsPerThread::ONE) {\n" +
-        "        return idx[0] * strides_[0] + idx[1] * strides_[1] + idx[2] * (strides_[2] * EPT_int);\n" +
+        "        return static_cast<stride_type>(idx[0]) * strides_[0] + static_cast<stride_type>(idx[1]) * strides_[1] + static_cast<stride_type>(idx[2]) * (strides_[2] * static_cast<stride_type>(EPT_int));\n" +
         "      } else {\n" +
-        "        return idx[0] * strides_[0] + idx[1] * strides_[1] + idx[2] * strides_[2];\n" +
+        "        return static_cast<stride_type>(idx[0]) * strides_[0] + static_cast<stride_type>(idx[1]) * strides_[1] + static_cast<stride_type>(idx[2]) * strides_[2];\n" +
         "      }\n" +
         "    }\n" +
         "    else if constexpr (rank == 4) {\n" +
         "      if constexpr (EPT != detail::ElementsPerThread::ONE) {\n" +
-        "        return idx[0] * strides_[0] + idx[1] * strides_[1] + idx[2] * strides_[2] + idx[3] * (strides_[3] * EPT_int);\n" +
+        "        return static_cast<stride_type>(idx[0]) * strides_[0] + static_cast<stride_type>(idx[1]) * strides_[1] + static_cast<stride_type>(idx[2]) * strides_[2] + static_cast<stride_type>(idx[3]) * (strides_[3] * static_cast<stride_type>(EPT_int));\n" +
         "      } else {\n" +
-        "        return idx[0] * strides_[0] + idx[1] * strides_[1] + idx[2] * strides_[2] + idx[3] * strides_[3];\n" +
+        "        return static_cast<stride_type>(idx[0]) * strides_[0] + static_cast<stride_type>(idx[1]) * strides_[1] + static_cast<stride_type>(idx[2]) * strides_[2] + static_cast<stride_type>(idx[3]) * strides_[3];\n" +
         "      }\n" +
         "    }\n" +
         "    else {\n" +
@@ -634,7 +635,7 @@ __MATX_INLINE__ std::string make_jit_tensor_struct_str(
         "        return ReturnType{};\n" +
         "      }\n" +
         "    }\n" +
-        "    const index_t offset = GetOffsetOptimized<CapType::ept>(indices...);\n" +
+        "    const stride_type offset = GetOffsetOptimized<CapType::ept>(indices...);\n" +
         "    if constexpr (CapType::ept == detail::ElementsPerThread::ONE) {\n" +
         "      return ldata_[offset];\n" +
         "    } else if constexpr (EPT_int * sizeof(T) <= MAX_VEC_WIDTH_BYTES ) {\n" +
@@ -660,7 +661,7 @@ __MATX_INLINE__ std::string make_jit_tensor_struct_str(
         "        return dummy_;\n" +
         "      }\n" +
         "    }\n" +
-        "    const index_t offset = GetOffsetOptimized<CapType::ept>(indices...);\n" +
+        "    const stride_type offset = GetOffsetOptimized<CapType::ept>(indices...);\n" +
         "    if constexpr (CapType::ept == detail::ElementsPerThread::ONE) {\n" +
         "      return ldata_[offset];\n" +
         "    } else {\n" +

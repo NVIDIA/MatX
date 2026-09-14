@@ -59,7 +59,7 @@ template <typename Op>
 using data_ptr_of_op_t = typename data_ptr_of_op<Op, is_tensor_view_v<Op>>::type;
 
 // Forward declaration — defined below.
-template <typename Op, bool IsUnitStride, int NumBound, typename IdxT = index_t>
+template <typename Op, bool IsUnitStride, int NumBound, typename IdxT = offset_t>
 struct BoundAccessor;
 
 // ----------------------------------------------------------------------------
@@ -86,10 +86,10 @@ struct BoundAccessor;
 // access time; on the slow path it captures the bound indices and forwards
 // them to op(leading..., is...).
 // ----------------------------------------------------------------------------
-// IdxT selects the width of the offset arithmetic. It defaults to index_t.
+// IdxT selects the width of the offset arithmetic. It defaults to offset_t.
 // Callers that have already proven every index the kernel forms fits in 32 bits
 // can pass int32_t to collapse the 64-bit integer arithmetic into 32-bit arithmetic.
-template <typename Op, bool IsUnitStride, typename IdxT = index_t, int RankParam = Op::Rank()>
+template <typename Op, bool IsUnitStride, typename IdxT = offset_t, int RankParam = Op::Rank()>
 struct TensorAccessor {
     static_assert(is_matx_op<Op>(), "TensorAccessor requires a MatX operator");
     static constexpr bool FastPath = IsUnitStride && is_tensor_view_v<Op>;

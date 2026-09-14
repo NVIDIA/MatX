@@ -35,6 +35,8 @@
 #include <vector>
 #include <string>
 #include <numeric>
+#include <type_traits>
+#include <utility>
 #include "matx/core/defines.h"
 #include "matx/core/error.h"
 #include "matx/core/storage.h"
@@ -56,7 +58,7 @@ namespace detail {
  * Delegates to the common make_jit_tensor_class_name_str in utils.h.
  */
 template <typename T>
-__MATX_INLINE__ std::string make_jit_tensor_class_name(int rank, const index_t *shape, const index_t *strides) {
+__MATX_INLINE__ std::string make_jit_tensor_class_name(int rank, const index_t *shape, const offset_t *strides) {
   return make_jit_tensor_class_name_str(type_to_string_c_name<T>(), rank, shape, strides);
 }
 
@@ -107,12 +109,14 @@ __MATX_INLINE__ std::vector<index_t> shape_to_vector(std::initializer_list<index
   return std::vector<index_t>(shape);
 }
 
-__MATX_INLINE__ index_t total_size_from_shape(const std::vector<index_t> &shape)
+__MATX_INLINE__ offset_t total_size_from_shape(const std::vector<index_t> &shape)
 {
-  index_t total = 1;
+  offset_t total = 1;
   for (const auto dim : shape) {
     MATX_ASSERT_STR(dim >= 0, matxInvalidSize, "Dynamic tensor shape dimensions must be non-negative");
-    total *= dim;
+    MATX_ASSERT_STR(dim == 0 || total <= cuda::std::numeric_limits<offset_t>::max() / dim,
+                    matxInvalidSize, "Dynamic tensor size cannot be represented by offset_t");
+    total *= static_cast<offset_t>(dim);
   }
   return total;
 }
@@ -139,8 +143,9 @@ public:
   using dynamic_tensor = bool;
   using type = T;
   using value_type = T;
-  using stride_type = index_t;
+  using stride_type = offset_t;
   using shape_container = std::vector<index_t>;
+  using stride_container = std::vector<offset_t>;
 
   dynamic_tensor_t() = default;
 
@@ -151,7 +156,9 @@ public:
    * Construct a dynamic tensor from a raw pointer, shape, and strides.
    * The caller is responsible for the lifetime of the data pointer.
    */
-  dynamic_tensor_t(T *data, const std::vector<index_t> &shape, const std::vector<index_t> &strides)
+  template <typename StrideType>
+    requires (std::is_integral_v<StrideType> && !std::is_same_v<std::remove_cv_t<StrideType>, bool>)
+  dynamic_tensor_t(T *data, const std::vector<index_t> &shape, const std::vector<StrideType> &strides)
       : ldata_(data),
         rank_(static_cast<int>(shape.size()))
   {
@@ -159,7 +166,12 @@ public:
                     "Dynamic tensor rank exceeds MATX_MAX_DYNAMIC_RANK");
     MATX_ASSERT_STR(shape.size() == strides.size(), matxInvalidParameter,
                     "Shape and strides must have the same length");
-    for (int i = 0; i < rank_; i++) { shape_[i] = shape[i]; strides_[i] = strides[i]; }
+    for (int i = 0; i < rank_; i++) {
+      MATX_ASSERT_STR(std::in_range<offset_t>(strides[i]), matxInvalidSize,
+                      "Dynamic tensor stride cannot be represented by offset_t");
+      shape_[i] = shape[i];
+      strides_[i] = static_cast<offset_t>(strides[i]);
+    }
   }
 
   /**
@@ -178,7 +190,9 @@ public:
   /**
    * Construct a dynamic tensor with owning storage, shape, and strides.
    */
-  dynamic_tensor_t(Storage<T> storage, const std::vector<index_t> &shape, const std::vector<index_t> &strides)
+  template <typename StrideType>
+    requires (std::is_integral_v<StrideType> && !std::is_same_v<std::remove_cv_t<StrideType>, bool>)
+  dynamic_tensor_t(Storage<T> storage, const std::vector<index_t> &shape, const std::vector<StrideType> &strides)
       : ldata_(storage.data()),
         rank_(static_cast<int>(shape.size())),
         storage_(std::move(storage))
@@ -187,7 +201,12 @@ public:
                     "Dynamic tensor rank exceeds MATX_MAX_DYNAMIC_RANK");
     MATX_ASSERT_STR(shape.size() == strides.size(), matxInvalidParameter,
                     "Shape and strides must have the same length");
-    for (int i = 0; i < rank_; i++) { shape_[i] = shape[i]; strides_[i] = strides[i]; }
+    for (int i = 0; i < rank_; i++) {
+      MATX_ASSERT_STR(std::in_range<offset_t>(strides[i]), matxInvalidSize,
+                      "Dynamic tensor stride cannot be represented by offset_t");
+      shape_[i] = shape[i];
+      strides_[i] = static_cast<offset_t>(strides[i]);
+    }
   }
 
   /**
@@ -214,7 +233,7 @@ public:
 
   __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const { return shape_[dim]; }
 
-  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Stride(int dim) const { return strides_[dim]; }
+  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ offset_t Stride(int dim) const { return strides_[dim]; }
 
   __MATX_INLINE__ T *Data() const { return ldata_; }
 
@@ -223,10 +242,12 @@ public:
     return Data() != nullptr;
   }
 
-  __MATX_INLINE__ index_t TotalSize() const {
-    index_t total = 1;
+  __MATX_INLINE__ auto TotalSize() const {
+    offset_t total = 1;
     for (int i = 0; i < rank_; ++i) {
-      total *= shape_[i];
+      MATX_ASSERT_STR(shape_[i] == 0 || total <= cuda::std::numeric_limits<offset_t>::max() / shape_[i],
+                      matxInvalidSize, "Dynamic tensor size cannot be represented by offset_t");
+      total *= static_cast<offset_t>(shape_[i]);
     }
     return total;
   }
@@ -289,10 +310,10 @@ public:
       }
       // Check contiguity
       bool contiguous = true;
-      index_t expected = 1;
+      offset_t expected = 1;
       for (int i = rank_ - 1; i >= 0; --i) {
         if (strides_[i] != expected) { contiguous = false; break; }
-        expected *= shape_[i];
+        expected *= static_cast<offset_t>(shape_[i]);
       }
       if (!contiguous) {
         return cuda::std::array<detail::ElementsPerThread, 2>{detail::ElementsPerThread::ONE, detail::ElementsPerThread::ONE};
@@ -381,7 +402,8 @@ public:
   }
 
 private:
-  std::string dims_to_string(const index_t *arr, int n) const {
+  template <typename DimType>
+  std::string dims_to_string(const DimType *arr, int n) const {
     std::string s;
     for (int i = 0; i < n; ++i) {
       if (i != 0) s += ", ";
@@ -392,9 +414,12 @@ private:
 
   void compute_row_major_strides() {
     if (rank_ > 0) {
-      strides_[rank_ - 1] = 1;
+      strides_[rank_ - 1] = offset_t{1};
       for (int i = rank_ - 2; i >= 0; --i) {
-        strides_[i] = strides_[i + 1] * shape_[i + 1];
+        MATX_ASSERT_STR(shape_[i + 1] == 0 ||
+                        strides_[i + 1] <= cuda::std::numeric_limits<offset_t>::max() / shape_[i + 1],
+                        matxInvalidSize, "Dynamic tensor stride cannot be represented by offset_t");
+        strides_[i] = strides_[i + 1] * static_cast<offset_t>(shape_[i + 1]);
       }
     }
   }
@@ -402,7 +427,7 @@ private:
   T *ldata_ = nullptr;
   int rank_ = 0;
   index_t shape_[MATX_MAX_DYNAMIC_RANK] = {};
-  index_t strides_[MATX_MAX_DYNAMIC_RANK] = {};
+  offset_t strides_[MATX_MAX_DYNAMIC_RANK] = {};
   Storage<T> storage_; // Optional owning storage (empty if non-owning)
   matxMemorySpace_t alloc_space_ = MATX_MANAGED_MEMORY;
   cudaStream_t alloc_stream_ = 0;
