@@ -330,13 +330,50 @@ std::vector<std::string> __MATX_HOST__ __MATX_INLINE__ get_preprocessor_options(
     }                                                                          \
   } while (0)
 
+// These have no CUDA runtime API equivalent, so they are resolved through the runtime instead of
+// linked against libcuda. See matx/core/error.h for why that matters.
+inline CUresult DrvModuleLoadDataEx(CUmodule *module, const void *image, unsigned int numOptions,
+                                    CUjit_option *options, void **optionValues) {
+  using fn_t = CUresult(CUDAAPI *)(CUmodule *, const void *, unsigned int, CUjit_option *, void **);
+  static const fn_t fn = DrvEntryPoint<fn_t>("cuModuleLoadDataEx");
+  MATX_ASSERT_STR(fn != nullptr, matxCudaError, "CUDA driver entry point cuModuleLoadDataEx is unavailable");
+  return fn(module, image, numOptions, options, optionValues);
+}
+
+inline CUresult DrvModuleGetFunction(CUfunction *hfunc, CUmodule hmod, const char *name) {
+  using fn_t = CUresult(CUDAAPI *)(CUfunction *, CUmodule, const char *);
+  static const fn_t fn = DrvEntryPoint<fn_t>("cuModuleGetFunction");
+  MATX_ASSERT_STR(fn != nullptr, matxCudaError, "CUDA driver entry point cuModuleGetFunction is unavailable");
+  return fn(hfunc, hmod, name);
+}
+
+inline CUresult DrvFuncSetAttribute(CUfunction hfunc, CUfunction_attribute attrib, int value) {
+  using fn_t = CUresult(CUDAAPI *)(CUfunction, CUfunction_attribute, int);
+  static const fn_t fn = DrvEntryPoint<fn_t>("cuFuncSetAttribute");
+  MATX_ASSERT_STR(fn != nullptr, matxCudaError, "CUDA driver entry point cuFuncSetAttribute is unavailable");
+  return fn(hfunc, attrib, value);
+}
+
+inline CUresult DrvLaunchKernel(CUfunction f, unsigned int gridDimX, unsigned int gridDimY,
+                                unsigned int gridDimZ, unsigned int blockDimX,
+                                unsigned int blockDimY, unsigned int blockDimZ,
+                                unsigned int sharedMemBytes, CUstream hStream, void **kernelParams,
+                                void **extra) {
+  using fn_t = CUresult(CUDAAPI *)(CUfunction, unsigned int, unsigned int, unsigned int,
+                                   unsigned int, unsigned int, unsigned int, unsigned int, CUstream,
+                                   void **, void **);
+  static const fn_t fn = DrvEntryPoint<fn_t>("cuLaunchKernel");
+  MATX_ASSERT_STR(fn != nullptr, matxCudaError, "CUDA driver entry point cuLaunchKernel is unavailable");
+  return fn(f, gridDimX, gridDimY, gridDimZ, blockDimX, blockDimY, blockDimZ, sharedMemBytes,
+            hStream, kernelParams, extra);
+}
+
 // Helper function to check CUDA Driver API errors
 #define CUDA_CHECK(call)                                                       \
   do {                                                                         \
     CUresult result = call;                                                    \
     if (result != CUDA_SUCCESS) {                                              \
-      const char* errStr = nullptr;                                            \
-      cuGetErrorString(result, &errStr);                                       \
+      const char* errStr = DrvGetErrorString(result);                           \
       std::string error_msg = std::string("CUDA error: ") +                    \
                               (errStr != nullptr ? errStr : "unknown");       \
       MATX_LOG_ERROR("{}", error_msg);                                         \
@@ -881,10 +918,10 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name,
         
         // Load the cached cubin into a CUDA module
         CUmodule module;
-        CUDA_CHECK(cuModuleLoadDataEx(&module, cached_cubin_ptr->data, 0, nullptr, nullptr));
+        CUDA_CHECK(DrvModuleLoadDataEx(&module, cached_cubin_ptr->data, 0, nullptr, nullptr));
         
         // Get kernel function using the cached lowered name
-        CUDA_CHECK(cuModuleGetFunction(&kernel_func, module, lowered_name.c_str()));
+        CUDA_CHECK(DrvModuleGetFunction(&kernel_func, module, lowered_name.c_str()));
         
         // Cache both module and function to prevent resource leak
         // Module must stay loaded for function to remain valid
@@ -1063,10 +1100,10 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name,
     
     // Load LTO-IR into CUDA module
     CUmodule module;
-    CUDA_CHECK(cuModuleLoadDataEx(&module, cubin.data(), 0, nullptr, nullptr));
+    CUDA_CHECK(DrvModuleLoadDataEx(&module, cubin.data(), 0, nullptr, nullptr));
     
     // Get kernel function using the lowered name
-    CUDA_CHECK(cuModuleGetFunction(&kernel_func, module, lowered_name.c_str()));
+    CUDA_CHECK(DrvModuleGetFunction(&kernel_func, module, lowered_name.c_str()));
     
     // Cache both module and function to prevent resource leak
     // Module must stay loaded for function to remain valid
@@ -1092,7 +1129,7 @@ launch_kernel:
   if (dynamic_shmem_size > max_shared_memory_per_block) {
     MATX_LOG_DEBUG("Requested dynamic shared memory ({} bytes) exceeds default per-block shared memory limit ({})",
                    dynamic_shmem_size, max_shared_memory_per_block);
-    CUDA_CHECK(cuFuncSetAttribute(kernel_func, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, dynamic_shmem_size));
+    CUDA_CHECK(DrvFuncSetAttribute(kernel_func, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, dynamic_shmem_size));
   }
 
   auto storage = op.ToJITStorage();
@@ -1111,13 +1148,13 @@ launch_kernel:
     MATX_LOG_DEBUG("Launching kernel with grid=({}, {}, {}), block=({}, {}, {}), dynamic_shmem_size={} bytes",
                    blocks.x, blocks.y, blocks.z, threads.x, threads.y, threads.z, dynamic_shmem_size);
     // Launch kernel
-    CUDA_CHECK(cuLaunchKernel(kernel_func,
-                              blocks.x, blocks.y, blocks.z,
-                              threads.x, threads.y, threads.z,
-                              dynamic_shmem_size,
-                              stream,
-                              args,
-                              nullptr));
+    CUDA_CHECK(DrvLaunchKernel(kernel_func,
+                               blocks.x, blocks.y, blocks.z,
+                               threads.x, threads.y, threads.z,
+                               dynamic_shmem_size,
+                               stream,
+                               args,
+                               nullptr));
   }
   else {
     // Rank 0-4 kernels: Pass individual size parameters
@@ -1139,13 +1176,13 @@ launch_kernel:
     MATX_LOG_DEBUG("Launching kernel with grid=({}, {}, {}), block=({}, {}, {}), dynamic_shmem_size={} bytes",
                    blocks.x, blocks.y, blocks.z, threads.x, threads.y, threads.z, dynamic_shmem_size);
     // Launch kernel
-    CUDA_CHECK(cuLaunchKernel(kernel_func,
-                              blocks.x, blocks.y, blocks.z,
-                              threads.x, threads.y, threads.z,
-                              dynamic_shmem_size,
-                              stream,
-                              args,
-                              nullptr));
+    CUDA_CHECK(DrvLaunchKernel(kernel_func,
+                               blocks.x, blocks.y, blocks.z,
+                               threads.x, threads.y, threads.z,
+                               dynamic_shmem_size,
+                               stream,
+                               args,
+                               nullptr));
   }
 }
 

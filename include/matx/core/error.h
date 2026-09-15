@@ -39,6 +39,7 @@
 #include <sstream>
 #ifdef __CUDACC__
 #include <cuda.h>
+#include <cuda_runtime_api.h>
 #endif
 
 #include "matx/core/stacktrace.h"
@@ -265,14 +266,64 @@ namespace matx
     MATX_CUDA_CHECK(e);                \
   }
 
+namespace detail {
+#ifdef __CUDACC__
+// The CUDA driver library (libcuda.so.1 on Linux, nvcuda.dll on Windows) ships with the display
+// driver, not with the toolkit. Calling its entry points directly makes every consumer record a
+// load-time dependency on it, so a binary using MatX cannot even start on a machine that has no
+// NVIDIA driver installed: the loader rejects it before main() runs, leaving the application no
+// way to report the problem. The CUDA runtime hands out the same entry points and resolves the
+// driver lazily, which keeps that dependency out of the link.
+//
+// Returns nullptr when the entry point is unavailable.
+template <typename Fn>
+inline Fn DrvEntryPoint(const char *symbol)
+{
+  // Ask for the API version the installed driver actually implements rather than the toolkit's
+  // CUDA_VERSION. A driver older than the toolkit is a supported configuration (CUDA minor
+  // version compatibility), and asking such a driver for a newer version than it provides makes
+  // the query fail with cudaDriverEntryPointSymbolNotFound.
+  int driver_version = 0;
+  if (cudaDriverGetVersion(&driver_version) != cudaSuccess || driver_version <= 0) {
+    return nullptr;
+  }
+  const unsigned int api_version = static_cast<unsigned int>(driver_version) < CUDA_VERSION
+                                       ? static_cast<unsigned int>(driver_version)
+                                       : static_cast<unsigned int>(CUDA_VERSION);
+
+  void *fn = nullptr;
+  cudaDriverEntryPointQueryResult qres = cudaDriverEntryPointSymbolNotFound;
+  const cudaError_t rc =
+      cudaGetDriverEntryPointByVersion(symbol, &fn, api_version, cudaEnableDefault, &qres);
+  // An unavailable symbol is reported as a success with a null pointer, so both must be checked
+  if (rc != cudaSuccess || qres != cudaDriverEntryPointSuccess) {
+    return nullptr;
+  }
+  return reinterpret_cast<Fn>(fn);
+}
+
+// Deliberately does not throw: this runs on an error path, where failing would replace the
+// original error with a less useful one.
+inline const char *DrvGetErrorString(CUresult error)
+{
+  using fn_t = CUresult(CUDAAPI *)(CUresult, const char **);
+  static const fn_t fn = DrvEntryPoint<fn_t>("cuGetErrorString");
+  const char *str = nullptr;
+  if (fn == nullptr || fn(error, &str) != CUDA_SUCCESS) {
+    return nullptr;
+  }
+  return str;
+}
+#endif
+}
+
 // Macro for checking CUDA driver API (CUresult) errors
 #define MATX_CUDA_DRIVER_CHECK(e)                                          \
   do {                                                                     \
     const CUresult e_ = (e);                                               \
     if (e_ != CUDA_SUCCESS)                                                \
     {                                                                      \
-      const char *err_str = nullptr;                                       \
-      cuGetErrorString(e_, &err_str);                                      \
+      const char *err_str = matx::detail::DrvGetErrorString(e_);            \
       MATX_LOG_ERROR("{}:{} CUDA Driver Error: {} ({})", __FILE__, __LINE__, err_str != nullptr ? err_str : "unknown", static_cast<int>(e_)); \
       MATX_THROW(matx::matxCudaError, err_str != nullptr ? err_str : "unknown"); \
     }                                                                      \
