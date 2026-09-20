@@ -191,12 +191,10 @@ class channelize_poly_operators:
 
         channelize_poly_operators.np_random_state = np.random.get_state()
 
-    def channelize(self) -> Dict[str, np.ndarray]:
+    @staticmethod
+    def _channelize(x, h, num_channels):
         def idivup(a, b) -> int: return (a+b-1)//b
 
-        h = self.res['filter_random']
-        num_channels = self.res['num_channels']
-        x = self.res['a']
         num_taps_per_channel = idivup(h.size, num_channels)
         if num_channels * num_taps_per_channel > h.size:
             h = np.pad(h, (0,num_channels*num_taps_per_channel-h.size))
@@ -214,7 +212,7 @@ class channelize_poly_operators:
             # flipud because samples are inserted into the filter banks in order
             # M-1, M-2, ..., 0
             xf = np.flipud(np.reshape(xpad, (num_channels,x_len_per_channel), order='F'))
-            buf = np.zeros((num_channels, num_taps_per_channel), dtype=self.dtype)
+            buf = np.zeros((num_channels, num_taps_per_channel), dtype=x.dtype)
 
             # We scale the outputs by num_channels because we use the ifft
             # and it scales by 1/N for an N-point FFT. We use ifft instead
@@ -225,9 +223,8 @@ class channelize_poly_operators:
             for i in range(x_len_per_channel):
                 buf[:, 1:] = buf[:, 0:num_taps_per_channel-1]
                 buf[:, 0] = xf[:, i]
-                for j in range(num_channels):
-                    out[batch_ind, j, i] = scale * np.dot(np.squeeze(buf[j,:]), np.squeeze(h[j,:]))
-                    out_hreal[batch_ind, j, i] = scale * np.dot(np.squeeze(buf[j,:]), np.squeeze(np.real(h[j,:])))
+                out[batch_ind, :, i] = scale * np.sum(buf * h, axis=1)
+                out_hreal[batch_ind, :, i] = scale * np.sum(buf * np.real(h), axis=1)
             out[batch_ind,:,:] = ifft(out[batch_ind,:,:], axis=0)
             out_hreal[batch_ind,:,:] = ifft(out_hreal[batch_ind,:,:], axis=0)
         if num_batches > 1:
@@ -242,8 +239,20 @@ class channelize_poly_operators:
         else:
             out = np.transpose(np.reshape(out, out.shape[1:]), axes=[1,0])
             out_hreal = np.transpose(np.reshape(out_hreal, out_hreal.shape[1:]), axes=[1,0])
-        self.res['b_random'] = out
-        self.res['b_random_hreal'] = out_hreal
+        return out, out_hreal
+
+    def channelize(self) -> Dict[str, np.ndarray]:
+        self.res['b_random'], self.res['b_random_hreal'] = self._channelize(
+            self.res['a'], self.res['filter_random'], self.res['num_channels'])
+        return self.res
+
+    def channelize_accum(self) -> Dict[str, np.ndarray]:
+        self.channelize()
+        # Isolate accumulation error using the exact FP32 operands in FP64.
+        x = self.res['a'].astype(np.complex64).astype(np.complex128)
+        h = self.res['filter_random_real'].astype(np.float32).astype(np.float64)
+        _, self.res['b_quantized_hreal'] = self._channelize(
+            x, h, self.res['num_channels'])
         return self.res
 
     def channelize_oversampled(self) -> Dict[str, np.ndarray]:

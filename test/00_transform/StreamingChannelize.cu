@@ -161,7 +161,7 @@ void large_dispatch_sweep(cudaExecutor &exec)
 {
   struct Cfg { index_t M, D, P; };
   const index_t N = 2051;
-  for (Cfg c : {Cfg{16, 16, 8}, Cfg{64, 32, 8}, Cfg{256, 128, 8},
+  for (Cfg c : {Cfg{12, 12, 8}, Cfg{64, 32, 8}, Cfg{256, 128, 8},
                 Cfg{64, 32, 20}, Cfg{64, 64, 192}, Cfg{64, 48, 192}}) {
     const index_t L = c.P * c.M - 1; // partial final polyphase row
     for (index_t chunk : {index_t(7), index_t(113), index_t(509)}) {

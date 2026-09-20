@@ -37,10 +37,495 @@
 #include "gtest/gtest.h"
 #include <cuda/std/complex>
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <limits>
 #include <numeric>
+#include <vector>
 
 using namespace matx;
+
+TEST(ChannelizePoly, BatchedAndPartialRowsMatchHost)
+{
+  MATX_ENTER_HANDLER();
+  cudaExecutor cuda_exec{};
+  SingleThreadedHostExecutor host_exec{};
+  auto check = [&](auto input_tag, auto real_tag) {
+    using Input = decltype(input_tag);
+    using Real = decltype(real_tag);
+    using Complex = cuda::std::complex<Real>;
+    struct Config { index_t m, d, p, n, b, tail = 1; };
+    const index_t batches = sizeof(Input) <= 8 ? 128 : 64;
+    const Config cases[] = {
+      {128, 128, 13, 1027, 8},
+      {40, 40, 13, 65537, batches},
+      {40, 20, 13, 65537, batches},
+      // Near-critical oversampling needs history across output-group reloads.
+      {64, 63, 1, 2051, 2},
+      {64, 63, 4, 2051, 2},
+      {64, 63, 13, 2051, 2},
+      {31, 31, 13, 65537, 8},
+      {16, 8, 128, 4099, 8},
+      {16, 16, 13, 1023, 4},
+      {16, 16, 13, 1039, 4},
+      // Packed power-of-two rows: short filters, partial tiles, and batching.
+      {8, 8, 1, 1031, 3, 0},
+      {8, 8, 4, 1031, 3},
+      {8, 8, 21, 16385, 4},
+      {8, 4, 21, 1031, 3},
+      {16, 16, 21, 1031, 3},
+      {16, 8, 21, 1031, 3},
+      // Long signals with modest filters, partial rows, and batching.
+      {12, 12, 13, 5000003, 1},
+      {16, 16, 13, 5000003, 1},
+      {24, 24, 21, 5000003, 2},
+      // Long batched filters and power-of-two shared-memory fit boundaries.
+      {32, 32, sizeof(Input) <= 4 ? 375 : sizeof(Input) <= 8 ? 183 : 87,
+       65537, 64},
+      {32, 32, 64, 65537, batches},
+      {32, 16, 64, 65537, batches},
+      {64, 64, 64, 65537, batches},
+      {64, 32, 64, 65537, batches},
+      // Short two-channel filters, partial rows, and batched output boundaries.
+      {2, 2, 1, 1027, 3},
+      {2, 2, 2, 1027, 3},
+      {2, 2, 4, 1027, 3},
+      {2, 2, 5, 1027, 3},
+      {2, 2, 13, 1027, 3},
+      {2, 2, 2, 1027, 3, 0},
+      {2, 2, 4, 1027, 3, 0},
+      {2, 1, 2, 1027, 3},
+      {2, 2, 939, 1027, 2},
+      {2, 2, 940, 1027, 2},
+      // Long real-double filters span the cached and fallback regimes.
+      {2, 2, 1280, 1027, 2},
+      {2, 2, 1281, 1027, 2},
+      {2, 2, 1472, 1027, 2},
+      {2, 2, 1473, 1027, 2},
+      {3, 3, 13, 65537, 2},
+      {4, 4, 21, 16383, 1},
+      {5, 5, 21, 16387, 4},
+      {6, 6, 48, 16383, 1},
+      // Direct small-channel FIRs: causal starts and full/partial filter tails.
+      {5, 5, 1, 1027, 3},
+      {5, 5, 4, 1027, 3},
+      {5, 5, 13, 1027, 3},
+      {5, 5, 1, 1027, 3, 0},
+      {5, 5, 4, 1027, 3, 0},
+      {5, 5, 13, 1027, 3, 0},
+      {6, 6, 1, 1027, 3},
+      {6, 6, 4, 1027, 3},
+      {6, 6, 13, 1027, 3},
+      {6, 6, 1, 1027, 3, 0},
+      {6, 6, 4, 1027, 3, 0},
+      {6, 6, 13, 1027, 3, 0},
+    };
+    for (const auto &tc : cases) {
+      SCOPED_TRACE(::testing::Message() << "M=" << tc.m << " D=" << tc.d
+          << " P=" << tc.p << " N=" << tc.n << " B=" << tc.b
+          << " bytes=" << sizeof(Input) << " complex=" << is_complex_v<Input>);
+      const index_t rows = (tc.n + tc.d - 1) / tc.d;
+      auto input = make_tensor<Input>({tc.b, tc.n});
+      auto filter = make_tensor<Real>({tc.m * tc.p - tc.tail});
+      auto output = make_tensor<Complex>({tc.b, rows, tc.m});
+      auto reference = make_tensor<Complex>({tc.b, 1, tc.m});
+      for (index_t b = 0; b < tc.b; b++) {
+        for (index_t n = 0; n < tc.n; n++) {
+          const auto re = static_cast<Real>((n + 17 * b) % 97 - 48) / 64;
+          if constexpr (is_complex_v<Input>) {
+            const auto im = static_cast<Real>((n + 31 * b) % 89 - 44) / 64;
+            input(b, n) = Input(re, im);
+          } else {
+            input(b, n) = re;
+          }
+        }
+      }
+      for (index_t k = 0; k < filter.Size(0); k++) {
+        filter(k) = static_cast<Real>((5 * k) % 17 - 8) / 32;
+      }
+      (output = channelize_poly(input, filter, tc.m, tc.d)).run(cuda_exec);
+      MATX_CUDA_CHECK_LAST_ERROR();
+      cuda_exec.sync();
+      for (index_t row : {index_t{0}, index_t{1}, index_t{3}, index_t{4},
+                          index_t{7}, index_t{8}, index_t{15}, index_t{16},
+                          index_t{31}, index_t{32}, index_t{63}, index_t{64},
+                          index_t{127}, index_t{128}, rows / 2, rows - 1}) {
+        if (row >= rows) continue;
+        channelize_poly_impl<decltype(reference), decltype(input),
+            decltype(filter), Real>(reference, input, filter, tc.m, tc.d,
+                host_exec, row);
+        for (index_t b = 0; b < tc.b; b++) {
+          for (index_t c = 0; c < tc.m; c++) {
+            const auto expected = reference(b, 0, c);
+            const double tolerance = (sizeof(Real) == 4 ? 2e-4 : 2e-11) *
+                (1.0 + cuda::std::abs(expected));
+            EXPECT_NEAR(output(b, row, c).real(), expected.real(), tolerance);
+            EXPECT_NEAR(output(b, row, c).imag(), expected.imag(), tolerance);
+          }
+        }
+      }
+    }
+  };
+  check(float{}, float{});
+  check(double{}, double{});
+  check(cuda::std::complex<float>{}, float{});
+  check(cuda::std::complex<double>{}, double{});
+  MATX_EXIT_HANDLER();
+}
+
+TEST(ChannelizePoly, LongPartialTileMatchesHost)
+{
+  MATX_ENTER_HANDLER();
+  cudaExecutor cuda_exec{};
+  SingleThreadedHostExecutor host_exec{};
+  auto check = [&](auto input_tag, auto real_tag) {
+    using Input = decltype(input_tag);
+    using Real = decltype(real_tag);
+    using Complex = cuda::std::complex<Real>;
+    struct Config { index_t channels, rows; };
+    const Config cases[] = {
+      {24, 32769}, {30, 32769}, {31, 32769}, {32, 32769},
+      // Multiple short batches still cannot amortize per-block tile setup.
+      {31, 2049},
+    };
+    for (const auto &tc : cases) {
+      const index_t channels = tc.channels;
+      const index_t rows = tc.rows;
+      SCOPED_TRACE(::testing::Message()
+          << "M=" << channels << " rows=" << rows << " input_bytes=" << sizeof(Input)
+          << " complex=" << is_complex_v<Input>);
+      constexpr index_t batches = 2;
+      const index_t length = channels * rows - 7;
+      const index_t taps = sizeof(Input) == 4 ? 375 :
+          (sizeof(Input) == 8 ? 183 : 87);
+      auto input = make_tensor<Input>({batches, length});
+      auto filter = make_tensor<Real>({channels * taps - 1});
+      auto output = make_tensor<Complex>({batches, rows, channels});
+      auto reference = make_tensor<Complex>({batches, 1, channels});
+      for (index_t b = 0; b < batches; b++) {
+        for (index_t n = 0; n < length; n++) {
+          const auto re = static_cast<Real>(static_cast<double>(n % 97 - 48 + b) / 64.0);
+          if constexpr (is_complex_v<Input>) {
+            input(b, n) = Input(re, static_cast<Real>(static_cast<double>(n % 89 - 44) / 64.0));
+          } else {
+            input(b, n) = re;
+          }
+        }
+      }
+      for (index_t k = 0; k < filter.Size(0); k++) {
+        filter(k) = static_cast<Real>(static_cast<double>(k % 13 - 6) / 64.0);
+      }
+      (output = channelize_poly(input, filter, channels, channels)).run(cuda_exec);
+      MATX_CUDA_CHECK_LAST_ERROR();
+      cuda_exec.sync();
+      for (index_t row : {index_t{0}, index_t{15}, index_t{16},
+                          rows / 2, rows - 2, rows - 1}) {
+        channelize_poly_impl<decltype(reference), decltype(input),
+            decltype(filter), Real>(reference, input, filter, channels,
+                channels, host_exec, row);
+        for (index_t b = 0; b < batches; b++) {
+          for (index_t c = 0; c < channels; c++) {
+            const auto expected = reference(b, 0, c);
+            const double tolerance = (sizeof(Real) == 4 ? 2e-4 : 2e-11) *
+                (1.0 + cuda::std::abs(expected));
+            EXPECT_NEAR(output(b, row, c).real(), expected.real(), tolerance);
+            EXPECT_NEAR(output(b, row, c).imag(), expected.imag(), tolerance);
+          }
+        }
+      }
+    }
+  };
+  check(float{}, float{});
+  check(double{}, double{});
+  check(cuda::std::complex<float>{}, float{});
+  check(cuda::std::complex<double>{}, double{});
+  MATX_EXIT_HANDLER();
+}
+
+// Every launchable backend plan must match the host implementation, whether or
+// not the dispatcher selects it, for the full grid and for a window at a nonzero
+// out_elem_offset. Plans that are not launchable must throw.
+TEST(ChannelizePoly, ExplicitPlansMatchHost)
+{
+  MATX_ENTER_HANDLER();
+  namespace cp = detail::cpoly;
+  cudaExecutor cuda_exec{};
+  SingleThreadedHostExecutor host_exec{};
+  auto check = [&](auto input_tag, auto real_tag) {
+    using Input = decltype(input_tag);
+    using Real = decltype(real_tag);
+    using Complex = cuda::std::complex<Real>;
+    struct Config { index_t m, d, p, n, b; };
+    const Config cases[] = {
+      {4, 4, 13, 4099, 2},
+      {5, 3, 7, 4099, 2},
+      {8, 6, 9, 4099, 2},
+      {10, 10, 21, 8195, 2},
+      {16, 16, 21, 8195, 2},
+      {20, 15, 13, 8195, 2},
+      {33, 22, 6, 16387, 3},
+      {40, 40, 13, 16387, 2},
+      {64, 64, 8, 16387, 2},
+      {96, 72, 5, 16387, 2},
+      {100, 100, 17, 16387, 2},
+      // The FIR tile exceeds shared memory, so the fused plan runs the direct FIR.
+      {5, 5, 2048, 8195, 2},
+    };
+    for (const auto &tc : cases) {
+      SCOPED_TRACE(::testing::Message() << "M=" << tc.m << " D=" << tc.d
+          << " P=" << tc.p << " N=" << tc.n << " B=" << tc.b
+          << " bytes=" << sizeof(Input) << " complex=" << is_complex_v<Input>);
+      const index_t rows = (tc.n + tc.d - 1) / tc.d;
+      auto input_storage = make_tensor<Input>({tc.b, tc.n});
+      auto filter = make_tensor<Real>({tc.m * tc.p - 1});
+      auto output_storage = make_tensor<Complex>({tc.b, rows, tc.m});
+      auto reference = make_tensor<Complex>({tc.b, 1, tc.m});
+      for (index_t b = 0; b < tc.b; b++) {
+        for (index_t n = 0; n < tc.n; n++) {
+          const auto re = static_cast<Real>((n + 17 * b) % 97 - 48) / 64;
+          if constexpr (is_complex_v<Input>) {
+            const auto im = static_cast<Real>((n + 31 * b) % 89 - 44) / 64;
+            input_storage(b, n) = Input(re, im);
+          } else {
+            input_storage(b, n) = re;
+          }
+        }
+      }
+      for (index_t k = 0; k < filter.Size(0); k++) {
+        filter(k) = static_cast<Real>((5 * k) % 17 - 8) / 32;
+      }
+      // Match the argument types passed by the channelize_poly operator.
+      detail::base_type_t<decltype(input_storage)> input = input_storage;
+      detail::base_type_t<decltype(output_storage)> output = output_storage;
+      using OutOp = decltype(output);
+      using InOp = decltype(input);
+      using FilterOp = decltype(filter);
+
+      const index_t sample_rows[] = {0, 1, 2, 15, 16, 17, rows / 2, rows - 2, rows - 1};
+      // Windowed launches, as issued by the streaming channelizer, cover rows
+      // [window_start, rows - 1): past the causal start and before the final row.
+      const index_t window_start = 17;
+      const index_t window_rows = rows - 1 - window_start;
+      auto window_storage = make_tensor<Complex>({tc.b, window_rows, tc.m});
+      detail::base_type_t<decltype(window_storage)> window = window_storage;
+      std::vector<Complex> expected;
+      for (index_t row : sample_rows) {
+        channelize_poly_impl<decltype(reference), decltype(input_storage),
+            decltype(filter), Real>(reference, input_storage, filter, tc.m,
+                tc.d, host_exec, row);
+        for (index_t b = 0; b < tc.b; b++) {
+          for (index_t c = 0; c < tc.m; c++) {
+            expected.push_back(reference(b, 0, c));
+          }
+        }
+      }
+
+      std::vector<cp::Plan> plans;
+      cp::Plan plan;
+      plan.backend = cp::Backend::Fused;
+      plans.push_back(plan);
+      plan.backend = cp::Backend::Smem;
+      plans.push_back(plan);
+      // The last row count is not supported and must throw.
+      for (int nout : {cp::SmemTiledMaxDecNout, cp::SmemTiledNout, 2 * cp::SmemTiledNout}) {
+        for (auto layout : {cp::SmemTiledFilterLayout::Full,
+                            cp::SmemTiledFilterLayout::Rotated,
+                            cp::SmemTiledFilterLayout::Global}) {
+          plan.backend = cp::Backend::Tiled;
+          plan.tiled = cp::SmemTiledPlanWithLayout(output, input, filter, tc.d, nout, layout);
+          plans.push_back(plan);
+        }
+      }
+      plans.push_back(cp::Plan{});
+      const auto selected = cp::SelectPlan<OutOp, InOp, FilterOp, Real>(
+          output, input, filter, tc.m, tc.d);
+      ASSERT_TRUE((cp::PlanIsLaunchable<OutOp, InOp, FilterOp, Real>(
+          selected, output, input, filter, tc.m, tc.d)));
+      plans.push_back(selected);
+
+      int launched = 0;
+      for (const auto &p : plans) {
+        SCOPED_TRACE(::testing::Message() << "backend="
+            << static_cast<int>(p.backend) << " nout=" << p.tiled.nout
+            << " layout=" << static_cast<int>(p.tiled.filter_layout));
+        if (!cp::PlanIsLaunchable<OutOp, InOp, FilterOp, Real>(
+                p, output, input, filter, tc.m, tc.d)) {
+          EXPECT_THROW((cp::ExecutePlan<OutOp, InOp, FilterOp, Real>(
+              p, output, input, filter, tc.m, tc.d, cuda_exec.getStream())), detail::matxException);
+          continue;
+        }
+        launched++;
+        for (const bool windowed : {false, true}) {
+          SCOPED_TRACE(windowed ? "windowed" : "full grid");
+          auto &storage = windowed ? window_storage : output_storage;
+          const index_t first_row = windowed ? window_start : 0;
+          const index_t row_count = windowed ? window_rows : rows;
+          (storage = Complex{9, -9}).run(cuda_exec);
+          cp::ExecutePlan<OutOp, InOp, FilterOp, Real>(
+              p, windowed ? window : output, input, filter, tc.m, tc.d, cuda_exec.getStream(),
+              first_row);
+          MATX_CUDA_CHECK_LAST_ERROR();
+          cuda_exec.sync();
+          size_t i = 0;
+          for (index_t row : sample_rows) {
+            for (index_t b = 0; b < tc.b; b++) {
+              for (index_t c = 0; c < tc.m; c++, i++) {
+                if (row < first_row || row >= first_row + row_count) continue;
+                const auto got = storage(b, row - first_row, c);
+                const double tolerance = (sizeof(Real) == 4 ? 2e-4 : 2e-11) *
+                    (1.0 + cuda::std::abs(expected[i]));
+                EXPECT_NEAR(got.real(), expected[i].real(), tolerance) << "row=" << row;
+                EXPECT_NEAR(got.imag(), expected[i].imag(), tolerance) << "row=" << row;
+              }
+            }
+          }
+        }
+      }
+      // Generic and at least one tiled layout are always launchable here.
+      EXPECT_GE(launched, 2);
+    }
+  };
+  check(float{}, float{});
+  check(double{}, double{});
+  check(cuda::std::complex<float>{}, float{});
+  check(cuda::std::complex<double>{}, double{});
+  MATX_EXIT_HANDLER();
+}
+
+// The dispatcher must always select a launchable plan.
+TEST(ChannelizePoly, SelectedPlansAreLaunchable)
+{
+  MATX_ENTER_HANDLER();
+  namespace cp = detail::cpoly;
+  auto check = [&](auto input_tag, auto real_tag) {
+    using Input = decltype(input_tag);
+    using Real = decltype(real_tag);
+    using Complex = cuda::std::complex<Real>;
+    // Plan selection reads only shapes and strides; no kernel is launched,
+    // so non-owning views over a small allocation suffice.
+    auto storage = make_tensor<Complex>({1}, MATX_DEVICE_MEMORY);
+    for (index_t m : {1, 2, 3, 6, 7, 8, 10, 16, 17, 32, 64, 65, 80, 256, 1000}) {
+      for (index_t d : {m, (m + 1) / 2, index_t{1}}) {
+        for (index_t p : {1, 4, 64, 400}) {
+          for (index_t n : {index_t{1000}, index_t{100000}}) {
+            const index_t rows = (n + d - 1) / d;
+            auto input = make_tensor<Input>(reinterpret_cast<Input *>(storage.Data()), {2, n});
+            auto filter = make_tensor<Real>(reinterpret_cast<Real *>(storage.Data()), {m * p});
+            auto output = make_tensor<Complex>(storage.Data(), {2, rows, m});
+            const auto plan = cp::SelectPlan<decltype(output), decltype(input),
+                decltype(filter), Real>(output, input, filter, m, d);
+            EXPECT_TRUE((cp::PlanIsLaunchable<decltype(output), decltype(input),
+                decltype(filter), Real>(plan, output, input, filter, m, d)))
+                << "M=" << m << " D=" << d << " P=" << p << " N=" << n;
+          }
+        }
+      }
+    }
+  };
+  check(float{}, float{});
+  check(double{}, double{});
+  check(cuda::std::complex<float>{}, float{});
+  check(cuda::std::complex<double>{}, double{});
+  MATX_EXIT_HANDLER();
+}
+
+// Outputs with more rows than the grid.y limit allows: Generic splits its time
+// blocks into several launches and the real-input DFT unpack strides over rows.
+// M=3 and M=4 give the unpack conjugate/mirror work (M=2 has none), and the
+// checked rows straddle both kernels' grid.y boundaries.
+TEST(ChannelizePoly, TallGridsMatchHost)
+{
+  MATX_ENTER_HANDLER();
+  namespace cp = detail::cpoly;
+  cudaExecutor cuda_exec{};
+  SingleThreadedHostExecutor host_exec{};
+  constexpr index_t decimation = 1;
+  constexpr index_t max_grid_y = 65535;
+  constexpr index_t generic_rows = 256;  // Generic time rows per CTA
+  constexpr index_t unpack_rows = 128;   // UnpackDFT rows per CTA
+  const index_t n = max_grid_y * generic_rows + 3 * generic_rows + 5;
+  const index_t unpack_edge = max_grid_y * unpack_rows;
+  const index_t generic_edge = max_grid_y * generic_rows;
+  for (index_t channels : {index_t{3}, index_t{4}}) {
+    SCOPED_TRACE(::testing::Message() << "M=" << channels);
+    auto input = make_tensor<float>({1, n});
+    auto filter = make_tensor<float>({channels * 4 - 1});
+    auto output = make_tensor<cuda::std::complex<float>>({1, n, channels});
+    auto reference = make_tensor<cuda::std::complex<float>>({1, 1, channels});
+    for (index_t k = 0; k < n; k++) {
+      input(0, k) = static_cast<float>(k % 97 - 48) / 64;
+    }
+    for (index_t k = 0; k < filter.Size(0); k++) {
+      filter(k) = static_cast<float>((5 * k) % 17 - 8) / 32;
+    }
+    (output = cuda::std::complex<float>{9, -9}).run(cuda_exec);
+    cp::ExecutePlan<decltype(output), decltype(input), decltype(filter), float>(
+        cp::Plan{}, output, input, filter, channels, decimation, cuda_exec.getStream());
+    MATX_CUDA_CHECK_LAST_ERROR();
+    cuda_exec.sync();
+    for (index_t row : {index_t{0}, unpack_edge - 1, unpack_edge, unpack_edge + 1,
+                        generic_edge - 1, generic_edge, generic_edge + 1, n - 1}) {
+      channelize_poly_impl<decltype(reference), decltype(input), decltype(filter),
+          float>(reference, input, filter, channels, decimation, host_exec, row);
+      for (index_t c = 0; c < channels; c++) {
+        const auto expected = reference(0, 0, c);
+        const double tolerance = 2e-4 * (1.0 + cuda::std::abs(expected));
+        EXPECT_NEAR(output(0, row, c).real(), expected.real(), tolerance)
+            << "row=" << row << " c=" << c;
+        EXPECT_NEAR(output(0, row, c).imag(), expected.imag(), tolerance)
+            << "row=" << row << " c=" << c;
+      }
+    }
+  }
+  MATX_EXIT_HANDLER();
+}
+
+// An empty signal, an empty batch dimension, or a zero-row output window leaves
+// nothing to compute and must not launch. The configurations span the fused,
+// Smem, tiled, and Generic dispatch families for real and complex input.
+TEST(ChannelizePoly, EmptyOutputsAreNoOps)
+{
+#ifndef NDEBUG
+  // Debug builds reject zero-sized tensors at construction, so empty outputs
+  // can reach channelize_poly only when assertions are compiled out.
+  GTEST_SKIP() << "Zero-sized tensors require NDEBUG";
+#else
+  MATX_ENTER_HANDLER();
+  cudaExecutor exec{};
+  auto check = [&](auto input_tag) {
+    using Input = decltype(input_tag);
+    using Complex = cuda::std::complex<float>;
+    struct Config { index_t m, d; };
+    const Config cases[] = {{4, 4}, {8, 8}, {40, 20}, {12, 12}, {64, 64}, {12, 6}};
+    for (const auto &tc : cases) {
+      SCOPED_TRACE(::testing::Message() << "M=" << tc.m << " D=" << tc.d
+          << " complex=" << is_complex_v<Input>);
+      const index_t n = 4099;
+      const index_t rows = (n + tc.d - 1) / tc.d;
+      auto filter = make_tensor<float>({13 * tc.m - 1});
+
+      auto empty_signal = make_tensor<Input>({0});
+      auto empty_output = make_tensor<Complex>({0, tc.m});
+      (empty_output = channelize_poly(empty_signal, filter, tc.m, tc.d)).run(exec);
+
+      auto empty_batches = make_tensor<Input>({0, n});
+      auto empty_batch_output = make_tensor<Complex>({0, rows, tc.m});
+      (empty_batch_output = channelize_poly(empty_batches, filter, tc.m, tc.d)).run(exec);
+
+      auto signal = make_tensor<Input>({n});
+      auto window = make_tensor<Complex>({0, tc.m});
+      channelize_poly_impl<decltype(window), decltype(signal), decltype(filter), float>(
+          window, signal, filter, tc.m, tc.d, exec.getStream(), 3);
+
+      exec.sync();
+      ASSERT_EQ(cudaGetLastError(), cudaSuccess);
+    }
+  };
+  check(float{});
+  check(cuda::std::complex<float>{});
+  MATX_EXIT_HANDLER();
+#endif
+}
 
 template <typename T>
 class ChannelizePolyTest : public ::testing::Test {
@@ -329,7 +814,12 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, Simple)
     { 27137, 301*13+3, 13 },
     { 27138, 301*14+4, 14 },
     { 1000000, 32*16, 32 },
-    { 1000000, 40*16, 40 }
+    { 1000000, 40*16, 40 },
+    // Fused radix/power-of-two paths with partial input and filter rows.
+    { 100003, 20*17+7, 20 },
+    { 100003, 40*17+7, 40 },
+    { 100003, 64*17+7, 64 },
+    { 100003, 80*17+7, 80 }
   };
 
   for (size_t i = 0; i < sizeof(test_cases)/sizeof(test_cases[0]); i++) {
@@ -535,10 +1025,8 @@ TYPED_TEST(ChannelizePolyTestDoubleType, AccumProperty)
     "00_transforms", "channelize_poly_operators", "channelize", {a_len, f_len, num_channels, num_channels});
   auto a64 = make_tensor<double>({a_len});
   auto f64 = make_tensor<double>({f_len});
-  auto gold_output_hreal = make_tensor<cuda::std::complex<double>>({b_len_per_channel, num_channels});
   this->pb->NumpyToTensorView(a64, "a");
   this->pb->NumpyToTensorView(f64, "filter_random");
-  this->pb->NumpyToTensorView(gold_output_hreal, "b_random_hreal");
 
   auto a32 = make_tensor<float>({a_len});
   (a32 = as_float(a64)).run(this->exec);
@@ -581,17 +1069,22 @@ TYPED_TEST(ChannelizePolyTestDoubleType, AccumProperty)
   }
 
   this->pb->template InitAndRunTVGenerator<cuda::std::complex<double>>(
-    "00_transforms", "channelize_poly_operators", "channelize", {a_len, f_len, num_channels, num_channels});
+    "00_transforms", "channelize_poly_operators", "channelize_accum",
+    {a_len, f_len, num_channels, num_channels});
   auto ac64 = make_tensor<cuda::std::complex<double>>({a_len});
   this->pb->NumpyToTensorView(ac64, "a");
   this->pb->NumpyToTensorView(f64, "filter_random_real");
-  this->pb->NumpyToTensorView(gold_output_hreal, "b_random_hreal");
 
   // The following cases are all for complex inputs and real filters
 
   auto ac32 = make_tensor<cuda::std::complex<float>>({a_len});
   (ac32 = as_complex_float(ac64)).run(this->exec);
   (f32 = as_float(f64)).run(this->exec);
+
+  // Python computes FP64 gold from the same rounded FP32 operands, separating
+  // input quantization from accumulation error without using MatX as gold.
+  auto quantized_gold = make_tensor<cuda::std::complex<double>>({b_len_per_channel, num_channels});
+  this->pb->NumpyToTensorView(quantized_gold, "b_quantized_hreal");
 
   // Below, we test that using a double-precision accumulator by running with fp32 inputs with and
   // without a double-precision accumulator demonstrates higher accuracy when an fp64 accumulator.
@@ -600,19 +1093,19 @@ TYPED_TEST(ChannelizePolyTestDoubleType, AccumProperty)
   auto max_err = make_tensor<double>({});
   double max_err_fp32{};
   double max_err_fp32_in_fp64_accum{};
-
-  // All single precision
+  // All single precision, using tensor filters in both accuracy cases.
   {
     auto chan_poly = channelize_poly(ac32, f32, num_channels, decimation_factor);
     (b32 = chan_poly).run(this->exec);
     cudaStreamSynchronize(stream);
     MATX_TEST_ASSERT_COMPARE(this->pb, b32, "b_random_hreal", mixed_thresh_complex_input);
-    (max_err = matx::max(matx::abs(as_complex_double(b32) - gold_output_hreal), {0,1})).run(this->exec);
+    (max_err = matx::max(
+      matx::abs(as_complex_double(b32) - quantized_gold), {0,1})).run(this->exec);
     cudaStreamSynchronize(stream);
     max_err_fp32 = max_err();
   }
 
-  // Single precision complex input, output, and filter, double precision accumulator
+  // Single precision complex input and filter, double accumulator and output.
   {
     auto chan_poly = channelize_poly(ac32, f32, num_channels, decimation_factor)
       .props<PropAccum<double>, PropOutput<cuda::std::complex<double>>>();
@@ -622,7 +1115,7 @@ TYPED_TEST(ChannelizePolyTestDoubleType, AccumProperty)
     (b64 = chan_poly + cuda::std::complex<double>(0.0, 0.0)).run(this->exec);
     cudaStreamSynchronize(stream);
     MATX_TEST_ASSERT_COMPARE(this->pb, b64, "b_random_hreal", mixed_thresh_complex_input);
-    (max_err = matx::max(matx::abs(b64 - gold_output_hreal), {0,1})).run(this->exec);
+    (max_err = matx::max(matx::abs(b64 - quantized_gold), {0,1})).run(this->exec);
     cudaStreamSynchronize(stream);
     max_err_fp32_in_fp64_accum = max_err();
   }
@@ -779,6 +1272,536 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, IdentityFilter)
     }
   }
 
+  MATX_EXIT_HANDLER();
+}
+
+TEST(ChannelizePoly, LongCriticalFilterMatchesHost)
+{
+  MATX_ENTER_HANDLER();
+
+  constexpr index_t M = 32;
+  constexpr index_t P = 184;
+  constexpr index_t input_len = 6400;
+  constexpr index_t output_len = (input_len + M - 1) / M;
+  using complex_t = cuda::std::complex<float>;
+  cudaExecutor cuda_exec{};
+  SingleThreadedHostExecutor host_exec{};
+  auto input = make_tensor<complex_t>({input_len});
+  auto filter = make_tensor<float>({M * P});
+  auto cuda_output = make_tensor<complex_t>({output_len, M});
+  auto host_output = make_tensor<complex_t>({output_len, M});
+
+  for (index_t n = 0; n < input_len; n++) {
+    const double x = static_cast<double>(n);
+    input(n) = complex_t{static_cast<float>(std::sin(0.037 * x)),
+                         static_cast<float>(std::cos(0.053 * x))};
+  }
+  for (index_t k = 0; k < M * P; k++) {
+    const double x = static_cast<double>(k);
+    filter(k) = static_cast<float>(std::cos(0.071 * x) * std::exp(-0.0013 * x));
+  }
+
+  (cuda_output = channelize_poly(input, filter, M, M)).run(cuda_exec);
+  cuda_exec.sync();
+  (host_output = channelize_poly(input, filter, M, M)).run(host_exec);
+
+  for (index_t t = 0; t < output_len; t++) {
+    for (index_t c = 0; c < M; c++) {
+      const auto expected = host_output(t, c);
+      const auto got = cuda_output(t, c);
+      const double scale = 1.0 + cuda::std::abs(expected);
+      EXPECT_NEAR(got.real(), expected.real(), 2e-3 * scale);
+      EXPECT_NEAR(got.imag(), expected.imag(), 2e-3 * scale);
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(ChannelizePoly, OperatorInput)
+{
+  MATX_ENTER_HANDLER();
+
+  using complex_t = cuda::std::complex<float>;
+  constexpr index_t batches = 2;
+  constexpr index_t input_len = 1027;
+  constexpr index_t taps_per_channel = 13;
+  struct TestCase {
+    index_t num_channels;
+    index_t decimation_factor;
+  };
+  const TestCase test_cases[] = {{4, 4}, {5, 3}};
+  cudaExecutor exec{};
+
+  for (const auto &tc : test_cases) {
+    const index_t filter_len = taps_per_channel * tc.num_channels - 3;
+    const index_t output_len = (input_len + tc.decimation_factor - 1) / tc.decimation_factor;
+    auto input_iq = make_tensor<int16_t>({batches, 2 * input_len});
+    auto phase_ramp = make_tensor<complex_t>({batches, input_len});
+    auto filter = make_tensor<float>({filter_len});
+    auto materialized = make_tensor<complex_t>({batches, input_len});
+    auto output = make_tensor<complex_t>({batches, output_len, tc.num_channels});
+    auto reference = make_tensor<complex_t>({batches, output_len, tc.num_channels});
+
+    for (index_t b = 0; b < batches; b++) {
+      for (index_t n = 0; n < input_len; n++) {
+        input_iq(b, 2 * n) = static_cast<int16_t>((n + 3 * b) % 31 - 15);
+        input_iq(b, 2 * n + 1) = static_cast<int16_t>((2 * n + 5 * b) % 29 - 14);
+        const float angle = 0.013f * static_cast<float>(n + 7 * b);
+        phase_ramp(b, n) = complex_t{std::cos(angle), std::sin(angle)};
+      }
+    }
+    for (index_t k = 0; k < filter_len; k++) {
+      const float x = static_cast<float>(k);
+      filter(k) = std::cos(0.071f * x) * std::exp(-0.013f * x);
+    }
+
+    auto i_values = slice(input_iq, {0, 0}, {batches, 2 * input_len}, {1, 2});
+    auto q_values = slice(input_iq, {0, 1}, {batches, 2 * input_len}, {1, 2});
+    auto input_op = phase_ramp * as_complex_float(i_values, q_values);
+
+    (materialized = input_op).run(exec);
+    (output = channelize_poly(input_op, filter, tc.num_channels, tc.decimation_factor)).run(exec);
+    // Compare with materialized input and an equivalent filter expression.
+    (reference = channelize_poly(
+        materialized, filter * 1.0f, tc.num_channels, tc.decimation_factor)).run(exec);
+    exec.sync();
+
+    for (index_t b = 0; b < batches; b++) {
+      for (index_t t = 0; t < output_len; t++) {
+        for (index_t c = 0; c < tc.num_channels; c++) {
+          const complex_t expected = reference(b, t, c);
+          const complex_t got = output(b, t, c);
+          const float scale = 1.0f + cuda::std::abs(expected);
+          EXPECT_NEAR(got.real(), expected.real(), 5e-4f * scale);
+          EXPECT_NEAR(got.imag(), expected.imag(), 5e-4f * scale);
+        }
+      }
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+// Compare explicit fused launches with the public channelizer using an equivalent filter
+// expression. For critical M<=6, the reference can also use the fused family. Cover both
+// precisions, complex input with a matched real filter, critical sampling, and arbitrary
+// integer/rational decimation. Exercise M=2 through the public dispatcher; launch the remaining
+// family directly so every leaf remains covered even on GPUs where the working-set or FP64
+// performance heuristic prefers the fallback.
+TEST(ChannelizePoly, FusedRadixPow2MatchedRealFilter)
+{
+  MATX_ENTER_HANDLER();
+
+  struct TestCase {
+    index_t num_channels;
+    index_t decimation_factor;
+    index_t taps_per_channel;
+  };
+  std::vector<TestCase> test_cases = {
+    { 2, 2, 64 },
+    { 2, 1, 64 },
+    // Short critical filters exercise the direct small-M leaf.
+    { 3, 3, 4 },
+    { 4, 4, 4 },
+    { 5, 5, 4 },
+    { 6, 6, 4 },
+    // Longer critical filters exercise its shared-memory-cached leaf.
+    { 3, 3, 17 },
+    { 3, 2, 17 },
+    { 4, 4, 17 },
+    { 4, 3, 17 },
+    { 5, 5, 17 },
+    { 5, 2, 17 },
+    { 6, 6, 17 },
+    { 6, 5, 17 },
+    { 8, 8, 17 },
+    { 8, 3, 17 },
+    { 10, 10, 17 },
+    { 10, 4, 17 },
+    { 16, 16, 17 },
+    { 16, 7, 17 },
+    { 20, 20, 17 },
+    { 20, 8, 17 },
+    { 32, 32, 17 },
+    { 32, 13, 17 },
+    { 40, 40, 17 },
+    { 40, 17, 17 },
+    { 64, 64, 17 },
+    { 64, 27, 17 },
+    { 80, 80, 17 },
+    { 80, 33, 17 },
+  };
+  // Single-tap branches cover circular-buffer wrap without a filter halo.
+  for (index_t channels : {8, 10, 16, 20, 32, 40, 64, 80}) {
+    test_cases.push_back({channels, channels, 1});
+    test_cases.push_back({channels, channels / 2, 1});
+  }
+  // Cover every small-channel oversampling factor with modest filter lengths.
+  for (index_t channels : {3, 4, 5, 6}) {
+    for (index_t decimation = 1; decimation < channels; decimation++) {
+      for (index_t taps : {4, 13, 21}) {
+        test_cases.push_back({channels, decimation, taps});
+      }
+    }
+  }
+
+  auto run = [&]<typename Scalar>() {
+    using Complex = cuda::std::complex<Scalar>;
+    constexpr index_t batches = 2;
+    constexpr index_t input_len = 2051;
+    const double tolerance = cuda::std::is_same_v<Scalar, double>
+        ? 3e-10 : 4e-4;
+    cudaExecutor exec{};
+
+    for (const auto &tc : test_cases) {
+      const index_t filter_len = tc.taps_per_channel * tc.num_channels - 3;
+      const index_t output_len = (input_len + tc.decimation_factor - 1) / tc.decimation_factor;
+      auto input = make_tensor<Complex>({batches, input_len});
+      auto filter = make_tensor<Scalar>({filter_len});
+      auto fused = make_tensor<Complex>({batches, output_len, tc.num_channels});
+      auto reference = make_tensor<Complex>({batches, output_len, tc.num_channels});
+
+      for (index_t b = 0; b < batches; b++) {
+        for (index_t n = 0; n < input_len; n++) {
+          const double x = static_cast<double>(n + 11 * b);
+          input(b, n) = Complex{
+              static_cast<Scalar>(std::sin(0.037 * x)), static_cast<Scalar>(std::cos(0.053 * x))};
+        }
+      }
+      for (index_t k = 0; k < filter_len; k++) {
+        const double x = static_cast<double>(k);
+        filter(k) = static_cast<Scalar>(std::cos(0.071 * x) * std::exp(-0.013 * x));
+      }
+
+      if (tc.num_channels == 2) {
+        (fused = channelize_poly(input, filter, tc.num_channels, tc.decimation_factor)).run(exec);
+      } else {
+        // Bypass performance heuristics, but retain the launchability checks.
+        using FusedOp = decltype(fused);
+        using InputOp = decltype(input);
+        using FilterOp = decltype(filter);
+        ASSERT_TRUE((detail::cpoly::FusedRadixFeasible<FusedOp, InputOp, FilterOp, Scalar>(
+            fused, input, filter, tc.num_channels, tc.decimation_factor)));
+        detail::cpoly::RunFusedRadix<FusedOp, InputOp, FilterOp, Scalar>(
+            fused, input, filter, tc.num_channels, tc.decimation_factor, exec.getStream(), 0);
+      }
+      ASSERT_EQ(cudaGetLastError(), cudaSuccess);
+      ASSERT_EQ(cudaStreamSynchronize(exec.getStream()), cudaSuccess);
+      if (tc.num_channels <= 6 && tc.decimation_factor == tc.num_channels) {
+        // Expression filters also fuse for small critical channelizers.
+        (reference = channelize_poly(
+            input, filter, tc.num_channels, tc.decimation_factor))
+            .run(SingleThreadedHostExecutor{});
+      } else {
+        (reference = channelize_poly(
+            input, filter * static_cast<Scalar>(1), tc.num_channels,
+            tc.decimation_factor)).run(exec);
+        ASSERT_EQ(cudaGetLastError(), cudaSuccess);
+        ASSERT_EQ(cudaStreamSynchronize(exec.getStream()), cudaSuccess);
+      }
+
+      for (index_t b = 0; b < batches; b++) {
+        for (index_t t = 0; t < output_len; t++) {
+          for (index_t c = 0; c < tc.num_channels; c++) {
+            const auto expected = reference(b, t, c);
+            const auto got = fused(b, t, c);
+            const double scale = 1.0 + cuda::std::abs(expected);
+            EXPECT_NEAR(static_cast<double>(got.real()),
+                        static_cast<double>(expected.real()),
+                        tolerance * scale)
+                << "real mismatch: M=" << tc.num_channels
+                << " D=" << tc.decimation_factor << " t=" << t
+                << " c=" << c;
+            EXPECT_NEAR(static_cast<double>(got.imag()),
+                        static_cast<double>(expected.imag()),
+                        tolerance * scale)
+                << "imag mismatch: M=" << tc.num_channels
+                << " D=" << tc.decimation_factor << " t=" << t
+                << " c=" << c;
+          }
+        }
+      }
+    }
+  };
+
+  run.template operator()<float>();
+  run.template operator()<double>();
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(ChannelizePoly, FusedRadixPow2Strided)
+{
+  MATX_ENTER_HANDLER();
+  constexpr index_t batches = 2;
+  constexpr index_t input_len = 1231;
+  constexpr index_t offset = 3;
+  constexpr index_t output_len = 73;
+  cudaExecutor cuda_exec{};
+  SingleThreadedHostExecutor host_exec{};
+
+  auto run = [&]<typename Scalar, int Channels, int Decimation>() {
+    static_assert(offset + output_len <= (input_len + Decimation - 1) / Decimation);
+    using Complex = cuda::std::complex<Scalar>;
+    using Reference = cuda::std::complex<double>;
+    using config = detail::cpoly::FusedRadixConfig<Channels, Scalar>;
+    constexpr index_t filter_len = 13 * Channels - 1;
+    constexpr index_t rows_per_cta = 2 * config::NRows;
+    const double tolerance = sizeof(Scalar) == sizeof(float) ? 1e-4 : 1e-10;
+    for (const auto strides : {std::array<index_t, 3>{1, 1, 1},
+                              {2, 1, 1}, {1, 2, 1}, {1, 1, 2}, {2, 2, 2}}) {
+      const auto [input_stride, filter_stride, output_stride] = strides;
+      SCOPED_TRACE(::testing::Message()
+          << "M=" << Channels << " D=" << Decimation
+          << " strides=" << input_stride << ',' << filter_stride << ','
+          << output_stride << " scalar bytes=" << sizeof(Scalar));
+      auto input_storage = make_tensor<Complex>({batches, input_stride * input_len});
+      auto filter_storage = make_tensor<Scalar>({filter_stride * filter_len});
+      auto output_storage = make_tensor<Complex>({batches, output_len, output_stride * Channels});
+      auto input = slice(input_storage, {0, 0},
+          {batches, input_stride * input_len}, {1, input_stride});
+      auto filter = slice(filter_storage, {0}, {filter_stride * filter_len}, {filter_stride});
+      auto output = slice(output_storage, {0, 0, 0},
+          {batches, output_len, output_stride * Channels},
+          {1, 1, output_stride});
+      auto reference = make_tensor<Reference>({batches, output_len, index_t{Channels}});
+      (input_storage = Complex{9, -9}).run(host_exec);
+      (filter_storage = Scalar{9}).run(host_exec);
+      for (index_t b = 0; b < batches; b++) {
+        for (index_t n = 0; n < input_len; n++) {
+          input(b, n) = {Scalar(((n + b) % 17) - 8) / Scalar{32},
+                         Scalar(((n + b) % 13) - 6) / Scalar{32}};
+        }
+      }
+      for (index_t k = 0; k < filter_len; k++) {
+        filter(k) = Scalar((k % 11) - 5) / Scalar{64};
+      }
+      channelize_poly_impl<decltype(reference), decltype(input),
+          decltype(filter), double>(reference, input, filter, Channels,
+              Decimation, host_exec, offset);
+
+      using OutOp = decltype(output);
+      using InOp = decltype(input);
+      using FilterOp = decltype(filter);
+      if (strides != std::array<index_t, 3>{1, 1, 1}) {
+        EXPECT_THROW((detail::cpoly::FusedRadixImpl<
+            Channels, Decimation == Channels, OutOp, InOp, FilterOp, Scalar>(
+                output, input, filter, Decimation, cuda_exec.getStream(),
+                offset)), detail::matxException);
+      }
+      for (bool direct : {true, false}) {
+        (output_storage = Complex{9, -9}).run(host_exec);
+        if (direct) {
+          // Explicit strided kernels must honor their accessor flag even
+          // though the public grouped dispatcher retains its FIR/FFT fallback.
+          ASSERT_TRUE((detail::cpoly::FusedRadixFits<
+              Channels, OutOp, InOp, FilterOp, Scalar>(
+                  output, input, filter, Decimation)));
+          const size_t smem = detail::cpoly::FusedRadixSizeBytes<
+              Channels, OutOp, InOp, FilterOp, Scalar>(
+                  output, input, filter, Decimation);
+          const dim3 grid(static_cast<unsigned>(
+              (output_len + rows_per_cta - 1) / rows_per_cta), 1, batches);
+          ChannelizePoly1D_FusedRadixPow2<config::Threads, Channels,
+              config::NRows, Decimation == Channels, false,
+              OutOp, InOp, FilterOp, Scalar>
+              <<<grid, config::Threads, smem, cuda_exec.getStream()>>>(
+                  output, input, filter, rows_per_cta, Decimation, offset);
+        } else {
+          channelize_poly_impl<OutOp, InOp, FilterOp, Scalar>(
+              output, input, filter, Channels, Decimation, cuda_exec.getStream(), offset);
+        }
+        ASSERT_EQ(cudaGetLastError(), cudaSuccess);
+        ASSERT_EQ(cudaStreamSynchronize(cuda_exec.getStream()), cudaSuccess);
+        for (index_t b = 0; b < batches; b++) {
+          for (index_t t = 0; t < output_len; t++) {
+            for (index_t c = 0; c < Channels; c++) {
+              const auto expected = reference(b, t, c);
+              const auto got = output(b, t, c);
+              const double scale = 1.0 + cuda::std::abs(expected);
+              EXPECT_NEAR(static_cast<double>(got.real()), expected.real(), tolerance * scale);
+              EXPECT_NEAR(static_cast<double>(got.imag()), expected.imag(), tolerance * scale);
+              if (output_stride == 2) {
+                EXPECT_EQ(output_storage(b, t, 2 * c + 1), (Complex{9, -9}));
+              }
+            }
+          }
+        }
+      }
+    }
+  };
+  run.template operator()<float, 6, 4>();
+  run.template operator()<double, 6, 4>();
+  run.template operator()<float, 8, 8>();
+  run.template operator()<float, 8, 4>();
+  run.template operator()<double, 8, 8>();
+  run.template operator()<double, 8, 4>();
+  run.template operator()<float, 16, 16>();
+  run.template operator()<float, 16, 8>();
+  run.template operator()<double, 16, 16>();
+  run.template operator()<double, 16, 8>();
+  run.template operator()<float, 10, 10>();
+  run.template operator()<double, 10, 10>();
+  MATX_EXIT_HANDLER();
+}
+
+TEST(ChannelizePoly, CriticalSmallChannelsStrided)
+{
+  MATX_ENTER_HANDLER();
+
+  cudaExecutor cuda_exec{};
+  SingleThreadedHostExecutor host_exec{};
+
+  auto run = [&]<typename Scalar, bool ComplexInput = true,
+                bool DoubleAccum = false>(index_t batches = 2,
+      index_t input_len = 1027, index_t offset = 0, index_t count = 0) {
+    using Complex = typename detail::scalar_to_complex<Scalar>::ctype;
+    using Input = cuda::std::conditional_t<ComplexInput, Complex, Scalar>;
+    using Reference = cuda::std::complex<double>;
+    const double tolerance = is_matx_half_v<Scalar> ? 2e-2 :
+        (cuda::std::is_same_v<Scalar, double> ? 1e-10 : 1e-4);
+    for (index_t num_channels : {2, 3, 4, 5, 6}) {
+      if (count != 0 && num_channels != 2) continue;
+      for (index_t taps_per_channel : {3, 13, 4096}) {
+        // Also cover half transforms that cannot fall back to cuFFT when
+        // their filter is too large to cache in shared memory.
+        if (taps_per_channel == 4096 &&
+            (!is_matx_half_v<Scalar> || num_channels == 2 ||
+             num_channels == 4)) continue;
+        for (index_t stride : {1, 2}) {
+          SCOPED_TRACE(::testing::Message()
+              << "M=" << num_channels << " P=" << taps_per_channel
+              << " stride=" << stride << " scalar bytes=" << sizeof(Scalar)
+              << " B=" << batches << " offset=" << offset << " count=" << count);
+          // Odd M=2 taps-per-channel counts exercise input-alignment padding.
+          const index_t filter_len = taps_per_channel * num_channels - 1;
+          const index_t output_len = (input_len + num_channels - 1) / num_channels;
+          const index_t window_len = count == 0 ? output_len : count;
+          ASSERT_LE(offset + window_len, output_len);
+          auto input_storage = make_tensor<Input>({batches, stride * input_len});
+          auto filter_storage = make_tensor<Scalar>({stride * filter_len});
+          auto output_storage = make_tensor<Complex>({batches, output_len, stride * num_channels});
+          auto input = slice(input_storage, {0, 0},
+              {batches, stride * input_len}, {1, stride});
+          auto filter = slice(filter_storage, {0}, {stride * filter_len}, {stride});
+          auto output = slice(output_storage, {0, offset, 0},
+              {batches, offset + window_len, stride * num_channels},
+              {1, 1, stride});
+          auto input_ref = make_tensor<Reference>({batches, input_len});
+          auto filter_ref = make_tensor<double>({filter_len});
+          auto reference = make_tensor<Reference>({batches, output_len, num_channels});
+
+          (input_storage = Input{9.0f}).run(host_exec);
+          (filter_storage = Scalar{9.0f}).run(host_exec);
+          (output_storage = Complex{9.0f, -9.0f}).run(host_exec);
+          for (index_t b = 0; b < batches; b++) {
+            for (index_t n = 0; n < input_len; n++) {
+              const float real = static_cast<float>(((n + b) % 17) - 8) / 32.0f;
+              const float imag = static_cast<float>(((n + b) % 13) - 6) / 32.0f;
+              if constexpr (ComplexInput) {
+                input(b, n) = Complex{real, imag};
+                input_ref(b, n) = {real, imag};
+              } else {
+                input(b, n) = real;
+                input_ref(b, n) = {real, 0.0};
+              }
+            }
+          }
+          for (index_t k = 0; k < filter_len; k++) {
+            const float value = static_cast<float>((k % 11) - 5) / 64.0f;
+            filter(k) = Scalar{value};
+            filter_ref(k) = value;
+          }
+
+          if (count == 0) {
+            auto op = channelize_poly(input, filter, num_channels, num_channels);
+            if constexpr (DoubleAccum) {
+              (output = op.template props<PropAccum<double>>()).run(cuda_exec);
+            } else {
+              (output = op).run(cuda_exec);
+            }
+          } else if constexpr (cuda::std::is_same_v<Scalar, float> &&
+                               ComplexInput && !DoubleAccum) {
+            // Reuse the existing complex-float window specialization only.
+            channelize_poly_impl<decltype(output), decltype(input),
+                decltype(filter), float>(output, input, filter, 2, 2,
+                    cuda_exec.getStream(), offset);
+          }
+          MATX_CUDA_CHECK_LAST_ERROR();
+          cuda_exec.sync();
+          (reference = channelize_poly(
+              input_ref, filter_ref, num_channels, num_channels)).run(host_exec);
+
+          for (index_t b = 0; b < batches; b++) {
+            for (index_t t = 0; t < output_len; t++) {
+              for (index_t c = 0; c < stride * num_channels; c++) {
+                const auto got = output_storage(b, t, c);
+                if (t < offset || t >= offset + window_len || c % stride != 0) {
+                  EXPECT_EQ(static_cast<double>(got.real()), 9.0);
+                  EXPECT_EQ(static_cast<double>(got.imag()), -9.0);
+                } else {
+                  const auto expected = reference(b, t, c / stride);
+                  const double scale = 1.0 + cuda::std::abs(expected);
+                  EXPECT_NEAR(static_cast<double>(got.real()), expected.real(), tolerance * scale);
+                  EXPECT_NEAR(static_cast<double>(got.imag()), expected.imag(), tolerance * scale);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  };
+  run.template operator()<float>();
+  // M=2 windows: a partial trailing row and batched windows of adjacent sizes.
+  run.template operator()<float>(1, 1031, 3, 513);
+  run.template operator()<float>(64, 8195, 3, 3584);
+  run.template operator()<float>(64, 8195, 3, 3585);
+  run.template operator()<double>();
+  run.template operator()<matxFp16>();
+  run.template operator()<matxBf16>();
+  run.template operator()<float, false>();
+  run.template operator()<double, false>();
+  run.template operator()<matxFp16, false>();
+  run.template operator()<matxBf16, false>();
+  run.template operator()<float, false, true>();
+  run.template operator()<float, true, true>();
+
+  MATX_EXIT_HANDLER();
+}
+
+// cuFFT has no half-precision transforms of non-power-of-two size. Critical
+// channelizers with 3, 5, or 6 channels always use the fused kernel (see
+// CriticalSmallChannelsStrided); other such configurations are rejected before any
+// kernel runs.
+TEST(ChannelizePoly, HalfNonPowerOfTwoWithoutFusedKernelThrows)
+{
+  MATX_ENTER_HANDLER();
+  using Complex = matxFp16Complex;
+  cudaExecutor exec{};
+  struct Config { index_t m, d; };
+  const Config cases[] = {{3, 2}, {5, 4}, {6, 3}, {7, 7}, {12, 12}};
+  for (const auto &tc : cases) {
+    SCOPED_TRACE(::testing::Message() << "M=" << tc.m << " D=" << tc.d);
+    constexpr index_t batches = 2;
+    constexpr index_t input_len = 1027;
+    const index_t filter_len = 13 * tc.m - 1;
+    const index_t rows = (input_len + tc.d - 1) / tc.d;
+    // Strided views of the same types as CriticalSmallChannelsStrided.
+    auto input_storage = make_tensor<Complex>({batches, input_len});
+    auto filter_storage = make_tensor<matxFp16>({filter_len});
+    auto output_storage = make_tensor<Complex>({batches, rows, tc.m});
+    auto input = slice(input_storage, {0, 0}, {batches, input_len}, {1, 1});
+    auto filter = slice(filter_storage, {0}, {filter_len}, {1});
+    auto output = slice(output_storage, {0, 0, 0}, {batches, rows, tc.m}, {1, 1, 1});
+    try {
+      (output = channelize_poly(input, filter, tc.m, tc.d)).run(exec);
+      ADD_FAILURE() << "expected matxInvalidParameter";
+    } catch (const detail::matxException &e) {
+      EXPECT_EQ(e.e, matxInvalidParameter);
+    }
+  }
   MATX_EXIT_HANDLER();
 }
 
@@ -1260,6 +2283,11 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, OversampledInteger)
     { 2500, 187, 10, 5 },
     { 1800, 120, 8, 4 },
     { 37193, 41*8+4, 8, 4 },
+    // Fused radix/power-of-two paths with partial filter rows.
+    { 10003, 17*20+7, 20, 10 },
+    { 10003, 17*40+7, 40, 20 },
+    { 10003, 17*64+7, 64, 32 },
+    { 10003, 17*80+7, 80, 40 },
     // 5x oversampling (D = M/5)
     { 2500, 170, 10, 2 },
     // Large channel count
@@ -1318,6 +2346,11 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, OversampledRational)
     { 2500, 187, 11, 4 },
     // Large channel count, rational
     { 35000, 5*181+17, 181, 60 },
+    // Fused radix/power-of-two rational-oversampling paths.
+    { 10003, 17*20+7, 20, 7 },
+    { 10003, 17*40+7, 40, 32 },
+    { 10003, 17*64+7, 64, 27 },
+    { 10003, 17*80+7, 80, 33 },
   };
 
   for (size_t i = 0; i < sizeof(test_cases)/sizeof(test_cases[0]); i++) {
@@ -1420,6 +2453,11 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, SmemTiledMaximallyDecimated)
     { 256000, 10*512+37, 512 },
     // M=1024, P=4 — large channel count, small P
     { 102400, 4*1024, 1024 },
+    // M=512, P=64 — exercises the grouped long-filter path and CTILE=32
+    { 128000, 64*512, 512 },
+    // M=512, P=192 — exercises the CTILE=32 path when it fits and the
+    // established generic fallback for wider element types
+    { 131072, 192*512, 512 },
   };
 
   for (size_t i = 0; i < sizeof(test_cases)/sizeof(test_cases[0]); i++) {
@@ -1542,9 +2580,9 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, SmemTiledOversampledLargeK)
   MATX_EXIT_HANDLER();
 }
 
-// SmemTiled oversampled with FilterInSmem=true.
-// Requires CTILE * K * P * sizeof(filter_t) <= 2048.
-// With K=2 (2x integer oversample) and small P, the filter fits in smem.
+// SmemTiled oversampled with FilterInSmem=true. Oversampled tiles cache only the
+// Full filter layout, and only when its M * P taps fit in
+// SmemTiledOversampledFilterBytes (4 KiB), so these cases keep M * P <= 256.
 TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, SmemTiledOversampledFilterInSmem)
 {
   MATX_ENTER_HANDLER();
@@ -1558,12 +2596,14 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, SmemTiledOversampledFilterInSmem
     index_t num_channels;
     index_t decimation_factor;
   } test_cases[] = {
-    // M=1024, D=512, K=2, P=4: filter_smem = 64*2*4*sizeof(filter_t) = 2048 bytes (float)
-    { 102400, 4*1024, 1024, 512 },
-    // M=512, D=256, K=2, P=3: filter_smem = 64*2*3*sizeof(filter_t) = 1536 bytes (float)
-    { 51200, 3*512, 512, 256 },
-    // M=1024, D=512, K=2, P=2: filter_smem = 64*2*2*sizeof(filter_t) = 1024 bytes (float)
-    { 102400, 2*1024, 1024, 512 },
+    // M=24, D=12, K=2, P=4 with a partial final polyphase row
+    { 10007, 4*24-5, 24, 12 },
+    // M=36, D=18, K=2, P=3
+    { 10007, 3*36, 36, 18 },
+    // M=48, D=36, K=4, P=2 (rational oversampling)
+    { 10007, 2*48, 48, 36 },
+    // M=48, D=24, K=2, P=4: a 3 KiB complex<double> filter, above the former 2 KiB limit
+    { 10007, 4*48, 48, 24 },
   };
 
   for (size_t i = 0; i < sizeof(test_cases)/sizeof(test_cases[0]); i++) {
@@ -1582,6 +2622,12 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, SmemTiledOversampledFilterInSmem
 
     this->pb->NumpyToTensorView(a, "a");
     this->pb->NumpyToTensorView(f, "filter_random");
+    // Fail if dispatch changes stop these cases from caching the filter.
+    using Accum = typename inner_op_type_t<ComplexType>::type;
+    const auto plan = detail::cpoly::SelectPlan<decltype(b), decltype(a), decltype(f), Accum>(
+        b, a, f, num_channels, decimation_factor);
+    ASSERT_EQ(plan.backend, detail::cpoly::Backend::Tiled);
+    ASSERT_EQ(plan.tiled.filter_layout, detail::cpoly::SmemTiledFilterLayout::Full);
     (b = channelize_poly(a, f, num_channels, decimation_factor)).run(this->exec);
 
     this->exec.sync();
@@ -1606,7 +2652,9 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, ComplexFilter)
     index_t num_channels;
     index_t decimation_factor;
   } test_cases[] = {
-    // Complex filter, D==M, small M (FusedChan path)
+    // Complex filter, D==M, specialized two-point DFT
+    { 1800, 120, 2, 2 },
+    // Complex filter, D==M, small M (fused FIR and DFT)
     { 1800, 120, 4, 4 },
     // Complex filter, D==M, medium M (_Smem path)
     { 2500, 170, 10, 10 },
@@ -1703,9 +2751,10 @@ TYPED_TEST(ChannelizePolyTestNonHalfFloatTypes, GenericOversampledFallback)
 namespace cpoly_window_test {
 
 // Run one windowed-vs-full comparison. InT is the input sample type (real ->
-// R2C path, complex -> C2C path); the filter is real.
-template <typename InT>
-bool run_case(cudaExecutor &exec, index_t N, index_t M, index_t D, index_t L,
+// R2C path, complex -> C2C path); the filter is real. ExplicitFused launches
+// the fused window regardless of the device's performance heuristics.
+template <typename InT, bool ExplicitFused = false>
+void run_case(cudaExecutor &exec, index_t N, index_t M, index_t D, index_t L,
               index_t offset, index_t count)
 {
   using OutT = cuda::std::complex<float>;
@@ -1713,7 +2762,7 @@ bool run_case(cudaExecutor &exec, index_t N, index_t M, index_t D, index_t L,
 
   const index_t T = (N + D - 1) / D; // full number of output elements per channel
   if (offset < 0 || count <= 0 || offset + count > T) {
-    return true; // skip degenerate windows
+    return; // skip degenerate windows
   }
 
   auto h = make_tensor<FiltT>({L});
@@ -1736,12 +2785,22 @@ bool run_case(cudaExecutor &exec, index_t N, index_t M, index_t D, index_t L,
   // Full one-shot reference (uses whichever kernel the heuristics pick).
   auto out_full = make_tensor<OutT>({T, M});
   (out_full = channelize_poly(in, h, M, D)).run(exec);
+  ASSERT_EQ(cudaGetLastError(), cudaSuccess);
 
-  // Windowed compute of only rows [offset, offset+count) via normal dispatch.
+  // Windowed compute of only rows [offset, offset+count).
   auto out_win = make_tensor<OutT>({count, M});
-  channelize_poly_impl<decltype(out_win), decltype(in), decltype(h), float>(
-      out_win, in, h, M, D, exec.getStream(), offset);
-  exec.sync();
+  if constexpr (ExplicitFused) {
+    using OutOp = decltype(out_win);
+    ASSERT_TRUE((detail::cpoly::FusedRadixFeasible<OutOp, decltype(in), decltype(h), float>(
+        out_win, in, h, M, D)));
+    detail::cpoly::RunFusedRadix<OutOp, decltype(in), decltype(h), float>(
+        out_win, in, h, M, D, exec.getStream(), offset);
+  } else {
+    channelize_poly_impl<decltype(out_win), decltype(in), decltype(h), float>(
+        out_win, in, h, M, D, exec.getStream(), offset);
+  }
+  ASSERT_EQ(cudaGetLastError(), cudaSuccess);
+  ASSERT_EQ(cudaStreamSynchronize(exec.getStream()), cudaSuccess);
 
   float max_abs = 0.0f, max_err = 0.0f;
   for (index_t t = 0; t < count; ++t) {
@@ -1756,7 +2815,6 @@ bool run_case(cudaExecutor &exec, index_t N, index_t M, index_t D, index_t L,
   EXPECT_TRUE(ok) << "M=" << M << " D=" << D << " L=" << L << " offset=" << offset
                   << " count=" << count << " max_err=" << max_err
                   << " max_abs=" << max_abs;
-  return ok;
 }
 
 template <typename InT>
@@ -1764,7 +2822,8 @@ void sweep(cudaExecutor &exec)
 {
   struct Cfg { index_t M, D; };
   const index_t N = 4096;
-  for (Cfg c : {Cfg{4, 4}, Cfg{8, 8},           // maximally decimated
+  for (Cfg c : {Cfg{4, 4}, Cfg{5, 5}, Cfg{6, 6}, Cfg{8, 8},
+                                                    // maximally decimated
                 Cfg{8, 4}, Cfg{8, 2},           // integer oversampled
                 Cfg{6, 4}, Cfg{8, 6}, Cfg{9, 6}}) { // rational oversampled
     const index_t L = 4 * c.M;                  // P = 4 taps/branch
@@ -1780,22 +2839,56 @@ void sweep(cudaExecutor &exec)
     // A bounded middle window as well.
     run_case<InT>(exec, N, c.M, c.D, L, T / 3, T / 4);
   }
+
+  // Small oversampled channelizers must preserve phase at arbitrary window
+  // offsets, including partial filter rows and partially populated end rows.
+  for (index_t channels : {3, 4, 5, 6}) {
+    constexpr index_t input_len = 1031;
+    const index_t filter_len = 13 * channels - 1;
+    for (index_t decimation = 1; decimation < channels; decimation++) {
+      const index_t rows = (input_len + decimation - 1) / decimation;
+      run_case<InT>(exec, input_len, channels, decimation, filter_len, 3, 67);
+      run_case<InT>(exec, input_len, channels, decimation, filter_len, rows - 17, 17);
+    }
+    // A longer bounded window also exercises repeated work within a CTA.
+    run_case<InT>(exec, 131075, channels, 1, filter_len, 3, 65539);
+  }
+
+  // Critical direct FIRs must preserve causal and trailing bounds in windows.
+  for (index_t channels : {5, 6}) {
+    constexpr index_t input_len = 1031;
+    const index_t rows = (input_len + channels - 1) / channels;
+    for (index_t tail : {0, 1}) {
+      const index_t filter_len = 13 * channels - tail;
+      for (index_t offset : {index_t{1}, index_t{7}, rows - 1}) {
+        run_case<InT>(exec, input_len, channels, channels, filter_len,
+                      offset, std::min(index_t{67}, rows - offset));
+      }
+    }
+  }
 }
 
-// Target the non-fused CUDA paths with out_elem_offset > 0. P is the number
-// of prototype-filter taps per channel. These sizes are chosen from the
-// dispatcher thresholds in transforms/channelize_poly.h:
-//   M=16,  D=16,  P=8:   Smem
-//   M=64,  D=32,  P=8:   SmemTiled, Full filter layout
-//   M=256, D=128, P=8:   SmemTiled, Rotated filter layout
-//   M=64,  D=32,  P=20:  SmemTiled, Global filter layout
-//   M=64,  D=64/48, P=192: Generic (input tile exceeds 48 KiB)
+// Target CUDA dispatch paths with out_elem_offset > 0. P is the number of
+// prototype-filter taps per channel. With the float filter used here, the
+// dispatcher in transforms/channelize_poly.h selects (real / complex input):
+//   M=2,   D=1,     P=64:  fused two-channel oversampled leaf
+//   M=40,  D=20/32, P=17:  fused
+//   M=12,  D=12,    P=8:   Smem
+//   M=64,  D=32,    P=8:   fused / SmemTiled 32x4, Full filter layout
+//   M=256, D=128,   P=8:   SmemTiled 32x4, Global filter layout
+//   M=64,  D=32,    P=20:  fused / SmemTiled 32x4, Global filter layout
+//   M=64,  D=64,    P=192: SmemTiled 32x16, Global filter layout / Generic
+//   M=64,  D=48,    P=192: SmemTiled 32x4, Global filter layout / Generic
+// ExplicitPlansMatchHost covers every backend and filter layout at a nonzero
+// offset regardless of these heuristics.
 template <typename InT>
 void large_dispatch_sweep(cudaExecutor &exec)
 {
   struct Cfg { index_t M, D, P; };
   const index_t N = 2051; // partial trailing block for every D below
-  for (Cfg c : {Cfg{16, 16, 8}, Cfg{64, 32, 8}, Cfg{256, 128, 8},
+  for (Cfg c : {Cfg{2, 1, 64}, Cfg{40, 20, 17}, Cfg{40, 32, 17},
+                Cfg{12, 12, 8},
+                Cfg{64, 32, 8}, Cfg{256, 128, 8},
                 Cfg{64, 32, 20}, Cfg{64, 64, 192}, Cfg{64, 48, 192}}) {
     const index_t L = c.P * c.M - 1; // partial final polyphase row
     const index_t T = (N + c.D - 1) / c.D;
@@ -1803,6 +2896,34 @@ void large_dispatch_sweep(cudaExecutor &exec)
     run_case<InT>(exec, N, c.M, c.D, L, offset,
                   std::min(index_t(19), T - offset));
     run_case<InT>(exec, N, c.M, c.D, L, T - 1, 1);
+  }
+
+  // A long Smem window has enough rows for the launch to use 16-row groups.
+  run_case<InT>(exec, 12 * 8192 + 5, 12, 12, 8 * 12 - 1, 3, 4099);
+
+  // Explicit fused M=40 windows cover critical sampling, oversampling, and a
+  // partial trailing row.
+  for (index_t D : {20, 32, 40}) {
+    const index_t T = (N + D - 1) / D;
+    run_case<InT, true>(exec, N, 40, D, 17 * 40 - 1, 3, 19);
+    run_case<InT, true>(exec, N, 40, D, 17 * 40 - 1, T - 1, 1);
+  }
+
+  // Long, offset windows cover repeated ring reloads and a partial final tile.
+  // P=1 has no halo; P=13 also wraps within the filtered sample history.
+  for (index_t P : {1, 13}) {
+    run_case<InT, true>(exec, 600003, 32, 32, P * 32 - 1, 7, 17003);
+    run_case<InT, true>(exec, 600003, 40, 40, P * 40 - 1, 7, 14003);
+  }
+
+  // Nonconstant input, nonzero offsets, and enough rows for grouped
+  // CTILE=32/NOUT=16 reloads. Both windows end with a partial output group;
+  // the second also includes the input's partially populated final row.
+  constexpr index_t grouped_N = 1056 * 512 + 3;
+  constexpr index_t grouped_count = 1051;
+  constexpr index_t grouped_T = (grouped_N + 511) / 512;
+  for (index_t offset : {index_t{3}, grouped_T - grouped_count}) {
+    run_case<InT>(exec, grouped_N, 512, 512, 64 * 512 - 1, offset, grouped_count);
   }
 }
 
@@ -1820,4 +2941,120 @@ TEST(ChannelizePoly, OutputElemWindowComplexInput)
   cudaExecutor exec{};
   cpoly_window_test::sweep<cuda::std::complex<float>>(exec);
   cpoly_window_test::large_dispatch_sweep<cuda::std::complex<float>>(exec);
+}
+
+TEST(ChannelizePoly, OutputElemWindowLongSignalsAndFilters)
+{
+  MATX_ENTER_HANDLER();
+  using Complex = cuda::std::complex<double>;
+  cudaExecutor cuda_exec{};
+  SingleThreadedHostExecutor host_exec{};
+  struct Config { index_t channels, taps, input_len, count; };
+  const Config cases[] = {
+    // Practical filters with long windows and incomplete final groups.
+    {512, 13, 553987, 1079},
+    {256, 21, 553987, 2103},
+    // Input tiles fit in 48 KiB, but caching the filter would exceed it.
+    {32, 80, 131075, 4097},
+    {64, 80, 262147, 4097},
+    // A trailing window close to the signed 32-bit sample-index limit.
+    {512, 64, std::numeric_limits<int32_t>::max() - 512, 1079},
+    // Fused staging includes padded rows beyond the valid sample range.
+    {2, 13, std::numeric_limits<int32_t>::max() - 10, 67},
+    {3, 13, std::numeric_limits<int32_t>::max() - 10, 67},
+    {4, 13, std::numeric_limits<int32_t>::max() - 10, 67},
+    {5, 13, std::numeric_limits<int32_t>::max() - 10, 67},
+    {6, 13, std::numeric_limits<int32_t>::max() - 10, 67},
+  };
+  for (const auto &tc : cases) {
+    SCOPED_TRACE(::testing::Message()
+        << "M=" << tc.channels << " P=" << tc.taps << " N=" << tc.input_len);
+    const index_t total_rows = (tc.input_len + tc.channels - 1) / tc.channels;
+    const index_t offset = total_rows - tc.count;
+    // Coprime periods expose sample/row shifts without a huge allocation.
+    auto indices = range<0>({tc.input_len}, index_t{0}, index_t{1});
+    auto input = as_complex_double(
+        (as_double(indices % 1009) - 504.0) / 512.0, (as_double(indices % 1013) - 506.0) / 512.0);
+    auto filter = make_tensor<float>({tc.taps * tc.channels - 1});
+    for (index_t k = 0; k < filter.Size(0); k++) {
+      filter(k) = static_cast<float>((k % 13) - 6) / 64.0f;
+    }
+    auto output = make_tensor<Complex>({tc.count, tc.channels});
+    channelize_poly_impl<decltype(output), decltype(input), decltype(filter),
+        double>(output, input, filter, tc.channels, tc.channels,
+                cuda_exec.getStream(), offset);
+    MATX_CUDA_CHECK_LAST_ERROR();
+    cuda_exec.sync();
+
+    // Check beginning, interior, and trailing rows against the host FIR/DFT.
+    auto reference = make_tensor<Complex>({1, tc.channels});
+    for (index_t row : {index_t{0}, tc.count / 2, tc.count - 17, tc.count - 1}) {
+      channelize_poly_impl<decltype(reference), decltype(input),
+          decltype(filter), double>(reference, input, filter,
+              tc.channels, tc.channels, host_exec, offset + row);
+      for (index_t c = 0; c < tc.channels; c++) {
+        const auto expected = reference(0, c);
+        const double tolerance = 1e-10 * (1.0 + cuda::std::abs(expected));
+        EXPECT_NEAR(output(row, c).real(), expected.real(), tolerance);
+        EXPECT_NEAR(output(row, c).imag(), expected.imag(), tolerance);
+      }
+    }
+  }
+  MATX_EXIT_HANDLER();
+}
+
+// The tiled kernel uses 32-bit indices only when every input index it forms fits.
+// An oversampled ring loads through the end of the input row holding the
+// window's newest sample, which can pass INT32_MAX even when input_len + M does
+// not.
+TEST(ChannelizePoly, TiledIndexWidthNearInt32Limit)
+{
+  MATX_ENTER_HANDLER();
+  namespace cp = detail::cpoly;
+  using Complex = cuda::std::complex<double>;
+  constexpr index_t max_index = std::numeric_limits<int32_t>::max();
+  constexpr index_t channels = 1022;
+  constexpr index_t decimation = 1016;
+  // The newest input row ends 1006 samples past INT32_MAX.
+  constexpr index_t input_len = 2147482625;
+  constexpr index_t total_rows = (input_len + decimation - 1) / decimation;
+  static_assert(input_len + channels <= max_index);
+  EXPECT_FALSE(cp::SmemTiledFitsInt32(input_len, channels, decimation, total_rows));
+  // Critical sampling at the limit keeps 32-bit indices.
+  constexpr index_t critical_len = max_index - 512;
+  EXPECT_TRUE(cp::SmemTiledFitsInt32(critical_len, 512, 512, (critical_len + 511) / 512));
+
+  // A trailing window through the tiled kernel matches the host FIR/DFT.
+  cudaExecutor cuda_exec{};
+  SingleThreadedHostExecutor host_exec{};
+  auto indices = range<0>({input_len}, index_t{0}, index_t{1});
+  auto input = as_complex_double(
+      (as_double(indices % 1009) - 504.0) / 512.0, (as_double(indices % 1013) - 506.0) / 512.0);
+  auto filter = make_tensor<float>({4 * channels - 1});
+  for (index_t k = 0; k < filter.Size(0); k++) {
+    filter(k) = static_cast<float>((k % 13) - 6) / 64.0f;
+  }
+  constexpr index_t count = 67;
+  constexpr index_t offset = total_rows - count;
+  auto output = make_tensor<Complex>({count, channels});
+  const auto plan = cp::SelectPlan<decltype(output), decltype(input), decltype(filter), double>(
+      output, input, filter, channels, decimation);
+  ASSERT_EQ(plan.backend, cp::Backend::Tiled);
+  channelize_poly_impl<decltype(output), decltype(input), decltype(filter), double>(
+      output, input, filter, channels, decimation, cuda_exec.getStream(), offset);
+  MATX_CUDA_CHECK_LAST_ERROR();
+  cuda_exec.sync();
+
+  auto reference = make_tensor<Complex>({1, channels});
+  for (index_t row : {index_t{0}, count / 2, count - 1}) {
+    channelize_poly_impl<decltype(reference), decltype(input), decltype(filter), double>(
+        reference, input, filter, channels, decimation, host_exec, offset + row);
+    for (index_t c = 0; c < channels; c++) {
+      const auto expected = reference(0, c);
+      const double tolerance = 1e-10 * (1.0 + cuda::std::abs(expected));
+      EXPECT_NEAR(output(row, c).real(), expected.real(), tolerance) << "row=" << row;
+      EXPECT_NEAR(output(row, c).imag(), expected.imag(), tolerance) << "row=" << row;
+    }
+  }
+  MATX_EXIT_HANDLER();
 }
