@@ -649,6 +649,7 @@ struct JITKernelCacheKey {
   int rank = 0;
   ElementsPerThread ept = ElementsPerThread::INVALID;
   int block_size = 0;
+  int groups_per_block = 1;
   bool stride = false;
   bool global_kernel = false;
   bool pass_through_threads = false;
@@ -661,6 +662,7 @@ struct JITKernelCacheKey {
     return rank == rhs.rank &&
            ept == rhs.ept &&
            block_size == rhs.block_size &&
+           groups_per_block == rhs.groups_per_block &&
            stride == rhs.stride &&
            global_kernel == rhs.global_kernel &&
            pass_through_threads == rhs.pass_through_threads &&
@@ -678,6 +680,7 @@ struct JITKernelCacheKeyHash {
     h ^= static_cast<std::size_t>(key.rank) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
     h ^= static_cast<std::size_t>(key.ept) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
     h ^= static_cast<std::size_t>(key.block_size) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+    h ^= static_cast<std::size_t>(key.groups_per_block) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
     h ^= static_cast<std::size_t>(key.stride) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
     h ^= static_cast<std::size_t>(key.global_kernel) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
     h ^= static_cast<std::size_t>(key.pass_through_threads) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
@@ -706,6 +709,7 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name,
                            bool block_reduces_rank = false,
                            const JITCacheKey &jit_cache_key = {},
                            std::optional<std::string> kernel_op_type = std::nullopt,
+                           int groups_per_block = 1,
                            bool launch_kernel = true) {
   // The actual rank comes from the size array, which may differ from Op::Rank()
   // for dynamic tensor expressions (where Op::Rank() = MATX_MAX_DYNAMIC_RANK).
@@ -739,12 +743,13 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name,
                                                            pass_through_inner_rank, block_reduces_rank);
   auto make_legacy_kernel_cache_key = [&]() {
     return device_cache_prefix + kernel_name + "_ept_" + std::to_string(static_cast<int>(ept)) +
-           "_block_" + std::to_string(threads.x) + "_" + ensure_kernel_op_type();
+           "_block_" + std::to_string(threads.x) + "_groups_" +
+           std::to_string(groups_per_block) + "_" + ensure_kernel_op_type();
   };
   auto make_jit_kernel_cache_key = [&]() {
-    return JITKernelCacheKey{jit_cache_key, RANK, ept, static_cast<int>(threads.x), stride, global_kernel,
-                             pass_through_threads, pass_through_inner_rank, block_reduces_rank,
-                             current_device, nvrtc_arch};
+    return JITKernelCacheKey{jit_cache_key, RANK, ept, static_cast<int>(threads.x), groups_per_block,
+                             stride, global_kernel, pass_through_threads, pass_through_inner_rank,
+                             block_reduces_rank, current_device, nvrtc_arch};
   };
 
   MATX_LOG_DEBUG("nvrtc_compile_and_run called with operator type: {}", typeid(op).name());
@@ -779,7 +784,8 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name,
   // Not in memory cache, check disk cache (outside lock to minimize critical section)
   {
     const std::string variant_prefix = "JITKernel_E" + std::to_string(static_cast<int>(ept)) +
-                                       "_B" + std::to_string(threads.x);
+                                       "_B" + std::to_string(threads.x) +
+                                       "_G" + std::to_string(groups_per_block);
     const auto cubin_filename = has_jit_cache_key ?
         device_cache_prefix + detail::JITCacheKeyToFilename(jit_cache_key, variant_prefix) :
         detail::GetCache().TypeStringToFilename(make_legacy_kernel_cache_key());

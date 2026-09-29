@@ -583,7 +583,7 @@ namespace matx
                     candidate_ept, candidate_stride, candidate_dynamic_shmem,
                     candidate_osize, global_kernel, stream_, pass_through_threads,
                     pass_through_inner_rank, block_reduces_rank, jit_cache_key,
-                    kernel_op_type, false);
+                    kernel_op_type, candidate_groups_per_block, false);
                 };
 
                 // Find the best launch parameters
@@ -627,7 +627,7 @@ namespace matx
                 (RANK == 0 ? 1 : static_cast<int>(op.Size(RANK - 1)));
             detail::nvrtc_compile_and_run("output.cu", op, sizes, blocks, threads, best_ept, stride, shm_size, osize,
                                           global_kernel, stream_, pass_through_threads, pass_through_inner_rank,
-                                          block_reduces_rank, jit_cache_key, kernel_op_type);
+                                          block_reduces_rank, jit_cache_key, kernel_op_type, groups_per_block);
             if (!has_cached_params) {
               if (jit_cache_key.valid) {
                 detail::StoreJITLaunchParams(jit_cache_key, params_to_cache);

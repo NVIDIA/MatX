@@ -338,3 +338,24 @@ TEST(CudaExecutorCommonTests, FindBestLaunchParamsUsesCompiledJitStaticShmem)
     op, provider, 32, true, static_shmem_provider);
   EXPECT_EQ(cuda::std::get<0>(result), detail::ElementsPerThread::TWO);
 }
+
+#ifdef MATX_EN_JIT
+TEST(CudaExecutorCommonTests, JitKernelCacheSeparatesGroupsPerBlock)
+{
+  detail::JITKernelCacheKey one_group{};
+  one_group.op_key = detail::MakeJITCacheKeyForType<int>("group-cache-test");
+  one_group.rank = 2;
+  one_group.ept = detail::ElementsPerThread::FOUR;
+  one_group.block_size = 256;
+  one_group.groups_per_block = 1;
+
+  auto two_groups = one_group;
+  two_groups.groups_per_block = 2;
+
+  EXPECT_FALSE(one_group == two_groups);
+  std::unordered_map<detail::JITKernelCacheKey, int, detail::JITKernelCacheKeyHash> cache;
+  cache[one_group] = 1;
+  cache[two_groups] = 2;
+  EXPECT_EQ(cache.size(), std::size_t{2});
+}
+#endif
