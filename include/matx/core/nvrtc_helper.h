@@ -647,6 +647,8 @@ inline std::string qualify_jit_type_names(const std::string& type_str) {
 struct JITKernelCacheKey {
   JITCacheKey op_key;
   int rank = 0;
+  ElementsPerThread ept = ElementsPerThread::INVALID;
+  int block_size = 0;
   bool stride = false;
   bool global_kernel = false;
   bool pass_through_threads = false;
@@ -657,6 +659,8 @@ struct JITKernelCacheKey {
 
   __MATX_INLINE__ __MATX_HOST__ bool operator==(const JITKernelCacheKey &rhs) const noexcept {
     return rank == rhs.rank &&
+           ept == rhs.ept &&
+           block_size == rhs.block_size &&
            stride == rhs.stride &&
            global_kernel == rhs.global_kernel &&
            pass_through_threads == rhs.pass_through_threads &&
@@ -672,6 +676,8 @@ struct JITKernelCacheKeyHash {
   __MATX_INLINE__ __MATX_HOST__ std::size_t operator()(const JITKernelCacheKey &key) const noexcept {
     std::size_t h = JITCacheKeyHash{}(key.op_key);
     h ^= static_cast<std::size_t>(key.rank) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+    h ^= static_cast<std::size_t>(key.ept) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+    h ^= static_cast<std::size_t>(key.block_size) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
     h ^= static_cast<std::size_t>(key.stride) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
     h ^= static_cast<std::size_t>(key.global_kernel) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
     h ^= static_cast<std::size_t>(key.pass_through_threads) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
@@ -699,7 +705,8 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name,
                            int pass_through_inner_rank = 2,
                            bool block_reduces_rank = false,
                            const JITCacheKey &jit_cache_key = {},
-                           std::optional<std::string> kernel_op_type = std::nullopt) {
+                           std::optional<std::string> kernel_op_type = std::nullopt,
+                           bool launch_kernel = true) {
   // The actual rank comes from the size array, which may differ from Op::Rank()
   // for dynamic tensor expressions (where Op::Rank() = MATX_MAX_DYNAMIC_RANK).
   constexpr int RANK = std::tuple_size_v<SizeArray>;
@@ -710,6 +717,7 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name,
   struct CachedKernel {
     CUmodule module;
     CUfunction function;
+    int static_shmem_size;
   };
   static std::unordered_map<std::string, CachedKernel> kernel_cache;
   static std::unordered_map<JITKernelCacheKey, CachedKernel, JITKernelCacheKeyHash> kernel_cache_by_key;
@@ -730,24 +738,30 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name,
   std::string kernel_name = get_kernel_name_for_rank<RANK>(stride, global_kernel, pass_through_threads,
                                                            pass_through_inner_rank, block_reduces_rank);
   auto make_legacy_kernel_cache_key = [&]() {
-    return device_cache_prefix + kernel_name + "_" + ensure_kernel_op_type();
+    return device_cache_prefix + kernel_name + "_ept_" + std::to_string(static_cast<int>(ept)) +
+           "_block_" + std::to_string(threads.x) + "_" + ensure_kernel_op_type();
+  };
+  auto make_jit_kernel_cache_key = [&]() {
+    return JITKernelCacheKey{jit_cache_key, RANK, ept, static_cast<int>(threads.x), stride, global_kernel,
+                             pass_through_threads, pass_through_inner_rank, block_reduces_rank,
+                             current_device, nvrtc_arch};
   };
 
   MATX_LOG_DEBUG("nvrtc_compile_and_run called with operator type: {}", typeid(op).name());
   
   CUfunction kernel_func;
   std::string lowered_name;
+  int kernel_static_shmem_size = 0;
   
   // Check if kernel is already compiled and cached in memory
   {
     std::lock_guard<std::mutex> lock(kernel_cache_mutex);
     if (has_jit_cache_key) {
-      JITKernelCacheKey cache_key{jit_cache_key, RANK, stride, global_kernel,
-                                  pass_through_threads, pass_through_inner_rank,
-                                  block_reduces_rank, current_device, nvrtc_arch};
+      const auto cache_key = make_jit_kernel_cache_key();
       auto it = kernel_cache_by_key.find(cache_key);
       if (it != kernel_cache_by_key.end()) {
         kernel_func = it->second.function;
+        kernel_static_shmem_size = it->second.static_shmem_size;
         goto launch_kernel;
       }
     } else {
@@ -756,6 +770,7 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name,
       if (it != kernel_cache.end()) {
         // Found in memory cache - use cached function (module is already loaded)
         kernel_func = it->second.function;
+        kernel_static_shmem_size = it->second.static_shmem_size;
         goto launch_kernel;
       }
     }
@@ -763,14 +778,18 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name,
   
   // Not in memory cache, check disk cache (outside lock to minimize critical section)
   {
+    const std::string variant_prefix = "JITKernel_E" + std::to_string(static_cast<int>(ept)) +
+                                       "_B" + std::to_string(threads.x);
     const auto cubin_filename = has_jit_cache_key ?
-        device_cache_prefix + detail::JITCacheKeyToFilename(jit_cache_key) :
-        device_cache_prefix + detail::GetCache().TypeStringToFilename(ensure_kernel_op_type());
+        device_cache_prefix + detail::JITCacheKeyToFilename(jit_cache_key, variant_prefix) :
+        detail::GetCache().TypeStringToFilename(make_legacy_kernel_cache_key());
     auto cached_cubin_ptr = detail::GetCache().GetLTOIRCachedBytes(cubin_filename);
     
     if (cached_cubin_ptr != nullptr) {
       // Found cached cubin on disk, try to load metadata
-      lowered_name = detail::GetCache().GetLTOIRMetadata(cubin_filename);
+      const auto kernel_metadata = detail::GetCache().GetLTOIRMetadata(cubin_filename);
+      std::istringstream kernel_metadata_stream(kernel_metadata);
+      kernel_metadata_stream >> lowered_name >> kernel_static_shmem_size;
       
       if (!lowered_name.empty()) {
         MATX_LOG_DEBUG("Loading cached kernel from: {}", cubin_filename);
@@ -788,12 +807,11 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name,
         {
           std::lock_guard<std::mutex> lock(kernel_cache_mutex);
           if (has_jit_cache_key) {
-            kernel_cache_by_key[JITKernelCacheKey{jit_cache_key, RANK, stride, global_kernel,
-                                                  pass_through_threads, pass_through_inner_rank,
-                                                  block_reduces_rank, current_device, nvrtc_arch}] =
-                CachedKernel{module, kernel_func};
+            kernel_cache_by_key[make_jit_kernel_cache_key()] =
+              CachedKernel{module, kernel_func, kernel_static_shmem_size};
           } else {
-            kernel_cache[make_legacy_kernel_cache_key()] = CachedKernel{module, kernel_func};
+            kernel_cache[make_legacy_kernel_cache_key()] =
+              CachedKernel{module, kernel_func, kernel_static_shmem_size};
           }
         }
         
@@ -917,24 +935,9 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name,
       NVRTC_CHECK(nvrtcGetLoweredName(prog, layout_name_expr->c_str(), &layout_lowered_name_ptr));
       const auto [static_shmem_size, static_shmem_alignment] =
         parse_jit_layout_probe_lowered_name(layout_lowered_name_ptr);
+      kernel_static_shmem_size = static_shmem_size;
       MATX_LOG_DEBUG("JIT kernel uses {} bytes of static shared memory with maximum alignment {}",
                      static_shmem_size, static_shmem_alignment);
-
-      int default_shmem_limit = 0;
-      int optin_shmem_limit = 0;
-      CUDA_RT_CHECK(cudaDeviceGetAttribute(&default_shmem_limit,
-                                           cudaDevAttrMaxSharedMemoryPerBlock,
-                                           current_device));
-      CUDA_RT_CHECK(cudaDeviceGetAttribute(&optin_shmem_limit,
-                                           cudaDevAttrMaxSharedMemoryPerBlockOptin,
-                                           current_device));
-      const int total_shmem_size = static_shmem_size + dynamic_shmem_size;
-      const int max_shmem_size = cuda::std::max(default_shmem_limit, optin_shmem_limit);
-      if (total_shmem_size > max_shmem_size) {
-        NVRTC_CHECK(nvrtcDestroyProgram(&prog));
-        MATX_THROW(matxInvalidParameter,
-                   "JIT kernel static and dynamic shared-memory requirements exceed the device limit");
-      }
     }
 
     // Compile any LTO-IR required for expression:
@@ -999,7 +1002,8 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name,
 
     // Store the entire linked kernel to the cache along with the lowered name
     detail::GetCache().StoreLTOIRCachedBytes(cubin_filename, static_cast<const char*>(cubin.data()), cubin_size);
-    detail::GetCache().StoreLTOIRMetadata(cubin_filename, lowered_name);
+    detail::GetCache().StoreLTOIRMetadata(
+      cubin_filename, lowered_name + " " + std::to_string(kernel_static_shmem_size));
 
     
     // Load LTO-IR into CUDA module
@@ -1014,17 +1018,20 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name,
     {
       std::lock_guard<std::mutex> lock(kernel_cache_mutex);
       if (has_jit_cache_key) {
-        kernel_cache_by_key[JITKernelCacheKey{jit_cache_key, RANK, stride, global_kernel,
-                                              pass_through_threads, pass_through_inner_rank,
-                                              block_reduces_rank, current_device, nvrtc_arch}] =
-            CachedKernel{module, kernel_func};
+        kernel_cache_by_key[make_jit_kernel_cache_key()] =
+          CachedKernel{module, kernel_func, kernel_static_shmem_size};
       } else {
-        kernel_cache[make_legacy_kernel_cache_key()] = CachedKernel{module, kernel_func};
+        kernel_cache[make_legacy_kernel_cache_key()] =
+          CachedKernel{module, kernel_func, kernel_static_shmem_size};
       }
     }
   }
   
 launch_kernel:
+  if (!launch_kernel) {
+    return kernel_static_shmem_size;
+  }
+
   // Get device attributes
   int max_shared_memory_per_block;
   CUDA_RT_CHECK(cudaDeviceGetAttribute(&max_shared_memory_per_block, cudaDevAttrMaxSharedMemoryPerBlock, current_device));
@@ -1088,6 +1095,7 @@ launch_kernel:
                               args,
                               nullptr));
   }
+  return kernel_static_shmem_size;
 }
 
 }

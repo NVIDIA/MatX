@@ -39,6 +39,7 @@
 #include "matx/core/log.h"
 #include <cuda/std/array>
 #include <cstdint>
+#include <functional>
 
 namespace matx
 {
@@ -323,7 +324,12 @@ namespace detail
    * @return Tuple containing the best EPT, shared memory size, block size, and groups per block
    */
   template <typename Op, typename KernelProvider>
-  auto find_best_launch_params(const Op &op, KernelProvider kernel_provider, int block_size, bool use_jit = false) {
+  auto find_best_launch_params(
+      const Op &op,
+      KernelProvider kernel_provider,
+      int block_size,
+      bool use_jit = false,
+      const std::function<int(ElementsPerThread, int, int)> &jit_static_shmem_provider = {}) {
     // Get device properties for constraints
     constexpr int min_occupancy = 2;
     int groups_per_block = 1;
@@ -406,12 +412,14 @@ namespace detail
           const auto block_dim_range = detail::get_operator_capability<detail::OperatorCapability::BLOCK_DIM>(op);
           detail::ValidateJITBlockDimRange(block_dim_range);
           block_size = global_kernel ? 256 : block_dim_range[1];
-          shm_size = detail::get_operator_capability<detail::OperatorCapability::DYN_SHM_SIZE>(op);
-          const int static_shm_size = detail::get_operator_capability<detail::OperatorCapability::STATIC_SHM_SIZE>(op);
-          const int total_shm_size = shm_size + static_shm_size;
-
           // Check register pressure constraint
           register_viable = (num_regs * block_size * min_occupancy) <= regs_per_multiprocessor;
+
+          shm_size = detail::get_operator_capability<detail::OperatorCapability::DYN_SHM_SIZE>(op);
+          const int static_shm_size = register_viable && jit_static_shmem_provider ?
+            jit_static_shmem_provider(current_ept, block_size, groups_per_block) :
+            detail::get_operator_capability<detail::OperatorCapability::STATIC_SHM_SIZE>(op);
+          const int total_shm_size = shm_size + static_shm_size;
 
           // Check per-block shared memory and per-SM occupancy constraints.
           const auto total_shm_for_occupancy = static_cast<int64_t>(total_shm_size) * min_occupancy;

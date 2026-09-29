@@ -132,6 +132,23 @@ struct JITBlockDimRangeTestOp {
   }
 };
 
+struct JITStaticShmemSelectionTestOp : JITBlockDimRangeTestOp {
+  template <detail::OperatorCapability Cap, typename InType>
+  __MATX_INLINE__ __MATX_HOST__ auto get_capability([[maybe_unused]] InType &in) const
+  {
+    if constexpr (Cap == detail::OperatorCapability::ELEMENTS_PER_THREAD) {
+      return cuda::std::array<detail::ElementsPerThread, 2>{
+        detail::ElementsPerThread::ONE, detail::ElementsPerThread::FOUR};
+    }
+    else if constexpr (Cap == detail::OperatorCapability::MAX_EPT_VEC_LOAD) {
+      return 4;
+    }
+    else {
+      return JITBlockDimRangeTestOp::template get_capability<Cap>(in);
+    }
+  }
+};
+
 #ifdef MATX_EN_JIT
 __global__ void DelayedFillForJitStreamTest(float *ptr, int n, float value, unsigned long long cycles)
 {
@@ -295,4 +312,29 @@ TEST(CudaExecutorCommonTests, FindBestLaunchParamsUsesUpperBlockDimForJitBlockOp
   auto result = detail::find_best_launch_params(op, provider, 32, true);
 
   EXPECT_EQ(cuda::std::get<2>(result), 128);
+}
+
+TEST(CudaExecutorCommonTests, FindBestLaunchParamsUsesCompiledJitStaticShmem)
+{
+  if (!HasCudaDevice()) {
+    GTEST_SKIP() << "CUDA device required for launch-parameter coverage";
+  }
+
+  int device = 0;
+  int max_shmem_per_sm = 0;
+  ASSERT_EQ(cudaGetDevice(&device), cudaSuccess);
+  ASSERT_EQ(cudaDeviceGetAttribute(&max_shmem_per_sm,
+                                   cudaDevAttrMaxSharedMemoryPerMultiprocessor,
+                                   device), cudaSuccess);
+
+  JITStaticShmemSelectionTestOp op{};
+  auto provider = detail::create_kernel_provider<JITStaticShmemSelectionTestOp>(
+    cuda::std::array<index_t, 0>{}, true, false);
+  auto static_shmem_provider = [max_shmem_per_sm](detail::ElementsPerThread ept, int, int) {
+    return ept == detail::ElementsPerThread::FOUR ? max_shmem_per_sm / 2 + 1 : 0;
+  };
+
+  auto result = detail::find_best_launch_params(
+    op, provider, 32, true, static_shmem_provider);
+  EXPECT_EQ(cuda::std::get<0>(result), detail::ElementsPerThread::TWO);
 }
