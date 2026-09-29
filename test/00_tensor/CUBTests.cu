@@ -39,6 +39,15 @@
 using namespace matx;
 
 #ifdef MATX_EN_JIT
+TEST(TensorStats, CubBlockJITLayoutProbeNameParsing)
+{
+  const auto [size, alignment] =
+      detail::parse_jit_layout_probe_lowered_name(
+        "_ZN4matx6detail25JITStaticShmemLayoutProbeILy32ELy16EEE");
+  EXPECT_EQ(size, 32);
+  EXPECT_EQ(alignment, 16);
+}
+
 struct EmptyLastDimJitOp {
   using matxop = bool;
   using value_type = float;

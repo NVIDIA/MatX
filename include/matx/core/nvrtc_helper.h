@@ -441,131 +441,28 @@ inline std::string get_jit_includes_path() {
     return (matx_root / "include" / "matx" / "core" / "jit_includes.h").string();
 }
 
-inline std::string make_cub_shmem_probe_source(const std::string &algorithm,
-                                               const std::string &value_type,
-                                               int ept,
-                                               int block_size)
+inline std::pair<int, int> parse_jit_layout_probe_lowered_name(const std::string &lowered_name)
 {
-  std::string block_decl;
-  if (algorithm == "sort") {
-    block_decl = "using BlockT = cub::BlockRadixSort<T, " + std::to_string(block_size) + ", " +
-                 std::to_string(ept) + ">;\n";
-  }
-  else if (algorithm == "sort_pairs") {
-    block_decl = "using BlockT = cub::BlockRadixSort<T, " + std::to_string(block_size) + ", " +
-                 std::to_string(ept) + ", index_t>;\n";
-  }
-  else if (algorithm == "scan") {
-    // BlockScan's TempStorage depends on the block dimensions/algorithm, not
-    // the InclusiveSum ITEMS_PER_THREAD member-function template parameter.
-    block_decl = "using BlockT = cub::BlockScan<T, " + std::to_string(block_size) + ">;\n";
-    block_decl += "// BlockScan TempStorage is independent of the InclusiveSum ITEMS_PER_THREAD overload.\n";
-  }
-  else {
-    block_decl = "using BlockT = cub::BlockReduce<T, " + std::to_string(block_size) + ">;\n";
-  }
-
-  return std::string(
-    "#include <matx/core/jit_includes.h>\n"
-    "using namespace matx;\n"
-    "using namespace matx::detail;\n"
-    "using T = ") + value_type + ";\n" +
-    block_decl +
-    "extern \"C\" __device__ unsigned int temp_storage_size = static_cast<unsigned int>(sizeof(BlockT::TempStorage));\n";
-}
-
-inline int nvrtc_get_cub_block_shmem_size(const std::string &algorithm,
-                                          const std::string &value_type,
-                                          int ept,
-                                          int block_size)
-{
-  static std::unordered_map<std::string, int> shmem_cache;
-  static std::mutex shmem_cache_mutex;
-
-  const std::string nvrtc_arch = resolve_nvrtc_cuda_arch();
-  const int cache_ept = (algorithm == "sort" || algorithm == "sort_pairs") ? ept : 1;
-  const std::string cache_key = "A" + nvrtc_arch + "_" + algorithm + "_" + value_type + "_E" +
-                                std::to_string(cache_ept) + "_B" + std::to_string(block_size);
-  {
-    std::lock_guard<std::mutex> lock(shmem_cache_mutex);
-    auto it = shmem_cache.find(cache_key);
-    if (it != shmem_cache.end()) {
-      return it->second;
-    }
-  }
-
-  MATX_LOG_DEBUG("Compiling CUB shared-memory probe for {}", cache_key);
-
-  std::string jit_includes_path = get_jit_includes_path();
-  std::string jit_includes_content = read_file_contents(jit_includes_path);
-  std::string source = make_cub_shmem_probe_source(algorithm, value_type, ept, block_size);
-
-  const char *headers[] = {jit_includes_content.c_str()};
-  const char *include_names[] = {"matx/core/jit_includes.h"};
-
-  nvrtcProgram prog;
-  NVRTC_CHECK(nvrtcCreateProgram(&prog, source.c_str(), "matx_cub_shmem_probe.cu", 1, headers, include_names));
-
-  auto options = get_preprocessor_options(nvrtc_arch);
-  options.push_back("-include=matx/core/jit_includes.h");
-  options.push_back("-default-device");
-  for (auto &option : options) {
-    static constexpr std::string_view sm_arch_prefix = "-arch=sm_";
-    if (option.rfind(sm_arch_prefix, 0) == 0) {
-      option = "-arch=compute_" + option.substr(sm_arch_prefix.size());
-    }
-  }
-
-  std::vector<const char*> opts;
-  for (const auto &opt : options) {
-    opts.push_back(opt.c_str());
-  }
-
-  nvrtcResult compile_result = nvrtcCompileProgram(prog, static_cast<int>(opts.size()), opts.data());
-
-  size_t log_size;
-  NVRTC_CHECK(nvrtcGetProgramLogSize(prog, &log_size));
-  if (log_size > 1) {
-    std::vector<char> log(log_size);
-    NVRTC_CHECK(nvrtcGetProgramLog(prog, log.data()));
-    MATX_LOG_DEBUG("CUB shared-memory probe compilation log:\n{}", log.data());
-  }
-
-  if (compile_result != NVRTC_SUCCESS) {
-    nvrtcDestroyProgram(&prog);
-    MATX_THROW(matxInvalidParameter, "NVRTC CUB shared-memory probe compilation failed");
-  }
-
-  size_t ptx_size = 0;
-  NVRTC_CHECK(nvrtcGetPTXSize(prog, &ptx_size));
-  std::string ptx(ptx_size, '\0');
-  NVRTC_CHECK(nvrtcGetPTX(prog, ptx.data()));
-  NVRTC_CHECK(nvrtcDestroyProgram(&prog));
-
-  const std::regex temp_storage_regex(
-      R"((?:\.visible\s+)?\.global\s+(?:\.align\s+[0-9]+\s+)?\.(?:[usb]32)\s+temp_storage_size\s*=\s*([0-9]+)\s*;)");
+  // Itanium ABI non-type template arguments use L <type> <value> E.  NVRTC
+  // uses 'y' for unsigned long long, so the two arguments below appear as
+  // Ly<size>E and Ly<alignment>E in the lowered variable-template name.
+  const std::regex layout_regex(R"(JITStaticShmemLayoutProbeI(?:L)?y([0-9]+)E(?:L)?y([0-9]+)EE)");
   std::smatch match;
-  if (!std::regex_search(ptx, match, temp_storage_regex)) {
-    MATX_LOG_ERROR("Could not find CUB temp storage initializer in NVRTC PTX for {}", cache_key);
-    MATX_LOG_DEBUG("CUB shared-memory probe PTX:\n{}", ptx);
-    MATX_THROW(matxInvalidParameter, "NVRTC CUB shared-memory probe PTX did not contain temp_storage_size initializer");
+  if (!std::regex_search(lowered_name, match, layout_regex)) {
+    MATX_LOG_ERROR("Could not decode JIT static shared-memory layout from lowered name {}", lowered_name);
+    MATX_THROW(matxInvalidParameter, "NVRTC JIT layout probe returned an unexpected lowered name");
   }
 
-  const auto parsed_result = std::stoll(match[1].str());
-  if (parsed_result <= 0 || parsed_result > static_cast<long long>(std::numeric_limits<int>::max())) {
-    MATX_LOG_ERROR("Invalid CUB temp storage size {} in NVRTC PTX for {}", parsed_result, cache_key);
-    MATX_LOG_DEBUG("CUB shared-memory probe PTX:\n{}", ptx);
-    MATX_THROW(matxInvalidParameter, "NVRTC CUB shared-memory probe emitted invalid temp_storage_size");
-  }
-  const int host_result = static_cast<int>(parsed_result);
-
-  {
-    std::lock_guard<std::mutex> lock(shmem_cache_mutex);
-    shmem_cache[cache_key] = host_result;
+  const auto parsed_size = std::stoll(match[1].str());
+  const auto parsed_alignment = std::stoll(match[2].str());
+  if (parsed_size <= 0 || parsed_size > static_cast<long long>(std::numeric_limits<int>::max()) ||
+      parsed_alignment <= 0 || parsed_alignment > static_cast<long long>(std::numeric_limits<int>::max())) {
+    MATX_LOG_ERROR("Invalid JIT static shared-memory layout ({}, {}) in lowered name {}",
+                   parsed_size, parsed_alignment, lowered_name);
+    MATX_THROW(matxInvalidParameter, "NVRTC JIT layout probe emitted an invalid layout");
   }
 
-  MATX_LOG_DEBUG("CUB shared-memory probe {} emitted {} bytes", cache_key, host_result);
-  return host_result;
+  return {static_cast<int>(parsed_size), static_cast<int>(parsed_alignment)};
 }
 
 template <typename Op>
@@ -953,6 +850,25 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name,
     std::string kernel_name_expr = kernel_name + "<" + qualified_kernel_op_type + ">";
     MATX_LOG_DEBUG("Kernel name expression: {}", kernel_name_expr);
     NVRTC_CHECK(nvrtcAddNameExpression(prog, kernel_name_expr.c_str()));
+
+    // CUB TempStorage types only exist in the NVRTC translation unit. Encode
+    // their aggregate sizeof/alignof as non-type template arguments so the
+    // values can be decoded from the lowered name produced by this same
+    // compilation. This avoids a separate NVRTC shared-memory probe program.
+    auto static_shmem_query = detail::JITStaticShmemQueryInput{ept, static_cast<int>(threads.x)};
+    const auto static_shm_types =
+      detail::get_operator_capability<OperatorCapability::JIT_STATIC_SHM_TYPES>(op, static_shmem_query);
+    std::optional<std::string> layout_name_expr;
+    if (!static_shm_types.empty()) {
+      const std::string layout_type =
+        "matx::detail::JITStaticShmemLayout<matx::detail::JITStaticShmemEmpty" +
+        static_shm_types + ">";
+      layout_name_expr =
+        "&matx::detail::JITStaticShmemLayoutProbe<" + layout_type +
+        "::size, " + layout_type + "::alignment>";
+      MATX_LOG_DEBUG("Static shared-memory layout expression: {}", *layout_name_expr);
+      NVRTC_CHECK(nvrtcAddNameExpression(prog, layout_name_expr->c_str()));
+    }
     
     // Get compilation options
     auto options = get_preprocessor_options(nvrtc_arch);
@@ -995,6 +911,31 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name,
     // Copy the lowered name before destroying the program
     lowered_name = std::string(lowered_name_ptr);
     MATX_LOG_DEBUG("Lowered kernel name: {}", lowered_name);
+
+    if (layout_name_expr.has_value()) {
+      const char *layout_lowered_name_ptr = nullptr;
+      NVRTC_CHECK(nvrtcGetLoweredName(prog, layout_name_expr->c_str(), &layout_lowered_name_ptr));
+      const auto [static_shmem_size, static_shmem_alignment] =
+        parse_jit_layout_probe_lowered_name(layout_lowered_name_ptr);
+      MATX_LOG_DEBUG("JIT kernel uses {} bytes of static shared memory with maximum alignment {}",
+                     static_shmem_size, static_shmem_alignment);
+
+      int default_shmem_limit = 0;
+      int optin_shmem_limit = 0;
+      CUDA_RT_CHECK(cudaDeviceGetAttribute(&default_shmem_limit,
+                                           cudaDevAttrMaxSharedMemoryPerBlock,
+                                           current_device));
+      CUDA_RT_CHECK(cudaDeviceGetAttribute(&optin_shmem_limit,
+                                           cudaDevAttrMaxSharedMemoryPerBlockOptin,
+                                           current_device));
+      const int total_shmem_size = static_shmem_size + dynamic_shmem_size;
+      const int max_shmem_size = cuda::std::max(default_shmem_limit, optin_shmem_limit);
+      if (total_shmem_size > max_shmem_size) {
+        NVRTC_CHECK(nvrtcDestroyProgram(&prog));
+        MATX_THROW(matxInvalidParameter,
+                   "JIT kernel static and dynamic shared-memory requirements exceed the device limit");
+      }
+    }
 
     // Compile any LTO-IR required for expression:
     auto ltoir_query_input = detail::LTOIRQueryInput{};

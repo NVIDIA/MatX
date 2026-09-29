@@ -40,9 +40,6 @@
   #include "matx/core/operator_options.h"
 #endif
 #include "matx/core/vector.h"
-#if defined(MATX_EN_JIT) && !defined(__CUDACC_RTC__)
-  #include "matx/core/nvrtc_helper.h"
-#endif
 #include <cuda/std/version>
 #include <cub/block/block_radix_sort.cuh>
 #include <cub/block/block_reduce.cuh>
@@ -60,6 +57,9 @@
 #endif
 #include <cuda/std/limits>
 #include <cuda/std/utility>
+#ifndef __CUDACC_RTC__
+  #include <string>
+#endif
 
 namespace matx {
 namespace detail {
@@ -82,6 +82,43 @@ namespace detail {
     SORT,
     SORT_PAIRS
   };
+
+#if defined(MATX_EN_JIT)
+  struct JITStaticShmemEmpty {};
+
+  template <typename T>
+  struct JITStaticShmemTypeLayout {
+    static constexpr unsigned long long size = sizeof(T);
+    static constexpr unsigned long long alignment = alignof(T);
+  };
+
+  template <>
+  struct JITStaticShmemTypeLayout<JITStaticShmemEmpty> {
+    static constexpr unsigned long long size = 0;
+    static constexpr unsigned long long alignment = 1;
+  };
+
+  template <typename... Types>
+  struct JITStaticShmemLayout;
+
+  template <typename Head>
+  struct JITStaticShmemLayout<Head> {
+    static constexpr unsigned long long size = JITStaticShmemTypeLayout<Head>::size;
+    static constexpr unsigned long long alignment = JITStaticShmemTypeLayout<Head>::alignment;
+  };
+
+  template <typename Head, typename... Tail>
+  struct JITStaticShmemLayout<Head, Tail...> {
+    static constexpr unsigned long long size =
+      JITStaticShmemTypeLayout<Head>::size + JITStaticShmemLayout<Tail...>::size;
+    static constexpr unsigned long long alignment =
+      JITStaticShmemTypeLayout<Head>::alignment > JITStaticShmemLayout<Tail...>::alignment ?
+        JITStaticShmemTypeLayout<Head>::alignment : JITStaticShmemLayout<Tail...>::alignment;
+  };
+
+  template <unsigned long long Size, unsigned long long Alignment>
+  static __device__ unsigned char JITStaticShmemLayoutProbe = 0;
+#endif
 
 #ifndef __CUDACC_RTC__
   static constexpr int CubJitMaxBlockThreads = 1024;
@@ -239,32 +276,32 @@ namespace detail {
 
 #ifndef __CUDACC_RTC__
   template <typename T>
-  __MATX_INLINE__ __MATX_HOST__ int GetCubBlockShmRequired(CubBlockAlgorithm algorithm,
-                                                           ElementsPerThread ept,
-                                                           int block_size)
+  __MATX_INLINE__ __MATX_HOST__ std::string GetCubBlockShmTypeName(CubBlockAlgorithm algorithm,
+                                                                   ElementsPerThread ept,
+                                                                   int block_size)
   {
-#if defined(MATX_EN_JIT) && !defined(__CUDACC_RTC__)
-    const char *algorithm_name = "reduce";
+#if defined(MATX_EN_JIT)
+    const std::string type_name = detail::type_to_string<T>();
+    if (algorithm == CubBlockAlgorithm::SORT) {
+      return ", typename cub::BlockRadixSort<" + type_name + ", " + std::to_string(block_size) +
+             ", " + std::to_string(static_cast<int>(ept)) + ">::TempStorage";
+    }
+    if (algorithm == CubBlockAlgorithm::SORT_PAIRS) {
+      return ", typename cub::BlockRadixSort<" + type_name + ", " + std::to_string(block_size) +
+             ", " + std::to_string(static_cast<int>(ept)) + ", matx::index_t>::TempStorage";
+    }
     if (algorithm == CubBlockAlgorithm::SCAN) {
-      algorithm_name = "scan";
+      return ", typename cub::BlockScan<" + type_name + ", " + std::to_string(block_size) +
+             ">::TempStorage";
     }
-    else if (algorithm == CubBlockAlgorithm::SORT) {
-      algorithm_name = "sort";
-    }
-    else if (algorithm == CubBlockAlgorithm::SORT_PAIRS) {
-      algorithm_name = "sort_pairs";
-    }
-
-    return nvrtc_get_cub_block_shmem_size(algorithm_name,
-                                          detail::type_to_string<T>(),
-                                          static_cast<int>(ept),
-                                          block_size);
+    return ", typename cub::BlockReduce<" + type_name + ", " + std::to_string(block_size) +
+           ">::TempStorage";
 #else
     (void)algorithm;
     (void)ept;
     (void)block_size;
-    MATX_THROW(matxNotSupported, "CUB block shared-memory queries require MATX_EN_JIT");
-    return 0;
+    MATX_THROW(matxNotSupported, "CUB block shared-memory type queries require MATX_EN_JIT");
+    return {};
 #endif
   }
 #endif
