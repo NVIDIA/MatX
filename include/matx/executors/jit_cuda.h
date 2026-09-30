@@ -119,7 +119,7 @@ namespace matx
     inline std::unordered_map<JITLaunchParamsCacheKey, JITLaunchParams, JITLaunchParamsCacheKeyHash> jit_launch_params_cache_by_key;
     inline std::mutex jit_launch_params_mutex;
 
-    static constexpr int JIT_LAUNCH_PARAMS_METADATA_VERSION = 6;
+    static constexpr int JIT_LAUNCH_PARAMS_METADATA_VERSION = 7;
 
     inline int GetJITLaunchParamsDevice()
     {
@@ -549,8 +549,46 @@ namespace matx
                 // Create kernel provider for JIT using consolidated function
                 auto kernel_provider = detail::create_kernel_provider<Op>(op_sizes, true, global_kernel);
 
+                // Compile each viable launch candidate once so its exact static
+                // shared-memory usage participates in occupancy selection. The
+                // selected CUfunction remains cached and is reused by the launch
+                // below, so the normal case still performs one NVRTC compile.
+                auto static_shmem_provider = [&](detail::ElementsPerThread candidate_ept,
+                                                 int candidate_block_size,
+                                                 int candidate_groups_per_block) {
+                  dim3 candidate_blocks = 1;
+                  dim3 candidate_threads = 1;
+                  bool candidate_stride = false;
+                  if (global_kernel) {
+                    candidate_stride = detail::get_grid_dims<RANK>(
+                      candidate_blocks, candidate_threads, sizes,
+                      static_cast<int>(candidate_ept), 256);
+                  } else if (block_reduces_rank) {
+                    candidate_stride = detail::get_grid_dims_block_reduce<RANK>(
+                      candidate_blocks, candidate_threads, sizes,
+                      candidate_groups_per_block, candidate_block_size);
+                  } else {
+                    candidate_stride = detail::get_grid_dims_block<RANK>(
+                      candidate_blocks, candidate_threads, sizes,
+                      static_cast<int>(candidate_ept), candidate_groups_per_block,
+                      candidate_block_size, true);
+                  }
+
+                  const int candidate_dynamic_shmem =
+                    detail::get_operator_capability<detail::OperatorCapability::DYN_SHM_SIZE>(op);
+                  const int candidate_osize =
+                    RANK == 0 ? 1 : static_cast<int>(op.Size(RANK - 1));
+                  return detail::nvrtc_compile_and_run(
+                    "output.cu", op, sizes, candidate_blocks, candidate_threads,
+                    candidate_ept, candidate_stride, candidate_dynamic_shmem,
+                    candidate_osize, global_kernel, stream_, pass_through_threads,
+                    pass_through_inner_rank, block_reduces_rank, jit_cache_key,
+                    kernel_op_type, candidate_groups_per_block, false);
+                };
+
                 // Find the best launch parameters
-                auto result = detail::find_best_launch_params(op, kernel_provider, 0, true);
+                auto result = detail::find_best_launch_params(
+                  op, kernel_provider, 0, true, static_shmem_provider);
                 best_ept = cuda::std::get<0>(result);
                 shm_size = cuda::std::get<1>(result);
                 block_size = cuda::std::get<2>(result);
@@ -589,7 +627,7 @@ namespace matx
                 (RANK == 0 ? 1 : static_cast<int>(op.Size(RANK - 1)));
             detail::nvrtc_compile_and_run("output.cu", op, sizes, blocks, threads, best_ept, stride, shm_size, osize,
                                           global_kernel, stream_, pass_through_threads, pass_through_inner_rank,
-                                          block_reduces_rank, jit_cache_key, kernel_op_type);
+                                          block_reduces_rank, jit_cache_key, kernel_op_type, groups_per_block);
             if (!has_cached_params) {
               if (jit_cache_key.valid) {
                 detail::StoreJITLaunchParams(jit_cache_key, params_to_cache);

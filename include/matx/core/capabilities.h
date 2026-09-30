@@ -58,6 +58,11 @@ namespace detail {
     ElementsPerThread ept;
   };
 
+  struct JITStaticShmemQueryInput {
+    ElementsPerThread ept;
+    int block_size;
+  };
+
   struct JITCacheKey {
     uint64_t h1 = 14695981039346656037ull;
     uint64_t h2 = 1099511628211ull;
@@ -162,6 +167,7 @@ namespace detail {
     JIT_CLASS_QUERY,  // Result is the concatenation of the capabilities of the operator and its children.
     DYN_SHM_SIZE,   // Result is the dynamic shared memory size required for the operator.
     STATIC_SHM_SIZE, // Result is the static shared memory size required for the operator.
+    JIT_STATIC_SHM_TYPES, // Comma-prefixed C++ types whose layouts contribute static JIT shared memory.
     BLOCK_DIM,      // Result is the block dimensions required for the operator.
     GENERATE_LTOIR, // Generate LTOIR code for the operator.
     JIT_TYPE_QUERY, // Result is the type of JIT code to generate for the operator.
@@ -371,6 +377,14 @@ namespace detail {
   };
 
   template <>
+  struct capability_attributes<OperatorCapability::JIT_STATIC_SHM_TYPES> {
+    using type = std::string;
+    using input_type = JITStaticShmemQueryInput;
+    static inline const std::string default_value = "";
+    static inline const std::string min_identity = "";
+  };
+
+  template <>
   struct capability_attributes<OperatorCapability::MAX_EPT_VEC_LOAD> {
     using type = int;
     using input_type = VoidCapabilityType;
@@ -502,6 +516,8 @@ namespace detail {
         return CapabilityQueryType::MAX_QUERY; // The expression should use the maximum dynamic shared memory size of its children.
       case OperatorCapability::STATIC_SHM_SIZE:
         return CapabilityQueryType::SUM_QUERY; // Static shared memory declarations are additive in fused kernels.
+      case OperatorCapability::JIT_STATIC_SHM_TYPES:
+        return CapabilityQueryType::STR_CAT_QUERY; // Preserve every static-storage type in the fused expression.
       case OperatorCapability::BLOCK_DIM:
         return CapabilityQueryType::RANGE_QUERY; // The expression should use the minimum block size supported by all operators.
       case OperatorCapability::GENERATE_LTOIR:

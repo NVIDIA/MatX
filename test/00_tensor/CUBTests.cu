@@ -39,6 +39,32 @@
 using namespace matx;
 
 #ifdef MATX_EN_JIT
+TEST(TensorStats, CubBlockJITLayoutLookupIntegration)
+{
+  MATX_ENTER_HANDLER();
+
+  CUDAJITExecutor exec{};
+  tensor_t<float, 2> input({3, 32});
+  tensor_t<float, 1> output({3});
+  for (index_t row = 0; row < input.Size(0); ++row) {
+    for (index_t col = 0; col < input.Size(1); ++col) {
+      input(row, col) = static_cast<float>(col);
+    }
+  }
+
+  // A cold CI cache compiles the generated CUB layout expression in the same
+  // NVRTC program as this kernel and decodes its lowered name. This run fails
+  // if either name-expression registration or layout decoding is broken.
+  (output = sum(input + 0.25f, {1})).run(exec);
+  exec.sync();
+
+  for (index_t row = 0; row < output.Size(0); ++row) {
+    EXPECT_NEAR(output(row), 504.0f, 0.001f);
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
 struct EmptyLastDimJitOp {
   using matxop = bool;
   using value_type = float;

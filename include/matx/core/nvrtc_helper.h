@@ -441,131 +441,28 @@ inline std::string get_jit_includes_path() {
     return (matx_root / "include" / "matx" / "core" / "jit_includes.h").string();
 }
 
-inline std::string make_cub_shmem_probe_source(const std::string &algorithm,
-                                               const std::string &value_type,
-                                               int ept,
-                                               int block_size)
+inline std::pair<int, int> parse_jit_layout_probe_lowered_name(const std::string &lowered_name)
 {
-  std::string block_decl;
-  if (algorithm == "sort") {
-    block_decl = "using BlockT = cub::BlockRadixSort<T, " + std::to_string(block_size) + ", " +
-                 std::to_string(ept) + ">;\n";
-  }
-  else if (algorithm == "sort_pairs") {
-    block_decl = "using BlockT = cub::BlockRadixSort<T, " + std::to_string(block_size) + ", " +
-                 std::to_string(ept) + ", index_t>;\n";
-  }
-  else if (algorithm == "scan") {
-    // BlockScan's TempStorage depends on the block dimensions/algorithm, not
-    // the InclusiveSum ITEMS_PER_THREAD member-function template parameter.
-    block_decl = "using BlockT = cub::BlockScan<T, " + std::to_string(block_size) + ">;\n";
-    block_decl += "// BlockScan TempStorage is independent of the InclusiveSum ITEMS_PER_THREAD overload.\n";
-  }
-  else {
-    block_decl = "using BlockT = cub::BlockReduce<T, " + std::to_string(block_size) + ">;\n";
-  }
-
-  return std::string(
-    "#include <matx/core/jit_includes.h>\n"
-    "using namespace matx;\n"
-    "using namespace matx::detail;\n"
-    "using T = ") + value_type + ";\n" +
-    block_decl +
-    "extern \"C\" __device__ unsigned int temp_storage_size = static_cast<unsigned int>(sizeof(BlockT::TempStorage));\n";
-}
-
-inline int nvrtc_get_cub_block_shmem_size(const std::string &algorithm,
-                                          const std::string &value_type,
-                                          int ept,
-                                          int block_size)
-{
-  static std::unordered_map<std::string, int> shmem_cache;
-  static std::mutex shmem_cache_mutex;
-
-  const std::string nvrtc_arch = resolve_nvrtc_cuda_arch();
-  const int cache_ept = (algorithm == "sort" || algorithm == "sort_pairs") ? ept : 1;
-  const std::string cache_key = "A" + nvrtc_arch + "_" + algorithm + "_" + value_type + "_E" +
-                                std::to_string(cache_ept) + "_B" + std::to_string(block_size);
-  {
-    std::lock_guard<std::mutex> lock(shmem_cache_mutex);
-    auto it = shmem_cache.find(cache_key);
-    if (it != shmem_cache.end()) {
-      return it->second;
-    }
-  }
-
-  MATX_LOG_DEBUG("Compiling CUB shared-memory probe for {}", cache_key);
-
-  std::string jit_includes_path = get_jit_includes_path();
-  std::string jit_includes_content = read_file_contents(jit_includes_path);
-  std::string source = make_cub_shmem_probe_source(algorithm, value_type, ept, block_size);
-
-  const char *headers[] = {jit_includes_content.c_str()};
-  const char *include_names[] = {"matx/core/jit_includes.h"};
-
-  nvrtcProgram prog;
-  NVRTC_CHECK(nvrtcCreateProgram(&prog, source.c_str(), "matx_cub_shmem_probe.cu", 1, headers, include_names));
-
-  auto options = get_preprocessor_options(nvrtc_arch);
-  options.push_back("-include=matx/core/jit_includes.h");
-  options.push_back("-default-device");
-  for (auto &option : options) {
-    static constexpr std::string_view sm_arch_prefix = "-arch=sm_";
-    if (option.rfind(sm_arch_prefix, 0) == 0) {
-      option = "-arch=compute_" + option.substr(sm_arch_prefix.size());
-    }
-  }
-
-  std::vector<const char*> opts;
-  for (const auto &opt : options) {
-    opts.push_back(opt.c_str());
-  }
-
-  nvrtcResult compile_result = nvrtcCompileProgram(prog, static_cast<int>(opts.size()), opts.data());
-
-  size_t log_size;
-  NVRTC_CHECK(nvrtcGetProgramLogSize(prog, &log_size));
-  if (log_size > 1) {
-    std::vector<char> log(log_size);
-    NVRTC_CHECK(nvrtcGetProgramLog(prog, log.data()));
-    MATX_LOG_DEBUG("CUB shared-memory probe compilation log:\n{}", log.data());
-  }
-
-  if (compile_result != NVRTC_SUCCESS) {
-    nvrtcDestroyProgram(&prog);
-    MATX_THROW(matxInvalidParameter, "NVRTC CUB shared-memory probe compilation failed");
-  }
-
-  size_t ptx_size = 0;
-  NVRTC_CHECK(nvrtcGetPTXSize(prog, &ptx_size));
-  std::string ptx(ptx_size, '\0');
-  NVRTC_CHECK(nvrtcGetPTX(prog, ptx.data()));
-  NVRTC_CHECK(nvrtcDestroyProgram(&prog));
-
-  const std::regex temp_storage_regex(
-      R"((?:\.visible\s+)?\.global\s+(?:\.align\s+[0-9]+\s+)?\.(?:[usb]32)\s+temp_storage_size\s*=\s*([0-9]+)\s*;)");
+  // Itanium ABI non-type template arguments use L <type> <value> E.  NVRTC
+  // uses 'y' for unsigned long long, so the two arguments below appear as
+  // Ly<size>E and Ly<alignment>E in the lowered variable-template name.
+  const std::regex layout_regex(R"(JITStaticShmemLayoutProbeI(?:L)?y([0-9]+)E(?:L)?y([0-9]+)EE)");
   std::smatch match;
-  if (!std::regex_search(ptx, match, temp_storage_regex)) {
-    MATX_LOG_ERROR("Could not find CUB temp storage initializer in NVRTC PTX for {}", cache_key);
-    MATX_LOG_DEBUG("CUB shared-memory probe PTX:\n{}", ptx);
-    MATX_THROW(matxInvalidParameter, "NVRTC CUB shared-memory probe PTX did not contain temp_storage_size initializer");
+  if (!std::regex_search(lowered_name, match, layout_regex)) {
+    MATX_LOG_ERROR("Could not decode JIT static shared-memory layout from lowered name {}", lowered_name);
+    MATX_THROW(matxInvalidParameter, "NVRTC JIT layout probe returned an unexpected lowered name");
   }
 
-  const auto parsed_result = std::stoll(match[1].str());
-  if (parsed_result <= 0 || parsed_result > static_cast<long long>(std::numeric_limits<int>::max())) {
-    MATX_LOG_ERROR("Invalid CUB temp storage size {} in NVRTC PTX for {}", parsed_result, cache_key);
-    MATX_LOG_DEBUG("CUB shared-memory probe PTX:\n{}", ptx);
-    MATX_THROW(matxInvalidParameter, "NVRTC CUB shared-memory probe emitted invalid temp_storage_size");
-  }
-  const int host_result = static_cast<int>(parsed_result);
-
-  {
-    std::lock_guard<std::mutex> lock(shmem_cache_mutex);
-    shmem_cache[cache_key] = host_result;
+  const auto parsed_size = std::stoll(match[1].str());
+  const auto parsed_alignment = std::stoll(match[2].str());
+  if (parsed_size <= 0 || parsed_size > static_cast<long long>(std::numeric_limits<int>::max()) ||
+      parsed_alignment <= 0 || parsed_alignment > static_cast<long long>(std::numeric_limits<int>::max())) {
+    MATX_LOG_ERROR("Invalid JIT static shared-memory layout ({}, {}) in lowered name {}",
+                   parsed_size, parsed_alignment, lowered_name);
+    MATX_THROW(matxInvalidParameter, "NVRTC JIT layout probe emitted an invalid layout");
   }
 
-  MATX_LOG_DEBUG("CUB shared-memory probe {} emitted {} bytes", cache_key, host_result);
-  return host_result;
+  return {static_cast<int>(parsed_size), static_cast<int>(parsed_alignment)};
 }
 
 template <typename Op>
@@ -750,6 +647,9 @@ inline std::string qualify_jit_type_names(const std::string& type_str) {
 struct JITKernelCacheKey {
   JITCacheKey op_key;
   int rank = 0;
+  ElementsPerThread ept = ElementsPerThread::INVALID;
+  int block_size = 0;
+  int groups_per_block = 1;
   bool stride = false;
   bool global_kernel = false;
   bool pass_through_threads = false;
@@ -760,6 +660,9 @@ struct JITKernelCacheKey {
 
   __MATX_INLINE__ __MATX_HOST__ bool operator==(const JITKernelCacheKey &rhs) const noexcept {
     return rank == rhs.rank &&
+           ept == rhs.ept &&
+           block_size == rhs.block_size &&
+           groups_per_block == rhs.groups_per_block &&
            stride == rhs.stride &&
            global_kernel == rhs.global_kernel &&
            pass_through_threads == rhs.pass_through_threads &&
@@ -775,6 +678,9 @@ struct JITKernelCacheKeyHash {
   __MATX_INLINE__ __MATX_HOST__ std::size_t operator()(const JITKernelCacheKey &key) const noexcept {
     std::size_t h = JITCacheKeyHash{}(key.op_key);
     h ^= static_cast<std::size_t>(key.rank) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+    h ^= static_cast<std::size_t>(key.ept) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+    h ^= static_cast<std::size_t>(key.block_size) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+    h ^= static_cast<std::size_t>(key.groups_per_block) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
     h ^= static_cast<std::size_t>(key.stride) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
     h ^= static_cast<std::size_t>(key.global_kernel) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
     h ^= static_cast<std::size_t>(key.pass_through_threads) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
@@ -802,7 +708,9 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name,
                            int pass_through_inner_rank = 2,
                            bool block_reduces_rank = false,
                            const JITCacheKey &jit_cache_key = {},
-                           std::optional<std::string> kernel_op_type = std::nullopt) {
+                           std::optional<std::string> kernel_op_type = std::nullopt,
+                           int groups_per_block = 1,
+                           bool launch_kernel = true) {
   // The actual rank comes from the size array, which may differ from Op::Rank()
   // for dynamic tensor expressions (where Op::Rank() = MATX_MAX_DYNAMIC_RANK).
   constexpr int RANK = std::tuple_size_v<SizeArray>;
@@ -813,6 +721,7 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name,
   struct CachedKernel {
     CUmodule module;
     CUfunction function;
+    int static_shmem_size;
   };
   static std::unordered_map<std::string, CachedKernel> kernel_cache;
   static std::unordered_map<JITKernelCacheKey, CachedKernel, JITKernelCacheKeyHash> kernel_cache_by_key;
@@ -833,24 +742,31 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name,
   std::string kernel_name = get_kernel_name_for_rank<RANK>(stride, global_kernel, pass_through_threads,
                                                            pass_through_inner_rank, block_reduces_rank);
   auto make_legacy_kernel_cache_key = [&]() {
-    return device_cache_prefix + kernel_name + "_" + ensure_kernel_op_type();
+    return device_cache_prefix + kernel_name + "_ept_" + std::to_string(static_cast<int>(ept)) +
+           "_block_" + std::to_string(threads.x) + "_groups_" +
+           std::to_string(groups_per_block) + "_" + ensure_kernel_op_type();
+  };
+  auto make_jit_kernel_cache_key = [&]() {
+    return JITKernelCacheKey{jit_cache_key, RANK, ept, static_cast<int>(threads.x), groups_per_block,
+                             stride, global_kernel, pass_through_threads, pass_through_inner_rank,
+                             block_reduces_rank, current_device, nvrtc_arch};
   };
 
   MATX_LOG_DEBUG("nvrtc_compile_and_run called with operator type: {}", typeid(op).name());
   
   CUfunction kernel_func;
   std::string lowered_name;
+  int kernel_static_shmem_size = 0;
   
   // Check if kernel is already compiled and cached in memory
   {
     std::lock_guard<std::mutex> lock(kernel_cache_mutex);
     if (has_jit_cache_key) {
-      JITKernelCacheKey cache_key{jit_cache_key, RANK, stride, global_kernel,
-                                  pass_through_threads, pass_through_inner_rank,
-                                  block_reduces_rank, current_device, nvrtc_arch};
+      const auto cache_key = make_jit_kernel_cache_key();
       auto it = kernel_cache_by_key.find(cache_key);
       if (it != kernel_cache_by_key.end()) {
         kernel_func = it->second.function;
+        kernel_static_shmem_size = it->second.static_shmem_size;
         goto launch_kernel;
       }
     } else {
@@ -859,6 +775,7 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name,
       if (it != kernel_cache.end()) {
         // Found in memory cache - use cached function (module is already loaded)
         kernel_func = it->second.function;
+        kernel_static_shmem_size = it->second.static_shmem_size;
         goto launch_kernel;
       }
     }
@@ -866,14 +783,19 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name,
   
   // Not in memory cache, check disk cache (outside lock to minimize critical section)
   {
+    const std::string variant_prefix = "JITKernel_E" + std::to_string(static_cast<int>(ept)) +
+                                       "_B" + std::to_string(threads.x) +
+                                       "_G" + std::to_string(groups_per_block);
     const auto cubin_filename = has_jit_cache_key ?
-        device_cache_prefix + detail::JITCacheKeyToFilename(jit_cache_key) :
-        device_cache_prefix + detail::GetCache().TypeStringToFilename(ensure_kernel_op_type());
+        device_cache_prefix + detail::JITCacheKeyToFilename(jit_cache_key, variant_prefix) :
+        detail::GetCache().TypeStringToFilename(make_legacy_kernel_cache_key());
     auto cached_cubin_ptr = detail::GetCache().GetLTOIRCachedBytes(cubin_filename);
     
     if (cached_cubin_ptr != nullptr) {
       // Found cached cubin on disk, try to load metadata
-      lowered_name = detail::GetCache().GetLTOIRMetadata(cubin_filename);
+      const auto kernel_metadata = detail::GetCache().GetLTOIRMetadata(cubin_filename);
+      std::istringstream kernel_metadata_stream(kernel_metadata);
+      kernel_metadata_stream >> lowered_name >> kernel_static_shmem_size;
       
       if (!lowered_name.empty()) {
         MATX_LOG_DEBUG("Loading cached kernel from: {}", cubin_filename);
@@ -891,12 +813,11 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name,
         {
           std::lock_guard<std::mutex> lock(kernel_cache_mutex);
           if (has_jit_cache_key) {
-            kernel_cache_by_key[JITKernelCacheKey{jit_cache_key, RANK, stride, global_kernel,
-                                                  pass_through_threads, pass_through_inner_rank,
-                                                  block_reduces_rank, current_device, nvrtc_arch}] =
-                CachedKernel{module, kernel_func};
+            kernel_cache_by_key[make_jit_kernel_cache_key()] =
+              CachedKernel{module, kernel_func, kernel_static_shmem_size};
           } else {
-            kernel_cache[make_legacy_kernel_cache_key()] = CachedKernel{module, kernel_func};
+            kernel_cache[make_legacy_kernel_cache_key()] =
+              CachedKernel{module, kernel_func, kernel_static_shmem_size};
           }
         }
         
@@ -953,6 +874,25 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name,
     std::string kernel_name_expr = kernel_name + "<" + qualified_kernel_op_type + ">";
     MATX_LOG_DEBUG("Kernel name expression: {}", kernel_name_expr);
     NVRTC_CHECK(nvrtcAddNameExpression(prog, kernel_name_expr.c_str()));
+
+    // CUB TempStorage types only exist in the NVRTC translation unit. Encode
+    // their aggregate sizeof/alignof as non-type template arguments so the
+    // values can be decoded from the lowered name produced by this same
+    // compilation. This avoids a separate NVRTC shared-memory probe program.
+    auto static_shmem_query = detail::JITStaticShmemQueryInput{ept, static_cast<int>(threads.x)};
+    const auto static_shm_types =
+      detail::get_operator_capability<OperatorCapability::JIT_STATIC_SHM_TYPES>(op, static_shmem_query);
+    std::optional<std::string> layout_name_expr;
+    if (!static_shm_types.empty()) {
+      const std::string layout_type =
+        "matx::detail::JITStaticShmemLayout<matx::detail::JITStaticShmemEmpty" +
+        static_shm_types + ">";
+      layout_name_expr =
+        "&matx::detail::JITStaticShmemLayoutProbe<" + layout_type +
+        "::size, " + layout_type + "::alignment>";
+      MATX_LOG_DEBUG("Static shared-memory layout expression: {}", *layout_name_expr);
+      NVRTC_CHECK(nvrtcAddNameExpression(prog, layout_name_expr->c_str()));
+    }
     
     // Get compilation options
     auto options = get_preprocessor_options(nvrtc_arch);
@@ -995,6 +935,16 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name,
     // Copy the lowered name before destroying the program
     lowered_name = std::string(lowered_name_ptr);
     MATX_LOG_DEBUG("Lowered kernel name: {}", lowered_name);
+
+    if (layout_name_expr.has_value()) {
+      const char *layout_lowered_name_ptr = nullptr;
+      NVRTC_CHECK(nvrtcGetLoweredName(prog, layout_name_expr->c_str(), &layout_lowered_name_ptr));
+      const auto [static_shmem_size, static_shmem_alignment] =
+        parse_jit_layout_probe_lowered_name(layout_lowered_name_ptr);
+      kernel_static_shmem_size = static_shmem_size;
+      MATX_LOG_DEBUG("JIT kernel uses {} bytes of static shared memory with maximum alignment {}",
+                     static_shmem_size, static_shmem_alignment);
+    }
 
     // Compile any LTO-IR required for expression:
     auto ltoir_query_input = detail::LTOIRQueryInput{};
@@ -1058,7 +1008,8 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name,
 
     // Store the entire linked kernel to the cache along with the lowered name
     detail::GetCache().StoreLTOIRCachedBytes(cubin_filename, static_cast<const char*>(cubin.data()), cubin_size);
-    detail::GetCache().StoreLTOIRMetadata(cubin_filename, lowered_name);
+    detail::GetCache().StoreLTOIRMetadata(
+      cubin_filename, lowered_name + " " + std::to_string(kernel_static_shmem_size));
 
     
     // Load LTO-IR into CUDA module
@@ -1073,17 +1024,20 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name,
     {
       std::lock_guard<std::mutex> lock(kernel_cache_mutex);
       if (has_jit_cache_key) {
-        kernel_cache_by_key[JITKernelCacheKey{jit_cache_key, RANK, stride, global_kernel,
-                                              pass_through_threads, pass_through_inner_rank,
-                                              block_reduces_rank, current_device, nvrtc_arch}] =
-            CachedKernel{module, kernel_func};
+        kernel_cache_by_key[make_jit_kernel_cache_key()] =
+          CachedKernel{module, kernel_func, kernel_static_shmem_size};
       } else {
-        kernel_cache[make_legacy_kernel_cache_key()] = CachedKernel{module, kernel_func};
+        kernel_cache[make_legacy_kernel_cache_key()] =
+          CachedKernel{module, kernel_func, kernel_static_shmem_size};
       }
     }
   }
   
 launch_kernel:
+  if (!launch_kernel) {
+    return kernel_static_shmem_size;
+  }
+
   // Get device attributes
   int max_shared_memory_per_block;
   CUDA_RT_CHECK(cudaDeviceGetAttribute(&max_shared_memory_per_block, cudaDevAttrMaxSharedMemoryPerBlock, current_device));
@@ -1147,6 +1101,7 @@ launch_kernel:
                               args,
                               nullptr));
   }
+  return kernel_static_shmem_size;
 }
 
 }
