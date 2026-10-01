@@ -96,20 +96,20 @@ namespace matx
         {
 #ifdef __CUDA_ARCH__
           if constexpr (is_matx_half_v<T>) {
-            range_ = Range<T>{first, (last - first) / static_cast<T>(count - 1.0f)};
+            range_ = Range<T>{first, count > 1 ? (last - first) / static_cast<T>(count - 1.0f) : static_cast<T>(0.0f)};
           }
           else {
-            range_ = Range<T>{first, (last - first) / static_cast<T>(count - 1)};
+            range_ = Range<T>{first, count > 1 ? (last - first) / static_cast<T>(count - 1) : static_cast<T>(0)};
           }
 #else
           // Host has no support for most half precision operators/intrinsics
           if constexpr (is_matx_half_v<T>) {
             range_ = Range<T>{static_cast<float>(first),
-              (static_cast<float>(last) - static_cast<float>(first)) /
-                static_cast<float>(count - 1)};
+              count > 1 ? (static_cast<float>(last) - static_cast<float>(first)) /
+                static_cast<float>(count - 1) : 0.0f};
           }
           else {
-            range_ = Range<T>{first, (last - first) / static_cast<T>(count - 1)};
+            range_ = Range<T>{first, count > 1 ? (last - first) / static_cast<T>(count - 1) : static_cast<T>(0)};
           }
           MATX_LOG_TRACE("Logspace constructor: first={}, last={}, count={}", first, last, count);
 #endif

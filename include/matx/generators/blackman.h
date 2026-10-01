@@ -72,7 +72,7 @@ namespace matx
                 "  template <typename CapType>\n" +
                 "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(index_t i) const\n" +
                 "  {\n" +
-                "    return detail::ApplyGeneratorVecFunc<CapType, T>([](index_t idx) { return T(.42) - T(.5) * cuda::std::cos(T(2 * cuda::std::numbers::pi) * T(idx) / T(size_ - 1)) + T(.08) * cuda::std::cos(T(4 * cuda::std::numbers::pi) * T(idx) / T(size_ - 1)); }, i);\n" +
+                "    return detail::ApplyGeneratorVecFunc<CapType, T>([](index_t idx) { if (size_ == 1) { return T(1); } return T(.42) - T(.5) * cuda::std::cos(T(2 * cuda::std::numbers::pi) * T(idx) / T(size_ - 1)) + T(.08) * cuda::std::cos(T(4 * cuda::std::numbers::pi) * T(idx) / T(size_ - 1)); }, i);\n" +
                 "  }\n" +
                 "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() { return 1; }\n" +
                 "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size([[maybe_unused]] int dim) const { return size_; }\n" +
@@ -92,7 +92,7 @@ namespace matx
         template <typename CapType>
         __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
         {
-          return detail::ApplyGeneratorVecFunc<CapType, T>([this](index_t idx) { return T(.42) - T(.5) * cuda::std::cos(T(2 * M_PI) * T(idx) / T(size_ - 1))
+          return detail::ApplyGeneratorVecFunc<CapType, T>([this](index_t idx) { if (size_ == 1) { return T(1); } return T(.42) - T(.5) * cuda::std::cos(T(2 * M_PI) * T(idx) / T(size_ - 1))
                     + T(.08) * cuda::std::cos(T(4 * M_PI) * T(idx) / T(size_ - 1)); }, i);
         }
 
