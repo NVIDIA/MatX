@@ -16,6 +16,49 @@ from the internet. Alternatively, the option ``CPM_USE_LOCAL_PACKAGES`` can be u
 or offline environment. Choosing local versions of packages uses the typical ``find_packages`` CMake search methods. Please see 
 the CPM documentation or the documentation for each package for more information.
 
+Conan Package Support
+---------------------
+MatX is available from the Conan Center Index (for example `matx/1.0.0` and `matx/0.9.4`). Consumers can obtain MatX from the central
+Conan index rather than creating a local package from this repository. For example:
+
+.. code-block:: shell
+
+  conan install --requires=matx/1.0.0
+
+After installing, use CMake to locate and link MatX:
+
+.. code-block:: cmake
+
+  find_package(matx CONFIG REQUIRED)
+  target_link_libraries(MyProject PRIVATE matx::matx)
+
+Conan package notes
+-------------------
+
+MatX packages published to the Conan Center Index have the following consumer-facing requirements:
+
+- `matx/1.0.0`: requires C++20 and a system or Conan-provided CUDA Toolkit 13.x (or newer). Consumers should ensure their
+  build environment provides a `CUDAToolkit` provider (for example a `cuda-toolkit` system installation or a Conan `CUDAToolkit` recipe).
+- `matx/0.9.4`: targets C++17 and is compatible with CUDA Toolkit 12.x.
+
+The Conan recipes published to CCI set `cmake_extra_dependencies` and `cmake_extra_interface_libs` properties to expose the CUDA
+toolkit linkage to downstream CMake consumers. These recipes require Conan 2.30+ due to the use of newer `cpp_info` properties.
+
+Example: requiring MatX from a Conan consumer (`conanfile.py`, Conan 2 style)
+
+.. code-block:: python
+
+    from conan import ConanFile
+
+    class ConsumerConan(ConanFile):
+        name = "consumer"
+        requires = ["matx/1.0.0"]
+
+After running `conan install` for your consumer project (or otherwise populating the local Conan cache), use CMake as usual
+to discover and link MatX with `find_package(matx CONFIG REQUIRED)`.
+
+If you require an offline deployment, use your standard Conan workflows to mirror or cache packages from Conan Center to an internal
+server or pre-populate the client cache on an internet-enabled system before transferring artifacts to the offline environment.
 
 System Requirements
 -------------------
@@ -392,3 +435,51 @@ and building on the offline system.
 
     
 - Build your MatX project per your standard process, CPM will automatically use the cache
+
+.. _conan-offline:
+
+Conan in Offline Environments
+==============================
+
+When using Conan to deploy MatX in offline or air-gapped environments, pre-cache packages from the Conan Center Index on an
+internet-enabled system and transfer the Conan client cache to the offline environment.
+
+**On an internet-enabled system:**
+
+1. Decide which MatX versions and consumer profiles you need (for example `matx/1.0.0`).
+
+2. Pre-download MatX and its dependencies into a local Conan cache. One approach is to use `conan download` or run `conan install` against a temporary consumer project to populate the cache. For example:
+
+  .. code-block:: shell
+
+    # Download a specific MatX package and its referenced recipe to the local cache
+    conan download matx/1.0.0 --remote=conan-center
+
+    # Or use a temporary consumer project to populate the cache via install
+    mkdir /tmp/matx_consumer && cd /tmp/matx_consumer
+    conan new hello/0.1 -t
+    conan install --requires=matx/1.0.0
+
+3. Archive the populated Conan cache (default: `~/.conan2` or `CONAN_USER_HOME`) for transfer:
+
+  .. code-block:: shell
+
+    tar -C "$HOME" -czvf matx_conan_cache.tar.gz .conan2
+
+4. Transfer the CPM cache (if used) and the Conan cache archive to the offline system.
+
+**On the offline system:**
+
+1. Extract the Conan and CPM caches and set environment variables to point Conan and CPM to the recovered caches:
+
+  .. code-block:: shell
+
+    tar -xzvf matx_conan_cache.tar.gz -C $HOME_OFFLINE/
+    export CONAN_HOME=$HOME_OFFLINE/.conan2
+    export CPM_SOURCE_CACHE=$HOME_OFFLINE/matx_cpm_cache
+
+2. Use your consumer project's standard Conan workflow to install packages from the local cache without network access. For example:
+
+  .. code-block:: shell
+
+    conan install --requires=matx/1.0.0
