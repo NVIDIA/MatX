@@ -156,7 +156,7 @@ TYPED_TEST(BasicGeneratorTestsFloatNonComplex, SingleElementWindows)
   exec.sync();
   EXPECT_EQ(static_cast<float>(ov(0)), 1.0f);
 
-  (ov = bartlett<0>({1})).run(exec);
+  (ov = bartlett<0, cuda::std::array<index_t, 1>, TestType>({1})).run(exec);
   exec.sync();
   EXPECT_EQ(static_cast<float>(ov(0)), 1.0f);
 
@@ -186,6 +186,12 @@ TEST(OperatorTests, SingleElementLinspaceLogspace)
   (ov = logspace<0>({1}, 1.0f, 3.0f)).run(exec);
   exec.sync();
   EXPECT_NEAR(ov(0), 10.0f, 1e-4f);
+
+  // The endpoint must not matter for a single point, even when last - first overflows.
+  (ov = logspace<0>({1}, -1e38f, 3e38f)).run(exec);
+  exec.sync();
+  EXPECT_FALSE(std::isnan(ov(0)));
+  EXPECT_EQ(ov(0), 0.0f);
 
   const float firsts[] = {2.0f, 3.0f};
   const float lasts[] = {5.0f, 9.0f};
@@ -884,6 +890,38 @@ TEST(OperatorTests, RandomJITCapabilityLimits)
 
   MATX_EXIT_HANDLER();
 }
+
+#ifdef MATX_EN_JIT
+TEST(OperatorTests, SingleElementWindowsJIT)
+{
+  MATX_ENTER_HANDLER();
+  CUDAJITExecutor exec{};
+
+  auto ov = make_tensor<float>({1});
+
+  (ov = hanning<0>({1})).run(exec);
+  exec.sync();
+  EXPECT_EQ(ov(0), 1.0f);
+
+  (ov = hamming<0>({1})).run(exec);
+  exec.sync();
+  EXPECT_EQ(ov(0), 1.0f);
+
+  (ov = bartlett<0>({1})).run(exec);
+  exec.sync();
+  EXPECT_EQ(ov(0), 1.0f);
+
+  (ov = blackman<0>({1})).run(exec);
+  exec.sync();
+  EXPECT_EQ(ov(0), 1.0f);
+
+  (ov = flattop<0>({1})).run(exec);
+  exec.sync();
+  EXPECT_EQ(ov(0), 1.0f);
+
+  MATX_EXIT_HANDLER();
+}
+#endif
 
 #if defined(MATX_EN_MATHDX) && defined(MATX_EN_JIT)
 TEST(OperatorTests, RandomJITFusedUniform)
