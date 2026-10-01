@@ -146,25 +146,28 @@ TYPED_TEST(BasicGeneratorTestsFloatNonComplex, SingleElementWindows)
   ExecType exec{};
 
   auto ov = make_tensor<TestType>({1});
+  using Shape = cuda::std::array<index_t, 1>;
+  // These windows cannot currently be instantiated with half or bfloat16 output types.
+  using WindowType = cuda::std::conditional_t<is_matx_half_v<TestType>, float, TestType>;
 
   // A one-point window is 1, matching numpy and scipy.
-  (ov = hanning<0>({1})).run(exec);
+  (ov = hanning<0, Shape, WindowType>({1})).run(exec);
   exec.sync();
   EXPECT_EQ(static_cast<float>(ov(0)), 1.0f);
 
-  (ov = hamming<0>({1})).run(exec);
+  (ov = hamming<0, Shape, WindowType>({1})).run(exec);
   exec.sync();
   EXPECT_EQ(static_cast<float>(ov(0)), 1.0f);
 
-  (ov = bartlett<0, cuda::std::array<index_t, 1>, TestType>({1})).run(exec);
+  (ov = bartlett<0, Shape, TestType>({1})).run(exec);
   exec.sync();
   EXPECT_EQ(static_cast<float>(ov(0)), 1.0f);
 
-  (ov = blackman<0>({1})).run(exec);
+  (ov = blackman<0, Shape, WindowType>({1})).run(exec);
   exec.sync();
   EXPECT_EQ(static_cast<float>(ov(0)), 1.0f);
 
-  (ov = flattop<0>({1})).run(exec);
+  (ov = flattop<0, Shape, WindowType>({1})).run(exec);
   exec.sync();
   EXPECT_EQ(static_cast<float>(ov(0)), 1.0f);
 
