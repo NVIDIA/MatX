@@ -98,9 +98,9 @@ namespace matx
                 "    if constexpr (CapType::ept == ElementsPerThread::ONE) {{\n"
                 "      cuda::std::array<index_t, Rank_> sind{{indices...}};\n"
                 "      cuda::std::array<index_t, OpRank_> gind;\n"
+                "      MATX_LOOP_UNROLL\n"
                 "      for(int i = 0; i < OpRank_; i++) {{\n"
-                "        auto idx = dims_[i];\n"
-                "        gind[i] = sind[idx];\n"
+                "        gind[i] = sind[dims_[i]];\n"
                 "      }}\n"
                 "      return get_value<CapType>(op_, gind);\n"
                 "    }} else {{\n"
@@ -158,10 +158,18 @@ MATX_IGNORE_WARNING_POP_GCC
             cuda::std::array<index_t, T::Rank()> gind{};
   MATX_IGNORE_WARNING_POP_GCC
 
-            // gather indices
+            // Gather indices. Select from sind with compile-time subscripts
+            // rather than indexing it with the runtime dims[i]: a runtime
+            // subscript forces sind into local memory on the device.
+            MATX_LOOP_UNROLL
             for(int i = 0; i < T::Rank(); i++) {
-              auto idx = dims[i];
-              gind[i] = sind[idx];
+              const auto idx = dims[i];
+              MATX_LOOP_UNROLL
+              for(int j = 0; j < Rank(); j++) {
+                if (j == idx) {
+                  gind[i] = sind[j];
+                }
+              }
             }
 
             return get_value<CapType>(cuda::std::forward<Op>(op), gind);
