@@ -58,7 +58,7 @@ namespace matx
         cuda::std::array<shape_type, DIM> sizes_;
         cuda::std::array<int32_t, DIM> dims_;
         cuda::std::array<shape_type, T::Rank()> starts_;
-        StrideType strides_; // Add [[no_unique_address]] in c++20
+        cuda::std::remove_cvref_t<StrideType> strides_; // Add [[no_unique_address]] in c++20
 
       public:
         using matxop = bool;
@@ -74,10 +74,11 @@ namespace matx
 #ifdef MATX_EN_JIT
         struct JIT_Storage {
           typename detail::inner_storage_or_self_t<detail::base_type_t<T>> op_;
+          cuda::std::remove_cvref_t<StrideType> strides_;
         };
 
         JIT_Storage ToJITStorage() const {
-          return JIT_Storage{detail::to_jit_storage(op_)};
+          return JIT_Storage{detail::to_jit_storage(op_), strides_};
         }
 
         __MATX_INLINE__ std::string get_jit_class_name() const {
@@ -124,10 +125,10 @@ namespace matx
                 "        for(int32_t j = 0; j < DIM_; j++) {{\n"
                 "          if(dims_[j] == i) {{\n"
                 "            if constexpr (!cuda::std::is_same_v<NoStride, StrideType>) {{\n"
-                "              ind[i] = starts_[j] + inds[j] * strides_[i];\n"
+                "              ind[i] = starts_[i] + inds[j] * strides_[i];\n"
                 "            }}\n"
                 "            else {{\n"
-                "              ind[i] = starts_[j] + inds[j];\n"
+                "              ind[i] = starts_[i] + inds[j];\n"
                 "            }}\n"
                 "          }}\n"
                 "        }}\n"
@@ -149,7 +150,7 @@ namespace matx
 
         __MATX_INLINE__ SliceOp(const T &op, const cuda::std::array<shape_type, T::Rank()> &starts,
                                       const cuda::std::array<shape_type, T::Rank()> &ends,
-                                      StrideType strides) : op_(op) {
+                                      StrideType strides) : op_(op), strides_(strides) {
           int32_t d = 0;
           for(int32_t i = 0; i < T::Rank(); i++) {
             shape_type start = starts[i] < 0 ? op.Size(i) + starts[i] : starts[i];
@@ -180,7 +181,7 @@ namespace matx
 
               //adjust size by stride
               if constexpr (!cuda::std::is_same_v<NoStride, StrideType>) {
-                sizes_[d] = (shape_type)std::ceil(static_cast<double>(sizes_[d])/ static_cast<double>(strides_[d]));
+                sizes_[d] = (shape_type)std::ceil(static_cast<double>(sizes_[d])/ static_cast<double>(strides_[i]));
               }
 
               d++;
@@ -212,10 +213,10 @@ namespace matx
               for(int32_t j = 0; j < Rank(); j++) {
                 if(dims[j] == i) {
                   if constexpr (!cuda::std::is_same_v<NoStride, StrideType>) {
-                    ind[i] = starts[j] + inds[j] * strides[i];
+                    ind[i] = starts[i] + inds[j] * strides[i];
                   }
                   else {
-                    ind[i] = starts[j] + inds[j];
+                    ind[i] = starts[i] + inds[j];
                   }
                 }
               }

@@ -6,6 +6,59 @@
 using namespace matx;
 using namespace matx::test;
 
+TEST(SliceOpRegression, DroppedLeadingDimensionKeepsRemainingStart)
+{
+  auto input = make_tensor<int>({3, 5});
+  for (index_t row = 0; row < 3; ++row) {
+    for (index_t column = 0; column < 5; ++column) {
+      input(row, column) = static_cast<int>(10 * row + column);
+    }
+  }
+
+  auto view = slice<1>(input, {1, 2}, {matxDropDim, matxEnd});
+  auto expression = slice<1>(input + 0, {1, 2}, {matxDropDim, matxEnd});
+  ASSERT_EQ(expression.Size(0), 3);
+  for (index_t column = 0; column < expression.Size(0); ++column) {
+    const int expected = static_cast<int>(12 + column);
+    EXPECT_EQ(view(column), expected);
+    EXPECT_EQ(expression(column), expected);
+  }
+
+  auto strided_view = slice<1>(input, {1, 2}, {matxDropDim, matxEnd}, {1, 2});
+  auto strided_expression = slice<1>(input + 0, {1, 2}, {matxDropDim, matxEnd}, {1, 2});
+  ASSERT_EQ(strided_expression.Size(0), 2);
+  for (index_t column = 0; column < strided_expression.Size(0); ++column) {
+    const int expected = static_cast<int>(12 + 2 * column);
+    EXPECT_EQ(strided_view(column), expected);
+    EXPECT_EQ(strided_expression(column), expected);
+  }
+
+  auto downsampled = downsample(input + 0, 1, 2);
+  ASSERT_EQ(downsampled.Size(1), 3);
+  for (index_t row = 0; row < 3; ++row) {
+    for (index_t column = 0; column < downsampled.Size(1); ++column) {
+      EXPECT_EQ(downsampled(row, column), 10 * row + 2 * column);
+    }
+  }
+
+#ifdef MATX_EN_JIT
+  CUDAJITExecutor exec{};
+  auto jit_output = make_tensor<int>({3});
+  (jit_output = expression).run(exec);
+  exec.sync();
+  for (index_t column = 0; column < jit_output.Size(0); ++column) {
+    EXPECT_EQ(jit_output(column), 12 + column);
+  }
+
+  auto jit_strided_output = make_tensor<int>({2});
+  (jit_strided_output = strided_expression).run(exec);
+  exec.sync();
+  for (index_t column = 0; column < jit_strided_output.Size(0); ++column) {
+    EXPECT_EQ(jit_strided_output(column), 12 + 2 * column);
+  }
+#endif
+}
+
 TYPED_TEST(OperatorTestsNumericAllExecs, SliceOp)
 {
   MATX_ENTER_HANDLER();
@@ -96,4 +149,4 @@ TYPED_TEST(OperatorTestsNumericAllExecs, SliceOp)
   }  
 
   MATX_EXIT_HANDLER();
-} 
+}
