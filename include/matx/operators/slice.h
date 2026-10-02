@@ -74,11 +74,12 @@ namespace matx
 #ifdef MATX_EN_JIT
         struct JIT_Storage {
           typename detail::inner_storage_or_self_t<detail::base_type_t<T>> op_;
+          cuda::std::array<shape_type, T::Rank()> starts_;
           cuda::std::remove_cvref_t<StrideType> strides_;
         };
 
         JIT_Storage ToJITStorage() const {
-          return JIT_Storage{detail::to_jit_storage(op_), strides_};
+          return JIT_Storage{detail::to_jit_storage(op_), starts_, strides_};
         }
 
         __MATX_INLINE__ std::string get_jit_class_name() const {
@@ -86,7 +87,8 @@ namespace matx
           for (int i = 0; i < DIM; i++) {
             params_str += std::format("d{}_s{}_", dims_[i], sizes_[i]);
           }
-          return std::format("JITSlice_{}", params_str);
+          const int input_rank = detail::get_dyn_rank(op_);
+          return std::format("JITSlice_v3_r{}_{}", input_rank, params_str);
         }
 
         __MATX_INLINE__ std::string get_jit_stride_type_name() const {
@@ -111,8 +113,8 @@ namespace matx
                 "  constexpr static int OpRank_ = {};\n"
                 "  constexpr static cuda::std::array<index_t, DIM_> sizes_ = {{ {} }};\n"
                 "  constexpr static cuda::std::array<int32_t, DIM_> dims_ = {{ {} }};\n"
-                "  constexpr static cuda::std::array<index_t, OpRank_> starts_ = {{ {} }};\n"
                 "  typename detail::inner_storage_or_self_t<detail::base_type_t<T>> op_;\n"
+                "  cuda::std::array<index_t, OpRank_> starts_;\n"
                 "  StrideType strides_;\n"
                 "  template <typename CapType, typename... Is>\n"
                 "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(Is... indices) const {{\n"
@@ -141,7 +143,7 @@ namespace matx
                 "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return DIM_; }}\n"
                 "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int32_t dim) const {{ return sizes_[dim]; }}\n"
                 "}};\n",
-                func_name, DIM, actual_input_rank, detail::array_to_string(sizes_), detail::array_to_string(dims_), detail::array_to_string(starts_, actual_input_rank))
+                func_name, DIM, actual_input_rank, detail::array_to_string(sizes_), detail::array_to_string(dims_))
           );
         }
 #endif
