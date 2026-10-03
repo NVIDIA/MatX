@@ -74,12 +74,10 @@ namespace matx
 #ifdef MATX_EN_JIT
         struct JIT_Storage {
           typename detail::inner_storage_or_self_t<detail::base_type_t<T>> op_;
-          cuda::std::array<shape_type, T::Rank()> starts_;
-          cuda::std::remove_cvref_t<StrideType> strides_;
         };
 
         JIT_Storage ToJITStorage() const {
-          return JIT_Storage{detail::to_jit_storage(op_), starts_, strides_};
+          return JIT_Storage{detail::to_jit_storage(op_)};
         }
 
         __MATX_INLINE__ std::string get_jit_class_name() const {
@@ -88,7 +86,16 @@ namespace matx
             params_str += std::format("d{}_s{}_", dims_[i], sizes_[i]);
           }
           const int input_rank = detail::get_dyn_rank(op_);
-          return std::format("JITSlice_v3_r{}_{}", input_rank, params_str);
+          for (int i = 0; i < input_rank; i++) {
+            params_str += std::format("b{}_", starts_[i]);
+            if constexpr (!cuda::std::is_same_v<StrideType, NoStride>) {
+              params_str += std::format("t{}_", strides_[i]);
+            }
+          }
+          if constexpr (cuda::std::is_same_v<StrideType, NoStride>) {
+            params_str += "n_";
+          }
+          return std::format("JITSlice_v4_r{}_{}", input_rank, params_str);
         }
 
         __MATX_INLINE__ std::string get_jit_stride_type_name() const {
@@ -103,6 +110,10 @@ namespace matx
         __MATX_INLINE__ auto get_jit_op_str() const {
           std::string func_name = get_jit_class_name();
           const int actual_input_rank = detail::get_dyn_rank(op_);
+          std::string strides_str;
+          if constexpr (!cuda::std::is_same_v<StrideType, NoStride>) {
+            strides_str = detail::array_to_string(strides_, actual_input_rank);
+          }
 
           return cuda::std::make_tuple(
             func_name,
@@ -113,9 +124,9 @@ namespace matx
                 "  constexpr static int OpRank_ = {};\n"
                 "  constexpr static cuda::std::array<index_t, DIM_> sizes_ = {{ {} }};\n"
                 "  constexpr static cuda::std::array<int32_t, DIM_> dims_ = {{ {} }};\n"
+                "  constexpr static cuda::std::array<index_t, OpRank_> starts_ = {{ {} }};\n"
+                "  constexpr static StrideType strides_ = {{ {} }};\n"
                 "  typename detail::inner_storage_or_self_t<detail::base_type_t<T>> op_;\n"
-                "  cuda::std::array<index_t, OpRank_> starts_;\n"
-                "  StrideType strides_;\n"
                 "  template <typename CapType, typename... Is>\n"
                 "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(Is... indices) const {{\n"
                 "    if constexpr (CapType::ept == ElementsPerThread::ONE) {{\n"
@@ -143,7 +154,8 @@ namespace matx
                 "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return DIM_; }}\n"
                 "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int32_t dim) const {{ return sizes_[dim]; }}\n"
                 "}};\n",
-                func_name, DIM, actual_input_rank, detail::array_to_string(sizes_), detail::array_to_string(dims_))
+                func_name, DIM, actual_input_rank, detail::array_to_string(sizes_), detail::array_to_string(dims_),
+                detail::array_to_string(starts_, actual_input_rank), strides_str)
           );
         }
 #endif
