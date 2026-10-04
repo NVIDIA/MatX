@@ -97,7 +97,8 @@ template <int RANK, typename T>
   requires (!cuda::std::is_array_v<remove_cvref_t<T>>)
 auto __MATX_INLINE__ getPermuteDims(T dims) {
   constexpr auto D = dims.size();
-  cuda::std::array<int, RANK> perm;
+  // Every element is written below, but gcc can't prove it
+  cuda::std::array<int, RANK> perm{};
   cuda::std::array<bool, RANK> visited;
 
   visited.fill(false);
@@ -107,8 +108,14 @@ auto __MATX_INLINE__ getPermuteDims(T dims) {
   MATX_LOOP_UNROLL
   for(int i = D-1; i>= 0; i--) {
     int a = dims[i];
-    MATX_ASSERT_STR(a >= 0 && a < RANK, matxInvalidDim, "Reduction dim out of range\n");
-    MATX_ASSERT_STR(visited[a] == false, matxInvalidDim, "Reduction Dim repeated");
+    // Checked in all build modes: a indexes visited, and a repeated dim would still yield a
+    // valid permutation that silently reduces the wrong dimensions
+    if (a < 0 || a >= RANK) {
+      MATX_THROW(matxInvalidDim, "Reduction dim out of range");
+    }
+    if (visited[a]) {
+      MATX_THROW(matxInvalidDim, "Reduction Dim repeated");
+    }
 
     visited[a] = true;
 
@@ -145,8 +152,12 @@ auto __MATX_INLINE__ getPermuteDims(int rt_rank, const int (&dims)[D]) {
   int j = rt_rank - 1;
   for (int i = D - 1; i >= 0; i--) {
     int a = dims[i];
-    MATX_ASSERT_STR(a >= 0 && a < rt_rank, matxInvalidDim, "Reduction dim out of range\n");
-    MATX_ASSERT_STR(visited[a] == false, matxInvalidDim, "Reduction Dim repeated");
+    if (a < 0 || a >= rt_rank) {
+      MATX_THROW(matxInvalidDim, "Reduction dim out of range");
+    }
+    if (visited[a]) {
+      MATX_THROW(matxInvalidDim, "Reduction Dim repeated");
+    }
     visited[a] = true;
     perm[j--] = a;
   }

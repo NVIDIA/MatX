@@ -136,8 +136,89 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Legendre)
       }
       else {
         ASSERT_NEAR(out(i), legendre_check(order, order, x(i)),.0001);
-      }        
+      }
     }
   }
+  MATX_EXIT_HANDLER();
+}
+
+// Places the n and m dimensions at every ordered pair of output axes
+TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, LegendreAxes)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+
+  if constexpr (is_cuda_jit_executor_v<ExecType>) {
+    // JIT legendre faults on a rank-2 input for every axis placement, including the default
+    GTEST_SKIP() << "JIT legendre does not support a rank-2 input";
+  }
+
+  ExecType exec{};
+
+  const int order = 3;
+  const index_t x0_size = 2;
+  const index_t x1_size = 4;
+  const double tol = is_matx_half_v<TestType> ? 50.0 : .0001;
+
+  auto n = range<0, 1, int>({order}, 0, 1);
+  auto m = range<0, 1, int>({order}, 0, 1);
+  auto x = make_tensor<TestType>({x0_size, x1_size});
+  for (index_t i = 0; i < x0_size; i++) {
+    for (index_t j = 0; j < x1_size; j++) {
+      x(i, j) = TestType(static_cast<float>(i * x1_size + j) / static_cast<float>(x0_size * x1_size));
+    }
+  }
+
+  for (int an = 0; an < 4; an++) {
+    for (int am = 0; am < 4; am++) {
+      if (an == am) continue;
+
+      cuda::std::array<index_t, 4> shape;
+      const index_t x_sizes[2] = {x0_size, x1_size};
+      for (int d = 0, xd = 0; d < 4; d++) {
+        shape[d] = (d == an || d == am) ? order : x_sizes[xd++];
+      }
+      auto out = make_tensor<TestType>(shape);
+
+      (out = legendre(n, m, x, cuda::std::array<int, 2>{an, am})).run(exec);
+      exec.sync();
+
+      for (index_t i0 = 0; i0 < shape[0]; i0++) {
+        for (index_t i1 = 0; i1 < shape[1]; i1++) {
+          for (index_t i2 = 0; i2 < shape[2]; i2++) {
+            for (index_t i3 = 0; i3 < shape[3]; i3++) {
+              const index_t idx[4] = {i0, i1, i2, i3};
+              index_t xi[2];
+              for (int d = 0, xd = 0; d < 4; d++) {
+                if (d != an && d != am) xi[xd++] = idx[d];
+              }
+              ASSERT_NEAR(out(i0, i1, i2, i3),
+                          legendre_check(static_cast<int>(idx[an]), static_cast<int>(idx[am]), x(xi[0], xi[1])), tol)
+                  << "axis={" << an << "," << am << "}";
+            }
+          }
+        }
+      }
+    }
+  }
+  MATX_EXIT_HANDLER();
+}
+// legendre rejects repeated or out-of-range axes in every build mode
+TEST(OperatorValidationTests, LegendreInvalidAxes)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = float;
+
+  auto n = range<0, 1, int>({3}, 0, 1);
+  auto m = range<0, 1, int>({3}, 0, 1);
+  auto x = make_tensor<TestType>({5});  // output rank 3
+
+  EXPECT_THROW(legendre(n, m, x, cuda::std::array<int, 2>{0, 0}), matx::detail::matxException);
+  EXPECT_THROW(legendre(n, m, x, cuda::std::array<int, 2>{0, 3}), matx::detail::matxException);
+  EXPECT_THROW(legendre(n, m, x, cuda::std::array<int, 2>{-1, 1}), matx::detail::matxException);
+  EXPECT_NO_THROW(legendre(n, m, x, cuda::std::array<int, 2>{1, 0}));
+  EXPECT_NO_THROW(legendre(n, m, x, cuda::std::array<int, 2>{0, 2}));
+
   MATX_EXIT_HANDLER();
 }

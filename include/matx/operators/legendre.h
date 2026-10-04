@@ -197,37 +197,34 @@ namespace matx
           MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
           static_assert(get_rank<T1>() <= 1, "legendre op:  n must be a scalar, rank 0 or 1 operator");
           static_assert(get_rank<T2>() <= 1, "legendre op:  m must be a scalar, rank 0 or 1 operator");
+          const int32_t rank = jit_rank();
+          if (axis_[0] < 0 || axis_[0] >= rank || axis_[1] < 0 || axis_[1] >= rank || axis_[0] == axis_[1]) {
+            MATX_THROW(matxInvalidDim, "legendre axes must be distinct and in [0, Rank())");
+          }
         }
 
         template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
         {
           if constexpr (CapType::ept == ElementsPerThread::ONE) {
-            cuda::std::array<index_t, Rank()> inds{indices...};
-            cuda::std::array<index_t, T3::Rank()> xinds{};
+            const cuda::std::array<index_t, Rank()> inds{indices...};
 
             int axis1 = axis_[0];
             int axis2 = axis_[1];
 
             // compute n
-            index_t nind = inds[axis1];
+            index_t nind = detail::select_at(inds, axis1);
             int n = get_value<DefaultCapabilities>(n_, nind);
             
             // compute m 
-            index_t mind = inds[axis2];
+            index_t mind = detail::select_at(inds, axis2);
             int m = get_value<DefaultCapabilities>(m_, mind);
             
             if(axis1>axis2) 
               cuda::std::swap(axis1, axis2);
 
             // compute indices for x
-            int idx = 0;
-            for(int i = 0; i < Rank(); i++) {
-              index_t ind = inds[i];
-              if(i != axis1 && i != axis2) {
-                xinds[idx++] = ind;
-              }
-            }
+            auto xinds = detail::drop_at(inds, axis1, axis2);
 
             auto lret = [](auto ln, auto lm, auto lx) {
               if constexpr (is_complex_half_v<value_type>) {
@@ -374,12 +371,13 @@ namespace matx
               d--;
             if(dim>axis2)
               d--;
-            return get_size(in_, d);
+            return detail::size_at(in_, d);
           }
         }
 
+        // The output has the input's rank plus the n and m axes
         __MATX_INLINE__ __MATX_HOST__ int32_t DynRank() const {
-          return detail::matx_max(detail::get_dyn_rank(n_), detail::matx_max(detail::get_dyn_rank(m_), detail::get_dyn_rank(in_)));
+          return detail::get_dyn_rank(in_) + 2;
         }
 
         __MATX_INLINE__ __MATX_HOST__ int32_t jit_rank() const {
@@ -406,7 +404,8 @@ namespace matx
    *   operator specifing which degrees to output
    *
    * @returns
-   *   New operator with Rank+1 and size of last dimension = order.
+   *   New operator with rank in.Rank()+2. Dimension 0 has the size of n, dimension 1 has the size of m,
+   *   and the remaining dimensions are those of in.
    */
   template <typename T1, typename T2, typename T3>
     auto __MATX_INLINE__ legendre(const T1 &n, const T2 &m, const T3 &in)
@@ -430,10 +429,12 @@ namespace matx
    * @param m
    *   operator specifing which degrees to output
    * @param axis
-   *   The axis to write the polynomial coeffients into the output tensor
+   *   The axis to write the polynomial coeffients into the output tensor. Both
+   *   axes must be distinct and in [0, Rank()), otherwise matxInvalidDim is thrown
    *
    * @returns
-   *   New operator with Rank+1 and size of last dimension = order.
+   *   New operator with rank in.Rank()+2. Dimension axis[0] has the size of n, dimension axis[1] has the
+   *   size of m, and the remaining dimensions are those of in, in order.
    */
   template <typename T1, typename T2, typename T3>
   auto __MATX_INLINE__ legendre(const T1 &n, const T2 &m, const T3 &in, cuda::std::array<int, 2> axis)

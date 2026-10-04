@@ -28,6 +28,7 @@ set(OPERATOR_TEST_FILES
   frexpc_test.cu
   get_string_test.cu
   ifelse_test.cu  
+  index_test.cu
   interleaved_test.cu
   interp_test.cu
   isclose_test.cu

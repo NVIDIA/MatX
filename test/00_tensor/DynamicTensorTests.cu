@@ -243,6 +243,98 @@ TEST_F(DynamicTensorTest, LCollapseRejectsDynamicRankLessThanDim) {
                matx::detail::matxException);
 }
 
+TEST_F(DynamicTensorTest, ConcatRejectsAxisBeyondDynamicRank) {
+  auto a = make_tensor<float>();
+  auto b = make_tensor<float>();
+  make_tensor(a, {4, 5}); // rank 2
+  make_tensor(b, {4, 5});
+
+  EXPECT_THROW({ [[maybe_unused]] auto op = concat(2, a, b); },
+               matx::detail::matxException);
+  EXPECT_NO_THROW({ [[maybe_unused]] auto op = concat(1, a, b); });
+}
+
+TEST_F(DynamicTensorTest, ConcatStackRejectMismatchedDynamicRanks) {
+  auto a = make_tensor<float>();
+  auto b = make_tensor<float>();
+  auto c = make_tensor<float>();
+  make_tensor(a, {4, 5});    // rank 2
+  make_tensor(b, {4, 5, 1}); // rank 3; trailing size 1 so only the rank differs
+  make_tensor(c, {4, 5});
+
+  EXPECT_THROW({ [[maybe_unused]] auto op = concat(0, a, b); },
+               matx::detail::matxException);
+  EXPECT_THROW({ [[maybe_unused]] auto op = stack(0, a, b); },
+               matx::detail::matxException);
+  EXPECT_NO_THROW({ [[maybe_unused]] auto op = concat(0, a, c); });
+  EXPECT_NO_THROW({ [[maybe_unused]] auto op = stack(0, a, c); });
+}
+
+TEST_F(DynamicTensorTest, StackRejectsAxisBeyondDynamicRank) {
+  auto a = make_tensor<float>();
+  auto b = make_tensor<float>();
+  make_tensor(a, {4, 5}); // rank 2, so the stacked output has rank 3
+  make_tensor(b, {4, 5});
+
+  EXPECT_THROW({ [[maybe_unused]] auto op = stack(3, a, b); },
+               matx::detail::matxException);
+  EXPECT_NO_THROW({ [[maybe_unused]] auto op = stack(2, a, b); });
+}
+
+TEST_F(DynamicTensorTest, PadRejectsAxisBeyondDynamicRank) {
+  auto a = make_tensor<float>();
+  make_tensor(a, {4, 5}); // rank 2
+
+  EXPECT_THROW({ [[maybe_unused]] auto op = pad(a, 2, {1, 1}, 0.0f); },
+               matx::detail::matxException);
+  EXPECT_NO_THROW({ [[maybe_unused]] auto op = pad(a, 1, {1, 1}, 0.0f); });
+}
+
+TEST_F(DynamicTensorTest, UnwrapRejectsAxisBeyondDynamicRank) {
+  auto a = make_tensor<float>();
+  make_tensor(a, {4, 5}); // rank 2
+
+  EXPECT_THROW({ [[maybe_unused]] auto op = unwrap(a, 2); },
+               matx::detail::matxException);
+  EXPECT_NO_THROW({ [[maybe_unused]] auto op = unwrap(a, -1); });
+}
+
+TEST_F(DynamicTensorTest, UnwrapAcceptsDefaultAxisForRankZero) {
+  auto a = make_tensor<float>();
+  make_tensor(a, std::vector<index_t>{}); // rank 0, so the axis is ignored
+
+  EXPECT_NO_THROW({ [[maybe_unused]] auto op = unwrap(a); });
+}
+
+TEST_F(DynamicTensorTest, PermuteValidatesOnlyDynamicRankDims) {
+  auto a = make_tensor<float>();
+  make_tensor(a, {4, 5}); // rank 2; the unused trailing dims are zero-filled
+
+  EXPECT_NO_THROW({ [[maybe_unused]] auto op = permute(a * 2.0f, {1, 0}); });
+  EXPECT_THROW({ [[maybe_unused]] auto op = permute(a * 2.0f, {0, 0}); },
+               matx::detail::matxException);
+  EXPECT_THROW({ [[maybe_unused]] auto op = permute(a * 2.0f, {0, 2}); },
+               matx::detail::matxException);
+}
+
+TEST_F(DynamicTensorTest, UpsampleRejectsDimBeyondDynamicRank) {
+  auto a = make_tensor<float>();
+  make_tensor(a, {4, 5}); // rank 2
+
+  EXPECT_THROW({ [[maybe_unused]] auto op = upsample(a, 2, 2); },
+               matx::detail::matxException);
+  EXPECT_NO_THROW({ [[maybe_unused]] auto op = upsample(a, 1, 2); });
+}
+TEST_F(DynamicTensorTest, LegendreRejectsAxisBeyondDynamicRank) {
+  auto n = range<0, 1, int>({3}, 0, 1);
+  auto x = make_tensor<float>();
+  make_tensor(x, {5}); // rank 1, so the output has rank 3
+
+  EXPECT_THROW({ [[maybe_unused]] auto op = legendre(n, n, x, cuda::std::array<int, 2>{0, 3}); },
+               matx::detail::matxException);
+  EXPECT_NO_THROW({ [[maybe_unused]] auto op = legendre(n, n, x, cuda::std::array<int, 2>{0, 2}); });
+}
+
 // ---------------------------------------------------------------------------
 // JIT execution: rank 1
 // ---------------------------------------------------------------------------

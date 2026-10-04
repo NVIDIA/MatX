@@ -156,14 +156,21 @@ namespace matx
 
         __MATX_INLINE__ PermuteOp(const T &op, const cuda::std::array<int32_t, T::Rank()> &dims) : op_(op) {
 
+          // Checked in all build modes: Size() and get_impl() select by these indices.
+          // Only the first jit_rank() entries are used; a dynamic-rank operand leaves the rest
+          // unused (typically zero-filled), so they are copied without validation.
+          const int32_t rank = jit_rank();
+          dims_ = dims;
           cuda::std::array<bool, Rank()> seen{};
-          for(int32_t i = 0; i < Rank(); i++) {
+          for(int32_t i = 0; i < rank; i++) {
             const int32_t dim = dims[i];
-            MATX_ASSERT_STR(dim < Rank() && dim >= 0, matxInvalidDim, "PermuteOp:  Invalid permute index.");
-            MATX_ASSERT_STR(!seen[dim], matxInvalidDim, "PermuteOp:  Duplicate permute index.");
+            if (dim >= rank || dim < 0) {
+              MATX_THROW(matxInvalidDim, "PermuteOp:  Invalid permute index.");
+            }
+            if (seen[dim]) {
+              MATX_THROW(matxInvalidDim, "PermuteOp:  Duplicate permute index.");
+            }
             seen[dim] = true;
-
-            dims_[i] = dims[i];
           }
           MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
         }
@@ -273,7 +280,7 @@ namespace matx
 
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int32_t dim) const
         {
-          return op_.Size(dims_[dim]);
+          return detail::size_at(op_, detail::select_at(dims_, dim));
         }
 
         __MATX_INLINE__ __MATX_HOST__ int32_t DynRank() const {
@@ -378,7 +385,7 @@ namespace matx
   /**
    * @brief Operator to permute the dimensions of a tensor or operator.
    *
-   * The each dimension must appear in the dims array once.
+   * Each dimension must appear in the dims array once, otherwise matxInvalidDim is thrown.
    * This operator can appear as an rvalue or lvalue.
    *
    * @tparam T Input operator/tensor type
@@ -400,7 +407,7 @@ namespace matx
   /**
    * @brief Operator to permute the dimensions of a tensor or operator.
    *
-   * The each dimension must appear in the dims array once.
+   * Each dimension must appear in the dims array once, otherwise matxInvalidDim is thrown.
 
    * This operator can appear as an rvalue or lvalue.
    *

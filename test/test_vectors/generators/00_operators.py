@@ -172,13 +172,21 @@ class unwrap_operator:
         phase_2d = phase_2d + 0.25 * np.random.randn(m, k)
         in2 = np.angle(np.exp(1j * phase_2d)).astype(dtype)
 
+        phase_3d = np.linspace(0.0, 11.0 * np.pi, 5 * 6 * 7).reshape((5, 6, 7))
+        phase_3d = phase_3d + 0.25 * np.random.randn(5, 6, 7)
+        in3 = np.angle(np.exp(1j * phase_3d)).astype(dtype)
+
         return {
             'in1': in1,
             'in2': in2,
+            'in3': in3,
             'out1_default': np.unwrap(in1).astype(dtype),
             'out1_period': np.unwrap(in1, discont=2.5, period=4.0).astype(dtype),
             'out2_axis1': np.unwrap(in2, axis=1).astype(dtype),
-            'out2_axis0': np.unwrap(in2, axis=0, discont=1.0, period=6.0).astype(dtype)
+            'out2_axis0': np.unwrap(in2, axis=0, discont=1.0, period=6.0).astype(dtype),
+            'out3_axis0': np.unwrap(in3, axis=0).astype(dtype),
+            'out3_axis1': np.unwrap(in3, axis=1).astype(dtype),
+            'out3_axis2': np.unwrap(in3, axis=2).astype(dtype)
         }
 
 class pwelch_operators:

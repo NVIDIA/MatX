@@ -48,4 +48,35 @@ TYPED_TEST(OperatorTestsAllExecs, PermuteOp)
   }
 
   MATX_EXIT_HANDLER();
-} 
+}
+
+// Invalid permutations are rejected in every build mode, for both tensors (strided views)
+// and expressions (PermuteOp)
+TEST(OperatorValidationTests, PermuteInvalidDims)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = float;
+
+  auto A = make_tensor<TestType>({2, 3, 4});
+  auto expr = reverse<0>(A);
+
+  EXPECT_THROW(permute(A, {0, 1, 3}), matx::detail::matxException);
+  EXPECT_THROW(permute(A, {0, -1, 2}), matx::detail::matxException);
+  EXPECT_THROW(permute(A, {0, 1, 1}), matx::detail::matxException);
+  EXPECT_NO_THROW(permute(A, {1, 2, 0}));
+
+  EXPECT_THROW(permute(expr, {0, 1, 3}), matx::detail::matxException);
+  EXPECT_THROW(permute(expr, {0, -1, 2}), matx::detail::matxException);
+  EXPECT_THROW(permute(expr, {0, 1, 1}), matx::detail::matxException);
+  EXPECT_NO_THROW(permute(expr, {1, 2, 0}));
+
+  // Both paths report the same error code
+  auto error_of = [](auto &&f) {
+    try { f(); } catch (const matx::detail::matxException &ex) { return ex.e; }
+    return matxSuccess;
+  };
+  EXPECT_EQ(error_of([&] { permute(A, {0, 1, 1}); }), matxInvalidDim);
+  EXPECT_EQ(error_of([&] { permute(expr, {0, 1, 1}); }), matxInvalidDim);
+
+  MATX_EXIT_HANDLER();
+}

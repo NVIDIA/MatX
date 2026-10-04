@@ -236,10 +236,23 @@ namespace matx
         MATX_LOG_TRACE("{} constructor: axis={}, num_tensors={}", str(), axis, sizeof...(Ts));
         static_assert(sizeof...(Ts) > 1, "Must have more than one tensor to stack");
         static_assert((... && (RANK == Ts::Rank())), "stacked ops must have the same rank");
+        // jit_rank() is the actual output rank, one more than the operands' rank
+        if (axis < 0 || axis >= jit_rank()) {
+          MATX_THROW(matxInvalidDim, "stack axis must be >= 0 and no greater than the rank of the operators");
+        }
 
-        for (int32_t i = 0; i < RANK; i++) {
-          MATX_ASSERT_STR(((ts.Size(i) == pp_get<0>(ts).Size(i)) && ...)
-              , matxInvalidSize, "stacked operators must have the same size");
+        // Compare every operand against the first. The runtime ranks must match too, since
+        // dynamic-rank operands share the same compile-time RANK.
+        const auto &first = pp_get<0>(ts...);
+        const int32_t rank = detail::get_runtime_rank(first);
+        if (!((detail::get_runtime_rank(ts) == rank) && ...)) {
+          MATX_THROW(matxInvalidDim, "stacked operators must have the same rank");
+        }
+
+        for (int32_t i = 0; i < rank; i++) {
+          if (!((ts.Size(i) == first.Size(i)) && ...)) {
+            MATX_THROW(matxInvalidSize, "stacked operators must have the same size");
+          }
         }
       }
 
@@ -284,20 +297,13 @@ namespace matx
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is) const
       {
         if constexpr (CapType::ept == ElementsPerThread::ONE) {
-          cuda::std::array<index_t, RANK + 1> indices = {{is...}};
-          cuda::std::array<index_t, RANK> indices_o;
+          const cuda::std::array<index_t, RANK + 1> indices = {{is...}};
 
           // operator index
-          index_t oidx = indices[axis_];
+          const index_t oidx = detail::select_at(indices, axis_);
 
           // removing operator axis from indices
-          for(int i = 0; i < axis_; i++) {
-            indices_o[i] = indices[i];
-          } 
-          
-          for(int i = axis_; i < (int)indices_o.size(); i++) {
-            indices_o[i] = indices[i+1];
-          }
+          auto indices_o = detail::drop_at(indices, axis_);
 
           return GetVal<CapType, 0, sizeof...(Ts)>(oidx, indices_o);
         } else {
@@ -332,17 +338,9 @@ namespace matx
       {
         if(dim==axis_)
           return sizeof...(Ts);
-        // Map the requested output dimension to the operand dimension by dropping
-        // the stacked axis. For any valid query op_dim is already >= 0 (a dim > axis_
-        // implies dim >= 1, and the only legitimate dim==0 query is the axis itself,
-        // handled above). The clamp is therefore unreachable for valid input and
-        // exists solely to give the compiler a provable lower bound for
-        // -Werror=array-bounds.
-        int op_dim = (dim < axis_) ? dim : dim - 1;
-        if (op_dim < 0) {
-          op_dim = 0;
-        }
-        return cuda::std::get<0>(ops_).Size(op_dim);
+        // Map the requested output dimension to the operand dimension by dropping the stacked axis
+        const int op_dim = (dim < axis_) ? dim : dim - 1;
+        return detail::size_at(cuda::std::get<0>(ops_), op_dim);
       }
 
       __MATX_INLINE__ __MATX_HOST__ int32_t DynRank() const {
@@ -478,15 +476,13 @@ namespace matx
    * @brief StackOp multiple operators along a dimension
    * 
    * @tparam Ts operator types
-   * @param axis dimension to insert new dimension
+   * @param axis dimension to insert new dimension; must be in [0, Rank()], otherwise matxInvalidDim is thrown
    * @param ts operators
-   * @return stacked operator 
+   * @return stacked operator
    */
   template <typename... Ts>
     __MATX_INLINE__ __MATX_HOST__  auto stack(int axis, const Ts&... ts)
     {
-      using first_type [[maybe_unused]] = cuda::std::tuple_element_t<0, cuda::std::tuple<Ts...>>;
-      MATX_ASSERT_STR(axis <= first_type::Rank(),matxInvalidDim, "stack must take an axis less than or equal to the the rank of the operators");
       return detail::StackOp<Ts...>{axis, ts...};
     }  
 } // end namespace matx
