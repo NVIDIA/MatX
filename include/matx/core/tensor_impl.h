@@ -32,9 +32,9 @@
 
 #pragma once
 
-#include <algorithm>
 #include <cassert>
 #include <type_traits>
+#include <cuda/std/algorithm>
 #include <cuda/std/functional>
 #include "matx/core/vector.h"
 #include "matx/core/error.h"
@@ -842,7 +842,7 @@ MATX_IGNORE_WARNING_POP_GCC
       MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
       // Checked in all build modes: the loop below reads the size and stride of each kept dimension
-      if (std::count(clones.begin(), clones.end(), matxKeepDim) != RANK) {
+      if (cuda::std::count(clones.begin(), clones.end(), matxKeepDim) != RANK) {
         MATX_THROW(matxInvalidDim, "Number of matxKeepDim in a clone must match input operator rank");
       }
 
