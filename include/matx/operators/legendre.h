@@ -56,6 +56,9 @@ namespace matx
         cuda::std::array<int,2> axis_;
 
 #ifdef MATX_EN_JIT
+      // Public so has_jit_storage_type/has_to_jit_storage detect them; otherwise the whole host
+      // operator is passed to the kernel in place of JIT_Storage
+      public:
         struct JIT_Storage {
           typename detail::inner_storage_or_self_t<detail::base_type_t<T1>> n_;
           typename detail::inner_storage_or_self_t<detail::base_type_t<T2>> m_;
@@ -142,9 +145,13 @@ namespace matx
                 "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return Rank_; }}\n"
                 "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const {{ return out_dims_[dim]; }}\n"
                 "}};\n",
-                func_name, actual_rank, axis_[0], axis_[1], detail::array_to_string(out_dims_, actual_rank), T3::Rank())
+                // xinds holds the input's indices: the output rank minus the n and m axes. T3::Rank()
+                // would be MATX_MAX_DYNAMIC_RANK for a dynamic-rank input
+                func_name, actual_rank, axis_[0], axis_[1], detail::array_to_string(out_dims_, actual_rank), actual_rank - 2)
           );
         }
+
+      private:
 #endif
 
         template<class TypeParam>

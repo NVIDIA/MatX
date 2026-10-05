@@ -149,11 +149,6 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, LegendreAxes)
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
   using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
 
-  if constexpr (is_cuda_jit_executor_v<ExecType>) {
-    // JIT legendre faults on a rank-2 input for every axis placement, including the default
-    GTEST_SKIP() << "JIT legendre does not support a rank-2 input";
-  }
-
   ExecType exec{};
 
   const int order = 3;

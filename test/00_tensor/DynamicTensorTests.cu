@@ -1125,6 +1125,43 @@ TEST_F(DynamicTensorTest, ExecFFTShift1D_Rank2) {
 // reverse<0> on rank-1 tensor
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// legendre with a dynamic-rank input: the JIT index array for x must use x's runtime
+// rank, not MATX_MAX_DYNAMIC_RANK
+// ---------------------------------------------------------------------------
+
+TEST_F(DynamicTensorTest, ExecLegendre) {
+  constexpr int order = 3;
+  constexpr int N = 5;
+  auto n = range<0, 1, int>({order}, 0, 1);
+  auto m = range<0, 1, int>({order}, 0, 1);
+
+  auto x = make_tensor<float>();
+  make_tensor(x, {N});
+  auto x_ref = make_tensor<float>({N});
+  for (int i = 0; i < N; i++) {
+    x.Data()[i] = static_cast<float>(i) / static_cast<float>(N);
+    x_ref(i) = x.Data()[i];
+  }
+
+  auto ref = make_tensor<float>({order, order, N});
+  (ref = legendre(n, m, x_ref)).run(SingleThreadedHostExecutor{});
+
+  auto out = make_tensor<float>();
+  make_tensor(out, {order, order, N});
+  (out = legendre(n, m, x)).run(exec);
+  sync();
+
+  for (int i = 0; i < order; i++) {
+    for (int j = 0; j < order; j++) {
+      for (int k = 0; k < N; k++) {
+        ASSERT_NEAR(out.Data()[(i * order + j) * N + k], ref(i, j, k), 1e-4)
+            << "legendre mismatch at (" << i << ", " << j << ", " << k << ")";
+      }
+    }
+  }
+}
+
 TEST_F(DynamicTensorTest, ExecReverse1D) {
   constexpr int N = 16;
   auto a = make_tensor<float>();
