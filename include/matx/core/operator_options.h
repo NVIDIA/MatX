@@ -205,6 +205,13 @@ namespace detail {
     bool is_prerun;
     void *start_ptr;
     void *end_ptr;
+    // Non-owning layout metadata for concrete tensor destinations. Keep this
+    // query trivially copyable because operator_options.h is also used by RTC compilation.
+    const void *view = nullptr;
+    int rank = -1;
+    decltype(sizeof(0)) element_bytes = 0;
+    long long (*size)(const void *, int) = nullptr;
+    long long (*stride)(const void *, int) = nullptr;
   };
 
 }

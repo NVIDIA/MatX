@@ -68,7 +68,19 @@ namespace matx
         };
         auto* end = static_cast<void*>(const_cast<value_type*>(get_last(cuda::std::make_index_sequence<T::Rank()>{})) + 1);
 
-        return AliasedMemoryQueryInput{false, is_prerun, start, end};
+        AliasedMemoryQueryInput query{false, is_prerun, start, end};
+        if constexpr (is_tensor_view_v<T>) {
+          query.view = &lval;
+          query.rank = T::Rank();
+          query.element_bytes = sizeof(value_type);
+          query.size = [](const void *view, int dim) -> long long {
+            return static_cast<long long>(static_cast<const T *>(view)->Size(dim));
+          };
+          query.stride = [](const void *view, int dim) -> long long {
+            return static_cast<long long>(static_cast<const T *>(view)->Stride(dim));
+          };
+        }
+        return query;
       }
       else {
         // For non-tensor types or rank 0, return null pointers (no aliasing checks needed)

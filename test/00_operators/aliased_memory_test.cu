@@ -33,7 +33,6 @@
 #include "operator_test_types.hpp"
 #include "matx.h"
 #include "test_types.h"
-#include "utilities.h"
 
 using namespace matx;
 using namespace matx::test;
@@ -357,6 +356,142 @@ TYPED_TEST(OperatorTestsFloatAllExecs, CorrMapAliasing)
   }, matx::detail::matxException);
 
   MATX_EXIT_HANDLER();
+}
+
+// Dropping the innermost dimension preserves its stride in the resulting view.
+TYPED_TEST(OperatorTestsNumericAllExecs, DroppedDimensionInPlaceDivision)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  ExecType exec{};
+  auto other = make_tensor<TestType>({2, 3, 16, 4});
+  (other = static_cast<TestType>(4)).run(exec);
+  auto a = slice<3>(other, {0, 0, 0, 1},
+                    {matxEnd, matxEnd, matxEnd, matxDropDim});
+  ASSERT_FALSE(a.IsContiguous());
+  EXPECT_NO_THROW((a = a / static_cast<TestType>(2)).run(exec));
+  exec.sync();
+  for (index_t i = 0; i < 2; ++i) {
+    for (index_t j = 0; j < 3; ++j) {
+      for (index_t k = 0; k < 16; ++k) {
+        for (index_t channel = 0; channel < 4; ++channel) {
+          EXPECT_EQ(other(i, j, k, channel), static_cast<TestType>(channel == 1 ? 2 : 4));
+        }
+      }
+    }
+  }
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(OperatorTestsNumericAllExecs, SteppedSliceInPlaceDivision)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  ExecType exec{};
+  auto other = make_tensor<TestType>({16});
+  (other = static_cast<TestType>(4)).run(exec);
+  auto a = slice(other, {0}, {16}, {2});
+  EXPECT_NO_THROW((a = a / static_cast<TestType>(2)).run(exec));
+  exec.sync();
+  for (index_t i = 0; i < 16; ++i) {
+    EXPECT_EQ(other(i), static_cast<TestType>(i % 2 == 0 ? 2 : 4));
+  }
+  MATX_EXIT_HANDLER();
+}
+
+// Compare both in-place and out-of-place batched strided IFFTs against a
+// contiguous transform, including every normalization mode.
+TYPED_TEST(OperatorTestsComplexNonHalfTypesAllExecs, DroppedDimensionIFFT)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  if constexpr (!detail::CheckFFTSupport<ExecType, TestType>()) {
+    GTEST_SKIP();
+  }
+  ExecType exec{};
+  auto input = make_tensor<TestType>({2, 3, 16});
+  auto reference = make_tensor<TestType>({2, 3, 16});
+  auto other = make_tensor<TestType>({2, 3, 16, 4});
+  auto a = slice<3>(other, {0, 0, 0, 1},
+                    {matxEnd, matxEnd, matxEnd, matxDropDim});
+  for (index_t i = 0; i < 2; ++i) {
+    for (index_t j = 0; j < 3; ++j) {
+      for (index_t k = 0; k < 16; ++k) {
+        input(i, j, k) = TestType{static_cast<typename TestType::value_type>(i + j + k),
+                                 static_cast<typename TestType::value_type>(k % 3)};
+      }
+    }
+  }
+  for (auto norm : {FFTNorm::BACKWARD, FFTNorm::ORTHO, FFTNorm::FORWARD}) {
+    (reference = ifft(input, 0, norm)).run(exec);
+    for (bool in_place : {false, true}) {
+      (other = static_cast<TestType>(7)).run(exec);
+      if (in_place) {
+        (a = input).run(exec);
+        EXPECT_NO_THROW((a = ifft(a, 0, norm)).run(exec));
+      } else {
+        EXPECT_NO_THROW((a = ifft(input, 0, norm)).run(exec));
+      }
+      exec.sync();
+      for (index_t i = 0; i < 2; ++i) {
+        for (index_t j = 0; j < 3; ++j) {
+          for (index_t k = 0; k < 16; ++k) {
+            EXPECT_NEAR(static_cast<double>(a(i, j, k).real()),
+                        static_cast<double>(reference(i, j, k).real()), 1e-4);
+            EXPECT_NEAR(static_cast<double>(a(i, j, k).imag()),
+                        static_cast<double>(reference(i, j, k).imag()), 1e-4);
+            for (index_t channel : {0, 2, 3}) {
+              EXPECT_EQ(other(i, j, k, channel), static_cast<TestType>(7));
+            }
+          }
+        }
+      }
+    }
+  }
+  MATX_EXIT_HANDLER();
+}
+
+TEST(AliasedMemoryLayoutTests, DifferentMappingsWithIdenticalEndpoints)
+{
+  auto storage = make_tensor<float>({16});
+  auto contiguous = make_tensor(storage.Data(), DefaultDescriptor<2>{
+      cuda::std::array<index_t, 2>{2, 2}, cuda::std::array<index_t, 2>{2, 1}});
+  auto transposed = make_tensor(storage.Data(), DefaultDescriptor<2>{
+      cuda::std::array<index_t, 2>{2, 2}, cuda::std::array<index_t, 2>{1, 2}});
+  EXPECT_THROW((contiguous = transposed + 1.0f).run(), detail::matxException);
+  auto different_shape = make_tensor(storage.Data(), DefaultDescriptor<2>{
+      cuda::std::array<index_t, 2>{2, 3}, cuda::std::array<index_t, 2>{1, 1}});
+  EXPECT_TRUE(detail::check_aliased_memory(contiguous, different_shape + 1.0f, true));
+  auto different_rank = make_tensor(storage.Data(), cuda::std::array<index_t, 1>{4});
+  EXPECT_TRUE(detail::check_aliased_memory(contiguous, different_rank + 1.0f, true));
+}
+
+TEST(AliasedMemoryLayoutTests, InternallyOverlappingViews)
+{
+  auto storage = make_tensor<float>({16});
+  for (auto strides : {cuda::std::array<index_t, 2>{0, 1},
+                       cuda::std::array<index_t, 2>{1, 1},
+                       cuda::std::array<index_t, 2>{-2, 1}}) {
+    auto overlapping = make_tensor(storage.Data() + 2, DefaultDescriptor<2>{
+        cuda::std::array<index_t, 2>{2, 2}, std::move(strides)});
+    EXPECT_THROW((overlapping = overlapping / 2.0f).run(), detail::matxException);
+  }
+}
+
+TEST(AliasedMemoryLayoutTests, PermutedMatchingViews)
+{
+  auto storage = make_tensor<float>({6});
+  (storage = 4.0f).run();
+  auto a = make_tensor(storage.Data(), DefaultDescriptor<2>{
+      cuda::std::array<index_t, 2>{2, 3}, cuda::std::array<index_t, 2>{1, 2}});
+  EXPECT_NO_THROW((a = a / 2.0f).run());
+  ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
+  for (index_t i = 0; i < 6; ++i) {
+    EXPECT_EQ(storage(i), 2.0f);
+  }
 }
 
 #endif
