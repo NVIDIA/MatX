@@ -18,3 +18,7 @@ Examples
    :start-after: example-begin permute-test-1
    :end-before: example-end permute-test-1
    :dedent:
+
+Adjacent permutations of expressions are composed into a single permutation. Inverse permutations therefore restore the original mapping,
+including for in-place element-wise operations with unsafe alias detection enabled. A non-identity combined permutation that reads the destination
+remains unsafe. Each permutation's axes are validated before composition.

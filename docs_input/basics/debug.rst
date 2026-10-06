@@ -82,6 +82,7 @@ Concrete tensor views with identical data pointers, element sizes, shapes, and s
 that elements do not overlap. This includes slices that select a fixed index and drop the last dimension of a contiguous tensor, and IFFT normalization on those
 views. Operators that reorder input relative to output, or tensors with different layouts, are still checked for unsafe overlap.
 A non-identity ``permute`` of an expression that reads the destination (for example, ``a = permute(a + a, {1, 0})``) is unsafe;
-an identity permutation preserves the element-wise alias exemption.
+an identity permutation preserves the element-wise alias exemption. Adjacent permutations are composed, so inverse permutations that restore the original
+mapping also preserve this exemption. Permutations separated by another operator are still checked conservatively.
 Layouts whose elements cannot be proven distinct (including zero or negative strides on non-singleton dimensions) remain conservatively rejected.
 Writable operator destinations without concrete tensor layout metadata retain the contiguity requirement for this exemption.

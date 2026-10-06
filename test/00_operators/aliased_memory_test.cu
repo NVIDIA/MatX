@@ -511,6 +511,11 @@ TYPED_TEST(OperatorTestsNumericAllExecsWithoutJIT, PermutedStridedExpressionAlia
   // An identity permutation around another permutation must retain its flag.
   EXPECT_THROW((a = permute(permute(a + a, {1, 0}), {0, 1})).run(exec),
                detail::matxException);
+  EXPECT_THROW((a = permute(permute(permute(a + a, {1, 0}), {1, 0}), {1, 0})).run(exec),
+               detail::matxException);
+  // Canceling permutations cannot clear an unrelated reordered-read flag.
+  EXPECT_THROW((a = permute(permute(reverse<0>(a), {1, 0}), {1, 0})).run(exec),
+               detail::matxException);
   MATX_EXIT_HANDLER();
 }
 
@@ -524,11 +529,43 @@ TYPED_TEST(OperatorTestsNumericAllExecsWithoutJIT, IdentityPermutedStridedExpres
   (other = static_cast<TestType>(4)).run(exec);
   auto a = slice<2>(other, {0, 0, 1}, {matxEnd, matxEnd, matxDropDim});
   EXPECT_NO_THROW((a = permute(a / static_cast<TestType>(2), {0, 1})).run(exec));
+  EXPECT_NO_THROW((a = permute(permute(a + a, {1, 0}), {1, 0})).run(exec));
   exec.sync();
   for (index_t i = 0; i < 4; ++i) {
     for (index_t j = 0; j < 4; ++j) {
       for (index_t channel = 0; channel < 3; ++channel) {
-        EXPECT_EQ(other(i, j, channel), static_cast<TestType>(channel == 1 ? 2 : 4));
+        EXPECT_EQ(other(i, j, channel), static_cast<TestType>(4));
+      }
+    }
+  }
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(OperatorTestsNumericAllExecsWithoutJIT, InversePermutedStridedExpression)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  ExecType exec{};
+  auto other = make_tensor<TestType>({2, 3, 4, 3});
+  (other = static_cast<TestType>(4)).run(exec);
+  exec.sync();
+  auto a = slice<3>(other, {0, 0, 0, 1}, {matxEnd, matxEnd, matxEnd, matxDropDim});
+  for (index_t i = 0; i < 2; ++i) {
+    for (index_t j = 0; j < 3; ++j) {
+      for (index_t k = 0; k < 4; ++k) {
+        a(i, j, k) = static_cast<TestType>(i + 2 * j + 3 * k);
+      }
+    }
+  }
+  EXPECT_NO_THROW((a = permute(permute(a + a, {2, 0, 1}), {1, 2, 0})).run(exec));
+  exec.sync();
+  for (index_t i = 0; i < 2; ++i) {
+    for (index_t j = 0; j < 3; ++j) {
+      for (index_t k = 0; k < 4; ++k) {
+        EXPECT_EQ(a(i, j, k), static_cast<TestType>(2 * (i + 2 * j + 3 * k)));
+        EXPECT_EQ(other(i, j, k, 0), static_cast<TestType>(4));
+        EXPECT_EQ(other(i, j, k, 2), static_cast<TestType>(4));
       }
     }
   }

@@ -185,6 +185,18 @@ namespace matx
           return true;
         }
 
+        // Compose adjacent permutations so alias queries observe the net mapping.
+        __MATX_INLINE__ auto ComposePermutation(const cuda::std::array<int32_t, Rank()> &dims) const
+        {
+          // Validate the outer axes before using them to index the inner axes.
+          [[maybe_unused]] const PermuteOp<self_type> outer(*this, dims);
+          auto combined = dims_;
+          for (int r = 0; r < jit_rank(); ++r) {
+            combined[r] = dims_[dims[r]];
+          }
+          return PermuteOp<detail::base_type_t<T>>(op_, combined);
+        }
+
         // For permuted-output axis K, find the input axis j with dims[j]==K
         // and return inds[j]. The accumulator form with a conditional store
         // (rather than an early return) is intentional: ptxas keeps `result`
@@ -398,6 +410,12 @@ namespace matx
    * @param dims the reordered dimensions of the operator.
    * @return permuted operator
    */
+  template <typename T>
+    __MATX_INLINE__ auto permute(const detail::PermuteOp<T> &op,
+        const cuda::std::array<int32_t, detail::PermuteOp<T>::Rank()> &dims) {
+      return op.ComposePermutation(dims);
+    }
+
   template <typename T>
     __MATX_INLINE__ auto permute( const T &op,
         const cuda::std::array<int32_t, T::Rank()> &dims) {

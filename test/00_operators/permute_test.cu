@@ -1,7 +1,6 @@
 #include "operator_test_types.hpp"
 #include "matx.h"
 #include "test_types.h"
-#include "utilities.h"
 
 using namespace matx;
 using namespace matx::test;
@@ -79,4 +78,44 @@ TEST(OperatorValidationTests, PermuteInvalidDims)
   EXPECT_EQ(error_of([&] { permute(expr, {0, 1, 1}); }), matxInvalidDim);
 
   MATX_EXIT_HANDLER();
+}
+TYPED_TEST(OperatorTestsNumericAllExecsWithoutJIT, NestedPermuteOp)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  ExecType exec{};
+  auto a = make_tensor<TestType>({2, 3, 4});
+  for (index_t i = 0; i < 2; ++i) {
+    for (index_t j = 0; j < 3; ++j) {
+      for (index_t k = 0; k < 4; ++k) {
+        a(i, j, k) = static_cast<TestType>(i + 2 * j + 3 * k);
+      }
+    }
+  }
+  const cuda::std::array<int32_t, 3> outer{2, 1, 0};
+  auto combined = permute(permute(a + a, {2, 0, 1}), outer);
+  EXPECT_EQ(combined.Size(0), 3);
+  EXPECT_EQ(combined.Size(1), 2);
+  EXPECT_EQ(combined.Size(2), 4);
+  auto out = make_tensor<TestType>({3, 2, 4});
+  (out = combined).run(exec);
+  exec.sync();
+  for (index_t i = 0; i < 3; ++i) {
+    for (index_t j = 0; j < 2; ++j) {
+      for (index_t k = 0; k < 4; ++k) {
+        EXPECT_EQ(out(i, j, k), static_cast<TestType>(2 * (j + 2 * i + 3 * k)));
+      }
+    }
+  }
+  MATX_EXIT_HANDLER();
+}
+
+TEST(OperatorValidationTests, NestedPermuteInvalidDims)
+{
+  auto a = make_tensor<float>({2, 3, 4});
+  auto inner = permute(a + a, {2, 0, 1});
+  EXPECT_THROW(permute(inner, {0, 1, 3}), detail::matxException);
+  EXPECT_THROW(permute(inner, {0, -1, 2}), detail::matxException);
+  EXPECT_THROW(permute(inner, {0, 1, 1}), detail::matxException);
 }
