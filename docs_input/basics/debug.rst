@@ -81,5 +81,7 @@ The types of aliasing that can be detected are:
 Concrete tensor views with identical data pointers, element sizes, shapes, and strides are accepted for in-place element-wise operations when their strides prove
 that elements do not overlap. This includes slices that select a fixed index and drop the last dimension of a contiguous tensor, and IFFT normalization on those
 views. Operators that reorder input relative to output, or tensors with different layouts, are still checked for unsafe overlap.
+A non-identity ``permute`` of an expression that reads the destination (for example, ``a = permute(a + a, {1, 0})``) is unsafe;
+an identity permutation preserves the element-wise alias exemption.
 Layouts whose elements cannot be proven distinct (including zero or negative strides on non-singleton dimensions) remain conservatively rejected.
 Writable operator destinations without concrete tensor layout metadata retain the contiguity requirement for this exemption.

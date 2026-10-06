@@ -353,6 +353,11 @@ namespace matx
             return false;
 #endif
           }
+          else if constexpr (Cap == OperatorCapability::ALIASED_MEMORY) {
+            auto in_copy = in;
+            in_copy.permutes_input_output = in_copy.permutes_input_output || !IsIdentityPermutation();
+            return detail::get_operator_capability<Cap>(op_, in_copy);
+          }
           else if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
             return detail::get_operator_capability<Cap>(op_, in);
           }

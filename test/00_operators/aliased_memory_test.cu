@@ -494,4 +494,45 @@ TEST(AliasedMemoryLayoutTests, PermutedMatchingViews)
   }
 }
 
+// Permuting an expression uses PermuteOp rather than a concrete tensor view.
+// Its alias query must preserve the reordered read through the expression.
+TYPED_TEST(OperatorTestsNumericAllExecsWithoutJIT, PermutedStridedExpressionAliasing)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  ExecType exec{};
+  auto other = make_tensor<TestType>({4, 4, 3});
+  auto a = slice<2>(other, {0, 0, 1}, {matxEnd, matxEnd, matxDropDim});
+  ASSERT_FALSE(a.IsContiguous());
+  EXPECT_THROW((a = permute(a + a, {1, 0})).run(exec), detail::matxException);
+  EXPECT_THROW((a = permute(a + a, {1, 0}) / static_cast<TestType>(2)).run(exec),
+               detail::matxException);
+  // An identity permutation around another permutation must retain its flag.
+  EXPECT_THROW((a = permute(permute(a + a, {1, 0}), {0, 1})).run(exec),
+               detail::matxException);
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(OperatorTestsNumericAllExecsWithoutJIT, IdentityPermutedStridedExpression)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  ExecType exec{};
+  auto other = make_tensor<TestType>({4, 4, 3});
+  (other = static_cast<TestType>(4)).run(exec);
+  auto a = slice<2>(other, {0, 0, 1}, {matxEnd, matxEnd, matxDropDim});
+  EXPECT_NO_THROW((a = permute(a / static_cast<TestType>(2), {0, 1})).run(exec));
+  exec.sync();
+  for (index_t i = 0; i < 4; ++i) {
+    for (index_t j = 0; j < 4; ++j) {
+      for (index_t channel = 0; channel < 3; ++channel) {
+        EXPECT_EQ(other(i, j, channel), static_cast<TestType>(channel == 1 ? 2 : 4));
+      }
+    }
+  }
+  MATX_EXIT_HANDLER();
+}
+
 #endif
