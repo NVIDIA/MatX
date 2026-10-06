@@ -51,6 +51,7 @@ set(OPERATOR_TEST_FILES
   print_test.cu
   r2c_test.cu
   real_imag_test.cu
+  reduction_lifecycle_test.cu
   remap_rank_zero_test.cu
   remap_test.cu
   repmat_test.cu
