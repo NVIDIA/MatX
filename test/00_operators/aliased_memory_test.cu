@@ -554,7 +554,8 @@ TYPED_TEST(OperatorTestsNumericAllExecsWithoutJIT, InversePermutedStridedExpress
   for (index_t i = 0; i < 2; ++i) {
     for (index_t j = 0; j < 3; ++j) {
       for (index_t k = 0; k < 4; ++k) {
-        a(i, j, k) = static_cast<TestType>(i + 2 * j + 3 * k);
+        a(i, j, k) = static_cast<TestType>(
+            static_cast<typename inner_op_type_t<TestType>::type>(i + 2 * j + 3 * k));
       }
     }
   }
@@ -563,7 +564,8 @@ TYPED_TEST(OperatorTestsNumericAllExecsWithoutJIT, InversePermutedStridedExpress
   for (index_t i = 0; i < 2; ++i) {
     for (index_t j = 0; j < 3; ++j) {
       for (index_t k = 0; k < 4; ++k) {
-        EXPECT_EQ(a(i, j, k), static_cast<TestType>(2 * (i + 2 * j + 3 * k)));
+        EXPECT_EQ(a(i, j, k), static_cast<TestType>(
+            static_cast<typename inner_op_type_t<TestType>::type>(2 * (i + 2 * j + 3 * k))));
         EXPECT_EQ(other(i, j, k, 0), static_cast<TestType>(4));
         EXPECT_EQ(other(i, j, k, 2), static_cast<TestType>(4));
       }
