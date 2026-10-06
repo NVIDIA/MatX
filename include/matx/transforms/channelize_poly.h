@@ -45,6 +45,7 @@
 #include "matx/core/tensor.h"
 #include "matx/executors/host.h"
 #include "matx/kernels/channelize_poly.cuh"
+#include "matx/kernels/tensor_accessor.h"
 #include "matx/operators/fft.h"
 #include "matx/operators/slice.h"
 #include <cuda/std/__algorithm/max.h>
@@ -290,8 +291,8 @@ inline SmemTiledPlan SelectTiledPlan(
 template <typename Launch, typename... Ops>
 inline void DispatchUnitStride(Launch &&launch, const Ops &...ops)
 {
-  if constexpr ((is_tensor_view_v<Ops> && ...)) {
-    if (((ops.Stride(Ops::Rank() - 1) == 1) && ...)) {
+  if constexpr (((is_tensor_view_v<Ops> || is_split_unit_stride_input_v<Ops>) && ...)) {
+    if ((get_operator_capability<OperatorCapability::UNIT_STRIDE_LAST>(ops) && ...)) {
       launch(cuda::std::bool_constant<true>{});
       return;
     }

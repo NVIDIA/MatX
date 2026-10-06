@@ -116,6 +116,16 @@ public:
     const index_t g = std::gcd(params.up, params.down);
     ur_ = params.up / g;
     dr_ = params.down / g;
+    // up == down (after reduction): resample_poly copies its input and ignores
+    // the filter, so each feed() passes its segment straight through. No
+    // history is retained, flush() emits nothing, and the filter is never read,
+    // so neither the retain buffer nor a filter copy is allocated.
+    if (identity()) {
+      H_ = 0;
+      history_len_ = 0;
+      reset();
+      return;
+    }
     // Filter footprint in input samples: floor((L-1)/ur). This rounds down to
     // 0 when L <= ur, but the streaming frame still needs one retained sample:
     // outputs positioned between the previous run's last sample and this run's
@@ -160,7 +170,8 @@ public:
    * @brief Maximum number of trailing input samples retained between calls.
    *
    * Informational; the caller does not size anything with it. feed()
-   * concatenates the retained history internally.
+   * concatenates the retained history internally. 0 when up == down (after
+   * reducing by their gcd), since then no history is retained.
    *
    * @return Maximum retained history length in samples
    */
@@ -191,7 +202,9 @@ public:
    */
   void reset()
   {
-    (retain_buf_ = zeros<InType>({retain_buf_.Size(0)})).run(exec_);
+    if (!identity()) {
+      (retain_buf_ = zeros<InType>({retain_buf_.Size(0)})).run(exec_);
+    }
     retain_len_ = 0;
     retain_buf_ind_ = 0;
     flushed_ = false;
@@ -203,7 +216,9 @@ public:
    *
    * Emits every not-yet-emitted output whose input samples have fully arrived;
    * the per-call count varies with the resampling ratio and segment size (it can
-   * be zero). Outputs are written to the front of `out`; the return value is the
+   * be zero). When up == down (after reducing by their gcd), resample_poly is a
+   * copy of its input, so each call writes the segment unchanged and returns its
+   * length. Outputs are written to the front of `out`; the return value is the
    * number written. Consume `slice(out, {0}, {count})` (the produced region)
    * before reusing `out`. Runs asynchronously on the object's executor. Throws
    * matxInvalidParameter if called after flush(). Use reset() to start a new
@@ -240,6 +255,20 @@ public:
     const index_t nl = new_samples.Size(InOp::Rank() - 1);
     MATX_ASSERT_STR(nl > 0, matxInvalidSize, "ResamplePolyStream::feed: empty segment");
 
+    if (identity()) {
+      // up == down: resample_poly copies its input, so every sample is an
+      // output as soon as it arrives. Copy via exec_.Exec, not run(), so the
+      // guard owns the segment's lifecycle (as below).
+      if (out.Size(OutTensor::Rank() - 1) < nl) {
+        MATX_THROW(matxInvalidSize,
+            "ResamplePolyStream: output buffer smaller than the produced count");
+      }
+      detail::SegmentLifecycleGuard<InOp, Exec> segment_guard(new_samples, exec_);
+      auto copy = (slice(out, {0}, {nl}) = new_samples);
+      exec_.Exec(copy);
+      return nl;
+    }
+
     const index_t buf_len = retain_len_ + nl;
     const index_t retain_len_next = cuda::std::min(
         H_ + nonneg_mod(retain_len_ + nl - H_, dr_), buf_len);
@@ -266,14 +295,17 @@ public:
     detail::SegmentLifecycleGuard<InOp, Exec> segment_guard(new_samples, exec_);
 
     if (retain_len_ == 0) {
-      if (plan.cnt > 0) { resample_exec(new_samples, plan.lo, plan.cnt, out); }
+      if (plan.cnt > 0) { resample_fir(new_samples, plan.lo, plan.cnt, out); }
       auto new_tail = slice(new_samples, {nl - retain_len_next}, {nl});
       auto retain_copy = (next_retain = new_tail);
       exec_.Exec(retain_copy);
     } else {
       auto retain = cur_retain();
+      if (plan.cnt > 0) {
+        detail::VisitStreamBuffer<Exec>(retain, new_samples,
+            [&](const auto &in) { resample_fir(in, plan.lo, plan.cnt, out); });
+      }
       auto buf = concat(0, retain, new_samples);
-      if (plan.cnt > 0) { resample_exec(buf, plan.lo, plan.cnt, out); }
       auto buf_tail = slice(buf, {buf_len - retain_len_next}, {buf_len});
       auto retain_copy = (next_retain = buf_tail);
       exec_.Exec(retain_copy);
@@ -322,12 +354,15 @@ public:
       MATX_THROW(matxInvalidSize,
           "ResamplePolyStream: output buffer smaller than the produced count");
     }
-    if (plan.cnt > 0) { resample_exec(cur_retain(), plan.lo, plan.cnt, out); }
+    if (plan.cnt > 0) { resample_fir(cur_retain(), plan.lo, plan.cnt, out); }
     flushed_ = true;
     return plan.cnt;
   }
 
 private:
+  // up == down after gcd reduction: feed() passes segments straight through.
+  bool identity() const { return ur_ == 1 && dr_ == 1; }
+
   // Non-negative modulo: result in [0, m) for any integer a (including negative a).
   // C++ truncated modulo reduces the magnitude, so a single +m correction suffices.
   static constexpr index_t nonneg_mod(index_t a, index_t m)
@@ -375,24 +410,16 @@ private:
 
   // Run one-shot resample_poly over `buf`, writing outputs [lo, lo+cnt) of the
   // full grid into the first cnt elements of `out`. `out` must already be
-  // validated to hold cnt (see resample_plan); cnt must be > 0.
+  // validated to hold cnt (see resample_plan); cnt must be > 0. Not used for
+  // up == down, which feed() passes straight through.
   template <typename BufOp, typename OutTensor>
-  void resample_exec(const BufOp &buf, index_t lo, index_t cnt, OutTensor &out)
+  void resample_fir(const BufOp &buf, index_t lo, index_t cnt, OutTensor &out)
   {
     auto os = slice(out, {0}, {cnt});
-    if (ur_ == 1 && dr_ == 1) {
-      // up == down is a special case; just copy the owned inputs directly.
-      // feed() owns the segment's lifecycle around this call, so copy via
-      // exec_.Exec, not run(), to avoid additional segment PreRun/PostRun.
-      auto id_copy = (os = slice(buf, {lo}, {lo + cnt}));
-      exec_.Exec(id_copy);
+    if constexpr (is_cuda_executor_v<Exec>) {
+      detail::matxResamplePoly1DInternal(os, buf, filter_, ur_, dr_, exec_.getStream(), lo);
     } else {
-      // Compute outputs [lo, lo+cnt) of buf's full resample grid
-      if constexpr (is_cuda_executor_v<Exec>) {
-        detail::matxResamplePoly1DInternal(os, buf, filter_, ur_, dr_, exec_.getStream(), lo);
-      } else {
-        detail::matxResamplePoly1DInternal(os, buf, filter_, ur_, dr_, exec_, lo);
-      }
+      detail::matxResamplePoly1DInternal(os, buf, filter_, ur_, dr_, exec_, lo);
     }
   }
 
@@ -418,6 +445,13 @@ private:
  * outputs equals a single one-shot
  * `resample_poly(signal, filter, params.up, params.down)` over the whole
  * signal.
+ *
+ * When `params.up == params.down` (after reducing by their gcd), resample_poly
+ * returns a copy of its input and ignores the filter. The stream then passes
+ * each segment straight through: @ref matx::ResamplePolyStream::feed "feed()"
+ * writes the segment unchanged and returns its length,
+ * @ref matx::ResamplePolyStream::flush "flush()" returns 0, and no history is
+ * retained.
  *
  * The streamed outputs match the one-shot to floating-point tolerance but are
  * not guaranteed bit-for-bit identical: `resample_poly` selects its kernel from
@@ -446,7 +480,8 @@ private:
  * @param filter FIR prototype filter (1D, length >= 1). The object
  *   materializes a copy of the filter at construction, so any filter operator
  *   (including a transform expression) is evaluated once and need not outlive
- *   the object.
+ *   the object. When up == down (after reducing by their gcd) the filter is
+ *   unused and is not evaluated.
  * @param params Stream parameters; see ResamplePolyStreamParams
  * @param exec Executor bound to this stream's lifetime. All @ref matx::ResamplePolyStream::feed "feed()"/@ref matx::ResamplePolyStream::flush "flush()"
  *   work runs on it. For CUDA executors the retain buffer is stream-ordered

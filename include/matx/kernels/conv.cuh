@@ -12,6 +12,7 @@
 #include "matx/core/operator_options.h"
 #include "matx/core/utils.h"
 #include "matx/core/type_utils.h"
+#include "matx/kernels/tensor_accessor.h"
 #include "matx/core/tensor_utils.h"
 
 
@@ -26,7 +27,7 @@ using namespace matx_conv1d_detail;
 #ifdef __CUDACC__
 template <int THREADS, int EPT, typename OutType, typename InType, typename FilterType>
 __launch_bounds__(THREADS)
-__global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
+__global__ void Conv1D(OutType d_out, const InType d_in, const FilterType d_filter,
                        index_t signal_len,
                        matxConvCorrMode_t mode)
 {
@@ -88,23 +89,74 @@ __global__ void Conv1D(OutType d_out, InType d_in, FilterType d_filter,
     if( n > 0 )
       __syncthreads();
 
-    // load signal,  pad extra elements with zeros
-    for (int32_t lidx = threadIdx.x,
-                 gidx = static_cast<int32_t>(chunk_idx * CONV1D_ELEMENTS_PER_BLOCK - filter_len + 1 + threadIdx.x);
-        gidx < static_cast<int32_t>((chunk_idx+1) * CONV1D_ELEMENTS_PER_BLOCK) ;
-        gidx += THREADS, lidx += THREADS) {
+    // load signal,  pad extra elements with zeros. Each thread fetches a batch of
+    // elements into registers before storing any of them, so the global loads
+    // overlap rather than each store serializing its own load.
+    const int32_t gidx_end = static_cast<int32_t>((chunk_idx+1) * CONV1D_ELEMENTS_PER_BLOCK);
+    if constexpr (detail::is_split_unit_stride_input_v<InType>) {
+      // Two-segment streaming input: pick the segment holding this block's whole
+      // staging range once (almost always the new segment), instead of selecting
+      // per element. Same loop as below, reading through that segment. The loop
+      // is deliberately duplicated: sharing one copy through a lambda changed the
+      // tensor-input kernels' SASS.
+      // Batch for 4 byte loads and doubles as those were measured to benefit.
+      // cuda::std::complex<float> regressed, despite being 8 bytes.
+      constexpr int SPLIT_LOAD_BATCH =
+          (sizeof(intype_strip) == 4 || cuda::std::is_same_v<intype_strip, double>) ? 4 : 1;
+      const int32_t gidx_begin = static_cast<int32_t>(chunk_idx * CONV1D_ELEMENTS_PER_BLOCK - filter_len + 1);
+      const index_t lo = cuda::std::max<index_t>(gidx_begin, 0);
+      const index_t hi = cuda::std::min<index_t>(gidx_end, signal_len) - 1;
+      detail::WithInputRangeReader(d_in, d_in, lo, hi, [&](auto read, index_t shift) {
+        for (int32_t lidx = threadIdx.x, gidx = gidx_begin + static_cast<int32_t>(threadIdx.x);
+            gidx < gidx_end;
+            gidx += SPLIT_LOAD_BATCH * THREADS, lidx += SPLIT_LOAD_BATCH * THREADS) {
+          intype_strip vals[SPLIT_LOAD_BATCH];
+          MATX_LOOP_UNROLL
+          for (int b = 0; b < SPLIT_LOAD_BATCH; b++) {
+            const int32_t g = gidx + b * THREADS;
+            vals[b] = intype_strip(0);
+            if (g >= 0 && g < signal_len && g < gidx_end) {
+              vals[b] = read(static_cast<index_t>(g) - shift);
+            }
+          }
+          MATX_LOOP_UNROLL
+          for (int b = 0; b < SPLIT_LOAD_BATCH; b++) {
+            if (gidx + b * THREADS < gidx_end) {
+              s_data[lidx + b * THREADS] = vals[b];
+            }
+          }
+        }
+        return 0;
+      });
+    } else {
+      // Batching only for 4-byte types: it was neutral to slower on larger types.
+      constexpr int LOAD_BATCH = (sizeof(intype_strip) == 4) ? 4 : 1;
+      for (int32_t lidx = threadIdx.x,
+                   gidx = static_cast<int32_t>(chunk_idx * CONV1D_ELEMENTS_PER_BLOCK - filter_len + 1 + threadIdx.x);
+          gidx < gidx_end;
+          gidx += LOAD_BATCH * THREADS, lidx += LOAD_BATCH * THREADS) {
 
-      // some elements may be out of range.  We set their values to 0.
-      intype_strip val(0);
+        intype_strip vals[LOAD_BATCH];
+        MATX_LOOP_UNROLL
+        for (int b = 0; b < LOAD_BATCH; b++) {
+          const int32_t g = gidx + b * THREADS;
+          // some elements may be out of range.  We set their values to 0.
+          vals[b] = intype_strip(0);
+          if (g >= 0 && g < signal_len && g < gidx_end) {
+            bdims[Rank - 1] = g;
+            cuda::std::apply([&](auto &&...args) {
+                vals[b] = d_in.operator()(args...);
+                }, bdims);
+          }
+        }
 
-      if( gidx >= 0 && gidx < signal_len) {
-        bdims[Rank - 1] = gidx;
-        cuda::std::apply([&val, d_in](auto &&...args) {
-            val = d_in.operator()(args...);
-            }, bdims);
+        MATX_LOOP_UNROLL
+        for (int b = 0; b < LOAD_BATCH; b++) {
+          if (gidx + b * THREADS < gidx_end) {
+            s_data[lidx + b * THREADS] = vals[b];
+          }
+        }
       }
-
-      s_data[lidx] = val;
     }
 
     // wait for signal to load

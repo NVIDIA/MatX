@@ -42,6 +42,7 @@ set (test_sources
     00_transform/StreamingConv.cu
     00_transform/StreamingResample.cu
     00_transform/StreamingChannelize.cu
+    00_transform/StreamingBuffer.cu
     00_transform/Solve.cu
     00_solver/Cholesky.cu
     00_solver/LU.cu

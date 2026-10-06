@@ -58,6 +58,59 @@ struct data_ptr_of_op<Op, true> {
 template <typename Op>
 using data_ptr_of_op_t = typename data_ptr_of_op<Op, is_tensor_view_v<Op>>::type;
 
+// 1D operators that read as two unit-stride segments in separate allocations,
+// head followed by tail (the streaming objects' SplitUnitStride1DOp). Such an
+// operator provides split_head(), split_tail() and split_head_len(): indices
+// in [0, split_head_len()) read split_head(), the rest read split_tail() at
+// idx - split_head_len(). There is no single base pointer, so TensorAccessor
+// still reads it through its own operator(). Transforms use the trait to:
+//  - let it join an IsUnitStride launch, so it doesn't force the other
+//    operands onto the strided path (its UNIT_STRIDE_LAST capability is the
+//    default true), and
+//  - in kernels that re-read input in an inner loop, pick the segment once
+//    for a whole index range and read it through a raw pointer.
+template <typename Op>
+inline constexpr bool is_split_unit_stride_input_v =
+    requires { typename remove_cvref_t<Op>::matx_split_unit_stride_input; };
+
+// Returns fir(read, shift), where read(i - shift) returns input element i for
+// every i in [lo, hi] that the caller reads; callers index read() with i - shift.
+// For a two-segment split input (is_split_unit_stride_input_v), reading through
+// the accessor selects the head or tail segment per element: a compare, two
+// selects and an address computation per read, which dominates issue-bound FIR
+// loops that read each input element once per tap. When [lo, hi] lies in one
+// segment, read loads through that segment's pointer instead, so the select
+// happens once per range. The shift is applied to the caller's loop indices
+// rather than inside read() so the loop stays a plain pointer walk, as for a
+// tensor input. Ranges that straddle the boundary, and all other input types,
+// read through input_acc. UseSegments = false also reads through input_acc:
+// the second copy of the loop costs registers, and whether that outweighs the
+// per-element select depends on the kernel and element size, so callers decide.
+template <bool UseSegments = true, typename InType, typename InAcc, typename IdxT, typename Fir>
+__MATX_DEVICE__ __MATX_INLINE__ auto WithInputRangeReader(const InType &input, const InAcc &input_acc,
+                                                       IdxT lo, IdxT hi, Fir &&fir)
+{
+  if constexpr (UseSegments && is_split_unit_stride_input_v<InType>) {
+    // The segment path indexes the op directly, without input_acc's batch
+    // binding, which is only correct for a 1D input.
+    static_assert(InType::Rank() == 1,
+                  "WithInputRangeReader: two-segment split inputs must be 1D");
+    const IdxT head_len = static_cast<IdxT>(input.split_head_len());
+    const typename InType::value_type *seg = nullptr;
+    IdxT shift = 0;
+    if (lo >= head_len) {
+      seg = input.split_tail();
+      shift = head_len;
+    } else if (hi < head_len) {
+      seg = input.split_head();
+    }
+    if (seg != nullptr) {
+      return fir([seg](IdxT i) { return seg[i]; }, shift);
+    }
+  }
+  return fir([&input_acc](IdxT i) { return input_acc(i); }, IdxT{0});
+}
+
 // Forward declaration — defined below.
 template <typename Op, bool IsUnitStride, int NumBound, typename IdxT = index_t>
 struct BoundAccessor;
