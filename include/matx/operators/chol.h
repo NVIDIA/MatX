@@ -39,6 +39,9 @@
 #include "matx/operators/base_operator.h"
 #include "matx/core/operator_options.h"
 #include "matx/transforms/chol/chol_cuda.h"
+#ifdef MATX_EN_CUSOLVERMP
+  #include "matx/transforms/distributed/distributed_mp.h"
+#endif
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
   #include "matx/transforms/solver_cusolverdx.h"
 #endif
@@ -298,6 +301,43 @@ namespace detail {
   };
 }
 
+namespace experimental::detail {
+
+template <typename OpA>
+class distributed_mp_chol_op {
+public:
+  using distributed_expression = bool;
+  using value_type = typename remove_cvref_t<OpA>::value_type;
+
+  distributed_mp_chol_op(const OpA &a, SolverFillMode uplo)
+      : a_{a}, uplo_{uplo} {}
+
+  template <typename Out, typename Executor>
+  void ExecuteTo(Out &out, Executor &executor) const {
+    static_assert(is_block_cyclic_distributed_tensor_v<Out>,
+                  "Block-cyclic Cholesky requires a block-cyclic output");
+    if constexpr (std::is_same_v<remove_cvref_t<Executor>,
+                                 distributedCUDAExecutor>) {
+#ifdef MATX_EN_CUSOLVERMP
+      CholMpImpl(out, a_, executor, uplo_);
+#else
+      MATX_THROW(matxNotSupported,
+                 "Block-cyclic Cholesky requires MATX_EN_CUSOLVERMP");
+#endif
+    }
+    else {
+      MATX_THROW(matxInvalidExecutor,
+                 "Block-cyclic Cholesky requires distributedCUDAExecutor");
+    }
+  }
+
+private:
+  remove_cvref_t<OpA> a_;
+  SolverFillMode uplo_;
+};
+
+} // namespace experimental::detail
+
 /**
  * Performs a Cholesky factorization, saving the result in either the upper or
  * lower triangle of the output. 
@@ -319,15 +359,21 @@ namespace detail {
 template<typename OpA>
 __MATX_INLINE__ auto chol(const OpA &a, SolverFillMode uplo = SolverFillMode::UPPER) {
   if constexpr (is_distributed_tensor_v<OpA>) {
-    static_assert(remove_cvref_t<OpA>::Rank() >= 3,
-                  "Distributed Cholesky factorization requires a batch "
-                  "dimension followed by matrix dimensions");
-    auto local_chol = [uplo](const auto &local_a) {
-      return detail::CholOp(local_a, uplo);
-    };
-    return experimental::detail::make_distributed_local_transform<
-        typename remove_cvref_t<OpA>::value_type, 2>(
-        std::move(local_chol), a);
+    if constexpr (
+        experimental::is_block_cyclic_distributed_tensor_v<OpA>) {
+      return experimental::detail::distributed_mp_chol_op<OpA>{a, uplo};
+    }
+    else {
+      static_assert(remove_cvref_t<OpA>::Rank() >= 3,
+                    "Distributed Cholesky needs a block-cyclic rank-2 matrix "
+                    "or a batch dimension followed by local matrix dimensions");
+      auto local_chol = [uplo](const auto &local_a) {
+        return detail::CholOp(local_a, uplo);
+      };
+      return experimental::detail::make_distributed_local_transform<
+          typename remove_cvref_t<OpA>::value_type, 2>(
+          std::move(local_chol), a);
+    }
   }
   else {
     return detail::CholOp(a, uplo);
