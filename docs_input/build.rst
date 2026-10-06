@@ -464,7 +464,7 @@ internet-enabled system and transfer the Conan client cache to the offline envir
 
 4. Transfer the CPM cache (if used) and the Conan cache archive to the offline system.
 
-**On the offline system:**
+**On an offline system:**
 
 1. Extract the Conan and CPM caches and set environment variables to point Conan and CPM to the recovered caches:
 
