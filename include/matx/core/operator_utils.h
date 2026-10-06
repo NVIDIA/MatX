@@ -74,6 +74,23 @@ namespace matx {
         return T::Rank();
       }
     }
+
+    /**
+     * @brief Get the rank an operator has at runtime: DynRank() only for dynamic-rank
+     * expressions, otherwise the compile-time Rank().
+     *
+     * Unlike get_dyn_rank(), this ignores DynRank() on static operators, which can
+     * differ from Rank() (e.g. toeplitz reports its input's rank).
+     */
+    template <typename T>
+    __MATX_INLINE__ __MATX_HOST__ int32_t get_runtime_rank(const T& op) {
+      if constexpr (is_dynamic_rank_op_v<T>) {
+        return get_dyn_rank(op);
+      }
+      else {
+        return remove_cvref_t<T>::Rank();
+      }
+    }
   }
 
   constexpr bool RankGTE(int32_t rank1, int32_t rank2) {
@@ -196,38 +213,139 @@ namespace matx {
       }
     }
 
+    // Runtime-indexed array access without runtime subscripts.
+    //
+    // On the device, subscripting a local array with a runtime value (or calling
+    // Size() with a runtime dimension) forces the array, or the whole operator,
+    // into local memory. These helpers compare the runtime index against each
+    // compile-time position and select, so every subscript is a constant and the
+    // values stay in registers. Pack expansion is used instead of unrolled loops
+    // because the compiler can fold an unrolled compare-and-select back into a
+    // dynamic load. Indices are not checked, so callers must validate them: an
+    // out-of-range index makes select_at and size_at return a default value,
+    // replace_at return the array unchanged, and drop_at drop the wrong element.
+    // With a single element the only valid index is 0, so select_at, replace_at
+    // and size_at skip the compare entirely (and ignore an out-of-range index).
+
+    template <typename T, size_t N, size_t... Ds>
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr T select_at_impl(
+        const cuda::std::array<T, N> &arr, int i, cuda::std::index_sequence<Ds...>) {
+      T v{};
+      ((v = (static_cast<int>(Ds) == i) ? cuda::std::get<Ds>(arr) : v), ...);
+      return v;
+    }
 
     /**
-      * @brief Returns an N-D coordinate as an array corresponding to the absolute index abs
-      *
-      * @param op Operator
-      * @param abs Absolute index
-      * @return cuda::std::array of indices
-      */
-    template <typename Op>
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto GetIdxFromAbs(const Op &op, index_t abs) {
-      using l_stride_type = index_t;
-      using l_shape_type = index_t;
-      constexpr int RANK = Op::Rank();
-
-      cuda::std::array<l_shape_type, RANK> indices;
-
-      for (int idx = 0; idx < RANK; idx++) {
-        if (idx == RANK-1) {
-          indices[RANK-1] = abs;
-        }
-        else {
-          // no std::accumulate on the device
-          l_stride_type prod = 1;
-          for (int i = idx + 1; i < RANK; i++) {
-            prod *= op.Size(i);
-          }
-
-          indices[idx] = abs / prod;
-          abs -= prod * indices[idx];
-        }
+     * @brief Returns arr[i] for a runtime i using only compile-time subscripts
+     */
+    template <typename T, size_t N>
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr T select_at(const cuda::std::array<T, N> &arr, [[maybe_unused]] int i) {
+      if constexpr (N == 1) {
+        return cuda::std::get<0>(arr);
       }
+      else {
+        return select_at_impl(arr, i, cuda::std::make_index_sequence<N>{});
+      }
+    }
 
+    template <typename T, size_t N, size_t... Ds>
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr cuda::std::array<T, N> replace_at_impl(
+        const cuda::std::array<T, N> &arr, int i, T v, cuda::std::index_sequence<Ds...>) {
+      return {{((static_cast<int>(Ds) == i) ? v : cuda::std::get<Ds>(arr))...}};
+    }
+
+    /**
+     * @brief Returns a copy of arr with element i (runtime) replaced by v
+     */
+    template <typename T, size_t N>
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr cuda::std::array<T, N> replace_at(
+        const cuda::std::array<T, N> &arr, [[maybe_unused]] int i, T v) {
+      if constexpr (N == 1) {
+        return {{v}};
+      }
+      else {
+        return replace_at_impl(arr, i, v, cuda::std::make_index_sequence<N>{});
+      }
+    }
+
+    template <typename T, size_t N, size_t... Ks>
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr cuda::std::array<T, N - 1> drop_at_impl(
+        const cuda::std::array<T, N> &arr, int i, cuda::std::index_sequence<Ks...>) {
+      return {{((static_cast<int>(Ks) < i) ? cuda::std::get<Ks>(arr) : cuda::std::get<Ks + 1>(arr))...}};
+    }
+
+    /**
+     * @brief Returns a copy of arr with element i (runtime) removed
+     */
+    template <typename T, size_t N>
+      requires (N > 0)
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr cuda::std::array<T, N - 1> drop_at(
+        const cuda::std::array<T, N> &arr, int i) {
+      return drop_at_impl(arr, i, cuda::std::make_index_sequence<N - 1>{});
+    }
+
+    template <typename T, size_t N, size_t... Ks>
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr cuda::std::array<T, N - 2> drop_at_impl(
+        const cuda::std::array<T, N> &arr, int lo, int hi, cuda::std::index_sequence<Ks...>) {
+      return {{((static_cast<int>(Ks) < lo)     ? cuda::std::get<Ks>(arr) :
+                (static_cast<int>(Ks) + 1 < hi) ? cuda::std::get<Ks + 1>(arr) :
+                                                  cuda::std::get<Ks + 2>(arr))...}};
+    }
+
+    /**
+     * @brief Returns a copy of arr with elements lo and hi (runtime, lo < hi) removed
+     */
+    template <typename T, size_t N>
+      requires (N > 1)
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr cuda::std::array<T, N - 2> drop_at(
+        const cuda::std::array<T, N> &arr, int lo, int hi) {
+      return drop_at_impl(arr, lo, hi, cuda::std::make_index_sequence<N - 2>{});
+    }
+
+    template <typename Op, size_t... Ds>
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr index_t size_at_impl(
+        const Op &op, int dim, cuda::std::index_sequence<Ds...>) {
+      index_t size = 0;
+      ((size = (static_cast<int>(Ds) == dim) ? static_cast<index_t>(op.Size(static_cast<int>(Ds))) : size), ...);
+      return size;
+    }
+
+    /**
+     * @brief Returns op.Size(dim) for a runtime dim, calling Size() only with compile-time dimensions
+     */
+    template <typename Op>
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr index_t size_at(const Op &op, [[maybe_unused]] int dim) {
+      if constexpr (remove_cvref_t<Op>::Rank() == 1) {
+        return static_cast<index_t>(op.Size(0));
+      }
+      else {
+        return size_at_impl(op, dim, cuda::std::make_index_sequence<remove_cvref_t<Op>::Rank()>{});
+      }
+    }
+
+    // Peels dimension D off abs. Every subscript and Size() argument is a
+    // compile-time constant: runtime ones force the index array and the
+    // operator's sizes into local memory on the device.
+    template <int D, typename Op, size_t N>
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ void PeelIdxFromAbs(
+        const Op &op, index_t &abs, cuda::std::array<index_t, N> &indices) {
+      const index_t size = op.Size(D);
+      const index_t quot = abs / size;
+      indices[D] = abs - quot * size;
+      abs = quot;
+    }
+
+    template <typename Op, size_t... Ds>
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto BlockToIdxImpl(
+        const Op &op, index_t abs, int nb_dims, cuda::std::index_sequence<Ds...>) {
+      constexpr int RANK = Op::Rank();
+      const int batched = RANK - nb_dims;
+      cuda::std::array<index_t, RANK> indices{0};
+      // Ds runs RANK-1 down to 1: peel the fastest-varying batched dims first
+      ((static_cast<int>(Ds) < batched ? PeelIdxFromAbs<static_cast<int>(Ds)>(op, abs, indices) : void()), ...);
+      if (batched > 0) {
+        indices[0] = abs;
+      }
       return indices;
     }
 
@@ -242,28 +360,26 @@ namespace matx {
       */
     template <typename Op>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto BlockToIdx(const Op &op, index_t abs, int nb_dims) {
-      using l_stride_type = index_t;
-      using l_shape_type = index_t;
       constexpr int RANK = Op::Rank();
-      cuda::std::array<l_shape_type, RANK> indices{0};
-
-      for (int idx = 0; idx < RANK - nb_dims; idx++) {
-        if (idx == RANK-nb_dims-1) {
-          indices[RANK - nb_dims - 1] = abs;
-        }
-        else {
-          // no std::accumulate on the device
-          l_stride_type prod = 1;
-          for (int i = idx + 1; i < RANK - nb_dims; i++) {
-            prod *= op.Size(i);
-          }
-
-          indices[idx] = abs / prod;
-          abs -= prod * indices[idx];
-        }
+      if constexpr (RANK == 0) {
+        return cuda::std::array<index_t, 0>{};
       }
+      else {
+        return BlockToIdxImpl(op, abs, nb_dims,
+                              offset_sequence_t<1, make_index_sequence_rev<RANK - 1>>{});
+      }
+    }
 
-      return indices;
+    /**
+      * @brief Returns an N-D coordinate as an array corresponding to the absolute index abs
+      *
+      * @param op Operator
+      * @param abs Absolute index
+      * @return cuda::std::array of indices
+      */
+    template <typename Op>
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto GetIdxFromAbs(const Op &op, index_t abs) {
+      return BlockToIdx(op, abs, 0);
     }
 
     template <typename T0, typename T1, typename... Tn>

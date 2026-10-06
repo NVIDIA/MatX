@@ -103,18 +103,15 @@ public:
         "          return static_cast<MathType>(v.data[lane]);\n" +
         "        }\n" +
         "      };\n" +
-        "      cuda::std::array<index_t, Rank_> idx{indices...};\n" +
-        "      const index_t out_idx = idx[axis_];\n" +
+        "      const cuda::std::array<index_t, Rank_> idx{indices...};\n" +
+        "      const index_t out_idx = detail::select_at(idx, axis_);\n" +
         "      const auto cur = get_value<CapType>(op_, idx);\n" +
         "      cuda::std::array<MathType, static_cast<size_t>(EPT)> correction{};\n" +
         "      if (out_idx != 0) {\n" +
-        "        cuda::std::array<index_t, Rank_> seq_idx = idx;\n" +
-        "        seq_idx[axis_] = 0;\n" +
-        "        auto prev = get_value<CapType>(op_, seq_idx);\n" +
+        "        auto prev = get_value<CapType>(op_, detail::replace_at(idx, axis_, index_t{0}));\n" +
         "        const MathType neg_half_period = -half_period_;\n" +
         "        for (index_t i = 1; i <= out_idx; i++) {\n" +
-        "          seq_idx[axis_] = i;\n" +
-        "          const auto next = get_value<CapType>(op_, seq_idx);\n" +
+        "          const auto next = get_value<CapType>(op_, detail::replace_at(idx, axis_, i));\n" +
         "          MATX_LOOP_UNROLL\n" +
         "          for (index_t lane = 0; lane < EPT; lane++) {\n" +
         "            const MathType next_s = get_lane_scalar(next, lane);\n" +
@@ -164,21 +161,26 @@ public:
     static_assert(!is_complex_v<value_type>,
                   "unwrap() does not support complex input");
 
-    MATX_ASSERT_STR(period_ > static_cast<MathType>(0), matxInvalidParameter,
-                    "unwrap period must be positive");
+    // Checked in all build modes: a zero period makes every output NaN (also rejects NaN)
+    if (!(period_ > static_cast<MathType>(0))) {
+      MATX_THROW(matxInvalidParameter, "unwrap period must be positive");
+    }
 
     MATX_LOOP_UNROLL
     for (int i = 0; i < Rank(); i++) {
       sizes_[i] = op_.Size(i);
     }
 
-    if constexpr (Rank() > 0) {
+    // A dynamic-rank operand can have a runtime rank of 0 even when Rank() > 0
+    const int32_t rank = jit_rank();
+    if (rank > 0) {
       axis_ = axis;
       if (axis_ < 0) {
-        axis_ += Rank();
+        axis_ += rank;
       }
-      MATX_ASSERT_STR(axis_ >= 0 && axis_ < Rank(), matxInvalidDim,
-                      "unwrap axis must be in range [-rank, rank-1]");
+      if (axis_ < 0 || axis_ >= rank) {
+        MATX_THROW(matxInvalidDim, "unwrap axis must be in range [-rank, rank-1]");
+      }
     }
     else {
       axis_ = 0;
@@ -210,20 +212,17 @@ public:
         }
       };
 
-      cuda::std::array<index_t, Rank()> idx{indices...};
-      const index_t out_idx = idx[axis_];
+      const cuda::std::array<index_t, Rank()> idx{indices...};
+      const index_t out_idx = detail::select_at(idx, axis_);
       const auto cur = get_value<CapType>(op_, idx);
       cuda::std::array<MathType, static_cast<size_t>(EPT)> correction{};
 
       if (out_idx != 0) {
-        cuda::std::array<index_t, Rank()> seq_idx = idx;
-        seq_idx[axis_] = 0;
-        auto prev = get_value<CapType>(op_, seq_idx);
+        auto prev = get_value<CapType>(op_, detail::replace_at(idx, axis_, index_t{0}));
         const MathType neg_half_period = -half_period_;
 
         for (index_t i = 1; i <= out_idx; i++) {
-          seq_idx[axis_] = i;
-          const auto next = get_value<CapType>(op_, seq_idx);
+          const auto next = get_value<CapType>(op_, detail::replace_at(idx, axis_, i));
 
           MATX_LOOP_UNROLL
           for (index_t lane = 0; lane < EPT; lane++) {
@@ -365,10 +364,12 @@ private:
  *
  * @tparam Op Input operator/tensor type
  * @param op Input operator
- * @param axis Axis to unwrap. Default is last axis (-1)
+ * @param axis Axis to unwrap. Default is last axis (-1). Must be in [-Rank(), Rank()),
+ * otherwise matxInvalidDim is thrown
  * @param discont Maximum discontinuity between adjacent samples. Values lower
  * than `period / 2` are treated as `period / 2`.
- * @param period Complement period used to unwrap phase values. Default is 2*pi.
+ * @param period Complement period used to unwrap phase values. Default is 2*pi. Must be
+ * positive, otherwise matxInvalidParameter is thrown
  */
 template <typename Op>
 __MATX_INLINE__ auto unwrap(

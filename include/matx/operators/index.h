@@ -105,8 +105,8 @@ namespace matx
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto operator()(Is... indices) const 
         {
           if constexpr (CapType::ept == ElementsPerThread::ONE) {
-            cuda::std::array<index_t, sizeof...(Is)> inds{indices...};
-            return inds[dim_];
+            const cuda::std::array<index_t, sizeof...(Is)> inds{{static_cast<index_t>(indices)...}};
+            return detail::select_at(inds, dim_);
           } else {
             return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
           }

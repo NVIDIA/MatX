@@ -34,6 +34,7 @@
 
 #include <cassert>
 #include <type_traits>
+#include <cuda/std/algorithm>
 #include <cuda/std/functional>
 #include "matx/core/vector.h"
 #include "matx/core/error.h"
@@ -840,6 +841,11 @@ MATX_IGNORE_WARNING_POP_GCC
     {
       MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
+      // Checked in all build modes: the loop below reads the size and stride of each kept dimension
+      if (cuda::std::count(clones.begin(), clones.end(), matxKeepDim) != RANK) {
+        MATX_THROW(matxInvalidDim, "Number of matxKeepDim in a clone must match input operator rank");
+      }
+
       cuda::std::array<index_t, N> n;
       cuda::std::array<typename Desc::stride_type, N> s;
 
@@ -864,8 +870,6 @@ MATX_IGNORE_WARNING_POP_GCC
           s[i] = 0;
         }
       }
-      MATX_ASSERT_STR(d == RANK, matxInvalidDim,
-                      "Must keep as many dimension as the original tensor has");
       tensor_desc_t<decltype(n), decltype(s), N> new_desc{std::move(n), std::move(s)};
       return new_desc;
     }
@@ -888,15 +892,18 @@ MATX_IGNORE_WARNING_POP_GCC
       static_assert(RANK >= 1, "Only tensors of rank 1 and higher can be permuted.");
       cuda::std::array<shape_type, RANK> n;
       cuda::std::array<stride_type, RANK> s;
-      [[maybe_unused]] bool done[RANK] = {0};
+      bool done[RANK] = {0};
 
   MATX_LOOP_UNROLL
       for (int i = 0; i < RANK; i++) {
         int d = dims[i];
-        MATX_ASSERT_STR(d < RANK, matxInvalidDim,
-                        "Index to permute is larger than tensor rank");
-        MATX_ASSERT_STR(done[d] == false, matxInvalidParameter,
-                        "Cannot list the same dimension to permute twice");
+        // Checked in all build modes: d indexes done, Size(), and Stride()
+        if (d < 0 || d >= RANK) {
+          MATX_THROW(matxInvalidDim, "Index to permute is outside the tensor rank");
+        }
+        if (done[d]) {
+          MATX_THROW(matxInvalidDim, "Cannot list the same dimension to permute twice");
+        }
         done[d] = true;
         n[i] = this->Size(d);
         s[i] = this->Stride(d);

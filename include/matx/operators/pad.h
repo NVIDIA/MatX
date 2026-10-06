@@ -141,38 +141,42 @@ namespace matx
       {
         MATX_LOG_TRACE("{} constructor: axis={}, mode={}", str(), axis, static_cast<int>(mode));
         static_assert(RANK > 0, "Cannot pad rank-0 tensors");
-        MATX_ASSERT_STR(axis >= 0 && axis < RANK, matxInvalidDim, "pad axis must be >= 0 and less than the rank of the operator");
+        if (axis < 0 || axis >= jit_rank()) {
+          MATX_THROW(matxInvalidDim, "pad axis must be >= 0 and less than the rank of the operator");
+        }
         MATX_ASSERT_STR(pad_sizes.size() == 2, matxInvalidParameter, "pad_sizes must contain exactly 2 elements [before, after]");
         
         before_ = pad_sizes[0];
         after_ = pad_sizes[1];
         
-        MATX_ASSERT_STR(before_ >= 0, matxInvalidParameter, "pad before size must be non-negative");
-        MATX_ASSERT_STR(after_ >= 0, matxInvalidParameter, "pad after size must be non-negative");
+        // Checked in all build modes: negative sizes would silently crop and shift the data
+        if (before_ < 0 || after_ < 0) {
+          MATX_THROW(matxInvalidParameter, "pad before and after sizes must be non-negative");
+        }
       }
 
       template <typename CapType, typename Op, typename... Is>
       static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(
-          Op&& op, int axis, index_t before, const value_type& pad_value, PadMode mode, Is... indices) {
+          Op&& op, int axis, index_t before, index_t op_size, const value_type& pad_value, PadMode mode, Is... indices) {
         if constexpr (CapType::ept == ElementsPerThread::ONE) {
-          cuda::std::array<index_t, sizeof...(Is)> ind_array = {{indices...}};
-          index_t idx = ind_array[axis];
-          index_t op_size = op.Size(axis);
-          
+          const cuda::std::array<index_t, sizeof...(Is)> ind_array{{static_cast<index_t>(indices)...}};
+          const index_t idx = detail::select_at(ind_array, axis);
+          index_t op_idx;
+
           // Check if we're in the padding region
           if (idx < before || idx >= before + op_size) {
             if (mode == MATX_PAD_MODE_EDGE) {
               // Edge padding - replicate edge values
-              ind_array[axis] = (idx < before) ? 0 : (op_size - 1);
+              op_idx = (idx < before) ? 0 : (op_size - 1);
             } else {
               // Default to constant padding
               return value_type(pad_value);
             }
           } else {
             // Original tensor region - adjust index to remove padding offset
-            ind_array[axis] = idx - before;
+            op_idx = idx - before;
           }
-          return value_type(get_value<CapType>(cuda::std::forward<Op>(op), ind_array));
+          return value_type(get_value<CapType>(cuda::std::forward<Op>(op), detail::replace_at(ind_array, axis, op_idx)));
         } else {
           return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
         }
@@ -181,7 +185,7 @@ namespace matx
       template <typename CapType, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is) const
       {
-        return get_impl<CapType>(cuda::std::as_const(op_), axis_, before_, pad_value_, mode_, is...);
+        return get_impl<CapType>(cuda::std::as_const(op_), axis_, before_, detail::size_at(op_, axis_), pad_value_, mode_, is...);
       }
 
       template <typename... Is>
@@ -193,7 +197,7 @@ namespace matx
       template <typename CapType, typename... Is>
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is)
       {
-        return get_impl<CapType>(cuda::std::forward<decltype(op_)>(op_), axis_, before_, pad_value_, mode_, is...);
+        return get_impl<CapType>(cuda::std::forward<decltype(op_)>(op_), axis_, before_, detail::size_at(op_, axis_), pad_value_, mode_, is...);
       }
 
       template <typename... Is>
@@ -305,9 +309,10 @@ namespace matx
    *
    * @tparam T Input operator type
    * @param op Input operator to pad
-   * @param axis Dimension along which to pad
+   * @param axis Dimension along which to pad; must be in [0, Rank()), otherwise matxInvalidDim is thrown
    * @param pad_sizes std::array containing {before, after} padding sizes. This operator will add before elements before
-   * the original operator and after elements after the original operator.
+   * the original operator and after elements after the original operator. Both must be non-negative, otherwise
+   * matxInvalidParameter is thrown.
    * @param pad_value Value to use for padding (constant padding mode only)
    * @param mode Padding mode. Defaults to MATX_PAD_MODE_CONSTANT if not provided.
    * @return Padded operator
@@ -326,9 +331,10 @@ namespace matx
    *
    * @tparam T Input operator type
    * @param op Input operator to pad
-   * @param axis Dimension along which to pad
+   * @param axis Dimension along which to pad; must be in [0, Rank()), otherwise matxInvalidDim is thrown
    * @param pad_sizes C-style array containing {before, after} padding sizes. This operator will add before elements before
-   * the original operator and after elements after the original operator.
+   * the original operator and after elements after the original operator. Both must be non-negative, otherwise
+   * matxInvalidParameter is thrown.
    * @param pad_value Value to use for padding (constant padding mode only)
    * @param mode Padding mode. Defaults to MATX_PAD_MODE_CONSTANT if not provided.
    * @return Padded operator

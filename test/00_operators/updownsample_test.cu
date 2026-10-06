@@ -82,3 +82,72 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Downsample)
 
   MATX_EXIT_HANDLER();
 }
+// Upsample a rank-3 tensor along each axis on the executor
+TYPED_TEST(OperatorTestsNumericAllExecs, UpsampleAllAxes)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  using inner_t = typename inner_op_type_t<TestType>::type;
+
+  ExecType exec{};
+
+  const index_t n = 3;
+  const cuda::std::array<index_t, 3> in_shape{2, 3, 4};
+  auto in = make_tensor<TestType>(in_shape);
+  for (index_t i = 0; i < 2; i++)
+    for (index_t j = 0; j < 3; j++)
+      for (index_t k = 0; k < 4; k++)
+        in(i, j, k) = static_cast<inner_t>(i * 12 + j * 4 + k + 1);
+
+  for (int axis = 0; axis < 3; axis++) {
+    cuda::std::array<index_t, 3> out_shape = in_shape;
+    out_shape[axis] *= n;
+    auto out = make_tensor<TestType>(out_shape);
+    (out = upsample(in, axis, n)).run(exec);
+    exec.sync();
+
+    for (index_t i = 0; i < out_shape[0]; i++) {
+      for (index_t j = 0; j < out_shape[1]; j++) {
+        for (index_t k = 0; k < out_shape[2]; k++) {
+          index_t idx[3] = {i, j, k};
+          TestType expected = static_cast<inner_t>(0);
+          if (idx[axis] % n == 0) {
+            idx[axis] /= n;
+            expected = in(idx[0], idx[1], idx[2]);
+          }
+          ASSERT_TRUE(MatXUtils::MatXTypeCompare(out(i, j, k), expected)) << "axis=" << axis;
+        }
+      }
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+// The upsample and downsample dim must be within the operator's rank, and the rate must be
+// positive, in every build mode
+TEST(OperatorValidationTests, UpDownsampleInvalidArgs)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = float;
+
+  auto in = make_tensor<TestType>({2, 3, 4});
+
+  EXPECT_THROW(upsample(in, 3, 2), matx::detail::matxException);
+  EXPECT_THROW(upsample(in, -1, 2), matx::detail::matxException);
+  EXPECT_NO_THROW(upsample(in, 2, 2));
+
+  EXPECT_THROW(downsample(in, 3, 2), matx::detail::matxException);
+  EXPECT_THROW(downsample(in, -1, 2), matx::detail::matxException);
+  EXPECT_NO_THROW(downsample(in, 2, 2));
+
+  EXPECT_THROW(upsample(in, 0, 0), matx::detail::matxException);
+  EXPECT_THROW(upsample(in, 0, -2), matx::detail::matxException);
+  EXPECT_THROW(downsample(in, 0, 0), matx::detail::matxException);
+  EXPECT_THROW(downsample(in, 0, -2), matx::detail::matxException);
+  EXPECT_NO_THROW(upsample(in, 0, 1));
+  EXPECT_NO_THROW(downsample(in, 0, 1));
+
+  MATX_EXIT_HANDLER();
+}

@@ -233,4 +233,107 @@ TYPED_TEST(OperatorTestsNumericAllExecs, CloneOp)
   }
 
   MATX_EXIT_HANDLER();
+}
+
+// Clones of expressions (which use CloneOp rather than a strided tensor view)
+// with kept dimensions in leading, non-adjacent, and interleaved positions
+TYPED_TEST(OperatorTestsNumericAllExecs, CloneOpKeepDimPatterns)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  using inner_t = typename inner_op_type_t<TestType>::type;
+
+  ExecType exec{};
+
+  auto t1 = make_tensor<TestType>({4});
+  auto t2 = make_tensor<TestType>({3, 4});
+  auto t3 = make_tensor<TestType>({2, 3, 4});
+  for (index_t i = 0; i < 4; i++) t1(i) = static_cast<inner_t>(i);
+  for (index_t i = 0; i < 3; i++)
+    for (index_t j = 0; j < 4; j++) t2(i, j) = static_cast<inner_t>(i * 4 + j);
+  for (index_t i = 0; i < 2; i++)
+    for (index_t j = 0; j < 3; j++)
+      for (index_t k = 0; k < 4; k++) t3(i, j, k) = static_cast<inner_t>(i * 12 + j * 4 + k);
+  const auto two = static_cast<inner_t>(2);
+
+  { // rank 2 -> 3, kept dims {0, 2}
+    auto out = make_tensor<TestType>({3, 5, 4});
+    (out = clone<3>(two * t2, {matxKeepDim, 5, matxKeepDim})).run(exec);
+    exec.sync();
+    for (index_t a = 0; a < 3; a++)
+      for (index_t b = 0; b < 5; b++)
+        for (index_t c = 0; c < 4; c++)
+          ASSERT_EQ(out(a, b, c), TestType(two) * t2(a, c));
+  }
+
+  { // rank 2 -> 4, kept dims {0, 3}
+    auto out = make_tensor<TestType>({3, 2, 5, 4});
+    (out = clone<4>(two * t2, {matxKeepDim, 2, 5, matxKeepDim})).run(exec);
+    exec.sync();
+    for (index_t a = 0; a < 3; a++)
+      for (index_t b = 0; b < 2; b++)
+        for (index_t c = 0; c < 5; c++)
+          for (index_t d = 0; d < 4; d++)
+            ASSERT_EQ(out(a, b, c, d), TestType(two) * t2(a, d));
+  }
+
+  { // rank 1 -> 4, kept dim {1}
+    auto out = make_tensor<TestType>({2, 4, 3, 5});
+    (out = clone<4>(two * t1, {2, matxKeepDim, 3, 5})).run(exec);
+    exec.sync();
+    for (index_t a = 0; a < 2; a++)
+      for (index_t b = 0; b < 4; b++)
+        for (index_t c = 0; c < 3; c++)
+          for (index_t d = 0; d < 5; d++)
+            ASSERT_EQ(out(a, b, c, d), TestType(two) * t1(b));
+  }
+
+  { // rank 3 -> 4, kept dims {0, 1, 3}
+    auto out = make_tensor<TestType>({2, 3, 5, 4});
+    (out = clone<4>(two * t3, {matxKeepDim, matxKeepDim, 5, matxKeepDim})).run(exec);
+    exec.sync();
+    for (index_t a = 0; a < 2; a++)
+      for (index_t b = 0; b < 3; b++)
+        for (index_t c = 0; c < 5; c++)
+          for (index_t d = 0; d < 4; d++)
+            ASSERT_EQ(out(a, b, c, d), TestType(two) * t3(a, b, d));
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+// The number of matxKeepDim entries must match the operator's rank in every build mode
+TEST(OperatorValidationTests, CloneOpInvalidKeepDims)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = float;
+  using inner_t = typename inner_op_type_t<TestType>::type;
+
+  auto t2 = make_tensor<TestType>({3, 4});
+  const auto two = static_cast<inner_t>(2);
+
+  EXPECT_THROW(clone<3>(two * t2, {3, 5, matxKeepDim}), matx::detail::matxException);
+  EXPECT_THROW(clone<3>(two * t2, {matxKeepDim, matxKeepDim, matxKeepDim}), matx::detail::matxException);
+  EXPECT_THROW(clone<3>(two * t2, {3, 5, 4}), matx::detail::matxException);
+  EXPECT_NO_THROW(clone<3>(two * t2, {matxKeepDim, 5, matxKeepDim}));
+
+  // Tensors take a separate path (a strided view) with the same requirement
+  EXPECT_THROW(clone<3>(t2, {3, 5, matxKeepDim}), matx::detail::matxException);
+  EXPECT_THROW(clone<3>(t2, {matxKeepDim, matxKeepDim, matxKeepDim}), matx::detail::matxException);
+  EXPECT_NO_THROW(clone<3>(t2, {matxKeepDim, 5, matxKeepDim}));
+
+  // ...as does the tensor's Clone() member that clone() uses
+  EXPECT_THROW(t2.template Clone<3>({3, 5, matxKeepDim}), matx::detail::matxException);
+  EXPECT_NO_THROW(t2.template Clone<3>({matxKeepDim, 5, matxKeepDim}));
+
+  // Both paths report the same error code
+  auto error_of = [](auto &&f) {
+    try { f(); } catch (const matx::detail::matxException &ex) { return ex.e; }
+    return matxSuccess;
+  };
+  EXPECT_EQ(error_of([&] { clone<3>(two * t2, {3, 5, matxKeepDim}); }), matxInvalidDim);
+  EXPECT_EQ(error_of([&] { clone<3>(t2, {3, 5, matxKeepDim}); }), matxInvalidDim);
+
+  MATX_EXIT_HANDLER();
 } 
