@@ -34,6 +34,8 @@
 // trivial types should be put in this file since it's used by the RTC compiler as well.
 #pragma once
 
+#include "matx/core/defines.h"
+
 namespace matx {
 
 typedef enum {
@@ -210,8 +212,8 @@ namespace detail {
     const void *view = nullptr;
     int rank = -1;
     decltype(sizeof(0)) element_bytes = 0;
-    long long (*size)(const void *, int) = nullptr;
-    long long (*stride)(const void *, int) = nullptr;
+    index_t (*size)(const void *, int) = nullptr;
+    index_t (*stride)(const void *, int) = nullptr;
   };
 
 }
