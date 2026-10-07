@@ -34,6 +34,8 @@
 // trivial types should be put in this file since it's used by the RTC compiler as well.
 #pragma once
 
+#include "matx/core/defines.h"
+
 namespace matx {
 
 typedef enum {
@@ -205,6 +207,13 @@ namespace detail {
     bool is_prerun;
     void *start_ptr;
     void *end_ptr;
+    // Non-owning layout metadata for concrete tensor destinations. Keep this
+    // query trivially copyable because operator_options.h is also used by RTC compilation.
+    const void *view = nullptr;
+    int rank = -1;
+    decltype(sizeof(0)) element_bytes = 0;
+    index_t (*size)(const void *, int) = nullptr;
+    index_t (*stride)(const void *, int) = nullptr;
   };
 
 }

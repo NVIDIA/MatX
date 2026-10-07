@@ -36,6 +36,7 @@
 #include <type_traits>
 #include <cuda/std/algorithm>
 #include <cuda/std/functional>
+#include <cuda/std/limits>
 #include "matx/core/vector.h"
 #include "matx/core/error.h"
 #include "matx/core/defines.h"
@@ -1484,10 +1485,9 @@ MATX_IGNORE_WARNING_POP_GCC
           return false;
         }
         else {
-          // The logic to detect overlaps is as follows: If we have a complete overlap (first and last pointers are identical),
-          // ie (a = a), then we need to check if the tensor is contiguous or if the input permutes the input and output. If either
-          // of those are true then this will alias. Otherwise we have a partial overlap. For a partial overlap we always say this
-          // can alias.
+          // Matching endpoints alone do not establish matching element mappings.
+          // Concrete destinations also provide shape and stride metadata so safe
+          // in-place operations on strided views can be recognized.
 
           // Get address of first element using operator()(0, 0, ...)
           auto get_first = [this]<size_t... Is>(cuda::std::index_sequence<Is...>) {
@@ -1504,7 +1504,51 @@ MATX_IGNORE_WARNING_POP_GCC
           bool complete_overlap = tensor_start == in.start_ptr && tensor_end == in.end_ptr;
           if (complete_overlap) {
             MATX_LOG_TRACE("Complete overlap of tensors. Contiguous: {}", IsContiguous());
-            return !IsContiguous() || in.permutes_input_output;
+            if (in.permutes_input_output) {
+              return true;
+            }
+            if (in.view == nullptr) {
+              // Writable operator destinations do not expose tensor layout metadata.
+              return !IsContiguous();
+            }
+            if (in.rank != Rank() || in.element_bytes != sizeof(T)) {
+              return true;
+            }
+            for (int dim = 0; dim < Rank(); ++dim) {
+              if (in.size(in.view, dim) != Size(dim) ||
+                  in.stride(in.view, dim) != Stride(dim)) {
+                return true;
+              }
+            }
+
+            // Prove that logical elements occupy distinct addresses. Sorting axes
+            // by stride also handles permuted layouts. Each successive axis must
+            // step beyond the complete span of all smaller-stride axes.
+            cuda::std::array<int, Rank()> axes{};
+            for (int dim = 0; dim < Rank(); ++dim) {
+              axes[dim] = dim;
+              for (int pos = dim; pos > 0 &&
+                   Stride(axes[pos]) < Stride(axes[pos - 1]); --pos) {
+                const int previous = axes[pos - 1];
+                axes[pos - 1] = axes[pos];
+                axes[pos] = previous;
+              }
+            }
+            index_t span = 1;
+            for (int axis : axes) {
+              if (Size(axis) <= 0) {
+                return true;
+              }
+              if (Size(axis) == 1) {
+                continue;
+              }
+              if (Stride(axis) < span ||
+                  Size(axis) - 1 > (cuda::std::numeric_limits<index_t>::max() - span) / Stride(axis)) {
+                return true;
+              }
+              span += (Size(axis) - 1) * Stride(axis);
+            }
+            return false;
           }
 
           // Check for overlap: two ranges [a1, a2) and [b1, b2) overlap if a1 < b2 && b1 < a2

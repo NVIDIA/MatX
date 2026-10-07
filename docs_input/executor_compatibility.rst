@@ -25,6 +25,10 @@ options. Optional backend dependencies such as CPU BLAS, CPU solver libraries, o
 still using |yes| when the operator is supported for that executor. CUDAJITExecutor support means the operator can participate in a
 fused JIT expression; non-JIT CUDA execution through cudaExecutor remains available for the broader CUDA library paths.
 
+With ``MATX_EN_UNSAFE_ALIAS_DETECTION`` enabled, host and non-JIT CUDA assignments accept in-place element-wise operations on matching
+strided tensor layouts whose elements can be proven distinct. This also applies to the normalization step of strided CUDA IFFTs.
+See :doc:`basics/debug` for the alias check's conservative limitations.
+
 The experimental ``distributedCUDAExecutor`` is intentionally narrower than
 the other executors in this table. It currently supports ``apply`` with
 distributed inputs, distributed-to-distributed copies with identical layouts,
