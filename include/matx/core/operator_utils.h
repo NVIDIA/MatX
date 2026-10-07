@@ -36,6 +36,7 @@
 #include "matx/core/type_utils_both.h"
 #include <cuda/std/__algorithm/copy.h>
 #ifndef __CUDACC_RTC__
+#include "matx/core/error.h"
 
 namespace matx {
   namespace detail {
@@ -130,12 +131,20 @@ namespace matx {
       }
     }
 
+    // Transforms materialize into a contiguous temporary allocated in PreRun.
+    // Callers must only use this between the enclosing op's PreRun and PostRun.
+    template <typename Op>
+    __MATX_INLINE__ auto GetTransformStorage(const Op &in) {
+      static_assert(is_matx_transform_op<Op>());
+      MATX_ASSERT_STR(in.TotalSize() == 0 || in.Data() != nullptr, matxInvalidParameter,
+                      "Transform input has no storage; PreRun was not run");
+      return in.Data();
+    }
+
     template <typename Op, typename ValidFunc>
     __MATX_INLINE__ auto GetSupportedTensor(const Op &in, const ValidFunc &fn, matxMemorySpace_t space, cudaStream_t stream = 0) {
       if constexpr (is_matx_transform_op<Op>()) {
-        // We can assume that if a transform is passed to the input then PreRun has already completed
-        // on the transform and we can use the internal pointer
-        return make_tensor<typename Op::value_type>(in.Data(), Shape(in));
+        return make_tensor<typename Op::value_type>(GetTransformStorage(in), Shape(in));
       }
       else if constexpr (!is_tensor_view_v<Op>) {
         return make_tensor<typename Op::value_type>(in.Shape(), space, stream);

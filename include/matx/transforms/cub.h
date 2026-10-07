@@ -1164,39 +1164,16 @@ inline void ExecSort(OutputTensor &a_out,
 #ifdef __CUDACC__
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
-    if constexpr (is_tensor_view_v<InputOperator>) {
-      const tensor_impl_t<typename InputOperator::value_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
-      if (a.IsContiguous()) {
-        cub::DeviceSelect::If(d_temp,
-                              temp_storage_bytes,
-                              a.Data(),
-                              a_out.Data(),
-                              Params().num_found.Data(),
-                              static_cast<int>(TotalSize(a)),
-                              Params().op,
-                              stream);
-      }
-      else {
-        cub::DeviceSelect::If(d_temp,
-                              temp_storage_bytes,
-                              RandomOperatorIterator{base},
-                              a_out.Data(),
-                              Params().num_found.Data(),
-                              static_cast<int>(TotalSize(a)),
-                              Params().op,
-                              stream);
-      }
-    }
-    else {
+    SelectInput(a, [&](auto in) {
       cub::DeviceSelect::If(d_temp,
                             temp_storage_bytes,
-                            RandomOperatorIterator{a},
+                            in,
                             a_out.Data(),
                             Params().num_found.Data(),
                             static_cast<int>(TotalSize(a)),
                             Params().op,
                             stream);
-    }
+    });
 #endif
   }
 
@@ -1243,42 +1220,16 @@ inline void ExecSort(OutputTensor &a_out,
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
     if constexpr (!has_index_cmp_op_v<decltype(Params().op)>) {
-      if constexpr (is_tensor_view_v<InputOperator>) {
-        if (a.IsContiguous()) {
-          cub::DeviceSelect::If(d_temp,
-                                temp_storage_bytes,
-                                detail::counting_iterator<index_t>(0),
-                                a_out.Data(),
-                                Params().num_found.Data(),
-                                static_cast<int>(TotalSize(a)),
-                                IndexToSelectOp<decltype(a.Data()), decltype(Params().op)>{a.Data(), Params().op},
-                                stream);
-        }
-        else {
-          tensor_impl_t<typename InputOperator::value_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
-          cub::DeviceSelect::If(d_temp,
-                                temp_storage_bytes,
-                                detail::counting_iterator<index_t>(0),
-                                a_out.Data(),
-                                Params().num_found.Data(),
-                                static_cast<int>(TotalSize(a)),
-                                IndexToSelectOp<decltype(RandomOperatorIterator{base}), decltype(Params().op)>
-                                  {RandomOperatorIterator{base}, Params().op},
-                                stream);
-        }
-      }
-      else {
-        tensor_impl_t<typename InputOperator::value_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
+      SelectInput(a, [&](auto in) {
         cub::DeviceSelect::If(d_temp,
                               temp_storage_bytes,
                               detail::counting_iterator<index_t>(0),
                               a_out.Data(),
                               Params().num_found.Data(),
                               static_cast<int>(TotalSize(a)),
-                              IndexToSelectOp<decltype(RandomOperatorIterator{base}), decltype(Params().op)>
-                                {RandomOperatorIterator{base}, Params().op},
+                              IndexToSelectOp<decltype(in), decltype(Params().op)>{in, Params().op},
                               stream);
-      }
+      });
     }
     else {
       // Custom compare op that only takes an index. This can be more powerful for users by allowing them to define whatever
@@ -1353,6 +1304,24 @@ inline void ExecSort(OutputTensor &a_out,
   }
 
 private:
+  // Share input dispatch between value and index selection.
+  template <typename Func>
+  inline void SelectInput(const InputOperator &a, const Func &f)
+  {
+    if constexpr (is_matx_transform_op<InputOperator>()) {
+      f(GetTransformStorage(a));
+    }
+    else {
+      if constexpr (is_tensor_view_v<InputOperator>) {
+        if (a.IsContiguous()) {
+          f(a.Data());
+          return;
+        }
+      }
+      f(RandomOperatorIterator{a});
+    }
+  }
+
   const CParams &Params() const
   {
     return cparams_;
