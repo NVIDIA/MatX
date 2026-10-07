@@ -95,7 +95,7 @@ namespace matx
           if constexpr (cuda::std::is_same_v<StrideType, NoStride>) {
             params_str += "n_";
           }
-          return std::format("JITSlice_v4_r{}_{}", input_rank, params_str);
+          return std::format("JITSlice_r{}_{}", input_rank, params_str);
         }
 
         __MATX_INLINE__ std::string get_jit_stride_type_name() const {
