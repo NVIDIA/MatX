@@ -298,15 +298,20 @@ __global__ void ResamplePoly1D_WarpCentric(OutType output, InType input, FilterT
             output_t accum = detail::WithInputRangeReader(input, input_b, x_start, x_end,
                 [&](auto read, index_t shift) {
                     output_t acc {};
-                    // Walk a filter pointer: with an indexed s_filter[h] the compiler
-                    // recomputed the smem address every tap for the two-segment
-                    // streaming input.
-                    const filter_t *hp = s_filter + h_ind;
-                    const index_t h_step = up * WARP_SIZE;
+                    // Walk the filter's 32-bit shared-memory address as an unsigned
+                    // integer: one integer op per tap (as a pointer walk) without
+                    // forming pointers outside s_filter. Converting back through
+                    // __cvta_shared_to_generic keeps the loads in shared memory (LDS).
+                    // This avoids the undefined behavior of pointer arithmetic resulting
+                    // in a pointer outside of the filter region.
+                    uint32_t ha = static_cast<uint32_t>(__cvta_generic_to_shared(s_filter)) +
+                        static_cast<uint32_t>(h_ind) * static_cast<uint32_t>(sizeof(filter_t));
+                    const uint32_t h_step =
+                        static_cast<uint32_t>(up) * WARP_SIZE * static_cast<uint32_t>(sizeof(filter_t));
                     for (index_t i = x_start - shift + lane_id; i <= x_end - shift; i += WARP_SIZE) {
                         const input_t in_val = read(i);
-                        acc += in_val * *hp;
-                        hp -= h_step;
+                        acc += in_val * *static_cast<const filter_t *>(__cvta_shared_to_generic(ha));
+                        ha -= h_step;
                     }
                     return acc;
                 });
