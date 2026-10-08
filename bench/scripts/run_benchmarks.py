@@ -373,13 +373,19 @@ def find_default_build_dir():
 # Per-profile orchestration.
 # ---------------------------------------------------------------------------
 
-def run_profile(name, profile, build_dir, out_dir, extra_args):
+def run_profile(name, profile, build_dir, out_dir, extra_args, dry_run):
     exe = _resolve_exe(build_dir, profile["exe_stems"])
-    if exe is None:
-        print(f"[{name}] could not find any of {profile['exe_stems']} under {build_dir}/bench/",
-              file=sys.stderr)
-        return False
 
+    if exe is None:
+        if not dry_run:
+            print(
+                f"[{name}] could not find any of {profile['exe_stems']} "
+                f"under {build_dir}/bench/",
+                file=sys.stderr,
+            )
+            return False
+
+        exe = build_dir / "bench" / profile["exe_stems"][0]
     json_path = out_dir / f"{name}.json"
     md_path   = out_dir / f"{name}.md"
     csv_path  = out_dir / f"{name}.csv"
@@ -395,6 +401,8 @@ def run_profile(name, profile, build_dir, out_dir, extra_args):
     cmd += extra_args
     timeout = profile.get("timeout_seconds", DEFAULT_TIMEOUT_SECONDS)
     print(f"[{name}] {' '.join(cmd)}  (timeout {timeout}s)")
+    if dry_run:
+       return True
     try:
         res = subprocess.run(cmd, timeout=timeout)
     except subprocess.TimeoutExpired:
@@ -434,6 +442,11 @@ def main():
         help="Directory for nvbench JSON/MD/CSV output (default: ./bench_results).",
     )
     parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print benchmark commands without executing them.",
+    )
+    parser.add_argument(
         "nvbench_args", nargs=argparse.REMAINDER,
         help="Extra args forwarded verbatim to the nvbench executable. "
              "Use `--` to separate them from this script's flags.",
@@ -447,7 +460,7 @@ def main():
     profiles = sorted(PROFILES) if args.profile == "all" else [args.profile]
     failures = 0
     for name in profiles:
-        ok = run_profile(name, PROFILES[name], build_dir, args.out_dir, extra)
+        ok = run_profile(name, PROFILES[name], build_dir, args.out_dir, extra, args.dry_run,)
         if not ok:
             failures += 1
 
