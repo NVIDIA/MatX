@@ -63,21 +63,29 @@ index_t one_shot_len(index_t N, index_t L, matxConvCorrMode_t mode)
 }
 
 // Streams the signal using the cyclic chunk-size schedule `chunks` (a
-// single-entry schedule is a fixed chunk size).
-template <typename Exec>
+// single-entry schedule is a fixed chunk size). With `strided`, each segment
+// is a stride-2 view, which feed() reads through concat rather than the
+// unit-stride two-segment path. T is the signal type; the filter is its real
+// scalar type.
+template <typename T = float, typename Exec>
 bool run_case(Exec &exec, index_t N, index_t L, matxConvCorrMode_t mode,
-              const std::vector<index_t> &chunks)
+              const std::vector<index_t> &chunks, bool strided = false)
 {
-  using T = float;
+  using S = typename inner_op_type_t<T>::type;
   std::string sched;
   for (auto c : chunks) { sched += std::to_string(c) + ","; }
   auto x = make_tensor<T>({N});
-  auto h = make_tensor<T>({L});
+  auto h = make_tensor<S>({L});
   for (index_t i = 0; i < N; i++) {
-    x(i) = std::sin(0.11f * static_cast<float>(i)) + 0.003f * static_cast<float>(i);
+    const S re = std::sin(S(0.11) * static_cast<S>(i)) + S(0.003) * static_cast<S>(i);
+    if constexpr (is_complex_v<T>) {
+      x(i) = T{re, std::cos(S(0.07) * static_cast<S>(i))};
+    } else {
+      x(i) = re;
+    }
   }
   for (index_t k = 0; k < L; k++) {
-    h(k) = std::cos(0.2f * static_cast<float>(k)) / static_cast<float>(L);
+    h(k) = std::cos(S(0.2) * static_cast<S>(k)) / static_cast<S>(L);
   }
 
   // Reference. For N >= L this is the one-shot conv1d in `mode` directly. For
@@ -96,6 +104,12 @@ bool run_case(Exec &exec, index_t N, index_t L, matxConvCorrMode_t mode,
     (slice(ref, {0}, {M}) = conv1d(x, h, mode)).run(exec);
   }
 
+  tensor_t<T, 1> sig_strided;
+  if (strided) {
+    make_tensor(sig_strided, {2 * N});
+    (slice(sig_strided, {0}, {2 * N}, {2}) = x).run(exec);
+  }
+
   const index_t max_chunk = *std::max_element(chunks.begin(), chunks.end());
   auto stream_obj = make_conv1d_stream<T>(h, {.mode = mode}, exec);
   auto frame = make_tensor<T>({stream_obj.max_output(max_chunk)});
@@ -105,9 +119,10 @@ bool run_case(Exec &exec, index_t N, index_t L, matxConvCorrMode_t mode,
   size_t ci = 0;
   for (index_t g = 0; g < N; ) {
     const index_t nl = std::min(chunks[ci++ % chunks.size()], N - g);
-    auto in_chunk = slice(x, {g}, {g + nl});
+    const index_t cnt = strided
+        ? stream_obj.feed(slice(sig_strided, {2 * g}, {2 * (g + nl)}, {2}), frame)
+        : stream_obj.feed(slice(x, {g}, {g + nl}), frame);
     g += nl;
-    const index_t cnt = stream_obj.feed(in_chunk, frame);
     if (cnt > 0) {
       (slice(acc, {off}, {off + cnt}) = slice(frame, {0}, {cnt})).run(exec);
     }
@@ -121,17 +136,18 @@ bool run_case(Exec &exec, index_t N, index_t L, matxConvCorrMode_t mode,
   exec.sync();
 
   EXPECT_EQ(off, M) << "N=" << N << " L=" << L << " mode=" << mode
-                    << " chunks=" << sched;
+                    << " chunks=" << sched << " strided=" << strided;
   if (off != M) return false;
 
-  float max_abs = 0.0f, max_err = 0.0f;
+  double max_abs = 0.0, max_err = 0.0;
   for (index_t i = 0; i < M; i++) {
-    max_abs = std::max(max_abs, std::fabs(ref(ref_off + i)));
-    max_err = std::max(max_err, std::fabs(acc(i) - ref(ref_off + i)));
+    max_abs = std::max(max_abs, static_cast<double>(cuda::std::abs(ref(ref_off + i))));
+    max_err = std::max(max_err, static_cast<double>(cuda::std::abs(acc(i) - ref(ref_off + i))));
   }
-  const bool ok = max_err < 1e-4f * (1.0f + max_abs);
+  const double tol = std::is_same_v<S, double> ? 1e-10 : 1e-4;
+  const bool ok = max_err < tol * (1.0 + max_abs);
   EXPECT_TRUE(ok) << "N=" << N << " L=" << L << " mode=" << mode
-                  << " chunks=" << sched << " max_err=" << max_err
+                  << " chunks=" << sched << " strided=" << strided << " max_err=" << max_err
                   << " max_abs=" << max_abs;
   return ok;
 }
@@ -225,6 +241,36 @@ TEST(StreamingConv, VaryingChunkSchedule)
     for (index_t L : {index_t(33), index_t(32)}) {
       for (const auto &sched : schedules) {
         run_case(exec, N, L, mode, sched);
+      }
+    }
+  }
+}
+
+// Non-unit-stride tensor segments take feed()'s concat fallback instead of
+// the unit-stride two-segment input.
+TEST(StreamingConv, StridedSegmentsMatchOneShot)
+{
+  cudaExecutor exec{};
+  for (auto mode : {MATX_C_MODE_FULL, MATX_C_MODE_SAME, MATX_C_MODE_VALID}) {
+    for (index_t L : {index_t(2), index_t(33)}) {
+      run_case(exec, 2048, L, mode, {113}, /*strided=*/true);
+      run_case(exec, 2048, L, mode, {1, 7, 500}, /*strided=*/true);
+    }
+  }
+}
+
+// The unit-stride two-segment input and the concat fallback for the other
+// element types: double, complex<float> and complex<double>, each with a real
+// filter of the matching precision.
+TEST(StreamingConv, OtherTypesMatchOneShot)
+{
+  cudaExecutor exec{};
+  for (auto mode : {MATX_C_MODE_FULL, MATX_C_MODE_SAME, MATX_C_MODE_VALID}) {
+    for (index_t L : {index_t(2), index_t(33), index_t(32)}) {
+      for (bool strided : {false, true}) {
+        run_case<double>(exec, 2048, L, mode, {1, 7, 500, 113}, strided);
+        run_case<cuda::std::complex<float>>(exec, 2048, L, mode, {1, 7, 500, 113}, strided);
+        run_case<cuda::std::complex<double>>(exec, 2048, L, mode, {1, 7, 500, 113}, strided);
       }
     }
   }

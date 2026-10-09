@@ -450,23 +450,33 @@ __global__ void ChannelizePoly1D(
         if (use_smem_filter) {
             for (index_t t = first_out_elem+tid; t <= last_out_elem; t += THREADS) {
                 const index_t g = t + out_elem_offset; // global output element (time) index
-                accum_t accum {};
                 index_t sample_idx = s + g * num_channels;
                 index_t h_skip = 0;
                 if (sample_idx >= input_len) {
                     h_skip = 1;
                     sample_idx -= num_channels;
                 }
-                const filter_t *h = smem_filter + h_skip;
-                int niter = static_cast<int>(cuda::std::min(filter_phase_len - h_skip, g + 1 - h_skip));
-                for (int i = 0; i < niter; i++) {
-                    const input_t in_val = input_b(sample_idx);
-                    detail::channelize_cmac(accum,
-                            detail::channelize_cast_operand<accum_t>(*h),
-                            detail::channelize_cast_operand<accum_t>(in_val));
-                    sample_idx -= num_channels;
-                    h++;
-                }
+                const filter_t *h0 = smem_filter + h_skip;
+                const int niter = static_cast<int>(cuda::std::min(filter_phase_len - h_skip, g + 1 - h_skip));
+                // Reads input sample_idx, sample_idx - M, ..., niter samples in all;
+                // WithInputRangeReader picks a two-segment input's segment once.
+                // Restrict to <= 8-byte inputs due to register usage for larger types.
+                const accum_t accum = detail::WithInputRangeReader<(sizeof(input_t) <= 8)>(input, input_b,
+                    sample_idx - (niter - 1) * num_channels, sample_idx,
+                    [&](auto read, index_t shift) {
+                        accum_t acc {};
+                        index_t idx = sample_idx - shift;
+                        const filter_t *h = h0;
+                        for (int i = 0; i < niter; i++) {
+                            const input_t in_val = read(idx);
+                            detail::channelize_cmac(acc,
+                                    detail::channelize_cast_operand<accum_t>(*h),
+                                    detail::channelize_cast_operand<accum_t>(in_val));
+                            idx -= num_channels;
+                            h++;
+                        }
+                        return acc;
+                    });
                 output_b(t, channel) = static_cast<output_t>(accum);
             }
         } else {
@@ -480,24 +490,31 @@ __global__ void ChannelizePoly1D(
 
             for (index_t t = first_out_elem+tid; t <= last_out_elem; t += THREADS) {
                 const index_t g = t + out_elem_offset; // global output element (time) index
-                accum_t accum {};
                 index_t sample_idx = s + g * num_channels;
                 index_t h_skip = 0;
                 if (sample_idx >= input_len) {
                     h_skip = 1;
                     sample_idx -= num_channels;
                 }
-                index_t h_ind = channel + h_skip * num_channels;
-                index_t niter = cuda::std::min(available_taps - h_skip, g + 1 - h_skip);
-                for (index_t i = 0; i < niter; i++) {
-                    const input_t in_val = input_b(sample_idx);
-                    const filter_t h_val = filter_acc(h_ind);
-                    detail::channelize_cmac(accum,
-                            detail::channelize_cast_operand<accum_t>(h_val),
-                            detail::channelize_cast_operand<accum_t>(in_val));
-                    h_ind += num_channels;
-                    sample_idx -= num_channels;
-                }
+                const index_t h_ind0 = channel + h_skip * num_channels;
+                const index_t niter = cuda::std::min(available_taps - h_skip, g + 1 - h_skip);
+                const accum_t accum = detail::WithInputRangeReader<(sizeof(input_t) <= 8)>(input, input_b,
+                    sample_idx - (niter - 1) * num_channels, sample_idx,
+                    [&](auto read, index_t shift) {
+                        accum_t acc {};
+                        index_t idx = sample_idx - shift;
+                        index_t h_ind = h_ind0;
+                        for (index_t i = 0; i < niter; i++) {
+                            const input_t in_val = read(idx);
+                            const filter_t h_val = filter_acc(h_ind);
+                            detail::channelize_cmac(acc,
+                                    detail::channelize_cast_operand<accum_t>(h_val),
+                                    detail::channelize_cast_operand<accum_t>(in_val));
+                            h_ind += num_channels;
+                            idx -= num_channels;
+                        }
+                        return acc;
+                    });
                 output_b(t, channel) = static_cast<output_t>(accum);
             }
         }
@@ -516,7 +533,6 @@ __global__ void ChannelizePoly1D(
             const index_t phase = (channel + g * decimation_factor) % num_channels;
             index_t h_ind { phase };
             index_t sample_idx = 0;
-            accum_t accum {};
             if (last_arrived >= s) {
                 const index_t A = last_arrived - s;
                 sample_idx = last_arrived - (A % num_channels);
@@ -536,15 +552,23 @@ __global__ void ChannelizePoly1D(
                 }
                 niter = cuda::std::min(available_taps - h_skip, causal_count - h_skip);
             }
-            for (index_t i = 0; i < niter; i++) {
-                const input_t in_val = input_b(sample_idx);
-                const filter_t h_val = filter_acc(h_ind);
-                detail::channelize_cmac(accum,
-                        detail::channelize_cast_operand<accum_t>(h_val),
-                        detail::channelize_cast_operand<accum_t>(in_val));
-                h_ind += num_channels;
-                sample_idx -= num_channels;
-            }
+            const accum_t accum = detail::WithInputRangeReader<(sizeof(input_t) <= 8)>(input, input_b,
+                sample_idx - (niter - 1) * num_channels, sample_idx,
+                [&](auto read, index_t shift) {
+                    accum_t acc {};
+                    index_t idx = sample_idx - shift;
+                    index_t h = h_ind;
+                    for (index_t i = 0; i < niter; i++) {
+                        const input_t in_val = read(idx);
+                        const filter_t h_val = filter_acc(h);
+                        detail::channelize_cmac(acc,
+                                detail::channelize_cast_operand<accum_t>(h_val),
+                                detail::channelize_cast_operand<accum_t>(in_val));
+                        h += num_channels;
+                        idx -= num_channels;
+                    }
+                    return acc;
+                });
             output_b(t, channel) = static_cast<output_t>(accum);
         }
     }
@@ -714,17 +738,21 @@ __global__ void ChannelizePoly1D_SmemTiled(
         output_len_per_channel - 1,
         start_elem + elems_per_channel_per_cta - 1);
 
-    // Helper: load one input sample into smem at (buf_row, col)
-    auto load_smem_elem = [&](int32_t buf_row, int32_t col, IdxT global_row) {
+    // Helper: fetch the input sample for (col, global_row), or zero outside the input
+    auto fetch_smem_elem = [&](int32_t col, IdxT global_row) -> input_t {
         const int32_t gc = tile_base + col;
         const int32_t gc_remapped = MaximallyDecimated ? gc : ((gc + L) % M);
         const int32_t branch_s = (gc < M) ? (M - 1 - gc_remapped) : 0;
         const IdxT raw_idx = static_cast<IdxT>(branch_s) + global_row * M;
         if (gc < M && global_row >= 0 && raw_idx >= 0 && raw_idx < input_len) {
-            smem_input[buf_row * CTILE + col] = input_b(raw_idx);
-        } else {
-            smem_input[buf_row * CTILE + col] = static_cast<input_t>(0);
+            return input_b(raw_idx);
         }
+        return static_cast<input_t>(0);
+    };
+
+    // Helper: load one input sample into smem at (buf_row, col)
+    auto load_smem_elem = [&](int32_t buf_row, int32_t col, IdxT global_row) {
+        smem_input[buf_row * CTILE + col] = fetch_smem_elem(col, global_row);
     };
 
     // Converts a local output element to the newest global input-block index it
@@ -822,13 +850,22 @@ __global__ void ChannelizePoly1D_SmemTiled(
                 const int32_t new_rows = static_cast<int32_t>(
                     cuda::std::min(static_cast<IdxT>(NOUT),
                                    last_elem - next_start - NOUT + 1));
+                // Issue all of this thread's global loads before any smem
+                // store so that the loads overlap rather than being serialized.
+                input_t new_vals[OUTPUTS_PER_THREAD];
+                #pragma unroll
+                for (int q = 0; q < OUTPUTS_PER_THREAD; q++) {
+                    const int32_t row = ty + q * YTHREADS;
+                    const IdxT global_row = next_start + out_elem_offset + NOUT + row;
+                    new_vals[q] = (row < new_rows) ? fetch_smem_elem(cx, global_row) : static_cast<input_t>(0);
+                }
                 #pragma unroll
                 for (int q = 0; q < OUTPUTS_PER_THREAD; q++) {
                     const int32_t row = ty + q * YTHREADS;
                     if (row < new_rows) {
                         const IdxT global_row = next_start + out_elem_offset + NOUT + row;
                         const int32_t smem_row = static_cast<int32_t>(global_row % height);
-                        load_smem_elem(smem_row, cx, global_row);
+                        smem_input[smem_row * CTILE + cx] = new_vals[q];
                     }
                 }
 
@@ -886,45 +923,57 @@ __global__ void ChannelizePoly1D_SmemTiled(
                     } else {
                         filter_idx = phase + h_skip * M;
                     }
-                    #pragma unroll 8
-                    for (int32_t i = 0; i < prologue; i++) {
-                        filter_t hv;
-                        if constexpr (FilterInSmem) {
-                            hv = smem_filter_base[filter_idx];
-                        } else {
-                            hv = filter_acc(static_cast<index_t>(filter_idx));
+                    // Accumulates `count` taps, walking buf_row down from its current
+                    // value. With a global filter, fetch a batch of taps into
+                    // registers before the FMAs that use them, so the global loads
+                    // overlap. The compiler sometimes did this and sometimes not, so
+                    // we make it explicit; the empty asm keeps it from interleaving
+                    // the FMAs back between the loads. No batching for a shared-memory
+                    // filter or for 16-byte inputs or filter taps (no gain, more
+                    // registers).
+                    auto run_taps = [&](int32_t count) {
+                        auto tap = [&](int32_t idx) -> filter_t {
+                            if constexpr (FilterInSmem) {
+                                return smem_filter_base[idx];
+                            } else {
+                                return filter_acc(static_cast<index_t>(idx));
+                            }
+                        };
+                        const int32_t filter_step = (FilterInSmem && !FilterFullLayout) ? 1 : M;
+                        constexpr int32_t FILTER_BATCH =
+                            (!FilterInSmem && sizeof(input_t) <= 8 && sizeof(filter_t) <= 8) ? 8 : 1;
+                        int32_t i = 0;
+                        for (; FILTER_BATCH > 1 && i + FILTER_BATCH <= count; i += FILTER_BATCH) {
+                            filter_t hb[FILTER_BATCH];
+                            #pragma unroll
+                            for (int32_t b = 0; b < FILTER_BATCH; b++) {
+                                hb[b] = tap(filter_idx + b * filter_step);
+                            }
+                            asm volatile("" ::: "memory");
+                            #pragma unroll
+                            for (int32_t b = 0; b < FILTER_BATCH; b++) {
+                                const input_t iv = smem_input[(buf_row - b) * CTILE + cx];
+                                detail::channelize_cmac(accum,
+                                        detail::channelize_cast_operand<accum_t>(hb[b]),
+                                        detail::channelize_cast_operand<accum_t>(iv));
+                            }
+                            buf_row -= FILTER_BATCH;
+                            filter_idx += FILTER_BATCH * filter_step;
                         }
-                        const input_t iv = smem_input[buf_row * CTILE + cx];
-                        detail::channelize_cmac(accum,
-                                detail::channelize_cast_operand<accum_t>(hv),
-                                detail::channelize_cast_operand<accum_t>(iv));
-                        buf_row--;
-                        if constexpr (FilterInSmem && !FilterFullLayout) {
-                            filter_idx += 1;
-                        } else {
-                            filter_idx += M;
+                        #pragma unroll 8
+                        for (; i < count; i++) {
+                            const filter_t hv = tap(filter_idx);
+                            const input_t iv = smem_input[buf_row * CTILE + cx];
+                            detail::channelize_cmac(accum,
+                                    detail::channelize_cast_operand<accum_t>(hv),
+                                    detail::channelize_cast_operand<accum_t>(iv));
+                            buf_row--;
+                            filter_idx += filter_step;
                         }
-                    }
+                    };
+                    run_taps(prologue);
                     buf_row = height - 1;
-                    #pragma unroll 8
-                    for (int32_t i = 0; i < epilogue; i++) {
-                        filter_t hv;
-                        if constexpr (FilterInSmem) {
-                            hv = smem_filter_base[filter_idx];
-                        } else {
-                            hv = filter_acc(static_cast<index_t>(filter_idx));
-                        }
-                        const input_t iv = smem_input[buf_row * CTILE + cx];
-                        detail::channelize_cmac(accum,
-                                detail::channelize_cast_operand<accum_t>(hv),
-                                detail::channelize_cast_operand<accum_t>(iv));
-                        buf_row--;
-                        if constexpr (FilterInSmem && !FilterFullLayout) {
-                            filter_idx += 1;
-                        } else {
-                            filter_idx += M;
-                        }
-                    }
+                    run_taps(epilogue);
                 }
 
                 output_b(t, c) = static_cast<output_t>(accum);

@@ -178,15 +178,20 @@ __global__ void ResamplePoly1D_ElemBlock(OutType output, InType input, FilterTyp
             // Since the filter is in shared memory, we can narrow the index type to 32 bits
             int h_ind = static_cast<int>(filter_central_tap + (up_ind - up*x_start));
 
-            output_t accum {};
-            // Cap the inner-loop unroll at 8; unroll=16 can saturate the MIO
-            // pipeline and reduce performance.
-            #pragma unroll 8
-            for (index_t i = x_start; i <= x_end; i++) {
-                const input_t in_val = input_b(i);
-                accum += in_val * s_filter[h_ind];
-                h_ind -= up;
-            }
+            output_t accum = detail::WithInputRangeReader(input, input_b, x_start, x_end,
+                [&](auto read, index_t shift) {
+                    output_t acc {};
+                    auto h = h_ind;
+                    // Cap the inner-loop unroll at 8; unroll=16 can saturate the MIO
+                    // pipeline and reduce performance.
+                    #pragma unroll 8
+                    for (index_t i = x_start - shift; i <= x_end - shift; i++) {
+                        const input_t in_val = read(i);
+                        acc += in_val * s_filter[h];
+                        h -= up;
+                    }
+                    return acc;
+                });
 
             accum *= scale;
             output_b(out_ind) = accum;
@@ -203,12 +208,17 @@ __global__ void ResamplePoly1D_ElemBlock(OutType output, InType input, FilterTyp
                 x_end--;
             }
 
-            output_t accum {};
-            for (index_t i = x_start; i <= x_end; i++) {
-                const input_t in_val = input_b(i);
-                accum += in_val * filter_acc(h_ind);
-                h_ind -= up;
-            }
+            output_t accum = detail::WithInputRangeReader(input, input_b, x_start, x_end,
+                [&](auto read, index_t shift) {
+                    output_t acc {};
+                    auto h = h_ind;
+                    for (index_t i = x_start - shift; i <= x_end - shift; i++) {
+                        const input_t in_val = read(i);
+                        acc += in_val * filter_acc(h);
+                        h -= up;
+                    }
+                    return acc;
+                });
 
             accum *= scale;
             output_b(out_ind) = accum;
@@ -283,12 +293,28 @@ __global__ void ResamplePoly1D_WarpCentric(OutType output, InType input, FilterT
             // Since the filter is in shared memory, we can narrow the index type to 32 bits
             int h_ind = static_cast<int>(filter_central_tap + (up_ind - up*x_start)) - static_cast<int>(lane_id*up);
 
-            output_t accum {};
-            for (index_t i = x_start+lane_id; i <= x_end; i += WARP_SIZE) {
-                const input_t in_val = input_b(i);
-                accum += in_val * s_filter[h_ind];
-                h_ind -= up * WARP_SIZE;
-            }
+            // [x_start, x_end] is the same for every lane, so the segment choice
+            // is warp-uniform.
+            output_t accum = detail::WithInputRangeReader(input, input_b, x_start, x_end,
+                [&](auto read, index_t shift) {
+                    output_t acc {};
+                    // Walk the filter's 32-bit shared-memory address as an unsigned
+                    // integer: one integer op per tap (as a pointer walk) without
+                    // forming pointers outside s_filter. Converting back through
+                    // __cvta_shared_to_generic keeps the loads in shared memory (LDS).
+                    // This avoids the undefined behavior of pointer arithmetic resulting
+                    // in a pointer outside of the filter region.
+                    uint32_t ha = static_cast<uint32_t>(__cvta_generic_to_shared(s_filter)) +
+                        static_cast<uint32_t>(h_ind) * static_cast<uint32_t>(sizeof(filter_t));
+                    const uint32_t h_step =
+                        static_cast<uint32_t>(up) * WARP_SIZE * static_cast<uint32_t>(sizeof(filter_t));
+                    for (index_t i = x_start - shift + lane_id; i <= x_end - shift; i += WARP_SIZE) {
+                        const input_t in_val = read(i);
+                        acc += in_val * *static_cast<const filter_t *>(__cvta_shared_to_generic(ha));
+                        ha -= h_step;
+                    }
+                    return acc;
+                });
 
             accum *= scale;
             if constexpr (is_complex_v<output_t>) {
@@ -315,12 +341,17 @@ __global__ void ResamplePoly1D_WarpCentric(OutType output, InType input, FilterT
             }
             h_ind -= lane_id*up;
 
-            output_t accum {};
-            for (index_t i = x_start+lane_id; i <= x_end; i += WARP_SIZE) {
-                const input_t in_val = input_b(i);
-                accum += in_val * filter_acc(h_ind);
-                h_ind -= up * WARP_SIZE;
-            }
+            output_t accum = detail::WithInputRangeReader(input, input_b, x_start, x_end,
+                [&](auto read, index_t shift) {
+                    output_t acc {};
+                    auto h = h_ind;
+                    for (index_t i = x_start - shift + lane_id; i <= x_end - shift; i += WARP_SIZE) {
+                        const input_t in_val = read(i);
+                        acc += in_val * filter_acc(h);
+                        h -= up * WARP_SIZE;
+                    }
+                    return acc;
+                });
 
             accum *= scale;
             if constexpr (is_complex_v<output_t>) {

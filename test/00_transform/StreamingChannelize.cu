@@ -52,30 +52,39 @@ using namespace matx::test;
 namespace {
 
 // Streams the signal using the cyclic chunk-size schedule `chunks` (a
-// single-entry schedule is a fixed chunk size).
+// single-entry schedule is a fixed chunk size). With `strided`, each segment
+// is a stride-2 view, which feed() reads through concat rather than the
+// unit-stride two-segment path. The filter and the complex output use the
+// input's real scalar precision.
 template <typename InT, typename Exec>
 bool run_case(Exec &exec, index_t N, index_t M, index_t D, index_t L,
-              const std::vector<index_t> &chunks)
+              const std::vector<index_t> &chunks, bool strided = false)
 {
-  using OutT = cuda::std::complex<float>;
+  using FiltT = typename inner_op_type_t<InT>::type;
+  using OutT = cuda::std::complex<FiltT>;
   std::string sched;
   for (auto c : chunks) { sched += std::to_string(c) + ","; }
-  using FiltT = float;
 
   auto h = make_tensor<FiltT>({L});
   for (index_t k = 0; k < L; ++k) {
-    h(k) = std::cos(0.11f * static_cast<float>(k)) *
-           std::exp(-0.004f * static_cast<float>(k));
+    h(k) = std::cos(FiltT(0.11) * static_cast<FiltT>(k)) *
+           std::exp(FiltT(-0.004) * static_cast<FiltT>(k));
   }
   auto sig = make_tensor<InT>({N});
   for (index_t n = 0; n < N; ++n) {
-    const float t = static_cast<float>(n);
+    const FiltT t = static_cast<FiltT>(n);
     if constexpr (is_complex_v<InT>) {
-      sig(n) = InT{std::sin(0.05f * t) + 0.3f * std::sin(0.17f * t),
-                   std::cos(0.03f * t) - 0.2f * std::sin(0.23f * t)};
+      sig(n) = InT{std::sin(FiltT(0.05) * t) + FiltT(0.3) * std::sin(FiltT(0.17) * t),
+                   std::cos(FiltT(0.03) * t) - FiltT(0.2) * std::sin(FiltT(0.23) * t)};
     } else {
-      sig(n) = std::sin(0.05f * t) + 0.3f * std::sin(0.17f * t) + 1e-4f * t;
+      sig(n) = std::sin(FiltT(0.05) * t) + FiltT(0.3) * std::sin(FiltT(0.17) * t) + FiltT(1e-4) * t;
     }
+  }
+
+  tensor_t<InT, 1> sig_strided;
+  if (strided) {
+    make_tensor(sig_strided, {2 * N});
+    (slice(sig_strided, {0}, {2 * N}, {2}) = sig).run(exec);
   }
 
   const index_t T = (N + D - 1) / D; // full number of output blocks per channel
@@ -91,9 +100,10 @@ bool run_case(Exec &exec, index_t N, index_t M, index_t D, index_t L,
   size_t ci = 0;
   for (index_t g = 0; g < N; ) {
     const index_t nl = std::min(chunks[ci++ % chunks.size()], N - g);
-    auto in_chunk = slice(sig, {g}, {g + nl});
+    const index_t cnt = strided
+        ? stream_obj.feed(slice(sig_strided, {2 * g}, {2 * (g + nl)}, {2}), frame)
+        : stream_obj.feed(slice(sig, {g}, {g + nl}), frame);
     g += nl;
-    const index_t cnt = stream_obj.feed(in_chunk, frame);
     if (cnt > 0) {
       (slice(acc, {off, 0}, {off + cnt, M}) = slice(frame, {0, 0}, {cnt, M})).run(exec);
     }
@@ -106,20 +116,21 @@ bool run_case(Exec &exec, index_t N, index_t M, index_t D, index_t L,
   off += tcnt;
   exec.sync();
 
-  EXPECT_EQ(off, T) << "M=" << M << " D=" << D << " chunks=" << sched;
+  EXPECT_EQ(off, T) << "M=" << M << " D=" << D << " chunks=" << sched << " strided=" << strided;
   if (off != T) return false;
 
-  float max_abs = 0.0f, max_err = 0.0f;
+  double max_abs = 0.0, max_err = 0.0;
   for (index_t t = 0; t < T; ++t) {
     for (index_t c = 0; c < M; ++c) {
       const OutT ref = y_full(t, c);
       const OutT got = acc(t, c);
-      max_abs = std::max(max_abs, cuda::std::abs(ref));
-      max_err = std::max(max_err, cuda::std::abs(got - ref));
+      max_abs = std::max(max_abs, static_cast<double>(cuda::std::abs(ref)));
+      max_err = std::max(max_err, static_cast<double>(cuda::std::abs(got - ref)));
     }
   }
-  const bool ok = max_err < 1e-3f * (1.0f + max_abs);
-  EXPECT_TRUE(ok) << "M=" << M << " D=" << D << " chunks=" << sched
+  const double tol = std::is_same_v<FiltT, double> ? 1e-10 : 1e-3;
+  const bool ok = max_err < tol * (1.0 + max_abs);
+  EXPECT_TRUE(ok) << "M=" << M << " D=" << D << " chunks=" << sched << " strided=" << strided
                   << " max_err=" << max_err << " max_abs=" << max_abs;
   return ok;
 }
@@ -204,6 +215,41 @@ TEST(StreamingChannelize, VaryingChunkSchedule)
     for (const auto &sched : schedules) {
       run_case<float>(exec, N, c.M, c.D, L, sched);
       run_case<cuda::std::complex<float>>(exec, N, c.M, c.D, L, sched);
+    }
+  }
+}
+
+// Non-unit-stride tensor segments take feed()'s concat fallback instead of
+// the unit-stride two-segment input. The fused-leaf configurations come first;
+// the rest reuse large_dispatch_sweep's to reach the non-fused filter kernels
+// (whole-channel smem, tiled and generic).
+TEST(StreamingChannelize, StridedSegmentsMatchOneShot)
+{
+  cudaExecutor exec{};
+  struct Cfg { index_t M, D, P; };
+  for (Cfg c : {Cfg{8, 8, 4}, Cfg{8, 4, 4}, Cfg{64, 64, 16}, Cfg{64, 32, 8},
+                Cfg{12, 12, 8}, Cfg{256, 128, 8}, Cfg{64, 64, 192}, Cfg{64, 48, 192}}) {
+    const index_t L = c.P * c.M;
+    run_case<float>(exec, 2051, c.M, c.D, L, {113}, /*strided=*/true);
+    run_case<cuda::std::complex<float>>(exec, 2051, c.M, c.D, L, {113}, /*strided=*/true);
+  }
+}
+
+// The two-segment input for double and complex<double> signals (double filter,
+// complex<double> output) through the fused leaves and each non-fused filter
+// kernel, plus the concat fallback. complex<double> takes the generic kernel's
+// per-element read instead of its per-output segment range (16-byte inputs).
+TEST(StreamingChannelize, DoubleInputsMatchOneShot)
+{
+  cudaExecutor exec{};
+  struct Cfg { index_t M, D, P; };
+  for (Cfg c : {Cfg{4, 4, 4}, Cfg{8, 4, 4}, Cfg{9, 6, 4}, Cfg{6, 4, 4},
+                Cfg{12, 12, 8}, Cfg{64, 32, 8}, Cfg{256, 128, 8},
+                Cfg{64, 64, 192}, Cfg{64, 48, 192}}) {
+    const index_t L = c.P * c.M - 1;
+    for (bool strided : {false, true}) {
+      run_case<double>(exec, 2051, c.M, c.D, L, {1, 7, 113, 509}, strided);
+      run_case<cuda::std::complex<double>>(exec, 2051, c.M, c.D, L, {1, 7, 113, 509}, strided);
     }
   }
 }
