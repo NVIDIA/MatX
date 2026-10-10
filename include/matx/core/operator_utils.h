@@ -47,8 +47,10 @@ namespace matx {
         auto in_tup = cuda::std::make_tuple(ops...);
         if (!cuda::std::get<N>(t).isSameView(cuda::std::get<N>(in_tup))) {
           (cuda::std::get<N>(t) = cuda::std::get<N>(in_tup)).run(exec);
-          assign_tuple_tensors<N + 1>(exec, t, ops...);
         }
+        // An operand that already aliases its supported tensor must not stop
+        // the remaining operands from being copied.
+        assign_tuple_tensors<N + 1>(exec, t, ops...);
       }
     }
   };

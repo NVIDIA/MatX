@@ -132,7 +132,7 @@ namespace matx
         template <typename ShapeType, typename Executor>
         __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
         {
-          if (prerun_done_) {
+          if (!detail::EnterLifecycle(lifecycle_depth_)) {
             return;
           }
 
@@ -140,12 +140,11 @@ namespace matx
 
           detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
 
-          prerun_done_ = true;
           Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
         }
 
         template <typename ShapeType, typename Executor>
-        __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
+        __MATX_INLINE__ void InnerPostRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
         {
           if constexpr (is_matx_op<OpX>()) {
             x_.PostRun(Shape(x_), std::forward<Executor>(ex));
@@ -154,10 +153,19 @@ namespace matx
           if constexpr (is_matx_op<OpW>()) {
             w_.PostRun(Shape(w_), std::forward<Executor>(ex));
           }
+        }
+
+        template <typename ShapeType, typename Executor>
+        __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
+        {
+          if (!detail::ExitLifecycle(lifecycle_depth_)) {
+            return;
+          }
+
+          InnerPostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
 
           matxFree(ptr);
           ptr = nullptr;
-          prerun_done_ = false;
         }
 
       private:
@@ -172,7 +180,7 @@ namespace matx
         cuda::std::array<index_t, 1> out_dims_;
         mutable detail::tensor_impl_t<typename remove_cvref_t<OpX>::value_type, 1> tmp_out_;
         mutable typename remove_cvref_t<OpX>::value_type *ptr = nullptr;
-        mutable bool prerun_done_ = false;
+        mutable uint8_t lifecycle_depth_ = 0;
     };
   }
 

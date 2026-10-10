@@ -200,6 +200,7 @@ namespace detail {
       cuda::std::array<index_t, RangeProfilesType::Rank()> out_dims_;
       mutable detail::tensor_impl_t<out_t, RangeProfilesType::Rank()> tmp_out_;
       mutable out_t *ptr = nullptr;
+      mutable uint8_t lifecycle_depth_ = 0;
 
     public:
       using matxop = bool;
@@ -290,6 +291,10 @@ namespace detail {
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
       {
+        if (!detail::EnterLifecycle(lifecycle_depth_)) {
+          return;
+        }
+
         InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));           
 
         detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
@@ -298,7 +303,7 @@ namespace detail {
       }
 
       template <typename ShapeType, typename Executor>
-      __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) const noexcept
+      __MATX_INLINE__ void InnerPostRun(ShapeType &&shape, Executor &&ex) const noexcept
       {
         if constexpr (is_matx_op<ImageType>()) {
           initial_image_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
@@ -319,6 +324,16 @@ namespace detail {
         if constexpr (is_matx_op<RangeToMcpType>()) {
           range_to_mcp_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
+      }
+
+      template <typename ShapeType, typename Executor>
+      __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) const noexcept
+      {
+        if (!detail::ExitLifecycle(lifecycle_depth_)) {
+          return;
+        }
+
+        InnerPostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
 
         matxFree(ptr);
         ptr = nullptr;
