@@ -214,6 +214,7 @@ namespace detail {
       mutable T *values_ = nullptr;
       uint64_t seed_;
       mutable bool init_ = false;
+      mutable uint8_t lifecycle_depth_ = 0;
 
       static constexpr bool is_float_random_v =
         cuda::std::is_same_v<T, float> ||
@@ -765,6 +766,10 @@ namespace detail {
       template <typename ST, typename Executor>
       __MATX_INLINE__ void PreRun([[maybe_unused]] ST &&shape, Executor &&ex) const
       {
+        if (!detail::EnterLifecycle(lifecycle_depth_)) {
+          return;
+        }
+
         InnerPreRun(std::forward<ST>(shape), std::forward<Executor>(ex));
 #ifdef __CUDACC__
         if constexpr (is_cuda_executor_v<Executor>) {
@@ -832,8 +837,17 @@ namespace detail {
       }
 
       template <typename ST, typename Executor>
+      __MATX_INLINE__ void InnerPostRun([[maybe_unused]] ST &&shape, [[maybe_unused]] Executor &&ex) const noexcept
+      {
+      }
+
+      template <typename ST, typename Executor>
       __MATX_INLINE__ void PostRun([[maybe_unused]] ST &&shape, [[maybe_unused]] Executor &&ex) const noexcept
       {
+        if (!detail::ExitLifecycle(lifecycle_depth_)) {
+          return;
+        }
+
         if constexpr (is_cuda_executor_v<Executor>) {
           if (init_) {
             if (values_ != nullptr) {

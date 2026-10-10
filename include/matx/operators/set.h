@@ -499,12 +499,22 @@ public:
   // Used as a shortcut where the RHS is an executor and LHS is a tensor. In this case we
   // want to avoid the RHS from allocating any temporary output memory, so we call
   // InnerPreRun on it to call any nested PreRun calls, then output directly into the LHS
-  // tensor.
+  // tensor. InnerPostRun cleans up the same nested operators.
   template <typename ShapeType, typename Executor>
   void TransformExec(ShapeType &&shape, Executor &&ex) const {
+    constexpr bool has_inner_post_run = requires {
+      op_.InnerPostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+    };
+    static_assert(has_inner_post_run,
+                  "A transform assigned directly to a tensor must define InnerPostRun() to clean up the "
+                  "inputs prepared by InnerPreRun(). See the Transform Operators section of the MatX "
+                  "developer guide: https://nvidia.github.io/MatX/developer_guide/transforms.html");
     op_.InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
     op_.Exec(cuda::std::make_tuple(out_), std::forward<Executor>(ex));
-    op_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+    // Guarded so a missing InnerPostRun reports only the static_assert above.
+    if constexpr (has_inner_post_run) {
+      op_.InnerPostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+    }
   }
 
   static constexpr bool IsTransformSet() {

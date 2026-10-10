@@ -202,6 +202,7 @@ namespace matx {
       typename detail::base_type_t<OpV> v_;    // Values at sample points
       typename detail::base_type_t<OpXQ> xq_;  // Query points
       InterpMethod method_;                    // Interpolation method
+      mutable uint8_t lifecycle_depth_ = 0;
 
       mutable detail::tensor_impl_t<value_type, OpV::Rank()> m_; // Derivatives at sample points (spline only)
       mutable value_type *ptr_m_ = nullptr;
@@ -432,6 +433,9 @@ namespace matx {
 
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const {
+        if (!detail::EnterLifecycle(lifecycle_depth_)) {
+          return;
+        }
 
         // Forward PreRun to the operands to support generic operators/transforms
         if constexpr (is_matx_op<OpX>()) {
@@ -492,6 +496,10 @@ namespace matx {
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape,
                                   [[maybe_unused]] Executor &&ex) const noexcept {
+        if (!detail::ExitLifecycle(lifecycle_depth_)) {
+          return;
+        }
+
         if constexpr (is_matx_op<OpX>()) {
           x_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
@@ -504,6 +512,7 @@ namespace matx {
 
         if (method_ == InterpMethod::SPLINE) {
           matxFree(ptr_m_);
+          ptr_m_ = nullptr;
         }
       }
 

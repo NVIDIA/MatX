@@ -77,7 +77,7 @@ struct PreRunLifecycle {
 // PreRun/PostRun calls forwarded to it by a composing operator. operator()
 // transparently forwards to the wrapped operand.
 //
-// By design there is no prerun_done_ idempotency guard: every PreRun/PostRun
+// By design there is no lifecycle depth guard: every PreRun/PostRun
 // call is counted so a test can detect both missing AND duplicated forwarding.
 // Use one PreRunLifecycle per operand per run() and assert the expected count.
 template <typename Op>
@@ -172,15 +172,25 @@ inline bool lifecycle_clean(const PreRunLifecycle &s, int expected_calls = 1) {
          s.active == 0 && s.tracked_ptr == nullptr;
 }
 
-// gtest helper: one call per operand. Each invariant is its own EXPECT, and the
-// SCOPED_TRACE label identifies which operand failed.
-inline void ExpectLifecycleClean(const PreRunLifecycle &s,
-                                 std::string_view operand, int expected_calls = 1) {
+// gtest helper for operands that an implementation may run again in a nested,
+// balanced lifecycle (for example through an internal run() on its input).
+// Each invariant is its own EXPECT, and the SCOPED_TRACE label identifies
+// which operand failed.
+inline void ExpectLifecycleBalanced(const PreRunLifecycle &s, std::string_view operand,
+                                    int min_calls, int max_calls) {
   SCOPED_TRACE(std::string("prerun_tester operand: ") + std::string(operand));
-  EXPECT_EQ(s.prerun_count, expected_calls);      // PreRun forwarded exactly expected_calls times
+  EXPECT_GE(s.prerun_count, min_calls);           // PreRun forwarded at least min_calls times
+  EXPECT_LE(s.prerun_count, max_calls);           // ... and at most max_calls times
   EXPECT_EQ(s.postrun_count, s.prerun_count);     // PostRun balanced PreRun
   EXPECT_EQ(s.active, 0);                          // lifecycle ownership released
   EXPECT_EQ(s.tracked_ptr, nullptr);               // tracked pointer cleared
+}
+
+// gtest helper: one call per operand, requiring exactly expected_calls
+// balanced lifecycles.
+inline void ExpectLifecycleClean(const PreRunLifecycle &s,
+                                 std::string_view operand, int expected_calls = 1) {
+  ExpectLifecycleBalanced(s, operand, expected_calls, expected_calls);
 }
 
 }  // namespace test
