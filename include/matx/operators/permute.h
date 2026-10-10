@@ -188,11 +188,15 @@ namespace matx
         // Compose adjacent permutations so alias queries observe the net mapping.
         __MATX_INLINE__ auto ComposePermutation(const cuda::std::array<int32_t, Rank()> &dims) const
         {
-          // Validate the outer axes before using them to index the inner axes.
-          [[maybe_unused]] const PermuteOp<self_type> outer(*this, dims);
+          // Validate each outer axis where it indexes the inner axes, so the
+          // compiler can see that invalid axes never reach the access.
           auto combined = dims_;
           for (int r = 0; r < jit_rank(); ++r) {
-            combined[r] = dims_[dims[r]];
+            const int32_t axis = dims[r];
+            if (axis >= jit_rank() || axis < 0) {
+              MATX_THROW(matxInvalidDim, "PermuteOp:  Invalid permute index.");
+            }
+            combined[r] = dims_[axis];
           }
           return PermuteOp<detail::base_type_t<T>>(op_, combined);
         }
