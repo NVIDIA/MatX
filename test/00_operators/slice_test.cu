@@ -6,6 +6,132 @@
 using namespace matx;
 using namespace matx::test;
 
+TEST(SliceOpRegression, DroppedLeadingDimensionKeepsRemainingStart)
+{
+  auto input = make_tensor<int>({3, 5});
+  for (index_t row = 0; row < 3; ++row) {
+    for (index_t column = 0; column < 5; ++column) {
+      input(row, column) = static_cast<int>(10 * row + column);
+    }
+  }
+
+  auto view = slice<1>(input, {1, 2}, {matxDropDim, matxEnd});
+  auto expression = slice<1>(input + 0, {1, 2}, {matxDropDim, matxEnd});
+  ASSERT_EQ(expression.Size(0), 3);
+  for (index_t column = 0; column < expression.Size(0); ++column) {
+    const int expected = static_cast<int>(12 + column);
+    EXPECT_EQ(view(column), expected);
+    EXPECT_EQ(expression(column), expected);
+  }
+
+  auto strided_view = slice<1>(input, {1, 2}, {matxDropDim, matxEnd}, {1, 2});
+  auto strided_expression = slice<1>(input + 0, {1, 2}, {matxDropDim, matxEnd}, {1, 2});
+  ASSERT_EQ(strided_expression.Size(0), 2);
+  for (index_t column = 0; column < strided_expression.Size(0); ++column) {
+    const int expected = static_cast<int>(12 + 2 * column);
+    EXPECT_EQ(strided_view(column), expected);
+    EXPECT_EQ(strided_expression(column), expected);
+  }
+
+  auto downsampled = downsample(input + 0, 1, 2);
+  ASSERT_EQ(downsampled.Size(1), 3);
+  for (index_t row = 0; row < 3; ++row) {
+    for (index_t column = 0; column < downsampled.Size(1); ++column) {
+      EXPECT_EQ(downsampled(row, column), 10 * row + 2 * column);
+    }
+  }
+
+  cudaExecutor cuda_exec{};
+  auto cuda_output = make_tensor<int>({3});
+  (cuda_output = expression).run(cuda_exec);
+  auto cuda_strided_output = make_tensor<int>({2});
+  (cuda_strided_output = strided_expression).run(cuda_exec);
+  cuda_exec.sync();
+  for (index_t column = 0; column < cuda_output.Size(0); ++column) {
+    EXPECT_EQ(cuda_output(column), 12 + column);
+  }
+  for (index_t column = 0; column < cuda_strided_output.Size(0); ++column) {
+    EXPECT_EQ(cuda_strided_output(column), 12 + 2 * column);
+  }
+
+#ifdef MATX_EN_JIT
+  CUDAJITExecutor exec{};
+  auto jit_output = make_tensor<int>({3});
+  (jit_output = expression).run(exec);
+  exec.sync();
+  for (index_t column = 0; column < jit_output.Size(0); ++column) {
+    EXPECT_EQ(jit_output(column), 12 + column);
+  }
+
+  auto jit_strided_output = make_tensor<int>({2});
+  (jit_strided_output = strided_expression).run(exec);
+  exec.sync();
+  for (index_t column = 0; column < jit_strided_output.Size(0); ++column) {
+    EXPECT_EQ(jit_strided_output(column), 12 + 2 * column);
+  }
+#endif
+}
+
+#ifdef MATX_EN_JIT
+TEST(SliceOpRegression, JITCacheDistinguishesSliceParameters)
+{
+  auto input = make_tensor<int>({3, 7});
+  for (index_t row = 0; row < 3; ++row) {
+    for (index_t column = 0; column < 7; ++column) {
+      input(row, column) = static_cast<int>(10 * row + column);
+    }
+  }
+
+  CUDAJITExecutor exec{};
+  auto output = make_tensor<int>({2});
+  const cuda::std::array<cuda::std::array<index_t, 2>, 4> starts{{
+      {1, 1}, {1, 2}, {2, 1}, {1, 1}}};
+  const cuda::std::array<index_t, 3> steps{1, 2, 3};
+  auto first = slice<1>(input + 0, starts[0], {matxDropDim, starts[0][1] + 2});
+  auto first_strided = slice<1>(input + 0, starts[0], {matxDropDim, starts[0][1] + 3}, {1, 2});
+  EXPECT_NE(first.get_jit_class_name(), "JITSlice_d1_s2_");
+
+  for (const auto &start : starts) {
+    auto ordinary = slice<1>(input + 0, start, {matxDropDim, start[1] + 2});
+    if (start == starts[0]) {
+      EXPECT_EQ(ordinary.get_jit_class_name(), first.get_jit_class_name());
+    } else {
+      EXPECT_NE(ordinary.get_jit_class_name(), first.get_jit_class_name());
+    }
+    (output = ordinary).run(exec);
+    exec.sync();
+    for (index_t column = 0; column < output.Size(0); ++column) {
+      EXPECT_EQ(output(column), 10 * start[0] + start[1] + column);
+    }
+
+    for (index_t step : steps) {
+      auto strided = slice<1>(input + 0, start,
+          {matxDropDim, start[1] + step + 1}, {1, step});
+      ASSERT_EQ(strided.Size(0), 2);
+      EXPECT_NE(strided.get_jit_class_name(), ordinary.get_jit_class_name());
+      if (start == starts[0] && step == 2) {
+        EXPECT_EQ(strided.get_jit_class_name(), first_strided.get_jit_class_name());
+      } else {
+        EXPECT_NE(strided.get_jit_class_name(), first_strided.get_jit_class_name());
+      }
+      (output = strided).run(exec);
+      exec.sync();
+      for (index_t column = 0; column < output.Size(0); ++column) {
+        EXPECT_EQ(output(column), 10 * start[0] + start[1] + step * column);
+      }
+    }
+  }
+
+  auto negative = slice<1>(input + 0, {-2, -6}, {matxDropDim, 3});
+  EXPECT_EQ(negative.get_jit_class_name(), first.get_jit_class_name());
+  (output = negative).run(exec);
+  exec.sync();
+  EXPECT_EQ(output(0), 11);
+  EXPECT_EQ(output(1), 12);
+}
+#endif
+
+
 TYPED_TEST(OperatorTestsNumericAllExecs, SliceOp)
 {
   MATX_ENTER_HANDLER();
@@ -96,4 +222,4 @@ TYPED_TEST(OperatorTestsNumericAllExecs, SliceOp)
   }  
 
   MATX_EXIT_HANDLER();
-} 
+}
