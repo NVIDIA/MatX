@@ -296,10 +296,12 @@ namespace matx
    * @tparam D
    *   Length of array
    * @param c
-   *   Operator or view for first input
+   *   First column of the matrix. The first row is also c (conjugated for
+   *   complex types), so the matrix is symmetric for real types and
+   *   Hermitian for complex types when c[0] is real.
    *
    * @returns
-   *   New operator of the kronecker product
+   *   Operator that generates the D x D Toeplitz matrix
    */
   template <typename T, int D>
   auto __MATX_INLINE__ toeplitz(const T (&c)[D])
@@ -319,13 +321,15 @@ namespace matx
    *
    * The toeplitz operator constructs a toeplitz matrix
    *
-   * @tparam T1
-   *   Type of first input
+   * @tparam Op
+   *   Operator type of c
    * @param c
-   *   Operator or view for first input
+   *   First column of the matrix. The first row is also c (conjugated for
+   *   complex types), so the matrix is symmetric for real types and
+   *   Hermitian for complex types when c[0] is real.
    *
    * @returns
-   *   New operator of the kronecker product
+   *   Operator that generates the c.Size(0) x c.Size(0) Toeplitz matrix
    */
   template <typename Op>
     requires (!cuda::std::is_array_v<remove_cvref_t<Op>>)
@@ -353,10 +357,11 @@ namespace matx
    * @param c
    *   First column of the matrix
    * @param r
-   *   First row of the matrix
+   *   First row of the matrix. Its first element is ignored; the diagonal
+   *   uses c[0].
    *
    * @returns
-   *   New operator of the kronecker product
+   *   Operator that generates the D1 x D2 Toeplitz matrix
    */
   template <typename T, int D1, int D2>
   auto __MATX_INLINE__ toeplitz(const T (&c)[D1], const T (&r)[D2])
@@ -378,10 +383,11 @@ namespace matx
    * @param c
    *   First column of the matrix
    * @param r
-   *   First row of the matrix
+   *   First row of the matrix. Its first element is ignored; the diagonal
+   *   uses c[0].
    *
    * @returns
-   *   New operator of the kronecker product
+   *   Operator that generates the c.Size(0) x r.Size(0) Toeplitz matrix
    */
   template <typename COp, typename ROp>
     requires (!cuda::std::is_array_v<remove_cvref_t<COp>> &&
