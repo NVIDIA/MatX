@@ -296,9 +296,10 @@ namespace matx
    * @tparam D
    *   Length of array
    * @param c
-   *   First column of the matrix. The first row is also c (conjugated for
-   *   complex types), so the matrix is symmetric for real types and
-   *   Hermitian for complex types when c[0] is real.
+   *   First column of the matrix. The first row starts with c[0] and
+   *   continues with the remaining elements of c, conjugated for complex
+   *   types. The matrix is symmetric for real types and Hermitian for
+   *   complex types when c[0] is real.
    *
    * @returns
    *   Operator that generates the D x D Toeplitz matrix
@@ -324,9 +325,10 @@ namespace matx
    * @tparam Op
    *   Operator type of c
    * @param c
-   *   First column of the matrix. The first row is also c (conjugated for
-   *   complex types), so the matrix is symmetric for real types and
-   *   Hermitian for complex types when c[0] is real.
+   *   First column of the matrix. The first row starts with c[0] and
+   *   continues with the remaining elements of c, conjugated for complex
+   *   types. The matrix is symmetric for real types and Hermitian for
+   *   complex types when c[0] is real.
    *
    * @returns
    *   Operator that generates the c.Size(0) x c.Size(0) Toeplitz matrix
