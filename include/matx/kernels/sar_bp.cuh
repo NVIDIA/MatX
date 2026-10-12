@@ -167,6 +167,20 @@ using strict_or_ff_compute_param_t = typename std::conditional<
     ComputeType == SarBpComputeType::FloatFloat,
     fltflt, strict_compute_param_t<ComputeType>>::type;
 
+// TaylorFast uses dr_inv in double precision for the per-pulse-block reference bin
+// (FillPulseBlockCache) and in single precision in the inner pulse loop. Both are passed
+// from the host so that the kernel performs no double->float conversions that may not
+// hoist out of the inner loop in all cases.
+struct SarBpTaylorFastDrInv {
+    double f64;
+    float f32;
+};
+
+template <SarBpComputeType ComputeType>
+using dr_inv_param_t = typename std::conditional<
+    ComputeType == SarBpComputeType::TaylorFast,
+    SarBpTaylorFastDrInv, strict_or_ff_compute_param_t<ComputeType>>::type;
+
 template <SarBpComputeType ComputeType>
 using sarbp_strict_compute_t = typename std::conditional<
     ComputeType == SarBpComputeType::Double ||
@@ -178,6 +192,14 @@ template <SarBpComputeType ComputeType>
 using loose_compute_param_t = typename std::conditional<
     ComputeType == SarBpComputeType::Double,
     double, float>::type;
+
+// The phase-correction factor is consumed in loose precision on the PhaseLUT path
+// (multiplied by the fractional bin weight) and in strict precision on the direct
+// path (multiplied by the full range delta). Passing the PhaseLUT value already in
+// loose precision avoids in-kernel conversions that may not hoist in all cases.
+template <SarBpComputeType ComputeType, bool PhaseLUT>
+using phase_correction_param_t = typename std::conditional<
+    PhaseLUT, loose_compute_param_t<ComputeType>, strict_compute_param_t<ComputeType>>::type;
 
 // Shared-memory layout for per-pulse-block cached state. Some compute modes
 // cache per-pulse antenna data or Taylor reference values once per pulse block,
@@ -583,8 +605,8 @@ template <SarBpComputeType ComputeType, typename OutImageType, typename InitialI
 // for all instantiations.
 __launch_bounds__(16*16, (SarBpMinCtas<ComputeType, PixelZMode, TaylorFastAddThirdOrder>))
 __global__ void SarBp(OutImageType output, const InitialImageType initial_image, const __grid_constant__ RangeProfilesType range_profiles, const __grid_constant__ PlatPosType platform_positions, const __grid_constant__ VoxLocType voxel_locations, const __grid_constant__ RangeToMcpType range_to_mcp,
-                      strict_or_ff_compute_param_t<ComputeType> dr_inv,
-                      strict_compute_param_t<ComputeType> phase_correction_partial,
+                      dr_inv_param_t<ComputeType> dr_inv,
+                      phase_correction_param_t<ComputeType, PhaseLUT> phase_correction_partial,
                       cuda::std::complex<loose_compute_param_t<ComputeType>> *phase_lut)
 {
     static_assert(OutImageType::Rank() == 2, "Output image must be a 2D tensor");
@@ -740,14 +762,19 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
         }
     };
 
-    [[maybe_unused]] const loose_compute_t phase_correction_partial_loose = static_cast<loose_compute_t>(phase_correction_partial);
-    const auto get_reference_phase_lut = [&phase_lut, &phase_correction_partial_loose](int32_t bin_floor_int, loose_compute_t w) -> loose_complex_compute_t {
+    // On the PhaseLUT path, phase_correction_partial is already loose_compute_t (see
+    // phase_correction_param_t), so it is used directly without a conversion. A mismatch
+    // would silently reintroduce a per-pulse conversion in the inner loop.
+    static_assert(!PhaseLUT ||
+                  cuda::std::is_same_v<decltype(phase_correction_partial), loose_compute_t>,
+                  "SarBp: PhaseLUT path expects phase_correction_partial pre-converted to loose_compute_t");
+    const auto get_reference_phase_lut = [&phase_lut, &phase_correction_partial](int32_t bin_floor_int, loose_compute_t w) -> loose_complex_compute_t {
         const loose_complex_compute_t base_phase = phase_lut[bin_floor_int];
         loose_compute_t incr_sinx, incr_cosx;
         if constexpr (cuda::std::is_same_v<loose_compute_t, double>) {
-            ::sincos(phase_correction_partial_loose * w, &incr_sinx, &incr_cosx);
+            ::sincos(phase_correction_partial * w, &incr_sinx, &incr_cosx);
         } else {
-            __sincosf(phase_correction_partial_loose * w, &incr_sinx, &incr_cosx);
+            __sincosf(phase_correction_partial * w, &incr_sinx, &incr_cosx);
         }
 
         return loose_complex_compute_t{
@@ -795,7 +822,7 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
     if constexpr (IsTaylorFast) {
         static_assert(PhaseLUT == true, "SarBp: TaylorFast compute type requires PhaseLUT optimization");
         if constexpr (PhaseLUT) {
-            thread_state.dr_inv_f32 = static_cast<float>(dr_inv);
+            thread_state.dr_inv_f32 = dr_inv.f32;
             if (tid == 0) {
                 // Use the midpoint of the CTA's valid image footprint. For
                 // partial right/bottom edge CTAs, clamping the nominal CTA
@@ -908,7 +935,7 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
                     static_assert(cuda::std::is_same_v<strict_compute_t, double>, "SarBp: TaylorFast compute type requires double precision");
                     const strict_compute_t ref_range_pure = ::sqrt(dxa*dxa + dya*dya + dza*dza);
                     const strict_compute_t ref_range = ref_range_pure - rtm;
-                    const strict_compute_t ref_bin = ref_range * dr_inv + static_cast<strict_compute_t>(bin_offset);
+                    const strict_compute_t ref_bin = ref_range * dr_inv.f64 + static_cast<strict_compute_t>(bin_offset);
                     const strict_compute_t bin_floor = ::floor(ref_bin);
                     const strict_compute_t inv_R_d = static_cast<strict_compute_t>(1.0) / ref_range_pure;
 
