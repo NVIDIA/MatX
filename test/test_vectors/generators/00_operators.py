@@ -133,12 +133,23 @@ class toeplitz:
     def __init__(self, dtype: str, size: List[int]):
         self.size = size
         self.dtype = dtype
-        pass
+        np.random.seed(1234)
 
     def run(self) -> Dict[str, np.array]:
-        c = matx_common.randn_ndarray((self.size[0],), self.dtype)
-        r = matx_common.randn_ndarray((self.size[1],), self.dtype)
-        r2 = matx_common.randn_ndarray((self.size[2],), self.dtype)
+        # Half-precision tests use these float32 values as references. Toeplitz
+        # only rearranges its inputs, so draw values k/16 with |k| <= 255. They
+        # need at most 8 significant bits, so fp16 and bf16 represent them
+        # exactly and the comparisons do not depend on input rounding.
+        def representable_values(shape):
+            def draw():
+                return np.random.randint(-255, 256, size=shape) / 16
+            if np.issubdtype(self.dtype, np.complexfloating):
+                return (draw() + 1j * draw()).astype(self.dtype)
+            return draw().astype(self.dtype)
+
+        c = representable_values((self.size[0],))
+        r = representable_values((self.size[1],))
+        r2 = representable_values((self.size[2],))
 
         # The first element in each array must match
         r[0]  = c[0]

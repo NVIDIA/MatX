@@ -27,21 +27,23 @@ TYPED_TEST(OperatorTestsFloatAllExecs, Toeplitz)
   pb->NumpyToTensorView(r, "r");
   pb->NumpyToTensorView(r2, "r2");
 
+  // The generator's inputs are exactly representable in every tested type, and
+  // toeplitz() only rearranges them, so the outputs must match exactly.
   // example-begin toeplitz-test-1
   (out1 = toeplitz(c)).run(exec);
   // example-end toeplitz-test-1
   exec.sync();
-  MATX_TEST_ASSERT_COMPARE(pb, out1, "out1", 0.01);
+  MATX_TEST_ASSERT_COMPARE(pb, out1, "out1", 0);
 
   // example-begin toeplitz-test-2
   (out2 = toeplitz(c, r)).run(exec);
   // example-end toeplitz-test-2
   exec.sync();
-  MATX_TEST_ASSERT_COMPARE(pb, out2, "out2", 0.01);  
+  MATX_TEST_ASSERT_COMPARE(pb, out2, "out2", 0);
 
   (out3 = toeplitz(c, r2)).run(exec);
   exec.sync();
-  MATX_TEST_ASSERT_COMPARE(pb, out3, "out3", 0.01);  
+  MATX_TEST_ASSERT_COMPARE(pb, out3, "out3", 0);
 
   MATX_EXIT_HANDLER();
 } 
