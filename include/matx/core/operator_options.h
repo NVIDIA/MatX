@@ -213,7 +213,7 @@ namespace detail {
     int rank = -1;
     decltype(sizeof(0)) element_bytes = 0;
     index_t (*size)(const void *, int) = nullptr;
-    offset_t (*stride)(const void *, int) = nullptr;
+    int64_t (*stride)(const void *, int) = nullptr;
   };
 
 }

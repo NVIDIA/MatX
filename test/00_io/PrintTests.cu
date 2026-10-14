@@ -31,11 +31,42 @@
 /////////////////////////////////////////////////////////////////////////////////
 
 #include <cstdio>
+#include <memory>
+#include <string>
 #include <cuda/std/ccomplex>
 #include "matx.h"
 #include "gtest/gtest.h"
 
 using namespace matx;
+
+TEST(PrintMetadata, CustomDescriptorWidths)
+{
+  std::unique_ptr<FILE, decltype(&std::fclose)> fp(std::tmpfile(), &std::fclose);
+  ASSERT_NE(fp.get(), nullptr);
+  int data = 0;
+  using WideDesc = tensor_desc_cr_ds_64_64_t<2>;
+  auto wide = make_tensor(&data,
+      WideDesc{cuda::std::array<long long, 2>{1, 1},
+               cuda::std::array<long long, 2>{1LL << 32, 1}});
+  detail::PrintShapeImpl(wide, fp.get());
+  using NarrowDesc = tensor_desc_cr_ds_32_32_t<2>;
+  auto narrow = make_tensor(&data,
+      NarrowDesc{cuda::std::array<int32_t, 2>{1, 1},
+                 cuda::std::array<int32_t, 2>{8, 1}});
+  detail::PrintShapeImpl(narrow, fp.get());
+  auto large_shape = make_tensor(&data,
+      WideDesc{cuda::std::array<long long, 2>{1LL << 32, 1},
+               cuda::std::array<long long, 2>{0, 1}});
+  detail::PrintShapeImpl(large_shape, fp.get());
+  std::rewind(fp.get());
+  char buffer[1024]{};
+  const auto bytes = std::fread(buffer, 1, sizeof(buffer), fp.get());
+  ASSERT_FALSE(std::ferror(fp.get()));
+  const std::string output(buffer, bytes);
+  EXPECT_NE(output.find("Sizes:[1, 1], Strides:[4294967296,1]"), std::string::npos);
+  EXPECT_NE(output.find("Sizes:[1, 1], Strides:[8,1]"), std::string::npos);
+  EXPECT_NE(output.find("Sizes:[4294967296, 1], Strides:[0,1]"), std::string::npos);
+}
 
 class PrintTest : public ::testing::Test
 {

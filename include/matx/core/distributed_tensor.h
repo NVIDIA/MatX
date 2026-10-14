@@ -58,6 +58,17 @@ template <int RANK> using distributed_index_t = cuda::std::array<index_t, RANK>;
 
 namespace detail {
 
+template <typename View, typename Index>
+typename View::stride_type DistributedMemoryOffset(const View &view,
+                                                   const Index &index) {
+  using stride_type = typename View::stride_type;
+  stride_type offset = 0;
+  for (int dim = 0; dim < View::Rank(); ++dim) {
+    offset += static_cast<stride_type>(index[dim]) * view.Stride(dim);
+  }
+  return offset;
+}
+
 template <int RANK>
 distributed_index_t<RANK>
 DistributedUnflatten(index_t linear, const distributed_index_t<RANK> &shape) {
@@ -587,12 +598,8 @@ public:
                   detail::DistributedUnflatten<RANK>(linear, local_shape);
               const auto global_index = distribution_.LocalToGlobal(
                   fragment.distribution_index, local_index);
-              offset_t source_offset = 0;
-              offset_t destination_offset = 0;
-              for (int dim = 0; dim < RANK; ++dim) {
-                source_offset += static_cast<offset_t>(local_index[dim]) * fragment.view.Stride(dim);
-                destination_offset += static_cast<offset_t>(global_index[dim]) * out.Stride(dim);
-              }
+              const auto source_offset = detail::DistributedMemoryOffset(fragment.view, local_index);
+              const auto destination_offset = detail::DistributedMemoryOffset(out, global_index);
               T *source = fragment.view.Data() + source_offset;
               T *destination = out.Data() + destination_offset;
               if (run_elements != 0 &&

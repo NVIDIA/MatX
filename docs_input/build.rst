@@ -288,6 +288,9 @@ A signed 32-bit integer has a maximum value of 2\ :sup:`31`-1.
 Sizes, strides, and calculations must fit in their selected types.
 Using 64-bit strides does not increase the size limit of a 32-bit ``index_t``.
 
+DLPack imports require the total element count to fit in ``index_t``.
+The memory span must also fit in ``offset_t`` and the storage size limit.
+
 File I/O Support
 ----------------
 

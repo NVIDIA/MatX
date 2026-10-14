@@ -1095,6 +1095,7 @@ size_t dlpack_shape_and_strides(const DLTensor &dt,
   constexpr auto max_index = static_cast<uint64_t>(std::numeric_limits<index_t>::max());
   constexpr auto max_stride = static_cast<uint64_t>(std::numeric_limits<offset_t>::max());
   constexpr auto max_addressable = dlpack_max_addressable_elements<T>();
+  constexpr auto max_logical_elements = max_index < max_addressable ? max_index : max_addressable;
   uint64_t logical_elements = 1;
 
   if constexpr (TensorType::Rank() > 0) {
@@ -1108,7 +1109,7 @@ size_t dlpack_shape_and_strides(const DLTensor &dt,
                               "DLPack shape dimensions must be positive for MatX tensors");
     validate_dlpack_condition(static_cast<uint64_t>(dim) <= max_index, matxInvalidSize,
                               "DLPack shape dimension exceeds MatX index range");
-    validate_dlpack_condition(logical_elements <= max_addressable / static_cast<uint64_t>(dim), matxInvalidSize,
+    validate_dlpack_condition(logical_elements <= max_logical_elements / static_cast<uint64_t>(dim), matxInvalidSize,
                               "DLPack tensor shape is too large");
 
     shape[r] = static_cast<index_t>(dim);
