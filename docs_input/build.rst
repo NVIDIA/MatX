@@ -176,8 +176,12 @@ Unless otherwise noted, these options are OFF by default.
     - CMake Option
   * - NVTX Flags
     - ``-DMATX_NVTX_FLAGS=ON``
-  * - 32-bit Indices for indexing
+  * - 32-bit Sizes and Strides
     - ``-DMATX_BUILD_32_BIT=ON``
+  * - 32-bit Sizes and Logical Indexes
+    - ``-DMATX_BUILD_32_BIT_SIZES=ON``
+  * - 32-bit Strides and Memory Offsets
+    - ``-DMATX_BUILD_32_BIT_STRIDES=ON``
   * - Visualization Support
     - ``-DMATX_EN_VISUALIZATION=ON``    
   * - File I/O Support
@@ -221,14 +225,25 @@ NVTX Flags
 Enabling NVTX flags adds NVTX ranges for existing MatX operations and enables users to add NVTX ranges to their own code
 using the provided MatX NVTX macros. See :ref:`nvtx-profiling` for more information.
 
-32-bit Indices
---------------
+32-bit Sizes and Strides
+------------------------
 
-Enabling 32-bit indices utilizes 32-bit signed integers as the ``index_t`` data type in MatX.
-This data type is used for sizing tensors and for indexing into tensors. By default, ``index_t``
-is a 64-bit signed integer type, which allows for tensors exceeding 2\ :sup:`31`-1 in size.
-If all of the tensors in your application will be less than 2\ :sup:`31`-1 elements, then using
-a 32-bit index type improves performance for some operations.
+MatX uses ``index_t`` for tensor sizes and logical indexes, and ``offset_t``
+for strides and memory offsets. Both types are signed 64-bit integers by default.
+
+Set ``MATX_BUILD_32_BIT_SIZES=ON`` to use a 32-bit ``index_t``.
+Set ``MATX_BUILD_32_BIT_STRIDES=ON`` to use a 32-bit ``offset_t``.
+These options are independent. For example, enabling only
+``MATX_BUILD_32_BIT_SIZES`` gives 32-bit sizes with 64-bit strides.
+
+The existing ``MATX_BUILD_32_BIT`` option enables both 32-bit types.
+It overrides the separate options, so leave it OFF when choosing the
+widths independently. Set all three options to OFF to use the default
+64-bit types.
+
+A signed 32-bit integer has a maximum value of 2\ :sup:`31`-1.
+Sizes, strides, and calculations must fit in their selected types.
+Using 64-bit strides does not increase the size limit of a 32-bit ``index_t``.
 
 File I/O Support
 ----------------
