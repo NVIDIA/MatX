@@ -450,7 +450,8 @@ namespace detail {
         return JIT_Storage{};
       }
 
-      static __MATX_INLINE__ std::string JITNamePart(index_t value)
+      template <typename IntType>
+      static __MATX_INLINE__ std::string JITNamePart(IntType value)
       {
         auto str = std::to_string(value);
         if (!str.empty() && str[0] == '-') {
@@ -459,8 +460,9 @@ namespace detail {
         return str;
       }
 
+      template <typename IntType>
       static __MATX_INLINE__ std::string JITArrayNamePart(const char *prefix,
-                                                          const cuda::std::array<index_t, RANK> &arr)
+                                                          const cuda::std::array<IntType, RANK> &arr)
       {
         std::string out = prefix;
         if constexpr (RANK == 0) {
@@ -477,7 +479,8 @@ namespace detail {
         return out;
       }
 
-      static __MATX_INLINE__ std::string JITArrayInit(const cuda::std::array<index_t, RANK> &arr)
+      template <typename IntType>
+      static __MATX_INLINE__ std::string JITArrayInit(const cuda::std::array<IntType, RANK> &arr)
       {
         std::string out = "{ ";
         for (int i = 0; i < RANK; i++) {
@@ -607,7 +610,7 @@ namespace detail {
           "      default: return vals.w;\n"
           "    }\n"
           "  }\n"
-          "  __MATX_INLINE__ __MATX_DEVICE__ inner_t GenerateStandardScalar(index_t scalar_linear) const\n"
+          "  __MATX_INLINE__ __MATX_DEVICE__ inner_t GenerateStandardScalar(offset_t scalar_linear) const\n"
           "  {\n"
           "    using RNG = decltype(curanddx::Generator<curanddx::philox4_32>() +\n"
           "                         curanddx::PhiloxRounds<10>() +\n"
@@ -688,7 +691,10 @@ namespace detail {
 
         MATX_LOOP_UNROLL
         for (int i = RANK - 2; i >= 0; i--) {
-          strides_[i] = strides_[i+1] * s[i+1];
+          MATX_ASSERT_STR(strides_[i+1] == 0 ||
+                          s[i+1] <= cuda::std::numeric_limits<offset_t>::max() / strides_[i+1],
+                          matxInvalidSize, "Random generator stride cannot be represented by offset_t");
+          strides_[i] = strides_[i+1] * static_cast<offset_t>(s[i+1]);
         }
 
         MATX_LOG_TRACE("RandomOp constructor: rank={}, total_size={}, seed={}", RANK, total_size_, seed);
@@ -1046,7 +1052,7 @@ namespace detail {
           for (int dim = out_t::Rank() - 1; dim >= 0; dim--) {
             const index_t dim_size = out.Size(dim);
             idx[dim] = static_cast<index_t>(rem % dim_size);
-            rem /= dim_size;
+            rem = static_cast<offset_t>(rem / dim_size);
           }
 
           cuda::std::apply([&](auto... args) {

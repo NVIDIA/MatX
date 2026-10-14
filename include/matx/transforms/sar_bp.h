@@ -255,12 +255,13 @@ inline void sar_bp_impl(OutImageType &out, const InitialImageType &initial_image
     }
   };
 
-  if constexpr (sizeof(index_t) <= sizeof(int32_t)) {
-    dispatch_stride(index_t{});
+  using fallback_index_t = cuda::std::common_type_t<index_t, offset_t>;
+  if constexpr (sizeof(fallback_index_t) <= sizeof(int32_t)) {
+    dispatch_stride(fallback_index_t{});
   } else if (use_32bit) {
     dispatch_stride(int32_t{});
   } else {
-    dispatch_stride(index_t{});
+    dispatch_stride(fallback_index_t{});
   }
 #endif // __CUDACC__
 }

@@ -34,6 +34,7 @@
 
 #include <cassert>
 #include <type_traits>
+#include <utility>
 #include <cuda/std/functional>
 #include "matx/core/vector.h"
 #include "matx/core/error.h"
@@ -776,7 +777,10 @@ MATX_IGNORE_WARNING_POP_GCC
           stride_mult = 1;
         }
         else {
-          stride_mult = (strides[i] == matxKeepStride) ? 1 : strides[i];
+          const auto step = (strides[i] == matxKeepStride) ? 1 : strides[i];
+          MATX_ASSERT_STR(std::in_range<stride_type>(step), matxInvalidSize,
+                          "Slice step cannot be represented by stride_type");
+          stride_mult = static_cast<stride_type>(step);
         }
 
         MATX_ASSERT_STR(first < end, matxInvalidParameter,
@@ -1544,7 +1548,7 @@ MATX_IGNORE_WARNING_POP_GCC
      * @returns Total number of elements across all dimensions
      *
      */
-    constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto TotalSize() const noexcept { return desc_.TotalSize(); }
+    constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto TotalSize() const { return desc_.TotalSize(); }
 
     /**
      * Get the size of a single dimension of the tensor
@@ -1586,7 +1590,7 @@ MATX_IGNORE_WARNING_POP_GCC
       return desc_.Size(Rank() - 1);
     }
 
-    __MATX_INLINE__ __MATX_HOST__  auto Bytes() const noexcept
+    __MATX_INLINE__ __MATX_HOST__  auto Bytes() const
     {
       return TotalSize() * sizeof(*data_.ldata_);
     }
@@ -1677,7 +1681,7 @@ MATX_IGNORE_WARNING_POP_GCC
     {
       using Scalar = typename T::value_type;
       const auto *base = reinterpret_cast<const Scalar *>(data_.ldata_);
-      const index_t total = this->TotalSize();
+      const auto total = this->TotalSize();
       T out{};
       out.real(base[offset]);
       out.imag(base[offset + total]);
@@ -1688,7 +1692,7 @@ MATX_IGNORE_WARNING_POP_GCC
     {
       using Scalar = typename T::value_type;
       auto *base = reinterpret_cast<Scalar *>(data_.ldata_);
-      const index_t total = this->TotalSize();
+      const auto total = this->TotalSize();
       base[offset] = v.real();
       base[offset + total] = v.imag();
     }

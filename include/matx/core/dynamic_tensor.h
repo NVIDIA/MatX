@@ -156,7 +156,7 @@ public:
    * Construct a dynamic tensor from a raw pointer, shape, and strides.
    * The caller is responsible for the lifetime of the data pointer.
    */
-  template <typename StrideType>
+  template <typename StrideType = index_t>
     requires (std::is_integral_v<StrideType> && !std::is_same_v<std::remove_cv_t<StrideType>, bool>)
   dynamic_tensor_t(T *data, const std::vector<index_t> &shape, const std::vector<StrideType> &strides)
       : ldata_(data),
@@ -190,7 +190,7 @@ public:
   /**
    * Construct a dynamic tensor with owning storage, shape, and strides.
    */
-  template <typename StrideType>
+  template <typename StrideType = index_t>
     requires (std::is_integral_v<StrideType> && !std::is_same_v<std::remove_cv_t<StrideType>, bool>)
   dynamic_tensor_t(Storage<T> storage, const std::vector<index_t> &shape, const std::vector<StrideType> &strides)
       : ldata_(storage.data()),
@@ -313,7 +313,13 @@ public:
       offset_t expected = 1;
       for (int i = rank_ - 1; i >= 0; --i) {
         if (strides_[i] != expected) { contiguous = false; break; }
-        expected *= static_cast<offset_t>(shape_[i]);
+        if (i > 0) {
+          if (expected != 0 && shape_[i] > cuda::std::numeric_limits<offset_t>::max() / expected) {
+            contiguous = false;
+            break;
+          }
+          expected *= static_cast<offset_t>(shape_[i]);
+        }
       }
       if (!contiguous) {
         return cuda::std::array<detail::ElementsPerThread, 2>{detail::ElementsPerThread::ONE, detail::ElementsPerThread::ONE};

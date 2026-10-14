@@ -810,6 +810,8 @@ auto make_tensor( T *const data,
   cuda::std::array<index_t, RANK> shape_arr;
   cuda::std::array<offset_t, RANK> strides_arr;
   for (int i = 0; i < RANK; i++) {
+    MATX_ASSERT_STR(shape[i] > 0, matxInvalidSize,
+                    "Must specify size larger than 0 for each dimension");
     MATX_ASSERT_STR(std::in_range<offset_t>(strides[i]), matxInvalidSize,
                     "Tensor stride cannot be represented by offset_t");
     shape_arr[i] = shape[i];
@@ -818,6 +820,12 @@ auto make_tensor( T *const data,
   DefaultDescriptor<RANK>  desc{std::move(shape_arr), std::move(strides_arr)};
   auto storage = owning ? make_owning_storage<T>(desc.TotalSize()) : make_non_owning_storage<T>(data, desc.TotalSize());
   return tensor_t<T,RANK, decltype(desc)>{std::move(storage), std::move(desc), data};
+}
+
+template <typename T, int RANK>
+auto make_tensor(T *const data, const index_t (&shape)[RANK],
+                 const index_t (&strides)[RANK], bool owning = false) {
+  return make_tensor<T, RANK, index_t>(data, shape, strides, owning);
 }
 
 /**
@@ -856,6 +864,14 @@ auto make_tensor( TensorType &tensor,
 
   auto tmp = make_tensor<typename TensorType::value_type, TensorType::Rank()>(data, shape, strides, false);
   tensor.Shallow(tmp);
+}
+
+template <typename TensorType>
+  requires (is_tensor<TensorType> && !is_dynamic_tensor_v<TensorType>)
+auto make_tensor(TensorType &tensor, typename TensorType::value_type *const data,
+                 const index_t (&shape)[TensorType::Rank()],
+                 const index_t (&strides)[TensorType::Rank()]) {
+  make_tensor<TensorType, index_t>(tensor, data, shape, strides);
 }
 
 

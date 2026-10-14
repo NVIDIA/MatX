@@ -228,7 +228,7 @@ public:
       }
 
       if (i > 0) {
-        if (Size(i) > cuda::std::numeric_limits<stride_type>::max() / ttl) {
+        if (ttl != 0 && Size(i) > cuda::std::numeric_limits<stride_type>::max() / ttl) {
           return false;
         }
         ttl *= static_cast<stride_type>(Size(i));
@@ -250,7 +250,7 @@ public:
     // The stride_type is expected to be able to hold this without overflowing
     stride_type size = 1;
     for (int i = 0; i < RANK; i++) {
-      MATX_ASSERT_STR(Size(i) <= cuda::std::numeric_limits<stride_type>::max() / size,
+      MATX_ASSERT_STR(size == 0 || Size(i) <= cuda::std::numeric_limits<stride_type>::max() / size,
                       matxInvalidSize, "Tensor size cannot be represented by stride_type");
       size *= static_cast<stride_type>(Size(i));
     }

@@ -271,6 +271,12 @@ std::vector<std::string> __MATX_HOST__ __MATX_INLINE__ get_preprocessor_options(
 
     std::vector<std::string> options;
     options.push_back("-DMATX_EN_JIT");
+#ifdef MATX_INDEX_32_BIT
+    options.push_back("-DMATX_INDEX_32_BIT");
+#endif
+#ifdef MATX_OFFSET_32_BIT
+    options.push_back("-DMATX_OFFSET_32_BIT");
+#endif
 #ifdef MATX_EN_MATHDX
     options.push_back("-DMATX_EN_MATHDX");
 #endif
@@ -829,7 +835,8 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name,
   const std::string nvrtc_arch = resolve_nvrtc_cuda_arch();
   int current_device = 0;
   CUDA_RT_CHECK(cudaGetDevice(&current_device));
-  const std::string device_cache_prefix = "device_" + std::to_string(current_device) + "_sm_" + nvrtc_arch + "_";
+  const std::string device_cache_prefix = "device_" + std::to_string(current_device) + "_sm_" + nvrtc_arch +
+      "_index" + std::to_string(sizeof(index_t) * 8) + "_offset" + std::to_string(sizeof(offset_t) * 8) + "_";
   std::string kernel_name = get_kernel_name_for_rank<RANK>(stride, global_kernel, pass_through_threads,
                                                            pass_through_inner_rank, block_reduces_rank);
   auto make_legacy_kernel_cache_key = [&]() {

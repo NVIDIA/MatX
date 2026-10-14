@@ -769,7 +769,7 @@ private:
       // for complex half we have copied to planar row major
       // we know the layout of this matrix is compact
       if constexpr (TensorTypeA::Rank() == RANK) {
-        stride = static_cast<int64_t>(static_cast<offset_t>(params_.a_rows) * static_cast<offset_t>(params_.a_cols) * offset_t{2});
+        stride = static_cast<int64_t>(params_.a_rows) * static_cast<int64_t>(params_.a_cols) * 2;
       }
       else {
         stride = 0;
@@ -788,7 +788,7 @@ private:
       // for complex half we have copied to planar row major
       // we know the layout of this matrix is compact
       if constexpr (TensorTypeB::Rank() == RANK) {
-        stride = static_cast<int64_t>(static_cast<offset_t>(params_.b_rows) * static_cast<offset_t>(params_.b_cols) * offset_t{2});
+        stride = static_cast<int64_t>(params_.b_rows) * static_cast<int64_t>(params_.b_cols) * 2;
       }
       else {
         stride = 0;
@@ -806,7 +806,7 @@ private:
     if constexpr (is_complex_half_v<T1>) {
       // for complex half we have copied to planar row major
       // we know the layout of this matrix is compact
-      stride = static_cast<int64_t>(static_cast<offset_t>(params_.c_rows) * static_cast<offset_t>(params_.c_cols) * offset_t{2});
+      stride = static_cast<int64_t>(params_.c_rows) * static_cast<int64_t>(params_.c_cols) * 2;
     }
     else {
       stride = static_cast<int64_t>(params_.cstride);
