@@ -47,6 +47,7 @@
 #include "matx/executors/host.h"
 #include "matx/operators/clone.h"
 #include "matx/kernels/resample_poly.cuh"
+#include "matx/kernels/tensor_accessor.h"
 
 namespace matx {
 namespace detail {
@@ -144,22 +145,24 @@ inline void matxResamplePoly1DInternal(OutType &o, const InType &i,
     return (max_outlen_per_cta + cta_comp_unit_count * grid.z - 1) / (cta_comp_unit_count * grid.z);
   };
 
-  // Unit-stride fast path: only viable when every hot tensor is a tensor view
-  // (Data()/Stride() callable) AND each one's last-dim stride is 1. The
-  // TensorAccessor in the kernel takes the fast pointer-arithmetic path when
-  // IsUnitStride is true; otherwise it forwards to operator() and works for
-  // any MatX op (computed ops included).
+  // Unit-stride fast path: only viable when every hot operand is a tensor view
+  // (Data()/Stride() callable) with last-dim stride 1, or, for the input, a
+  // two-segment split view (is_split_unit_stride_input_v).
+  // The TensorAccessor in the kernel takes the fast pointer-arithmetic path for
+  // tensor views when IsUnitStride is true; otherwise, including for the split
+  // view, it forwards to operator() and works for any MatX op (computed ops
+  // included). Both the ElemBlock and WarpCentric kernels read the split view's
+  // segments directly through detail::WithInputRangeReader.
   constexpr bool fast_path_eligible =
       is_tensor_view_v<OutType> &&
-      is_tensor_view_v<InType> &&
+      (is_tensor_view_v<InType> || is_split_unit_stride_input_v<InType>) &&
       is_tensor_view_v<FilterType>;
 
   bool is_unit_stride = false;
   if constexpr (fast_path_eligible) {
-    is_unit_stride =
-        o.Stride(OutType::Rank() - 1) == 1 &&
-        i.Stride(InType::Rank() - 1) == 1 &&
-        filter.Stride(FilterType::Rank() - 1) == 1;
+    is_unit_stride = get_operator_capability<OperatorCapability::UNIT_STRIDE_LAST>(o) &&
+                     get_operator_capability<OperatorCapability::UNIT_STRIDE_LAST>(i) &&
+                     get_operator_capability<OperatorCapability::UNIT_STRIDE_LAST>(filter);
   }
 
   constexpr int THREADS = MATX_RESAMPLE_POLY_MAX_NUM_THREADS;

@@ -159,6 +159,8 @@ TEST(CapabilitiesTests, QueryTypeMappingCoversEveryCapability)
   ExpectQueryType(detail::OperatorCapability::JIT_CLASS_QUERY, detail::CapabilityQueryType::AND_QUERY);
   ExpectQueryType(detail::OperatorCapability::JIT_TYPE_QUERY, detail::CapabilityQueryType::STR_CAT_QUERY);
   ExpectQueryType(detail::OperatorCapability::DYN_SHM_SIZE, detail::CapabilityQueryType::MAX_QUERY);
+  ExpectQueryType(detail::OperatorCapability::STATIC_SHM_SIZE, detail::CapabilityQueryType::SUM_QUERY);
+  ExpectQueryType(detail::OperatorCapability::JIT_STATIC_SHM_TYPES, detail::CapabilityQueryType::STR_CAT_QUERY);
   ExpectQueryType(detail::OperatorCapability::BLOCK_DIM, detail::CapabilityQueryType::RANGE_QUERY);
   ExpectQueryType(detail::OperatorCapability::GENERATE_LTOIR, detail::CapabilityQueryType::AND_QUERY);
   ExpectQueryType(detail::OperatorCapability::PASS_THROUGH_THREADS, detail::CapabilityQueryType::OR_QUERY);

@@ -137,6 +137,76 @@ TYPED_TEST(BasicGeneratorTestsFloatNonComplex, Windows)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(BasicGeneratorTestsFloatNonComplex, SingleElementWindows)
+{
+  MATX_ENTER_HANDLER();
+
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  ExecType exec{};
+
+  auto ov = make_tensor<TestType>({1});
+  using Shape = cuda::std::array<index_t, 1>;
+  // These windows cannot currently be instantiated with half or bfloat16 output types.
+  using WindowType = cuda::std::conditional_t<is_matx_half_v<TestType>, float, TestType>;
+
+  // A one-point window is 1, matching numpy and scipy.
+  (ov = hanning<0, Shape, WindowType>({1})).run(exec);
+  exec.sync();
+  EXPECT_EQ(static_cast<float>(ov(0)), 1.0f);
+
+  (ov = hamming<0, Shape, WindowType>({1})).run(exec);
+  exec.sync();
+  EXPECT_EQ(static_cast<float>(ov(0)), 1.0f);
+
+  (ov = bartlett<0, Shape, TestType>({1})).run(exec);
+  exec.sync();
+  EXPECT_EQ(static_cast<float>(ov(0)), 1.0f);
+
+  (ov = blackman<0, Shape, WindowType>({1})).run(exec);
+  exec.sync();
+  EXPECT_EQ(static_cast<float>(ov(0)), 1.0f);
+
+  (ov = flattop<0, Shape, WindowType>({1})).run(exec);
+  exec.sync();
+  EXPECT_EQ(static_cast<float>(ov(0)), 1.0f);
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(OperatorTests, SingleElementLinspaceLogspace)
+{
+  MATX_ENTER_HANDLER();
+  cudaExecutor exec{};
+
+  auto ov = make_tensor<float>({1});
+
+  // A single point is the start value, matching numpy.
+  (ov = linspace(2.0f, 5.0f, 1)).run(exec);
+  exec.sync();
+  EXPECT_EQ(ov(0), 2.0f);
+
+  (ov = logspace<0>({1}, 1.0f, 3.0f)).run(exec);
+  exec.sync();
+  EXPECT_NEAR(ov(0), 10.0f, 1e-4f);
+
+  // The endpoint must not matter for a single point, even when last - first overflows.
+  (ov = logspace<0>({1}, -1e38f, 3e38f)).run(exec);
+  exec.sync();
+  EXPECT_FALSE(std::isnan(ov(0)));
+  EXPECT_EQ(ov(0), 0.0f);
+
+  const float firsts[] = {2.0f, 3.0f};
+  const float lasts[] = {5.0f, 9.0f};
+  auto ov2 = make_tensor<float>({1, 2});
+  (ov2 = linspace(firsts, lasts, 1, 0)).run(exec);
+  exec.sync();
+  EXPECT_EQ(ov2(0, 0), 2.0f);
+  EXPECT_EQ(ov2(0, 1), 3.0f);
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(BasicGeneratorTestsAll, Diag)
 {
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
@@ -823,6 +893,38 @@ TEST(OperatorTests, RandomJITCapabilityLimits)
 
   MATX_EXIT_HANDLER();
 }
+
+#ifdef MATX_EN_JIT
+TEST(OperatorTests, SingleElementWindowsJIT)
+{
+  MATX_ENTER_HANDLER();
+  CUDAJITExecutor exec{};
+
+  auto ov = make_tensor<float>({1});
+
+  (ov = hanning<0>({1})).run(exec);
+  exec.sync();
+  EXPECT_EQ(ov(0), 1.0f);
+
+  (ov = hamming<0>({1})).run(exec);
+  exec.sync();
+  EXPECT_EQ(ov(0), 1.0f);
+
+  (ov = bartlett<0>({1})).run(exec);
+  exec.sync();
+  EXPECT_EQ(ov(0), 1.0f);
+
+  (ov = blackman<0>({1})).run(exec);
+  exec.sync();
+  EXPECT_EQ(ov(0), 1.0f);
+
+  (ov = flattop<0>({1})).run(exec);
+  exec.sync();
+  EXPECT_EQ(ov(0), 1.0f);
+
+  MATX_EXIT_HANDLER();
+}
+#endif
 
 #if defined(MATX_EN_MATHDX) && defined(MATX_EN_JIT)
 TEST(OperatorTests, RandomJITFusedUniform)

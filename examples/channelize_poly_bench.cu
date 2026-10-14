@@ -38,14 +38,13 @@
 #include <memory>
 #include <fstream>
 #include <istream>
+#include <vector>
 #include <cuda/std/complex>
 
 using namespace matx;
 
-// This example is used primarily for development purposes to benchmark the performance of the
-// polyphase channelizer kernel(s). Typically, the parameters below (batch size, filter
-// length, input signal length, and channel range) will be adjusted to a range of interest
-// and the benchmark will be run with and without the proposed kernel changes.
+// This example is used primarily for development purposes to benchmark the
+// performance of the polyphase channelizer kernels.
 
 constexpr int NUM_WARMUP_ITERATIONS = 2;
 
@@ -62,13 +61,16 @@ const char *TypeName() {
 }
 
 template <typename InType, typename OutType, typename FilterType>
-void ChannelizePolyBench(matx::index_t num_channels, matx::index_t decimation_factor)
+void ChannelizePolyBench(matx::index_t num_channels, matx::index_t decimation_factor,
+                         matx::index_t custom_batches, matx::index_t custom_filter_len_per_channel,
+                         matx::index_t custom_input_len, int warmup_iterations, int iterations)
 {
-  struct {
+  struct TestCase {
     matx::index_t num_batches;
     matx::index_t filter_len_per_channel;
     matx::index_t input_len;
-  } test_cases[] = {
+  };
+  std::vector<TestCase> test_cases = {
     { 1, 17, 256 },
     { 1, 17, 3000 },
     { 1, 17, 31000 },
@@ -78,6 +80,9 @@ void ChannelizePolyBench(matx::index_t num_channels, matx::index_t decimation_fa
     { 1, 17, 8192*1024 },
     { 42, 17, 8192*1024 }
   };
+  if (custom_input_len > 0) {
+    test_cases = {{custom_batches, custom_filter_len_per_channel, custom_input_len}};
+  }
 
   cudaStream_t stream;
   cudaStreamCreate(&stream);
@@ -85,15 +90,15 @@ void ChannelizePolyBench(matx::index_t num_channels, matx::index_t decimation_fa
   cudaEventCreate(&start);
   cudaEventCreate(&stop);
 
-  cudaExecutor exec{};
+  cudaExecutor exec{stream};
 
-  for (size_t i = 0; i < sizeof(test_cases)/sizeof(test_cases[0]); i++) {
+  for (size_t i = 0; i < test_cases.size(); i++) {
     const matx::index_t num_batches = test_cases[i].num_batches;
     const matx::index_t filter_len = test_cases[i].filter_len_per_channel * num_channels;
     const matx::index_t input_len = test_cases[i].input_len;
     const matx::index_t output_len_per_channel = (input_len + decimation_factor - 1) / decimation_factor;
 
-    if (input_len < num_channels * 100) {
+    if (custom_input_len <= 0 && input_len < num_channels * 100) {
       continue;
     }
 
@@ -103,7 +108,7 @@ void ChannelizePolyBench(matx::index_t num_channels, matx::index_t decimation_fa
     (input = static_cast<InType>(1)).run(exec);
     (filter = static_cast<FilterType>(1)).run(exec);
 
-    for (int k = 0; k < NUM_WARMUP_ITERATIONS; k++) {
+    for (int k = 0; k < warmup_iterations; k++) {
       (output = channelize_poly(input, filter, num_channels, decimation_factor)).run(exec);
     }
 
@@ -111,7 +116,7 @@ void ChannelizePolyBench(matx::index_t num_channels, matx::index_t decimation_fa
 
     float elapsed_ms = 0.0f;
     cudaEventRecord(start, stream);
-    for (int k = 0; k < NUM_ITERATIONS; k++) {
+    for (int k = 0; k < iterations; k++) {
       (output = channelize_poly(input, filter, num_channels, decimation_factor)).run(exec);
     }
     cudaEventRecord(stop, stream);
@@ -119,7 +124,7 @@ void ChannelizePolyBench(matx::index_t num_channels, matx::index_t decimation_fa
     MATX_CUDA_CHECK_LAST_ERROR();
     cudaEventElapsedTime(&elapsed_ms, start, stop);
 
-    const double avg_elapsed_us = (static_cast<double>(elapsed_ms)/NUM_ITERATIONS)*1.0e3;
+    const double avg_elapsed_us = (static_cast<double>(elapsed_ms)/iterations)*1.0e3;
     printf("Batches: %5" MATX_INDEX_T_FMT " Channels: %5" MATX_INDEX_T_FMT " Decimation: %5" MATX_INDEX_T_FMT " FilterLen: %5" MATX_INDEX_T_FMT
       " InputLen: %7" MATX_INDEX_T_FMT " Elapsed Usecs: %12.1f MPts/sec: %12.3f\n",
       num_batches, num_channels, decimation_factor, filter_len, input_len, avg_elapsed_us,
@@ -143,6 +148,11 @@ struct BenchConfig {
   Domain    filter_domain = Domain::Real;
   matx::index_t M = 10;   // number of channels
   matx::index_t D = -1;   // decimation factor (-1 means D = M)
+  matx::index_t batches = 1;
+  matx::index_t filter_len_per_channel = 17;
+  matx::index_t input_len = -1;
+  int warmup_iterations = NUM_WARMUP_ITERATIONS;
+  int iterations = NUM_ITERATIONS;
 };
 
 void PrintUsage(const char *prog) {
@@ -151,7 +161,13 @@ void PrintUsage(const char *prog) {
   printf("  --filter-type  <type>   Filter type: float, double, cf, cd (default: float)\n");
   printf("  -M <N>                  Number of channels (default: 10)\n");
   printf("  -D <N>                  Decimation factor, 0 < D <= M (default: M)\n");
+  printf("  --batches <N>            Batch count for a single custom case (default: 1)\n");
+  printf("  --filter-per-channel <N> Filter taps per channel for a custom case (default: 17)\n");
+  printf("  --input-len <N>          Run one custom case with input length N > 0\n");
+  printf("  --warmups <N>            Warmup iterations (default: %d)\n", NUM_WARMUP_ITERATIONS);
+  printf("  --iterations <N>         Timed iterations (default: %d)\n", NUM_ITERATIONS);
   printf("\n");
+  printf("--batches and --filter-per-channel require --input-len.\n");
   printf("Type shorthands: float, double, cf (complex<float>), cd (complex<double>)\n");
 }
 
@@ -179,7 +195,9 @@ void DispatchBench(const BenchConfig &cfg) {
       TypeName<InType>(), TypeName<FilterType>(), TypeName<OutType>());
   printf("M: %" MATX_INDEX_T_FMT "  D: %" MATX_INDEX_T_FMT "\n\n", cfg.M, cfg.D);
 
-  ChannelizePolyBench<InType, OutType, FilterType>(cfg.M, cfg.D);
+  ChannelizePolyBench<InType, OutType, FilterType>(
+      cfg.M, cfg.D, cfg.batches, cfg.filter_len_per_channel, cfg.input_len,
+      cfg.warmup_iterations, cfg.iterations);
 }
 
 void RunBench(const BenchConfig &cfg) {
@@ -213,6 +231,7 @@ int main(int argc, char **argv)
   MATX_ENTER_HANDLER();
 
   BenchConfig cfg;
+  bool requires_input_len = false;
 
   for (int i = 1; i < argc; i++) {
     if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
@@ -232,6 +251,22 @@ int main(int argc, char **argv)
       cfg.M = static_cast<matx::index_t>(atol(argv[++i]));
     } else if (strcmp(argv[i], "-D") == 0 && i + 1 < argc) {
       cfg.D = static_cast<matx::index_t>(atol(argv[++i]));
+    } else if (strcmp(argv[i], "--batches") == 0 && i + 1 < argc) {
+      cfg.batches = static_cast<matx::index_t>(atol(argv[++i]));
+      requires_input_len = true;
+    } else if (strcmp(argv[i], "--filter-per-channel") == 0 && i + 1 < argc) {
+      cfg.filter_len_per_channel = static_cast<matx::index_t>(atol(argv[++i]));
+      requires_input_len = true;
+    } else if (strcmp(argv[i], "--input-len") == 0 && i + 1 < argc) {
+      cfg.input_len = static_cast<matx::index_t>(atol(argv[++i]));
+      if (cfg.input_len <= 0) {
+        fprintf(stderr, "Error: --input-len must be positive\n");
+        return 1;
+      }
+    } else if (strcmp(argv[i], "--warmups") == 0 && i + 1 < argc) {
+      cfg.warmup_iterations = atoi(argv[++i]);
+    } else if (strcmp(argv[i], "--iterations") == 0 && i + 1 < argc) {
+      cfg.iterations = atoi(argv[++i]);
     } else {
       fprintf(stderr, "Unknown option: %s\n", argv[i]);
       PrintUsage(argv[0]);
@@ -252,6 +287,18 @@ int main(int argc, char **argv)
 
   if (cfg.M < 2) {
     fprintf(stderr, "Error: number of channels M must be >= 2 (got M=%" MATX_INDEX_T_FMT ")\n", cfg.M);
+    return 1;
+  }
+
+  if (requires_input_len && cfg.input_len < 0) {
+    fprintf(stderr, "Error: --batches and --filter-per-channel require --input-len\n");
+    return 1;
+  }
+
+  if (cfg.batches <= 0 || cfg.filter_len_per_channel <= 0 ||
+      cfg.warmup_iterations < 0 || cfg.iterations <= 0) {
+    fprintf(stderr,
+        "Error: custom dimensions and iteration counts must be positive (warmups may be zero)\n");
     return 1;
   }
 

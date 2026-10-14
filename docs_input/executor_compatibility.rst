@@ -25,6 +25,10 @@ options. Optional backend dependencies such as CPU BLAS, CPU solver libraries, o
 still using |yes| when the operator is supported for that executor. CUDAJITExecutor support means the operator can participate in a
 fused JIT expression; non-JIT CUDA execution through cudaExecutor remains available for the broader CUDA library paths.
 
+With ``MATX_EN_UNSAFE_ALIAS_DETECTION`` enabled, host and non-JIT CUDA assignments accept in-place element-wise operations on matching
+strided tensor layouts whose elements can be proven distinct. This also applies to the normalization step of strided CUDA IFFTs.
+See :doc:`basics/debug` for the alias check's conservative limitations.
+
 The experimental ``distributedCUDAExecutor`` is intentionally narrower than
 the other executors in this table. It currently supports ``apply`` with
 distributed inputs, distributed-to-distributed copies with identical layouts,
@@ -78,7 +82,7 @@ existing operators do not implicitly become distributed operations.
    "cart2sph", "|yes|", "|yes|", "|yes|", "|no|", "Element-wise coordinate conversion expression."
    "ceil", "|yes|", "|yes|", "|yes|", "|no|", "Element-wise expression."
    "cgsolve", "|no|", "|yes|", "|no|", "|no|", "CUDA iterative solver path."
-   "channelize_poly", "|yes|", "|yes|", "|no|", "|no|", "Polyphase channelizer; host path directly computes the per-branch FIR and DFT stages."
+   "channelize_poly", "|yes|", "|yes|", "|no|", "|no|", "Polyphase channelizer; host path directly computes the per-branch FIR and DFT stages. CUDA has limitations for half-precision outputs; see :ref:`channelize_poly_func`."
    "chirp", "|yes|", "|yes|", "|yes|", "|no|", "Generator expression."
    "chol", "|yes|", "|yes|", "|yes|", "|partial|", "Host support requires the CPU solver backend. CUDAJITExecutor support uses cuSolverDx through MathDx for supported rank 2-4 square float, double, complex-float, and complex-double matrices. Experimental distributedCUDAExecutor support is limited to aligned batch sharding with fully local matrix dimensions."
    "clone", "|yes|", "|yes|", "|yes|", "|no|", "View expression."

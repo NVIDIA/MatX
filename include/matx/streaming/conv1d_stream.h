@@ -143,15 +143,17 @@ public:
     }
     // One allocation holding both ping-pong halves ([0,H) and [H,2H)) instead
     // of two separate tensors — fewer allocations / less fragmentation when
-    // many objects exist. max(H,1) avoids a zero-size allocation when L==1.
+    // many objects exist — followed by flush_len zeros that flush() reads as
+    // the zero tail (zeroed by reset(), never written otherwise). max(H,1)
+    // avoids a zero-size allocation when L==1.
     // CUDA executors get stream-ordered device memory; host executors get
     // system-allocated memory.
     const index_t rsz = cuda::std::max(L_ - 1, index_t(1));
     if constexpr (is_cuda_executor_v<Exec>) {
-      make_tensor(retain_buf_, {2 * rsz}, MATX_ASYNC_DEVICE_MEMORY, exec_.getStream());
+      make_tensor(retain_buf_, {2 * rsz + flush_len_}, MATX_ASYNC_DEVICE_MEMORY, exec_.getStream());
       make_tensor(filter_, {L_}, MATX_ASYNC_DEVICE_MEMORY, exec_.getStream());
     } else {
-      make_tensor(retain_buf_, {2 * rsz}, MATX_HOST_MALLOC_MEMORY);
+      make_tensor(retain_buf_, {2 * rsz + flush_len_}, MATX_HOST_MALLOC_MEMORY);
       make_tensor(filter_, {L_}, MATX_HOST_MALLOC_MEMORY);
     }
     // Materialize the filter once. The assignment runs the full operator
@@ -291,19 +293,22 @@ public:
       return cnt;
     }
 
-    // Lazy [retain | new] view. The retain lives in half `retain_buf_ind_` of
-    // the shared buffer.
+    // The retain lives in half `retain_buf_ind_` of the shared buffer.
     auto retain = cur_retain();
-    auto sig = concat(0, retain, new_samples);
     if (cnt > 0) {
-      conv1d_impl(slice(out, {0}, {cnt}), slice(sig, {d}, {L_ - 1 + nl}), filter_,
-                  MATX_C_MODE_VALID, MATX_C_METHOD_DIRECT, exec_);
+      // Read [retain[d:] | new]: the startup skip trims the front of the buffer.
+      detail::VisitStreamBuffer<Exec>(retain, d, new_samples, [&](const auto &in) {
+        conv1d_impl(slice(out, {0}, {cnt}), in, filter_, MATX_C_MODE_VALID,
+                    MATX_C_METHOD_DIRECT, exec_);
+      });
     }
 
     // New retain = trailing L-1 samples of [retain | new]. Written into the
-    // OTHER half (disjoint from the half `sig` reads), so no aliasing. Uses
+    // OTHER half (disjoint from the current retain half, which the convolution
+    // above and `sig` below read), so no aliasing. Uses
     // exec_.Exec (not run()) so it does not re-enter the segment's lifecycle.
     const index_t nxt = (1 - retain_buf_ind_) * (L_ - 1);
+    auto sig         = concat(0, retain, new_samples); // lazy [retain | new] view
     auto next_retain = slice(retain_buf_, {nxt}, {nxt + L_ - 1});
     auto sig_tail    = slice(sig, {nl}, {nl + L_ - 1});
     auto retain_copy = (next_retain = sig_tail);
@@ -352,13 +357,19 @@ public:
           "Conv1DStream::flush: output buffer smaller than the produced count");
     }
     // [retain | zeros(flush_len)] has length L-1+flush_len; VALID over its
-    // [d:] suffix yields exactly the cnt trailing outputs. flush() reads the
-    // retain buffer (a tensor) and a zeros generator -- no operator segment --
-    // so there is no segment lifecycle to run here.
+    // [d:] suffix yields exactly the cnt trailing outputs. The zeros are the
+    // zero region at the end of retain_buf_, so the buffer has the same type
+    // as feed()'s and flush() reuses its convolution kernels instead of
+    // instantiating a set for a zeros generator. flush() reads only
+    // retain_buf_ -- no operator segment -- so there is no segment lifecycle
+    // to run here.
     auto retain = cur_retain();
-    auto sig = concat(0, retain, zeros<InType>({flush_len_}));
-    conv1d_impl(slice(out, {0}, {cnt}), slice(sig, {d}, {L_ - 1 + flush_len_}), filter_,
-                MATX_C_MODE_VALID, MATX_C_METHOD_DIRECT, exec_);
+    const index_t zbase = retain_buf_.Size(0) - flush_len_;
+    auto zero_tail = slice(retain_buf_, {zbase}, {zbase + flush_len_});
+    detail::VisitStreamBuffer<Exec>(retain, d, zero_tail, [&](const auto &in) {
+      conv1d_impl(slice(out, {0}, {cnt}), in, filter_, MATX_C_MODE_VALID,
+                  MATX_C_METHOD_DIRECT, exec_);
+    });
     // Commit end-of-stream only after validation and scheduling succeed, so a
     // failed flush() (e.g. an undersized output buffer) can be retried.
     flushed_ = true;

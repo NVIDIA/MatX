@@ -123,6 +123,12 @@ namespace matx
         __MATX_INLINE__ std::string str() const { return "upsample(" + op_.str() + ")"; }
 
         __MATX_INLINE__ UpsampleOp(const T &op, int32_t dim, index_t n) : op_(op), dim_(dim), n_(n) {
+          if (dim < 0 || dim >= jit_rank()) {
+            MATX_THROW(matxInvalidDim, "upsample dim must be in range [0, rank-1]");
+          }
+          if (n <= 0) {
+            MATX_THROW(matxInvalidParameter, "upsample rate must be positive");
+          }
           MATX_LOG_TRACE("{} constructor: dim={}, n={}, rank={}", str(), dim, n, Rank());
         };
 
@@ -133,11 +139,10 @@ namespace matx
               static_assert(sizeof...(Is)==Rank());
               static_assert((cuda::std::is_convertible_v<Is, index_t> && ... ));
 
-              // convert variadic type to tuple so we can read/update
-              cuda::std::array<index_t, Rank()> ind{indices...};
-              if ((ind[dim_] % n_) == 0) {
-                ind[dim_] /= n_;
-                return get_value<CapType>(op_, ind);
+              const cuda::std::array<index_t, Rank()> ind{indices...};
+              const index_t idx = detail::select_at(ind, dim_);
+              if ((idx % n_) == 0) {
+                return get_value<CapType>(op_, detail::replace_at(ind, dim_, idx / n_));
               }
 
             return static_cast<typename decltype(op_)::value_type>(0);
@@ -246,8 +251,8 @@ namespace matx
    *
    * @tparam T Input operator/tensor type
    * @param op Input operator
-   * @param dim the factor to upsample
-   * @param n Upsample rate
+   * @param dim Dimension to upsample. Must be in [0, Rank()), otherwise matxInvalidDim is thrown
+   * @param n Upsample rate. Must be positive, otherwise matxInvalidParameter is thrown
    * @return Upsampled operator
    */
   template <typename T>
@@ -260,12 +265,20 @@ namespace matx
    *
    * @tparam T Input operator/tensor type
    * @param op Input operator
-   * @param dim the factor to downsample
-   * @param n Downsample rate
+   * @param dim Dimension to downsample. Must be in [0, Rank()), otherwise matxInvalidDim is thrown
+   * @param n Downsample rate. Must be positive, otherwise matxInvalidParameter is thrown
    * @return Downsample operator
    */
   template <typename T>
   __MATX_INLINE__ auto downsample( const T &op, int32_t dim, index_t n) {
+    // T::Rank() is the runtime rank here: slice() does not accept dynamic-rank operands
+    if (dim < 0 || dim >= T::Rank()) {
+      MATX_THROW(matxInvalidDim, "downsample dim must be in range [0, rank-1]");
+    }
+    if (n <= 0) {
+      MATX_THROW(matxInvalidParameter, "downsample rate must be positive");
+    }
+
     index_t starts[T::Rank()];
     index_t ends[T::Rank()];
     index_t strides[T::Rank()];

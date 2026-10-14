@@ -141,6 +141,27 @@ TEST(IndexStrideTests, DynamicContiguityRejectsStrideOverflow)
   }
 }
 
+TEST(IndexStrideTests, AliasedMemoryUsesStrideType)
+{
+  int data[16]{};
+  auto padded = make_tensor(data, {2, 3}, {8, 2});
+  const auto query = detail::get_memory_range(padded, true);
+  static_assert(std::is_same_v<decltype(query.stride(query.view, 0)), offset_t>);
+  EXPECT_EQ(query.stride(query.view, 0), 8);
+  EXPECT_FALSE(padded.get_capability<detail::OperatorCapability::ALIASED_MEMORY>(query));
+  auto overlapping = make_tensor(data, {2, 3}, {2, 1});
+  const auto overlap_query = detail::get_memory_range(overlapping, true);
+  EXPECT_TRUE(overlapping.get_capability<detail::OperatorCapability::ALIASED_MEMORY>(overlap_query));
+  if constexpr (sizeof(offset_t) == 8) {
+    const offset_t wide = static_cast<offset_t>(uint64_t{1} << 32);
+    const offset_t strides[]{wide, 1};
+    auto view = make_tensor(data, {1, 1}, strides);
+    const auto wide_query = detail::get_memory_range(view, true);
+    EXPECT_EQ(wide_query.stride(wide_query.view, 0), wide);
+    EXPECT_FALSE(view.get_capability<detail::OperatorCapability::ALIASED_MEMORY>(wide_query));
+  }
+}
+
 TEST(IndexStrideTests, EmptyMdspan)
 {
   int data = 0;

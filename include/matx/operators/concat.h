@@ -241,46 +241,55 @@ namespace matx
         static_assert(sizeof...(Ts) > 1, "Must have more than one tensor to concatenate");
         static_assert((... && (RANK == Ts::Rank())), "concatenated ops must have the same rank");
         MATX_LOG_TRACE("{} constructor: rank={}, axis={}, num_tensors={}", str(), RANK, axis, sizeof...(Ts));
+        if (axis < 0 || axis >= jit_rank()) {
+          MATX_THROW(matxInvalidDim, "concat axis must be >= 0 and less than the rank of the operators");
+        }
 
-        for (int32_t i = 0; i < RANK; i++) {
+        // Compare every operand against the first. The runtime ranks must match too, since
+        // dynamic-rank operands share the same compile-time RANK.
+        const auto &first = pp_get<0>(ts...);
+        const int32_t rank = detail::get_runtime_rank(first);
+        if (!((detail::get_runtime_rank(ts) == rank) && ...)) {
+          MATX_THROW(matxInvalidDim, "concatenated operators must have the same rank");
+        }
+
+        for (int32_t i = 0; i < rank; i++) {
           if(i == axis_) {
             size_ = (ts.Size(i) + ...);
           } else {
-            MATX_ASSERT_STR(((ts.Size(i) == pp_get<0>(ts).Size(i)) && ...)
-                , matxInvalidSize, "concatenate operators must have the same size in non-axis dimension");
+            if (!((ts.Size(i) == first.Size(i)) && ...)) {
+              MATX_THROW(matxInvalidSize, "concatenate operators must have the same size in non-axis dimension");
+            }
           }
         }
       }
 
-
       // Non-const path returns references where available (used for LHS writes)
       template <typename CapType, int I = 0, int N>
-      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(cuda::std::array<index_t,RANK> &indices) {
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(const cuda::std::array<index_t,RANK> &indices, index_t idx) {
         if constexpr ( I == N ) {
           // This should never happen, but we return a fake value from the first tuple element anyways
           auto &op = cuda::std::get<0>(ops_);
-          return cuda::std::apply([&](auto &&...call_args) -> decltype(auto) { 
-            return op.template operator()<CapType>(call_args...); }, indices);
+          return cuda::std::apply([&](auto &&...call_args) -> decltype(auto) {
+            return op.template operator()<CapType>(call_args...); }, detail::replace_at(indices, axis_, idx));
         } else {
           auto &op = cuda::std::get<I>(ops_);
-          auto idx = indices[axis_];
-          auto size = op.Size(axis_);
+          const index_t size = detail::size_at(op, axis_);
           // If in range of this operator
           if(idx < size) {
             // evaluate operator
-            return cuda::std::apply([&](auto &&...call_args) -> decltype(auto) { 
-              return op.template operator()<CapType>(call_args...); }, indices);
+            return cuda::std::apply([&](auto &&...call_args) -> decltype(auto) {
+              return op.template operator()<CapType>(call_args...); }, detail::replace_at(indices, axis_, idx));
           } else {
             // otherwise remove this operator and recurse
-            indices[axis_] -= size;
-            return get_impl<CapType, I+1, N>(indices);
+            return get_impl<CapType, I+1, N>(indices, idx - size);
           }
         }
       }
 
       // Const path: unify scalar return type to value_type to avoid ref/value conflicts
       template <typename CapType, int I = 0, int N>
-      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto get_impl(cuda::std::array<index_t,RANK> &indices) const {
+      __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ auto get_impl(const cuda::std::array<index_t,RANK> &indices, index_t idx) const {
         using return_t = cuda::std::conditional_t<
             (CapType::ept == ElementsPerThread::ONE),
             value_type,
@@ -289,18 +298,16 @@ namespace matx
           const auto &op = cuda::std::get<0>(ops_);
           return cuda::std::apply([&](auto &&...call_args) -> return_t {
             return op.template operator()<CapType>(call_args...);
-          }, indices);
+          }, detail::replace_at(indices, axis_, idx));
         } else {
           const auto &op = cuda::std::get<I>(ops_);
-          auto idx = indices[axis_];
-          auto size = op.Size(axis_);
+          const index_t size = detail::size_at(op, axis_);
           if(idx < size) {
             return cuda::std::apply([&](auto &&...call_args) -> return_t {
               return op.template operator()<CapType>(call_args...);
-            }, indices);
+            }, detail::replace_at(indices, axis_, idx));
           } else {
-            indices[axis_] -= size;
-            return get_impl<CapType, I+1, N>(indices);
+            return get_impl<CapType, I+1, N>(indices, idx - size);
           }
         }
       }
@@ -309,8 +316,8 @@ namespace matx
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is) const
       {
         if constexpr (CapType::ept == ElementsPerThread::ONE) {
-          cuda::std::array<index_t, sizeof...(Is)> indices = {{is...}};
-          return get_impl<CapType, 0, sizeof...(Ts)>(indices);
+          const cuda::std::array<index_t, sizeof...(Is)> indices = {{is...}};
+          return get_impl<CapType, 0, sizeof...(Ts)>(indices, detail::select_at(indices, axis_));
         }
         else {
           return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
@@ -329,8 +336,8 @@ namespace matx
       __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... is)
       {
         if constexpr (CapType::ept == ElementsPerThread::ONE) {
-          cuda::std::array<index_t, sizeof...(Is)> indices = {{is...}};
-          return get_impl<CapType, 0, sizeof...(Ts)>(indices);
+          const cuda::std::array<index_t, sizeof...(Is)> indices = {{is...}};
+          return get_impl<CapType, 0, sizeof...(Ts)>(indices, detail::select_at(indices, axis_));
         }
         else {
           return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
@@ -501,16 +508,13 @@ namespace matx
    *
    * @tparam Dim dimension to concatenate
    * @tparam Ts operator types
-   * @param axis axis to operate along
+   * @param axis axis to operate along; must be in [0, Rank()), otherwise matxInvalidDim is thrown
    * @param ts operators
    * @return concatenated operator
    */
   template <typename... Ts>
     __MATX_INLINE__ __MATX_HOST__  auto concat(int axis, const Ts&... ts)
     {
-      [[maybe_unused]] const auto first = detail::pp_get<0>(ts...);
-      MATX_ASSERT_STR(axis <= first.Rank(),matxInvalidDim, "concat must take an axis less than the rank of the operators");
-
       return detail::ConcatOp<Ts...>{axis, ts...};
     }
 } // end namespace matx

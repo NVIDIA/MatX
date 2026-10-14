@@ -576,6 +576,22 @@ auto interp1(const OpX &x, const OpV &v, const OpXQ &xq, InterpMethod method = I
   return detail::Interp1Op(x, v, xq, method);
 }
 
+namespace detail {
+  // Permutation that moves dim to the end, or the identity when dim is negative (the
+  // interpolation axis is a leading dimension of xq that this operand does not have)
+  template <int RANK>
+  __MATX_INLINE__ cuda::std::array<int, RANK> interp1PermuteDims(int dim) {
+    if (dim < 0) {
+      cuda::std::array<int, RANK> perm;
+      for (int i = 0; i < RANK; i++) {
+        perm[i] = i;
+      }
+      return perm;
+    }
+    return getPermuteDims<RANK>(cuda::std::array<int, 1>{dim});
+  }
+} // namespace detail
+
 
 /**
  * 1D interpolation of samples at query points.
@@ -607,8 +623,10 @@ auto interp1(const OpX &x, const OpV &v, const OpXQ &xq, const int (&axis)[1],In
   static_assert(OpXQ::Rank() >= OpV::Rank(), "interp: query points must have at least the same rank as sample values");
 
 
-  auto x_perm = detail::getPermuteDims<OpX::Rank()>({axis[0] + OpX::Rank() - OpXQ::Rank()});
-  auto v_perm = detail::getPermuteDims<OpV::Rank()>({axis[0] + OpV::Rank() - OpXQ::Rank()});
+  // x and v may have lower rank than xq (e.g. vectors with a matrix xq). When the axis is a
+  // leading xq dimension that x or v does not have, that operand is left unpermuted.
+  auto x_perm = detail::interp1PermuteDims<OpX::Rank()>(axis[0] + OpX::Rank() - OpXQ::Rank());
+  auto v_perm = detail::interp1PermuteDims<OpV::Rank()>(axis[0] + OpV::Rank() - OpXQ::Rank());
   auto xq_perm = detail::getPermuteDims<OpXQ::Rank()>({axis[0]});
 
   auto px = permute(x, x_perm);

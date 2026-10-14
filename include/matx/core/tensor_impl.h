@@ -35,7 +35,9 @@
 #include <cassert>
 #include <type_traits>
 #include <utility>
+#include <cuda/std/algorithm>
 #include <cuda/std/functional>
+#include <cuda/std/limits>
 #include "matx/core/vector.h"
 #include "matx/core/error.h"
 #include "matx/core/defines.h"
@@ -843,6 +845,11 @@ MATX_IGNORE_WARNING_POP_GCC
     {
       MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
+      // Checked in all build modes: the loop below reads the size and stride of each kept dimension
+      if (cuda::std::count(clones.begin(), clones.end(), matxKeepDim) != RANK) {
+        MATX_THROW(matxInvalidDim, "Number of matxKeepDim in a clone must match input operator rank");
+      }
+
       cuda::std::array<index_t, N> n;
       cuda::std::array<typename Desc::stride_type, N> s;
 
@@ -867,8 +874,6 @@ MATX_IGNORE_WARNING_POP_GCC
           s[i] = 0;
         }
       }
-      MATX_ASSERT_STR(d == RANK, matxInvalidDim,
-                      "Must keep as many dimension as the original tensor has");
       tensor_desc_t<decltype(n), decltype(s), N> new_desc{std::move(n), std::move(s)};
       return new_desc;
     }
@@ -891,15 +896,18 @@ MATX_IGNORE_WARNING_POP_GCC
       static_assert(RANK >= 1, "Only tensors of rank 1 and higher can be permuted.");
       cuda::std::array<shape_type, RANK> n;
       cuda::std::array<stride_type, RANK> s;
-      [[maybe_unused]] bool done[RANK] = {0};
+      bool done[RANK] = {0};
 
   MATX_LOOP_UNROLL
       for (int i = 0; i < RANK; i++) {
         int d = dims[i];
-        MATX_ASSERT_STR(d < RANK, matxInvalidDim,
-                        "Index to permute is larger than tensor rank");
-        MATX_ASSERT_STR(done[d] == false, matxInvalidParameter,
-                        "Cannot list the same dimension to permute twice");
+        // Checked in all build modes: d indexes done, Size(), and Stride()
+        if (d < 0 || d >= RANK) {
+          MATX_THROW(matxInvalidDim, "Index to permute is outside the tensor rank");
+        }
+        if (done[d]) {
+          MATX_THROW(matxInvalidDim, "Cannot list the same dimension to permute twice");
+        }
         done[d] = true;
         n[i] = this->Size(d);
         s[i] = this->Stride(d);
@@ -1489,10 +1497,9 @@ MATX_IGNORE_WARNING_POP_GCC
           return false;
         }
         else {
-          // The logic to detect overlaps is as follows: If we have a complete overlap (first and last pointers are identical),
-          // ie (a = a), then we need to check if the tensor is contiguous or if the input permutes the input and output. If either
-          // of those are true then this will alias. Otherwise we have a partial overlap. For a partial overlap we always say this
-          // can alias.
+          // Matching endpoints alone do not establish matching element mappings.
+          // Concrete destinations also provide shape and stride metadata so safe
+          // in-place operations on strided views can be recognized.
 
           // Get address of first element using operator()(0, 0, ...)
           auto get_first = [this]<size_t... Is>(cuda::std::index_sequence<Is...>) {
@@ -1509,7 +1516,51 @@ MATX_IGNORE_WARNING_POP_GCC
           bool complete_overlap = tensor_start == in.start_ptr && tensor_end == in.end_ptr;
           if (complete_overlap) {
             MATX_LOG_TRACE("Complete overlap of tensors. Contiguous: {}", IsContiguous());
-            return !IsContiguous() || in.permutes_input_output;
+            if (in.permutes_input_output) {
+              return true;
+            }
+            if (in.view == nullptr) {
+              // Writable operator destinations do not expose tensor layout metadata.
+              return !IsContiguous();
+            }
+            if (in.rank != Rank() || in.element_bytes != sizeof(T)) {
+              return true;
+            }
+            for (int dim = 0; dim < Rank(); ++dim) {
+              if (in.size(in.view, dim) != Size(dim) ||
+                  in.stride(in.view, dim) != Stride(dim)) {
+                return true;
+              }
+            }
+
+            // Prove that logical elements occupy distinct addresses. Sorting axes
+            // by stride also handles permuted layouts. Each successive axis must
+            // step beyond the complete span of all smaller-stride axes.
+            cuda::std::array<int, Rank()> axes{};
+            for (int dim = 0; dim < Rank(); ++dim) {
+              axes[dim] = dim;
+              for (int pos = dim; pos > 0 &&
+                   Stride(axes[pos]) < Stride(axes[pos - 1]); --pos) {
+                const int previous = axes[pos - 1];
+                axes[pos - 1] = axes[pos];
+                axes[pos] = previous;
+              }
+            }
+            stride_type span = 1;
+            for (int axis : axes) {
+              if (Size(axis) <= 0) {
+                return true;
+              }
+              if (Size(axis) == 1) {
+                continue;
+              }
+              if (Stride(axis) < span ||
+                  Size(axis) - 1 > (cuda::std::numeric_limits<stride_type>::max() - span) / Stride(axis)) {
+                return true;
+              }
+              span += static_cast<stride_type>(Size(axis) - 1) * Stride(axis);
+            }
+            return false;
           }
 
           // Check for overlap: two ranges [a1, a2) and [b1, b2) overlap if a1 < b2 && b1 < a2

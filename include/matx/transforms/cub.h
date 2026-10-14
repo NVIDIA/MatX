@@ -860,6 +860,9 @@ inline void ExecSort(OutputTensor &a_out,
     // type of reduction where there's not a single output, since any type of reduction can be generalized
     // to a segmented type
     if constexpr (OutputTensor::Rank() > 0) {
+      if (TotalSize(out_base) == 0) {
+        return;
+      }
 #if CUB_MAJOR_VERSION > 3 || (CUB_MAJOR_VERSION == 3 && CUB_MINOR_VERSION >= 2)
       [[maybe_unused]] cudaError_t err;
       if constexpr(is_tensor_view_v<InputOperator>) {
@@ -872,11 +875,23 @@ inline void ExecSort(OutputTensor &a_out,
         }
       }
 
-      auto ft = [&](auto &&in, auto &&out, auto &&begin, auto &&end) {
-        return cub::DeviceSegmentedReduce::Reduce(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(out_base)), begin, end, Params().reduce_op,
-                                  Params().init, stream);
-      };
-      err = ReduceInput(ft, out_base, in_base);
+      if (IsFixedSizeReductionCompatible(a)) {
+        auto fixed_size_ft = [&](auto &&in, auto &&out) {
+          const int seg_size = static_cast<int>(TotalSize(a) / TotalSize(out_base));
+          return cub::DeviceSegmentedReduce::Reduce(d_temp, temp_storage_bytes, in, out,
+            static_cast<cuda::std::int64_t>(TotalSize(out_base)), seg_size, Params().reduce_op,
+            Params().init, stream);
+        };
+        err = ReduceInputFixed(fixed_size_ft, out_base, in_base);
+      }
+      else {
+        auto ft = [&](auto &&in, auto &&out, auto &&begin, auto &&end) {
+          return cub::DeviceSegmentedReduce::Reduce(d_temp, temp_storage_bytes, in, out,
+            static_cast<int>(TotalSize(out_base)), begin, end, Params().reduce_op,
+            Params().init, stream);
+        };
+        err = ReduceInput(ft, out_base, in_base);
+      }
       MATX_ASSERT_STR_EXP(err, cudaSuccess, matxCudaError, "Error in cub::DeviceSegmentedReduce::Reduce");
 #else
       auto ft = [&](auto &&in, auto &&out, auto &&begin, auto &&end) {
@@ -931,6 +946,9 @@ inline void ExecSort(OutputTensor &a_out,
     // type of reduction where there's not a single output, since any type of reduction can be generalized
     // to a segmented type
     if constexpr (OutputTensor::Rank() > 0) {
+      if (TotalSize(out_base) == 0) {
+        return;
+      }
       // Check if fixed-size reductions are supported
 #if CUB_MAJOR_VERSION > 3 || (CUB_MAJOR_VERSION == 3 && CUB_MINOR_VERSION >= 2)
       [[maybe_unused]] cudaError_t err;
@@ -943,10 +961,21 @@ inline void ExecSort(OutputTensor &a_out,
         }
       }
 
-      auto ft = [&](auto &&in, auto &&out, auto &&begin, auto &&end) {
-          return cub::DeviceSegmentedReduce::Sum(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(out_base)), begin, end, stream);
-      };
-      err = ReduceInput(ft, out_base, in_base);
+      if (IsFixedSizeReductionCompatible(a)) {
+        auto fixed_size_ft = [&](auto &&in, auto &&out) {
+          const int seg_size = static_cast<int>(TotalSize(a) / TotalSize(out_base));
+          return cub::DeviceSegmentedReduce::Sum(d_temp, temp_storage_bytes, in, out,
+            static_cast<cuda::std::int64_t>(TotalSize(out_base)), seg_size, stream);
+        };
+        err = ReduceInputFixed(fixed_size_ft, out_base, in_base);
+      }
+      else {
+        auto ft = [&](auto &&in, auto &&out, auto &&begin, auto &&end) {
+          return cub::DeviceSegmentedReduce::Sum(d_temp, temp_storage_bytes, in, out,
+            static_cast<int>(TotalSize(out_base)), begin, end, stream);
+        };
+        err = ReduceInput(ft, out_base, in_base);
+      }
       MATX_ASSERT_STR_EXP(err, cudaSuccess, matxCudaError, "Error in cub::DeviceSegmentedReduce::Sum");
 #else
       auto ft = [&](auto &&in, auto &&out, auto &&begin, auto &&end) {
@@ -996,6 +1025,9 @@ inline void ExecSort(OutputTensor &a_out,
     // type of reduction where there's not a single output, since any type of reduction can be generalized
     // to a segmented type
     if constexpr (OutputTensor::Rank() > 0) {
+      if (TotalSize(out_base) == 0) {
+        return;
+      }
 #if CUB_MAJOR_VERSION > 3 || (CUB_MAJOR_VERSION == 3 && CUB_MINOR_VERSION >= 2)
       [[maybe_unused]] cudaError_t err;
       if constexpr (is_tensor_view_v<InputOperator>) {
@@ -1007,10 +1039,21 @@ inline void ExecSort(OutputTensor &a_out,
         }
       }
 
-      auto ft = [&](auto &&in, auto &&out, auto &&begin, auto &&end) {
-          return cub::DeviceSegmentedReduce::Min(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(out_base)), begin, end, stream);
-      };
-      err = ReduceInput(ft, out_base, in_base);
+      if (IsFixedSizeReductionCompatible(a)) {
+        auto fixed_size_ft = [&](auto &&in, auto &&out) {
+          const int seg_size = static_cast<int>(TotalSize(a) / TotalSize(out_base));
+          return cub::DeviceSegmentedReduce::Min(d_temp, temp_storage_bytes, in, out,
+            static_cast<cuda::std::int64_t>(TotalSize(out_base)), seg_size, stream);
+        };
+        err = ReduceInputFixed(fixed_size_ft, out_base, in_base);
+      }
+      else {
+        auto ft = [&](auto &&in, auto &&out, auto &&begin, auto &&end) {
+          return cub::DeviceSegmentedReduce::Min(d_temp, temp_storage_bytes, in, out,
+            static_cast<int>(TotalSize(out_base)), begin, end, stream);
+        };
+        err = ReduceInput(ft, out_base, in_base);
+      }
       MATX_ASSERT_STR_EXP(err, cudaSuccess, matxCudaError, "Error in cub::DeviceSegmentedReduce::Min");
 #else
       auto ft = [&](auto &&in, auto &&out, auto &&begin, auto &&end) {
@@ -1060,6 +1103,9 @@ inline void ExecSort(OutputTensor &a_out,
     // type of reduction where there's not a single output, since any type of reduction can be generalized
     // to a segmented type
     if constexpr (OutputTensor::Rank() > 0) {
+      if (TotalSize(out_base) == 0) {
+        return;
+      }
 #if CUB_MAJOR_VERSION > 3 || (CUB_MAJOR_VERSION == 3 && CUB_MINOR_VERSION >= 2)
       [[maybe_unused]] cudaError_t err;
       if constexpr (is_tensor_view_v<InputOperator>) {
@@ -1071,10 +1117,21 @@ inline void ExecSort(OutputTensor &a_out,
         }
       }
 
-      auto ft = [&](auto &&in, auto &&out, auto &&begin, auto &&end) {
-          return cub::DeviceSegmentedReduce::Max(d_temp, temp_storage_bytes, in, out, static_cast<int>(TotalSize(out_base)), begin, end, stream);
-      };
-      err = ReduceInput(ft, out_base, in_base);
+      if (IsFixedSizeReductionCompatible(a)) {
+        auto fixed_size_ft = [&](auto &&in, auto &&out) {
+          const int seg_size = static_cast<int>(TotalSize(a) / TotalSize(out_base));
+          return cub::DeviceSegmentedReduce::Max(d_temp, temp_storage_bytes, in, out,
+            static_cast<cuda::std::int64_t>(TotalSize(out_base)), seg_size, stream);
+        };
+        err = ReduceInputFixed(fixed_size_ft, out_base, in_base);
+      }
+      else {
+        auto ft = [&](auto &&in, auto &&out, auto &&begin, auto &&end) {
+          return cub::DeviceSegmentedReduce::Max(d_temp, temp_storage_bytes, in, out,
+            static_cast<int>(TotalSize(out_base)), begin, end, stream);
+        };
+        err = ReduceInput(ft, out_base, in_base);
+      }
       MATX_ASSERT_STR_EXP(err, cudaSuccess, matxCudaError, "Error in cub::DeviceSegmentedReduce::Max");
 #else
       auto ft = [&](auto &&in, auto &&out, auto &&begin, auto &&end) {
@@ -1118,39 +1175,16 @@ inline void ExecSort(OutputTensor &a_out,
 #ifdef __CUDACC__
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
-    if constexpr (is_tensor_view_v<InputOperator>) {
-      const tensor_impl_t<typename InputOperator::value_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
-      if (a.IsContiguous()) {
-        cub::DeviceSelect::If(d_temp,
-                              temp_storage_bytes,
-                              a.Data(),
-                              a_out.Data(),
-                              Params().num_found.Data(),
-                              static_cast<int>(TotalSize(a)),
-                              Params().op,
-                              stream);
-      }
-      else {
-        cub::DeviceSelect::If(d_temp,
-                              temp_storage_bytes,
-                              RandomOperatorIterator{base},
-                              a_out.Data(),
-                              Params().num_found.Data(),
-                              static_cast<int>(TotalSize(a)),
-                              Params().op,
-                              stream);
-      }
-    }
-    else {
+    SelectInput(a, [&](auto in) {
       cub::DeviceSelect::If(d_temp,
                             temp_storage_bytes,
-                            RandomOperatorIterator{a},
+                            in,
                             a_out.Data(),
                             Params().num_found.Data(),
                             static_cast<int>(TotalSize(a)),
                             Params().op,
                             stream);
-    }
+    });
 #endif
   }
 
@@ -1197,42 +1231,16 @@ inline void ExecSort(OutputTensor &a_out,
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
     if constexpr (!has_index_cmp_op_v<decltype(Params().op)>) {
-      if constexpr (is_tensor_view_v<InputOperator>) {
-        if (a.IsContiguous()) {
-          cub::DeviceSelect::If(d_temp,
-                                temp_storage_bytes,
-                                detail::counting_iterator<index_t>(0),
-                                a_out.Data(),
-                                Params().num_found.Data(),
-                                static_cast<int>(TotalSize(a)),
-                                IndexToSelectOp<decltype(a.Data()), decltype(Params().op)>{a.Data(), Params().op},
-                                stream);
-        }
-        else {
-          tensor_impl_t<typename InputOperator::value_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
-          cub::DeviceSelect::If(d_temp,
-                                temp_storage_bytes,
-                                detail::counting_iterator<index_t>(0),
-                                a_out.Data(),
-                                Params().num_found.Data(),
-                                static_cast<int>(TotalSize(a)),
-                                IndexToSelectOp<decltype(RandomOperatorIterator{base}), decltype(Params().op)>
-                                  {RandomOperatorIterator{base}, Params().op},
-                                stream);
-        }
-      }
-      else {
-        tensor_impl_t<typename InputOperator::value_type, InputOperator::Rank(), typename InputOperator::desc_type> base = a;
+      SelectInput(a, [&](auto in) {
         cub::DeviceSelect::If(d_temp,
                               temp_storage_bytes,
                               detail::counting_iterator<index_t>(0),
                               a_out.Data(),
                               Params().num_found.Data(),
                               static_cast<int>(TotalSize(a)),
-                              IndexToSelectOp<decltype(RandomOperatorIterator{base}), decltype(Params().op)>
-                                {RandomOperatorIterator{base}, Params().op},
+                              IndexToSelectOp<decltype(in), decltype(Params().op)>{in, Params().op},
                               stream);
-      }
+      });
     }
     else {
       // Custom compare op that only takes an index. This can be more powerful for users by allowing them to define whatever
@@ -1307,6 +1315,24 @@ inline void ExecSort(OutputTensor &a_out,
   }
 
 private:
+  // Share input dispatch between value and index selection.
+  template <typename Func>
+  inline void SelectInput(const InputOperator &a, const Func &f)
+  {
+    if constexpr (is_matx_transform_op<InputOperator>()) {
+      f(GetTransformStorage(a));
+    }
+    else {
+      if constexpr (is_tensor_view_v<InputOperator>) {
+        if (a.IsContiguous()) {
+          f(a.Data());
+          return;
+        }
+      }
+      f(RandomOperatorIterator{a});
+    }
+  }
+
   const CParams &Params() const
   {
     return cparams_;

@@ -49,6 +49,7 @@
 #include <algorithm>
 #include <cmath>
 #include <string>
+#include <tuple>
 #include <vector>
 
 using namespace matx;
@@ -57,28 +58,42 @@ using namespace matx::test;
 namespace {
 
 // Streams the signal using the cyclic chunk-size schedule `chunks` (a
-// single-entry schedule is a fixed chunk size).
-template <typename Exec>
+// single-entry schedule is a fixed chunk size). With `strided`, each segment
+// is a stride-2 view, which feed() reads through concat rather than the
+// unit-stride two-segment path. T is the signal type; the filter is its real
+// scalar type.
+template <typename T = float, typename Exec>
 bool run_case(Exec &exec, index_t N, index_t up, index_t down,
-              index_t L, const std::vector<index_t> &chunks)
+              index_t L, const std::vector<index_t> &chunks, bool strided = false)
 {
-  using T = float;
+  using S = typename inner_op_type_t<T>::type;
   std::string sched;
   for (auto c : chunks) { sched += std::to_string(c) + ","; }
-  auto h = make_tensor<T>({L});
+  auto h = make_tensor<S>({L});
   for (index_t k = 0; k < L; ++k) {
-    h(k) = std::cos(0.12f * static_cast<float>(k)) *
-           std::exp(-0.02f * static_cast<float>(k)) / static_cast<float>(L);
+    h(k) = std::cos(S(0.12) * static_cast<S>(k)) *
+           std::exp(S(-0.02) * static_cast<S>(k)) / static_cast<S>(L);
   }
   auto sig = make_tensor<T>({N});
   for (index_t i = 0; i < N; ++i) {
-    const float t = static_cast<float>(i);
-    sig(i) = std::sin(0.05f * t) + 0.4f * std::sin(0.2f * t) + 1e-4f * t;
+    const S t = static_cast<S>(i);
+    const S re = std::sin(S(0.05) * t) + S(0.4) * std::sin(S(0.2) * t) + S(1e-4) * t;
+    if constexpr (is_complex_v<T>) {
+      sig(i) = T{re, std::cos(S(0.03) * t)};
+    } else {
+      sig(i) = re;
+    }
   }
 
   const index_t M = (N * up + down - 1) / down; // ceil(N*up/down)
   auto y_full = make_tensor<T>({M});
   (y_full = resample_poly(sig, h, up, down)).run(exec);
+
+  tensor_t<T, 1> sig_strided;
+  if (strided) {
+    make_tensor(sig_strided, {2 * N});
+    (slice(sig_strided, {0}, {2 * N}, {2}) = sig).run(exec);
+  }
 
   const index_t max_chunk = *std::max_element(chunks.begin(), chunks.end());
   auto stream_obj = make_resample_poly_stream<T>(h, {.up = up, .down = down}, exec);
@@ -89,9 +104,10 @@ bool run_case(Exec &exec, index_t N, index_t up, index_t down,
   size_t ci = 0;
   for (index_t g = 0; g < N; ) {
     const index_t nl = std::min(chunks[ci++ % chunks.size()], N - g);
-    auto in_chunk = slice(sig, {g}, {g + nl});
+    const index_t cnt = strided
+        ? stream_obj.feed(slice(sig_strided, {2 * g}, {2 * (g + nl)}, {2}), frame)
+        : stream_obj.feed(slice(sig, {g}, {g + nl}), frame);
     g += nl;
-    const index_t cnt = stream_obj.feed(in_chunk, frame);
     if (cnt > 0) {
       (slice(acc, {off}, {off + cnt}) = slice(frame, {0}, {cnt})).run(exec);
     }
@@ -104,16 +120,17 @@ bool run_case(Exec &exec, index_t N, index_t up, index_t down,
   off += tcnt;
   exec.sync();
 
-  EXPECT_EQ(off, M) << "up=" << up << " down=" << down << " chunks=" << sched;
+  EXPECT_EQ(off, M) << "up=" << up << " down=" << down << " chunks=" << sched << " strided=" << strided;
   if (off != M) return false;
 
-  float max_abs = 0.0f, max_err = 0.0f;
+  double max_abs = 0.0, max_err = 0.0;
   for (index_t i = 0; i < M; ++i) {
-    max_abs = std::max(max_abs, std::fabs(y_full(i)));
-    max_err = std::max(max_err, std::fabs(acc(i) - y_full(i)));
+    max_abs = std::max(max_abs, static_cast<double>(cuda::std::abs(y_full(i))));
+    max_err = std::max(max_err, static_cast<double>(cuda::std::abs(acc(i) - y_full(i))));
   }
-  const bool ok = max_err < 1e-4f * (1.0f + max_abs);
-  EXPECT_TRUE(ok) << "up=" << up << " down=" << down << " chunks=" << sched
+  const double tol = std::is_same_v<S, double> ? 1e-10 : 1e-4;
+  const bool ok = max_err < tol * (1.0 + max_abs);
+  EXPECT_TRUE(ok) << "up=" << up << " down=" << down << " chunks=" << sched << " strided=" << strided
                   << " max_err=" << max_err << " max_abs=" << max_abs;
   return ok;
 }
@@ -207,6 +224,133 @@ TEST(StreamingResample, VaryingChunkSchedule)
       run_case(exec, N, c.up, c.down, c.L, sched);
     }
   }
+}
+
+// Every resample_poly kernel path reading the two-segment feed() input. The
+// kernels read a filter window from the retained head, the new segment, or
+// across both, and each of the four paths below handles that separately. The
+// CUDA dispatcher picks WarpCentric for <= 2048 outputs or > 256 taps per
+// phase (else ElemBlock), and keeps the filter in global memory when it
+// exceeds 11 KiB (> 2815 float taps). Large feeds give ElemBlock and mostly
+// new-segment windows; feeds of 1 and 7 samples give WarpCentric and windows
+// that lie entirely in the retained head.
+TEST(StreamingResample, AllKernelPaths)
+{
+  cudaExecutor exec{};
+  struct Cfg { index_t up, down, L; };
+  const index_t N = 20000;
+  const std::vector<index_t> sched = {3000, 1, 7, 2500};
+  for (Cfg c : {Cfg{3, 2, 61},      // ElemBlock / WarpCentric, smem filter
+                Cfg{16, 15, 4001},  // ElemBlock / WarpCentric, global filter (251 taps/phase)
+                Cfg{16, 15, 4000},  // same, even L
+                Cfg{2, 3, 1025},    // WarpCentric only (513 taps/phase), smem filter
+                Cfg{4, 5, 4001}}) { // WarpCentric only (1001 taps/phase), global filter
+    run_case(exec, N, c.up, c.down, c.L, sched);
+  }
+}
+
+// Non-unit-stride tensor segments take feed()'s concat fallback instead of
+// the unit-stride two-segment input.
+TEST(StreamingResample, StridedSegmentsMatchOneShot)
+{
+  cudaExecutor exec{};
+  struct Cfg { index_t up, down, L; };
+  for (Cfg c : {Cfg{3, 2, 31}, Cfg{2, 3, 30}, Cfg{1, 1, 5}}) {
+    run_case(exec, 2048, c.up, c.down, c.L, {113}, /*strided=*/true);
+    run_case(exec, 2048, c.up, c.down, c.L, {1, 7, 500}, /*strided=*/true);
+  }
+}
+
+// The two-segment input through every kernel path (see AllKernelPaths) and
+// the identity (up == down) copy, for double, complex<float> and
+// complex<double> signals with a real filter of the matching precision.
+TEST(StreamingResample, OtherTypesMatchOneShot)
+{
+  cudaExecutor exec{};
+  struct Cfg { index_t up, down, L; };
+  const index_t N = 20000;
+  const std::vector<index_t> sched = {3000, 1, 7, 2500};
+  for (Cfg c : {Cfg{3, 2, 61}, Cfg{16, 15, 4001}, Cfg{2, 3, 1025}, Cfg{4, 5, 4001},
+                Cfg{1, 1, 5}}) {
+    run_case<double>(exec, N, c.up, c.down, c.L, sched);
+    run_case<cuda::std::complex<float>>(exec, N, c.up, c.down, c.L, sched);
+    run_case<cuda::std::complex<double>>(exec, N, c.up, c.down, c.L, sched);
+  }
+  run_case<cuda::std::complex<double>>(exec, 2048, 3, 2, 31, {1, 7, 500}, /*strided=*/true);
+}
+
+// up == down (after reducing by the gcd): resample_poly copies its input, so
+// the stream passes each segment straight through. Every feed() returns its
+// segment unchanged (bit-exact) and its length, flush() emits nothing, and no
+// history is retained. Checked on the CUDA and host executors.
+template <typename Exec>
+void run_identity_case(Exec &exec, index_t up, index_t down, index_t L)
+{
+  using T = float;
+  const index_t N = 2048;
+  auto h = make_tensor<T>({L});
+  for (index_t k = 0; k < L; k++) { h(k) = 1.0f / static_cast<float>(k + 1); }
+  auto sig = make_tensor<T>({N});
+  for (index_t i = 0; i < N; i++) { sig(i) = std::sin(0.11f * static_cast<float>(i)); }
+
+  const std::vector<index_t> sched = {1, 7, 64, 3, 1000};
+  auto stream_obj = make_resample_poly_stream<T>(h, {.up = up, .down = down}, exec);
+  EXPECT_EQ(stream_obj.history_len(), 0);
+  EXPECT_EQ(stream_obj.max_output(1000), 1000);
+  auto frame = make_tensor<T>({stream_obj.max_output(1000)});
+
+  size_t ci = 0;
+  for (index_t g = 0; g < N; ) {
+    const index_t nl = std::min(sched[ci++ % sched.size()], N - g);
+    const index_t cnt = stream_obj.feed(slice(sig, {g}, {g + nl}), frame);
+    EXPECT_EQ(cnt, nl) << "up=" << up << " down=" << down << " g=" << g;
+    exec.sync();
+    for (index_t i = 0; i < cnt; i++) {
+      ASSERT_EQ(frame(i), sig(g + i)) << "up=" << up << " down=" << down << " i=" << g + i;
+    }
+    g += nl;
+  }
+  EXPECT_EQ(stream_obj.flush(frame), 0);
+}
+
+TEST(StreamingResample, IdentityPassesSegmentsThrough)
+{
+  cudaExecutor exec{};
+  SingleThreadedHostExecutor host_exec{};
+  for (auto [up, down, L] : {std::tuple<index_t, index_t, index_t>{1, 1, 41},
+                             {2, 2, 5}, {3, 3, 1}}) {
+    run_identity_case(exec, up, down, L);
+    run_identity_case(host_exec, up, down, L);
+  }
+
+  // The pass-through runs the segment's lifecycle exactly once per feed, and an
+  // undersized output is rejected before the lifecycle starts.
+  using T = float;
+  auto h = make_tensor<T>({5});
+  auto sig = make_tensor<T>({64});
+  for (index_t i = 0; i < 64; i++) { sig(i) = static_cast<float>(i); }
+  auto stream_obj = make_resample_poly_stream<T>(h, {.up = 2, .down = 2}, exec);
+  auto frame = make_tensor<T>({32});
+  {
+    PreRunLifecycle seg_life;
+    auto seg = make_prerun_tester(slice(sig, {0}, {32}), seg_life);
+    EXPECT_EQ(stream_obj.feed(seg, frame), 32);
+    ExpectLifecycleClean(seg_life, "identity feed");
+    // The copy is asynchronous; wait for it before reading frame.
+    exec.sync();
+    for (index_t i = 0; i < 32; i++) {
+      ASSERT_EQ(frame(i), sig(i)) << "i=" << i;
+    }
+  }
+  {
+    auto tiny = make_tensor<T>({1});
+    PreRunLifecycle seg_life;
+    auto seg = make_prerun_tester(slice(sig, {32}, {64}), seg_life);
+    EXPECT_THROW(stream_obj.feed(seg, tiny), detail::matxException);
+    ExpectLifecycleClean(seg_life, "rejected identity feed", /*expected_calls=*/0);
+  }
+  // Don't free the buffers while queued work may still use them.
+  exec.sync();
 }
 
 // A flush() that throws (undersized output buffer) must not consume the

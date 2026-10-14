@@ -290,9 +290,12 @@ public:
       }
     } else {
       auto retain = cur_retain();
-      auto buf = concat(0, retain, new_samples);
-      if (plan.cnt > 0) { channelize_exec(buf, plan.lo, plan.cnt, out); }
+      if (plan.cnt > 0) {
+        detail::VisitStreamBuffer<Exec>(retain, new_samples,
+            [&](const auto &in) { channelize_exec(in, plan.lo, plan.cnt, out); });
+      }
       if (retain_len_next > 0) {
+        auto buf = concat(0, retain, new_samples);
         auto next_retain = slice(retain_buf_, {nxt}, {nxt + retain_len_next});
         auto buf_tail = slice(buf, {buf_len - retain_len_next}, {buf_len});
         auto retain_copy = (next_retain = buf_tail);

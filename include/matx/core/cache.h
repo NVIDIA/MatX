@@ -235,7 +235,7 @@ public:
 
     auto &cval = cache[id];
     if constexpr (is_cuda_executor_v<Executor>) {
-      cudaGetDevice(&key.device_id);
+      MATX_CUDA_CHECK(cudaGetDevice(&key.device_id));
     }
     else {
       key.device_id = 0;
@@ -262,7 +262,7 @@ public:
     void *ptr = nullptr;
     CacheCommonParamsKey key;
     key.thread_id = std::this_thread::get_id();
-    cudaGetDevice(&key.device_id);
+    MATX_CUDA_CHECK(cudaGetDevice(&key.device_id));
 
     [[maybe_unused]] std::lock_guard<std::recursive_mutex> lock(stream_alloc_mutex);
 

@@ -255,6 +255,20 @@ TEST(InterpTests, Interp)
     }
   }
 
+  // Vector x and v with a matrix xq interpolated along its leading axis: the axis is not a
+  // dimension of x or v, so they are used unpermuted
+  auto xq_cols = make_tensor<TestType>({xq.Size(0), 2});
+  (xq_cols = clone<2>(xq, {matxKeepDim, 2})).run(exec);
+  auto out_axis0 = make_tensor<TestType>(xq_cols.Shape());
+  (out_axis0 = interp1(x, v, xq_cols, {0}, InterpMethod::LINEAR)).run(exec);
+  exec.sync();
+
+  for (index_t i = 0; i < xq_cols.Size(0); i++) {
+    for (index_t j = 0; j < xq_cols.Size(1); j++) {
+      ASSERT_EQ(out_axis0(i, j), vq_linear(i));
+    }
+  }
+
   MATX_EXIT_HANDLER();
 }
 

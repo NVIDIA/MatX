@@ -92,16 +92,17 @@ namespace matx
                 "  constexpr static cuda::std::array<index_t, Rank_> sizes_ = {{ {} }};\n"
                 "  constexpr static cuda::std::array<index_t, OpRank_> dims_ = {{ {} }};\n"
                 "  typename detail::inner_storage_or_self_t<detail::base_type_t<T>> op_;\n"
+                "  template <size_t... Is>\n"
+                "  static __MATX_INLINE__ __MATX_DEVICE__ cuda::std::array<index_t, OpRank_> gather_indices(\n"
+                "      const cuda::std::array<index_t, Rank_> &sind, cuda::std::index_sequence<Is...>) {{\n"
+                "    return {{{{sind[dims_[Is]]...}}}};\n"
+                "  }}\n"
                 "  template <typename CapType, typename... Is>\n"
                 "  __MATX_INLINE__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) const\n"
                 "  {{\n"
                 "    if constexpr (CapType::ept == ElementsPerThread::ONE) {{\n"
-                "      cuda::std::array<index_t, Rank_> sind{{indices...}};\n"
-                "      cuda::std::array<index_t, OpRank_> gind;\n"
-                "      for(int i = 0; i < OpRank_; i++) {{\n"
-                "        auto idx = dims_[i];\n"
-                "        gind[i] = sind[idx];\n"
-                "      }}\n"
+                "      const cuda::std::array<index_t, Rank_> sind{{indices...}};\n"
+                "      const auto gind = gather_indices(sind, cuda::std::make_index_sequence<OpRank_>{{}});\n"
                 "      return get_value<CapType>(op_, gind);\n"
                 "    }} else {{\n"
                 "      return Vector<value_type, static_cast<index_t>(CapType::ept)>{{}};\n"
@@ -120,19 +121,21 @@ namespace matx
         __MATX_INLINE__ CloneOp(const T &op, cuda::std::array<index_t, CRank> shape) : op_(op) {
           static_assert(T::Rank() < CRank, "Cloning rank must be higher than input operator rank");
 
-          [[maybe_unused]] const index_t num_keep = static_cast<index_t>(
+          // Checked in all build modes: a mismatch would leave dims_ incomplete or overrun it
+          const index_t num_keep = static_cast<index_t>(
 			  std::count_if(shape.begin(), shape.end(), [](index_t i) { return i == matxKeepDim; }));
-          MATX_ASSERT_STR(num_keep == T::Rank(), matxInvalidParameter,
-            "Number of matxKeepDim in a clone must match input operator rank");
+          if (num_keep != T::Rank()) {
+            MATX_THROW(matxInvalidDim, "Number of matxKeepDim in a clone must match input operator rank");
+          }
 
           // create gather list
-          int d = 0;
+          [[maybe_unused]] int d = 0;
           for(int i = 0; i < Rank(); i++) {
             if constexpr (T::Rank() > 0) { // This is needed since the compiler can be fooled
               if(shape[i] == matxKeepDim) {
                 sizes_[i] = op_.Size(d);
-                // gcc incorrectly shows an invalid access to array element [1] in a unit test here. This is not
-                // possible based on runtime checks we have. Disable the warning temporarily.
+                // The matxKeepDim count check above keeps d < T::Rank(), but gcc can't see that and
+                // reports an out-of-bounds write. Disable the warning temporarily.
 MATX_IGNORE_WARNING_PUSH_GCC("-Warray-bounds")
                 dims_[d++] = i;
 MATX_IGNORE_WARNING_POP_GCC
@@ -141,40 +144,31 @@ MATX_IGNORE_WARNING_POP_GCC
               }
             }
             else {
-              MATX_ASSERT(shape[i] != matxKeepDim, matxInvalidDim);
               sizes_[i] = shape[i];
             }
           }
-          MATX_ASSERT(d == T::Rank(), matxInvalidDim);
           MATX_LOG_TRACE("{} constructor: input_rank={}, output_rank={}", str(), T::Rank(), CRank);
+        }
+
+        // Operand index Is is the output index at the runtime position dims[Is]
+        template <typename Dims, size_t... Is>
+        static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ cuda::std::array<index_t, T::Rank()> gather_indices(
+            const cuda::std::array<index_t, CRank> &sind, const Dims &dims, cuda::std::index_sequence<Is...>)
+        {
+          return {{detail::select_at(sind, static_cast<int>(dims[Is]))...}};
         }
 
         template <typename CapType, typename Op, typename Dims, typename... Is>
         static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, const Dims &dims, Is... indices)
         {
           if constexpr (CapType::ept == ElementsPerThread::ONE) {
-  MATX_IGNORE_WARNING_PUSH_GCC("-Wmaybe-uninitialized")
-            cuda::std::array<index_t, Rank()> sind{indices...};
-            cuda::std::array<index_t, T::Rank()> gind{};
-  MATX_IGNORE_WARNING_POP_GCC
-
-            // gather indices
-            for(int i = 0; i < T::Rank(); i++) {
-              auto idx = dims[i];
-              gind[i] = sind[idx];
-            }
-
+            const cuda::std::array<index_t, CRank> sind{indices...};
+            const auto gind = gather_indices(sind, dims, cuda::std::make_index_sequence<T::Rank()>{});
             return get_value<CapType>(cuda::std::forward<Op>(op), gind);
           }
           else {
             return Vector<value_type, static_cast<index_t>(CapType::ept)>{};
           }
-        }
-
-        template <typename Op, typename Dims, typename... Is>
-        static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(Op&& op, const Dims &dims, Is... indices)
-        {
-          return get_impl<detail::ElementsPerThread::ONE>(cuda::std::forward<Op>(op), dims, indices...);
         }
 
         template <typename CapType, typename... Is>
@@ -287,7 +281,8 @@ MATX_IGNORE_WARNING_POP_GCC
    * @tparam T source operator/tensor type
    * @param t source operator/tensor
    * @param shape the shape of the cloned operator/tensor.
-   * Each element is either the size of the cloned dimension or `matxKeepDim` to be from the source tensor
+   * Each element is either the size of the cloned dimension or `matxKeepDim` to be from the source tensor.
+   * The number of `matxKeepDim` entries must equal the rank of the source.
    * @return operator to compute the cloned value
    */
   template <std::size_t Rank, typename Op>

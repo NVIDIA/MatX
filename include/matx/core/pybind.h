@@ -525,7 +525,7 @@ public:
     auto ften = pybind11::array_t<ntype>(resobj);
     constexpr int RANK = TensorType::Rank();
 
-    cudaDeviceSynchronize();
+    MATX_CUDA_CHECK(cudaDeviceSynchronize());
 
     if constexpr (RANK == 0) {
       auto file_val = ften.at();

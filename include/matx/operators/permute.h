@@ -156,14 +156,21 @@ namespace matx
 
         __MATX_INLINE__ PermuteOp(const T &op, const cuda::std::array<int32_t, T::Rank()> &dims) : op_(op) {
 
+          // Checked in all build modes: Size() and get_impl() select by these indices.
+          // Only the first jit_rank() entries are used; a dynamic-rank operand leaves the rest
+          // unused (typically zero-filled), so they are copied without validation.
+          const int32_t rank = jit_rank();
+          dims_ = dims;
           cuda::std::array<bool, Rank()> seen{};
-          for(int32_t i = 0; i < Rank(); i++) {
+          for(int32_t i = 0; i < rank; i++) {
             const int32_t dim = dims[i];
-            MATX_ASSERT_STR(dim < Rank() && dim >= 0, matxInvalidDim, "PermuteOp:  Invalid permute index.");
-            MATX_ASSERT_STR(!seen[dim], matxInvalidDim, "PermuteOp:  Duplicate permute index.");
+            if (dim >= rank || dim < 0) {
+              MATX_THROW(matxInvalidDim, "PermuteOp:  Invalid permute index.");
+            }
+            if (seen[dim]) {
+              MATX_THROW(matxInvalidDim, "PermuteOp:  Duplicate permute index.");
+            }
             seen[dim] = true;
-
-            dims_[i] = dims[i];
           }
           MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
         }
@@ -176,6 +183,22 @@ namespace matx
             }
           }
           return true;
+        }
+
+        // Compose adjacent permutations so alias queries observe the net mapping.
+        __MATX_INLINE__ auto ComposePermutation(const cuda::std::array<int32_t, Rank()> &dims) const
+        {
+          // Validate each outer axis where it indexes the inner axes, so the
+          // compiler can see that invalid axes never reach the access.
+          auto combined = dims_;
+          for (int r = 0; r < jit_rank(); ++r) {
+            const int32_t axis = dims[r];
+            if (axis >= jit_rank() || axis < 0) {
+              MATX_THROW(matxInvalidDim, "PermuteOp:  Invalid permute index.");
+            }
+            combined[r] = dims_[axis];
+          }
+          return PermuteOp<detail::base_type_t<T>>(op_, combined);
         }
 
         // For permuted-output axis K, find the input axis j with dims[j]==K
@@ -273,7 +296,7 @@ namespace matx
 
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int32_t dim) const
         {
-          return op_.Size(dims_[dim]);
+          return detail::size_at(op_, detail::select_at(dims_, dim));
         }
 
         __MATX_INLINE__ __MATX_HOST__ int32_t DynRank() const {
@@ -346,6 +369,11 @@ namespace matx
             return false;
 #endif
           }
+          else if constexpr (Cap == OperatorCapability::ALIASED_MEMORY) {
+            auto in_copy = in;
+            in_copy.permutes_input_output = in_copy.permutes_input_output || !IsIdentityPermutation();
+            return detail::get_operator_capability<Cap>(op_, in_copy);
+          }
           else if constexpr (Cap == OperatorCapability::DYN_SHM_SIZE) {
             return detail::get_operator_capability<Cap>(op_, in);
           }
@@ -378,7 +406,7 @@ namespace matx
   /**
    * @brief Operator to permute the dimensions of a tensor or operator.
    *
-   * The each dimension must appear in the dims array once.
+   * Each dimension must appear in the dims array once, otherwise matxInvalidDim is thrown.
    * This operator can appear as an rvalue or lvalue.
    *
    * @tparam T Input operator/tensor type
@@ -386,6 +414,12 @@ namespace matx
    * @param dims the reordered dimensions of the operator.
    * @return permuted operator
    */
+  template <typename T>
+    __MATX_INLINE__ auto permute(const detail::PermuteOp<T> &op,
+        const cuda::std::array<int32_t, detail::PermuteOp<T>::Rank()> &dims) {
+      return op.ComposePermutation(dims);
+    }
+
   template <typename T>
     __MATX_INLINE__ auto permute( const T &op,
         const cuda::std::array<int32_t, T::Rank()> &dims) {
@@ -400,7 +434,7 @@ namespace matx
   /**
    * @brief Operator to permute the dimensions of a tensor or operator.
    *
-   * The each dimension must appear in the dims array once.
+   * Each dimension must appear in the dims array once, otherwise matxInvalidDim is thrown.
 
    * This operator can appear as an rvalue or lvalue.
    *

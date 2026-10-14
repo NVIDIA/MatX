@@ -265,6 +265,23 @@ ctest --test-dir build/test
 
 MatX currently fully supports Linux with alpha support for Windows. A C++20 build environment is required. GPU builds require the CUDA Toolkit and a supported host compiler; consult the [build guide](https://nvidia.github.io/MatX/build.html) for exact current versions, optional backends, offline setup, and CPU support.
 
+### Use conan
+
+MatX is available from the Conan Center Index. Install the appropriate package with:
+
+```sh
+conan install --requires=matx/<version>  # e.g. matx/1.0.0
+```
+
+Then use CMake to locate and link MatX:
+
+```cmake
+find_package(matx CONFIG REQUIRED)
+target_link_libraries(MyProject PRIVATE matx::matx)
+```
+
+For the full Conan integration details, see `docs_input/build.rst`.
+
 ## Choose your next step
 
 | I want to… | Go here |

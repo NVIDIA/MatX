@@ -235,3 +235,79 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, PadAPIVariations)
 
   MATX_EXIT_HANDLER();
 }
+
+// Pads a rank-3 tensor along each axis in both constant and edge modes
+TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, PadAllAxes)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+
+  ExecType exec{};
+
+  const index_t in_shape[3] = {2, 3, 4};
+  const index_t before = 1;
+  const index_t after = 2;
+  const TestType pad_value = TestType(99);
+
+  auto in = make_tensor<TestType>({in_shape[0], in_shape[1], in_shape[2]});
+  for (index_t i = 0; i < in_shape[0]; i++)
+    for (index_t j = 0; j < in_shape[1]; j++)
+      for (index_t k = 0; k < in_shape[2]; k++)
+        in(i, j, k) = TestType(static_cast<float>(i * 16 + j * 4 + k));
+
+  for (int axis = 0; axis < 3; axis++) {
+    for (PadMode mode : {MATX_PAD_MODE_CONSTANT, MATX_PAD_MODE_EDGE}) {
+      cuda::std::array<index_t, 3> shape{in_shape[0], in_shape[1], in_shape[2]};
+      shape[axis] += before + after;
+      auto out = make_tensor<TestType>(shape);
+
+      (out = pad(in, axis, {before, after}, pad_value, mode)).run(exec);
+      exec.sync();
+
+      for (index_t i = 0; i < shape[0]; i++) {
+        for (index_t j = 0; j < shape[1]; j++) {
+          for (index_t k = 0; k < shape[2]; k++) {
+            index_t idx[3] = {i, j, k};
+            const index_t p = idx[axis] - before;
+            TestType expected;
+            if (p >= 0 && p < in_shape[axis]) {
+              idx[axis] = p;
+              expected = in(idx[0], idx[1], idx[2]);
+            } else if (mode == MATX_PAD_MODE_CONSTANT) {
+              expected = pad_value;
+            } else {
+              idx[axis] = (p < 0) ? 0 : in_shape[axis] - 1;
+              expected = in(idx[0], idx[1], idx[2]);
+            }
+            ASSERT_EQ(out(i, j, k), expected) << "axis=" << axis << " mode=" << static_cast<int>(mode);
+          }
+        }
+      }
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+// pad rejects an axis outside [0, Rank()) in every build mode
+TEST(OperatorValidationTests, PadInvalidAxis)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = float;
+
+  auto t = make_tensor<TestType>({2, 3, 4});
+  const TestType v = TestType(0);
+
+  EXPECT_THROW(pad(t, 3, {1, 2}, v), matx::detail::matxException);
+  EXPECT_THROW(pad(t, -1, {1, 2}, v), matx::detail::matxException);
+  EXPECT_NO_THROW(pad(t, 0, {1, 2}, v));
+  EXPECT_NO_THROW(pad(t, 2, {1, 2}, v));
+
+  // Negative pad sizes are rejected in every build mode
+  EXPECT_THROW(pad(t, 0, {-1, 2}, v), matx::detail::matxException);
+  EXPECT_THROW(pad(t, 0, {1, -2}, v), matx::detail::matxException);
+  EXPECT_NO_THROW(pad(t, 0, {0, 0}, v));
+
+  MATX_EXIT_HANDLER();
+}

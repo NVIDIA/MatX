@@ -68,7 +68,19 @@ namespace matx
         };
         auto* end = static_cast<void*>(const_cast<value_type*>(get_last(cuda::std::make_index_sequence<T::Rank()>{})) + 1);
 
-        return AliasedMemoryQueryInput{false, is_prerun, start, end};
+        AliasedMemoryQueryInput query{false, is_prerun, start, end};
+        if constexpr (is_tensor_view_v<T>) {
+          query.view = &lval;
+          query.rank = T::Rank();
+          query.element_bytes = sizeof(value_type);
+          query.size = [](const void *view, int dim) -> index_t {
+            return static_cast<const T *>(view)->Size(dim);
+          };
+          query.stride = [](const void *view, int dim) -> offset_t {
+            return static_cast<const T *>(view)->Stride(dim);
+          };
+        }
+        return query;
       }
       else {
         // For non-tensor types or rank 0, return null pointers (no aliasing checks needed)
@@ -255,11 +267,11 @@ namespace matx
                 MATX_ASSERT_STR(tp->get_lhs().Bytes() >= tp->get_rhs().Bytes(), matxInvalidSize, "LHS tensor is smaller than RHS tensor in assignment");
                 MATX_LOG_TRACE("Copying {} bytes from {} to {} using cudaMemcpyAsync",
                   tp->get_lhs().Bytes(), reinterpret_cast<void*>(tp->get_rhs().Data()), reinterpret_cast<void*>(tp->get_lhs().Data()));
-                cudaMemcpyAsync(reinterpret_cast<void*>(tp->get_lhs().Data()),
+                MATX_CUDA_CHECK(cudaMemcpyAsync(reinterpret_cast<void*>(tp->get_lhs().Data()),
                                 reinterpret_cast<void*>(tp->get_rhs().Data()),
                                 tp->get_rhs().Bytes(),
                                 cudaMemcpyDefault,
-                                ex.getStream());
+                                ex.getStream()));
               }
               else {
                 MATX_LOG_TRACE("Copying {} bytes from {} to {} using kernel",
@@ -321,7 +333,7 @@ namespace matx
           MATX_NVTX_START(static_cast<T *>(this)->str(), matx::MATX_NVTX_LOG_API)
 
           run(cudaExecutor{stream, false});
-          cudaEventRecord(ev, stream);
+          MATX_CUDA_CHECK(cudaEventRecord(ev, stream));
         }
 
         /**

@@ -133,12 +133,23 @@ class toeplitz:
     def __init__(self, dtype: str, size: List[int]):
         self.size = size
         self.dtype = dtype
-        pass
+        np.random.seed(1234)
 
     def run(self) -> Dict[str, np.array]:
-        c = matx_common.randn_ndarray((self.size[0],), self.dtype)
-        r = matx_common.randn_ndarray((self.size[1],), self.dtype)
-        r2 = matx_common.randn_ndarray((self.size[2],), self.dtype)
+        # Half-precision tests use these float32 values as references. Toeplitz
+        # only rearranges its inputs, so draw values k/16 with |k| <= 255. They
+        # need at most 8 significant bits, so fp16 and bf16 represent them
+        # exactly and the comparisons do not depend on input rounding.
+        def representable_values(shape):
+            def draw():
+                return np.random.randint(-255, 256, size=shape) / 16
+            if np.issubdtype(self.dtype, np.complexfloating):
+                return (draw() + 1j * draw()).astype(self.dtype)
+            return draw().astype(self.dtype)
+
+        c = representable_values((self.size[0],))
+        r = representable_values((self.size[1],))
+        r2 = representable_values((self.size[2],))
 
         # The first element in each array must match
         r[0]  = c[0]
@@ -172,13 +183,21 @@ class unwrap_operator:
         phase_2d = phase_2d + 0.25 * np.random.randn(m, k)
         in2 = np.angle(np.exp(1j * phase_2d)).astype(dtype)
 
+        phase_3d = np.linspace(0.0, 11.0 * np.pi, 5 * 6 * 7).reshape((5, 6, 7))
+        phase_3d = phase_3d + 0.25 * np.random.randn(5, 6, 7)
+        in3 = np.angle(np.exp(1j * phase_3d)).astype(dtype)
+
         return {
             'in1': in1,
             'in2': in2,
+            'in3': in3,
             'out1_default': np.unwrap(in1).astype(dtype),
             'out1_period': np.unwrap(in1, discont=2.5, period=4.0).astype(dtype),
             'out2_axis1': np.unwrap(in2, axis=1).astype(dtype),
-            'out2_axis0': np.unwrap(in2, axis=0, discont=1.0, period=6.0).astype(dtype)
+            'out2_axis0': np.unwrap(in2, axis=0, discont=1.0, period=6.0).astype(dtype),
+            'out3_axis0': np.unwrap(in3, axis=0).astype(dtype),
+            'out3_axis1': np.unwrap(in3, axis=1).astype(dtype),
+            'out3_axis2': np.unwrap(in3, axis=2).astype(dtype)
         }
 
 class pwelch_operators:

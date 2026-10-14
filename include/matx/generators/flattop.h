@@ -85,6 +85,7 @@ namespace matx
                 "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(index_t i) const\n" +
                 "  {\n" +
                 "    return detail::ApplyGeneratorVecFunc<CapType, T>([](index_t idx) {\n" +
+                "      if (size_ == 1) { return T(1); }\n" +
                 "      static constexpr T tmp_pi = cuda::std::numbers::pi;\n" +
                 "      return a0 - a1 * cuda::std::cos(static_cast<T>(2) * tmp_pi * idx / (size_ - 1)) + a2 * cuda::std::cos(static_cast<T>(4) * tmp_pi * idx / (size_ - 1)) - a3 * cuda::std::cos(static_cast<T>(6) * tmp_pi * idx / (size_ - 1)) + a4 * cuda::std::cos(static_cast<T>(8) * tmp_pi * idx / (size_ - 1));\n" +
                 "    }, i);\n" +
@@ -108,6 +109,7 @@ namespace matx
         inline __MATX_HOST__ __MATX_DEVICE__ auto operator()(index_t i) const
         {
           return detail::ApplyGeneratorVecFunc<CapType, T>([this](index_t idx) {
+            if (size_ == 1) { return T(1); }
             static constexpr T tmp_pi = cuda::std::numbers::pi;
             return  a0
               - a1 * cuda::std::cos(static_cast<T>(2)*tmp_pi*idx / (size_ - 1))

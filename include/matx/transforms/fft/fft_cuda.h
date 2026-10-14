@@ -376,7 +376,7 @@ matxCUDAFFTPlan1D_t(OutTensorType &o, const InTensorType &i)
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
   int dev;
-  cudaGetDevice(&dev);
+  MATX_CUDA_CHECK(cudaGetDevice(&dev));
 
   this->workspace_ = nullptr;
   this->params_ = this->GetFFTParams(o, i, 1);
@@ -509,7 +509,7 @@ public:
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
     int dev;
-    cudaGetDevice(&dev);
+    MATX_CUDA_CHECK(cudaGetDevice(&dev));
 
     this->workspace_ = nullptr;
     this->params_ = this->GetFFTParams(o, i, 2);

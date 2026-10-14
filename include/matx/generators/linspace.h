@@ -131,7 +131,7 @@ namespace matx
           count_ = count;
           for (int i = 0; i < NUM_RC; ++i) {
             firsts_[i] = firsts[i];
-            steps_[i] = (lasts[i] - firsts[i]) / static_cast<T>(count - 1);
+            steps_[i] = (count > 1) ? (lasts[i] - firsts[i]) / static_cast<T>(count - 1) : static_cast<T>(0);
           }
         }
 

@@ -45,5 +45,37 @@ TYPED_TEST(OperatorTestsFloatNonComplexNonHalfAllExecs, Unwrap)
   exec.sync();
   MATX_TEST_ASSERT_COMPARE(pb, out2_axis0, "out2_axis0", 0.01);
 
+  // Every axis of a rank-3 input, including the middle one
+  auto in3 = make_tensor<TestType>({5, 6, 7});
+  auto out3 = make_tensor<TestType>({5, 6, 7});
+  pb->NumpyToTensorView(in3, "in3");
+  for (int axis = 0; axis < 3; axis++) {
+    (out3 = unwrap(in3, axis)).run(exec);
+    exec.sync();
+    MATX_TEST_ASSERT_COMPARE(pb, out3, "out3_axis" + std::to_string(axis), 0.01);
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+// unwrap rejects an axis outside [-Rank(), Rank()) in every build mode
+TEST(OperatorValidationTests, UnwrapInvalidAxis)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = float;
+
+  auto t = make_tensor<TestType>({3, 4});
+
+  EXPECT_THROW(unwrap(t, 2), matx::detail::matxException);
+  EXPECT_THROW(unwrap(t, -3), matx::detail::matxException);
+  EXPECT_NO_THROW(unwrap(t, -2));
+  EXPECT_NO_THROW(unwrap(t, -1));
+  EXPECT_NO_THROW(unwrap(t, 1));
+
+  // The period must be positive in every build mode
+  EXPECT_THROW(unwrap(t, -1, TestType(-1), TestType(0)), matx::detail::matxException);
+  EXPECT_THROW(unwrap(t, -1, TestType(-1), TestType(-1)), matx::detail::matxException);
+  EXPECT_NO_THROW(unwrap(t, -1, TestType(-1), TestType(1)));
+
   MATX_EXIT_HANDLER();
 }
