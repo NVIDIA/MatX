@@ -282,9 +282,12 @@ public:
   block_cyclic_distribution_t(distributed_index_t<2> global_shape,
                               distributed_index_t<2> block_shape,
                               distributed_index_t<2> process_grid,
-                              std::vector<distributed_endpoint_t> endpoints)
+                              std::vector<distributed_endpoint_t> endpoints,
+                              distributed_grid_layout layout =
+                                  distributed_grid_layout::row_major)
       : global_shape_{global_shape}, block_shape_{block_shape},
-        process_grid_{process_grid}, endpoints_{std::move(endpoints)} {
+        process_grid_{process_grid}, endpoints_{std::move(endpoints)},
+        layout_{layout} {
     for (int dim = 0; dim < 2; ++dim) {
       matx::detail::DistributedCheck(
           global_shape_[dim] > 0 && block_shape_[dim] > 0 &&
@@ -308,16 +311,14 @@ public:
   const distributed_index_t<2> &ProcessGrid() const noexcept {
     return process_grid_;
   }
+  distributed_grid_layout GridLayout() const noexcept { return layout_; }
   size_t FragmentCount() const noexcept { return endpoints_.size(); }
   const distributed_endpoint_t &FragmentEndpoint(size_t fragment) const {
     return endpoints_.at(fragment);
   }
 
   distributed_index_t<2> LocalShape(size_t fragment) const {
-    const index_t process_row =
-        static_cast<index_t>(fragment) / process_grid_[1];
-    const index_t process_col =
-        static_cast<index_t>(fragment) % process_grid_[1];
+    const auto [process_row, process_col] = ProcessCoordinate(fragment);
     return {OwnedExtent(global_shape_[0], block_shape_[0], process_grid_[0],
                         process_row),
             OwnedExtent(global_shape_[1], block_shape_[1], process_grid_[1],
@@ -332,10 +333,7 @@ public:
         local_index[0] >= 0 && local_index[0] < local_shape[0] &&
             local_index[1] >= 0 && local_index[1] < local_shape[1],
         matxInvalidSize, "Local block-cyclic index is out of bounds");
-    const index_t process_row =
-        static_cast<index_t>(fragment) / process_grid_[1];
-    const index_t process_col =
-        static_cast<index_t>(fragment) % process_grid_[1];
+    const auto [process_row, process_col] = ProcessCoordinate(fragment);
     return {MapIndex(local_index[0], block_shape_[0], process_grid_[0],
                      process_row),
             MapIndex(local_index[1], block_shape_[1], process_grid_[1],
@@ -346,7 +344,7 @@ public:
     return global_shape_ == other.global_shape_ &&
            block_shape_ == other.block_shape_ &&
            process_grid_ == other.process_grid_ &&
-           endpoints_ == other.endpoints_;
+           endpoints_ == other.endpoints_ && layout_ == other.layout_;
   }
 
 private:
@@ -369,11 +367,31 @@ private:
     return (local_block * processes + coordinate) * block + within_block;
   }
 
+  std::pair<index_t, index_t> ProcessCoordinate(size_t fragment) const {
+    const index_t rank = static_cast<index_t>(fragment);
+    if (layout_ == distributed_grid_layout::column_major) {
+      return {rank % process_grid_[0], rank / process_grid_[0]};
+    }
+    return {rank / process_grid_[1], rank % process_grid_[1]};
+  }
+
   distributed_index_t<2> global_shape_{};
   distributed_index_t<2> block_shape_{};
   distributed_index_t<2> process_grid_{};
   std::vector<distributed_endpoint_t> endpoints_;
+  distributed_grid_layout layout_ = distributed_grid_layout::row_major;
 };
+
+template <typename T>
+inline constexpr bool is_block_cyclic_distributed_tensor_v = [] {
+  if constexpr (is_distributed_tensor_v<T>) {
+    return std::is_same_v<typename remove_cvref_t<T>::distribution_type,
+                          block_cyclic_distribution_t>;
+  }
+  else {
+    return false;
+  }
+}();
 
 /** One locally addressable, homogeneous piece of a distributed tensor. */
 template <typename T, int RANK> struct local_fragment_t {

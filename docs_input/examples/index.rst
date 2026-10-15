@@ -12,3 +12,5 @@ the examples require compiling them into an executable. Instructions for buildin
 
    black_scholes.rst
    fftconv.rst
+   distributed_fft_multi_gpu.rst
+   distributed_cholesky_mpi.rst

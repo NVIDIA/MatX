@@ -32,6 +32,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "matx.h"
+#include "matx/distributed.h"
 #include "gtest/gtest.h"
 
 #include <chrono>
@@ -88,6 +89,53 @@ void FillMultiGpu(Distributed &tensor, Generator &&generator) {
 }
 
 } // namespace
+
+TEST(DistributedTensorMultiGpu, CufftMgOneDimensionalComplex) {
+  int device_count = 0;
+  MATX_CUDA_CHECK(cudaGetDeviceCount(&device_count));
+  if (device_count < 2) {
+    GTEST_SKIP() << "This integration test requires two CUDA devices";
+  }
+
+  constexpr index_t count = 1024;
+  using complex_type = cuda::std::complex<float>;
+  distributed_context context{{0, 1}};
+  distributedCUDAExecutor executor{context};
+  auto distribution =
+      block_distribution_t<1>::Slab({count}, {{0, 0}, {0, 1}});
+  auto input = make_distributed_tensor<complex_type>(distribution, context);
+  auto output = make_distributed_tensor<complex_type>(distribution, context);
+
+  for (size_t local = 0; local < input.LocalFragmentCount(); ++local) {
+    const auto &fragment = input.LocalFragment(local);
+    const index_t local_size = input.LocalView(local).Size(0);
+    std::vector<complex_type> host(static_cast<size_t>(local_size),
+                                   complex_type{0.0F, 0.0F});
+    if (distribution.LocalToGlobal(fragment.distribution_index, {0})[0] == 0) {
+      host[0] = complex_type{1.0F, 0.0F};
+    }
+    matx::detail::distributed_device_guard guard{fragment.endpoint.device_id};
+    MATX_CUDA_CHECK(cudaMemcpy(input.LocalView(local).Data(), host.data(),
+                               host.size() * sizeof(complex_type),
+                               cudaMemcpyHostToDevice));
+  }
+
+  (output = fft(input)).run(executor);
+
+  for (size_t local = 0; local < output.LocalFragmentCount(); ++local) {
+    const auto &fragment = output.LocalFragment(local);
+    const index_t local_size = output.LocalView(local).Size(0);
+    std::vector<complex_type> host(static_cast<size_t>(local_size));
+    matx::detail::distributed_device_guard guard{fragment.endpoint.device_id};
+    MATX_CUDA_CHECK(cudaMemcpy(host.data(), output.LocalView(local).Data(),
+                               host.size() * sizeof(complex_type),
+                               cudaMemcpyDeviceToHost));
+    for (index_t i = 0; i < local_size; ++i) {
+      EXPECT_NEAR(host[static_cast<size_t>(i)].real(), 1.0F, 1.0e-5F);
+      EXPECT_NEAR(host[static_cast<size_t>(i)].imag(), 0.0F, 1.0e-5F);
+    }
+  }
+}
 
 TEST(DistributedTensorMultiGpu, BlackScholesUnevenFragments) {
   int device_count = 0;
