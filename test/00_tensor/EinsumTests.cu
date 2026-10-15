@@ -32,6 +32,7 @@
 
 #include "assert.h"
 #include "matx.h"
+#include "prerun_tester.h"
 #include "test_types.h"
 #include "utilities.h"
 #include "gtest/gtest.h"
@@ -95,6 +96,109 @@ TYPED_TEST_SUITE(EinsumTestsNumeric, MatXNumericTypesCUDAExec);
 TYPED_TEST_SUITE(EinsumTestsIntegral, MatXAllIntegralTypesCUDAExec);
 TYPED_TEST_SUITE(EinsumTestsNumericNonComplex, MatXNumericNonComplexTypesCUDAExec);
 TYPED_TEST_SUITE(EinsumTestsBoolean, MatXBoolTypesCUDAExec);
+
+// Operand lifecycle forwarding does not require cuTENSOR, so these tests invoke
+// the hooks and materialization helper directly on the host.
+TEST(EinsumLifecycle, ForwardsCleanupToAllOperands)
+{
+  MATX_ENTER_HANDLER();
+  SingleThreadedHostExecutor exec{};
+  auto in = make_tensor<float>({4}, MATX_HOST_MEMORY);
+  in.SetVals({1, 2, 3, 4});
+  test::PreRunLifecycle first_life;
+  test::PreRunLifecycle second_life;
+  auto op = cutensor::einsum("i,i->", cumsum(test::make_prerun_tester(in, first_life)),
+                             cumsum(test::make_prerun_tester(in, second_life)));
+
+  op.PreRun(detail::NoShape{}, exec);
+  op.PostRun(detail::NoShape{}, exec);
+  test::ExpectLifecycleClean(first_life, "first operand", 1);
+  test::ExpectLifecycleClean(second_life, "second operand", 1);
+
+  // Direct transform assignment prepares and cleans up only the operands.
+  op.InnerPreRun(detail::NoShape{}, exec);
+  op.InnerPostRun(detail::NoShape{}, exec);
+  test::ExpectLifecycleClean(first_life, "first operand", 2);
+  test::ExpectLifecycleClean(second_life, "second operand", 2);
+  MATX_EXIT_HANDLER();
+}
+
+TEST(EinsumLifecycle, ContinuesPastNonMatXOperands)
+{
+  MATX_ENTER_HANDLER();
+  SingleThreadedHostExecutor exec{};
+  auto in = make_tensor<float>({4}, MATX_HOST_MEMORY);
+  test::PreRunLifecycle first_life;
+  test::PreRunLifecycle second_life;
+  auto op = cutensor::einsum(",i,,i->", 2.0f, test::make_prerun_tester(in, first_life), 3.0f,
+                             test::make_prerun_tester(in, second_life));
+
+  op.PreRun(detail::NoShape{}, exec);
+  op.PostRun(detail::NoShape{}, exec);
+  test::ExpectLifecycleClean(first_life, "first operand", 1);
+  test::ExpectLifecycleClean(second_life, "second operand", 1);
+  MATX_EXIT_HANDLER();
+}
+
+TEST(EinsumLifecycle, MaterializesAfterAliasedOperand)
+{
+  MATX_ENTER_HANDLER();
+  SingleThreadedHostExecutor exec{};
+  auto in = make_tensor<float>({4}, MATX_HOST_MEMORY);
+  auto out = make_tensor<float>({4}, MATX_HOST_MEMORY);
+  in.SetVals({1, 2, 3, 4});
+  out.SetVals({-1, -1, -1, -1});
+  test::PreRunLifecycle life;
+  auto second = test::make_prerun_tester(cumsum(in), life);
+  auto supported = cuda::std::make_tuple(in, out);
+
+  second.PreRun(detail::NoShape{}, exec);
+  detail::assign_tuple_tensors<0>(exec, supported, in, second);
+  second.PostRun(detail::NoShape{}, exec);
+
+  test::ExpectLifecycleBalanced(life, "second operand", 1, 2);
+  const float expected[] = {1, 3, 6, 10};
+  for (index_t i = 0; i < 4; ++i) {
+    EXPECT_EQ(out(i), expected[i]);
+  }
+  MATX_EXIT_HANDLER();
+}
+
+TEST(EinsumLifecycle, MaterializationPreservesInputLifecycle)
+{
+  MATX_ENTER_HANDLER();
+  SingleThreadedHostExecutor exec{};
+  auto in = make_tensor<float>({4}, MATX_HOST_MEMORY);
+  auto out = make_tensor<float>({4}, MATX_HOST_MEMORY);
+  in.SetVals({1, 2, 3, 4});
+  test::PreRunLifecycle direct_life;
+  test::PreRunLifecycle expression_life;
+  auto direct = cumsum(test::make_prerun_tester(in, direct_life));
+  auto expression = test::make_prerun_tester(cumsum(in), expression_life) + 1.0f;
+
+  direct.PreRun(detail::NoShape{}, exec);
+  expression.PreRun(detail::NoShape{}, exec);
+  // A transform operand's supported tensor aliases its prepared storage.
+  auto supported = cuda::std::make_tuple(make_tensor<float>(direct.Data(), Shape(direct)), out);
+  detail::assign_tuple_tensors<0>(exec, supported, direct, expression);
+
+  // Nested lifecycles inside the helper may balance, but must not release the
+  // caller's preparation of either operand.
+  for (const auto *life : {&direct_life, &expression_life}) {
+    EXPECT_GE(life->prerun_count, 1);
+    EXPECT_EQ(life->active, 1);
+  }
+  const float expected[] = {2, 4, 7, 11};
+  for (index_t i = 0; i < 4; ++i) {
+    EXPECT_EQ(out(i), expected[i]);
+  }
+
+  direct.PostRun(detail::NoShape{}, exec);
+  expression.PostRun(detail::NoShape{}, exec);
+  test::ExpectLifecycleBalanced(direct_life, "direct operand", 1, 2);
+  test::ExpectLifecycleBalanced(expression_life, "expression operand", 1, 2);
+  MATX_EXIT_HANDLER();
+}
 
 #if MATX_EN_CUTENSOR
 TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, Contraction3D)
@@ -534,6 +638,39 @@ TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, BroadcastBatchSizeMismatchThr
   MATX_EXIT_HANDLER();
 }
 
+
+TYPED_TEST(EinsumTestsFloatNonComplexNonHalfTypes, ComposedInputLifecycle)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  ExecType exec{};
+
+  auto first = make_tensor<TestType>({4});
+  auto in = make_tensor<TestType>({4});
+  auto out = make_tensor<TestType>({});
+  first.SetVals({1, 1, 1, 1});
+  test::PreRunLifecycle direct_life;
+  test::PreRunLifecycle expression_life;
+  // The leading tensor aliases its supported tensor, so materialization must
+  // continue past it to the transform and expression operands.
+  auto statement = (out = cutensor::einsum("i,i,i->", first, cumsum(test::make_prerun_tester(in, direct_life)),
+                                           test::make_prerun_tester(cumsum(in), expression_life) + TestType(1)));
+
+  for (int iteration = 0; iteration < 2; ++iteration) {
+    SCOPED_TRACE(iteration);
+    const TestType scale = static_cast<TestType>(iteration + 1);
+    in.SetVals({scale, scale, scale, scale});
+    statement.run(exec);
+    exec.sync();
+
+    test::ExpectLifecycleBalanced(direct_life, "direct operand", iteration + 1, 2 * (iteration + 1));
+    test::ExpectLifecycleBalanced(expression_life, "expression operand", iteration + 1, 2 * (iteration + 1));
+    // sum_i (i * scale) * (i * scale + 1) for i = 1..4
+    EXPECT_NEAR(out(), 30 * scale * scale + 10 * scale, 1e-3);
+  }
+  MATX_EXIT_HANDLER();
+}
 
 #endif
 

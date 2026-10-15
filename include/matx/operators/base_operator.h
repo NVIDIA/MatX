@@ -149,6 +149,52 @@ namespace matx
       }
 #endif
     }
+
+    /**
+     * @brief Enter PreRun on an operator that tracks its lifecycle depth
+     *
+     * Operators whose PreRun may create per-run state, such as a temporary
+     * output buffer, call this on every PreRun, whether or not that particular
+     * run allocates. Transform implementations may run nested expressions
+     * holding copies of an operand that is already prepared. Those copies share
+     * the operand's state, so each copy tracks the nesting depth of its own
+     * PreRun/PostRun pairs. Only the outermost pair may prepare the operator's
+     * inputs and allocate, or clean up its inputs and free.
+     *
+     * The depth is a uint8_t to keep operators small. A depth beyond its range
+     * means either unbalanced PreRun/PostRun calls or an unusually deep chain
+     * of nested PreRun calls on the same operator; MatX's own operators stay at
+     * two or less, so more than 255 levels would be unusual. This throws rather
+     * than wrapping, which terminates when called from a noexcept hook.
+     *
+     * @param depth The operator's lifecycle depth
+     * @return true if this is the outermost PreRun
+     */
+    __MATX_INLINE__ __MATX_HOST__ bool EnterLifecycle(uint8_t &depth) {
+      if (depth == cuda::std::numeric_limits<uint8_t>::max()) {
+        MATX_THROW(matxInvalidParameter,
+                   "PreRun nesting depth exceeded 255; PreRun/PostRun calls may be unbalanced");
+      }
+      return depth++ == 0;
+    }
+
+    /**
+     * @brief Exit PostRun on an operator that tracks its lifecycle depth
+     *
+     * @param depth The operator's lifecycle depth
+     * @return true if this PostRun closes the outermost PreRun. A PostRun
+     * without a matching PreRun returns false and changes nothing; debug
+     * builds also log it as an error.
+     */
+    __MATX_INLINE__ __MATX_HOST__ bool ExitLifecycle(uint8_t &depth) noexcept {
+      if (depth == 0) {
+#ifndef NDEBUG
+        MATX_LOG_ERROR("PostRun called without a matching PreRun");
+#endif
+        return false;
+      }
+      return --depth == 0;
+    }
   } // namespace detail
 
   /**

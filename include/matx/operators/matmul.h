@@ -67,7 +67,7 @@ namespace matx
         // This should be tensor_impl_t, but need to work around issues with temp types returned in matmul
         mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, out_rank> tmp_out_;
         mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr;
-        mutable bool prerun_done_ = false;
+        mutable uint8_t lifecycle_depth_ = 0;
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
         mutable cuBLASDxHelper<typename OpA::value_type> dx_gemm_helper_;
 #endif
@@ -426,7 +426,7 @@ namespace matx
         template <typename ShapeType, typename Executor>
         __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
         {
-          if (prerun_done_) {
+          if (!detail::EnterLifecycle(lifecycle_depth_)) {
             return;
           }
 
@@ -434,12 +434,11 @@ namespace matx
 
           detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);
 
-          prerun_done_ = true;
           Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
         }
 
         template <typename ShapeType, typename Executor>
-        __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) const noexcept
+        __MATX_INLINE__ void InnerPostRun(ShapeType &&shape, Executor &&ex) const noexcept
         {
           if constexpr (is_matx_op<OpA>()) {
             a_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
@@ -448,10 +447,19 @@ namespace matx
           if constexpr (is_matx_op<OpB>()) {
             b_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           }
+        }
+
+        template <typename ShapeType, typename Executor>
+        __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) const noexcept
+        {
+          if (!detail::ExitLifecycle(lifecycle_depth_)) {
+            return;
+          }
+
+          InnerPostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
 
           matxFree(ptr);
           ptr = nullptr;
-          prerun_done_ = false;
         }
     };
   }

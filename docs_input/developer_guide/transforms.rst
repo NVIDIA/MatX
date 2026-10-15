@@ -64,6 +64,7 @@ are two new data members:
 
   mutable detail::tensor_impl_t<ttype, OpA::Rank()> tmp_out_;
   mutable ttype *ptr = nullptr;
+  mutable uint8_t lifecycle_depth_ = 0;
 
 `tmp_out_` is a temporary uninitialized tensor. Only the type and rank are defined, but the size is undefined at this point. `ptr` is 
 a pointer of the same type as the tensor that will be used later to allocate memory for the tensor.
@@ -139,6 +140,10 @@ The last functions to discuss are the Pre/PostRun functions:
   template <typename ShapeType, typename Executor>
   __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, Executor &&ex) const noexcept
   {
+    if (!detail::EnterLifecycle(lifecycle_depth_)) {
+      return;
+    }
+
     InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));  
 
     detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), out_dims_, &ptr);         
@@ -147,26 +152,47 @@ The last functions to discuss are the Pre/PostRun functions:
   }
 
   template <typename ShapeType, typename Executor>
-  __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) const noexcept
+  __MATX_INLINE__ void InnerPostRun(ShapeType &&shape, Executor &&ex) const noexcept
   {
     if constexpr (is_matx_op<OpA>()) {
       a_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
     }
-
-    matxFree(ptr); 
   }
 
-`PreRun` runs *before* the start of the executor calling `run()`, while `PostRun()` runs *after* `run()` is complete. `InnerPreRun` is separate so 
-that the operator can run nested PreRuns without any allocations.
+  template <typename ShapeType, typename Executor>
+  __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) const noexcept
+  {
+    if (!detail::ExitLifecycle(lifecycle_depth_)) {
+      return;
+    }
+
+    InnerPostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+
+    matxFree(ptr); 
+    ptr = nullptr;
+  }
+
+`PreRun` runs *before* the start of the executor calling `run()`, while `PostRun()` runs *after* `run()` is complete. `InnerPreRun` and
+`InnerPostRun` are separate so that the operator can prepare and clean up its inputs without any allocations. When a transform is assigned
+directly to a tensor, MatX calls `InnerPreRun`, executes the transform into the output tensor, and then calls `InnerPostRun`.
 
 Starting with `InnerPreRun`, all it does is conditionally call the member operator's `PreRun()`. If there were multiple inputs, it would 
-call both `PreRun` functions for each of those operators. 
+call both `PreRun` functions for each of those operators. `InnerPostRun` calls `PostRun()` on the same inputs. Every transform that defines
+`InnerPreRun` must also define `InnerPostRun`; assigning a transform without one directly to a tensor fails to compile with a `static_assert`.
 
 `PreRun` is for running any work that needs to be done before `run()`. For most transforms this means allocating our temporary `tmp_out_` tensor 
 with the appropriate dimensions, then executing our transform into that memory.
 
 Conversely, `PostRun` does any cleanup necessary after the execution of the `run()` statement completes. For most transforms this means freeing 
 our temporary memory used for `tmp_out_`.
+
+Every `PreRun` must be balanced by one `PostRun` on the same operator object. A transform implementation may run a nested expression that
+holds a copy of an input that is already prepared, and that copy shares the input's temporary memory. `lifecycle_depth_` counts the nested
+`PreRun`/`PostRun` pairs on each copy: `detail::EnterLifecycle` returns true only for the outermost `PreRun`, and `detail::ExitLifecycle`
+returns true only for the matching outermost `PostRun`. Only those calls may prepare inputs and allocate, or clean up inputs and free. Without
+this guard, the nested expression's `PostRun` would free memory that the original operator frees again. Any intervening use of the buffer would
+be a use-after-free hazard. A `PostRun` without a matching `PreRun` changes nothing. Operators that do not own temporary memory only need to
+forward both calls to their inputs.
 
 While these calls recursively call other operators' `Pre/PostRun`, it does so following the usual C++ order of operations. Looking at the FFT 
 convolution example: 

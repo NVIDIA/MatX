@@ -52,7 +52,7 @@ namespace detail {
       typename detail::base_type_t<OpA> a_;
       mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, OpA::Rank()> tmp_out_;
       mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr;
-      mutable bool prerun_done_ = false; 
+      mutable uint8_t lifecycle_depth_ = 0;
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
       mutable cuSolverDxHelper<typename OpA::value_type> dx_solver_helper_;
 #endif
@@ -270,29 +270,37 @@ namespace detail {
       {
         static_assert(ALGO == MAT_INVERSE_ALGO_LU || is_cuda_jit_executor_v<Executor>,
                       "MAT_INVERSE_ALGO_POSV requires CUDAJITExecutor with MathDx");
-        if (prerun_done_) {
+        if (!detail::EnterLifecycle(lifecycle_depth_)) {
           return;
         }
 
         InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
 
         if constexpr (is_cuda_jit_executor_v<Executor>) {
-          prerun_done_ = true;
           return;
         }
 
         detail::AllocateTempTensor(tmp_out_, std::forward<Executor>(ex), a_.Shape(), &ptr);
 
-        prerun_done_ = true;
         Exec(cuda::std::make_tuple(tmp_out_), std::forward<Executor>(ex));
       }      
 
       template <typename ShapeType, typename Executor>
-      __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
+      __MATX_INLINE__ void InnerPostRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
       {
         if constexpr (is_matx_op<OpA>()) {
           a_.PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }  
+      }
+
+      template <typename ShapeType, typename Executor>
+      __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
+      {
+        if (!detail::ExitLifecycle(lifecycle_depth_)) {
+          return;
+        }
+
+        InnerPostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
 
         if (ptr != nullptr) {
           if constexpr (is_cuda_executor_v<Executor>) {
@@ -303,7 +311,6 @@ namespace detail {
           }
           ptr = nullptr;
         }
-        prerun_done_ = false;
       }
   };
 }

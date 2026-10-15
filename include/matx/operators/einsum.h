@@ -80,34 +80,54 @@ namespace detail {
         return matxNoRank;
       }
 
-      template <typename ShapeType, typename Executor>
-      __MATX_INLINE__ void InnerPreRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
-      {
-        // Maybe do something here later if we take operators as input        
-      }
-
       template <int I, typename ShapeType, typename Executor>
       __MATX_INLINE__ void PreRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
       {
-        if constexpr (I < sizeof...(OpA)-1) {
+        if constexpr (I < sizeof...(OpA)) {
           if constexpr (is_matx_op<cuda::std::tuple_element_t<I,cuda::std::tuple<OpA...>>>()) {
             cuda::std::get<I>(a_).PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-            PreRun<I+1, ShapeType, Executor>(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
           }
-        } else if constexpr (I == sizeof...(OpA)-1) {
-          if constexpr (is_matx_op<cuda::std::tuple_element_t<I,cuda::std::tuple<OpA...>>>()) {
-            cuda::std::get<I>(a_).PreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
-            // This was the last ops_ element, so stop recursion
-          }
+          // Continue past non-MatX operands such as scalars
+          PreRun<I+1, ShapeType, Executor>(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
         }
+      }
+
+      template <int I, typename ShapeType, typename Executor>
+      __MATX_INLINE__ void PostRun([[maybe_unused]] ShapeType &&shape, [[maybe_unused]] Executor &&ex) const noexcept
+      {
+        if constexpr (I < sizeof...(OpA)) {
+          if constexpr (is_matx_op<cuda::std::tuple_element_t<I,cuda::std::tuple<OpA...>>>()) {
+            cuda::std::get<I>(a_).PostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+          }
+          PostRun<I+1, ShapeType, Executor>(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        }
+      }
+
+      // einsum() has no temporary storage of its own, so the inner hooks and the
+      // ordinary hooks both prepare and clean up only the operands.
+      template <typename ShapeType, typename Executor>
+      __MATX_INLINE__ void InnerPreRun(ShapeType &&shape, Executor &&ex) const noexcept
+      {
+        PreRun<0, ShapeType, Executor>(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
       }
 
       template <typename ShapeType, typename Executor>
       __MATX_INLINE__ void PreRun(ShapeType &&shape, Executor &&ex) const noexcept
       {
-        PreRun<0, ShapeType, Executor>(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+        InnerPreRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
       }          
 
+      template <typename ShapeType, typename Executor>
+      __MATX_INLINE__ void InnerPostRun(ShapeType &&shape, Executor &&ex) const noexcept
+      {
+        PostRun<0, ShapeType, Executor>(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+      }
+
+      template <typename ShapeType, typename Executor>
+      __MATX_INLINE__ void PostRun(ShapeType &&shape, Executor &&ex) const noexcept
+      {
+        InnerPostRun(std::forward<ShapeType>(shape), std::forward<Executor>(ex));
+      }
 
       // Size is not relevant in einsum() since there are multiple return values and it
       // is not allowed to be called in larger expressions
