@@ -58,7 +58,7 @@ namespace matx
         cuda::std::array<shape_type, DIM> sizes_;
         cuda::std::array<int32_t, DIM> dims_;
         cuda::std::array<shape_type, T::Rank()> starts_;
-        StrideType strides_; // Add [[no_unique_address]] in c++20
+        cuda::std::remove_cvref_t<StrideType> strides_; // Add [[no_unique_address]] in c++20
 
       public:
         using matxop = bool;
@@ -85,7 +85,17 @@ namespace matx
           for (int i = 0; i < DIM; i++) {
             params_str += std::format("d{}_s{}_", dims_[i], sizes_[i]);
           }
-          return std::format("JITSlice_{}", params_str);
+          const int input_rank = detail::get_dyn_rank(op_);
+          for (int i = 0; i < input_rank; i++) {
+            params_str += std::format("b{}_", starts_[i]);
+            if constexpr (!cuda::std::is_same_v<StrideType, NoStride>) {
+              params_str += std::format("t{}_", strides_[i]);
+            }
+          }
+          if constexpr (cuda::std::is_same_v<StrideType, NoStride>) {
+            params_str += "n_";
+          }
+          return std::format("JITSlice_r{}_{}", input_rank, params_str);
         }
 
         __MATX_INLINE__ std::string get_jit_stride_type_name() const {
@@ -100,6 +110,10 @@ namespace matx
         __MATX_INLINE__ auto get_jit_op_str() const {
           std::string func_name = get_jit_class_name();
           const int actual_input_rank = detail::get_dyn_rank(op_);
+          std::string strides_str;
+          if constexpr (!cuda::std::is_same_v<StrideType, NoStride>) {
+            strides_str = detail::array_to_string(strides_, actual_input_rank);
+          }
 
           return cuda::std::make_tuple(
             func_name,
@@ -111,8 +125,8 @@ namespace matx
                 "  constexpr static cuda::std::array<index_t, DIM_> sizes_ = {{ {} }};\n"
                 "  constexpr static cuda::std::array<int32_t, DIM_> dims_ = {{ {} }};\n"
                 "  constexpr static cuda::std::array<index_t, OpRank_> starts_ = {{ {} }};\n"
+                "  constexpr static StrideType strides_ = {{ {} }};\n"
                 "  typename detail::inner_storage_or_self_t<detail::base_type_t<T>> op_;\n"
-                "  StrideType strides_;\n"
                 "  template <typename CapType, typename... Is>\n"
                 "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(Is... indices) const {{\n"
                 "    if constexpr (CapType::ept == ElementsPerThread::ONE) {{\n"
@@ -124,10 +138,10 @@ namespace matx
                 "        for(int32_t j = 0; j < DIM_; j++) {{\n"
                 "          if(dims_[j] == i) {{\n"
                 "            if constexpr (!cuda::std::is_same_v<NoStride, StrideType>) {{\n"
-                "              ind[i] = starts_[j] + inds[j] * strides_[i];\n"
+                "              ind[i] = starts_[i] + inds[j] * strides_[i];\n"
                 "            }}\n"
                 "            else {{\n"
-                "              ind[i] = starts_[j] + inds[j];\n"
+                "              ind[i] = starts_[i] + inds[j];\n"
                 "            }}\n"
                 "          }}\n"
                 "        }}\n"
@@ -140,7 +154,8 @@ namespace matx
                 "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return DIM_; }}\n"
                 "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int32_t dim) const {{ return sizes_[dim]; }}\n"
                 "}};\n",
-                func_name, DIM, actual_input_rank, detail::array_to_string(sizes_), detail::array_to_string(dims_), detail::array_to_string(starts_, actual_input_rank))
+                func_name, DIM, actual_input_rank, detail::array_to_string(sizes_), detail::array_to_string(dims_),
+                detail::array_to_string(starts_, actual_input_rank), strides_str)
           );
         }
 #endif
@@ -149,7 +164,7 @@ namespace matx
 
         __MATX_INLINE__ SliceOp(const T &op, const cuda::std::array<shape_type, T::Rank()> &starts,
                                       const cuda::std::array<shape_type, T::Rank()> &ends,
-                                      StrideType strides) : op_(op) {
+                                      StrideType strides) : op_(op), strides_(strides) {
           int32_t d = 0;
           for(int32_t i = 0; i < T::Rank(); i++) {
             shape_type start = starts[i] < 0 ? op.Size(i) + starts[i] : starts[i];
@@ -180,7 +195,7 @@ namespace matx
 
               //adjust size by stride
               if constexpr (!cuda::std::is_same_v<NoStride, StrideType>) {
-                sizes_[d] = (shape_type)std::ceil(static_cast<double>(sizes_[d])/ static_cast<double>(strides_[d]));
+                sizes_[d] = (shape_type)std::ceil(static_cast<double>(sizes_[d])/ static_cast<double>(strides_[i]));
               }
 
               d++;
@@ -212,10 +227,10 @@ namespace matx
               for(int32_t j = 0; j < Rank(); j++) {
                 if(dims[j] == i) {
                   if constexpr (!cuda::std::is_same_v<NoStride, StrideType>) {
-                    ind[i] = starts[j] + inds[j] * strides[i];
+                    ind[i] = starts[i] + inds[j] * strides[i];
                   }
                   else {
-                    ind[i] = starts[j] + inds[j];
+                    ind[i] = starts[i] + inds[j];
                   }
                 }
               }
