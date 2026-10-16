@@ -76,7 +76,7 @@ namespace matx
           query.size = [](const void *view, int dim) -> index_t {
             return static_cast<const T *>(view)->Size(dim);
           };
-          query.stride = [](const void *view, int dim) -> index_t {
+          query.stride = [](const void *view, int dim) -> int64_t {
             return static_cast<const T *>(view)->Stride(dim);
           };
         }

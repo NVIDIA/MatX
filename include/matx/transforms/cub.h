@@ -204,7 +204,7 @@ __MATX_INLINE__ bool IsTransposedMatrixReduction(const OutputTensor &out,
     constexpr int in_rank = InputTensor::Rank();
 
     for (int dim = 0; dim < OutputTensor::Rank(); ++dim) {
-      if (out.Size(dim) != in.Size(dim)) {
+      if (out.Size(dim) != in.Size(dim) || in.Size(dim) == 0) {
         return false;
       }
     }
@@ -223,12 +223,23 @@ __MATX_INLINE__ bool IsTransposedMatrixReduction(const OutputTensor &out,
       return false;
     }
 
-    index_t expected_stride = in.Size(in_rank - 2) * in.Size(in_rank - 1);
+    if (in.Size(in_rank - 1) >
+        cuda::std::numeric_limits<offset_t>::max() / in.Size(in_rank - 2)) {
+      return false;
+    }
+    offset_t expected_stride = static_cast<offset_t>(in.Size(in_rank - 2)) *
+                               static_cast<offset_t>(in.Size(in_rank - 1));
     for (int dim = in_rank - 3; dim >= 0; --dim) {
       if (in.Stride(dim) != expected_stride) {
         return false;
       }
-      expected_stride *= in.Size(dim);
+      if (dim > 0) {
+        if (in.Size(dim) >
+            cuda::std::numeric_limits<offset_t>::max() / expected_stride) {
+          return false;
+        }
+        expected_stride *= static_cast<offset_t>(in.Size(dim));
+      }
     }
 
     return true;

@@ -58,6 +58,17 @@ template <int RANK> using distributed_index_t = cuda::std::array<index_t, RANK>;
 
 namespace detail {
 
+template <typename View, typename Index>
+typename View::stride_type DistributedMemoryOffset(const View &view,
+                                                   const Index &index) {
+  using stride_type = typename View::stride_type;
+  stride_type offset = 0;
+  for (int dim = 0; dim < View::Rank(); ++dim) {
+    offset += static_cast<stride_type>(index[dim]) * view.Stride(dim);
+  }
+  return offset;
+}
+
 template <int RANK>
 distributed_index_t<RANK>
 DistributedUnflatten(index_t linear, const distributed_index_t<RANK> &shape) {
@@ -587,12 +598,8 @@ public:
                   detail::DistributedUnflatten<RANK>(linear, local_shape);
               const auto global_index = distribution_.LocalToGlobal(
                   fragment.distribution_index, local_index);
-              index_t source_offset = 0;
-              index_t destination_offset = 0;
-              for (int dim = 0; dim < RANK; ++dim) {
-                source_offset += local_index[dim] * fragment.view.Stride(dim);
-                destination_offset += global_index[dim] * out.Stride(dim);
-              }
+              const auto source_offset = detail::DistributedMemoryOffset(fragment.view, local_index);
+              const auto destination_offset = detail::DistributedMemoryOffset(out, global_index);
               T *source = fragment.view.Data() + source_offset;
               T *destination = out.Data() + destination_offset;
               if (run_elements != 0 &&
@@ -777,12 +784,13 @@ private:
 
   template <typename View>
   static std::pair<uintptr_t, uintptr_t> AddressRange(const View &view) {
-    index_t first_offset = 0;
-    index_t last_offset = 0;
+    using view_offset_t = typename View::stride_type;
+    view_offset_t first_offset = 0;
+    view_offset_t last_offset = 0;
     for (int dim = 0; dim < RANK; ++dim) {
-      const index_t extent = (view.Size(dim) - 1) * view.Stride(dim);
-      first_offset += std::min<index_t>(0, extent);
-      last_offset += std::max<index_t>(0, extent);
+      const view_offset_t extent = static_cast<view_offset_t>(view.Size(dim) - 1) * view.Stride(dim);
+      first_offset += std::min<view_offset_t>(view_offset_t{0}, extent);
+      last_offset += std::max<view_offset_t>(view_offset_t{0}, extent);
     }
     const auto begin = reinterpret_cast<uintptr_t>(view.Data() + first_offset);
     const auto end = reinterpret_cast<uintptr_t>(view.Data() + last_offset + 1);

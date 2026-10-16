@@ -35,14 +35,338 @@
 
 #include <cuda/std/array>
 #include <cuda/std/mdspan>
+#include <algorithm>
 #include <cstdlib>
 #include <cstdint>
 #include <memory>
 #include <type_traits>
 #include <limits>
+#include <string>
+#include <vector>
 
 
 using namespace matx;
+
+TEST(IndexStrideTests, ConfiguredTypes)
+{
+#ifdef MATX_INDEX_32_BIT
+  static_assert(sizeof(index_t) == 4);
+#else
+  static_assert(sizeof(index_t) == 8);
+#endif
+#ifdef MATX_OFFSET_32_BIT
+  static_assert(sizeof(offset_t) == 4);
+#else
+  static_assert(sizeof(offset_t) == 8);
+#endif
+  using Desc = DefaultDescriptor<2>;
+  static_assert(std::is_same_v<typename Desc::shape_type, index_t>);
+  static_assert(std::is_same_v<typename Desc::stride_type, offset_t>);
+  const Desc desc{cuda::std::array<index_t, 2>{3, 5}};
+  static_assert(std::is_same_v<decltype(desc.Size(0)), index_t>);
+  static_assert(std::is_same_v<decltype(desc.Stride(0)), offset_t>);
+  EXPECT_EQ(desc.Stride(0), 5);
+  EXPECT_EQ(desc.Stride(1), 1);
+  EXPECT_EQ(desc.TotalSize(), 15);
+  EXPECT_TRUE(desc.IsContiguous());
+  EXPECT_EQ((static_tensor_desc_t<3, 5>::TotalSize()), 15);
+  static_assert(std::is_same_v<decltype(static_tensor_desc_t<3, 5>::Stride(0)), offset_t>);
+}
+
+TEST(IndexStrideTests, IntegerStrideArraysAddressPaddedStorage)
+{
+  int data[16]{};
+  const index_t shape[]{2, 3};
+  const int32_t narrow[]{8, 2};
+  const uint64_t wide[]{8, 2};
+  auto a = make_tensor(data, shape, narrow);
+  auto b = make_tensor(data, shape, wide);
+  a(1, 2) = 37;
+  EXPECT_EQ(data[12], 37);
+  EXPECT_EQ(b(1, 2), 37);
+  EXPECT_EQ(b.Stride(0), 8);
+  EXPECT_FALSE(b.IsContiguous());
+  tensor_t<int, 2> placed;
+  make_tensor(placed, data, shape, wide);
+  EXPECT_EQ(placed.GetPointer(1, 2), data + 12);
+}
+
+TEST(IndexStrideTests, DynamicIntegerStrideVectors)
+{
+  int data[16]{};
+  const std::vector<index_t> shape{2, 3};
+  detail::dynamic_tensor_t<int> a(data, shape, std::vector<int32_t>{8, 2});
+  detail::dynamic_tensor_t<int> b(data, shape, std::vector<uint64_t>{8, 2});
+  static_assert(std::is_same_v<decltype(a.Stride(0)), offset_t>);
+  EXPECT_EQ(a.Data(), data);
+  EXPECT_EQ(a.Size(1), 3);
+  EXPECT_EQ(a.Stride(0), 8);
+  EXPECT_EQ(b.Stride(1), 2);
+  EXPECT_EQ(b.TotalSize(), 6);
+}
+
+TEST(IndexStrideTests, BraceInitializedStrides)
+{
+  int data[16]{};
+  index_t row_stride = 8;
+  auto tensor = make_tensor(data, {2, 3}, {row_stride, 2});
+  EXPECT_EQ(tensor.GetPointer(1, 2), data + 12);
+  tensor_t<int, 2> placed;
+  make_tensor(placed, data, {2, 3}, {row_stride, 2});
+  EXPECT_EQ(placed.GetPointer(1, 2), data + 12);
+  detail::dynamic_tensor_t<int> dynamic(data, {2, 3}, {row_stride, 2});
+  EXPECT_EQ(dynamic.Stride(0), 8);
+  EXPECT_EQ(dynamic.Stride(1), 2);
+  detail::dynamic_tensor_t<int> stored(
+      make_non_owning_storage<int>(data, 16), {2, 3}, {row_stride, 2});
+  EXPECT_EQ(stored.Data(), data);
+  EXPECT_EQ(stored.Stride(0), 8);
+  EXPECT_EQ(stored.Stride(1), 2);
+}
+
+TEST(IndexStrideTests, DynamicContiguityRejectsStrideOverflow)
+{
+  if constexpr (sizeof(offset_t) == 4) {
+    alignas(16) int data = 0;
+    detail::dynamic_tensor_t<int> tensor(
+        &data, {1, 65536, 65536}, std::vector<offset_t>{0, 65536, 1});
+    detail::capability_attributes<detail::OperatorCapability::ELEMENTS_PER_THREAD>::input_type query{};
+    query.jit = false;
+    const auto ept = tensor.get_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(query);
+    EXPECT_EQ(ept[0], detail::ElementsPerThread::ONE);
+    EXPECT_EQ(ept[1], detail::ElementsPerThread::ONE);
+  }
+  else {
+    GTEST_SKIP() << "Requires 32-bit offsets";
+  }
+}
+
+TEST(IndexStrideTests, AliasedMemoryUsesStrideType)
+{
+  int data[16]{};
+  auto padded = make_tensor(data, {2, 3}, {8, 2});
+  const auto query = detail::get_memory_range(padded, true);
+  static_assert(std::is_same_v<decltype(query.stride(query.view, 0)), int64_t>);
+  EXPECT_EQ(query.stride(query.view, 0), 8);
+  EXPECT_FALSE(padded.get_capability<detail::OperatorCapability::ALIASED_MEMORY>(query));
+  auto overlapping = make_tensor(data, {2, 3}, {2, 1});
+  const auto overlap_query = detail::get_memory_range(overlapping, true);
+  EXPECT_TRUE(overlapping.get_capability<detail::OperatorCapability::ALIASED_MEMORY>(overlap_query));
+  using Desc = tensor_desc_cr_ds_64_64_t<2>;
+  const long long wide = 1LL << 32;
+  auto view = make_tensor(data, Desc{cuda::std::array<long long, 2>{1, 1},
+                                    cuda::std::array<long long, 2>{wide, 1}});
+  const auto wide_query = detail::get_memory_range(view, true);
+  EXPECT_EQ(wide_query.stride(wide_query.view, 0), wide);
+  EXPECT_FALSE(view.get_capability<detail::OperatorCapability::ALIASED_MEMORY>(wide_query));
+}
+
+TEST(IndexStrideTests, EmptyMdspan)
+{
+  int data = 0;
+  using Extents = cuda::std::extents<index_t, 2, 3, 0, 4>;
+  cuda::std::mdspan<int, Extents> span{&data};
+  auto tensor = make_tensor(span);
+  EXPECT_EQ(tensor.TotalSize(), 0);
+  EXPECT_EQ(tensor.Bytes(), 0);
+  EXPECT_EQ(tensor.Stride(0), 0);
+  EXPECT_EQ(tensor.Stride(1), 0);
+  EXPECT_TRUE(tensor.IsContiguous());
+}
+
+TEST(IndexStrideTests, SliceStrideConversion)
+{
+  int data[16]{};
+  auto tensor = make_tensor(data, {2, 4}, {8, 1});
+  auto sliced = tensor.Slice({0, 0}, {2, 4}, cuda::std::array<index_t, 2>{matxKeepStride, 2});
+  EXPECT_EQ(sliced.Size(0), 2);
+  EXPECT_EQ(sliced.Size(1), 2);
+  EXPECT_EQ(sliced.Stride(0), 8);
+  EXPECT_EQ(sliced.Stride(1), 2);
+  EXPECT_EQ(sliced.GetPointer(1, 1), data + 10);
+}
+
+TEST(IndexStrideTests, PlanarComplexPlaneOffset)
+{
+  matxFp16ComplexPlanar data[6]{};
+  auto tensor = make_tensor(data, {2, 3}, {3, 1});
+  tensor(1, 2) = matxFp16ComplexPlanar{2.0f, 3.0f};
+  const auto *raw = reinterpret_cast<const matxFp16 *>(data);
+  EXPECT_EQ(static_cast<float>(raw[5]), 2.0f);
+  EXPECT_EQ(static_cast<float>(raw[11]), 3.0f);
+  const auto &view = tensor;
+  const auto value = view(1, 2);
+  EXPECT_EQ(static_cast<float>(value.real()), 2.0f);
+  EXPECT_EQ(static_cast<float>(value.imag()), 3.0f);
+}
+
+TEST(IndexStrideTests, TransposedReductionStrideDetection)
+{
+  int data[121]{};
+  int result[30]{};
+  auto input = make_tensor(data, {2, 3, 5, 4}, {60, 20, 1, 5});
+  auto output = make_tensor(result, {2, 3, 5}, {15, 5, 1});
+  EXPECT_TRUE(detail::IsTransposedMatrixReduction(output, input));
+  auto padded = make_tensor(data, {2, 3, 5, 4}, {61, 20, 1, 5});
+  EXPECT_FALSE(detail::IsTransposedMatrixReduction(output, padded));
+  detail::tensor_impl_t<int, 4> empty_input{data, DefaultDescriptor<4>{
+      cuda::std::array<index_t, 4>{2, 0, 5, 4},
+      cuda::std::array<offset_t, 4>{0, 20, 1, 5}}};
+  detail::tensor_impl_t<int, 3> empty_output{result, DefaultDescriptor<3>{
+      cuda::std::array<index_t, 3>{2, 0, 5},
+      cuda::std::array<offset_t, 3>{0, 5, 1}}};
+  EXPECT_FALSE(detail::IsTransposedMatrixReduction(empty_output, empty_input));
+}
+
+#ifdef MATX_EN_JIT
+TEST(IndexStrideTests, JITCompilerUsesConfiguredWidths)
+{
+  const auto options = detail::get_preprocessor_options("75");
+  const auto has_index_flag = std::find(options.begin(), options.end(), "-DMATX_INDEX_32_BIT") != options.end();
+  const auto has_offset_flag = std::find(options.begin(), options.end(), "-DMATX_OFFSET_32_BIT") != options.end();
+  EXPECT_EQ(has_index_flag, sizeof(index_t) == 4);
+  EXPECT_EQ(has_offset_flag, sizeof(offset_t) == 4);
+}
+
+TEST(IndexStrideTests, RandomJITMetadataUsesSeparateTypes)
+{
+  auto op = random<float>({2, 3}, UNIFORM, 1234);
+  const auto [name, source] = op.get_jit_op_str();
+  EXPECT_NE(name.find("S2_3_T3_1"), std::string::npos);
+  EXPECT_NE(source.find("array<index_t, RANK> shape_ = { 2, 3 }"), std::string::npos);
+  EXPECT_NE(source.find("array<offset_t, RANK> strides_ = { 3, 1 }"), std::string::npos);
+  if constexpr (sizeof(offset_t) == 8) {
+    const cuda::std::array<offset_t, 2> strides{static_cast<offset_t>(uint64_t{1} << 32), 1};
+    EXPECT_EQ(decltype(op)::JITArrayNamePart("T", strides), "T4294967296_1");
+    EXPECT_EQ(decltype(op)::JITArrayInit(strides), "{ 4294967296, 1 }");
+  }
+}
+
+TEST(IndexStrideTests, PaddedStrideJITAssignment)
+{
+  auto storage = make_tensor<int>({16}, MATX_MANAGED_MEMORY);
+  for (index_t i = 0; i < 16; ++i) {
+    storage(i) = -1;
+  }
+  auto view = make_tensor(storage.Data(), {2, 3}, {8, 2});
+  CUDAJITExecutor exec{};
+  (view = 21).run(exec);
+  exec.sync();
+  EXPECT_EQ(storage(12), 21);
+  detail::dynamic_tensor_t<int> dynamic(storage.Data(), {2, 3}, {8, 2});
+  (dynamic = 42).run(exec);
+  exec.sync();
+  for (index_t i = 0; i < 16; ++i) {
+    const bool selected = i == 0 || i == 2 || i == 4 || i == 8 || i == 10 || i == 12;
+    EXPECT_EQ(storage(i), selected ? 42 : -1) << "element " << i;
+  }
+}
+#endif
+
+TEST(IndexStrideTests, WideStrideMetadata)
+{
+  if constexpr (sizeof(offset_t) > sizeof(int32_t)) {
+    int data = 0;
+    const index_t shape[]{1, 1};
+    const uint64_t large = uint64_t{1} << 32;
+    const uint64_t strides[]{large, 1};
+    auto tensor = make_tensor(&data, shape, strides);
+    EXPECT_EQ(static_cast<uint64_t>(tensor.Stride(0)), large);
+    detail::dynamic_tensor_t<int> dynamic(
+        &data, std::vector<index_t>{1, 1}, std::vector<uint64_t>{large, 1});
+    EXPECT_EQ(static_cast<uint64_t>(dynamic.Stride(0)), large);
+    using Extents = cuda::std::extents<uint64_t, 1, 1>;
+    const cuda::std::layout_stride::mapping<Extents> mapping{
+        Extents{}, cuda::std::array<uint64_t, 2>{large, 1}};
+    cuda::std::mdspan<int, Extents, cuda::std::layout_stride> span{&data, mapping};
+    auto imported = make_tensor(span);
+    EXPECT_EQ(static_cast<uint64_t>(imported.Stride(0)), large);
+    const index_t offset_shape[]{3, 1};
+    auto offset_view = make_tensor(&data, offset_shape, strides);
+    const auto offset = offset_view.template GetOffsetOptimized<detail::DefaultCapabilities>(
+        index_t{2}, index_t{0});
+    EXPECT_EQ(static_cast<uint64_t>(offset), large * 2);
+  }
+  else {
+    GTEST_SKIP() << "Requires 64-bit offsets";
+  }
+}
+
+TEST(IndexStrideTests, PaddedStrideDeviceAssignment)
+{
+  auto storage = make_tensor<int>({16}, MATX_MANAGED_MEMORY);
+  for (index_t i = 0; i < 16; ++i) {
+    storage(i) = -1;
+  }
+  const index_t shape[]{2, 3};
+  const uint64_t strides[]{8, 2};
+  auto view = make_tensor(storage.Data(), shape, strides);
+  (view = 42).run();
+  ASSERT_EQ(cudaGetLastError(), cudaSuccess);
+  ASSERT_EQ(cudaDeviceSynchronize(), cudaSuccess);
+  for (index_t i = 0; i < 16; ++i) {
+    const bool selected = i == 0 || i == 2 || i == 4 || i == 8 || i == 10 || i == 12;
+    EXPECT_EQ(storage(i), selected ? 42 : -1) << "element " << i;
+  }
+}
+
+#if !defined(NDEBUG) && !defined(MATX_DISABLE_EXCEPTIONS)
+TEST(IndexStrideTests, RejectsUnrepresentableIntegerStrides)
+{
+  int data = 0;
+  const index_t shape[]{1};
+  const uint64_t oversized = static_cast<uint64_t>(std::numeric_limits<offset_t>::max()) + 1;
+  const uint64_t strides[]{oversized};
+  EXPECT_THROW((make_tensor(&data, shape, strides)), detail::matxException);
+  EXPECT_THROW((detail::dynamic_tensor_t<int>(
+      &data, std::vector<index_t>{1}, std::vector<uint64_t>{oversized})),
+      detail::matxException);
+}
+
+TEST(IndexStrideTests, RejectsInvalidExplicitShape)
+{
+  int data = 0;
+  EXPECT_THROW((make_tensor(&data, {0}, {1})), detail::matxException);
+  EXPECT_THROW((make_tensor(&data, {-1}, {1})), detail::matxException);
+}
+
+TEST(IndexStrideTests, RejectsUnrepresentableSliceStep)
+{
+  if constexpr (sizeof(index_t) > sizeof(offset_t)) {
+    int data = 0;
+    auto tensor = make_tensor(&data, {1}, {1});
+    const auto step = static_cast<index_t>(static_cast<uint64_t>(std::numeric_limits<offset_t>::max()) + 1);
+    EXPECT_THROW((tensor.Slice({0}, {1}, cuda::std::array<index_t, 1>{step})), detail::matxException);
+  }
+  else {
+    GTEST_SKIP() << "Requires sizes wider than offsets";
+  }
+}
+
+TEST(IndexStrideTests, RejectsContiguousSizeOverflow)
+{
+  if constexpr (sizeof(offset_t) == 4) {
+    const DefaultDescriptor<2> desc{cuda::std::array<index_t, 2>{65536, 65536}};
+    EXPECT_THROW(desc.TotalSize(), detail::matxException);
+    int data = 0;
+    const detail::tensor_impl_t<int, 2> tensor{&data, desc};
+    EXPECT_THROW(tensor.TotalSize(), detail::matxException);
+    EXPECT_THROW(tensor.Bytes(), detail::matxException);
+    detail::dynamic_tensor_t<int> dynamic(&data, std::vector<index_t>{65536, 65536});
+    EXPECT_THROW(dynamic.TotalSize(), detail::matxException);
+    EXPECT_THROW(detail::total_size_from_shape(std::vector<index_t>{65536, 65536}),
+                 detail::matxException);
+    EXPECT_THROW((DefaultDescriptor<3>{cuda::std::array<index_t, 3>{1, 65536, 65536}}),
+                 detail::matxException);
+    EXPECT_THROW((detail::dynamic_tensor_t<int>(
+        &data, std::vector<index_t>{1, 65536, 65536})), detail::matxException);
+    EXPECT_THROW((random<float>({0, 65536, 65536}, UNIFORM)), detail::matxException);
+  }
+  else {
+    GTEST_SKIP() << "Requires 32-bit offsets";
+  }
+}
+#endif
 
 namespace {
 
@@ -475,7 +799,8 @@ TEST(MakeTensorTests, RejectsMdspanValuesOutsideMatXIndexRange)
 
     const mapping_type mapping{
         extents_type{},
-        cuda::std::array<uint64_t, 2>{oversized, 1}};
+        cuda::std::array<uint64_t, 2>{
+            static_cast<uint64_t>(std::numeric_limits<offset_t>::max()) + 1ULL, 1}};
 
     cuda::std::mdspan<int, extents_type, cuda::std::layout_stride> span{
         &data, mapping};

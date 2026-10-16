@@ -458,12 +458,12 @@ TEST(AliasedMemoryLayoutTests, DifferentMappingsWithIdenticalEndpoints)
 {
   auto storage = make_tensor<float>({16});
   auto contiguous = make_tensor(storage.Data(), DefaultDescriptor<2>{
-      cuda::std::array<index_t, 2>{2, 2}, cuda::std::array<index_t, 2>{2, 1}});
+      cuda::std::array<index_t, 2>{2, 2}, cuda::std::array<offset_t, 2>{2, 1}});
   auto transposed = make_tensor(storage.Data(), DefaultDescriptor<2>{
-      cuda::std::array<index_t, 2>{2, 2}, cuda::std::array<index_t, 2>{1, 2}});
+      cuda::std::array<index_t, 2>{2, 2}, cuda::std::array<offset_t, 2>{1, 2}});
   EXPECT_THROW((contiguous = transposed + 1.0f).run(), detail::matxException);
   auto different_shape = make_tensor(storage.Data(), DefaultDescriptor<2>{
-      cuda::std::array<index_t, 2>{2, 3}, cuda::std::array<index_t, 2>{1, 1}});
+      cuda::std::array<index_t, 2>{2, 3}, cuda::std::array<offset_t, 2>{1, 1}});
   EXPECT_TRUE(detail::check_aliased_memory(contiguous, different_shape + 1.0f, true));
   auto different_rank = make_tensor(storage.Data(), cuda::std::array<index_t, 1>{4});
   EXPECT_TRUE(detail::check_aliased_memory(contiguous, different_rank + 1.0f, true));
@@ -472,9 +472,9 @@ TEST(AliasedMemoryLayoutTests, DifferentMappingsWithIdenticalEndpoints)
 TEST(AliasedMemoryLayoutTests, InternallyOverlappingViews)
 {
   auto storage = make_tensor<float>({16});
-  for (auto strides : {cuda::std::array<index_t, 2>{0, 1},
-                       cuda::std::array<index_t, 2>{1, 1},
-                       cuda::std::array<index_t, 2>{-2, 1}}) {
+  for (auto strides : {cuda::std::array<offset_t, 2>{0, 1},
+                       cuda::std::array<offset_t, 2>{1, 1},
+                       cuda::std::array<offset_t, 2>{-2, 1}}) {
     auto overlapping = make_tensor(storage.Data() + 2, DefaultDescriptor<2>{
         cuda::std::array<index_t, 2>{2, 2}, std::move(strides)});
     EXPECT_THROW((overlapping = overlapping / 2.0f).run(), detail::matxException);
@@ -486,7 +486,7 @@ TEST(AliasedMemoryLayoutTests, PermutedMatchingViews)
   auto storage = make_tensor<float>({6});
   (storage = 4.0f).run();
   auto a = make_tensor(storage.Data(), DefaultDescriptor<2>{
-      cuda::std::array<index_t, 2>{2, 3}, cuda::std::array<index_t, 2>{1, 2}});
+      cuda::std::array<index_t, 2>{2, 3}, cuda::std::array<offset_t, 2>{1, 2}});
   EXPECT_NO_THROW((a = a / 2.0f).run());
   ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
   for (index_t i = 0; i < 6; ++i) {

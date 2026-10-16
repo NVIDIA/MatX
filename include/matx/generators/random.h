@@ -163,27 +163,27 @@ namespace detail {
 
 #ifdef __CUDACC__
   template <typename T, typename ScaleT>
-  __global__ void random_scale_kernel(T *data, index_t size, ScaleT alpha, ScaleT beta)
+  __global__ void random_scale_kernel(T *data, offset_t size, ScaleT alpha, ScaleT beta)
   {
-    index_t idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    offset_t idx = static_cast<offset_t>(blockIdx.x) * blockDim.x + threadIdx.x;
     if (idx < size) {
       data[idx] = alpha * data[idx] + beta;
     }
   }
 
   template <typename RandomOp, typename Out>
-  __global__ void random_direct_fill_kernel(RandomOp op, Out out, index_t count, index_t offset)
+  __global__ void random_direct_fill_kernel(RandomOp op, Out out, offset_t count, offset_t offset)
   {
-    index_t idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    offset_t idx = static_cast<offset_t>(blockIdx.x) * blockDim.x + threadIdx.x;
     if (idx < count) {
       op.DirectAssignLinear(out, offset + idx);
     }
   }
 
   template <typename RandomOp, typename T>
-  __global__ void random_materialize_kernel(RandomOp op, T *data, index_t count, index_t offset)
+  __global__ void random_materialize_kernel(RandomOp op, T *data, offset_t count, offset_t offset)
   {
-    index_t idx = static_cast<index_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    offset_t idx = static_cast<offset_t>(blockIdx.x) * blockDim.x + threadIdx.x;
     if (idx < count) {
       data[offset + idx] = op.DirectValue(offset + idx);
     }
@@ -209,8 +209,8 @@ namespace detail {
       using inner_t = typename inner_op_type_t<T>::type;
       static constexpr int RANK = static_cast<int>(cuda::std::tuple_size<ShapeType>{});
       cuda::std::array<index_t, RANK> shape_;
-      cuda::std::array<index_t, RANK> strides_;
-      index_t total_size_;
+      cuda::std::array<offset_t, RANK> strides_;
+      offset_t total_size_;
       mutable T *values_ = nullptr;
       uint64_t seed_;
       mutable bool init_ = false;
@@ -276,12 +276,15 @@ namespace detail {
       }
 
       template <typename DataT>
-      __MATX_INLINE__ void ScaleContiguous(DataT *data, index_t count, cudaStream_t stream) const
+      __MATX_INLINE__ void ScaleContiguous(DataT *data, offset_t count, cudaStream_t stream) const
       {
         if constexpr (is_float_random_v) {
           if (count > 0 && NeedsScale()) {
             constexpr int threads = 256;
-            int blocks = static_cast<int>((count + threads - 1) / threads);
+            MATX_ASSERT_STR(static_cast<uint64_t>(count) <=
+                            static_cast<uint64_t>(cuda::std::numeric_limits<int>::max()) * threads,
+                            matxInvalidSize, "Random generator launch size exceeds CUDA grid range");
+            int blocks = static_cast<int>(1 + (count - 1) / threads);
             random_scale_kernel<<<blocks, threads, 0, stream>>>(data, count, fParams_.alpha_, fParams_.beta_);
           }
         }
@@ -299,29 +302,35 @@ namespace detail {
       }
 
       template <typename Out>
-      __MATX_INLINE__ void LaunchStateFreeFill(Out &out, index_t count, index_t offset, cudaStream_t stream) const
+      __MATX_INLINE__ void LaunchStateFreeFill(Out &out, offset_t count, offset_t offset, cudaStream_t stream) const
       {
         if (count == 0) {
           return;
         }
 
         constexpr int threads = 256;
-        int blocks = static_cast<int>((count + threads - 1) / threads);
+        MATX_ASSERT_STR(static_cast<uint64_t>(count) <=
+                        static_cast<uint64_t>(cuda::std::numeric_limits<int>::max()) * threads,
+                        matxInvalidSize, "Random generator launch size exceeds CUDA grid range");
+        int blocks = static_cast<int>(1 + (count - 1) / threads);
         random_direct_fill_kernel<<<blocks, threads, 0, stream>>>(*this, out, count, offset);
       }
 
-      __MATX_INLINE__ void LaunchMaterializeFill(T *data, index_t count, index_t offset, cudaStream_t stream) const
+      __MATX_INLINE__ void LaunchMaterializeFill(T *data, offset_t count, offset_t offset, cudaStream_t stream) const
       {
         if (count == 0) {
           return;
         }
 
         constexpr int threads = 256;
-        int blocks = static_cast<int>((count + threads - 1) / threads);
+        MATX_ASSERT_STR(static_cast<uint64_t>(count) <=
+                        static_cast<uint64_t>(cuda::std::numeric_limits<int>::max()) * threads,
+                        matxInvalidSize, "Random generator launch size exceeds CUDA grid range");
+        int blocks = static_cast<int>(1 + (count - 1) / threads);
         random_materialize_kernel<<<blocks, threads, 0, stream>>>(*this, data, count, offset);
       }
 
-      __MATX_INLINE__ void GenerateCurandContiguous(T *data, index_t count, cudaStream_t stream) const
+      __MATX_INLINE__ void GenerateCurandContiguous(T *data, offset_t count, cudaStream_t stream) const
       {
         struct CurandGeneratorGuard {
           curandGenerator_t gen = nullptr;
@@ -369,7 +378,7 @@ namespace detail {
         ret = curandSetPseudoRandomGeneratorSeed(gen.Get(), seed_);
         MATX_ASSERT_STR_EXP(ret, CURAND_STATUS_SUCCESS, matxCudaError, "Error setting random seed");
 
-        index_t gen_count = count;
+        offset_t gen_count = count;
         const bool has_tail = fParams_.dist_ == NORMAL &&
                               (cuda::std::is_same_v<T, float> || cuda::std::is_same_v<T, double>) &&
                               ((gen_count % 2) != 0);
@@ -442,7 +451,8 @@ namespace detail {
         return JIT_Storage{};
       }
 
-      static __MATX_INLINE__ std::string JITNamePart(index_t value)
+      template <typename IntType>
+      static __MATX_INLINE__ std::string JITNamePart(IntType value)
       {
         auto str = std::to_string(value);
         if (!str.empty() && str[0] == '-') {
@@ -451,8 +461,9 @@ namespace detail {
         return str;
       }
 
+      template <typename IntType>
       static __MATX_INLINE__ std::string JITArrayNamePart(const char *prefix,
-                                                          const cuda::std::array<index_t, RANK> &arr)
+                                                          const cuda::std::array<IntType, RANK> &arr)
       {
         std::string out = prefix;
         if constexpr (RANK == 0) {
@@ -469,7 +480,8 @@ namespace detail {
         return out;
       }
 
-      static __MATX_INLINE__ std::string JITArrayInit(const cuda::std::array<index_t, RANK> &arr)
+      template <typename IntType>
+      static __MATX_INLINE__ std::string JITArrayInit(const cuda::std::array<IntType, RANK> &arr)
       {
         std::string out = "{ ";
         for (int i = 0; i < RANK; i++) {
@@ -582,7 +594,7 @@ namespace detail {
           "  using inner_t = typename matx::inner_op_type_t<T>::type;\n"
           "  static constexpr int32_t RANK = " + std::to_string(RANK) + ";\n"
           "  static constexpr cuda::std::array<index_t, RANK> shape_ = " + JITArrayInit(shape_) + ";\n"
-          "  static constexpr cuda::std::array<index_t, RANK> strides_ = " + JITArrayInit(strides_) + ";\n"
+          "  static constexpr cuda::std::array<offset_t, RANK> strides_ = " + JITArrayInit(strides_) + ";\n"
           "  static constexpr unsigned long long seed_ = " + std::to_string(seed_) + "ULL;\n"
           "  static constexpr int dist_ = " + std::to_string(dist) + ";\n"
           "  static constexpr inner_t alpha_ = static_cast<inner_t>(" + JITValueLiteral(alpha) + ");\n"
@@ -599,7 +611,7 @@ namespace detail {
           "      default: return vals.w;\n"
           "    }\n"
           "  }\n"
-          "  __MATX_INLINE__ __MATX_DEVICE__ inner_t GenerateStandardScalar(index_t scalar_linear) const\n"
+          "  __MATX_INLINE__ __MATX_DEVICE__ inner_t GenerateStandardScalar(offset_t scalar_linear) const\n"
           "  {\n"
           "    using RNG = decltype(curanddx::Generator<curanddx::philox4_32>() +\n"
           "                         curanddx::PhiloxRounds<10>() +\n"
@@ -616,7 +628,7 @@ namespace detail {
           "    return SelectLane(dist.generate4(rng), lane);\n"
           "  }\n"
           "  template <typename... Is>\n"
-          "  __MATX_INLINE__ __MATX_DEVICE__ index_t LinearIndex(Is... indices) const\n"
+          "  __MATX_INLINE__ __MATX_DEVICE__ offset_t LinearIndex(Is... indices) const\n"
           "  {\n"
           "    static_assert(sizeof...(indices) == RANK, \"Incorrect number of indices for JIT random operator\");\n"
           "    if constexpr (RANK == 0) {\n"
@@ -624,10 +636,10 @@ namespace detail {
           "    }\n"
           "    else {\n"
           "      cuda::std::array<index_t, RANK> idx{static_cast<index_t>(indices)...};\n"
-          "      index_t linear = 0;\n"
+          "      offset_t linear = 0;\n"
           "      MATX_LOOP_UNROLL\n"
           "      for (int i = 0; i < RANK; i++) {\n"
-          "        linear += idx[i] * strides_[i];\n"
+          "        linear += static_cast<offset_t>(idx[i]) * strides_[i];\n"
           "      }\n"
           "      return linear;\n"
           "    }\n"
@@ -635,7 +647,7 @@ namespace detail {
           "  template <typename CapType, typename... Is>\n"
           "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(Is... indices) const\n"
           "  {\n"
-          "    const index_t linear = LinearIndex(indices...);\n"
+          "    const offset_t linear = LinearIndex(indices...);\n"
           "    if constexpr (matx::is_complex_v<T>) {\n"
           "      const inner_t real = alpha_ * GenerateStandardScalar(linear * 2) + beta_;\n"
           "      const inner_t imag = alpha_ * GenerateStandardScalar(linear * 2 + 1);\n"
@@ -658,7 +670,14 @@ namespace detail {
       // base constructor, should never be called directly
       __MATX_INLINE__ RandomOp(ShapeType &&s, uint64_t seed) : seed_(seed)
       {
-        total_size_ = std::accumulate(s.begin(), s.end(), static_cast<index_t>(1), std::multiplies<index_t>());
+        total_size_ = offset_t{1};
+        for (const auto dim : s) {
+          MATX_ASSERT_STR(dim >= 0, matxInvalidSize, "Random generator dimensions must be non-negative");
+          MATX_ASSERT_STR(dim == 0 || total_size_ == 0 ||
+                          dim <= cuda::std::numeric_limits<offset_t>::max() / total_size_,
+                          matxInvalidSize, "Random generator size cannot be represented by offset_t");
+          total_size_ *= static_cast<offset_t>(dim);
+        }
 
         if constexpr (RANK >= 1) {
           strides_[RANK-1] = 1;
@@ -673,7 +692,10 @@ namespace detail {
 
         MATX_LOOP_UNROLL
         for (int i = RANK - 2; i >= 0; i--) {
-          strides_[i] = strides_[i+1] * s[i+1];
+          MATX_ASSERT_STR(strides_[i+1] == 0 ||
+                          s[i+1] <= cuda::std::numeric_limits<offset_t>::max() / strides_[i+1],
+                          matxInvalidSize, "Random generator stride cannot be represented by offset_t");
+          strides_[i] = strides_[i+1] * static_cast<offset_t>(s[i+1]);
         }
 
         MATX_LOG_TRACE("RandomOp constructor: rank={}, total_size={}, seed={}", RANK, total_size_, seed);
@@ -868,14 +890,14 @@ namespace detail {
 
       template <int I = 0, typename ...Is>
         requires (I == sizeof...(Is))
-      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t GetValC(const cuda::std::tuple<Is...>) const {
+      constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ offset_t GetValC(const cuda::std::tuple<Is...>) const {
         return 0;
       }
 
       template <int I = 0, typename ...Is>
         requires (I < sizeof...(Is))
-      __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t GetValC(const cuda::std::tuple<Is...> tup) const {
-        return GetValC<I+1, Is...>(tup) + cuda::std::get<I>(tup)*strides_[I];
+      __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ offset_t GetValC(const cuda::std::tuple<Is...> tup) const {
+        return GetValC<I+1, Is...>(tup) + static_cast<offset_t>(cuda::std::get<I>(tup))*strides_[I];
       }
 
       /**
@@ -1008,7 +1030,7 @@ namespace detail {
         }
       }
 
-      __MATX_INLINE__ __MATX_DEVICE__ T DirectValue(index_t linear) const
+      __MATX_INLINE__ __MATX_DEVICE__ T DirectValue(offset_t linear) const
       {
         curandStatePhilox4_32_10_t state;
         curand_init(seed_, static_cast<unsigned long long>(linear), 0, &state);
@@ -1029,7 +1051,7 @@ namespace detail {
       }
 
       template <typename Out>
-      __MATX_INLINE__ __MATX_DEVICE__ void DirectAssignLinear(Out out, index_t linear) const
+      __MATX_INLINE__ __MATX_DEVICE__ void DirectAssignLinear(Out out, offset_t linear) const
       {
         const auto val = DirectValue(linear);
         using out_t = remove_cvref_t<Out>;
@@ -1039,12 +1061,12 @@ namespace detail {
         }
         else {
           cuda::std::array<index_t, out_t::Rank()> idx;
-          index_t rem = linear;
+          offset_t rem = linear;
           MATX_LOOP_UNROLL
           for (int dim = out_t::Rank() - 1; dim >= 0; dim--) {
             const index_t dim_size = out.Size(dim);
-            idx[dim] = rem % dim_size;
-            rem /= dim_size;
+            idx[dim] = static_cast<index_t>(rem % dim_size);
+            rem = static_cast<offset_t>(rem / dim_size);
           }
 
           cuda::std::apply([&](auto... args) {
