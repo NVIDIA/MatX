@@ -53,7 +53,7 @@ namespace matx
 
 
         private:
-        mutable SpaceOp sop_;
+        mutable typename detail::base_type_t<SpaceOp> sop_;
         FreqType f0_;
         FreqType f1_;
         space_type t1_;
@@ -65,7 +65,7 @@ namespace matx
 
 #ifdef MATX_EN_JIT
         struct JIT_Storage {
-          typename detail::inner_storage_or_self_t<SpaceOp> sop_;
+          typename detail::inner_storage_or_self_t<detail::base_type_t<SpaceOp>> sop_;
         };
 
         JIT_Storage ToJITStorage() const {
@@ -198,7 +198,7 @@ namespace matx
 
 
         private:
-        mutable SpaceOp sop_;
+        mutable typename detail::base_type_t<SpaceOp> sop_;
         FreqType f0_;
         FreqType f1_;
         space_type t1_;
@@ -210,7 +210,7 @@ namespace matx
 
 #ifdef MATX_EN_JIT
         struct JIT_Storage {
-          typename detail::inner_storage_or_self_t<SpaceOp> sop_;
+          typename detail::inner_storage_or_self_t<detail::base_type_t<SpaceOp>> sop_;
         };
 
         JIT_Storage ToJITStorage() const {

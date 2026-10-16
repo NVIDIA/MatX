@@ -46,9 +46,8 @@ namespace matx
     class AmbgFunOp : public BaseOp<AmbgFunOp<OpX, OpY>>
     {
       private:
-        // Make these base_type once we get rid of std::optional
-        mutable OpX x_;
-        mutable OpY y_;
+        mutable typename detail::base_type_t<OpX> x_;
+        mutable typename detail::base_type_t<OpY> y_;
         double fs_;
         AMBGFunCutType_t cut_;
         float cut_val_;

@@ -335,7 +335,14 @@ lazy assignment expression can also be assigned into a temporary variable:
 
 In the code above, the ``=`` on the right side indicates lazy assignment, while the ``=`` on the left side executes the copy constructor on the new
 variable ``op``. The pattern above is expected to be infrequently used since expressions are typically executed on the same line as the definition, 
-but sometimes it's useful for debugging purposes to look at the type of the expression. More complex expressions follow the same rules:
+but sometimes it's useful for debugging purposes to look at the type of the expression.
+
+Operators do not own their input tensors. An expression holds views of them, so every tensor that an expression references
+must remain valid until the expression has been run. This matters when an expression is stored and run later, as with ``op`` above:
+running it after one of its tensors has been destroyed reads freed memory. Temporaries created in the same statement as ``run()`` live
+until the end of that statement, so that case is safe.
+
+More complex expressions follow the same rules:
 
 .. code-block:: cpp
 

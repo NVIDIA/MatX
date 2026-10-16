@@ -238,8 +238,6 @@ void ambgfun_impl(AMFTensor &amf, XTensor &x,
   using T1 = typename XTensor::value_type;
 
   MATX_STATIC_ASSERT(is_cuda_complex_v<T1>, matxInvalidType);
-  auto ry = x.View();
-  //tensor_t<T1, RANK> ry(x);
 
   auto x_normdiv_v = make_tensor<T1>(x.Shape(),  MATX_ASYNC_DEVICE_MEMORY, stream);
   auto x_norm_v = make_tensor<float>({}, MATX_ASYNC_DEVICE_MEMORY, stream);
@@ -251,7 +249,7 @@ void ambgfun_impl(AMFTensor &amf, XTensor &x,
   auto y_normdiv_v = x_normdiv_v.View();
 
   if constexpr (!cuda::std::is_same_v<YTensor, EmptyY>) {
-    ry.Reset(y.Data(), y.Shape());
+    auto ry = make_tensor<T1>(y.Data(), y.Shape());
     y_normdiv_v.Shallow(make_tensor<T1>(y_normdiv_v.Shape(), MATX_ASYNC_DEVICE_MEMORY, stream));
     auto y_norm_v = make_tensor<float>({}, MATX_ASYNC_DEVICE_MEMORY, stream);
 

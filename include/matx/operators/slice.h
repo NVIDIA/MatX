@@ -57,8 +57,8 @@ namespace matx
         mutable typename detail::base_type_t<T> op_;
         cuda::std::array<shape_type, DIM> sizes_;
         cuda::std::array<int32_t, DIM> dims_;
-        cuda::std::array<shape_type, T::Rank()> starts_;
         StrideType strides_; // Add [[no_unique_address]] in c++20
+        cuda::std::array<shape_type, T::Rank()> starts_;
 
       public:
         using matxop = bool;

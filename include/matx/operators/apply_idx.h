@@ -66,12 +66,6 @@ namespace matx
         {
           MATX_LOG_TRACE("{} constructor: num_ops={}", str(), sizeof...(Ops));
           static_assert(sizeof...(Ops) > 0, "ApplyIdxOp requires at least one input operator");
-          
-          // Initialize sizes from the first operator
-          constexpr int rank = Rank();
-          for (int i = 0; i < rank; i++) {
-            sizes_[i] = cuda::std::get<0>(ops_).Size(i);
-          }
         }
 
         template <typename CapType, typename... Is>
@@ -125,9 +119,10 @@ namespace matx
           return first_op_type::Rank();
         }
 
+        // The shape comes from the first operator
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
         {
-          return sizes_[dim];
+          return cuda::std::get<0>(ops_).Size(dim);
         }
 
         ~ApplyIdxOp() = default;
@@ -136,7 +131,6 @@ namespace matx
       private:
         Func func_;
         cuda::std::tuple<typename detail::base_type_t<Ops>...> ops_;
-        cuda::std::array<index_t, first_op_type::Rank()> sizes_;
         
         // Helper to apply the lambda function with indices and operators
         template <typename CapType, size_t... Is, typename... Indices>

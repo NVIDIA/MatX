@@ -54,9 +54,9 @@ namespace detail {
     private:
       typename detail::base_type_t<OpA> a_;
       SolverFillMode uplo_;
+      mutable uint8_t lifecycle_depth_ = 0;
       mutable detail::tensor_impl_t<typename OpA::value_type, OpA::Rank()> tmp_out_;
       mutable typename OpA::value_type *ptr = nullptr;
-      mutable uint8_t lifecycle_depth_ = 0;
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
       mutable cuSolverDxHelper<typename OpA::value_type> dx_potrf_helper_;
 #endif

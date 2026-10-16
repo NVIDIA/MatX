@@ -63,6 +63,16 @@ namespace detail {
     int block_size;
   };
 
+  // Version of the on-disk JIT cache. Bump it when generated JIT code changes in a way that makes
+  // entries cached by older versions unusable, such as a JIT_Storage layout change.
+  inline constexpr int JIT_CACHE_VERSION = 2;
+
+  // Tag hashed into every on-disk JIT cache entry (kernels and launch metadata), whether keyed by
+  // JIT_CACHE_KEY or by type string
+  __MATX_INLINE__ __MATX_HOST__ std::string JITCacheVersionTag() {
+    return "matx_jit_cache_key_v" + std::to_string(JIT_CACHE_VERSION);
+  }
+
   struct JITCacheKey {
     uint64_t h1 = 14695981039346656037ull;
     uint64_t h2 = 1099511628211ull;
@@ -125,7 +135,7 @@ namespace detail {
     static const auto base_key = []() {
       auto key = JITCacheKey{};
       key.valid = true;
-      HashJITCacheString(key, "matx_jit_cache_key_v1");
+      HashJITCacheString(key, JITCacheVersionTag());
       HashJITCacheType<T>(key);
       return key;
     }();

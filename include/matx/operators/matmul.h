@@ -62,12 +62,12 @@ namespace matx
         float alpha_;
         float beta_;
         PermDims perm_;
+        mutable uint8_t lifecycle_depth_ = 0;
         static constexpr int out_rank = cuda::std::max(OpA::Rank(), OpB::Rank());
         cuda::std::array<index_t, out_rank> out_dims_;
         // This should be tensor_impl_t, but need to work around issues with temp types returned in matmul
         mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, out_rank> tmp_out_;
         mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr;
-        mutable uint8_t lifecycle_depth_ = 0;
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
         mutable cuBLASDxHelper<typename OpA::value_type> dx_gemm_helper_;
 #endif

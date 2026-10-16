@@ -48,7 +48,7 @@ namespace matx
     {
       private:
         mutable typename detail::base_type_t<Op> op_;
-        mutable Coeffs coeffs_;
+        mutable typename detail::base_type_t<Coeffs> coeffs_;
 
       public:
         using matxop = bool;
@@ -63,7 +63,7 @@ namespace matx
 #ifdef MATX_EN_JIT
         struct JIT_Storage {
           typename detail::inner_storage_or_self_t<detail::base_type_t<Op>> op_;
-          typename detail::inner_storage_or_self_t<Coeffs> coeffs_;
+          typename detail::inner_storage_or_self_t<detail::base_type_t<Coeffs>> coeffs_;
         };
 
         JIT_Storage ToJITStorage() const {
