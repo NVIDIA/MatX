@@ -774,7 +774,10 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
         if constexpr (cuda::std::is_same_v<loose_compute_t, double>) {
             ::sincos(phase_correction_partial * w, &incr_sinx, &incr_cosx);
         } else {
-            __sincosf(phase_correction_partial * w, &incr_sinx, &incr_cosx);
+            // The lambda is also checked when PhaseLUT is false, where the phase
+            // factor can be double. On the LUT path this cast is a no-op because
+            // the host already supplies loose_compute_t.
+            __sincosf(static_cast<loose_compute_t>(phase_correction_partial) * w, &incr_sinx, &incr_cosx);
         }
 
         return loose_complex_compute_t{
