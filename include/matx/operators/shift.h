@@ -138,30 +138,25 @@ namespace matx
 
         __MATX_INLINE__ std::string str() const { return "shift(" + op_.str() + ")"; }
 
-        __MATX_INLINE__ ShiftOp(const T1 &op, T2 shift) : op_(op), shift_(shift)
+        __MATX_INLINE__ ShiftOp(const T1 &op, T2 shift)
+            : op_(op), dim_size_(detail::get_expanded_size<Rank()>(op_, DIM)), shift_(shift)
         {
           MATX_LOG_TRACE("{} constructor: dim={}, rank={}", str(), DIM, Rank());
           static_assert(DIM < Rank(), "Dimension to shift must be less than rank of tensor");
 
-          // Output sizes always come from the input operator — shifting doesn't change shape
-          MATX_LOOP_UNROLL
-          for (int i = 0; i < Rank(); i++) {
-            sizes_[i] = detail::get_expanded_size<Rank()>(op_, i);
-          }
-
           if constexpr (shift_rank_ == 1) {
             // Validate shift size matches the non-DIM dimension it maps to
-            MATX_ASSERT_STR(shift_.Size(0) == sizes_[SHIFT_DIM_], matxInvalidSize,
+            MATX_ASSERT_STR(shift_.Size(0) == Size(SHIFT_DIM_), matxInvalidSize,
                             "Rank-1 shift operator size must match the non-shifted dimension size");
           }
 
           MATX_ASSERT_COMPATIBLE_OP_SIZES(op_);
         }
 
-        template <typename CapType, typename Op, typename Sizes, typename ShiftType, typename... Is>
+        template <typename CapType, typename Op, typename ShiftType, typename... Is>
         static __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) get_impl(
             Op&& op,
-            const Sizes &sizes,
+            index_t size,
             ShiftType shiftin,
             Is... indices)
         {
@@ -178,10 +173,10 @@ namespace matx
               shift = -get_value<CapType>(shiftin, indices...);
             }
 
-            shift = (shift + idx[DIM]) % sizes[DIM];
+            shift = (shift + idx[DIM]) % size;
 
             if (shift < 0) {
-              shift += sizes[DIM];
+              shift += size;
             }
 
             idx[DIM] = shift;
@@ -195,7 +190,7 @@ namespace matx
         template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices) const
         {
-          return get_impl<CapType>(cuda::std::as_const(op_), sizes_, shift_, indices...);
+          return get_impl<CapType>(cuda::std::as_const(op_), dim_size_, shift_, indices...);
         }
 
         template <typename... Is>
@@ -207,7 +202,7 @@ namespace matx
         template <typename CapType, typename... Is>
         __MATX_INLINE__ __MATX_DEVICE__ __MATX_HOST__ decltype(auto) operator()(Is... indices)
         {
-          return get_impl<CapType>(cuda::std::forward<decltype(op_)>(op_), sizes_, shift_, indices...);
+          return get_impl<CapType>(cuda::std::forward<decltype(op_)>(op_), dim_size_, shift_, indices...);
         }
 
         template <typename... Is>
@@ -300,9 +295,10 @@ namespace matx
           return detail::matx_max(detail::get_rank<T1>(), detail::get_rank<T2>());
         }
 
+        // Shifting doesn't change shape, so sizes come from the input operator
         constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
         {
-          return sizes_[dim];
+          return detail::get_expanded_size<Rank()>(op_, dim);
         }
 
         __MATX_INLINE__ __MATX_HOST__ int32_t DynRank() const {
@@ -328,7 +324,9 @@ namespace matx
 
       private:
         typename detail::base_type_t<T1> op_;
-        cuda::std::array<index_t, Rank()> sizes_;
+        // Size of the shifted dimension, used for every element. Getting it from op_ each time
+        // would walk the input's Size() chain.
+        index_t dim_size_;
         typename detail::base_type_t<T2> shift_;
     };
   }

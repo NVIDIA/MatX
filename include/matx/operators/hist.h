@@ -50,10 +50,10 @@ namespace detail {
       typename OpA::value_type lower_;
       typename OpA::value_type upper_;
       int num_levels_;
+      mutable uint8_t lifecycle_depth_ = 0;
       cuda::std::array<index_t, OpA::Rank()> out_dims_;
       mutable detail::tensor_impl_t<int, OpA::Rank()> tmp_out_;
       mutable int *ptr = nullptr;
-      mutable uint8_t lifecycle_depth_ = 0;
 
     public:
       using matxop = bool;

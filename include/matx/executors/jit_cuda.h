@@ -135,7 +135,7 @@ namespace matx
 
     inline std::string GetJITLaunchParamsCacheKey(const std::string &kernel_op_type)
     {
-      return GetJITLaunchParamsDevicePrefix() + kernel_op_type;
+      return GetJITLaunchParamsDevicePrefix() + kernel_op_type + "_" + JITCacheVersionTag();
     }
 
     inline JITLaunchParamsCacheKey GetJITLaunchParamsCacheKey(const JITCacheKey &jit_cache_key)

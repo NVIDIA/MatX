@@ -417,6 +417,43 @@ TEST(OperatorTests, MeshGrid)
   MATX_EXIT_HANDLER();
 }
 
+TEST(OperatorTests, MeshGridTensorInputs)
+{
+  MATX_ENTER_HANDLER();
+
+  cudaExecutor exec{};
+  using dtype = int;
+  auto pb = std::make_unique<detail::MatXPybind>();
+  constexpr dtype xd = 3;
+  constexpr dtype yd = 5;
+  pb->InitAndRunTVGenerator<dtype>("00_operators", "meshgrid_operator", "run", {xd, yd});
+
+  auto xv = make_tensor<dtype>({yd, xd});
+  auto yv = make_tensor<dtype>({yd, xd});
+  auto x = make_tensor<dtype>({xd});
+  auto y = make_tensor<dtype>({yd});
+  (x = linspace(1, xd, xd)).run(exec);
+  (y = linspace(1, yd, yd)).run(exec);
+
+  // Tensor inputs
+  auto [xx, yy] = meshgrid(x, y);
+  (xv = xx).run(exec);
+  (yv = yy).run(exec);
+  exec.sync();
+  MATX_TEST_ASSERT_COMPARE(pb, xv, "X", 0);
+  MATX_TEST_ASSERT_COMPARE(pb, yv, "Y", 0);
+
+  // Mixed tensor and generator inputs
+  auto [xx2, yy2] = meshgrid(x, linspace(1, yd, yd));
+  (xv = xx2).run(exec);
+  (yv = yy2).run(exec);
+  exec.sync();
+  MATX_TEST_ASSERT_COMPARE(pb, xv, "X", 0);
+  MATX_TEST_ASSERT_COMPARE(pb, yv, "Y", 0);
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(BasicGeneratorTestsFloatNonComplex, FFTFreq)
 {
   MATX_ENTER_HANDLER();
@@ -1492,6 +1529,21 @@ TYPED_TEST(BasicGeneratorTestsFloatNonComplexNonHalf, Chirp)
   // example-end chirp-gen-test-1
 
   MATX_TEST_ASSERT_COMPARE(pb, t1, "Y", 0.01);
+
+  // A tensor of sample times gives the same chirps as the generated time base
+  auto t = make_tensor<TestType>({count});
+  auto t2 = make_tensor<TestType>({count});
+  auto t1c = make_tensor<cuda::std::complex<TestType>>({count});
+  auto t2c = make_tensor<cuda::std::complex<TestType>>({count});
+  (t = linspace(static_cast<TestType>(0), end, count)).run(exec);
+  (t2 = chirp(t, f0, end, f1)).run(exec);
+  (t1c = cchirp(count, end, f0, end, f1)).run(exec);
+  (t2c = cchirp(t, f0, end, f1)).run(exec);
+  exec.sync();
+  for (index_t i = 0; i < count; i++) {
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2(i), t1(i)));
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t2c(i), t1c(i)));
+  }
 
   pb.reset();
   MATX_EXIT_HANDLER();
