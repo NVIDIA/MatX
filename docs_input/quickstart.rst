@@ -337,10 +337,17 @@ In the code above, the ``=`` on the right side indicates lazy assignment, while 
 variable ``op``. The pattern above is expected to be infrequently used since expressions are typically executed on the same line as the definition, 
 but sometimes it's useful for debugging purposes to look at the type of the expression.
 
-Operators do not own their input tensors. An expression holds views of them, so every tensor that an expression references
-must remain valid until the expression has been run. This matters when an expression is stored and run later, as with ``op`` above:
-running it after one of its tensors has been destroyed reads freed memory. Temporaries created in the same statement as ``run()`` live
-until the end of that statement, so that case is safe.
+Operators do not own their input tensors. An expression holds views of them, so the memory of every tensor that an expression
+references must remain valid until the work that reads it has finished. With a CUDA executor, ``run()`` queues that work on the
+executor's stream and can return before it finishes.
+
+This matters when an expression is stored and run later, as with ``op`` above: running it after one of its tensors has been destroyed
+reads freed memory. It also matters when a tensor is destroyed soon after ``run()``. For example, a temporary created in the same
+statement as ``run()`` is destroyed at the end of that statement. That is safe only when freeing the memory is ordered after the
+queued work. ``MATX_ASYNC_DEVICE_MEMORY`` is freed on the stream it was allocated on: a tensor allocated on the stream that runs the
+expression is freed after the expression's work, but one allocated on another stream can be freed while that work still reads it.
+When freeing is not ordered after the work, keep the tensor alive until the executor has been synchronized with ``exec.sync()``, or
+until other steps have been taken to order the free after that work.
 
 More complex expressions follow the same rules:
 
