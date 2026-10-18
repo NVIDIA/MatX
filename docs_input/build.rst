@@ -149,8 +149,9 @@ The Python packages used to generate test vectors are listed in ``test/requireme
 
     pip install -r test/requirements.txt
 
-The solver (``test/00_solver``) and radar pipeline tests additionally require CuPy, which is not part of ``test/requirements.txt``
-because its package name depends on the CUDA major version. Install the package matching your CUDA version, for example:
+CuPy is optional and is used to generate reference data for the LU decomposition and ambiguity function tests, which are skipped
+when CuPy is not found at configure time. It is not part of ``test/requirements.txt`` because its package name depends on the CUDA
+major version. Install the package matching your CUDA version, for example:
 
 .. code-block:: shell
 
