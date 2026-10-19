@@ -70,6 +70,25 @@ CI pipeline, but on a best-effort basis. JIT and multi-GPU are not supported on 
 
 .. warning:: Using MatX with an unsupported compiler may result in compiler and/or runtime errors.
 
+Loading without an NVIDIA driver
+--------------------------------
+Applications and shared libraries using MatX can be loaded without an installed
+NVIDIA driver. CUDA toolkit runtime libraries must still be available. GPU work
+requires a working driver and device; applications can use ``cudaGetDeviceCount``
+to check availability before choosing an executor. JIT driver entry points are
+resolved lazily through the CUDA runtime.
+
+The Linux load regression test can be built independently of the GPU test suite::
+
+    cmake -S test/driverless -B build-driverless -DCMAKE_CUDA_ARCHITECTURES=80
+    cmake --build build-driverless
+    ctest --test-dir build-driverless --output-on-failure
+
+Run these tests on a host or in a container without the NVIDIA driver to verify
+loading and CPU memory export. They also reject a direct ``libcuda`` dependency
+on systems where the driver is installed. Set ``-DMATX_EN_JIT=ON`` to cover JIT
+entry points as well.
+
 Required Third-party Dependencies
 ---------------------------------
 

@@ -597,17 +597,10 @@ namespace matx {
 
         // Try to get pointer from cuda
         if (kind == MATX_INVALID_MEMORY) {
-          CUmemorytype mtype;
-          void *data[] = {&mtype};
-          CUpointer_attribute attrs[] = {CU_POINTER_ATTRIBUTE_MEMORY_TYPE};
-          MATX_CUDA_DRIVER_CHECK(cuPointerGetAttributes(1,
-                                            &attrs[0],
-                                            data,
-                                            reinterpret_cast<CUdeviceptr>(op.Data())));
-          MATX_ASSERT_STR(mtype == CU_MEMORYTYPE_HOST || mtype == 0 || mtype == CU_MEMORYTYPE_DEVICE,
-            matxNotSupported, "Invalid memory type for printing");
+          cudaPointerAttributes attributes{};
+          MATX_CUDA_CHECK(cudaPointerGetAttributes(&attributes, op.Data()));
 
-          if (mtype == CU_MEMORYTYPE_DEVICE) {
+          if (attributes.type == cudaMemoryTypeDevice) {
             detail::DevicePrint(fp, op, dims...);
           }
           else {

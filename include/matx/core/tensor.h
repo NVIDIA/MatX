@@ -1143,11 +1143,10 @@ MATX_LOOP_UNROLL
   }
 
   __MATX_INLINE__ __MATX_HOST__ bool IsHostAccessiblePointer() {
-    void* hostPtr = nullptr;
-    [[maybe_unused]] const CUresult retval =
-        cuPointerGetAttribute(&hostPtr, CU_POINTER_ATTRIBUTE_HOST_POINTER, (CUdeviceptr)this->Data());
-    MATX_ASSERT_STR_EXP(retval, CUDA_SUCCESS, matxNotSupported, "Pointer is not host-accessible");
-    return hostPtr != nullptr;
+    cudaPointerAttributes attributes{};
+    MATX_CUDA_CHECK(cudaPointerGetAttributes(&attributes, this->Data()));
+    return attributes.type == cudaMemoryTypeUnregistered ||
+           attributes.type == cudaMemoryTypeManaged || attributes.hostPointer != nullptr;
   }
 
   /**
@@ -1518,34 +1517,29 @@ MATX_LOOP_UNROLL
     // Pass in the base pointer, not a potentially offset pointer
     void *data_ptr = const_cast<void *>(static_cast<const void *>(this->GetStorage().data()));
     auto kind = GetPointerKind(data_ptr);
-    auto cu_ptr = reinterpret_cast<CUdeviceptr>(data_ptr);
 
     if (kind == MATX_INVALID_MEMORY) {
       // GetStorage().data() is only guaranteed to be the true allocation base
       // for storage that still shares its owning tensor's buffer (e.g. Slice()/
       // Permute()). A view with its own non-owning storage at an offset/
       // reinterpreted address (e.g. RealView()/ImagView()) lands here instead,
-      // so classify it from the driver's own record of that address.
+      // so classify it from the runtime's record of that address.
       // Managed memory is reported separately from plain device memory since
       // DLPack defines a distinct kDLCUDAManaged device type for it.
-      CUpointer_attribute attr[] = {CU_POINTER_ATTRIBUTE_MEMORY_TYPE, CU_POINTER_ATTRIBUTE_DEVICE_ORDINAL, CU_POINTER_ATTRIBUTE_IS_MANAGED};
-      CUmemorytype mem_type;
-      int dev_ord;
-      int is_managed;
-      void *data[3] = {&mem_type, &dev_ord, &is_managed};
-      MATX_CUDA_DRIVER_CHECK(cuPointerGetAttributes(sizeof(attr)/sizeof(attr[0]), attr, data, cu_ptr));
+      cudaPointerAttributes attributes{};
+      MATX_CUDA_CHECK(cudaPointerGetAttributes(&attributes, data_ptr));
 
-      if (is_managed) {
+      if (attributes.type == cudaMemoryTypeManaged) {
         t->device.device_type = kDLCUDAManaged;
-        t->device.device_id = dev_ord;
+        t->device.device_id = attributes.device;
       }
-      else if (mem_type == CU_MEMORYTYPE_DEVICE) {
+      else if (attributes.type == cudaMemoryTypeDevice) {
         t->device.device_type = kDLCUDA;
-        t->device.device_id = dev_ord;
+        t->device.device_id = attributes.device;
       }
-      else if (mem_type == CU_MEMORYTYPE_HOST) {
+      else if (attributes.type == cudaMemoryTypeHost) {
         t->device.device_type = kDLCUDAHost;
-        t->device.device_id = dev_ord;
+        t->device.device_id = attributes.device;
       }
       else {
         t->device.device_type = kDLCPU;
@@ -1557,11 +1551,9 @@ MATX_LOOP_UNROLL
     }
     else {
       // We have a record of this pointer's memory space; only the device
-      // ordinal still needs to come from the driver
-      CUpointer_attribute attr = CU_POINTER_ATTRIBUTE_DEVICE_ORDINAL;
-      int dev_ord;
-      void *data = &dev_ord;
-      MATX_CUDA_DRIVER_CHECK(cuPointerGetAttributes(1, &attr, &data, cu_ptr));
+      // ordinal still needs to come from the runtime
+      cudaPointerAttributes attributes{};
+      MATX_CUDA_CHECK(cudaPointerGetAttributes(&attributes, data_ptr));
 
       switch (kind) {
         case MATX_MANAGED_MEMORY:
@@ -1580,7 +1572,7 @@ MATX_LOOP_UNROLL
           MATX_ASSERT_STR(false, matxCudaError, "Cannot determine kind of memory");
           break;
       }
-      t->device.device_id = dev_ord;
+      t->device.device_id = attributes.device;
     }
 
     t->ndim         = RANK;

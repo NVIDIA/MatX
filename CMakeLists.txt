@@ -526,7 +526,6 @@ endif()
 target_link_libraries(matx INTERFACE
     CUDA::cublas
     CUDA::cublasLt
-    CUDA::cuda_driver
     CUDA::cudart
     CUDA::cufft
     CUDA::curand

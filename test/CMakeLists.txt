@@ -218,3 +218,6 @@ add_custom_target(test
     COMMENT "Running all MatX tests in parallel (${CTEST_PARALLEL_JOBS} cores)"
     VERBATIM
 )
+
+# Loading and CPU-only use must also work on hosts without an NVIDIA driver.
+add_subdirectory(driverless)

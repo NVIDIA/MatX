@@ -38,7 +38,7 @@
 #include <exception>
 #include <sstream>
 #ifdef __CUDACC__
-#include <cuda.h>
+#include "matx/core/cuda_driver.h"
 #endif
 
 #include "matx/core/stacktrace.h"
@@ -293,7 +293,7 @@ namespace matx
     if (e_ != CUDA_SUCCESS)                                                \
     {                                                                      \
       const char *err_str = nullptr;                                       \
-      cuGetErrorString(e_, &err_str);                                      \
+      (void)MATX_CUDA_DRIVER_CALL(cuGetErrorString, e_, &err_str);          \
       MATX_LOG_ERROR("{}:{} CUDA Driver Error: {} ({})", __FILE__, __LINE__, err_str != nullptr ? err_str : "unknown", static_cast<int>(e_)); \
       MATX_THROW(matx::matxCudaError, err_str != nullptr ? err_str : "unknown"); \
     }                                                                      \

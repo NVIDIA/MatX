@@ -34,7 +34,7 @@
 
 #ifdef MATX_EN_JIT
 
-#include <cuda.h>
+#include "matx/core/cuda_driver.h"
 
 #include <nvrtc.h>
 #include <fstream>
@@ -342,7 +342,7 @@ std::vector<std::string> __MATX_HOST__ __MATX_INLINE__ get_preprocessor_options(
     CUresult result = call;                                                    \
     if (result != CUDA_SUCCESS) {                                              \
       const char* errStr = nullptr;                                            \
-      cuGetErrorString(result, &errStr);                                       \
+      (void)MATX_CUDA_DRIVER_CALL(cuGetErrorString, result, &errStr);       \
       std::string error_msg = std::string("CUDA error: ") +                    \
                               (errStr != nullptr ? errStr : "unknown");       \
       MATX_LOG_ERROR("{}", error_msg);                                         \
@@ -810,10 +810,10 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name,
         
         // Load the cached cubin into a CUDA module
         CUmodule module;
-        CUDA_CHECK(cuModuleLoadDataEx(&module, cached_cubin_ptr->data, 0, nullptr, nullptr));
+        CUDA_CHECK(MATX_CUDA_DRIVER_CALL(cuModuleLoadDataEx, &module, cached_cubin_ptr->data, 0, nullptr, nullptr));
         
         // Get kernel function using the cached lowered name
-        CUDA_CHECK(cuModuleGetFunction(&kernel_func, module, lowered_name.c_str()));
+        CUDA_CHECK(MATX_CUDA_DRIVER_CALL(cuModuleGetFunction, &kernel_func, module, lowered_name.c_str()));
         
         // Cache both module and function to prevent resource leak
         // Module must stay loaded for function to remain valid
@@ -1021,10 +1021,10 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name,
     
     // Load LTO-IR into CUDA module
     CUmodule module;
-    CUDA_CHECK(cuModuleLoadDataEx(&module, cubin.data(), 0, nullptr, nullptr));
+    CUDA_CHECK(MATX_CUDA_DRIVER_CALL(cuModuleLoadDataEx, &module, cubin.data(), 0, nullptr, nullptr));
     
     // Get kernel function using the lowered name
-    CUDA_CHECK(cuModuleGetFunction(&kernel_func, module, lowered_name.c_str()));
+    CUDA_CHECK(MATX_CUDA_DRIVER_CALL(cuModuleGetFunction, &kernel_func, module, lowered_name.c_str()));
     
     // Cache both module and function to prevent resource leak
     // Module must stay loaded for function to remain valid
@@ -1053,7 +1053,7 @@ launch_kernel:
   if (dynamic_shmem_size > max_shared_memory_per_block) {
     MATX_LOG_DEBUG("Requested dynamic shared memory ({} bytes) exceeds default per-block shared memory limit ({})",
                    dynamic_shmem_size, max_shared_memory_per_block);
-    CUDA_CHECK(cuFuncSetAttribute(kernel_func, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, dynamic_shmem_size));
+    CUDA_CHECK(MATX_CUDA_DRIVER_CALL(cuFuncSetAttribute, kernel_func, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, dynamic_shmem_size));
   }
 
   auto storage = op.ToJITStorage();
@@ -1072,7 +1072,7 @@ launch_kernel:
     MATX_LOG_DEBUG("Launching kernel with grid=({}, {}, {}), block=({}, {}, {}), dynamic_shmem_size={} bytes",
                    blocks.x, blocks.y, blocks.z, threads.x, threads.y, threads.z, dynamic_shmem_size);
     // Launch kernel
-    CUDA_CHECK(cuLaunchKernel(kernel_func,
+    CUDA_CHECK(MATX_CUDA_DRIVER_CALL(cuLaunchKernel, kernel_func,
                               blocks.x, blocks.y, blocks.z,
                               threads.x, threads.y, threads.z,
                               dynamic_shmem_size,
@@ -1100,7 +1100,7 @@ launch_kernel:
     MATX_LOG_DEBUG("Launching kernel with grid=({}, {}, {}), block=({}, {}, {}), dynamic_shmem_size={} bytes",
                    blocks.x, blocks.y, blocks.z, threads.x, threads.y, threads.z, dynamic_shmem_size);
     // Launch kernel
-    CUDA_CHECK(cuLaunchKernel(kernel_func,
+    CUDA_CHECK(MATX_CUDA_DRIVER_CALL(cuLaunchKernel, kernel_func,
                               blocks.x, blocks.y, blocks.z,
                               threads.x, threads.y, threads.z,
                               dynamic_shmem_size,
