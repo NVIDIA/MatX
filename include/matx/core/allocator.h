@@ -198,6 +198,14 @@ struct MemTracker {
   void allocate(void **ptr, size_t bytes,
                       matxMemorySpace_t space = MATX_MANAGED_MEMORY,
                       cudaStream_t stream = 0) {
+    allocate_internal(ptr, bytes, space, stream, detail::DeviceSupportsMemoryPools);
+  }
+
+  // Inject the capability query so tests can exercise the fallback on devices
+  // with memory pools without overriding global state or changing matxAlloc.
+  template <typename MemoryPoolSupport>
+  void allocate_internal(void **ptr, size_t bytes, matxMemorySpace_t space,
+                         cudaStream_t stream, MemoryPoolSupport supports_memory_pools) {
     [[maybe_unused]] cudaError_t err = cudaSuccess;
 
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
@@ -225,7 +233,7 @@ struct MemTracker {
     if (space == MATX_ASYNC_DEVICE_MEMORY) {
       int device = 0;
       MATX_CUDA_CHECK(cudaGetDevice(&device));
-      if (!detail::DeviceSupportsMemoryPools(device)) {
+      if (!supports_memory_pools(device)) {
         space = MATX_DEVICE_MEMORY;
       }
     }

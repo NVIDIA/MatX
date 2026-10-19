@@ -91,6 +91,48 @@ TEST_P(AsyncDeviceAllocatorTest, DeviceCapabilityAndStreamLifetime) {
     MATX_EXIT_HANDLER();
 }
 
+TEST_P(AsyncDeviceAllocatorTest, UnsupportedMemoryPoolsFallback) {
+    MATX_ENTER_HANDLER();
+
+    int device = 0;
+    ASSERT_EQ(cudaGetDevice(&device), cudaSuccess);
+    cudaStream_t nondefault_stream;
+    ASSERT_EQ(cudaStreamCreateWithFlags(&nondefault_stream, cudaStreamNonBlocking), cudaSuccess);
+    for (cudaStream_t stream : {cudaStream_t{}, nondefault_stream}) {
+        size_t initial, total, maximum;
+        matxGetMemoryStats(&initial, &total, &maximum);
+        void *ptr = nullptr;
+        int queries = 0;
+        // Use the production allocation implementation, forcing only the
+        // capability result. This must exercise cudaMalloc even on pooled GPUs.
+        GetAllocMap().allocate_internal(&ptr, 1024, MATX_ASYNC_DEVICE_MEMORY, stream,
+            [&](int queried_device) {
+                EXPECT_EQ(queried_device, device);
+                ++queries;
+                return false;
+            });
+        EXPECT_EQ(queries, 1);
+        EXPECT_NE(ptr, nullptr);
+        EXPECT_EQ(GetPointerKind(ptr), MATX_DEVICE_MEMORY);
+
+        EXPECT_EQ(cudaMemsetAsync(ptr, 0x5a, 1024, stream), cudaSuccess);
+        if (GetParam()) {
+            matxFree(ptr, stream);
+        } else {
+            matxFree(ptr);
+        }
+        EXPECT_EQ(cudaStreamSynchronize(stream), cudaSuccess);
+        EXPECT_FALSE(IsAllocated(ptr));
+        EXPECT_EQ(GetPointerKind(ptr), MATX_INVALID_MEMORY);
+        size_t current;
+        matxGetMemoryStats(&current, &total, &maximum);
+        EXPECT_EQ(current, initial);
+    }
+    EXPECT_EQ(cudaStreamDestroy(nondefault_stream), cudaSuccess);
+
+    MATX_EXIT_HANDLER();
+}
+
 INSTANTIATE_TEST_SUITE_P(FreeOverloads, AsyncDeviceAllocatorTest, ::testing::Bool());
 
 TEST(DeviceAllocatorTest, CachedMemoryPoolSupportAcrossDevices) {
