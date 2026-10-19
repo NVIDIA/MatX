@@ -93,6 +93,42 @@ TEST_P(AsyncDeviceAllocatorTest, DeviceCapabilityAndStreamLifetime) {
 
 INSTANTIATE_TEST_SUITE_P(FreeOverloads, AsyncDeviceAllocatorTest, ::testing::Bool());
 
+TEST(DeviceAllocatorTest, CachedMemoryPoolSupportAcrossDevices) {
+    MATX_ENTER_HANDLER();
+
+    int original_device = 0;
+    ASSERT_EQ(cudaGetDevice(&original_device), cudaSuccess);
+    struct RestoreDevice {
+        int device;
+        ~RestoreDevice() { (void)cudaSetDevice(device); }
+    } restore{original_device};
+
+    int device_count = 0;
+    ASSERT_EQ(cudaGetDeviceCount(&device_count), cudaSuccess);
+    std::vector<int> pools_supported(static_cast<size_t>(device_count));
+    for (int device = 0; device < device_count; ++device) {
+        ASSERT_EQ(cudaDeviceGetAttribute(&pools_supported[static_cast<size_t>(device)],
+            cudaDevAttrMemoryPoolsSupported, device), cudaSuccess);
+    }
+
+    // Revisit devices in reverse order to exercise cached capabilities after
+    // switching devices, including systems with different device capabilities.
+    for (int pass = 0; pass < 2; ++pass) {
+        for (int i = 0; i < device_count; ++i) {
+            const int device = pass == 0 ? i : device_count - 1 - i;
+            ASSERT_EQ(cudaSetDevice(device), cudaSuccess);
+            void *ptr = nullptr;
+            matxAlloc(&ptr, 1024, MATX_ASYNC_DEVICE_MEMORY);
+            EXPECT_EQ(GetPointerKind(ptr), pools_supported[static_cast<size_t>(device)]
+                ? MATX_ASYNC_DEVICE_MEMORY : MATX_DEVICE_MEMORY);
+            matxFree(ptr);
+            EXPECT_EQ(cudaDeviceSynchronize(), cudaSuccess);
+        }
+    }
+
+    MATX_EXIT_HANDLER();
+}
+
 // Example 1: Simple custom allocator - NO INHERITANCE REQUIRED!
 class TrackedAllocator {
 private:

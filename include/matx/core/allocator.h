@@ -80,6 +80,22 @@ struct matxPointerAttr_t {
   matxMemorySpace_t kind = MATX_INVALID_MEMORY;
   cudaStream_t stream;
 };
+
+inline bool DeviceSupportsMemoryPools(int device) {
+  static std::mutex cache_mtx;
+  static std::unordered_map<int, bool> support;
+  std::lock_guard lock(cache_mtx);
+  const auto iter = support.find(device);
+  if (iter != support.end()) {
+    return iter->second;
+  }
+
+  int supported = 0;
+  MATX_CUDA_CHECK(cudaDeviceGetAttribute(&supported, cudaDevAttrMemoryPoolsSupported, device));
+  // Cache only successful queries so a transient CUDA error can be retried.
+  support.emplace(device, supported != 0);
+  return supported != 0;
+}
 }
 
 
@@ -209,9 +225,7 @@ struct MemTracker {
     if (space == MATX_ASYNC_DEVICE_MEMORY) {
       int device = 0;
       MATX_CUDA_CHECK(cudaGetDevice(&device));
-      int memoryPoolsSupported = 0;
-      MATX_CUDA_CHECK(cudaDeviceGetAttribute(&memoryPoolsSupported, cudaDevAttrMemoryPoolsSupported, device));
-      if (memoryPoolsSupported == 0) {
+      if (!detail::DeviceSupportsMemoryPools(device)) {
         space = MATX_DEVICE_MEMORY;
       }
     }

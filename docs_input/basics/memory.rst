@@ -25,6 +25,9 @@ MatX requests ``MATX_ASYNC_DEVICE_MEMORY`` for internal device allocations such 
 transform workspaces and temporary outputs. On devices that support CUDA memory
 pools, these allocations use ``cudaMallocAsync`` and ``cudaFreeAsync`` with the
 associated CUDA stream.
+Memory pool support is queried once per device and cached across threads. MatX
+still checks the current device for each allocation so switching devices selects
+the correct cached capability. Failed capability queries are not cached.
 
 When the current device reports ``cudaDevAttrMemoryPoolsSupported == 0``, MatX
 automatically falls back to ``cudaMalloc`` and ``cudaFree``. This also applies to
