@@ -34,6 +34,7 @@
 
 #include <cassert>
 #include <type_traits>
+#include <utility>
 #include <cuda/std/algorithm>
 #include <cuda/std/functional>
 #include <cuda/std/limits>
@@ -112,7 +113,7 @@ class tensor_impl_t {
     // reference-like read/write semantics for expression assignment paths.
     struct PlanarComplexProxy {
       self_type *self;
-      index_t offset;
+      stride_type offset;
 
       __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ operator T() const
       {
@@ -778,7 +779,10 @@ MATX_IGNORE_WARNING_POP_GCC
           stride_mult = 1;
         }
         else {
-          stride_mult = (strides[i] == matxKeepStride) ? 1 : strides[i];
+          const auto step = (strides[i] == matxKeepStride) ? 1 : strides[i];
+          MATX_ASSERT_STR(std::in_range<stride_type>(step), matxInvalidSize,
+                          "Slice step cannot be represented by stride_type");
+          stride_mult = static_cast<stride_type>(step);
         }
 
         MATX_ASSERT_STR(first < end, matxInvalidParameter,
@@ -787,8 +791,7 @@ MATX_IGNORE_WARNING_POP_GCC
                         "Requested slice start index out of bounds");
 
         // offset by first
-        tmpdata += first * Stride(i);
-
+        tmpdata += static_cast<stride_type>(first) * Stride(i);
         if constexpr (N > 0) {
           if (end != matxDropDim) {
             MATX_ASSERT_STR(end != matxKeepDim, matxInvalidParameter, "matxKeepDim only valid for clone(), not slice()");
@@ -1096,24 +1099,33 @@ MATX_IGNORE_WARNING_POP_GCC
       }
     }
 
-    // Compute the stride contribution for a single dimension, eliding the
-    // load and multiply when the last dimension is known at dispatch time
-    // to have unit stride (via CapType::unit_stride_last).
+    // For one dimension, calculate index × stride
+    // But if MatX already knows the final dimension has stride 1,
+    // skip loading the stride and skip multiplying by 1
     template <int DIM, int RANK_VAL, typename CapType>
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type
     DimStride(index_t idx_val) const {
       constexpr bool is_last = (DIM == RANK_VAL - 1);
-      constexpr bool is_unit = CapType::unit_stride_last && is_last;
-      constexpr bool has_ept = (CapType::ept != detail::ElementsPerThread::ONE) && is_last;
+      constexpr bool is_unit =
+          CapType::unit_stride_last && is_last;
+      constexpr bool has_ept =
+          (CapType::ept != detail::ElementsPerThread::ONE) && is_last;
 
       if constexpr (is_unit && has_ept) {
-        return idx_val * static_cast<index_t>(CapType::ept);
-      } else if constexpr (is_unit) {
-        return idx_val;
-      } else if constexpr (has_ept) {
-        return idx_val * (this->desc_.Stride(DIM) * static_cast<index_t>(CapType::ept));
-      } else {
-        return idx_val * this->desc_.Stride(DIM);
+        return static_cast<stride_type>(idx_val) *
+               static_cast<stride_type>(CapType::ept);
+      }
+      else if constexpr (is_unit) {
+        return static_cast<stride_type>(idx_val);
+      }
+      else if constexpr (has_ept) {
+        return static_cast<stride_type>(idx_val) *
+               (this->desc_.Stride(DIM) *
+                static_cast<stride_type>(CapType::ept));
+      }
+      else {
+        return static_cast<stride_type>(idx_val) *
+               this->desc_.Stride(DIM);
       }
     }
 
@@ -1183,7 +1195,7 @@ MATX_IGNORE_WARNING_POP_GCC
         assert(data_.ldata_ != nullptr);
 #endif
         constexpr int EPT_int = static_cast<int>(CapType::ept);
-        const index_t offset = GetOffsetOptimized<CapType>(indices...);
+        const stride_type offset = GetOffsetOptimized<CapType>(indices...);
 
         if constexpr (CapType::ept == detail::ElementsPerThread::ONE) {
           if constexpr (is_planar_complex_v<T>) {
@@ -1218,7 +1230,7 @@ MATX_IGNORE_WARNING_POP_GCC
     {
       static_assert(sizeof...(Is) == M, "Number of indices of data_ptr must match rank of tensor");
       if constexpr (!is_sparse_data_v<TensorData>) {
-        const index_t offset = GetOffsetOptimized<CapType>(indices...);
+        const stride_type offset = GetOffsetOptimized<CapType>(indices...);
         return data_.ldata_ + offset;
       }
       else {
@@ -1252,7 +1264,7 @@ MATX_IGNORE_WARNING_POP_GCC
         assert(data_.ldata_ != nullptr);
 #endif
         constexpr int EPT_int = static_cast<int>(CapType::ept);
-        const index_t offset = GetOffsetOptimized<CapType>(indices...);
+        const stride_type  offset = GetOffsetOptimized<CapType>(indices...);
 
         if constexpr (CapType::ept == detail::ElementsPerThread::ONE) {
           if constexpr (is_planar_complex_v<T>) {
@@ -1534,7 +1546,7 @@ MATX_IGNORE_WARNING_POP_GCC
                 axes[pos] = previous;
               }
             }
-            index_t span = 1;
+            stride_type span = 1;
             for (int axis : axes) {
               if (Size(axis) <= 0) {
                 return true;
@@ -1543,10 +1555,10 @@ MATX_IGNORE_WARNING_POP_GCC
                 continue;
               }
               if (Stride(axis) < span ||
-                  Size(axis) - 1 > (cuda::std::numeric_limits<index_t>::max() - span) / Stride(axis)) {
+                  Size(axis) - 1 > (cuda::std::numeric_limits<stride_type>::max() - span) / Stride(axis)) {
                 return true;
               }
-              span += (Size(axis) - 1) * Stride(axis);
+              span += static_cast<stride_type>(Size(axis) - 1) * Stride(axis);
             }
             return false;
           }
@@ -1587,7 +1599,7 @@ MATX_IGNORE_WARNING_POP_GCC
      * @returns Total number of elements across all dimensions
      *
      */
-    constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto TotalSize() const noexcept { return desc_.TotalSize(); }
+    constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto TotalSize() const { return desc_.TotalSize(); }
 
     /**
      * Get the size of a single dimension of the tensor
@@ -1629,7 +1641,7 @@ MATX_IGNORE_WARNING_POP_GCC
       return desc_.Size(Rank() - 1);
     }
 
-    __MATX_INLINE__ __MATX_HOST__  auto Bytes() const noexcept
+    __MATX_INLINE__ __MATX_HOST__  auto Bytes() const
     {
       return TotalSize() * sizeof(*data_.ldata_);
     }
@@ -1716,22 +1728,22 @@ MATX_IGNORE_WARNING_POP_GCC
     Desc desc_;
 
   private:
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T LoadPlanarComplex(index_t offset) const
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ T LoadPlanarComplex(stride_type offset) const
     {
       using Scalar = typename T::value_type;
       const auto *base = reinterpret_cast<const Scalar *>(data_.ldata_);
-      const index_t total = this->TotalSize();
+      const auto total = this->TotalSize();
       T out{};
       out.real(base[offset]);
       out.imag(base[offset + total]);
       return out;
     }
 
-    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ void StorePlanarComplex(index_t offset, const T &v)
+    __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ void StorePlanarComplex(stride_type offset, const T &v)
     {
       using Scalar = typename T::value_type;
       auto *base = reinterpret_cast<Scalar *>(data_.ldata_);
-      const index_t total = this->TotalSize();
+      const auto total = this->TotalSize();
       base[offset] = v.real();
       base[offset + total] = v.imag();
     }

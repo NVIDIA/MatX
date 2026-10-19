@@ -58,6 +58,17 @@ struct data_ptr_of_op<Op, true> {
 template <typename Op>
 using data_ptr_of_op_t = typename data_ptr_of_op<Op, is_tensor_view_v<Op>>::type;
 
+template <typename Op, bool IsTensorView = is_tensor_view_v<Op>>
+struct accessor_offset_type { using type = offset_t; };
+
+template <typename Op>
+struct accessor_offset_type<Op, true> {
+    using type = typename Op::stride_type;
+};
+
+template <typename Op>
+using accessor_offset_type_t = typename accessor_offset_type<Op>::type;
+
 // 1D operators that read as two unit-stride segments in separate allocations,
 // head followed by tail (the streaming objects' SplitUnitStride1DOp). Such an
 // operator provides split_head(), split_tail() and split_head_len(): indices
@@ -112,7 +123,7 @@ __MATX_DEVICE__ __MATX_INLINE__ auto WithInputRangeReader(const InType &input, c
 }
 
 // Forward declaration — defined below.
-template <typename Op, bool IsUnitStride, int NumBound, typename IdxT = index_t>
+template <typename Op, bool IsUnitStride, int NumBound, typename IdxT = accessor_offset_type_t<Op>>
 struct BoundAccessor;
 
 // ----------------------------------------------------------------------------
@@ -139,10 +150,10 @@ struct BoundAccessor;
 // access time; on the slow path it captures the bound indices and forwards
 // them to op(leading..., is...).
 // ----------------------------------------------------------------------------
-// IdxT selects the width of the offset arithmetic. It defaults to index_t.
+// IdxT selects the width of the offset arithmetic. It defaults to the tensor's stride_type, or offset_t for other operators.
 // Callers that have already proven every index the kernel forms fits in 32 bits
 // can pass int32_t to collapse the 64-bit integer arithmetic into 32-bit arithmetic.
-template <typename Op, bool IsUnitStride, typename IdxT = index_t, int RankParam = Op::Rank()>
+template <typename Op, bool IsUnitStride, typename IdxT = accessor_offset_type_t<Op>, int RankParam = Op::Rank()>
 struct TensorAccessor {
     static_assert(is_matx_op<Op>(), "TensorAccessor requires a MatX operator");
     static constexpr bool FastPath = IsUnitStride && is_tensor_view_v<Op>;
