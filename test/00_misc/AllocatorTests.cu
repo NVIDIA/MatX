@@ -41,6 +41,58 @@
 
 using namespace matx;
 
+class AsyncDeviceAllocatorTest : public ::testing::TestWithParam<bool> {};
+
+TEST_P(AsyncDeviceAllocatorTest, DeviceCapabilityAndStreamLifetime) {
+    MATX_ENTER_HANDLER();
+
+    int device = 0;
+    ASSERT_EQ(cudaGetDevice(&device), cudaSuccess);
+    int pools_supported = 0;
+    ASSERT_EQ(cudaDeviceGetAttribute(&pools_supported, cudaDevAttrMemoryPoolsSupported, device), cudaSuccess);
+    const auto expected_kind = pools_supported ? MATX_ASYNC_DEVICE_MEMORY : MATX_DEVICE_MEMORY;
+
+    cudaStream_t nondefault_stream;
+    ASSERT_EQ(cudaStreamCreateWithFlags(&nondefault_stream, cudaStreamNonBlocking), cudaSuccess);
+    for (cudaStream_t stream : {cudaStream_t{}, nondefault_stream}) {
+        size_t initial, total, maximum;
+        matxGetMemoryStats(&initial, &total, &maximum);
+        void *ptr = nullptr;
+        constexpr size_t bytes = 1024;
+        matxAlloc(&ptr, bytes, MATX_ASYNC_DEVICE_MEMORY, stream);
+        EXPECT_NE(ptr, nullptr);
+        EXPECT_EQ(GetPointerKind(ptr), expected_kind);
+
+        size_t current;
+        matxGetMemoryStats(&current, &total, &maximum);
+        EXPECT_EQ(current, initial + bytes);
+
+        // Exercise the allocation on its stream, then free it with work pending.
+        // The synchronous fallback must also safely handle a nonblocking stream.
+        EXPECT_EQ(cudaMemsetAsync(ptr, 0x5a, bytes, stream), cudaSuccess);
+        unsigned char result = 0;
+        EXPECT_EQ(cudaMemcpyAsync(&result, ptr, sizeof(result), cudaMemcpyDeviceToHost, stream), cudaSuccess);
+        EXPECT_EQ(cudaStreamSynchronize(stream), cudaSuccess);
+        EXPECT_EQ(result, 0x5a);
+        EXPECT_EQ(cudaMemsetAsync(ptr, 0, bytes, stream), cudaSuccess);
+        if (GetParam()) {
+            matxFree(ptr, stream);
+        } else {
+            matxFree(ptr);
+        }
+        EXPECT_FALSE(IsAllocated(ptr));
+        EXPECT_EQ(GetPointerKind(ptr), MATX_INVALID_MEMORY);
+        EXPECT_EQ(cudaStreamSynchronize(stream), cudaSuccess);
+        matxGetMemoryStats(&current, &total, &maximum);
+        EXPECT_EQ(current, initial);
+    }
+    EXPECT_EQ(cudaStreamDestroy(nondefault_stream), cudaSuccess);
+
+    MATX_EXIT_HANDLER();
+}
+
+INSTANTIATE_TEST_SUITE_P(FreeOverloads, AsyncDeviceAllocatorTest, ::testing::Bool());
+
 // Example 1: Simple custom allocator - NO INHERITANCE REQUIRED!
 class TrackedAllocator {
 private:
