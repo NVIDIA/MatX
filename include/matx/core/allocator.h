@@ -60,7 +60,7 @@ enum matxMemorySpace_t {
   MATX_HOST_MEMORY,         ///< CUDA host-pinned memory from cudaHostAlloc
   MATX_HOST_MALLOC_MEMORY,  ///< Host-alloced memory (pageable) from malloc
   MATX_DEVICE_MEMORY,       ///< CUDA device memory from cudaMalloc
-  MATX_ASYNC_DEVICE_MEMORY, ///< CUDA asynchronous device memory corresponding to a stream from cudaMallocAsync
+  MATX_ASYNC_DEVICE_MEMORY, ///< Stream-ordered device memory from cudaMallocAsync, or cudaMalloc when memory pools are unsupported
   MATX_INVALID_MEMORY       ///< Sentinel value
 };
 
@@ -80,6 +80,22 @@ struct matxPointerAttr_t {
   matxMemorySpace_t kind = MATX_INVALID_MEMORY;
   cudaStream_t stream;
 };
+
+inline bool DeviceSupportsMemoryPools(int device) {
+  static std::mutex cache_mtx;
+  static std::unordered_map<int, bool> support;
+  std::lock_guard lock(cache_mtx);
+  const auto iter = support.find(device);
+  if (iter != support.end()) {
+    return iter->second;
+  }
+
+  int supported = 0;
+  MATX_CUDA_CHECK(cudaDeviceGetAttribute(&supported, cudaDevAttrMemoryPoolsSupported, device));
+  // Cache only successful queries so a transient CUDA error can be retried.
+  support.emplace(device, supported != 0);
+  return supported != 0;
+}
 }
 
 
@@ -182,6 +198,14 @@ struct MemTracker {
   void allocate(void **ptr, size_t bytes,
                       matxMemorySpace_t space = MATX_MANAGED_MEMORY,
                       cudaStream_t stream = 0) {
+    allocate_internal(ptr, bytes, space, stream, detail::DeviceSupportsMemoryPools);
+  }
+
+  // Inject the capability query so tests can exercise the fallback on devices
+  // with memory pools without overriding global state or changing matxAlloc.
+  template <typename MemoryPoolSupport>
+  void allocate_internal(void **ptr, size_t bytes, matxMemorySpace_t space,
+                         cudaStream_t stream, MemoryPoolSupport supports_memory_pools) {
     [[maybe_unused]] cudaError_t err = cudaSuccess;
 
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
@@ -201,6 +225,16 @@ struct MemTracker {
       MATX_CUDA_CHECK(cudaDeviceGetAttribute(&concurrentManagedAccess, cudaDevAttrConcurrentManagedAccess, device));
       if (concurrentManagedAccess == 0) {
         space = MATX_HOST_MEMORY;
+      }
+    }
+
+    // Devices without memory pools cannot use cudaMallocAsync. Record the
+    // fallback kind so deallocation also uses cudaFree instead of cudaFreeAsync.
+    if (space == MATX_ASYNC_DEVICE_MEMORY) {
+      int device = 0;
+      MATX_CUDA_CHECK(cudaGetDevice(&device));
+      if (!supports_memory_pools(device)) {
+        space = MATX_DEVICE_MEMORY;
       }
     }
 
@@ -401,6 +435,9 @@ __MATX_INLINE__ void matxPrintMemoryStatistics()
  * @brief Allocate memory
  *
  * Can be used for managed, pinned, malloced, device, and async device allocations
+ * Async device allocations fall back to cudaMalloc/cudaFree when the current
+ * device does not support memory pools. GetPointerKind reports MATX_DEVICE_MEMORY
+ * for these allocations, and allocation and deallocation may synchronize.
  *
  * @param ptr Pointer to store allocated pointer
  * @param bytes Bytes to allocate
