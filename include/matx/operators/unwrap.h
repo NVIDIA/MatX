@@ -166,6 +166,11 @@ public:
       MATX_THROW(matxInvalidParameter, "unwrap period must be positive");
     }
 
+    MATX_LOOP_UNROLL
+    for (int i = 0; i < Rank(); i++) {
+      sizes_[i] = op_.Size(i);
+    }
+
     // A dynamic-rank operand can have a runtime rank of 0 even when Rank() > 0
     const int32_t rank = jit_rank();
     if (rank > 0) {
@@ -272,7 +277,7 @@ public:
   }
 
   constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ index_t Size(int dim) const {
-    return op_.Size(dim);
+    return sizes_[dim];
   }
 
   __MATX_INLINE__ __MATX_HOST__ int32_t DynRank() const {
@@ -343,6 +348,7 @@ public:
 
 private:
   typename detail::base_type_t<OpA> op_;
+  cuda::std::array<index_t, Rank()> sizes_;
   int axis_;
   MathType discont_;
   MathType period_;

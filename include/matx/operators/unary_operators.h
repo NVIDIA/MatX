@@ -59,6 +59,7 @@ namespace matx
   {
   private:
     typename detail::base_type_t<I1> in1_;
+    cuda::std::array<index_t, detail::get_rank<I1>()> size_;
 
     // The functor is stateless and trivial, so it is constructed where it is called instead of
     // being stored, which would cost 8 bytes per node after padding. Element-wise functions that
@@ -119,6 +120,11 @@ namespace matx
     // The functor argument is only used to deduce Op.
     __MATX_INLINE__ matxUnaryOp(const I1 &in1, const Op &) : in1_(in1) {
       MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
+      if constexpr (Rank() > 0) {
+        for (int32_t i = 0; i < Rank(); i++) {
+          size_[i] = get_size(in1_, i);
+        }
+      }
     }
 
     __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ decltype(auto) operator()(const cuda::std::array<index_t, detail::get_rank<I1>()> &idx) const noexcept
@@ -269,10 +275,9 @@ namespace matx
       return detail::get_rank<I1>();
     }
 
-    // Element-wise operators have the shape of their input
     constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto Size(int dim) const noexcept
     {
-      return get_size(in1_, dim);
+      return size_[dim];
     }
 
     __MATX_INLINE__ __MATX_HOST__ int32_t DynRank() const {
