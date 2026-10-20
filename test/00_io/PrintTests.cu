@@ -41,7 +41,8 @@ using namespace matx;
 
 TEST(PrintMetadata, CustomDescriptorWidths)
 {
-  std::unique_ptr<FILE, decltype(&std::fclose)> fp(std::tmpfile(), &std::fclose);
+  auto close_file = [](FILE *file) { std::fclose(file); };
+  std::unique_ptr<FILE, decltype(close_file)> fp(std::tmpfile(), close_file);
   ASSERT_NE(fp.get(), nullptr);
   int data = 0;
   using WideDesc = tensor_desc_cr_ds_64_64_t<2>;
