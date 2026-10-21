@@ -255,6 +255,9 @@ TYPED_TEST(DenseSolveTestFloatTypes, SolveOperatorInputs)
 
 TYPED_TEST(DenseSolveTestFloatTypes, SolveInvalidShape)
 {
+#ifdef NDEBUG
+  GTEST_SKIP() << "Dense solve shape checks require assertions (NDEBUG must be undefined)";
+#else
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
@@ -269,10 +272,14 @@ TYPED_TEST(DenseSolveTestFloatTypes, SolveInvalidShape)
   }, matx::detail::matxException);
 
   MATX_EXIT_HANDLER();
+#endif
 }
 
 TYPED_TEST(DenseSolveTestFloatTypes, SolveSingularMatrix)
 {
+#ifdef NDEBUG
+  GTEST_SKIP() << "Dense solve singularity checks require assertions (NDEBUG must be undefined)";
+#else
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
@@ -294,4 +301,5 @@ TYPED_TEST(DenseSolveTestFloatTypes, SolveSingularMatrix)
   }, matx::detail::matxException);
 
   MATX_EXIT_HANDLER();
+#endif
 }
