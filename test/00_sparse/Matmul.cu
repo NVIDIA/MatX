@@ -238,6 +238,12 @@ TYPED_TEST(MatmulSparseTestsAll, MatmulCSC) {
 
   // Matmul.
   auto O = make_tensor<TestType>({m, n});
+  if constexpr (is_matx_half_v<TestType>) {
+    // CSC is unsupported by cuSPARSE's mixed-precision SpMM algorithms.
+    // This must throw even when NDEBUG disables MatX assertions.
+    ASSERT_THROW({ (O = matmul(S, B)).run(exec); }, detail::matxException);
+    return;
+  }
   (O = matmul(S, B)).run(exec);
 
   // Verify result.
