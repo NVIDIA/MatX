@@ -32,10 +32,13 @@ class cross_operator:
         a = matx_common.randn_ndarray(self.size, self.dtype)
         b = matx_common.randn_ndarray(self.size, self.dtype)
 
-        #for the result so that the rank matches that of the MatX output
-        result = np.cross(a, b)
-        if len(result.shape) == 0:
-            result = np.expand_dims(result, axis=0)
+        # NumPy no longer supports two-component vectors in np.cross.
+        if self.size[-1] == 2:
+            result = a[..., 0] * b[..., 1] - a[..., 1] * b[..., 0]
+            # MatX retains a singleton vector dimension for scalar results.
+            result = np.expand_dims(result, axis=-1)
+        else:
+            result = np.cross(a, b)
 
         return {
             'a': a,
