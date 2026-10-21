@@ -32,6 +32,7 @@
 
 #pragma once
 
+#include <format>
 #include <type_traits>
 #include <string>
 #include <cuda_fp16.h>
@@ -463,9 +464,10 @@ auto get_jit_class_or_pod_name(const T& op)
  *
  * Formats a numeric value as a string that can be used in C++ variable names.
  * For complex numbers, the format is "r{real}_i{imag}".
- * For non-complex numbers, the format is the string representation of the value.
+ * For non-complex numbers, the format is the shortest representation that
+ * converts back to the same value, so distinct values never share a symbol.
  * Special characters like '.' and '-' are replaced with 'p' (for point) and
- * 'n' (for negative) respectively.
+ * 'n' (for negative) respectively, and the '+' of a positive exponent is dropped.
  *
  * @tparam T Numeric type (can be complex or non-complex)
  * @param val Numeric value to convert
@@ -475,18 +477,18 @@ auto get_jit_class_or_pod_name(const T& op)
  * number_to_symbol(cuda::std::complex<float>{1.5, -2.3}) returns "r1p5_in2p3"
  * number_to_symbol(3.14f) returns "3p14"
  * number_to_symbol(-5) returns "n5"
+ * number_to_symbol(1e-7f) returns "1en07"
  */
 template <typename T>
 __MATX_INLINE__ std::string number_to_symbol(const T& val)
 {
   // Helper lambda to sanitize floating point values for variable names
   auto sanitize_float = [](auto v) -> std::string {
-    std::ostringstream oss;
-    oss << v;
-    std::string str = oss.str();
-    for (auto& c : str) {
-      if (c == '.') c = 'p';
-      else if (c == '-') c = 'n';
+    std::string str;
+    for (const char c : std::format("{}", v)) {
+      if (c == '.') str += 'p';
+      else if (c == '-') str += 'n';
+      else if (c != '+') str += c;
     }
     return str;
   };

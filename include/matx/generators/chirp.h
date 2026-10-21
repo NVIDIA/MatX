@@ -73,7 +73,8 @@ namespace matx
         }
 
         __MATX_INLINE__ std::string get_jit_class_name() const {
-          return std::format("JITChirp_method{}_f0{}_f1{}_t1{}", static_cast<int>(method_), f0_, f1_, t1_);
+          return std::format("JITChirp_method{}_f0{}_f1{}_t1{}", static_cast<int>(method_),
+                             number_to_symbol(f0_), number_to_symbol(f1_), number_to_symbol(t1_));
         }
 
         __MATX_INLINE__ auto get_jit_op_str() const {
@@ -218,7 +219,8 @@ namespace matx
         }
 
         __MATX_INLINE__ std::string get_jit_class_name() const {
-          return std::format("JITComplexChirp_method{}_f0{}_f1{}_t1{}", static_cast<int>(method_), f0_, f1_, t1_);
+          return std::format("JITComplexChirp_method{}_f0{}_f1{}_t1{}", static_cast<int>(method_),
+                             number_to_symbol(f0_), number_to_symbol(f1_), number_to_symbol(t1_));
         }
 
         __MATX_INLINE__ auto get_jit_op_str() const {

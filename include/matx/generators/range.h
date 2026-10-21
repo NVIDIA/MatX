@@ -60,12 +60,7 @@ namespace matx
         }
 
         __MATX_INLINE__ std::string get_jit_class_name() const {
-          auto float_to_str = [](auto v) {
-            std::string s = std::to_string(v);
-            std::replace(s.begin(), s.end(), '.', '_');
-            return s;
-          };
-          return "JITRange_first" + float_to_str(first_) + "_step" + float_to_str(step_);
+          return "JITRange_first" + number_to_symbol(first_) + "_step" + number_to_symbol(step_);
         }
 
         __MATX_INLINE__ auto get_jit_op_str() const {

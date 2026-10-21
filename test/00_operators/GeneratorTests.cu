@@ -133,6 +133,12 @@ TYPED_TEST(BasicGeneratorTestsFloatNonComplex, Windows)
   // example-end flattop-gen-test-1
   MATX_TEST_ASSERT_COMPARE(pb, ov, "flattop", 0.01);
 
+  // example-begin taylor-gen-test-1
+  // Assign a Taylor window of size `win_size` with the default parameters (nbar = 4, sll = 30 dB) to `ov`
+  (ov = taylor<0>({win_size})).run(exec);
+  // example-end taylor-gen-test-1
+  MATX_TEST_ASSERT_COMPARE(pb, ov, "taylor", 0.01);
+
 
   MATX_EXIT_HANDLER();
 }
@@ -171,8 +177,126 @@ TYPED_TEST(BasicGeneratorTestsFloatNonComplex, SingleElementWindows)
   exec.sync();
   EXPECT_EQ(static_cast<float>(ov(0)), 1.0f);
 
+  (ov = taylor<0, WindowType>({1})).run(exec);
+  exec.sync();
+  EXPECT_EQ(static_cast<float>(ov(0)), 1.0f);
+
+  (ov = taylor<0, WindowType>({1}, {.sym = false})).run(exec);
+  exec.sync();
+  EXPECT_EQ(static_cast<float>(ov(0)), 1.0f);
+
   MATX_EXIT_HANDLER();
 }
+
+template <typename TensorType>
+class TaylorWindowTests : public ::testing::Test {
+};
+using TaylorWindowTypes =
+    TupleToTypes<TypedCartesianProduct<MatXFloatNonComplexNonHalfTuple, ExecutorTypesAllWithJIT>::type>::type;
+TYPED_TEST_SUITE(TaylorWindowTests, TaylorWindowTypes);
+
+TYPED_TEST(TaylorWindowTests, MatchesScipy)
+{
+  MATX_ENTER_HANDLER();
+
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  ExecType exec{};
+  const double thresh = cuda::std::is_same_v<TestType, double> ? 1e-10 : 1e-5;
+
+  // Even and odd lengths place the window center between samples and on a sample
+  for (const index_t win_size : {index_t{100}, index_t{101}}) {
+    auto pb = std::make_unique<detail::MatXPybind>();
+    pb->InitAndRunTVGenerator<TestType>("00_operators", "taylor_window", "run", {win_size});
+    auto ov = make_tensor<TestType>({win_size});
+
+    (ov = taylor<0, TestType>({win_size})).run(exec);
+    exec.sync();
+    MATX_TEST_ASSERT_COMPARE(pb, ov, "default", thresh);
+
+    // example-begin taylor-gen-test-2
+    // Members of TaylorWindowParams that are not named keep their defaults (norm = true, sym = true)
+    (ov = taylor<0, TestType>({win_size}, {.nbar = 6, .sll = 40})).run(exec);
+    // example-end taylor-gen-test-2
+    exec.sync();
+    MATX_TEST_ASSERT_COMPARE(pb, ov, "nbar6_sll40", thresh);
+
+    // A coefficient array sized exactly to nbar gives the same window
+    (ov = taylor<0, TestType, 6>({win_size}, {.nbar = 6, .sll = 40})).run(exec);
+    exec.sync();
+    MATX_TEST_ASSERT_COMPARE(pb, ov, "nbar6_sll40", thresh);
+
+    (ov = taylor<0, TestType>({win_size}, {.nbar = 5, .sll = 35, .norm = false})).run(exec);
+    exec.sync();
+    MATX_TEST_ASSERT_COMPARE(pb, ov, "no_norm", thresh);
+
+    (ov = taylor<0, TestType>({win_size}, {.sym = false})).run(exec);
+    exec.sync();
+    MATX_TEST_ASSERT_COMPARE(pb, ov, "periodic", thresh);
+
+    (ov = taylor<0, TestType>({win_size}, {.nbar = 1})).run(exec);
+    exec.sync();
+    MATX_TEST_ASSERT_COMPARE(pb, ov, "nbar1", thresh);
+
+    // example-begin taylor-gen-test-4
+    // A 100 dB taper needs nbar = 31, which is above the default MaxNbar of 24, so raise MaxNbar
+    // (the third template argument) to make room for the larger coefficient array
+    (ov = taylor<0, TestType, 32>({win_size}, {.nbar = 31, .sll = 100})).run(exec);
+    // example-end taylor-gen-test-4
+    exec.sync();
+    MATX_TEST_ASSERT_COMPARE(pb, ov, "nbar31_sll100", thresh);
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(TaylorWindowTests, Separable2D)
+{
+  MATX_ENTER_HANDLER();
+
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  ExecType exec{};
+  const TestType thresh = cuda::std::is_same_v<TestType, double> ? TestType(1e-12) : TestType(1e-6);
+
+  const index_t rows = 33;
+  const index_t cols = 64;
+  auto img = make_tensor<TestType>({rows, cols});
+  auto row_win = make_tensor<TestType>({rows});
+  auto col_win = make_tensor<TestType>({cols});
+  (img = ones<TestType>({rows, cols})).run(exec);
+  (row_win = taylor<0, TestType>({rows}, {.nbar = 5, .sll = 35})).run(exec);
+  (col_win = taylor<0, TestType>({cols}, {.nbar = 4, .sll = 30})).run(exec);
+
+  // example-begin taylor-gen-test-3
+  // Separable 2D Taylor weighting of a `rows` x `cols` image, with different parameters along each dimension
+  (img = img * taylor<0, TestType>({rows, cols}, {.nbar = 5, .sll = 35})
+             * taylor<1, TestType>({rows, cols}, {.nbar = 4, .sll = 30})).run(exec);
+  // example-end taylor-gen-test-3
+  exec.sync();
+
+  for (index_t r = 0; r < rows; r++) {
+    for (index_t c = 0; c < cols; c++) {
+      EXPECT_NEAR(img(r, c), row_win(r) * col_win(c), thresh) << "at (" << r << ", " << c << ")";
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
+#ifndef MATX_DISABLE_EXCEPTIONS
+TEST(OperatorTests, TaylorWindowNbarLimit)
+{
+  MATX_ENTER_HANDLER();
+
+  // nbar can be at most the MaxNbar template argument (24 by default), which can be raised
+  EXPECT_NO_THROW(taylor<0>({16}, {.nbar = 24}));
+  EXPECT_THROW(taylor<0>({16}, {.nbar = 25}), detail::matxException);
+  EXPECT_NO_THROW((taylor<0, float, 32>({16}, {.nbar = 25})));
+
+  MATX_EXIT_HANDLER();
+}
+#endif
 
 TEST(OperatorTests, SingleElementLinspaceLogspace)
 {
@@ -932,6 +1056,32 @@ TEST(OperatorTests, RandomJITCapabilityLimits)
 }
 
 #ifdef MATX_EN_JIT
+// Runs op on the JIT and CUDA executors and counts the elements that differ by more than tol
+template <typename Op>
+index_t CountJITMismatches(const Op &op, double tol)
+{
+  using T = typename Op::value_type;
+  EXPECT_TRUE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op));
+  CUDAJITExecutor jit_exec{};
+  cudaExecutor cuda_exec{};
+  auto jit_out = make_tensor<T>(op.Shape());
+  auto ref_out = make_tensor<T>(op.Shape());
+  (jit_out = op).run(jit_exec);
+  (ref_out = op).run(cuda_exec);
+  jit_exec.sync();
+  cuda_exec.sync();
+
+  auto jit_flat = flatten(jit_out);
+  auto ref_flat = flatten(ref_out);
+  index_t mismatches = 0;
+  for (index_t i = 0; i < jit_flat.Size(0); i++) {
+    if (static_cast<double>(cuda::std::abs(jit_flat(i) - ref_flat(i))) > tol) {
+      mismatches++;
+    }
+  }
+  return mismatches;
+}
+
 TEST(OperatorTests, SingleElementWindowsJIT)
 {
   MATX_ENTER_HANDLER();
@@ -958,6 +1108,50 @@ TEST(OperatorTests, SingleElementWindowsJIT)
   (ov = flattop<0>({1})).run(exec);
   exec.sync();
   EXPECT_EQ(ov(0), 1.0f);
+
+  (ov = taylor<0>({1})).run(exec);
+  exec.sync();
+  EXPECT_EQ(ov(0), 1.0f);
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(OperatorTests, Generator1DJITAlongEachDim)
+{
+  MATX_ENTER_HANDLER();
+
+  // A 1D generator on an N-D shape varies only along Dim under JIT, as it does on the CUDA executor
+  const index_t rows = 33;
+  const index_t cols = 64;
+  EXPECT_EQ(CountJITMismatches(hamming<0>({rows, cols}), 1e-6), 0) << "hamming<0>";
+  EXPECT_EQ(CountJITMismatches(hamming<1>({rows, cols}), 1e-6), 0) << "hamming<1>";
+  EXPECT_EQ(CountJITMismatches(taylor<0>({rows, cols}, {.nbar = 5, .sll = 35}), 1e-6), 0) << "taylor<0>";
+  EXPECT_EQ(CountJITMismatches(taylor<1>({rows, cols}, {.nbar = 5, .sll = 35}), 1e-6), 0) << "taylor<1>";
+  EXPECT_EQ(CountJITMismatches(range<0>({rows, cols}, 1.0f, 0.5f), 1e-6), 0) << "range<0>";
+  EXPECT_EQ(CountJITMismatches(hamming<1>({4, rows, 8}), 1e-6), 0) << "hamming<1> on a 3D shape";
+  EXPECT_EQ(CountJITMismatches(hamming<0>({rows, cols}) * taylor<1>({rows, cols}), 1e-6), 0) << "hamming<0> * taylor<1>";
+  // Long 1D windows can be evaluated several elements per thread
+  EXPECT_EQ(CountJITMismatches(hamming<0>({1 << 20}), 1e-6), 0) << "hamming<0> on a long 1D shape";
+  EXPECT_EQ(CountJITMismatches(taylor<0>({1 << 20}), 1e-6), 0) << "taylor<0> on a long 1D shape";
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(OperatorTests, GeneratorJITParameterValues)
+{
+  MATX_ENTER_HANDLER();
+  const index_t n = 64;
+
+  // Generators that differ only in their parameters must each compute their own values under JIT, even when
+  // the parameters agree to 6 significant digits, and negative parameters must work too
+  EXPECT_EQ(CountJITMismatches(taylor<0>({n}, {.sll = 30.0}) - taylor<0>({n}, {.sll = 30.5}) +
+                               taylor<0>({n}, {.norm = false}), 1e-6), 0)
+      << "Taylor windows with different sll and norm";
+  EXPECT_EQ(CountJITMismatches(range<0>({n}, 0.0f, 1e-7f) - range<0>({n}, 0.0f, 2e-7f), 1e-9), 0)
+      << "range steps 1e-7 and 2e-7";
+  EXPECT_EQ(CountJITMismatches(range<0>({n}, -1.5f, 0.25f), 1e-6), 0) << "range with a negative start";
+  EXPECT_EQ(CountJITMismatches(fill({n}, 1.0000001f) - fill({n}, 1.0000002f), 1e-9), 0)
+      << "constants 1.0000001 and 1.0000002";
 
   MATX_EXIT_HANDLER();
 }

@@ -47,5 +47,6 @@
 #include "matx/generators/ones.h"
 #include "matx/generators/random.h"
 #include "matx/generators/range.h"
+#include "matx/generators/taylor.h"
 #include "matx/generators/zeros.h"
 #include "matx/generators/fftfreq.h"
