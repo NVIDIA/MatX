@@ -61,6 +61,9 @@ protected:
   GExecType exec{};
   std::unique_ptr<detail::MatXPybind> pb;
   float thresh = 0.001f;
+  // Match the generator's cutoff with margin for SVD roundoff in the null space.
+  static constexpr float rank_deficient_rcond =
+      is_fp32_inner_type_v<GTestType> ? 1e-6f : 1e-12f;
 };
 
 template <typename TensorType>
@@ -118,7 +121,7 @@ TYPED_TEST(PinvSolverTestFloatTypes, PinvRankDeficient)
     this->pb->template InitAndRunTVGenerator<TestType>("00_solver", "pinv", "run_rank_deficient", {m, n});
     this->pb->NumpyToTensorView(A, "A");
 
-    (A_pinv = pinv(A)).run(this->exec);
+    (A_pinv = pinv(A, this->rank_deficient_rcond)).run(this->exec);
     this->exec.sync();
 
     MATX_TEST_ASSERT_COMPARE(this->pb, A_pinv, "pinv", this->thresh);
@@ -163,7 +166,7 @@ TYPED_TEST(PinvSolverTestFloatTypes, PinvBatchedRankDeficient)
   this->pb->template InitAndRunTVGenerator<TestType>("00_solver", "pinv", "run_rank_deficient", {batches, m, n});
   this->pb->NumpyToTensorView(A, "A");
 
-  (A_pinv = pinv(A)).run(this->exec);
+  (A_pinv = pinv(A, this->rank_deficient_rcond)).run(this->exec);
   this->exec.sync();
 
   MATX_TEST_ASSERT_COMPARE(this->pb, A_pinv, "pinv", this->thresh);
