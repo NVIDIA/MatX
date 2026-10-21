@@ -751,7 +751,7 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name,
   auto make_legacy_kernel_cache_key = [&]() {
     return device_cache_prefix + kernel_name + "_ept_" + std::to_string(static_cast<int>(ept)) +
            "_block_" + std::to_string(threads.x) + "_groups_" +
-           std::to_string(groups_per_block) + "_" + ensure_kernel_op_type();
+           std::to_string(groups_per_block) + "_" + ensure_kernel_op_type() + "_" + detail::JITCacheVersionTag();
   };
   auto make_jit_kernel_cache_key = [&]() {
     return JITKernelCacheKey{jit_cache_key, RANK, ept, static_cast<int>(threads.x), groups_per_block,

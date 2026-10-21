@@ -59,8 +59,15 @@ namespace matx
   {
   private:
     typename detail::base_type_t<I1> in1_;
-    typename detail::base_type_t<Op> op_;
     cuda::std::array<index_t, detail::get_rank<I1>()> size_;
+
+    // The functor is stateless and trivial, so it is constructed where it is called instead of
+    // being stored, which would cost 8 bytes per node after padding. Element-wise functions that
+    // need state should use apply() or a dedicated operator, as isclose() does.
+    static_assert(cuda::std::is_empty_v<Op> && cuda::std::is_trivially_default_constructible_v<Op> &&
+                  cuda::std::is_trivially_destructible_v<Op>,
+                  "Unary operator functors must be stateless and trivial; use apply() or a dedicated "
+                  "operator for element-wise functions that need state");
 
   public:
     // dummy type to signal this is a matxop
@@ -95,23 +102,23 @@ namespace matx
 #ifdef MATX_EN_JIT
     struct JIT_Storage {
       typename detail::inner_storage_or_self_t<detail::base_type_t<I1>> in1_;
-      typename detail::inner_storage_or_self_t<detail::base_type_t<Op>> op_;
     };
 
     JIT_Storage ToJITStorage() const {
-      return JIT_Storage{detail::to_jit_storage(in1_), detail::to_jit_storage(op_)};
+      return JIT_Storage{detail::to_jit_storage(in1_)};
     }
 #endif
 
     __MATX_INLINE__ const std::string str() const {
-      return op_.str() + "(" + get_type_str(in1_) + ")";
+      return Op{}.str() + "(" + get_type_str(in1_) + ")";
     }
 
     __MATX_INLINE__ const auto& Input() const noexcept {
       return in1_;
     }
 
-    __MATX_INLINE__ matxUnaryOp(const I1 &in1, const Op &op) : in1_(in1), op_(op) {
+    // The functor argument is only used to deduce Op.
+    __MATX_INLINE__ matxUnaryOp(const I1 &in1, const Op &) : in1_(in1) {
       MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
       if constexpr (Rank() > 0) {
         for (int32_t i = 0; i < Rank(); i++) {
@@ -136,7 +143,7 @@ namespace matx
                                               (!ContainsBlockReduction<I1>() && !IsDirectBlockReduction<I1>()),
                                               ScalarCap, CapType>;
       auto i1 = get_value<I1Cap>(in1_, indices...);
-      return op_.template operator()<CapType>(i1);
+      return Op{}.template operator()<CapType>(i1);
     }
 
     template <typename... Is>
@@ -185,7 +192,6 @@ namespace matx
             "  constexpr static cuda::std::array<index_t, " + std::to_string(actual_rank) + "> out_dims_ = { " +
             dims_str + " };\n" +
             "  typename detail::inner_storage_or_self_t<detail::base_type_t<I1>> in1_;\n" +
-            "  typename detail::inner_storage_or_self_t<detail::base_type_t<Op>> op_;\n" +
             "  template <typename CapType, typename... Is>\n" +
             "  __MATX_INLINE__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) const\n" +
             "  {\n" +
@@ -195,11 +201,11 @@ namespace matx
             "    if constexpr (!matx_jit_contains_block_reduction::value && !CapType::pass_through_threads) {\n"
             "      if ((threadIdx.x * static_cast<int>(CapType::ept)) > Size(Rank() - 1)) {\n"
             "        using I1Value = remove_cvref_t<decltype(get_value<I1Cap>(in1_, indices...))>;\n"
-            "        return op_.template operator()<CapType>(I1Value{});\n"
+            "        return Op{}.template operator()<CapType>(I1Value{});\n"
             "      }\n"
             "    }\n" : "") +
             "    auto i1 = get_value<I1Cap>(in1_, indices...);\n" +
-            "    return op_.template operator()<CapType>(i1);\n" +
+            "    return Op{}.template operator()<CapType>(i1);\n" +
             "  }\n" +
             "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank()\n" +
             "  {\n" +
@@ -219,7 +225,7 @@ namespace matx
       if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
 #ifdef MATX_EN_JIT
         const auto lhs_jit_name = detail::get_operator_capability<Cap>(in1_, in);
-        const auto op_jit_name = detail::get_operator_capability<Cap>(op_, in);
+        const auto op_jit_name = detail::get_operator_capability<Cap>(Op{}, in);
         return get_jit_class_name() + "<" + lhs_jit_name + "," + op_jit_name + ">";
 #else
         return "";
@@ -239,7 +245,7 @@ namespace matx
           in[key] = value;
         }
         detail::get_operator_capability<Cap>(in1_, in);
-        detail::get_operator_capability<Cap>(op_, in);
+        detail::get_operator_capability<Cap>(Op{}, in);
         return true;
 #else
 	        return false;

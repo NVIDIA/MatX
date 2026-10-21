@@ -53,10 +53,10 @@ namespace detail {
     private:
       typename detail::base_type_t<OpA> a_;
       SortDirection_t dir_;
+      mutable uint8_t lifecycle_depth_ = 0;
       cuda::std::array<index_t, OpA::Rank()> out_dims_;
       mutable detail::tensor_impl_t<index_t, OpA::Rank()> tmp_out_;
       mutable index_t *ptr = nullptr;
-      mutable uint8_t lifecycle_depth_ = 0;
       mutable ElementsPerThread current_ept_ = ElementsPerThread::ONE;
       mutable int current_groups_per_block_ = 1;
 

@@ -59,9 +59,9 @@ namespace matx {
       // for cubic spline interpolation
 
     private:
-      O dl_, d_, du_, b_;
-      OpX x_;
-      OpV v_;
+      typename detail::base_type_t<O> dl_, d_, du_, b_;
+      typename detail::base_type_t<OpX> x_;
+      typename detail::base_type_t<OpV> v_;
       using x_val_type = typename OpX::value_type;
       using v_val_type = typename OpV::value_type;
 

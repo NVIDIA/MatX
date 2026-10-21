@@ -756,6 +756,19 @@ TYPED_TEST(ReductionTestsNumericNonComplexAllExecs, Any)
     exec.sync();
     EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TestType)(1)));
 
+    // any() holds its own view of the input, so pointing the input tensor object at other
+    // data after building the operator does not change the result
+    {
+      auto in = t1;
+      auto any_op = any(in);
+      tensor_t<TestType, 1> zero({30});
+      (zero = zeros<TestType>(zero.Shape())).run(exec);
+      in.Shallow(zero);
+      (t0 = any_op).run(exec);
+      exec.sync();
+      EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), (TestType)(1)));
+    }
+
     // test partial reduction
     (t2 = any(t4, {2, 3})).run(exec);
     exec.sync();

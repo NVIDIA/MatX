@@ -48,10 +48,10 @@ namespace matx
         typename detail::base_type_t<OpB> b_;
         double tol_;
         int max_iters_;
+        mutable uint8_t lifecycle_depth_ = 0;
         cuda::std::array<index_t, 2> out_dims_;
         mutable detail::tensor_impl_t<typename OpA::value_type, 2> tmp_out_;
         mutable typename OpA::value_type *ptr = nullptr;
-        mutable uint8_t lifecycle_depth_ = 0;
 
       public:
         using matxop = bool;
