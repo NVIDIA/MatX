@@ -1075,7 +1075,9 @@ index_t CountJITMismatches(const Op &op, double tol)
   auto ref_flat = flatten(ref_out);
   index_t mismatches = 0;
   for (index_t i = 0; i < jit_flat.Size(0); i++) {
-    if (static_cast<double>(cuda::std::abs(jit_flat(i) - ref_flat(i))) > tol) {
+    // Written so that a NaN on either side counts as a mismatch
+    const double error = static_cast<double>(cuda::std::abs(jit_flat(i) - ref_flat(i)));
+    if (!(error <= tol)) {
       mismatches++;
     }
   }
