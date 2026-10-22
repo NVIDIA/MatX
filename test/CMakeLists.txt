@@ -17,6 +17,7 @@ set (test_sources
     00_tensor/BasicTensorTests.cu
     00_tensor/DLPackTests.cu
     00_tensor/MakeTensorTests.cu
+    00_tensor/MinimalTensorTests.cu
     00_tensor/CUBTests.cu
     00_tensor/Storage.cu
     00_tensor/ViewTests.cu
@@ -172,6 +173,18 @@ endfunction()
 foreach(test_file ${test_sources})
     create_test_executable(${test_file})
 endforeach()
+
+target_sources(test_00_tensor_MinimalTensorTests PRIVATE
+    00_tensor/MinimalTensorBeforeMatx.cu
+    00_tensor/MinimalTensorAfterMatx.cu)
+
+add_library(test_minimal_tensor_host OBJECT 00_tensor/MinimalTensorHost.cpp)
+target_link_libraries(test_minimal_tensor_host PRIVATE matx::matx)
+add_dependencies(test_00_tensor_MinimalTensorTests test_minimal_tensor_host)
+
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+add_test(NAME test_00_tensor_MinimalTensorIncludes
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/00_tensor/MinimalTensorIncludes.py)
 
 # Create individual executables for proprietary tests
 foreach(test_file ${proprietary_sources})
