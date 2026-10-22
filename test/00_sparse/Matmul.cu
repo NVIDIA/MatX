@@ -241,7 +241,12 @@ TYPED_TEST(MatmulSparseTestsAll, MatmulCSC) {
   if constexpr (is_matx_half_v<TestType>) {
     // CSC is unsupported by cuSPARSE's mixed-precision SpMM algorithms.
     // This must throw even when NDEBUG disables MatX assertions.
-    ASSERT_THROW({ (O = matmul(S, B)).run(exec); }, detail::matxException);
+    try {
+      (O = matmul(S, B)).run(exec);
+      FAIL() << "Half-precision CSC matmul must throw matxNotSupported";
+    } catch (const detail::matxException &e) {
+      ASSERT_EQ(e.e, matxNotSupported);
+    }
     return;
   }
   (O = matmul(S, B)).run(exec);
