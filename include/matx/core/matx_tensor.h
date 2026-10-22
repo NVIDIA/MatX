@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // BSD 3-Clause License
 //
-// Copyright (c) 2021, NVIDIA Corporation
+// Copyright (c) 2026, NVIDIA Corporation
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -30,6 +30,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
+// This allows users to create and perform basic operations on MatX tensors without entire MatX library.
 #pragma once
 
 #include "matx/core/defines.h"
