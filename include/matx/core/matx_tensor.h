@@ -33,6 +33,7 @@
 #pragma once
 
 #include "matx/core/defines.h"
+#include <cuda.h>
 
 #ifdef __CUDACC__
 #if defined(__CUDA_ARCH__) && __CUDA_ARCH__ < 600
@@ -45,8 +46,8 @@
 
 #include "matx/core/tensor.h"
 #include "matx/core/make_tensor.h"
-#include "matx/operators/binary_operators.h"
 #include "matx/operators/unary_operators.h"
+#include "matx/operators/binary_operators.h"
 
 namespace matx {
 
