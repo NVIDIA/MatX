@@ -8,9 +8,12 @@ same kernel. The ``window_functions`` example (``examples/window_functions.cu``)
 window below and reports its peak sidelobe level, 3 dB mainlobe width, and equivalent noise bandwidth. When MatX is built
 with ``MATX_EN_VISUALIZATION=ON``, it also plots the responses.
 
-Because a window is recomputed in every kernel that uses it, an expensive window applied to a large tensor can be cheaper
-to compute once into a tensor and then apply, e.g. ``(w = taylor<0>({N})).run(exec);`` followed by
-``(out = in * w).run(exec);``.
+Some windows are relatively expensive to compute per element, and a window generator repeats that computation for every
+element it is applied to. If the computation is a bottleneck, materialize the window into a tensor by assigning the
+generator to it, then apply the tensor instead, which replaces the computation with memory accesses. This is more likely
+to help when the same window is applied many times, such as to every row of a batch or in repeated runs, because the
+window is then computed only once. Whether it is faster depends on the window, data type, data size, and GPU, so
+benchmark both forms.
 
 
 .. toctree::

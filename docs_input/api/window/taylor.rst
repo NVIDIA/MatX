@@ -24,7 +24,7 @@ A 2D window for a rectangular aperture, such as SAR range and azimuth weighting,
 The ``window_functions`` example (``examples/window_functions.cu``) compares the frequency response of the Taylor window
 with the other windows MatX provides.
 
-.. versionadded:: head
+.. versionadded:: 1.2.0
 
 .. doxygenstruct:: matx::TaylorWindowParams
    :members:

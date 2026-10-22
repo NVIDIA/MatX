@@ -80,15 +80,22 @@ namespace matx
       static_assert(MaxNbar >= 1, "taylor() MaxNbar must be at least 1");
 
       private:
-        // Ordered so the scalars pack into 24 bytes ahead of the coefficients
+        // Ordered so the scalars pack tightly ahead of the coefficients
         index_t size_;
         [[maybe_unused]] double sll_;   // Only needed to generate JIT code
+        T theta_scale_;                 // pi / len, so each sample needs a multiply instead of a division
         int32_t nbar_;                  // Checked against MaxNbar before construction
         [[maybe_unused]] bool norm_;    // Only needed to generate JIT code
         bool sym_;                      // When false, sample the first size_ points of a (size_ + 1)-point symmetric window
         // The window is coeffs_[0] + sum_{m=1}^{nbar-1} coeffs_[m] * cos(m * theta), where coeffs_[0] is the
         // normalization scale and coeffs_[m] = 2 * scale * F_m
         cuda::std::array<T, MaxNbar> coeffs_;
+
+        // pi / len in double precision, where len is the length of the symmetric window the samples come from
+        static double ThetaScale(index_t size, bool sym) {
+          const index_t len = sym ? size : size + 1;
+          return len > 0 ? cuda::std::numbers::pi / static_cast<double>(len) : 0.0;
+        }
 
         // Cosine sequence coefficients in double precision
         static cuda::std::array<double, MaxNbar> ComputeCoeffs(int32_t nbar, double sll, bool norm) {
@@ -162,6 +169,7 @@ namespace matx
                 "  constexpr static index_t size_ = {};\n"
                 "  constexpr static bool sym_ = {};\n"
                 "  constexpr static index_t len_ = sym_ ? size_ : size_ + 1;\n"
+                "  constexpr static T theta_scale_ = static_cast<T>({});\n"
                 "  constexpr static int32_t nbar_ = {};\n"
                 "  constexpr static cuda::std::array<T, nbar_> coeffs_ = {};\n"
                 "  template <typename CapType>\n"
@@ -169,7 +177,7 @@ namespace matx
                 "  {{\n"
                 "    return detail::ApplyGeneratorVecFunc<CapType, T>([](index_t idx) {{\n"
                 "      if (size_ == 1) {{ return T(1); }}\n"
-                "      const T ct = cuda::std::cos(cuda::std::numbers::pi_v<T> * static_cast<T>(2 * idx - len_ + 1) / static_cast<T>(len_));\n"
+                "      const T ct = cuda::std::cos(theta_scale_ * static_cast<T>(2 * idx - len_ + 1));\n"
                 "      T b1 = T(0);\n"
                 "      T b2 = T(0);\n"
                 "      for (int32_t m = nbar_ - 1; m >= 1; m--) {{\n"
@@ -183,7 +191,7 @@ namespace matx
                 "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return 1; }}\n"
                 "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size([[maybe_unused]] int dim) const {{ return size_; }}\n"
                 "}};\n",
-                func_name, size_, sym_, nbar_, coeffs_init)
+                func_name, size_, sym_, ThetaScale(size_, sym_), nbar_, coeffs_init)
           );
         }
 #endif
@@ -193,6 +201,7 @@ namespace matx
         inline Taylor(index_t size, const TaylorWindowParams &params) :
           size_(size),
           sll_(params.sll),
+          theta_scale_(static_cast<T>(ThetaScale(size, params.sym))),
           nbar_(static_cast<int32_t>(params.nbar)),
           norm_(params.norm),
           sym_(params.sym)
@@ -212,7 +221,7 @@ namespace matx
             if (size_ == 1) { return T(1); }
             const index_t len = sym_ ? size_ : size_ + 1;
             // theta = 2 * pi * (idx - len/2 + 1/2) / len, formed from an exact integer numerator
-            const T ct = cuda::std::cos(cuda::std::numbers::pi_v<T> * static_cast<T>(2 * idx - len + 1) / static_cast<T>(len));
+            const T ct = cuda::std::cos(theta_scale_ * static_cast<T>(2 * idx - len + 1));
             // Clenshaw recurrence evaluates the cosine series with a single cosine
             T b1 = T(0);
             T b2 = T(0);
