@@ -513,6 +513,11 @@ if (MATX_EN_FILEIO OR MATX_EN_VISUALIZATION OR MATX_EN_PYBIND11 OR MATX_BUILD_EX
     check_python_libs("numpy")
     check_optional_python_libs("cupy")
 
+    # Unit test vector generators require scipy
+    if (MATX_BUILD_TESTS)
+        check_python_libs("scipy")
+    endif()
+
     target_link_libraries(matx INTERFACE pybind11::embed)
 
     # Visualization requires Python libraries

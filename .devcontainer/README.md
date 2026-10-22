@@ -17,6 +17,8 @@ Note: architecture (`-amd64` or `-arm64`) is automatically added to the tag by t
 
 1. Make your changes to the container recipe
 
+Note: the Python packages needed by the unit tests are read from `test/requirements.txt`. The path is relative to this directory, so generate the container through `create_base_container.sh`.
+
 2. Build the container
 
 `MATX_IMAGE_NAME="someTestName" MATX_VERSION_TAG="someNewTag" create_base_container.sh`
