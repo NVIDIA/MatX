@@ -12,9 +12,25 @@ look at the following sources:
 
 Adding MatX to your project
 ---------------------------
-MatX is a single header file to include in your project called ``matx.h``. Simply add the matx/include directory to your compiler's
-include search path, and add ``#include "matx.h"``. All core MatX functions are in a top-level ``matx`` namespace, while more specific functions have
-a nested namespace. For example, the visualization pieces of MatX are under ``matx::viz``.
+MatX is a header-only library. Add the matx/include directory to your compiler's include search path and include ``matx.h`` for the full API.
+If you only need tensors, ``make_tensor``, and unary or binary elementwise operations, include ``matx/core/matx_tensor.h`` instead:
+
+.. code-block:: cpp
+
+    #include "matx/core/matx_tensor.h"
+
+    int main()
+    {
+        auto a = matx::make_tensor<int>({2}, matx::MATX_HOST_MALLOC_MEMORY);
+        auto b = matx::make_tensor<int>({2}, matx::MATX_HOST_MALLOC_MEMORY);
+        a(0) = 3;
+        a(1) = 4;
+        (b = a + 2).run(matx::HostExecutor{});
+        return b(0) + b(1) == 11 ? 0 : 1;
+    }
+
+Include ``matx.h`` when using the broader operator and transform APIs. MatX functions are in the top-level ``matx`` namespace, while more
+specific functions have a nested namespace. For example, the visualization pieces of MatX are under ``matx::viz``.
 
 Tensor Views
 ------------
