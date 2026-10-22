@@ -39,7 +39,16 @@
 #include <type_traits>
 
 #ifdef __CUDACC__
+#if defined(__NVCC_DIAG_PRAGMA_SUPPORT__)
+// Some nvcc/host compiler combinations diagnose CUB histogram constants used
+// as template arguments as unused. Suppress that diagnostic in CUB only.
+#pragma nv_diagnostic push
+#pragma nv_diag_suppress 177
+#endif
 #include <cub/cub.cuh>
+#if defined(__NVCC_DIAG_PRAGMA_SUPPORT__)
+#pragma nv_diagnostic pop
+#endif
 #include <cuda/std/tuple>
 #endif // __CUDACC__
 

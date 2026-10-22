@@ -99,6 +99,12 @@ matvec, matmul, and solve::
    (C = matmul(Acoo, B)).run(exec); // only Sparse-Matrix x Matrix (SpMM)
    (X = solve(Acsr, Y)).run(exec);  // only on CSR or (batched) tri-DIA format
 
+Sparse ``matmul`` supports rank-2 COO, CSR, and CSC inputs with matching
+input and output value types. FP16 and BF16 use float accumulation and require
+COO or CSR storage: cuSPARSE does not support mixed-precision SpMM with CSC.
+MatX raises ``matxNotSupported`` for FP16/BF16 CSC matmul in both debug and
+release builds. Use COO or CSR storage for these types.
+
 We expect the assortment of supported sparse operations and storage
 formats to grow if the experimental implementation is well-received.
 

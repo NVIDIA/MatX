@@ -341,10 +341,9 @@ class pinv:
         
         A = np.matmul(U, V)
 
-        # 1e-15 is default rcond in numpy but it should match the machine precision
-        # value of the datatype. This is 1e-7 for floats but 1e-6 works better
-        # for singular matrices to mask out singular values that should be zero.
-        tol = 1e-6 if A.dtype == np.float32 or A.dtype == np.complex64 else 1e-15
+        # Match rank_deficient_rcond in Pinv.cu. Leave margin for roundoff in
+        # both U @ V and the SVD so nominally zero singular values are discarded.
+        tol = 1e-6 if A.dtype == np.float32 or A.dtype == np.complex64 else 1e-12
         p_inv = np.linalg.pinv(A, rcond=tol)
 
         return {
