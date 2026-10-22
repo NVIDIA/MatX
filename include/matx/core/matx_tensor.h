@@ -30,6 +30,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////////////
 
+// This allows users to create and perform basic operations on MatX tensors without entire MatX library.
 #pragma once
 
 #include "matx/core/defines.h"
