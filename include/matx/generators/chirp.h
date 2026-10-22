@@ -72,12 +72,18 @@ namespace matx
           return JIT_Storage{detail::to_jit_storage(sop_)};
         }
 
+        // The generated code implements only the linear method, the only one that exists, and get_jit_op_str
+        // rejects any other. The method is still part of the class name so that other methods would get their
+        // own classes.
         __MATX_INLINE__ std::string get_jit_class_name() const {
           return std::format("JITChirp_method{}_f0{}_f1{}_t1{}", static_cast<int>(method_),
                              number_to_symbol(f0_), number_to_symbol(f1_), number_to_symbol(t1_));
         }
 
         __MATX_INLINE__ auto get_jit_op_str() const {
+          if (method_ != ChirpMethod::CHIRP_METHOD_LINEAR) {
+            MATX_THROW(matxNotSupported, "JIT chirp generation supports only the linear method");
+          }
           std::string func_name = get_jit_class_name();
           
           return cuda::std::make_tuple(
@@ -86,7 +92,6 @@ namespace matx
                 "  using space_type = typename SpaceOp::value_type;\n"
                 "  using value_type = FreqType;\n"
                 "  using matxop = bool;\n"
-                "  constexpr static ChirpMethod method_ = static_cast<ChirpMethod>({});\n"
                 "  constexpr static FreqType f0_ = static_cast<FreqType>({});\n"
                 "  constexpr static FreqType f1_ = static_cast<FreqType>({});\n"
                 "  constexpr static space_type t1_ = static_cast<space_type>({});\n"
@@ -95,18 +100,16 @@ namespace matx
                 "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(index_t i) const\n"
                 "  {{\n"
                 "    return detail::ApplyGeneratorVecFunc<CapType, FreqType>([this](index_t idx) {{\n"
-                "      if (method_ == ChirpMethod::CHIRP_METHOD_LINEAR) {{\n"
-                "        const FreqType tval = static_cast<FreqType>(sop_(idx));\n"
-                "        const FreqType phase = FreqType(2) * static_cast<FreqType>(M_PI) * (f0_ * tval + FreqType(0.5) * ((f1_ - f0_) / static_cast<FreqType>(t1_)) * tval * tval);\n"
-                "        return static_cast<FreqType>(cuda::std::cos(phase));\n"
-                "      }}\n"
-                "      return FreqType(0);\n"
+                // The lambda receives element indices, so the time value is read one element at a time
+                "      const FreqType tval = static_cast<FreqType>(get_value<typename CapType::scalar_cap>(sop_, idx));\n"
+                "      const FreqType phase = FreqType(2) * cuda::std::numbers::pi_v<FreqType> * (f0_ * tval + FreqType(0.5) * ((f1_ - f0_) / static_cast<FreqType>(t1_)) * tval * tval);\n"
+                "      return static_cast<FreqType>(cuda::std::cos(phase));\n"
                 "    }}, i);\n"
                 "  }}\n"
                 "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return 1; }}\n"
                 "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size([[maybe_unused]] int dim) const {{ return sop_.Size(0); }}\n"
                 "}};\n",
-                func_name, static_cast<int>(method_), f0_, f1_, t1_)
+                func_name, f0_, f1_, t1_)
           );
         }
 #endif
@@ -130,7 +133,7 @@ namespace matx
           if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
 #ifdef MATX_EN_JIT
             const auto sop_jit_name = detail::get_operator_capability<Cap>(sop_, in);
-            return std::format("{}<{}>", get_jit_class_name(), sop_jit_name);
+            return std::format("{}<{},{}>", get_jit_class_name(), sop_jit_name, type_to_string<FreqType>());
 #else
             return "";
 #endif
@@ -144,10 +147,7 @@ namespace matx
           }
           else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
 #ifdef MATX_EN_JIT
-            const auto [key, value] = get_jit_op_str();
-            if (in.find(key) == in.end()) {
-              in[key] = value;
-            }
+            detail::register_jit_class(in, *this);
             detail::get_operator_capability<Cap>(sop_, in);
             return true;
 #else
@@ -218,12 +218,18 @@ namespace matx
           return JIT_Storage{detail::to_jit_storage(sop_)};
         }
 
+        // The generated code implements only the linear method, the only one that exists, and get_jit_op_str
+        // rejects any other. The method is still part of the class name so that other methods would get their
+        // own classes.
         __MATX_INLINE__ std::string get_jit_class_name() const {
           return std::format("JITComplexChirp_method{}_f0{}_f1{}_t1{}", static_cast<int>(method_),
                              number_to_symbol(f0_), number_to_symbol(f1_), number_to_symbol(t1_));
         }
 
         __MATX_INLINE__ auto get_jit_op_str() const {
+          if (method_ != ChirpMethod::CHIRP_METHOD_LINEAR) {
+            MATX_THROW(matxNotSupported, "JIT chirp generation supports only the linear method");
+          }
           std::string func_name = get_jit_class_name();
           
           return cuda::std::make_tuple(
@@ -232,7 +238,6 @@ namespace matx
                 "  using space_type = typename SpaceOp::value_type;\n"
                 "  using value_type = cuda::std::complex<FreqType>;\n"
                 "  using matxop = bool;\n"
-                "  constexpr static ChirpMethod method_ = static_cast<ChirpMethod>({});\n"
                 "  constexpr static FreqType f0_ = static_cast<FreqType>({});\n"
                 "  constexpr static FreqType f1_ = static_cast<FreqType>({});\n"
                 "  constexpr static space_type t1_ = static_cast<space_type>({});\n"
@@ -241,21 +246,19 @@ namespace matx
                 "  __MATX_INLINE__ __MATX_DEVICE__ decltype(auto) operator()(index_t i) const\n"
                 "  {{\n"
                 "    return detail::ApplyGeneratorVecFunc<CapType, value_type>([this](index_t idx) {{\n"
-                "      if (method_ == ChirpMethod::CHIRP_METHOD_LINEAR) {{\n"
-                "        const FreqType tval = static_cast<FreqType>(sop_(idx));\n"
-                "        const FreqType phase = FreqType(2) * static_cast<FreqType>(M_PI) * (f0_ * tval + FreqType(0.5) * ((f1_ - f0_) / static_cast<FreqType>(t1_)) * tval * tval);\n"
-                "        const FreqType quadrature_offset = FreqType(2) * static_cast<FreqType>(M_PI) * FreqType(90.0 / 360.0);\n"
-                "        FreqType real = static_cast<FreqType>(cuda::std::cos(phase));\n"
-                "        FreqType imag = static_cast<FreqType>(-cuda::std::cos(phase + quadrature_offset));\n"
-                "        return cuda::std::complex<FreqType>{{real, imag}};\n"
-                "      }}\n"
-                "      return cuda::std::complex<FreqType>{{0, 0}};\n"
+                // The lambda receives element indices, so the time value is read one element at a time
+                "      const FreqType tval = static_cast<FreqType>(get_value<typename CapType::scalar_cap>(sop_, idx));\n"
+                "      const FreqType phase = FreqType(2) * cuda::std::numbers::pi_v<FreqType> * (f0_ * tval + FreqType(0.5) * ((f1_ - f0_) / static_cast<FreqType>(t1_)) * tval * tval);\n"
+                "      const FreqType quadrature_offset = FreqType(2) * cuda::std::numbers::pi_v<FreqType> * FreqType(90.0 / 360.0);\n"
+                "      FreqType real = static_cast<FreqType>(cuda::std::cos(phase));\n"
+                "      FreqType imag = static_cast<FreqType>(-cuda::std::cos(phase + quadrature_offset));\n"
+                "      return cuda::std::complex<FreqType>{{real, imag}};\n"
                 "    }}, i);\n"
                 "  }}\n"
                 "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return 1; }}\n"
                 "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size([[maybe_unused]] int dim) const {{ return sop_.Size(0); }}\n"
                 "}};\n",
-                func_name, static_cast<int>(method_), f0_, f1_, t1_)
+                func_name, f0_, f1_, t1_)
           );
         }
 #endif
@@ -279,7 +282,7 @@ namespace matx
           if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
 #ifdef MATX_EN_JIT
             const auto sop_jit_name = detail::get_operator_capability<Cap>(sop_, in);
-            return std::format("{}<{}>", get_jit_class_name(), sop_jit_name);
+            return std::format("{}<{},{}>", get_jit_class_name(), sop_jit_name, type_to_string<FreqType>());
 #else
             return "";
 #endif
@@ -293,10 +296,7 @@ namespace matx
           }
           else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
 #ifdef MATX_EN_JIT
-            const auto [key, value] = get_jit_op_str();
-            if (in.find(key) == in.end()) {
-              in[key] = value;
-            }
+            detail::register_jit_class(in, *this);
             detail::get_operator_capability<Cap>(sop_, in);
             return true;
 #else

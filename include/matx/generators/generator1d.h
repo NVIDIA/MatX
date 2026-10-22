@@ -73,10 +73,7 @@ namespace matx
           }
           else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
 #ifdef MATX_EN_JIT
-            const auto [key, value] = get_jit_op_str();
-            if (in.find(key) == in.end()) {
-              in[key] = value;
-            }
+            detail::register_jit_class(in, *this);
 #endif
             return f_.template get_capability<Cap>(in);
           }
@@ -97,11 +94,7 @@ namespace matx
         }
 
         __MATX_INLINE__ std::string get_jit_class_name() const {
-          std::string name = std::format("JITGenerator1D_dim{}_rank{}_sizes", Dim, RANK);
-          for (int i = 0; i < RANK; i++) {
-            name += std::format("_{}", Size(i));
-          }
-          return name;
+          return std::format("JITGenerator1D_dim{}", Dim) + detail::jit_shape_suffix(*this);
         }
 
         __MATX_INLINE__ auto get_jit_op_str() const {

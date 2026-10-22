@@ -198,7 +198,7 @@ namespace matx
 #ifdef MATX_EN_JIT
       __MATX_INLINE__ std::string get_jit_class_name() const {
         std::string symbol_name = "JITBinOp";
-        return symbol_name;
+        return symbol_name + detail::jit_shape_suffix(*this);
       }
 
       __MATX_INLINE__ auto get_jit_op_str() const {
@@ -283,13 +283,7 @@ namespace matx
         }
 	        else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
 #ifdef MATX_EN_JIT
-          // Get the key/value pair from get_jit_op_str()
-          const auto [key, value] = get_jit_op_str();
-
-          // Insert into the map if the key doesn't exist
-          if (in.find(key) == in.end()) {
-            in[key] = value;
-          }
+          detail::register_jit_class(in, *this);
 
           // Also handle child operators
           detail::get_operator_capability<Cap>(in1_, in);

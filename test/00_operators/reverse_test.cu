@@ -117,3 +117,36 @@ TYPED_TEST(OperatorTestsNumericAllExecs, Reverse)
 
   MATX_EXIT_HANDLER();
 }
+
+TYPED_TEST(OperatorTestsNumericAllExecs, ReverseDifferentSizesInOneExpression)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  ExecType exec{};
+
+  // Reversals of inputs with different sizes can appear in the same expression
+  const index_t na = 8;
+  const index_t nb = 16;
+  auto a = make_tensor<TestType>({na});
+  auto b = make_tensor<TestType>({nb});
+  auto out = make_tensor<TestType>({na + nb});
+  for (index_t i = 0; i < na; i++) {
+    a(i) = static_cast<detail::value_promote_t<TestType>>(i);
+  }
+  for (index_t i = 0; i < nb; i++) {
+    b(i) = static_cast<detail::value_promote_t<TestType>>(na + i);
+  }
+
+  (out = concat(0, reverse<0>(a), reverse<0>(b))).run(exec);
+  exec.sync();
+
+  for (index_t i = 0; i < na; i++) {
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(out(i), a(na - i - 1)));
+  }
+  for (index_t i = 0; i < nb; i++) {
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(out(na + i), b(nb - i - 1)));
+  }
+
+  MATX_EXIT_HANDLER();
+}

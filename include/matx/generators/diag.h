@@ -60,13 +60,7 @@ namespace matx
       }
 
       __MATX_INLINE__ std::string get_jit_class_name() const {
-        std::string val_str;
-        if constexpr (cuda::std::is_floating_point_v<T>) {
-          val_str = std::format("{}", val_);
-        } else {
-          val_str = std::to_string(val_);
-        }
-        return std::format("JITDiagGen_rank{}_val{}", Rank(), val_str);
+        return std::format("JITDiagGen_val{}", detail::number_to_symbol(val_)) + detail::jit_shape_suffix(*this);
       }
 
       __MATX_INLINE__ auto get_jit_op_str() const {
@@ -126,10 +120,7 @@ namespace matx
           }
           else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
 #ifdef MATX_EN_JIT
-          const auto [key, value] = get_jit_op_str();
-          if (in.find(key) == in.end()) {
-            in[key] = value;
-          }
+          detail::register_jit_class(in, *this);
           return true;
 #else
           return false;

@@ -101,14 +101,9 @@ namespace matx
 
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
         __MATX_INLINE__ std::string get_jit_class_name() const {
-          std::string symbol_name = "JITMatMulOp_";
-          symbol_name += std::to_string(dx_gemm_helper_.get_m());
-          symbol_name += "_";
-          symbol_name += std::to_string(dx_gemm_helper_.get_n());
-          symbol_name += "_";
-          symbol_name += std::to_string(dx_gemm_helper_.get_k());
-          symbol_name += dx_gemm_helper_.get_is_complex() ? "_C" : "_R";
-          return symbol_name;
+          // The GEMM symbol (sizes, precision, and target) and alpha and beta are compiled into the generated code
+          return "JITMatMulOp_" + dx_gemm_helper_.GetSymbolName() + "_a" + detail::number_to_symbol(alpha_) + "_b" +
+                 detail::number_to_symbol(beta_) + detail::jit_shape_suffix(*this);
         }
 
         __MATX_INLINE__ auto get_jit_op_str() const {
@@ -244,12 +239,7 @@ namespace matx
           }
           else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
             // Get the capability string and add to map
-            const auto [key, value] = get_jit_op_str();
-
-            // Insert into the map if the key doesn't exist
-            if (in.find(key) == in.end()) {
-              in[key] = value;
-            }
+            detail::register_jit_class(in, *this);
 
             // Also handle child operators
             detail::get_operator_capability<Cap>(a_, in);

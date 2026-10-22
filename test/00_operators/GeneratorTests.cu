@@ -1139,6 +1139,59 @@ TEST(OperatorTests, Generator1DJITAlongEachDim)
   MATX_EXIT_HANDLER();
 }
 
+TEST(OperatorTests, JITExpressionsInsideIndexRemappingOperators)
+{
+  MATX_ENTER_HANDLER();
+  cudaExecutor exec{};
+
+  // Operators such as kron, repmat, and concat pass their children indices that differ from the output's.
+  // Expression children must still give the same values as on the CUDA executor.
+  auto m2 = make_tensor<float>({2, 2});
+  auto m4 = make_tensor<float>({4, 4});
+  auto m28 = make_tensor<float>({2, 8});
+  auto a = make_tensor<float>({8});
+  auto b = make_tensor<float>({16});
+  auto ai = make_tensor<int>({8});
+  auto p34 = make_tensor<float>({3, 4});
+  auto p54 = make_tensor<float>({5, 4});
+  auto c35 = make_tensor<cuda::std::complex<float>>({3, 5});
+  auto c25 = make_tensor<cuda::std::complex<float>>({2, 5});
+  (m2 = reshape(range<0>({4}, -1.0f, 1.0f), {2, 2})).run(exec);
+  (m4 = reshape(range<0>({16}, -3.0f, 1.0f), {4, 4})).run(exec);
+  (m28 = reshape(range<0>({16}, 100.0f, 1.0f), {2, 8})).run(exec);
+  (a = range<0>({8}, -4.0f, 1.0f)).run(exec);
+  (b = range<0>({16}, -8.0f, 1.0f)).run(exec);
+  (ai = range<0>({8}, -4, 1)).run(exec);
+  (p34 = reshape(range<0>({12}, -6.0f, 1.0f), {3, 4})).run(exec);
+  (p54 = reshape(range<0>({20}, 100.0f, 1.0f), {5, 4})).run(exec);
+  (c35 = reshape(range<0>({15}, -7.0f, 1.0f), {3, 5}) * cuda::std::complex<float>{1.0f, 0.5f}).run(exec);
+  (c25 = reshape(range<0>({10}, 100.0f, 1.0f), {2, 5}) * cuda::std::complex<float>{1.0f, -0.5f}).run(exec);
+  exec.sync();
+
+  EXPECT_EQ(CountJITMismatches(kron(abs(m2), m4), 0.0), 0) << "kron(abs(m2), m4)";
+  EXPECT_EQ(CountJITMismatches(kron(m2, abs(m4)), 0.0), 0) << "kron(m2, abs(m4))";
+  EXPECT_EQ(CountJITMismatches(kron(abs(m2), abs(m4)), 0.0), 0) << "kron(abs(m2), abs(m4))";
+  EXPECT_EQ(CountJITMismatches(repmat(abs(a), 2), 0.0), 0) << "repmat(abs(a), 2)";
+  EXPECT_EQ(CountJITMismatches(concat(0, abs(a), abs(b)), 0.0), 0) << "concat(0, abs(a), abs(b))";
+  EXPECT_EQ(CountJITMismatches(repmat(as_float(ai), 2), 0.0), 0) << "repmat(as_float(ai), 2)";
+  EXPECT_EQ(CountJITMismatches(diag(abs(m4), -1), 0.0), 0) << "diag(abs(m4), -1)";
+
+  // Operators of the same type that differ in their offsets or input shapes must each keep their own values
+  EXPECT_EQ(CountJITMismatches(concat(0, slice(abs(b), {0}, {8}), slice(abs(b), {8}, {16})), 0.0), 0)
+      << "concat of two slices of abs(b)";
+  EXPECT_EQ(CountJITMismatches(concat(0, reshape(m28, {16}), reshape(m4, {16})), 0.0), 0)
+      << "concat of reshapes of m28 and m4";
+  EXPECT_EQ(CountJITMismatches(concat(0, lcollapse<2>(m28), lcollapse<2>(m4)), 0.0), 0)
+      << "concat of lcollapse of m28 and m4";
+  EXPECT_EQ(CountJITMismatches(concat(0, rcollapse<2>(m28), rcollapse<2>(m4)), 0.0), 0)
+      << "concat of rcollapse of m28 and m4";
+  EXPECT_EQ(CountJITMismatches(kron(r2c(c35, 8), r2c(c25, 8)), 0.0), 0) << "kron of r2c of c35 and c25";
+  EXPECT_EQ(CountJITMismatches(kron(permute(abs(p34), {1, 0}), permute(abs(p54), {1, 0})), 0.0), 0)
+      << "kron of permutes of p34 and p54";
+
+  MATX_EXIT_HANDLER();
+}
+
 TEST(OperatorTests, GeneratorJITParameterValues)
 {
   MATX_ENTER_HANDLER();
@@ -1154,6 +1207,11 @@ TEST(OperatorTests, GeneratorJITParameterValues)
   EXPECT_EQ(CountJITMismatches(range<0>({n}, -1.5f, 0.25f), 1e-6), 0) << "range with a negative start";
   EXPECT_EQ(CountJITMismatches(fill({n}, 1.0000001f) - fill({n}, 1.0000002f), 1e-9), 0)
       << "constants 1.0000001 and 1.0000002";
+  EXPECT_EQ(CountJITMismatches(chirp(n, 0.5f, -2.5f, 0.5f, 3.25f), 1e-5), 0) << "chirp";
+  EXPECT_EQ(CountJITMismatches(cchirp(n, 0.5f, -2.5f, 0.5f, 3.25f), 1e-5), 0) << "complex chirp";
+  EXPECT_EQ(CountJITMismatches(linspace(0.0f, 1.0f, n) - linspace(0.0f, 2.0f, n), 1e-6), 0)
+      << "linspaces with different ranges";
+  EXPECT_EQ(CountJITMismatches(fftfreq<float>(n, 0.5f), 1e-6), 0) << "fftfreq with a sample spacing of 0.5";
 
   MATX_EXIT_HANDLER();
 }

@@ -207,8 +207,12 @@ namespace matx
           symbol_name += std::to_string(static_cast<int>(DeduceFFTTransformType<typename scalar_to_complex<typename OpA::value_type>::ctype, value_type>()));
           symbol_name += "_D";
           symbol_name += Direction == detail::FFTDirection::FORWARD ? std::string("F") : std::string("B");
+          // The input precision and contiguity, normalization, and output shape are also compiled into the generated code
+          symbol_name += "_" + detail::type_to_string_c_name<typename OpA::value_type>();
+          symbol_name += dx_fft_helper_.get_contiguous_input() ? "_CI" : "_NCI";
+          symbol_name += "_N" + std::to_string(static_cast<int>(norm_));
 
-          return symbol_name;
+          return symbol_name + detail::jit_shape_suffix(*this);
         }
 
         __MATX_INLINE__ auto get_jit_op_str() const {
@@ -300,12 +304,7 @@ namespace matx
           }
           else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
             // Get the capability string and add to map
-            const auto [key, value] = get_jit_op_str();
-
-            // Insert into the map if the key doesn't exist
-            if (in.find(key) == in.end()) {
-              in[key] = value;
-            }
+            detail::register_jit_class(in, *this);
 
             // Also handle child operators
             detail::get_operator_capability<Cap>(a_, in);
@@ -896,7 +895,9 @@ namespace matx
           symbol_name += std::to_string(dx_fft2_helper_.get_cc());
           symbol_name += "_N";
           symbol_name += std::to_string(static_cast<int>(norm_));
-          return symbol_name;
+          // The precision and the batch sizes are also compiled into the generated code
+          symbol_name += "_" + detail::type_to_string_c_name<value_type>();
+          return symbol_name + detail::jit_shape_suffix(*this);
         }
 
         __MATX_INLINE__ auto get_jit_op_str() const {
@@ -1033,10 +1034,7 @@ namespace matx
             return result;
           }
           else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
-            const auto [key, value] = get_jit_op_str();
-            if (in.find(key) == in.end()) {
-              in[key] = value;
-            }
+            detail::register_jit_class(in, *this);
             detail::get_operator_capability<Cap>(a_, in);
             MATX_LOG_DEBUG("cuFFTDx 2D JIT_CLASS_QUERY: true");
             return true;

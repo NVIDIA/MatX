@@ -57,7 +57,7 @@ namespace matx
         }
 
         __MATX_INLINE__ std::string get_jit_class_name() const {
-          return std::format("JITFFTFreq_n{}_d{}", n_, d_);
+          return std::format("JITFFTFreq_n{}_d{}", n_, detail::number_to_symbol(d_));
         }
 
         __MATX_INLINE__ auto get_jit_op_str() const {
@@ -125,10 +125,7 @@ namespace matx
           }
           else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
 #ifdef MATX_EN_JIT
-            const auto [key, value] = get_jit_op_str();
-            if (in.find(key) == in.end()) {
-              in[key] = value;
-            }
+            detail::register_jit_class(in, *this);
             return true;
 #else
             return false;
