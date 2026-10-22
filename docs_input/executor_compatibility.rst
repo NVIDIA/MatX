@@ -201,7 +201,7 @@ existing operators do not implicitly become distributed operations.
    "sin", "|yes|", "|yes|", "|yes|", "|no|", "Element-wise expression."
    "sincos", "|yes|", "|yes|", "|yes|", "|no|", "Element-wise expression."
    "sinh", "|yes|", "|yes|", "|yes|", "|no|", "Element-wise expression."
-   "slice", "|yes|", "|yes|", "|yes|", "|no|", "View expression."
+   "slice", "|yes|", "|yes|", "|yes|", "|no|", "View expression; JIT specializes starts and strides."
    "softmax", "|no|", "|yes|", "|no|", "|no|", "CUDA-only reduction-style transform."
    "solve", "|yes|", "|yes|", "|yes|", "|no|", "Solver transform; host support requires the CPU solver backend. JIT support follows the underlying cuSolverDx factorization limits when it lowers to a supported solver projection."
    "sort", "|partial|", "|yes|", "|no|", "|no|", "Sort transform; host execution is available but does not generally use multithreaded host executor paths."
