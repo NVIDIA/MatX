@@ -1,14 +1,6 @@
 #pragma once
 
-#include <complex>
-#include <cuda.h>
-#include <iomanip>
-#include <stdint.h>
-#include <stdio.h>
-#include <vector>
-
-#include "matx/core/tensor.h"
-#include "matx/core/type_utils.h"
+#include <cuda_runtime.h>
 
 
 namespace matx {
