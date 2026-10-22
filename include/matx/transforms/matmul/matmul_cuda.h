@@ -51,6 +51,7 @@
 #include "matx/operators/transpose.h"
 #include "matx/operators/unary_operators.h"
 #include "matx/transforms/matmul/matmul_common.h"
+#include "matx/transforms/cuda_type_utils.h"
 
 namespace matx {
 

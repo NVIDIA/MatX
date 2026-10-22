@@ -61,6 +61,7 @@
 #include "matx/executors/executors.h"
 #include "matx/generators/generators.h"
 #include "matx/operators/operators.h"
+#include "matx/transforms/cuda_type_utils.h"
 #include "matx/transforms/transforms.h"
 #include "matx/streaming/streaming.h"
 #include "matx/core/distributed_tensor.h" // distributed support is experimental
