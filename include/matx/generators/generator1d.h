@@ -42,6 +42,8 @@ namespace matx
         // dummy type to signal this is a matxop
         using matxop = bool;
         using value_type = typename Generator1D::value_type;
+        // Rank of the output shape, which can be any rank. The generator varies only along Dim and repeats
+        // across the other dimensions.
         static constexpr int RANK = cuda::std::tuple_size<cuda::std::decay_t<ShapeType>>::value;
 
         __MATX_INLINE__ std::string str() const { return "gen1d"; }
@@ -59,10 +61,23 @@ namespace matx
               return detail::capability_attributes<Cap>::default_value;
             }
           }
-          else if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY ||
-                             Cap == OperatorCapability::JIT_CLASS_QUERY ||
-                             Cap == OperatorCapability::SUPPORTS_JIT) {
-            // Forward JIT-related capabilities to the generator
+          else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
+            return f_.template get_capability<Cap>(in);
+          }
+          else if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
+#ifdef MATX_EN_JIT
+            return std::format("{}<{}>", get_jit_class_name(), f_.template get_capability<Cap>(in));
+#else
+            return f_.template get_capability<Cap>(in);
+#endif
+          }
+          else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
+#ifdef MATX_EN_JIT
+            const auto [key, value] = get_jit_op_str();
+            if (in.find(key) == in.end()) {
+              in[key] = value;
+            }
+#endif
             return f_.template get_capability<Cap>(in);
           }
           else {
@@ -71,20 +86,51 @@ namespace matx
         }
 
 #ifdef MATX_EN_JIT
+        // The JIT class wraps the generator's class so the generator is indexed along Dim and the wrapper
+        // reports the full rank and shape
         struct JIT_Storage {
-          // Empty storage - generator data is made constexpr in JIT code
+          typename detail::inner_storage_or_self_t<detail::base_type_t<Generator1D>> f_;
         };
 
         JIT_Storage ToJITStorage() const {
-          return JIT_Storage{};
+          return JIT_Storage{detail::to_jit_storage(f_)};
         }
 
         __MATX_INLINE__ std::string get_jit_class_name() const {
-          return f_.get_jit_class_name();
+          std::string name = std::format("JITGenerator1D_dim{}_rank{}_sizes", Dim, RANK);
+          for (int i = 0; i < RANK; i++) {
+            name += std::format("_{}", Size(i));
+          }
+          return name;
         }
 
         __MATX_INLINE__ auto get_jit_op_str() const {
-          return f_.get_jit_op_str();
+          std::string func_name = get_jit_class_name();
+          cuda::std::array<index_t, RANK> sizes;
+          for (int i = 0; i < RANK; i++) {
+            sizes[i] = Size(i);
+          }
+
+          return cuda::std::make_tuple(
+            func_name,
+            std::format("template <typename Gen> struct {} {{\n"
+                "  using value_type = typename Gen::value_type;\n"
+                "  using matxop = bool;\n"
+                "  constexpr static int Dim_ = {};\n"
+                "  constexpr static int Rank_ = {};\n"
+                "  constexpr static cuda::std::array<index_t, Rank_> sizes_ = {{ {} }};\n"
+                "  typename detail::inner_storage_or_self_t<detail::base_type_t<Gen>> f_;\n"
+                "  template <typename CapType, typename... Is>\n"
+                "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(Is... indices) const\n"
+                "  {{\n"
+                "    const cuda::std::array<index_t, Rank_> idx{{static_cast<index_t>(indices)...}};\n"
+                "    return f_.template operator()<CapType>(idx[Dim_]);\n"
+                "  }}\n"
+                "  static __MATX_INLINE__ constexpr __MATX_DEVICE__ int32_t Rank() {{ return Rank_; }}\n"
+                "  constexpr __MATX_INLINE__ __MATX_DEVICE__ index_t Size(int dim) const {{ return sizes_[dim]; }}\n"
+                "}};\n",
+                func_name, Dim, RANK, detail::array_to_string(sizes))
+          );
         }
 #endif
 
@@ -106,7 +152,9 @@ namespace matx
 
       private:
         Generator1D f_;
-        ShapeType s_;
+        // Stored by value: an lvalue shape argument deduces ShapeType as a reference, which would dangle
+        // once the caller's shape goes out of scope
+        cuda::std::decay_t<ShapeType> s_;
     };
   }
 } // end namespace matx

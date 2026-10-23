@@ -215,6 +215,7 @@ existing operators do not implicitly become distributed operations.
    "svdpi", "|no|", "|yes|", "|no|", "|no|", "CUDA-only power-iteration SVD transform."
    "tan", "|yes|", "|yes|", "|yes|", "|no|", "Element-wise expression."
    "tanh", "|yes|", "|yes|", "|yes|", "|no|", "Element-wise expression."
+   "taylor", "|yes|", "|yes|", "|yes|", "|no|", "Window generator expression."
    "toeplitz", "|yes|", "|yes|", "|yes|", "|no|", "Generator/expression composition."
    "trace", "|partial|", "|yes|", "|no|", "|no|", "Reduction-style matrix transform; host execution is available but reductions are not generally parallelized across host threads."
    "transpose", "|yes|", "|yes|", "|yes|", "|no|", "View/reindex expression."

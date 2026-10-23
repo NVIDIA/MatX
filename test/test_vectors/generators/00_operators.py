@@ -88,13 +88,32 @@ class window:
         self.blackman = np.blackman(self.win_size)
         self.bartlett = np.bartlett(self.win_size)
         self.flattop = ss.windows.flattop(self.win_size)
+        self.taylor = ss.windows.taylor(self.win_size)
 
         return {
             'hamming': self.hamming,
             'hanning': self.hanning,
             'blackman': self.blackman,
             'bartlett': self.bartlett,
-            'flattop': self.flattop
+            'flattop': self.flattop,
+            'taylor': self.taylor
+        }
+
+
+class taylor_window:
+    def __init__(self, dtype: str, size: List[int]):
+        self.win_size = size[0]
+
+    def run(self) -> Dict[str, np.array]:
+        M = self.win_size
+
+        return {
+            'default': ss.windows.taylor(M),
+            'nbar6_sll40': ss.windows.taylor(M, nbar=6, sll=40),
+            'no_norm': ss.windows.taylor(M, nbar=5, sll=35, norm=False),
+            'periodic': ss.windows.taylor(M, sym=False),
+            'nbar1': ss.windows.taylor(M, nbar=1),
+            'nbar31_sll100': ss.windows.taylor(M, nbar=31, sll=100),
         }
 
 
