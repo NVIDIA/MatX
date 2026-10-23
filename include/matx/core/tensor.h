@@ -45,7 +45,6 @@
 #include "matx/core/tensor_utils.h"
 #include "matx/core/dlpack.h"
 #include "matx/core/tie.h"
-#include "matx/kernels/utility.cuh"
 
 
 
