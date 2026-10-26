@@ -12,10 +12,13 @@ to the CUDA stream overloads and the overloads that return a new tensor. No
 additional build options or dependencies are required. Synchronize the executor
 or stream before accessing the copied data from the host.
 
-Noncontiguous views, copies that convert element types, and expression inputs
+Sparse sources, noncontiguous views, copies that convert element types, and expression inputs
 use executor-dispatched assignment. Host executors continue to use assignment.
 Source and destination must have matching ranks and sizes, and their memory
 regions must not overlap.
+With ``MATX_EN_UNSAFE_ALIAS_DETECTION`` enabled, the CUDA byte-copy path uses
+the same alias check as assignment and throws on detected unsafe overlap before
+issuing the copy.
 
 .. versionadded:: 0.3.0
 

@@ -258,6 +258,62 @@ TEST(CopyTests, TypeConversion)
   MATX_EXIT_HANDLER();
 }
 
+TEST(CopyTests, SparseSource)
+{
+  MATX_ENTER_HANDLER();
+  auto values = make_tensor<float>({2});
+  auto rows = make_tensor<index_t>({2});
+  auto columns = make_tensor<index_t>({2});
+  values(0) = 5.0f;
+  values(1) = 7.0f;
+  rows(0) = 0;
+  rows(1) = 1;
+  columns(0) = 2;
+  columns(1) = 0;
+  auto sparse = experimental::make_tensor_coo(values, rows, columns, {2, 3});
+  auto out = make_tensor<float>({2, 3});
+  auto assigned = make_tensor<float>({2, 3});
+  auto expected = make_tensor<float>({2, 3});
+  cudaExecutor exec{};
+  // An expression forces evaluation of sparse elements, including implicit zeros.
+  (expected = sparse + 0.0f).run(exec);
+  (assigned = sparse).run(exec);
+  matx::copy(out, sparse, exec);
+  exec.sync();
+  for (index_t i = 0; i < 2; i++) {
+    for (index_t j = 0; j < 3; j++) {
+      EXPECT_EQ(out(i, j), expected(i, j));
+      EXPECT_EQ(assigned(i, j), expected(i, j));
+    }
+  }
+  MATX_EXIT_HANDLER();
+}
+
+#ifdef MATX_EN_UNSAFE_ALIAS_DETECTION
+TEST(CopyTests, OverlappingContiguousViews)
+{
+  // Host allocation allows verifying rejection before any CUDA work is issued.
+  auto storage = make_tensor<float>({8}, MATX_HOST_MALLOC_MEMORY);
+  auto first = slice(storage, {0}, {5});
+  auto second = slice(storage, {3}, {8});
+  ASSERT_TRUE(first.IsContiguous());
+  ASSERT_TRUE(second.IsContiguous());
+  auto expect_overlap = [](auto &out, const auto &in, auto exec) {
+    try {
+      matx::copy(out, in, exec);
+      FAIL() << "Overlapping views must be rejected before copying";
+    }
+    catch (const detail::matxException &error) {
+      EXPECT_EQ(error.e, matxInvalidParameter);
+      EXPECT_NE(std::string(error.what()).find("memory ranges overlap"), std::string::npos);
+    }
+  };
+  expect_overlap(second, first, cudaExecutor{});
+  expect_overlap(first, second, cudaExecutor{});
+  expect_overlap(second, first, cudaStream_t{});
+}
+#endif
+
 #ifndef NDEBUG
 TEST(CopyTests, MismatchedSizes)
 {
