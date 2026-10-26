@@ -32,6 +32,7 @@
 
 #pragma once
 
+#include <charconv>
 #include <format>
 #include <type_traits>
 #include <string>
@@ -460,6 +461,51 @@ auto get_jit_class_or_pod_name(const T& op)
 }
 
 /**
+ * @brief Append a number to a string as characters that are valid in a C++ symbol/identifier
+ *
+ * Appends the same characters as number_to_symbol without building a temporary string, for JIT class names that
+ * are built on every launch.
+ *
+ * @tparam T Numeric type (can be complex or non-complex)
+ * @param str String to append to
+ * @param val Numeric value to append
+ */
+template <typename T>
+__MATX_INLINE__ void append_number_symbol(std::string &str, const T& val)
+{
+  // Helper lambdas to append a value with the characters that are invalid in variable names replaced
+  auto append_chars = [&str](std::string_view chars) {
+    for (const char c : chars) {
+      if (c == '.') str += 'p';
+      else if (c == '-') str += 'n';
+      else if (c != '+') str += c;
+    }
+  };
+  auto append_sanitized = [&append_chars](auto v) {
+    using V = decltype(v);
+    // to_chars gives the same characters as std::format("{}") without its overhead. It does not apply to bool,
+    // which std::format writes as "true" or "false", or to char, which std::format writes as a character.
+    if constexpr (!cuda::std::is_same_v<V, char> && requires(char *p, V x) { std::to_chars(p, p, x); }) {
+      char digits[64];
+      append_chars(std::string_view(digits, std::to_chars(digits, digits + sizeof(digits), v).ptr));
+    } else {
+      append_chars(std::format("{}", v));
+    }
+  };
+
+  if constexpr (is_complex_v<T>) {
+    // Format complex numbers as r{real}_i{imag}
+    str += 'r';
+    append_sanitized(val.real());
+    str += "_i";
+    append_sanitized(val.imag());
+  } else {
+    // Format non-complex numbers directly
+    append_sanitized(val);
+  }
+}
+
+/**
  * @brief Convert a number to a valid C++ symbol/identifier string
  *
  * Formats a numeric value as a string that can be used in C++ variable names.
@@ -482,25 +528,56 @@ auto get_jit_class_or_pod_name(const T& op)
 template <typename T>
 __MATX_INLINE__ std::string number_to_symbol(const T& val)
 {
-  // Helper lambda to sanitize floating point values for variable names
-  auto sanitize_float = [](auto v) -> std::string {
-    std::string str;
-    for (const char c : std::format("{}", v)) {
-      if (c == '.') str += 'p';
-      else if (c == '-') str += 'n';
-      else if (c != '+') str += c;
-    }
-    return str;
-  };
+  std::string str;
+  append_number_symbol(str, val);
+  return str;
+}
 
-  if constexpr (is_complex_v<T>) {
-    // Format complex numbers as r{real}_i{imag}
-    auto real_val = val.real();
-    auto imag_val = val.imag();
-    return std::string("r") + sanitize_float(real_val) + "_i" + sanitize_float(imag_val);
-  } else {
-    // Format non-complex numbers directly
-    return sanitize_float(val);
+/**
+ * @brief Suffix for the JIT class name of an operator whose generated code bakes in its rank and sizes
+ *
+ * A JIT class name must determine every value compiled into its definition, so operators that differ in shape
+ * must not share a name. Registering a different definition under an existing name throws (see
+ * register_jit_class), so a missing shape suffix shows up as an exception that names the class.
+ *
+ * @tparam Op Operator type
+ * @param op Operator to describe
+ * @param rank Rank to describe, such as get_dyn_rank() of an operand whose rank is only known at run time
+ * @return "_r{rank}_{size0}_{size1}..." for a ranked operator, or "_rNo" for one without a shape
+ */
+template <typename Op>
+__MATX_INLINE__ std::string jit_shape_suffix(const Op &op, int rank)
+{
+  if (rank < 0) {
+    return "_rNo";
+  }
+  // Built on every JIT launch through JIT_TYPE_QUERY, so numbers are appended in place rather than formatted
+  std::string suffix = "_r";
+  append_number_symbol(suffix, rank);
+  for (int i = 0; i < rank; i++) {
+    suffix += '_';
+    append_number_symbol(suffix, op.Size(i));
+  }
+  return suffix;
+}
+
+/**
+ * @brief Suffix for the JIT class name of an operator whose generated code bakes in its rank and sizes
+ *
+ * Uses the operator's jit_rank() when it has one, and its Rank() otherwise.
+ *
+ * @tparam Op Operator type
+ * @param op Operator to describe
+ * @return "_r{rank}_{size0}_{size1}..." for a ranked operator, or "_rNo" for one without a shape
+ */
+template <typename Op>
+__MATX_INLINE__ std::string jit_shape_suffix(const Op &op)
+{
+  if constexpr (requires { op.jit_rank(); }) {
+    return jit_shape_suffix(op, op.jit_rank());
+  }
+  else {
+    return jit_shape_suffix(op, op.Rank());
   }
 }
 

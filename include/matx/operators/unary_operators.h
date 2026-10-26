@@ -156,7 +156,7 @@ namespace matx
     
 #ifdef MATX_EN_JIT
     __MATX_INLINE__ std::string get_jit_class_name() const {
-      return "JITUnaryOp";
+      return "JITUnaryOp" + detail::jit_shape_suffix(*this);
     }
 
     __MATX_INLINE__ auto get_jit_op_str() const {
@@ -197,9 +197,12 @@ namespace matx
             "  {\n" +
             "    using ScalarCap = CapabilityParams<ElementsPerThread::ONE, CapType::jit>;\n" +
             "    using I1Cap = cuda::std::conditional_t<matx_jit_contains_block_reduction::value && (!ContainsBlockReduction<I1>() && !IsDirectBlockReduction<I1>()), ScalarCap, CapType>;\n" +
+            // Threads past the end of the data can call this operator in some kernels. Check the index this operator
+            // received, not threadIdx.x, so the check also holds when a parent operator such as kron, repmat, or
+            // concat remaps indices into a child with a different size.
             (actual_rank > 0 ?
             "    if constexpr (!matx_jit_contains_block_reduction::value && !CapType::pass_through_threads) {\n"
-            "      if ((threadIdx.x * static_cast<int>(CapType::ept)) > Size(Rank() - 1)) {\n"
+            "      if (static_cast<index_t>(pp_get<Rank() - 1>(indices...)) * static_cast<index_t>(CapType::ept) >= Size(Rank() - 1)) {\n"
             "        using I1Value = remove_cvref_t<decltype(get_value<I1Cap>(in1_, indices...))>;\n"
             "        return Op{}.template operator()<CapType>(I1Value{});\n"
             "      }\n"
@@ -240,10 +243,7 @@ namespace matx
       }
 	      else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
 #ifdef MATX_EN_JIT
-        const auto [key, value] = get_jit_op_str();
-        if (in.find(key) == in.end()) {
-          in[key] = value;
-        }
+        detail::register_jit_class(in, *this);
         detail::get_operator_capability<Cap>(in1_, in);
         detail::get_operator_capability<Cap>(Op{}, in);
         return true;

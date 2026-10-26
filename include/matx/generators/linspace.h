@@ -57,8 +57,22 @@ namespace matx
           return JIT_Storage{};
         }
 
+        // Built on every JIT launch through JIT_TYPE_QUERY, so numbers are appended in place rather than formatted
         __MATX_INLINE__ std::string get_jit_class_name() const {
-          return std::format("JITLinspace_axis{}_count{}_numrc{}", axis_, count_, NUM_RC);
+          std::string name = "JITLinspace_axis";
+          detail::append_number_symbol(name, axis_);
+          name += "_count";
+          detail::append_number_symbol(name, count_);
+          name += "_numrc";
+          detail::append_number_symbol(name, NUM_RC);
+          // The first values and steps are compiled into the generated code, so they are part of the name
+          for (int i = 0; i < NUM_RC; i++) {
+            name += "_f";
+            detail::append_number_symbol(name, firsts_[i]);
+            name += "_s";
+            detail::append_number_symbol(name, steps_[i]);
+          }
+          return name;
         }
 
         __MATX_INLINE__ auto get_jit_op_str() const {
@@ -153,10 +167,7 @@ namespace matx
           }
           else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
 #ifdef MATX_EN_JIT
-            const auto [key, value] = get_jit_op_str();
-            if (in.find(key) == in.end()) {
-              in[key] = value;
-            }
+            detail::register_jit_class(in, *this);
             return true;
 #else
             return false;

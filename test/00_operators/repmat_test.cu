@@ -61,3 +61,37 @@ TYPED_TEST(OperatorTestsAllExecs, RepMat)
   }
   MATX_EXIT_HANDLER();
 }
+
+TYPED_TEST(OperatorTestsAllExecs, RepMatDifferentSizesInOneExpression)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  ExecType exec{};
+
+  // Repetitions of inputs with different sizes can appear in the same expression
+  const index_t na = 8;
+  const index_t nb = 16;
+  const index_t reps = 2;
+  auto a = make_tensor<TestType>({na});
+  auto b = make_tensor<TestType>({nb});
+  auto out = make_tensor<TestType>({(na + nb) * reps});
+  for (index_t i = 0; i < na; i++) {
+    a(i) = static_cast<detail::value_promote_t<TestType>>(i);
+  }
+  for (index_t i = 0; i < nb; i++) {
+    b(i) = static_cast<detail::value_promote_t<TestType>>(na + i);
+  }
+
+  (out = concat(0, repmat(a, reps), repmat(b, reps))).run(exec);
+  exec.sync();
+
+  for (index_t i = 0; i < na * reps; i++) {
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(out(i), a(i % na)));
+  }
+  for (index_t i = 0; i < nb * reps; i++) {
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(out(na * reps + i), b(i % nb)));
+  }
+
+  MATX_EXIT_HANDLER();
+}

@@ -89,6 +89,42 @@ namespace detail {
     }
   };
 
+  /**
+   * @brief Registers a JIT class definition under its class name
+   *
+   * Kernels are cached by the names of the classes they use, and each name is compiled once, so a class name
+   * must determine every value compiled into its definition. Registering a second, different definition under
+   * an existing name means the name is missing one of those values, so this throws instead of letting one
+   * operator run with another's code.
+   *
+   * @param classes Map from class name to definition being collected for one expression
+   * @param name Class name
+   * @param definition Generated class definition
+   */
+  template <typename ClassMap>
+  __MATX_INLINE__ __MATX_HOST__ void register_jit_class(ClassMap &classes, const std::string &name,
+                                                        const std::string &definition) {
+    const auto [it, inserted] = classes.try_emplace(name, definition);
+    if (!inserted && it->second != definition) {
+      MATX_THROW(matxInvalidParameter,
+                 std::format("JIT class {} has two different definitions, so its name is missing a value that is "
+                             "compiled into it", name));
+    }
+  }
+
+  /**
+   * @brief Registers the JIT class definition that an operator generates under its class name
+   *
+   * @param classes Map from class name to definition being collected for one expression
+   * @param op Operator whose get_jit_op_str() returns its class name and definition
+   */
+  template <typename ClassMap, typename Op>
+    requires requires(const Op &o) { o.get_jit_op_str(); }
+  __MATX_INLINE__ __MATX_HOST__ void register_jit_class(ClassMap &classes, const Op &op) {
+    const auto [name, definition] = op.get_jit_op_str();
+    register_jit_class(classes, name, definition);
+  }
+
   __MATX_INLINE__ __MATX_HOST__ JITCacheKey MakeInvalidJITCacheKey() {
     return {};
   }

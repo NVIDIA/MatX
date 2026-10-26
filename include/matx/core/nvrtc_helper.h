@@ -50,6 +50,7 @@
 #include <vector>
 #include <string>
 #include <string_view>
+#include <atomic>
 #include <mutex>
 #include <cctype>
 #include <regex>
@@ -650,6 +651,29 @@ inline std::string qualify_jit_type_names(const std::string& type_str) {
   return result;
 }
 
+/**
+ * @brief Callback that sees every JIT launch, such as the unit tests' class name check
+ *
+ * Receives the class definitions of the launched expression, its fixed-size cache key, its type string, and its
+ * launch configuration (kernel variant, elements per thread, block size, and groups per block). Some operators
+ * generate different code for different launch configurations, which is safe because every kernel cache key
+ * includes the configuration. Generating the definitions costs more than the rest of a warm launch, so they are
+ * generated only while an observer is installed.
+ */
+using JITLaunchObserver = void (*)(const std::unordered_map<std::string, std::string> &classes,
+                                   const JITCacheKey &jit_cache_key, const std::string &type_str,
+                                   const std::string &launch_config);
+
+/**
+ * @brief The installed JIT launch observer, or nullptr when none is installed
+ *
+ * Atomic so that an observer can be installed or removed while other threads launch JIT kernels.
+ */
+inline std::atomic<JITLaunchObserver> &jit_launch_observer() {
+  static std::atomic<JITLaunchObserver> observer{nullptr};
+  return observer;
+}
+
 struct JITKernelCacheKey {
   JITCacheKey op_key;
   int rank = 0;
@@ -748,6 +772,13 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name,
       "_index" + std::to_string(sizeof(index_t) * 8) + "_offset" + std::to_string(sizeof(offset_t) * 8) + "_";
   std::string kernel_name = get_kernel_name_for_rank<RANK>(stride, global_kernel, pass_through_threads,
                                                            pass_through_inner_rank, block_reduces_rank);
+  if (const auto observer = jit_launch_observer().load()) {
+    std::unordered_map<std::string, std::string> classes;
+    detail::get_operator_capability<OperatorCapability::JIT_CLASS_QUERY>(op, classes);
+    const std::string launch_config = kernel_name + "_ept" + std::to_string(static_cast<int>(ept)) + "_block" +
+                                      std::to_string(threads.x) + "_groups" + std::to_string(groups_per_block);
+    observer(classes, jit_cache_key, ensure_kernel_op_type(), launch_config);
+  }
   auto make_legacy_kernel_cache_key = [&]() {
     return device_cache_prefix + kernel_name + "_ept_" + std::to_string(static_cast<int>(ept)) +
            "_block_" + std::to_string(threads.x) + "_groups_" +

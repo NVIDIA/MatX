@@ -61,7 +61,7 @@ namespace matx
       __MATX_INLINE__ std::string get_jit_class_name() const {
         // Convert the numeric value to a valid C++ symbol name
         std::string val_str = detail::number_to_symbol(v_);
-        return std::format("JITConstVal_val{}_rank{}", val_str, Rank() == matxNoRank ? "No" : std::to_string(Rank()));
+        return std::format("JITConstVal_val{}", val_str) + detail::jit_shape_suffix(*this);
       }
 
       __MATX_INLINE__ auto get_jit_op_str() const {
@@ -167,10 +167,7 @@ namespace matx
         }
         else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
 #ifdef MATX_EN_JIT
-          const auto [key, value] = get_jit_op_str();
-          if (in.find(key) == in.end()) {
-            in[key] = value;
-          }
+          detail::register_jit_class(in, *this);
           return true;
 #else
           return false;

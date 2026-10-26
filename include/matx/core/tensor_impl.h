@@ -1472,12 +1472,7 @@ MATX_IGNORE_WARNING_POP_GCC
       }
       else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
 #ifdef MATX_EN_JIT
-        const auto [key, value] = get_jit_op_str();
-
-        // Insert into the map if the key doesn't exist
-        if (in.find(key) == in.end()) {
-          in[key] = value;
-        }
+        detail::register_jit_class(in, *this);
 
         return true;
 #else

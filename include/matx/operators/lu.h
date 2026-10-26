@@ -275,12 +275,8 @@ namespace detail {
       void AddJITProjectionClasses(std::unordered_map<std::string, std::string> &in) const
       {
         const std::string class_name = GetJITProjectionClassName<Component>();
-        if (in.find(class_name) != in.end()) {
-          return;
-        }
-
         const std::string solver_func_name = std::string(SOLVER_DX_FUNC_PREFIX) + "_" + dx_lu_helper_.GetSymbolName();
-        in[class_name] =
+        const std::string definition =
           " extern \"C\" __device__ void " + solver_func_name + "(" + detail::type_to_string<a_value_type>() + "*, int*, int*);\n"
           " template <typename OpA, int Component> struct " + class_name + "  {\n"
           "  using solver_value_type = typename OpA::value_type;\n"
@@ -308,6 +304,7 @@ namespace detail {
           "    else { return a_.Size(dim); }\n"
           "  }\n"
           "};\n";
+        detail::register_jit_class(in, class_name, definition);
       }
 #endif
   };

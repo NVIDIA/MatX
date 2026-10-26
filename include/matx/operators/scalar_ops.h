@@ -112,10 +112,7 @@ namespace detail {
       if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) { \
         static_assert(cuda::std::is_same_v<InType, std::unordered_map<std::string, std::string>>, \
                       "JIT_CLASS_QUERY capability requires std::unordered_map<std::string, std::string> as input type"); \
-        const auto [key, value] = get_jit_op_str(); \
-        if (in.find(key) == in.end()) { \
-          in[key] = value; \
-        } \
+        detail::register_jit_class(in, *this); \
         return true; \
       } \
       else if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) { \
@@ -184,10 +181,7 @@ namespace detail {
       if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) { \
         static_assert(cuda::std::is_same_v<InType, std::unordered_map<std::string, std::string>>, \
                       "JIT_CLASS_QUERY capability requires std::unordered_map<std::string, std::string> as input type"); \
-        const auto [key, value] = get_jit_op_str(); \
-        if (in.find(key) == in.end()) { \
-          in[key] = value; \
-        } \
+        detail::register_jit_class(in, *this); \
         return true; \
       } \
       else if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) { \
@@ -264,10 +258,7 @@ namespace detail {
       if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) { \
         static_assert(cuda::std::is_same_v<InType, std::unordered_map<std::string, std::string>>, \
                       "JIT_CLASS_QUERY capability requires std::unordered_map<std::string, std::string> as input type"); \
-        const auto [key, value] = get_jit_op_str(); \
-        if (in.find(key) == in.end()) { \
-          in[key] = value; \
-        } \
+        detail::register_jit_class(in, *this); \
         return true; \
       } \
       else if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) { \
@@ -338,10 +329,7 @@ namespace detail {
       if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) { \
         static_assert(cuda::std::is_same_v<InType, std::unordered_map<std::string, std::string>>, \
                       "JIT_CLASS_QUERY capability requires std::unordered_map<std::string, std::string> as input type"); \
-        const auto [key, value] = get_jit_op_str(); \
-        if (in.find(key) == in.end()) { \
-          in[key] = value; \
-        } \
+        detail::register_jit_class(in, *this); \
         return true; \
       } \
       else if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) { \
@@ -410,10 +398,7 @@ namespace detail {
       if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) { \
         static_assert(cuda::std::is_same_v<InType, std::unordered_map<std::string, std::string>>, \
                       "JIT_CLASS_QUERY capability requires std::unordered_map<std::string, std::string> as input type"); \
-        const auto [key, value] = get_jit_op_str(); \
-        if (in.find(key) == in.end()) { \
-          in[key] = value; \
-        } \
+        detail::register_jit_class(in, *this); \
         return true; \
       } \
       else if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) { \

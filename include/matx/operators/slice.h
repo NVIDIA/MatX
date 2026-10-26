@@ -72,20 +72,34 @@ namespace matx
         static_assert(DIM<=T::Rank(), "SliceOp: DIM must be less than or equal to operator rank.");
 
 #ifdef MATX_EN_JIT
+        // Matches the members of the generated class, which reads the strides at run time
         struct JIT_Storage {
           typename detail::inner_storage_or_self_t<detail::base_type_t<T>> op_;
+          StrideType strides_;
         };
 
         JIT_Storage ToJITStorage() const {
-          return JIT_Storage{detail::to_jit_storage(op_)};
+          return JIT_Storage{detail::to_jit_storage(op_), strides_};
         }
 
+        // Built on every JIT launch through JIT_TYPE_QUERY, so numbers are appended in place rather than formatted
         __MATX_INLINE__ std::string get_jit_class_name() const {
-          std::string params_str;
+          std::string name = "JITSlice_";
           for (int i = 0; i < DIM; i++) {
-            params_str += std::format("d{}_s{}_", dims_[i], sizes_[i]);
+            name += 'd';
+            detail::append_number_symbol(name, dims_[i]);
+            name += "_s";
+            detail::append_number_symbol(name, sizes_[i]);
+            name += '_';
           }
-          return std::format("JITSlice_{}", params_str);
+          // The start offsets are compiled into the generated code, so slices at different offsets need distinct names
+          const int actual_input_rank = detail::get_dyn_rank(op_);
+          for (int i = 0; i < actual_input_rank; i++) {
+            name += "st";
+            detail::append_number_symbol(name, starts_[i]);
+            name += '_';
+          }
+          return name;
         }
 
         __MATX_INLINE__ std::string get_jit_stride_type_name() const {
@@ -246,10 +260,7 @@ namespace matx
           }
           else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
 #ifdef MATX_EN_JIT
-            const auto [key, value] = get_jit_op_str();
-            if (in.find(key) == in.end()) {
-              in[key] = value;
-            }
+            detail::register_jit_class(in, *this);
             detail::get_operator_capability<Cap>(op_, in);
             return true;
 #else
