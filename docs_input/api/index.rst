@@ -7,6 +7,7 @@ API Reference
    :maxdepth: 3
 
    creation/index.rst
+   tensor.rst
    manipulation/index.rst
    io/index.rst
    math/index.rst
