@@ -3,10 +3,10 @@
 Tensor Class Methods
 ####################
 
-This page lists the public methods of ``matx::tensor_t`` and its base class,
-``matx::detail::tensor_impl_t``, followed by the dynamic, sparse, and distributed
-tensor interfaces. Overloads are grouped by method name in the tables; the
-generated ``tensor_t`` reference at the end gives its full declarations.
+This page lists tensor methods intended for direct use in application code,
+including inherited methods such as ``IsContiguous()``. It covers dense,
+dynamic, sparse, and distributed tensors. Overloads are grouped by method name
+in the tables.
 
 For an introduction to tensors, see :ref:`tensor_api`. Prefer
 :ref:`make_tensor` to direct construction. Include ``<matx.h>`` to use the
@@ -100,8 +100,7 @@ Data access and initialization
    * - ``operator()(indices...)``; ``operator()(index_array)``
      - Access an element using strides, with const and non-const overloads.
        Supply exactly ``Rank()`` integral indices, or a
-       ``cuda::std::array<index_t, RANK>``. Use ``a()`` for a scalar. The
-       capability-template overloads are used by executors for vector access.
+       ``cuda::std::array<index_t, RANK>``. Use ``a()`` for a scalar.
        Planar complex elements use a proxy for reads and writes.
    * - ``operator[](indices...)``
      - Equivalent element access for rank greater than zero, when the compiler
@@ -109,17 +108,11 @@ Data access and initialization
        (``__cpp_multidimensional_subscript >= 202211L``).
    * - ``GetPointer(indices...)``
      - Pointer at the stride-adjusted element offset for ordinary dense storage.
-   * - ``data_ptr<CapType>(indices...)``
-     - Capability-aware element pointer for dense storage; returns null for
-       sparse storage. Intended for executor integration.
    * - ``SetVals(value)``; ``SetVals(nested_initializer_list)``
      - Immediate host initialization for ranks zero through four. Real tensors
        take a scalar or lists nested to match the rank. CUDA complex tensors
        also support an extra list level containing real/imaginary pairs.
        The pointer must be host-accessible and the supplied values must fit.
-   * - ``IsHostAccessiblePointer()``
-     - Checks host accessibility through the CUDA driver, raising
-       ``matxNotSupported`` when its pointer query fails.
 
 Direct element access requires memory accessible to the calling processor.
 Synchronize relevant GPU work before reading or writing its results on the
@@ -148,8 +141,6 @@ Assignment and ownership
    * - ``Shallow(rhs)``
      - Rebinds the tensor's pointer, descriptor, and shared storage to ``rhs``.
        Does not assign elements.
-   * - ``View()``
-     - Returns a copy of the tensor sharing its storage and metadata values.
    * - ``GetStorage()``
      - On a non-const tensor, returns a storage copy sharing ownership. On a const
        tensor, returns a const storage reference that must not outlive the tensor.
@@ -160,10 +151,6 @@ Assignment and ownership
        the descriptor; the other overloads retain it. The two-pointer form uses
        ``data`` as the storage base and ``local_data`` as the view start. The
        caller must keep the external allocation alive.
-   * - ``SetData(data)``; ``SetLocalData(data)``
-     - Low-level inherited pointer setters. They change the view pointer only;
-       they do not update the storage owner or descriptor. Prefer ``Reset`` when
-       rebinding a ``tensor_t`` to external storage.
    * - ``swap(lhs, rhs)``
      - Friend function that swaps pointers, descriptors, and storage owners.
    * - ``str()``; ``set_name(name)``
@@ -182,32 +169,12 @@ Views
 
    * - Method
      - Behavior and restrictions
-   * - ``View(shape)``; ``View<M, R>(shape)``
-     - Creates a contiguous view, optionally changing element type with the
-       generic shape overload. The source must be contiguous and the requested
-       bytes must fit in storage. The C-array shape overload deduces the new
-       rank. No elements are copied.
    * - ``Permute(dims)``
      - Reorders dimensions using a ``cuda::std::array<int32_t, RANK>`` or C array.
        Each dimension must appear exactly once; requires rank at least one.
    * - ``PermuteMatrix()``
      - Swaps the final two dimensions, preserving leading batch dimensions.
        Requires rank at least two.
-   * - ``Slice<N>(firsts, ends)``;
-       ``Slice<N>(firsts, ends, strides)``
-     - Creates a view of a subset, with optional steps and output rank ``N``.
-       Accepts CUDA arrays or C arrays. End indices are exclusive;
-       ``matxEnd`` selects a dimension's end, ``matxDropDim`` drops it, and
-       ``matxKeepStride`` retains the original stride. Prefer the free
-       ``slice()`` operator for new code.
-   * - ``Clone<N>(clones)``
-     - Adds broadcast dimensions using zero strides, without copying data.
-       Accepts a CUDA array or C array; use ``matxKeepDim`` for each existing
-       dimension. Writes through broadcast dimensions alias the same elements.
-   * - ``OverlapView(windows, strides)``
-     - Creates a rank-two overlapping window view of a rank-one tensor. Window
-       and step arrays have one entry; the step must be positive and smaller
-       than the window. Trailing elements that do not fill a window are omitted.
    * - ``RealView()``; ``ImagView()``
      - Real or imaginary component view of an interleaved complex tensor, using
        doubled element strides. These views use non-owning storage: keep the
@@ -231,61 +198,6 @@ Prefetch and interchange
      - Exports a legacy or versioned DLPack managed tensor, sharing the tensor's
        lifetime through its manager context. Prefer the versioned API. The
        consumer must eventually call the returned object's ``deleter``.
-   * - ``ToDlPackImpl<ManagedType>()``;
-       ``FreeDLPackCommon_(managed_tensor)``
-     - Public implementation helpers for the export methods and their deleter.
-       Use the export methods for interoperability.
-
-Base implementation and integration methods
-===========================================
-
-``detail::tensor_impl_t`` is the lightweight, non-owning base used in device
-code. Its pointer and descriptor do not keep an allocation alive. It provides
-the common metadata and access methods above, lazy assignment and compound
-assignment operators, and CUDA-array forms of ``Slice``, ``Clone``, ``Permute``,
-and ``OverlapView``. The owning overrides in ``tensor_t`` preserve storage
-ownership. Host/device availability is determined by each declaration's
-``__MATX_HOST__`` and ``__MATX_DEVICE__`` annotations; not every public method
-is callable from a CUDA kernel.
-
-The base constructors accept no arguments, a scalar pointer, a shape, a shape
-and strides, a pointer and shape (with optional strides), a descriptor, or a
-pointer and descriptor. Copy/move construction, move assignment, and destruction
-are defaulted. Its ``Shallow(rhs)`` and ``copy(rhs)`` methods copy pointer and
-descriptor metadata only, and its friend ``swap`` swaps these fields.
-
-The following publicly declared helpers support MatX's implementation. They
-are listed for completeness; ordinary tensor use does not require calling them.
-
-.. list-table::
-   :header-rows: 1
-   :widths: 35 65
-
-   * - Method
-     - Purpose
-   * - ``SliceImpl<N>(firsts, ends, strides)``
-     - Computes the descriptor and adjusted data pointer for slicing.
-   * - ``CloneImpl<N>(clones)``; ``PermuteImpl(dims)``;
-       ``OverlapViewImpl<N>(windows, strides)``
-     - Computes descriptors for the corresponding view methods.
-   * - ``DimStride<DIM, RANK_VAL, CapType>(index)``;
-       ``GetOffsetOptimized<CapType>(indices...)``
-     - Computes capability-aware dimension and element offsets.
-   * - ``GetVal<CapType, I>(tuple)``; ``GetValC<CapType, I>(tuple)``
-     - Recursive offset accumulation helpers (non-const and const).
-   * - ``GetPos<L>(level_sizes, levels, position)``;
-       ``GetSparseValue(indices...)``
-     - Searches sparse storage and returns a stored value or implicit zero.
-   * - ``get_capability<Cap>(input)``; ``has_capability(cap)``
-     - Executor capability queries. ``has_capability`` currently returns false.
-   * - ``PreRun(shape, executor)``; ``PostRun(shape, executor)``
-     - Empty hooks for expression execution.
-   * - ``ToJITStorage()``; ``get_jit_class_name()``; ``get_jit_op_str()``
-     - JIT storage and code-generation helpers, available with ``MATX_EN_JIT``.
-
-The public nested ``PlanarComplexProxy`` supports conversion to ``T``, assignment
-from complex values, and ``real()`` and ``imag()`` accessors. It implements
-element access for planar complex storage.
 
 Dynamic tensors
 ===============
@@ -325,10 +237,6 @@ the dense tensor methods listed above.
        expressions such as ``(a = a + b).run(exec)``.
    * - ``str()``
      - Diagnostic name containing runtime rank and element type.
-   * - ``get_capability<Cap>(input)``
-     - Executor capability query.
-   * - ``ToJITStorage()``; ``get_jit_class_name()``; ``get_jit_op_str()``
-     - JIT integration helpers, present with ``MATX_EN_JIT``.
 
 Dynamic tensors currently have no public ``IsContiguous()``, ``Shape()``,
 ``Strides()``, or element-access ``operator()`` method.
@@ -356,12 +264,6 @@ not the arrangement of sparse values and index buffers.
        ``~sparse_tensor_t()``
      - Constructs from value and per-level coordinate/position storage;
        destruction releases these storage containers. Prefer the sparse factories.
-   * - ``SetVal(storage)``; ``SetCrd(level, storage)``;
-       ``SetPos(level, storage)``
-     - Replaces the corresponding storage container. Call ``SetSparseDataImpl()``
-       after changing storage to refresh the inherited raw pointers.
-   * - ``SetSparseDataImpl()``
-     - Refreshes the base class's value, coordinate, and position pointers.
    * - ``Nse()``
      - Number of stored values, including any explicitly stored zeros.
    * - ``crdSize(level)``; ``posSize(level)``
@@ -369,9 +271,6 @@ not the arrangement of sparse values and index buffers.
    * - ``CRDData(level)``; ``POSData(level)``
      - Inherited raw coordinate and position pointers; available only with sparse
        data storage. Storage levels need not correspond one-to-one to dimensions.
-   * - ``SetSparseData(values, coordinates, positions)``
-     - Inherited low-level setter for all raw sparse pointers; does not transfer
-       storage ownership.
    * - ``operator=(conversion)``
      - Lazy assignment from a supported sparse conversion transform.
 
@@ -410,22 +309,5 @@ construction, executor setup, and current single-process limitations.
        distribution index. Raises ``matxInvalidParameter`` if it is not local.
    * - ``operator=(expression)``; ``operator=(other)``
      - Creates a lazy distributed assignment for a distributed executor.
-   * - ``MaterializeTo(output, executor)``
-     - Gathers into an ordinary tensor with matching global shape and element
-       type. Currently requires a single-process distributed executor.
-   * - ``ExecuteTo(output, executor)``
-     - Copies into a compatible distributed tensor with matching element type,
-       distribution, shape, and context.
    * - ``str()``
      - Returns the diagnostic name ``"distributed_tensor"``.
-
-Dense tensor declarations
-=========================
-
-The declarations below include constructors, the destructor, and overloads
-defined directly on ``tensor_t``. Inherited methods are documented in the
-tables above because the generated API excludes the ``detail`` namespace.
-
-.. doxygenclass:: matx::tensor_t
-   :members:
-   :undoc-members:
