@@ -8,6 +8,7 @@ set (test_sources
     00_misc/CapabilitiesTests.cu
     00_misc/ClearCacheTests.cu
     00_misc/CudaExecutorCommonTests.cu
+    00_misc/DeviceAttributeCacheTests.cu
     00_misc/ErrorTests.cu
     00_misc/FloatFloatTests.cu
     00_misc/GridDimTests.cu

@@ -12,5 +12,6 @@ terminology used in the MatX code base.
 
    operators.rst
    transforms.rst
+   device_attributes.rst
    distributed_tensors.rst
    docs.rst

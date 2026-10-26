@@ -115,7 +115,6 @@ namespace matx {
       index_t m_;       // Output rows (A rows)
       index_t n_;       // Output cols (B cols)
       index_t k_;       // Inner dimension (A cols = B rows)
-      int cc_;          // Compute capability
       bool is_complex_; // Whether the type is complex
 
       template <typename Scalar>
@@ -134,14 +133,16 @@ namespace matx {
       index_t get_m() const { return m_; }
       index_t get_n() const { return n_; }
       index_t get_k() const { return k_; }
-      int get_cc() const { return cc_; }
+      // Target compute capability, from the current device when it is needed.
+      // JIT kernels launch on the current device, which can differ from the
+      // device that was current when the operator was built.
+      int get_cc() const { return TryGetComputeCapability(); }
       bool get_is_complex() const { return is_complex_; }
 
       // Setters
       void set_m(index_t m) { m_ = m; }
       void set_n(index_t n) { n_ = n; }
       void set_k(index_t k) { k_ = k; }
-      void set_cc(int cc) { cc_ = cc; }
       void set_is_complex(bool is_complex) { is_complex_ = is_complex; }
 
       cublasdxDescriptor GeneratePlan() const {
@@ -185,7 +186,7 @@ namespace matx {
         LIBCUBLASDX_CHECK(cublasdxSetOperatorInt64(h_, CUBLASDX_OPERATOR_TYPE, type));
 
         // Set target compute capability
-        LIBCUBLASDX_CHECK(cublasdxSetOperatorInt64(h_, CUBLASDX_OPERATOR_SM, cc_));
+        LIBCUBLASDX_CHECK(cublasdxSetOperatorInt64(h_, CUBLASDX_OPERATOR_SM, get_cc()));
 
         // Set arrangement - row major for all matrices (MatX default)
         long long int arrangements[3] = {CUBLASDX_ARRANGEMENT_ROW_MAJOR,
@@ -206,7 +207,7 @@ namespace matx {
         symbol_name += "_T";
         symbol_name += is_complex_ ? "C" : "R";
         symbol_name += "_CC";
-        symbol_name += std::to_string(cc_);
+        symbol_name += std::to_string(get_cc());
 
         // Add precision identifier
         if constexpr (cuda::std::is_same_v<InputType, matxFp16> || cuda::std::is_same_v<InputType, matxFp16Complex>) {
@@ -234,13 +235,13 @@ namespace matx {
         std::cout << "m_ = " << m_ << std::endl;
         std::cout << "n_ = " << n_ << std::endl;
         std::cout << "k_ = " << k_ << std::endl;
-        std::cout << "cc_ = " << cc_ << std::endl;
+        std::cout << "cc = " << get_cc() << std::endl;
         std::cout << "is_complex_ = " << is_complex_ << std::endl;
       }
 
       bool IsSupported() const {
         // Check basic size requirements
-        if (!IscuBLASDxSupported<InputType>(m_, n_, k_, cc_)) {
+        if (!IscuBLASDxSupported<InputType>(m_, n_, k_, get_cc())) {
           MATX_LOG_DEBUG("cuBLASDx not supported: matrix size too large for shared memory");
           return false;
         }
@@ -276,7 +277,7 @@ namespace matx {
         }
 
         // Check size constraints
-        return IscuBLASDxSupported<OpAType>(m_, n_, k_, cc_);
+        return IscuBLASDxSupported<OpAType>(m_, n_, k_, get_cc());
       }
 
       int GetShmRequired() const {
@@ -339,7 +340,7 @@ namespace matx {
         commondxCode code;
         LIBCUBLASDX_CHECK(commondxCreateCode(&code));
 
-        LIBCUBLASDX_CHECK(commondxSetCodeOptionInt64(code, COMMONDX_OPTION_TARGET_SM, cc_));
+        LIBCUBLASDX_CHECK(commondxSetCodeOptionInt64(code, COMMONDX_OPTION_TARGET_SM, get_cc()));
         LIBCUBLASDX_CHECK(cublasdxFinalizeCode(code, handle));
 
         LIBCUBLASDX_CHECK(commondxGetCodeLTOIRSize(code, &ltoir.length));

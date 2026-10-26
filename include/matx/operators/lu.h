@@ -123,11 +123,8 @@ namespace detail {
         factors_shape_ = SolverShapeFromInput<RANK>(a_);
         piv_shape_ = SolverVectorShapeFromMatrixShape<RANK>(factors_shape_);
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
-        const int cc = GetComputeCapability();
-
         dx_lu_helper_.set_m(factors_shape_[RANK - 2]);
         dx_lu_helper_.set_n(factors_shape_[RANK - 1]);
-        dx_lu_helper_.set_cc(cc);
         dx_lu_helper_.set_function(CUSOLVERDX_FUNCTION_GETRF_PARTIAL_PIVOT);
 #endif
       }

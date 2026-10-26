@@ -184,8 +184,25 @@ namespace detail {
 
   // Capabilities structures
 
+  struct DeviceAttributes;  // matx/core/device_attributes.h
+
   struct EPTQueryInput {
+    /**
+     * Query input for ELEMENTS_PER_THREAD and MAX_EPT_VEC_LOAD on a device.
+     * There is no default vector width: in host code MAX_VEC_WIDTH_BYTES is
+     * always 16, so every query must name the device it targets.
+     *
+     * Defined in executors/cuda_executor_common.h, so this header does not
+     * need the attribute cache and stays usable by NVRTC.
+     *
+     * @param jit_query Whether the query is for a JIT kernel
+     * @param attrs Attributes of the device the kernel will run on
+     */
+    inline EPTQueryInput(bool jit_query, const DeviceAttributes &attrs);
+
     bool jit;
+    // Widest vector load, in bytes, the target device supports
+    int max_vec_width_bytes;
   };
 
 

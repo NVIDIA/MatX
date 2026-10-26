@@ -38,6 +38,7 @@
 #include <cuda_fp16.h>
 
 #include "matx/core/defines.h"
+#include "matx/core/device_attributes.h"
 #include "matx/core/error.h"
 
 namespace matx {
@@ -48,26 +49,30 @@ constexpr int VOLTA_CC = 7;
 constexpr int PASCAL_CC = 6;
 
 namespace detail {
-__MATX_INLINE__ int GetDeviceAttr(cudaDeviceAttr attr) {
-    int val;
-    int dev;
-    [[maybe_unused]] auto err = cudaGetDevice(&dev);
-    MATX_ASSERT(err == cudaSuccess, matxCudaError);
-    err = cudaDeviceGetAttribute(&val, attr, dev);
-    MATX_ASSERT(err == cudaSuccess, matxCudaError);
-    return val;
-}
-
 __MATX_INLINE__ int GetComputeCapabilityMajor() {
-    return GetDeviceAttr(cudaDevAttrComputeCapabilityMajor);
+    return GetCurrentDeviceAttributes().cc_major;
 }
 
 __MATX_INLINE__ int GetComputeCapabilityMinor() {
-    return GetDeviceAttr(cudaDevAttrComputeCapabilityMinor);
+    return GetCurrentDeviceAttributes().cc_minor;
 }
 
 __MATX_INLINE__ int GetComputeCapability() {
-    return GetComputeCapabilityMajor() * 100 + GetComputeCapabilityMinor() * 10;
+    return GetCurrentDeviceAttributes().ComputeCapability();
+}
+
+// Same as GetComputeCapability(), but returns 0 instead of throwing when no
+// device can be queried. For code that also runs with host executors on
+// machines without a GPU, such as the MathDx helpers.
+__MATX_INLINE__ int TryGetComputeCapability() {
+    const DeviceAttributes *attrs = nullptr;
+    if (TryGetCurrentDeviceAttributes(attrs) != cudaSuccess) {
+      // Clear the error, where CUDA allows it, so a later CUDA error check does
+      // not report it. Without a device, CUDA keeps reporting cudaErrorNoDevice.
+      cudaGetLastError();
+      return 0;
+    }
+    return attrs->ComputeCapability();
 }
 
 __MATX_INLINE__ bool IsHopperOrAbove() {

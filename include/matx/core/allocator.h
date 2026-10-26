@@ -40,10 +40,13 @@
 #include <driver_types.h>
 #include <cuda_runtime_api.h>
 #endif
+#include <cuda.h>
 
+#include "matx/core/device_attributes.h"
 #include "matx/core/error.h"
 #include "matx/core/nvtx.h"
 #include "matx/core/log.h"
+#include "matx/core/resource_guard.h"
 #include <cuda/std/functional>
 #include <cuda/std/__algorithm/max.h>
 
@@ -81,20 +84,114 @@ struct matxPointerAttr_t {
   cudaStream_t stream;
 };
 
-inline bool DeviceSupportsMemoryPools(int device) {
-  static std::mutex cache_mtx;
-  static std::unordered_map<int, bool> support;
-  std::lock_guard lock(cache_mtx);
-  const auto iter = support.find(device);
-  if (iter != support.end()) {
-    return iter->second;
-  }
+// What the stream-device lookup needs to know about the process. None of it
+// can change while the process runs, so it is resolved once.
+//
+// The lookup reads the stream's context rather than calling cuStreamGetDevice
+// (12.8+ drivers). Newer drivers allow cuStreamGetDevice during CUDA graph
+// capture, but a range of drivers, including the 595 branch, reject it on a
+// capturing stream and invalidate the capture. The context queries work during
+// capture on every supported driver.
+struct StreamDeviceLookup {
+  bool single_device = false;
+  // cuStreamGetCtx_v2, on 12.5+ drivers. Unlike cuStreamGetCtx, it accepts
+  // green-context streams. The last parameter is a CUgreenCtx *, which
+  // toolkits before 12.4 do not declare.
+  CUresult (CUDAAPI *get_ctx_v2)(CUstream, CUcontext *, void **) = nullptr;
+};
 
-  int supported = 0;
-  MATX_CUDA_CHECK(cudaDeviceGetAttribute(&supported, cudaDevAttrMemoryPoolsSupported, device));
-  // Cache only successful queries so a transient CUDA error can be retried.
-  support.emplace(device, supported != 0);
-  return supported != 0;
+inline StreamDeviceLookup MakeStreamDeviceLookup() {
+  StreamDeviceLookup lookup;
+  lookup.single_device = GetDeviceCount() == 1;
+  // cuGetProcAddress returns the newest version of a symbol that the driver
+  // has, so an older driver would return the two-argument cuStreamGetCtx.
+  int version = 0;
+  if (cuDriverGetVersion(&version) == CUDA_SUCCESS && version >= 12050) {
+    void *pfn = nullptr;
+    CUdriverProcAddressQueryResult status = CU_GET_PROC_ADDRESS_SYMBOL_NOT_FOUND;
+    if (cuGetProcAddress("cuStreamGetCtx", &pfn, 12050, CU_GET_PROC_ADDRESS_DEFAULT,
+                         &status) == CUDA_SUCCESS &&
+        status == CU_GET_PROC_ADDRESS_SUCCESS) {
+      lookup.get_ctx_v2 = reinterpret_cast<decltype(lookup.get_ctx_v2)>(pfn);
+    }
+  }
+  MATX_LOG_DEBUG("Stream device lookup: driver {}, cuStreamGetCtx_v2 {}",
+                 version, lookup.get_ctx_v2 != nullptr);
+  return lookup;
+}
+
+inline const StreamDeviceLookup &GetStreamDeviceLookup() {
+  static const StreamDeviceLookup lookup = MakeStreamDeviceLookup();
+  return lookup;
+}
+
+// Device that owns a stream. cudaMallocAsync allocates from this device's
+// memory pool, which can differ from the current device. Tests pass a lookup
+// to take each branch.
+inline int GetStreamDevice(cudaStream_t stream,
+                           const StreamDeviceLookup &lookup = GetStreamDeviceLookup()) {
+  if (lookup.single_device) {
+    return 0;
+  }
+  // The default-stream handles name the current device's default stream. The
+  // driver resolves them through the current context, which a thread may not
+  // have yet.
+  if (stream == nullptr || stream == cudaStreamLegacy || stream == cudaStreamPerThread) {
+    int device = 0;
+    MATX_CUDA_CHECK(cudaGetDevice(&device));
+    return device;
+  }
+  // Read the stream's context. cuStreamGetCtx rejects green-context streams;
+  // cuStreamGetCtx_v2 returns the primary context of their device.
+  const auto cu_stream = reinterpret_cast<CUstream>(stream);
+  CUcontext ctx = nullptr;
+  if (lookup.get_ctx_v2 != nullptr) {
+    void *green_ctx = nullptr;
+    MATX_CUDA_DRIVER_CHECK(lookup.get_ctx_v2(cu_stream, &ctx, &green_ctx));
+  } else {
+    MATX_CUDA_DRIVER_CHECK(cuStreamGetCtx(cu_stream, &ctx));
+  }
+  // cuCtxGetDevice reads the current context, so make ctx current briefly.
+  MATX_CUDA_DRIVER_CHECK(cuCtxPushCurrent(ctx));
+  CUdevice device = 0;
+  const CUresult err = cuCtxGetDevice(&device);
+  MATX_CUDA_DRIVER_CHECK(cuCtxPopCurrent(nullptr));
+  MATX_CUDA_DRIVER_CHECK(err);
+  return static_cast<int>(device);
+}
+
+// Signature of TryGetDeviceAttributes, so tests can inject query failures.
+using TryGetDeviceAttributesFn = cudaError_t (*)(int, const DeviceAttributes *&);
+
+// Whether every visible device supports memory pools. If so, cudaMallocAsync
+// works on any stream, so allocations skip finding the stream's device. A
+// device whose attributes cannot be read counts as lacking pools, so
+// allocations check only their stream's device rather than all failing.
+inline bool QueryAllDevicesSupportMemoryPools(
+    TryGetDeviceAttributesFn try_get_attrs = &TryGetDeviceAttributes) {
+  const int count = GetDeviceCount();
+  for (int device = 0; device < count; ++device) {
+    const DeviceAttributes *attrs = nullptr;
+    const cudaError_t err = try_get_attrs(device, attrs);
+    if (err != cudaSuccess) {
+      // Clear the error so a later CUDA error check does not report it.
+      cudaGetLastError();
+      MATX_LOG_WARN("Device {} attribute query failed ({}). Checking memory pool support per allocation",
+                    device, cudaGetErrorString(err));
+      return false;
+    }
+    if (!attrs->memory_pools_supported) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// Device attributes cannot change while the process runs, so this is checked
+// once.
+inline bool AllDevicesSupportMemoryPools() {
+  static const bool all_supported = QueryAllDevicesSupportMemoryPools();
+  return all_supported;
 }
 }
 
@@ -198,14 +295,20 @@ struct MemTracker {
   void allocate(void **ptr, size_t bytes,
                       matxMemorySpace_t space = MATX_MANAGED_MEMORY,
                       cudaStream_t stream = 0) {
-    allocate_internal(ptr, bytes, space, stream, detail::DeviceSupportsMemoryPools);
+    // Only async allocations need pool support, so other memory spaces never
+    // query devices. Host allocations then work without a visible GPU.
+    allocate_internal(ptr, bytes, space, stream,
+        [](int device) { return detail::GetDeviceAttributes(device).memory_pools_supported; },
+        space == MATX_ASYNC_DEVICE_MEMORY && detail::AllDevicesSupportMemoryPools());
   }
 
   // Inject the capability query so tests can exercise the fallback on devices
   // with memory pools without overriding global state or changing matxAlloc.
+  // all_devices_support_pools skips the stream's device lookup and the query.
   template <typename MemoryPoolSupport>
   void allocate_internal(void **ptr, size_t bytes, matxMemorySpace_t space,
-                         cudaStream_t stream, MemoryPoolSupport supports_memory_pools) {
+                         cudaStream_t stream, MemoryPoolSupport supports_memory_pools,
+                         bool all_devices_support_pools = false) {
     [[maybe_unused]] cudaError_t err = cudaSuccess;
 
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
@@ -219,22 +322,21 @@ struct MemTracker {
     // If requesting managed memory, check if the device supports concurrent managed access.
     // If not, fall back to pinned host memory. Jetsons are one system type where this is needed.
     if (space == MATX_MANAGED_MEMORY) {
-      int device = 0;
-      MATX_CUDA_CHECK(cudaGetDevice(&device));
-      int concurrentManagedAccess = 0;
-      MATX_CUDA_CHECK(cudaDeviceGetAttribute(&concurrentManagedAccess, cudaDevAttrConcurrentManagedAccess, device));
-      if (concurrentManagedAccess == 0) {
+      if (!detail::GetCurrentDeviceAttributes().concurrent_managed_access) {
         space = MATX_HOST_MEMORY;
       }
     }
 
     // Devices without memory pools cannot use cudaMallocAsync. Record the
     // fallback kind so deallocation also uses cudaFree instead of cudaFreeAsync.
-    if (space == MATX_ASYNC_DEVICE_MEMORY) {
-      int device = 0;
-      MATX_CUDA_CHECK(cudaGetDevice(&device));
-      if (!supports_memory_pools(device)) {
+    // When every device has pools, the common case, cudaMallocAsync finds the
+    // stream's device itself.
+    int fallback_device = -1;
+    if (space == MATX_ASYNC_DEVICE_MEMORY && !all_devices_support_pools) {
+      const int stream_device = detail::GetStreamDevice(stream);
+      if (!supports_memory_pools(stream_device)) {
         space = MATX_DEVICE_MEMORY;
+        fallback_device = stream_device;
       }
     }
 
@@ -251,7 +353,15 @@ struct MemTracker {
       *ptr = malloc(bytes);
       break;
     case MATX_DEVICE_MEMORY:
-      err = cudaMalloc(ptr, bytes);
+      if (fallback_device >= 0) {
+        // cudaMalloc allocates on the current device, but the fallback belongs
+        // on the stream's device, where cudaMallocAsync would have put it.
+        detail::CudaDeviceGuard guard{fallback_device};
+        err = cudaMalloc(ptr, bytes);
+      }
+      else {
+        err = cudaMalloc(ptr, bytes);
+      }
       break;
     case MATX_ASYNC_DEVICE_MEMORY:
       err = cudaMallocAsync(ptr, bytes, stream);
@@ -435,9 +545,10 @@ __MATX_INLINE__ void matxPrintMemoryStatistics()
  * @brief Allocate memory
  *
  * Can be used for managed, pinned, malloced, device, and async device allocations
- * Async device allocations fall back to cudaMalloc/cudaFree when the current
- * device does not support memory pools. GetPointerKind reports MATX_DEVICE_MEMORY
- * for these allocations, and allocation and deallocation may synchronize.
+ * Async device allocations fall back to cudaMalloc/cudaFree, on the stream's
+ * device, when that device does not support memory pools. GetPointerKind reports
+ * MATX_DEVICE_MEMORY for these allocations, and allocation and deallocation may
+ * synchronize.
  *
  * @param ptr Pointer to store allocated pointer
  * @param bytes Bytes to allocate

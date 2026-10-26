@@ -185,12 +185,9 @@ namespace matx
           // m = rows of output (from A's second-to-last dim)
           // n = cols of output (from B's last dim)
           // k = inner dimension (A's last dim = B's second-to-last dim)
-          const int cc = GetComputeCapability();  // Compute capability as __CUDA_ARCH__ digits (e.g., 890 for SM 8.9)
-
           dx_gemm_helper_.set_m(a_.Size(OpA::Rank() - 2));
           dx_gemm_helper_.set_n(b_.Size(OpB::Rank() - 1));
           dx_gemm_helper_.set_k(a_.Size(OpA::Rank() - 1));
-          dx_gemm_helper_.set_cc(cc);
           dx_gemm_helper_.set_is_complex(is_complex_v<typename OpA::value_type>);
 #endif
         }

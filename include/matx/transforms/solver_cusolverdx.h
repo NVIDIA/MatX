@@ -34,11 +34,11 @@ private:
   index_t m_ = 0;
   index_t n_ = 0;
   index_t k_ = 0;
-  int cc_ = 0;
   cusolverdxFunction function_ = CUSOLVERDX_FUNCTION_POTRF;
   SolverFillMode fill_mode_ = SolverFillMode::UPPER;
   cusolverdxJob job_ = CUSOLVERDX_JOB_NO_VECTORS;
   mutable bool traits_cached_ = false;
+  mutable int traits_cc_ = 0;  // Compute capability the cached traits were queried for
   mutable bool traits_supported_ = false;
   mutable long long int trait_shared_memory_size_ = 0;
   mutable long long int trait_workspace_size_ = 0;
@@ -270,11 +270,14 @@ private:
 
   bool TryCacheTraits() const
   {
-    if (traits_cached_) {
+    // Traits depend on the target architecture, which follows the current device.
+    const int cc = get_cc();
+    if (traits_cached_ && traits_cc_ == cc) {
       return traits_supported_;
     }
 
     traits_cached_ = true;
+    traits_cc_ = cc;
     traits_supported_ = false;
     trait_shared_memory_size_ = 0;
     trait_workspace_size_ = 0;
@@ -322,7 +325,10 @@ private:
 
   void EnsureTraitsCached() const
   {
-    MATX_ASSERT_STR(TryCacheTraits(), matxInvalidParameter, "cuSolverDx trait query failed");
+    // Call outside the assert, which compiles out in release builds. The call
+    // also refreshes the traits when the current device's architecture changed.
+    [[maybe_unused]] const bool cached = TryCacheTraits();
+    MATX_ASSERT_STR(cached, matxInvalidParameter, "cuSolverDx trait query failed");
   }
 
   std::string GetTraitSymbolName(cusolverdxDescriptor handle) const
@@ -348,7 +354,6 @@ public:
   void set_m(index_t m) { m_ = m; InvalidateTraitCache(); }
   void set_n(index_t n) { n_ = n; InvalidateTraitCache(); }
   void set_k(index_t k) { k_ = k; InvalidateTraitCache(); }
-  void set_cc(int cc) { cc_ = cc; InvalidateTraitCache(); }
   void set_function(cusolverdxFunction function) { function_ = function; InvalidateTraitCache(); }
   void set_fill_mode(SolverFillMode fill_mode) { fill_mode_ = fill_mode; InvalidateTraitCache(); }
   void set_job(cusolverdxJob job) { job_ = job; InvalidateTraitCache(); }
@@ -356,7 +361,10 @@ public:
   index_t get_m() const { return m_; }
   index_t get_n() const { return n_; }
   index_t get_k() const { return k_; }
-  int get_cc() const { return cc_; }
+  // Target compute capability, from the current device when it is needed.
+  // JIT kernels launch on the current device, which can differ from the
+  // device that was current when the operator was built.
+  int get_cc() const { return TryGetComputeCapability(); }
   cusolverdxFunction get_function() const { return function_; }
   SolverFillMode get_fill_mode() const { return fill_mode_; }
 
@@ -374,7 +382,7 @@ public:
     LIBCUSOLVERDX_CHECK(cusolverdxSetOperatorInt64s(h_.get(), CUSOLVERDX_OPERATOR_SIZE, GetSizeCount(), sizes));
     LIBCUSOLVERDX_CHECK(cusolverdxSetOperatorInt64(h_.get(), CUSOLVERDX_OPERATOR_TYPE, GetType()));
     LIBCUSOLVERDX_CHECK(cusolverdxSetOperatorInt64(h_.get(), CUSOLVERDX_OPERATOR_PRECISION, GetPrecision()));
-    LIBCUSOLVERDX_CHECK(cusolverdxSetOperatorInt64(h_.get(), CUSOLVERDX_OPERATOR_SM, cc_));
+    LIBCUSOLVERDX_CHECK(cusolverdxSetOperatorInt64(h_.get(), CUSOLVERDX_OPERATOR_SM, get_cc()));
     LIBCUSOLVERDX_CHECK(cusolverdxSetOperatorInt64(h_.get(), CUSOLVERDX_OPERATOR_EXECUTION, COMMONDX_EXECUTION_BLOCK));
     LIBCUSOLVERDX_CHECK(cusolverdxSetOperatorInt64(h_.get(), CUSOLVERDX_OPERATOR_API, CUSOLVERDX_API_SMEM));
     LIBCUSOLVERDX_CHECK(cusolverdxSetOperatorInt64(h_.get(), CUSOLVERDX_OPERATOR_FUNCTION, function_));
@@ -419,7 +427,7 @@ public:
     }
 
     symbol_name += "_CC";
-    symbol_name += std::to_string(cc_);
+    symbol_name += std::to_string(get_cc());
 
 #if defined(CUDART_VERSION)
     symbol_name += "_CUDA";
@@ -493,7 +501,7 @@ public:
 
     CodeHandle code;
     LIBCUSOLVERDX_CHECK(commondxCreateCode(code.put()));
-    LIBCUSOLVERDX_CHECK(commondxSetCodeOptionInt64(code.get(), COMMONDX_OPTION_TARGET_SM, cc_));
+    LIBCUSOLVERDX_CHECK(commondxSetCodeOptionInt64(code.get(), COMMONDX_OPTION_TARGET_SM, get_cc()));
     LIBCUSOLVERDX_CHECK(cusolverdxFinalizeCode(code.get(), handle.get()));
 
     size_t ltoir_length = 0;
