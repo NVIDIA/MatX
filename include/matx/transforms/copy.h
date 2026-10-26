@@ -70,6 +70,20 @@ namespace matx
         MATX_ASSERT(out.Size(i) == in.Size(i), matxInvalidSize);
       }
 
+      // A byte copy is valid only for dense views with identical element types.
+      if constexpr (is_cuda_executor_v<Executor> &&
+                    is_tensor_view_v<OutputTensor> && is_tensor_view_v<InputTensor> &&
+                    !is_sparse_tensor_v<OutputTensor> && !is_sparse_tensor_v<InputTensor> &&
+                    OutputTensor::Rank() == InputTensor::Rank() &&
+                    cuda::std::is_same_v<typename OutputTensor::value_type,
+                                         typename InputTensor::value_type>) {
+        if (out.IsContiguous() && in.IsContiguous()) {
+          MATX_CUDA_CHECK(cudaMemcpyAsync(out.Data(), in.Data(), out.Bytes(),
+                                          cudaMemcpyDefault, exec.getStream()));
+          return;
+        }
+      }
+
       (out = in).run(exec);
     };
 

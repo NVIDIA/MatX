@@ -90,7 +90,7 @@ existing operators do not implicitly become distributed operations.
    "conj", "|yes|", "|yes|", "|yes|", "|no|", "Element-wise expression."
    "conv1d", "|yes|", "|yes|", "|no|", "|no|", "Direct convolution supports host and CUDA executors. FFT convolution can use the CPU FFT backend when enabled."
    "conv2d", "|yes|", "|yes|", "|no|", "|no|", "Direct convolution supports host and CUDA executors."
-   "copy", "|yes|", "|yes|", "|no|", "|partial|", "Executor-dispatched assignment/copy transform; CUDAJITExecutor fuses expression evaluation instead of using this transform directly. Experimental distributedCUDAExecutor support covers identical-layout distributed copies and distributed-to-regular materialization."
+   "copy", "|yes|", "|yes|", "|no|", "|partial|", "CUDA uses cudaMemcpyAsync on the executor stream for contiguous dense tensor views with matching element types; other copies use executor-dispatched assignment. CUDAJITExecutor fuses expression evaluation instead of using this transform directly. Experimental distributedCUDAExecutor support covers identical-layout distributed copies and distributed-to-regular materialization."
    "corr", "|yes|", "|yes|", "|no|", "|no|", "Direct correlation supports host and CUDA executors. FFT correlation can use the CPU FFT backend when enabled."
    "corrmap", "|yes|", "|yes|", "|yes|", "|no|", "Per-element windowed correlation map (1-D or 2-D window). Inputs must be floating-point or complex floating-point; integer inputs are rejected by static_assert."
    "cos", "|yes|", "|yes|", "|yes|", "|no|", "Element-wise expression."
