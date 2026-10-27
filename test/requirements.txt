@@ -1,0 +1,9 @@
+# Python packages required to generate MatX unit test vectors.
+# Install with: pip install -r test/requirements.txt
+numpy
+scipy
+
+# CuPy is also required for the solver (test/00_solver) and radar pipeline tests, but is not
+# listed here because its package name depends on the CUDA version. Install the one that
+# matches your CUDA version.
+# cupy-cuda13x
