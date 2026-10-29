@@ -305,8 +305,11 @@ namespace matx
               using lhs_value_type = remove_cvref_t<typename T::tensor_type::value_type>;
               using rhs_value_type = remove_cvref_t<typename T::op_type::value_type>;
               constexpr bool same_value_type = cuda::std::is_same_v<lhs_value_type, rhs_value_type>;
+              constexpr bool dense_tensors =
+                  !is_sparse_data_v<typename T::tensor_type::data_type> &&
+                  !is_sparse_data_v<typename T::op_type::data_type>;
 
-              if (same_value_type &&
+              if (same_value_type && dense_tensors &&
                   tp->get_lhs().IsContiguous() &&
                   tp->get_rhs().IsContiguous() &&
                   tp->get_lhs().Rank() == tp->get_rhs().Rank()) {

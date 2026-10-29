@@ -33,8 +33,8 @@
 #include "assert.h"
 #include "matx.h"
 #include "test_types.h"
-#include "utilities.h"
 #include "gtest/gtest.h"
+#include <vector>
 
 using namespace matx;
 
@@ -132,6 +132,204 @@ TYPED_TEST(CopyTestsAll, CopyOutParam)
 
   MATX_EXIT_HANDLER();
 }
+
+TYPED_TEST(CopyTestsAll, CopyViewsAndExpressions)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  ExecType exec{};
+  constexpr auto memory = is_cuda_executor_v<ExecType> ? MATX_MANAGED_MEMORY : MATX_HOST_MALLOC_MEMORY;
+
+  auto in = make_tensor<TestType>({4, 6}, memory);
+  auto out = make_tensor<TestType>({4, 6}, memory);
+  auto expected = make_tensor<TestType>({4, 6}, memory);
+  for (index_t i = 0; i < 4; i++) {
+    for (index_t j = 0; j < 6; j++) {
+      in(i, j) = TestType{static_cast<detail::value_promote_t<TestType>>((i + j) % 2)};
+    }
+  }
+
+  // A noncontiguous source must preserve the logical element order.
+  auto transposed = permute(in, {1, 0});
+  auto transposed_out = make_tensor<TestType>({6, 4}, memory);
+  matx::copy(transposed_out, transposed, exec);
+
+  // A noncontiguous destination must leave the gaps untouched.
+  (out = TestType{0}).run(exec);
+  (expected = TestType{0}).run(exec);
+  auto strided_out = slice(out, {0, 0}, {matxEnd, matxEnd}, {1, 2});
+  auto strided_in = slice(in, {0, 0}, {matxEnd, matxEnd}, {1, 2});
+  auto strided_expected = slice(expected, {0, 0}, {matxEnd, matxEnd}, {1, 2});
+  auto compact = make_tensor<TestType>({4, 3}, memory);
+  (compact = strided_in).run(exec);
+  (strided_expected = strided_in).run(exec);
+  matx::copy(strided_out, compact, exec);
+  exec.sync();
+  for (index_t i = 0; i < 4; i++) {
+    for (index_t j = 0; j < 6; j++) {
+      EXPECT_EQ(transposed_out(j, i), in(i, j));
+      EXPECT_EQ(out(i, j), expected(i, j));
+    }
+  }
+
+  // Expression inputs still evaluate through assignment. Bool addition promotes
+  // to int, so explicitly convert the result back to the output element type.
+  matx::copy(out, as_type<TestType>(in + TestType{0}), exec);
+  exec.sync();
+  for (index_t i = 0; i < 4; i++) {
+    for (index_t j = 0; j < 6; j++) {
+      EXPECT_EQ(out(i, j), in(i, j));
+    }
+  }
+
+  // Contiguous slices copy from their view pointers, including offsets.
+  auto in_row = slice<1>(in, {2, 1}, {matxDropDim, 5});
+  auto out_row = slice<1>(out, {1, 2}, {matxDropDim, matxEnd});
+  (out = TestType{0}).run(exec);
+  matx::copy(out_row, in_row, exec);
+  exec.sync();
+  for (index_t i = 0; i < 4; i++) {
+    for (index_t j = 0; j < 6; j++) {
+      EXPECT_EQ(out(i, j), (i == 1 && j >= 2) ? in(2, j - 1) : TestType{0});
+    }
+  }
+  MATX_EXIT_HANDLER();
+}
+
+TEST(CopyTests, CudaMemcpyOnExecutorStream)
+{
+  MATX_ENTER_HANDLER();
+  cudaStream_t stream;
+  ASSERT_EQ(cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking), cudaSuccess);
+  cudaExecutor exec{stream};
+  auto in = make_tensor<float>({2, 3, 4}, MATX_DEVICE_MEMORY);
+  auto out = make_tensor<float>({2, 3, 4}, MATX_DEVICE_MEMORY);
+  auto stream_out = make_tensor<float>({2, 3, 4}, MATX_DEVICE_MEMORY);
+  auto expected = make_tensor<float>({2, 3, 4});
+  auto actual = make_tensor<float>({2, 3, 4});
+  (in = 7.0f).run(exec);
+  (expected = in).run(exec);
+  exec.sync();
+
+  // Capture verifies both dispatch to memcpy and use of the requested stream.
+  cudaGraph_t graph;
+  ASSERT_EQ(cudaStreamBeginCapture(stream, cudaStreamCaptureModeThreadLocal), cudaSuccess);
+  matx::copy(out, in, exec);
+  matx::copy(stream_out, out, stream);
+  ASSERT_EQ(cudaStreamEndCapture(stream, &graph), cudaSuccess);
+  size_t count = 0;
+  ASSERT_EQ(cudaGraphGetNodes(graph, nullptr, &count), cudaSuccess);
+  EXPECT_EQ(count, 2u);
+  std::vector<cudaGraphNode_t> nodes(count);
+  ASSERT_EQ(cudaGraphGetNodes(graph, nodes.data(), &count), cudaSuccess);
+  for (auto node : nodes) {
+    cudaGraphNodeType type;
+    ASSERT_EQ(cudaGraphNodeGetType(node, &type), cudaSuccess);
+    EXPECT_EQ(type, cudaGraphNodeTypeMemcpy);
+  }
+  cudaGraphExec_t graph_exec;
+  ASSERT_EQ(cudaGraphInstantiate(&graph_exec, graph, nullptr, nullptr, 0), cudaSuccess);
+  ASSERT_EQ(cudaGraphLaunch(graph_exec, stream), cudaSuccess);
+  (actual = stream_out).run(exec);
+  exec.sync();
+  for (index_t i = 0; i < actual.TotalSize(); i++) {
+    EXPECT_EQ(actual.Data()[i], expected.Data()[i]);
+  }
+  ASSERT_EQ(cudaGraphExecDestroy(graph_exec), cudaSuccess);
+  ASSERT_EQ(cudaGraphDestroy(graph), cudaSuccess);
+  ASSERT_EQ(cudaStreamDestroy(stream), cudaSuccess);
+  MATX_EXIT_HANDLER();
+}
+
+TEST(CopyTests, TypeConversion)
+{
+  MATX_ENTER_HANDLER();
+  auto in = make_tensor<float>({4});
+  auto out = make_tensor<int>({4});
+  auto wide_out = make_tensor<double>({4});
+  for (index_t i = 0; i < 4; i++) {
+    in(i) = static_cast<float>(i) + 0.5f;
+  }
+  cudaExecutor exec{};
+  matx::copy(wide_out, in, exec);
+#if MATX_CHECK_NARROWING_CONVERSIONS
+  matx::copy(out, as_type<int>(in), exec);
+#else
+  matx::copy(out, in, exec);
+#endif
+  exec.sync();
+  for (index_t i = 0; i < 4; i++) {
+    EXPECT_EQ(out(i), static_cast<int>(in(i)));
+    EXPECT_EQ(wide_out(i), static_cast<double>(in(i)));
+  }
+  MATX_EXIT_HANDLER();
+}
+
+TEST(CopyTests, SparseSource)
+{
+  MATX_ENTER_HANDLER();
+  auto values = make_tensor<float>({2});
+  auto rows = make_tensor<index_t>({2});
+  auto columns = make_tensor<index_t>({2});
+  values(0) = 5.0f;
+  values(1) = 7.0f;
+  rows(0) = 0;
+  rows(1) = 1;
+  columns(0) = 2;
+  columns(1) = 0;
+  auto sparse = experimental::make_tensor_coo(values, rows, columns, {2, 3});
+  auto out = make_tensor<float>({2, 3});
+  auto assigned = make_tensor<float>({2, 3});
+  auto expected = make_tensor<float>({2, 3});
+  cudaExecutor exec{};
+  // An expression forces evaluation of sparse elements, including implicit zeros.
+  (expected = sparse + 0.0f).run(exec);
+  (assigned = sparse).run(exec);
+  matx::copy(out, sparse, exec);
+  exec.sync();
+  for (index_t i = 0; i < 2; i++) {
+    for (index_t j = 0; j < 3; j++) {
+      EXPECT_EQ(out(i, j), expected(i, j));
+      EXPECT_EQ(assigned(i, j), expected(i, j));
+    }
+  }
+  MATX_EXIT_HANDLER();
+}
+
+#ifdef MATX_EN_UNSAFE_ALIAS_DETECTION
+TEST(CopyTests, OverlappingContiguousViews)
+{
+  // Host allocation allows verifying rejection before any CUDA work is issued.
+  auto storage = make_tensor<float>({8}, MATX_HOST_MALLOC_MEMORY);
+  auto first = slice(storage, {0}, {5});
+  auto second = slice(storage, {3}, {8});
+  ASSERT_TRUE(first.IsContiguous());
+  ASSERT_TRUE(second.IsContiguous());
+  auto expect_overlap = [](auto &out, const auto &in, auto exec) {
+    try {
+      matx::copy(out, in, exec);
+      FAIL() << "Overlapping views must be rejected before copying";
+    }
+    catch (const detail::matxException &error) {
+      EXPECT_EQ(error.e, matxInvalidParameter);
+      EXPECT_NE(std::string(error.what()).find("memory ranges overlap"), std::string::npos);
+    }
+  };
+  expect_overlap(second, first, cudaExecutor{});
+  expect_overlap(first, second, cudaExecutor{});
+  expect_overlap(second, first, cudaStream_t{});
+}
+#endif
+
+#ifndef NDEBUG
+TEST(CopyTests, MismatchedSizes)
+{
+  auto in = make_tensor<float>({2, 3}, MATX_HOST_MALLOC_MEMORY);
+  auto out = make_tensor<float>({2, 4}, MATX_HOST_MALLOC_MEMORY);
+  EXPECT_THROW(matx::copy(out, in, cudaExecutor{}), detail::matxException);
+}
+#endif
 
 TYPED_TEST(CopyTestsAll, CopyReturn)
 {
