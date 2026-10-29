@@ -1549,8 +1549,10 @@ TEST(ChannelizePoly, FusedRadixPow2Strided)
     constexpr index_t filter_len = 13 * Channels - 1;
     constexpr index_t rows_per_cta = 2 * config::NRows;
     const double tolerance = sizeof(Scalar) == sizeof(float) ? 1e-4 : 1e-10;
-    for (const auto strides : {std::array<index_t, 3>{1, 1, 1},
-                              {2, 1, 1}, {1, 2, 1}, {1, 1, 2}, {2, 2, 2}}) {
+    // Type every element: nvcc 12.x cannot deduce the list from the first one.
+    using Strides = std::array<index_t, 3>;
+    for (const auto strides : {Strides{1, 1, 1}, Strides{2, 1, 1}, Strides{1, 2, 1},
+                              Strides{1, 1, 2}, Strides{2, 2, 2}}) {
       const auto [input_stride, filter_stride, output_stride] = strides;
       SCOPED_TRACE(::testing::Message()
           << "M=" << Channels << " D=" << Decimation

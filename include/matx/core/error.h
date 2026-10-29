@@ -299,6 +299,23 @@ namespace matx
     }                                                                      \
   } while (0)
 
+// Driver API counterpart of MATX_CUDA_CHECK_NOEXCEPT. Driver errors do not
+// set the runtime's last error, so there is nothing to drain.
+#define MATX_CUDA_DRIVER_CHECK_NOEXCEPT(e)                                 \
+  do {                                                                     \
+    const CUresult e_ = (e);                                               \
+    if (e_ != CUDA_SUCCESS)                                                \
+    {                                                                      \
+      try {                                                                \
+        const char *err_str = nullptr;                                     \
+        cuGetErrorString(e_, &err_str);                                    \
+        MATX_LOG_ERROR("{}:{} CUDA Driver Error (noexcept context): {} ({})", \
+                        __FILE__, __LINE__, err_str != nullptr ? err_str : "unknown", \
+                        static_cast<int>(e_));                             \
+      } catch (...) {}                                                     \
+    }                                                                      \
+  } while (0)
+
 // This macro asserts compatible dimensions of current class to an operator.
 #define MATX_ASSERT_COMPATIBLE_OP_SIZES(op)                          \
   if constexpr (Rank() > 0) {                                        \

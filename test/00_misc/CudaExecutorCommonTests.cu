@@ -31,6 +31,7 @@
 /////////////////////////////////////////////////////////////////////////////////
 
 #include "matx.h"
+#include "utilities.h"
 
 #include "gtest/gtest.h"
 
@@ -40,18 +41,6 @@
 using namespace matx;
 
 namespace {
-
-bool HasCudaDevice()
-{
-  int device_count = 0;
-  const auto err = cudaGetDeviceCount(&device_count);
-  if (err != cudaSuccess || device_count == 0) {
-    cudaGetLastError();
-    return false;
-  }
-
-  return true;
-}
 
 template <typename KernelProvider>
 void ExpectAllSupportedEPTs(KernelProvider &&provider, bool expect_supported)
@@ -180,7 +169,7 @@ TEST(CudaExecutorCommonTests, BaseConstructorsKeepStreamAndRejectUnprofiledTimin
 
 TEST(CudaExecutorCommonTests, ProfiledBaseRecordsElapsedTimeWhenDeviceIsAvailable)
 {
-  if (!HasCudaDevice()) {
+  if (CudaDeviceCount() == 0) {
     GTEST_SKIP() << "CUDA device required for profiling event coverage";
   }
 
@@ -200,7 +189,7 @@ TEST(CudaExecutorCommonTests, CUDAJITExecutorLaunchesOnProvidedStream)
 #ifndef MATX_EN_JIT
   GTEST_SKIP() << "MATX_EN_JIT required for CUDAJITExecutor stream coverage";
 #else
-  if (!HasCudaDevice()) {
+  if (CudaDeviceCount() == 0) {
     GTEST_SKIP() << "CUDA device required for CUDAJITExecutor stream coverage";
   }
 
@@ -280,7 +269,7 @@ TEST(CudaExecutorCommonTests, KernelProviderCoversStrideAndJitGridPaths)
 
 TEST(CudaExecutorCommonTests, FindBestLaunchParamsUsesCompiledKernelAttributes)
 {
-  if (!HasCudaDevice()) {
+  if (CudaDeviceCount() == 0) {
     GTEST_SKIP() << "CUDA device required for launch-parameter coverage";
   }
 
@@ -302,7 +291,7 @@ TEST(CudaExecutorCommonTests, FindBestLaunchParamsUsesCompiledKernelAttributes)
 
 TEST(CudaExecutorCommonTests, FindBestLaunchParamsUsesUpperBlockDimForJitBlockOperator)
 {
-  if (!HasCudaDevice()) {
+  if (CudaDeviceCount() == 0) {
     GTEST_SKIP() << "CUDA device required for launch-parameter coverage";
   }
 
@@ -316,7 +305,7 @@ TEST(CudaExecutorCommonTests, FindBestLaunchParamsUsesUpperBlockDimForJitBlockOp
 
 TEST(CudaExecutorCommonTests, FindBestLaunchParamsUsesCompiledJitStaticShmem)
 {
-  if (!HasCudaDevice()) {
+  if (CudaDeviceCount() == 0) {
     GTEST_SKIP() << "CUDA device required for launch-parameter coverage";
   }
 

@@ -210,7 +210,7 @@ namespace matx
               }
             }
             else {
-              auto ept_type = detail::EPTQueryInput{false};
+              auto ept_type = detail::EPTQueryInput{false, detail::GetCurrentDeviceAttributes()};
               const auto ept_bounds = detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(op, ept_type);
               [[maybe_unused]] bool stride = detail::get_grid_dims<Op::Rank()>(blocks, threads, sizes, static_cast<int>(ept_bounds[1]), 1024);
               index_t dims = cuda::std::accumulate(cuda::std::begin(sizes) + 1, cuda::std::end(sizes), index_t{1}, cuda::std::multiplies<index_t>());

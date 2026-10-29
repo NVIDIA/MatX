@@ -112,7 +112,7 @@ void FillDistributed(Distributed &tensor, Generator &&generator) {
           distribution.LocalToGlobal(fragment.distribution_index, local_index);
       host[static_cast<size_t>(linear)] = generator(global_index);
     }
-    matx::detail::distributed_device_guard guard{fragment.endpoint.device_id};
+    matx::detail::CudaDeviceGuard guard{fragment.endpoint.device_id};
     MATX_CUDA_CHECK(cudaMemcpy(tensor.LocalView(local).Data(), host.data(),
                                host.size() * sizeof(host[0]),
                                cudaMemcpyDefault));

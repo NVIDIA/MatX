@@ -1405,11 +1405,8 @@ MATX_IGNORE_WARNING_POP_GCC
           return cuda::std::array<detail::ElementsPerThread, 2>{detail::ElementsPerThread::ONE, detail::ElementsPerThread::ONE};
         } else {
           // Set to the max ILP if possible and let the dispatch routine reduce it if needed
-          // Host dispatch may select 32B width on CC100+, but 256b instructions are only
-          // generated when the binary contains an sm_100+ device image.
-          const int max_vec_width_bytes = (detail::GetComputeCapability() >= 1000) ? 32 : MAX_VEC_WIDTH_BYTES;
           const int type_width_bytes = static_cast<int>(sizeof(T));
-          int width = in.jit ? 32 : max_vec_width_bytes / type_width_bytes;
+          int width = in.jit ? 32 : in.max_vec_width_bytes / type_width_bytes;
           while (width > 1) {
             if (((Lsize() % width) == 0) &&                                       // Last dim is a multiple of vector load size
               ((reinterpret_cast<uintptr_t>(data_.ldata_) % (sizeof(T) * width)) == 0)) {
@@ -1423,11 +1420,8 @@ MATX_IGNORE_WARNING_POP_GCC
         }
       }
       else if constexpr (Cap == OperatorCapability::MAX_EPT_VEC_LOAD) {
-        // Same caveat as above: runtime selection can prefer 32B, while actual instruction
-        // width depends on whether sm_100+ code was compiled into the binary.
-        const int max_vec_width_bytes = (detail::GetComputeCapability() >= 1000) ? 32 : MAX_VEC_WIDTH_BYTES;
         const int type_width_bytes = static_cast<int>(sizeof(T));
-        int vec = max_vec_width_bytes / type_width_bytes;
+        int vec = in.max_vec_width_bytes / type_width_bytes;
         // Round down to next lower power of two
         // (if already a power of two, remains unchanged)
         // For vec = 0, will stay zero (avoid infinite loop)
