@@ -67,7 +67,8 @@ enum class SarBpComputeType {
               Otherwise, the kernel will perform double-to-fltflt conversions internally.
               FloatFloat requires \p PhaseLUTOptimization. */
   TaylorFast, /**< Uses a local Taylor approximation of the pulse-to-pixel range about a centered per-thread-block
-              reference point. This mode prioritizes throughput and requires \p PhaseLUTOptimization.
+              reference point. This mode prioritizes throughput. It synthesizes its reference phase rather than
+              reading a lookup table, so it accepts either \p PhaseLUTOptimization setting and ignores it.
               The \p PropSarBpTaylorFastAddThirdOrder property can be used to add a third-order term to the Taylor approximation.
               On systems with reduced double-precision throughput, TaylorFast is typically the fastest compute type using either
               second order or third order Taylor approximation. TaylorFast will divide by reference range values to certain image
@@ -106,8 +107,10 @@ enum class SarBpFeature : uint32_t {
   to store partial values for the reference phases used during backprojection. The value from the lookup table will
   be combined with an incremental phase calculation within a single range bin that is computed using the lower-precision
   intrinsic sine/cosine functions. This optimization will utilize a small amount of device memory as a workspace
-  buffer. This optimization is typically useful for the \p Mixed, \p FloatFloat, and \p TaylorFast compute types.
-  It is required for \p FloatFloat and \p TaylorFast. */
+  buffer. This optimization is typically useful for the \p Mixed and \p FloatFloat compute types.
+  It is required for \p FloatFloat. \p TaylorFast ignores it: TaylorFast always synthesizes its phase from a per-pulse
+  reference phase and the local bin offset, which reads no table and allocates no workspace. See the sar_bp
+  documentation on TaylorFast phase synthesis. */
 };
 
 /**
@@ -171,6 +174,29 @@ struct SarBpParams {
   double center_frequency{0.0}; //!<  The range-profile phase-reference frequency in Hz; for FFT-compressed FX data, this is the frequency placed at IFFT DC.
   double del_r{0.0}; //!<  The range per compressed range bin. The units should match those of the other locations and distances provided to the backprojector.
 };
+
+namespace detail {
+// Whether a compute type synthesizes its reference phase instead of reading a
+// phase lookup table. TaylorFast does, so it never builds or reads a phase LUT,
+// whether or not SarBpFeature::PhaseLUTOptimization is set. The kernel and the
+// host both use this predicate, so they cannot disagree about which compute
+// types read a LUT.
+__MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ constexpr bool SarBpSynthesizesPhase(SarBpComputeType compute_type) noexcept {
+  return compute_type == SarBpComputeType::TaylorFast;
+}
+} // namespace detail
+
+/**
+ * @brief Whether sar_bp builds and reads a phase lookup table for these parameters.
+ *
+ * True when SarBpFeature::PhaseLUTOptimization is set and the compute type reads a table, which is every compute
+ * type except TaylorFast: TaylorFast synthesizes its phase and ignores the feature. Callers can use this to
+ * account for the table, one complex value per range bin, in device memory and cache footprint estimates.
+ */
+constexpr bool SarBpUsesPhaseLUT(const SarBpParams &params) noexcept {
+  return has_feature(params.features, SarBpFeature::PhaseLUTOptimization) &&
+         !detail::SarBpSynthesizesPhase(params.compute_type);
+}
 
 }
 
@@ -401,6 +427,7 @@ namespace experimental {
 * See \p ImageType documentation for details on supported rank and data types.
 * @param range_profiles Range profiles. Range profiles must represent a 2D operator of size num_pulses x num_range_bins containing the range-compressed complex samples.
 * They must use the FFT-shift convention in which zero differential range is at bin floor(num_range_bins / 2).
+* num_range_bins must be at least 2 and at most INT32_MAX; compute types other than Double further limit it to 2^24.
 * See \p RangeProfilesType documentation for details on supported rank and data types.
 * @param platform_positions Platform positions represent the x, y, and z coordinates of the aperture phase center for each pulse. The coordinates should be in
 * the same coordinate system and units as the voxel locations. See \p PlatPosType documentation for details on supported rank and data types.

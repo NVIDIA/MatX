@@ -193,7 +193,9 @@ static bool parse_image_tiles_arg(const std::string &arg, ImageTilesSelection &s
 
 static size_t get_phase_lut_bytes(index_t range_bins, const SarBpParams &params)
 {
-  if (!has_feature(params.features, SarBpFeature::PhaseLUTOptimization)) {
+  // Reserve L2 for a table only when sar_bp builds one. TaylorFast synthesizes
+  // its phase and builds none, whether or not the feature is set.
+  if (!SarBpUsesPhaseLUT(params)) {
     return 0;
   }
 

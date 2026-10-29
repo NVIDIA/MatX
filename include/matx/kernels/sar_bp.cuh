@@ -193,13 +193,125 @@ using loose_compute_param_t = typename std::conditional<
     ComputeType == SarBpComputeType::Double,
     double, float>::type;
 
+// TaylorFast synthesizes its phase (see below) from the phase-correction factor
+// alpha (radians per range bin). It uses alpha in single precision for the
+// fractional-bin term in the inner pulse loop, and the fractional revolutions per
+// bin, frac(alpha / 2*pi), in fixed point: Q0.64 to form the per-pulse reference
+// ticks (Q0.32) and Q0.32 for the per-bin increment Q. As with dr_inv, all three
+// are formed on the host, here by Make, so the kernel performs no conversions or
+// FP64 rounding to obtain them.
+struct SarBpTaylorFastPhaseCorrection {
+    uint64_t Q64;     // fractional revolutions per bin, Q0.64
+    float    alpha32; // radians per bin
+    uint32_t Q;       // fractional revolutions per bin, Q0.32
+
+    static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ SarBpTaylorFastPhaseCorrection Make(double alpha)
+    {
+        constexpr double inv_two_pi = 0.5 * cuda::std::numbers::inv_pi_v<double>;
+        const double rho = alpha * inv_two_pi;
+        // frac(rho) reaches 1 only by rounding when rho is a tiny negative value,
+        // and is NaN for a non-finite alpha. Map both to 0 (a whole revolution, or
+        // no increment) so that the conversion stays in range. Scaling by 2^64 is
+        // exact, and the conversion truncates only when frac(rho) < 2^-12, by less
+        // than 2^-64 revolutions.
+        const double frac = rho - ::floor(rho);
+        const uint64_t q64 = (frac < 1.0) ? static_cast<uint64_t>(frac * 0x1p64) : 0;
+        // Round Q0.64 to Q0.32. A sum that carries out of 64 bits is a rounded
+        // 2^32, which wraps to 0, the phase-equivalent increment. We add half
+        // of one Q0.32 step (0x80000000ull) to properly round the last bit of q32.
+        const uint32_t q32 = static_cast<uint32_t>((q64 + 0x80000000ull) >> 32);
+        return SarBpTaylorFastPhaseCorrection{q64, static_cast<float>(alpha), q32};
+    }
+};
+
 // The phase-correction factor is consumed in loose precision on the PhaseLUT path
 // (multiplied by the fractional bin weight) and in strict precision on the direct
 // path (multiplied by the full range delta). Passing the PhaseLUT value already in
 // loose precision avoids in-kernel conversions that may not hoist in all cases.
 template <SarBpComputeType ComputeType, bool PhaseLUT>
 using phase_correction_param_t = typename std::conditional<
-    PhaseLUT, loose_compute_param_t<ComputeType>, strict_compute_param_t<ComputeType>>::type;
+    ComputeType == SarBpComputeType::TaylorFast, SarBpTaylorFastPhaseCorrection,
+    typename std::conditional<PhaseLUT, loose_compute_param_t<ComputeType>,
+                              strict_compute_param_t<ComputeType>>::type>::type;
+
+// ---------------------------------------------------------------------------
+// TaylorFast reference-relative phase synthesis.
+//
+// The TaylorFast reference phase is phi = alpha*(b - bin_offset), alpha being
+// the phase advance per range bin. TaylorFast already splits the bin as
+// b = J + n + w, where J is the per-pulse integer reference bin shared by the
+// CTA, n the integer local offset and w the interpolation weight. Then
+//
+//     phi = alpha*(J - bin_offset) + alpha*n + alpha*w
+//
+// and each component may be reduced modulo 2*pi independently. The first two
+// are combined in Q0.32 binary angular measure (BAM), where one revolution is
+// 2^32 ticks and uint32 wraparound performs the reduction modulo one
+// revolution exactly:
+//
+//     ticks = T_ref + Q*n  (mod 2^32),
+//
+// with Q the fractional revolutions per bin in Q0.32 and T_ref the reference
+// angle alpha*(J - bin_offset) in ticks, formed once per pulse per CTA from the
+// same fraction in Q0.64 by the same wraparound argument. The fractional-bin
+// term alpha*w is added in float. This is an alternative to the phase lookup
+// table, which gathered e^{i*alpha*(J+n-bin_offset)} from a pre-computed table.
+// Memory access is a bottleneck for TaylorFast with a phase LUT and phase
+// synthesis partially mitigates that memory bottleneck by removing the LUT loads.
+// ---------------------------------------------------------------------------
+
+// The per-pulse reference angle alpha*(J - bin_offset) in Q0.32 ticks, formed
+// once per pulse per CTA and amortized over the CTA's pixels. k = J - bin_offset
+// is an integer, so only the fractional revolutions per bin matter: the angle is
+// the upper word of the low 64 bits of Q64*k, which wrap modulo one revolution
+// exactly for either sign. The upper word is truncated rather than rounded,
+// costing at most one tick (1.5e-9 rad).
+__MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ uint32_t SarBpRefPhaseTicks(
+    const SarBpTaylorFastPhaseCorrection &c, int32_t ref_bin_int, int32_t bin_offset)
+{
+    // k modulo 2^32. It is exact as a signed value whenever the CTA has any
+    // in-range sample, as |k| is then far below 2^31.
+    const uint32_t k = static_cast<uint32_t>(ref_bin_int) - static_cast<uint32_t>(bin_offset);
+    const uint32_t q_lo = static_cast<uint32_t>(c.Q64);
+    const uint32_t q_hi = static_cast<uint32_t>(c.Q64 >> 32);
+    // We want bits 63..32 of the product Q64 * k. Higher bits are whole revolutions
+    // and can be dropped. Bits 31..0 are fractions of a tick. We decompose the product
+    // into 32-bit components due to register spills in some cases when using 64-bit
+    // integer arithmetic.
+    //
+    // With Q64 = q_hi*2^32 + q_lo, k_u the bits of k read as unsigned and
+    // s = 1 for negative k (else 0), two's complement gives k = k_u - s*2^32, so
+    //
+    //   Q64*k = q_lo*k_u + 2^32*(q_hi*k_u) - 2^32*(s*q_lo) - 2^64*(s*q_hi).
+    //
+    // The last term is whole revolutions and vanishes modulo 2^64. Adding
+    // 2^32*X to a 64-bit value adds X to its upper word modulo 2^32, so
+    //
+    //   upper word = hi32(q_lo*k_u) + q_hi*k_u - s*q_lo  (mod 2^32).
+    //
+    // Only the low 32 bits of q_hi*k_u matter, as the rest are also whole
+    // revolutions. Dropping the lower word of q_lo*k_u is truncation.
+    const uint32_t t = static_cast<uint32_t>((static_cast<uint64_t>(q_lo) * k) >> 32) + q_hi * k;
+    return t - ((static_cast<int32_t>(k) < 0) ? q_lo : 0u);
+}
+
+// Form the phase factor for local integer offset n and weight w from the
+// per-pulse reference ticks produced by SarBpRefPhaseTicks.
+__device__ __forceinline__ cuda::std::complex<float> SarBpSynthesizePhase(
+    const SarBpTaylorFastPhaseCorrection &c, uint32_t ref_ticks, int32_t n, float w)
+{
+    // 2*pi/2^32 is a power-of-two rescaling of float(pi), so the float constant
+    // carries only the rounding of pi itself.
+    constexpr float rad_per_tick =
+        static_cast<float>(cuda::std::numbers::pi_v<double>) * 0x1p-31f;
+    // The uint32 product wraps modulo one revolution for any n, including
+    // negative n via the int32 -> uint32 conversion. Reading the tick count as
+    // int32 centres it to [-1/2, 1/2) revolutions.
+    const int32_t z = static_cast<int32_t>(ref_ticks + c.Q * static_cast<uint32_t>(n));
+    float sn, cs;
+    __sincosf(__fmaf_rn(static_cast<float>(z), rad_per_tick, c.alpha32 * w), &sn, &cs);
+    return cuda::std::complex<float>{cs, sn};
+}
 
 // Shared-memory layout for per-pulse-block cached state. Some compute modes
 // cache per-pulse antenna data or Taylor reference values once per pulse block,
@@ -238,7 +350,11 @@ struct SarBpTaylorFastSharedMemory<false, TaylorFastAddThirdOrder> {
     // ptxas schedule the six vector loads for a four-pulse unrolled group close
     // to their uses while meeting the six-CTA register constraint.
     float4 geometry[PULSE_BLOCK_SIZE]; // ux, uy, uz, half_inv_R
-    int2 ref_bin[PULSE_BLOCK_SIZE];     // integer bin and fractional-bin bits
+    // Integer bin, fractional-bin bits, and reference phase ticks (w unused).
+    // The int4 keeps the reference phase on the geometry's 16-byte stride, so
+    // one base address serves both arrays; a separate 4-byte-stride array had
+    // its address rebuilt for every sample.
+    int4 ref_bin[PULSE_BLOCK_SIZE];
     double ref_x;
     double ref_y;
     double ref_z;
@@ -249,8 +365,10 @@ struct SarBpTaylorFastSharedMemory<true, false> {
     // Uniform pixel z does not consume uz, so do not cache it. Store the five
     // consumed values in separate arrays; across the four-way unrolled pulse
     // loop, ptxas combines four adjacent entries from each array into five
-    // LDS.128 loads.
-    int32_t ref_bin_int[PULSE_BLOCK_SIZE];
+    // LDS.128 loads. The reference phase ticks are paired with the integer
+    // bin, which costs one more LDS.128 per four pulses; a separate array was
+    // loaded with four scalar LDS instead.
+    int2 ref_bin_int[PULSE_BLOCK_SIZE]; // integer bin, reference phase ticks
     float  ref_bin_frac[PULSE_BLOCK_SIZE];
     float  ux          [PULSE_BLOCK_SIZE];
     float  uy          [PULSE_BLOCK_SIZE];
@@ -265,7 +383,7 @@ struct SarBpTaylorFastSharedMemory<true, true> {
     // The third-order Uniform-Z path benefits from keeping each pulse's values
     // together so its additional arithmetic does not extend vector live ranges.
     float4 geometry[PULSE_BLOCK_SIZE]; // ux, uy, half_inv_R, ref_bin_frac
-    int32_t ref_bin[PULSE_BLOCK_SIZE];
+    int2 ref_bin[PULSE_BLOCK_SIZE]; // integer bin, reference phase ticks
     double ref_x;
     double ref_y;
     double ref_z;
@@ -438,14 +556,20 @@ __device__ inline SarBpBinAndWeight<float> ComputeBinWeightToPixelTaylorFast(
     const SarBpPulseBlockCache<SarBpComputeType::TaylorFast, true, PixelZIsUniform,
                                TaylorFastAddThirdOrder> &sh_mem,
     const SarBpThreadState<SarBpComputeType::TaylorFast, true> &thread_state,
-    IdxT ip)
+    IdxT ip,
+    // Reference-relative integer bin offset n, so that the lower sample is
+    // ref_bin_int + n, and the pulse's reference phase ticks.
+    int32_t &bin_floor_local,
+    uint32_t &ref_phase_ticks)
 {
     // In the mathematical derivation in the documentation, we defined s = dot(u, d) as
     // the dot product of the along-range unit vector u=(ux, uy, uz) with the local offset d,
     // and q as the squared perpendicular distance from the local pixel
     // to the pulse-to-reference-pixel line. These calculations then map directly to the
-    // derivation. We store the integer component of the reference bin b_0 in
-    // ref_bin.x for variable z and directly in a scalar array for uniform z.
+    // derivation. Each pulse's integer entry (ref_bin, or ref_bin_int for the
+    // second-order uniform-z layout) holds the integer component of the
+    // reference bin b_0 in .x and the pulse's reference phase ticks in .z for
+    // variable z or .y for uniform z.
     // Its fractional component remains separate to preserve the interpolation
     // weight: otherwise, b_0 can be large enough that storing it as a float
     // loses low-order bin precision. Variable z stores the fractional
@@ -469,17 +593,22 @@ __device__ inline SarBpBinAndWeight<float> ComputeBinWeightToPixelTaylorFast(
             sh_mem.uy[ip] * thread_state.ref_dy;
         half_inv_R = sh_mem.half_inv_R[ip];
         ref_bin_frac = sh_mem.ref_bin_frac[ip];
-        ref_bin_int = sh_mem.ref_bin_int[ip];
+        const int2 ref_bin = sh_mem.ref_bin_int[ip];
+        ref_bin_int = ref_bin.x;
+        ref_phase_ticks = static_cast<uint32_t>(ref_bin.y);
     } else if constexpr (PixelZIsUniform) {
         const float4 geometry = sh_mem.geometry[ip];
         s = geometry.x * thread_state.ref_dx +
             geometry.y * thread_state.ref_dy;
         half_inv_R = geometry.z;
         ref_bin_frac = geometry.w;
-        ref_bin_int = sh_mem.ref_bin[ip];
+        const int2 ref_bin = sh_mem.ref_bin[ip];
+        ref_bin_int = ref_bin.x;
+        ref_phase_ticks = static_cast<uint32_t>(ref_bin.y);
     } else {
         const float4 geometry = sh_mem.geometry[ip];
-        const int2 ref_bin = sh_mem.ref_bin[ip];
+        const int4 ref_bin = sh_mem.ref_bin[ip];
+        ref_phase_ticks = static_cast<uint32_t>(ref_bin.z);
         s = geometry.x * thread_state.ref_dx +
             geometry.y * thread_state.ref_dy +
             geometry.z * thread_state.ref_dz;
@@ -494,10 +623,21 @@ __device__ inline SarBpBinAndWeight<float> ComputeBinWeightToPixelTaylorFast(
         dR = fmaf(-2.0f * half_inv_R * half_inv_R * s, q, dR_2nd);
     }
     const float bin_loc = fmaf(dR, thread_state.dr_inv_f32, ref_bin_frac);
-    const float bin_floor = ::floorf(bin_loc);
+    // Convert the floored integer back to float rather than calling floorf:
+    // the int-to-float conversion issues on the FMA pipe, while FRND would
+    // share the conversion/MUFU pipe with the phase's __sincosf.
+    bin_floor_local = __float2int_rd(bin_loc);
+    const float bin_floor = static_cast<float>(bin_floor_local);
+    // Re-form the weight against the integer bin rather than taking
+    // bin_loc - bin_floor, so that both roundings happen at O(1) instead of
+    // inheriting ulp(bin_loc) from a value spanning the CTA's bins. The
+    // synthesized phase scales w by alpha, so its rounding lands in the phase
+    // unattenuated. The pair is not exactly consistent: w can land outside
+    // [0, 1) by up to ulp(bin_loc)/2, which the linear interpolation and the
+    // phase both tolerate.
     return SarBpBinAndWeight<float>{
-        bin_loc - bin_floor,
-        ref_bin_int + static_cast<int32_t>(bin_floor)
+        fmaf(dR, thread_state.dr_inv_f32, -bin_floor) + ref_bin_frac,
+        ref_bin_int + bin_floor_local
     };
 }
 
@@ -762,22 +902,36 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
         }
     };
 
+    // TaylorFast synthesizes its reference phase from a per-pulse reference
+    // angle and the local bin offset instead of gathering it from the LUT.
+    constexpr bool SynthesizePhase = detail::SarBpSynthesizesPhase(ComputeType);
+    // The LUT and direct helpers below take the scalar phase-correction factor.
+    // TaylorFast receives it in both precisions and calls neither helper, so they
+    // see its float value. Either way this is a copy, not a conversion.
+    const auto phase_correction_scalar = [&]() {
+        if constexpr (SynthesizePhase) {
+            return phase_correction_partial.alpha32;
+        } else {
+            return phase_correction_partial;
+        }
+    }();
+
     // On the PhaseLUT path, phase_correction_partial is already loose_compute_t (see
     // phase_correction_param_t), so it is used directly without a conversion. A mismatch
     // would silently reintroduce a per-pulse conversion in the inner loop.
     static_assert(!PhaseLUT ||
-                  cuda::std::is_same_v<decltype(phase_correction_partial), loose_compute_t>,
+                  cuda::std::is_same_v<cuda::std::remove_cv_t<decltype(phase_correction_scalar)>, loose_compute_t>,
                   "SarBp: PhaseLUT path expects phase_correction_partial pre-converted to loose_compute_t");
-    const auto get_reference_phase_lut = [&phase_lut, &phase_correction_partial](int32_t bin_floor_int, loose_compute_t w) -> loose_complex_compute_t {
+    const auto get_reference_phase_lut = [&phase_lut, &phase_correction_scalar](int32_t bin_floor_int, loose_compute_t w) -> loose_complex_compute_t {
         const loose_complex_compute_t base_phase = phase_lut[bin_floor_int];
         loose_compute_t incr_sinx, incr_cosx;
         if constexpr (cuda::std::is_same_v<loose_compute_t, double>) {
-            ::sincos(phase_correction_partial * w, &incr_sinx, &incr_cosx);
+            ::sincos(phase_correction_scalar * w, &incr_sinx, &incr_cosx);
         } else {
             // The lambda is also checked when PhaseLUT is false, where the phase
             // factor can be double. On the LUT path this cast is a no-op because
             // the host already supplies loose_compute_t.
-            __sincosf(static_cast<loose_compute_t>(phase_correction_partial) * w, &incr_sinx, &incr_cosx);
+            __sincosf(static_cast<loose_compute_t>(phase_correction_scalar) * w, &incr_sinx, &incr_cosx);
         }
 
         return loose_complex_compute_t{
@@ -786,8 +940,8 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
         };
     };
 
-    const auto get_reference_phase_direct = [&phase_correction_partial](strict_compute_t range_delta) -> loose_complex_compute_t {
-        const strict_compute_t phase = static_cast<strict_compute_t>(phase_correction_partial * range_delta);
+    const auto get_reference_phase_direct = [&phase_correction_scalar](strict_compute_t range_delta) -> loose_complex_compute_t {
+        const strict_compute_t phase = static_cast<strict_compute_t>(phase_correction_scalar * range_delta);
         strict_compute_t sinx, cosx;
         if constexpr (cuda::std::is_same_v<strict_compute_t, double>) {
             ::sincos(phase, &sinx, &cosx);
@@ -823,7 +977,7 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
 
     SarBpThreadState<ComputeType, PhaseLUT> thread_state{};
     if constexpr (IsTaylorFast) {
-        static_assert(PhaseLUT == true, "SarBp: TaylorFast compute type requires PhaseLUT optimization");
+        static_assert(PhaseLUT == true, "SarBp: TaylorFast is only instantiated with PhaseLUT=true");
         if constexpr (PhaseLUT) {
             thread_state.dr_inv_f32 = dr_inv.f32;
             if (tid == 0) {
@@ -947,17 +1101,21 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
                     const float ux = static_cast<float>(dxa * inv_R_d);
                     const float uy = static_cast<float>(dya * inv_R_d);
                     const float half_inv_R = static_cast<float>(static_cast<strict_compute_t>(0.5) * inv_R_d);
+                    // Once per pulse per CTA, amortized over the CTA's pixels.
+                    const int32_t ref_phase_ticks = static_cast<int32_t>(SarBpRefPhaseTicks(
+                        phase_correction_partial, ref_bin_int, num_range_bins / 2));
                     if constexpr (PixelZIsUniform && !TaylorFastAddThirdOrder) {
-                        sh_mem.ref_bin_int[ip] = ref_bin_int;
+                        sh_mem.ref_bin_int[ip] = int2{ref_bin_int, ref_phase_ticks};
                         sh_mem.ref_bin_frac[ip] = ref_bin_frac;
                         sh_mem.ux[ip] = ux;
                         sh_mem.uy[ip] = uy;
                         sh_mem.half_inv_R[ip] = half_inv_R;
                     } else if constexpr (PixelZIsUniform) {
-                        sh_mem.ref_bin[ip] = ref_bin_int;
+                        sh_mem.ref_bin[ip] = int2{ref_bin_int, ref_phase_ticks};
                         sh_mem.geometry[ip] = float4{ux, uy, half_inv_R, ref_bin_frac};
                     } else {
-                        sh_mem.ref_bin[ip] = int2{ref_bin_int, __float_as_int(ref_bin_frac)};
+                        sh_mem.ref_bin[ip] = int4{ref_bin_int, __float_as_int(ref_bin_frac),
+                                                  ref_phase_ticks, 0};
                         sh_mem.geometry[ip] = float4{
                             ux,
                             uy,
@@ -1009,21 +1167,38 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
             continue;
         }
 
+        // On the unit-stride fast path, carry the current pulse's row offset
+        // across iterations, so a sample's element index is row_offset + bin:
+        // one add instead of recomputing (pulse_base + ip)*stride + bin.
+        // Exclude direct-sincos paths as this added register spills in that case.
+        constexpr bool UseRowOffset = IsUnitStride && PhaseLUT;
+        [[maybe_unused]] IdxT row_offset = 0;
+        [[maybe_unused]] IdxT row_step = 0;
+        if constexpr (UseRowOffset) {
+            row_step = rp.outer_stride(0);
+            row_offset = pulse_base * row_step;
+        }
+
+        // The row offset advances in the loop header so that samples skipped
+        // by the bounds check below still step it.
         #pragma unroll 4
-        for (IdxT ip = 0; ip < num_pulses_in_block; ++ip) {
-            const IdxT p = pulse_base + ip;
+        for (IdxT ip = 0; ip < num_pulses_in_block; ++ip, row_offset += row_step) {
+            [[maybe_unused]] const IdxT p = pulse_base + ip;
 
             // The following branches all compute at least the base range bin index and interpolation weight
             // for the current pulse. Paths not using the PhaseLUT optimization will also populate the
             // thread_state.range_delta member for use in get_reference_phase_direct().
             SarBpBinAndWeight<loose_compute_t> bin_weight;
+            [[maybe_unused]] int32_t bin_floor_local = 0;
+            [[maybe_unused]] uint32_t ref_phase_ticks = 0;
             if constexpr (IsFloatFloat) {
                 bin_weight = ComputeBinWeightToPixelFloatFloat<UseCachedPz2FF, PixelZIsUniform>(sh_mem, ip, px, py, pz, dr_inv);
             } else if constexpr (IsTaylorFast) {
-                static_assert(PhaseLUT == true, "SarBp: TaylorFast compute type requires PhaseLUT optimization");
+                static_assert(PhaseLUT == true, "SarBp: TaylorFast is only instantiated with PhaseLUT=true");
                 // Zero and Fixed both make ref_dz == 0, so PixelZIsUniform drives the elision.
                 bin_weight = ComputeBinWeightToPixelTaylorFast<
-                    TaylorFastAddThirdOrder, PixelZIsUniform>(sh_mem, thread_state, ip);
+                    TaylorFastAddThirdOrder, PixelZIsUniform>(
+                        sh_mem, thread_state, ip, bin_floor_local, ref_phase_ticks);
             } else if constexpr (UsePulseBlockCache) {
                 bin_weight = ComputeBinWeightToPixelPulseBlockCache<ComputeType, PixelZIsZero, UseCachedDz2, PixelZIsUniform>(sh_mem, ip, px, py, pz, dr_inv);
             } else {
@@ -1050,14 +1225,27 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
                 bin_weight.bin_floor_int = static_cast<int32_t>(bin_floor);
             }
 
-            if (bin_weight.bin_floor_int < 0 || bin_weight.bin_floor_int >= num_range_bins-1) {
+            // One unsigned compare covers both bounds: a negative bin wraps to
+            // a value above any valid upper bound. sar_bp_impl verifies
+            // 2 <= num_range_bins <= INT32_MAX on the host, so num_range_bins - 1
+            // lies in [1, 2^31 - 2], below every negative bin read as uint32_t
+            // (at least 2^31).
+            if (static_cast<uint32_t>(bin_weight.bin_floor_int) >=
+                static_cast<uint32_t>(num_range_bins - 1)) {
                 continue;
             }
 
             // rp accessor picks the fast pointer path on IsUnitStride or
             // falls through to operator().
-            const range_profiles_t sample_lo = rp(p, bin_weight.bin_floor_int);
-            const range_profiles_t sample_hi = rp(p, bin_weight.bin_floor_int + 1);
+            range_profiles_t sample_lo, sample_hi;
+            if constexpr (UseRowOffset) {
+                const IdxT offset = row_offset + bin_weight.bin_floor_int;
+                sample_lo = rp.at_offset(offset);
+                sample_hi = rp.at_offset(offset + 1);
+            } else {
+                sample_lo = rp(p, bin_weight.bin_floor_int);
+                sample_hi = rp(p, bin_weight.bin_floor_int + 1);
+            }
 
             const loose_complex_compute_t sample = [&sample_lo, &sample_hi, &bin_weight]() -> loose_complex_compute_t {
                 const loose_complex_compute_t loose_sample_lo = static_cast<loose_complex_compute_t>(sample_lo);
@@ -1078,9 +1266,11 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
 
             static_assert((!IsFloatFloat &&
                             !IsTaylorFast) || PhaseLUT == true,
-                            "SarBp: FloatFloat and TaylorFast compute types require PhaseLUT optimization");
+                            "SarBp: FloatFloat and TaylorFast are only instantiated with PhaseLUT=true");
             const loose_complex_compute_t ref_phase = [&]() {
-                if constexpr (PhaseLUT) {
+                if constexpr (SynthesizePhase) {
+                    return SarBpSynthesizePhase(phase_correction_partial, ref_phase_ticks, bin_floor_local, bin_weight.w);
+                } else if constexpr (PhaseLUT) {
                     return get_reference_phase_lut(bin_weight.bin_floor_int, bin_weight.w);
                 } else {
                     return get_reference_phase_direct(thread_state.range_delta);
