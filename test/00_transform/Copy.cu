@@ -173,8 +173,9 @@ TYPED_TEST(CopyTestsAll, CopyViewsAndExpressions)
     }
   }
 
-  // Expression inputs still evaluate through assignment.
-  matx::copy(out, in + TestType{0}, exec);
+  // Expression inputs still evaluate through assignment. Bool addition promotes
+  // to int, so explicitly convert the result back to the output element type.
+  matx::copy(out, as_type<TestType>(in + TestType{0}), exec);
   exec.sync();
   for (index_t i = 0; i < 4; i++) {
     for (index_t j = 0; j < 6; j++) {
@@ -246,14 +247,21 @@ TEST(CopyTests, TypeConversion)
   MATX_ENTER_HANDLER();
   auto in = make_tensor<float>({4});
   auto out = make_tensor<int>({4});
+  auto wide_out = make_tensor<double>({4});
   for (index_t i = 0; i < 4; i++) {
     in(i) = static_cast<float>(i) + 0.5f;
   }
   cudaExecutor exec{};
+  matx::copy(wide_out, in, exec);
+#if MATX_CHECK_NARROWING_CONVERSIONS
+  matx::copy(out, as_type<int>(in), exec);
+#else
   matx::copy(out, in, exec);
+#endif
   exec.sync();
   for (index_t i = 0; i < 4; i++) {
     EXPECT_EQ(out(i), static_cast<int>(in(i)));
+    EXPECT_EQ(wide_out(i), static_cast<double>(in(i)));
   }
   MATX_EXIT_HANDLER();
 }
