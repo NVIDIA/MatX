@@ -34,6 +34,7 @@
 #include <cinttypes>
 #include <utility>
 #include <matx/core/type_utils.h>
+#include "matx/kernels/utility.cuh"
 
 namespace matx {
   namespace detail {
