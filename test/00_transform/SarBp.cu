@@ -868,7 +868,7 @@ __global__ void SarBpPhaseSynthTestKernel(const SarBpPhaseSynthSample *samples, 
 }
 
 // Largest |P - e^{i*phi}| over the samples, which for unit phasors is the
-// phase error in radians to first order.
+// phase error in radians to first order, or the first non-finite error.
 double SarBpPhaseSynthMaxError(const std::vector<SarBpPhaseSynthSample> &h_samples, double alpha, int32_t bin_offset)
 {
   const int count = static_cast<int>(h_samples.size());
@@ -892,7 +892,13 @@ double SarBpPhaseSynthMaxError(const std::vector<SarBpPhaseSynthSample> &h_sampl
     const double phi = 2.0 * cuda::std::numbers::pi * int_rev + alpha * static_cast<double>(s.w);
     const double dr = static_cast<double>(h_out[i].real()) - std::cos(phi);
     const double di = static_cast<double>(h_out[i].imag()) - std::sin(phi);
-    max_err = std::max(max_err, std::sqrt(dr * dr + di * di));
+    const double err = std::sqrt(dr * dr + di * di);
+    // std::max would drop a NaN error, so return a non-finite error at once;
+    // it then fails every tolerance check.
+    if (!std::isfinite(err)) {
+      return err;
+    }
+    max_err = std::max(max_err, err);
   }
   return max_err;
 }
