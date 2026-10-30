@@ -149,6 +149,10 @@ struct BoundAccessor;
 // precomputes a shifted base pointer so the bound dims cost nothing at
 // access time; on the slow path it captures the bound indices and forwards
 // them to op(leading..., is...).
+//
+// outer_stride(d) and at_offset(offset) expose the fast path's strides and
+// linear element access to callers that maintain their own offsets. They are
+// only available when FastPath is true.
 // ----------------------------------------------------------------------------
 // IdxT selects the width of the offset arithmetic. It defaults to the tensor's stride_type, or offset_t for other operators.
 // Callers that have already proven every index the kernel forms fits in 32 bits
@@ -218,6 +222,17 @@ struct TensorAccessor {
         return BoundAccessor<Op, IsUnitStride, sizeof...(Leading), IdxT>(
             *this, static_cast<index_t>(leading)...);
     }
+
+    // Fast path only: Stride(d) of an outer dimension d in [0, Rank - 1), and
+    // the element at a linear offset from the data pointer. Together they let
+    // a caller carry part of an offset across iterations, for example a row
+    // offset advanced by outer_stride(0) per row, instead of re-forming it
+    // through operator() for each access.
+    __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__
+    IdxT outer_stride(int d) const requires (FastPath && NumOuter > 0) { return outer_strides_[d]; }
+
+    __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__
+    decltype(auto) at_offset(IdxT offset) const requires FastPath { return data_[offset]; }
 };
 
 // ----------------------------------------------------------------------------

@@ -38,6 +38,10 @@
 #include "prerun_tester.h"
 #include <cuda/std/complex>
 #include <cuda/std/numbers>
+#include <cmath>
+#include <limits>
+#include <random>
+#include <vector>
 
 using namespace matx;
 
@@ -81,170 +85,6 @@ class SarBpTestDoubleType
 TYPED_TEST_SUITE(SarBpTestNonComplexNonHalfFloatTypes, MatXFloatNonComplexNonHalfTypesCUDAExec);
 TYPED_TEST_SUITE(SarBpTestDoubleType, MatXDoubleOnlyTypeCUDAExec);
 
-// Test with all values (input data, pixels, locations, etc.) having the same floating
-// point precision.
-TYPED_TEST(SarBpTestNonComplexNonHalfFloatTypes, NonMixedTypes)
-{
-  MATX_ENTER_HANDLER();
-
-  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
-  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
-  using complex_t = cuda::std::complex<TestType>;
-  using apc_t = cuda::std::conditional_t<cuda::std::is_same_v<TestType, double>, double3, float3>;
-
-  const index_t num_range_bins = 128;
-  const index_t num_pulses = 128;
-  const index_t image_width = 128;
-  const index_t image_height = 128;
-
-  auto zero_image = matx::zeros<complex_t>({image_height, image_width});
-  const TestType min_x = static_cast<TestType>(-10.0);
-  const TestType max_x = static_cast<TestType>(10.0);
-  const TestType min_y = static_cast<TestType>(-10.0);
-  const TestType max_y = static_cast<TestType>(10.0);
-  auto pix_coords_x = matx::linspace<TestType>(min_x, max_x, image_width);
-  auto pix_coords_y = matx::linspace<TestType>(min_y, max_y, image_height);
-  auto pix_coords_yclone = matx::clone<2>(pix_coords_y, {matx::matxKeepDim, image_width});
-  auto pix_coords_xclone = matx::clone<2>(pix_coords_x, {image_height, matx::matxKeepDim});
-  auto voxel_locations = matx::zipvec(
-    pix_coords_xclone, pix_coords_yclone, matx::zeros<TestType>({image_height, image_width}));
-
-  auto range_profiles = matx::ones<complex_t>({num_pulses, num_range_bins});
-  auto range_to_mcp = matx::make_tensor<TestType>({num_pulses});
-  auto platform_positions = matx::make_tensor<apc_t>({num_pulses});
-  auto image = matx::make_tensor<complex_t>({image_height, image_width});
-  const TestType plat_dx = (max_x - min_x) / num_pulses;
-  const TestType plat_y = static_cast<TestType>(-1000.0);
-  const TestType plat_z = static_cast<TestType>(1000.0);
-  for (index_t i = 0; i < num_pulses; i++) {
-    const TestType plat_x = min_x + static_cast<TestType>(i) * plat_dx;
-    platform_positions(i) = apc_t{plat_x, plat_y, plat_z};
-    range_to_mcp(i) = ::sqrt(plat_x*plat_x + plat_y*plat_y + plat_z*plat_z);
-  }
-
-  SarBpParams params;
-  if constexpr (cuda::std::is_same_v<TestType, double>) {
-    params.compute_type = SarBpComputeType::Double;
-  } else {
-    params.compute_type = SarBpComputeType::Float;
-  }
-  params.features = SarBpFeature::PhaseLUTOptimization;
-  params.center_frequency = 10.0e9;
-  params.del_r = (max_x - min_x) / num_range_bins;
-
-  (image = matx::experimental::sar_bp(zero_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, params)).run(this->exec);
-  this->exec.sync();
-
-  MATX_EXIT_HANDLER();
-}
-
-// Test Mixed, FloatFloat, and TaylorFast precisions. These precisions are used when the user wants
-// better than fp32 precision at lower cost than fp64 (especially for GPUs with reduced FP64 throughput).
-TYPED_TEST(SarBpTestDoubleType, MixedPrecision)
-{
-  MATX_ENTER_HANDLER();
-
-  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
-  // Used for image pixels and input data, which are assumed to be fp32 for
-  // mixed precision variants.
-  using complex_t = cuda::std::complex<float>;
-  using loose_compute_t = float;
-  using strict_compute_t = double;
-  using apc_t = double3;
-
-  const index_t num_range_bins = 128;
-  const index_t num_pulses = 128;
-  const index_t image_width = 128;
-  const index_t image_height = 128;
-
-  auto zero_image = matx::zeros<complex_t>({image_height, image_width});
-  const loose_compute_t min_x = -10.0;
-  const loose_compute_t max_x = 10.0;
-  const loose_compute_t min_y = -10.0;
-  const loose_compute_t max_y = 10.0;
-  auto pix_coords_x = matx::linspace<loose_compute_t>(min_x, max_x, image_width);
-  auto pix_coords_y = matx::linspace<loose_compute_t>(min_y, max_y, image_height);
-  auto pix_coords_yclone = matx::clone<2>(pix_coords_y, {matx::matxKeepDim, image_width});
-  auto pix_coords_xclone = matx::clone<2>(pix_coords_x, {image_height, matx::matxKeepDim});
-  auto voxel_locations = matx::zipvec(
-    pix_coords_xclone, pix_coords_yclone, matx::zeros<loose_compute_t>({image_height, image_width}));
-
-  auto range_profiles = matx::ones<complex_t>({num_pulses, num_range_bins});
-  auto range_to_mcp = matx::make_tensor<strict_compute_t>({num_pulses});
-  auto platform_positions = matx::make_tensor<apc_t>({num_pulses});
-  auto image = matx::make_tensor<complex_t>({image_height, image_width});
-  const strict_compute_t plat_dx = (max_x - min_x) / num_pulses;
-  const strict_compute_t plat_y = -1000.0;
-  const strict_compute_t plat_z = 1000.0;
-  for (index_t i = 0; i < num_pulses; i++) {
-    const strict_compute_t plat_x = min_x + static_cast<strict_compute_t>(i) * plat_dx;
-    platform_positions(i) = apc_t{plat_x, plat_y, plat_z};
-    range_to_mcp(i) = ::sqrt(plat_x*plat_x + plat_y*plat_y + plat_z*plat_z);
-  }
-
-  SarBpParams params;
-  params.center_frequency = 10.0e9;
-  params.del_r = (max_x - min_x) / num_range_bins;
-
-  this->exec.sync();
-
-  // Run with Mixed precision and no additional optimizations
-  {
-    params.compute_type = SarBpComputeType::Mixed;
-    (image = matx::experimental::sar_bp(zero_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, params)).run(this->exec);
-    this->exec.sync();
-  }
-
-  // Enable PhaseLUTOptimization for all remaining tests
-  params.features = SarBpFeature::PhaseLUTOptimization;
-
-  {
-    (image = matx::experimental::sar_bp(zero_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, params)).run(this->exec);
-    this->exec.sync();
-  }
-
-  // Enable FloatFloat optimizations. This is only an optimization on GPUs with reduced FP64 throughput.
-  // On 100 class GPUs with full FP64 throughput, Mixed precision is significantly faster than FloatFloat.
-  {
-    params.compute_type = SarBpComputeType::FloatFloat;
-    (image = matx::experimental::sar_bp(zero_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, params)).run(this->exec);
-    this->exec.sync();
-  }
-
-  {
-    params.compute_type = SarBpComputeType::TaylorFast;
-    (image = matx::experimental::sar_bp(zero_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, params)).run(this->exec);
-    this->exec.sync();
-
-    // We reset TaylorFast and enable PhaseLUTOptimization below to include the text in the
-    // example that will be used in the documentation.
-    // example-begin sar-bp-2
-    params.compute_type = SarBpComputeType::TaylorFast;
-    params.features = SarBpFeature::PhaseLUTOptimization;
-
-    (image = matx::experimental::sar_bp(zero_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, params)
-      .props<PropSarBpTaylorFastAddThirdOrder>()).run(this->exec);
-    // example-end sar-bp-2
-    this->exec.sync();
-  }
-
-  // The voxel_locations grid in this test places every pixel on the z = 0 plane,
-  // so the PropSarBpPixelZIsZero assumption holds and can be applied to any
-  // compute type.
-  {
-    // example-begin sar-bp-3
-    params.compute_type = SarBpComputeType::Mixed;
-    params.features = SarBpFeature::PhaseLUTOptimization;
-
-    (image = matx::experimental::sar_bp(zero_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, params)
-      .props<PropSarBpPixelZIsZero>()).run(this->exec);
-    // example-end sar-bp-3
-    this->exec.sync();
-  }
-
-  MATX_EXIT_HANDLER();
-}
-
 // Verify the num_range_bins boundary at 2^24 for compute types that compute
 // the per-pulse bin_offset in fp32 (Float, Mixed, FloatFloat, TaylorFast). fp32 can
 // exactly represent all integers in [-2^24, 2^24] but not above, so those
@@ -255,6 +95,11 @@ TYPED_TEST(SarBpTestDoubleType, MixedPrecision)
 // All bulk inputs use operator generators (matx::ones / matx::zeros) so the
 // only allocated memory is the tiny output image and a 1-element
 // platform_positions tensor.
+//
+// Also verify the lower bound, which the host checks before dispatching on the
+// compute type: linear interpolation reads two adjacent bins, so fewer than two
+// range bins must be rejected. The kernel's single unsigned bounds check relies
+// on this, since with zero bins num_range_bins - 1 would wrap to UINT32_MAX.
 TYPED_TEST(SarBpTestDoubleType, RangeBinsLimitFp32Path)
 {
   MATX_ENTER_HANDLER();
@@ -294,6 +139,11 @@ TYPED_TEST(SarBpTestDoubleType, RangeBinsLimitFp32Path)
 
   // num_range_bins == 2^24 + 1 must throw matxException.
   ASSERT_THROW(run(MAX_RANGE_BINS + 1), matx::detail::matxException);
+
+  // Two bins is the smallest valid profile.
+  ASSERT_THROW(run(0), matx::detail::matxException);
+  ASSERT_THROW(run(1), matx::detail::matxException);
+  EXPECT_NO_THROW(run(2));
 
   MATX_EXIT_HANDLER();
 }
@@ -682,8 +532,11 @@ TYPED_TEST(SarBpTestDoubleType, PointTarget)
 
     {
       SCOPED_TRACE("TaylorFast third order");
+      // example-begin sar-bp-2
+      bp_params.compute_type = matx::SarBpComputeType::TaylorFast;
       (image = matx::experimental::sar_bp(zero_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, bp_params)
         .props<matx::PropSarBpTaylorFastAddThirdOrder>()).run(this->exec);
+      // example-end sar-bp-2
       this->exec.sync();
 
       validate(image, f32_accum_re_thresh, 1.8e-2);
@@ -703,8 +556,18 @@ TYPED_TEST(SarBpTestDoubleType, PointTarget)
         validate(image, f32_accum_re_thresh, im_thresh);
       };
 
-      bp_params.compute_type = matx::SarBpComputeType::Mixed;
-      run_props("Mixed PropSarBpPixelZIsZero", 1.0e-2, matx::PropSarBpPixelZIsZero{});
+      {
+        SCOPED_TRACE("Mixed PropSarBpPixelZIsZero");
+        // example-begin sar-bp-3
+        bp_params.compute_type = matx::SarBpComputeType::Mixed;
+        bp_params.features = matx::SarBpFeature::PhaseLUTOptimization;
+
+        (image = matx::experimental::sar_bp(zero_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, bp_params)
+          .props<matx::PropSarBpPixelZIsZero>()).run(this->exec);
+        // example-end sar-bp-3
+        this->exec.sync();
+        validate(image, f32_accum_re_thresh, 1.0e-2);
+      }
       run_props("Mixed PropSarBpPixelZIsFixed", 1.0e-2, matx::PropSarBpPixelZIsFixed{});
 
       bp_params.compute_type = matx::SarBpComputeType::FloatFloat;
@@ -976,5 +839,437 @@ TYPED_TEST(SarBpTestNonComplexNonHalfFloatTypes, RangeToMcpOperatorInput)
     }
   }
 
+  MATX_EXIT_HANDLER();
+}
+
+// TaylorFast reference-relative phase synthesis. These tests call the
+// per-sample helpers directly and compare the synthesized phasor with
+// e^{i*alpha*(J + n + w - bin_offset)} evaluated in double for the same
+// (J, n, w).
+namespace {
+
+struct SarBpPhaseSynthSample {
+  int32_t J;
+  int32_t n;
+  float w;
+};
+
+// As in the sar_bp transform, the phase correction is formed on the host and
+// passed to the kernel by value.
+__global__ void SarBpPhaseSynthTestKernel(const SarBpPhaseSynthSample *samples, int count,
+                                          SarBpTaylorFastPhaseCorrection c, int32_t bin_offset,
+                                          cuda::std::complex<float> *out)
+{
+  const int i = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
+  if (i < count) {
+    const uint32_t ref_ticks = SarBpRefPhaseTicks(c, samples[i].J, bin_offset);
+    out[i] = SarBpSynthesizePhase(c, ref_ticks, samples[i].n, samples[i].w);
+  }
+}
+
+// Largest |P - e^{i*phi}| over the samples, which for unit phasors is the
+// phase error in radians to first order, or the first non-finite error.
+double SarBpPhaseSynthMaxError(const std::vector<SarBpPhaseSynthSample> &h_samples, double alpha, int32_t bin_offset)
+{
+  const int count = static_cast<int>(h_samples.size());
+  auto samples = make_tensor<SarBpPhaseSynthSample>({count});
+  auto out = make_tensor<cuda::std::complex<float>>({count});
+  MATX_CUDA_CHECK(cudaMemcpy(samples.Data(), h_samples.data(), count * sizeof(SarBpPhaseSynthSample), cudaMemcpyHostToDevice));
+  SarBpPhaseSynthTestKernel<<<(count + 255) / 256, 256>>>(
+      samples.Data(), count, SarBpTaylorFastPhaseCorrection::Make(alpha), bin_offset, out.Data());
+  MATX_CUDA_CHECK(cudaDeviceSynchronize());
+
+  std::vector<cuda::std::complex<float>> h_out(count);
+  MATX_CUDA_CHECK(cudaMemcpy(h_out.data(), out.Data(), count * sizeof(cuda::std::complex<float>), cudaMemcpyDeviceToHost));
+  double max_err = 0.0;
+  for (int i = 0; i < count; i++) {
+    const SarBpPhaseSynthSample &s = h_samples[i];
+    // Reduce the integer-bin part exactly before forming the angle so that
+    // the reference itself is accurate for |J| up to 2^24.
+    const double rev = alpha / (2.0 * cuda::std::numbers::pi);
+    const double k = static_cast<double>(s.J) + static_cast<double>(s.n) - static_cast<double>(bin_offset);
+    const double int_rev = std::fmod(std::fmod(rev, 1.0) * k, 1.0);
+    const double phi = 2.0 * cuda::std::numbers::pi * int_rev + alpha * static_cast<double>(s.w);
+    const double dr = static_cast<double>(h_out[i].real()) - std::cos(phi);
+    const double di = static_cast<double>(h_out[i].imag()) - std::sin(phi);
+    const double err = std::sqrt(dr * dr + di * di);
+    // std::max would drop a NaN error, so return a non-finite error at once;
+    // it then fails every tolerance check.
+    if (!std::isfinite(err)) {
+      return err;
+    }
+    max_err = std::max(max_err, err);
+  }
+  return max_err;
+}
+
+std::vector<SarBpPhaseSynthSample> SarBpPhaseSynthSamples(float w_lo, float w_hi, int count)
+{
+  std::mt19937 gen(1234);
+  std::uniform_int_distribution<int32_t> J_dist(-(1 << 23), (1 << 24));
+  std::uniform_int_distribution<int32_t> n_dist(-256, 256);
+  std::uniform_real_distribution<float> w_dist(w_lo, w_hi);
+  std::vector<SarBpPhaseSynthSample> samples(count);
+  for (auto &s : samples) {
+    s = SarBpPhaseSynthSample{J_dist(gen), n_dist(gen), w_dist(gen)};
+  }
+  // Include the weight endpoints and an exact zero offset.
+  if (samples.size() >= 3) {
+    samples[0].w = 0.0f;
+    samples[1].w = std::nextafter(1.0f, 0.0f);
+    samples[2].n = 0;
+  }
+  return samples;
+}
+
+} // namespace
+
+TEST(SarBpPhaseSynthesis, IncrementWrapsAtOneRevolution)
+{
+  // A fractional revolution per bin within half a tick of one rounds to
+  // 2^32, which must narrow to the phase-equivalent increment 0.
+  const SarBpTaylorFastPhaseCorrection c = SarBpTaylorFastPhaseCorrection::Make(
+      2.0 * cuda::std::numbers::pi * (23.0 + (1.0 - 0x1p-40)));
+  EXPECT_EQ(c.Q, 0u);
+
+  const SarBpTaylorFastPhaseCorrection c2 = SarBpTaylorFastPhaseCorrection::Make(
+      2.0 * cuda::std::numbers::pi * 23.25);
+  EXPECT_EQ(c2.Q, 0x40000000u);
+  EXPECT_EQ(c2.Q64, 0x4000000000000000ull);
+
+  // For a tiny negative alpha, frac(alpha / 2pi) rounds to exactly 1, which
+  // must also wrap to a zero increment in both widths.
+  const SarBpTaylorFastPhaseCorrection c3 = SarBpTaylorFastPhaseCorrection::Make(-1.0e-300);
+  EXPECT_EQ(c3.Q64, 0ull);
+  EXPECT_EQ(c3.Q, 0u);
+
+  // A non-finite alpha has no meaningful increment; Make must still produce a
+  // defined value rather than convert NaN to an integer.
+  for (const double bad : {std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::infinity(),
+                           -std::numeric_limits<double>::infinity()}) {
+    const SarBpTaylorFastPhaseCorrection c4 = SarBpTaylorFastPhaseCorrection::Make(bad);
+    EXPECT_EQ(c4.Q64, 0ull);
+    EXPECT_EQ(c4.Q, 0u);
+  }
+}
+
+TEST(SarBpPhaseSynthesis, ReferenceTicks)
+{
+  // A quarter revolution per bin: the reference angle for J - bin_offset = k is
+  // k/4 revolutions, reduced modulo one revolution for negative k as well.
+  constexpr int32_t bin_offset = 1 << 23;
+  const SarBpTaylorFastPhaseCorrection quarter = SarBpTaylorFastPhaseCorrection::Make(
+      2.0 * cuda::std::numbers::pi * 23.25);
+  EXPECT_EQ(SarBpRefPhaseTicks(quarter, bin_offset, bin_offset), 0u);
+  EXPECT_EQ(SarBpRefPhaseTicks(quarter, bin_offset + 2, bin_offset), 0x80000000u);
+  EXPECT_EQ(SarBpRefPhaseTicks(quarter, bin_offset + 3, bin_offset), 0xC0000000u);
+  EXPECT_EQ(SarBpRefPhaseTicks(quarter, bin_offset - 1, bin_offset), 0xC0000000u);
+  EXPECT_EQ(SarBpRefPhaseTicks(quarter, -(1 << 23), bin_offset), 0u);
+
+  // SarBpRefPhaseTicks forms bits 63..32 of Q64*k from 32-bit pieces. Check it
+  // against the 64-bit product, including nonzero low words of Q64, which the
+  // sign correction for negative k depends on. With Q64 = 1 and k = -1 the
+  // product is 2^64 - 1, whose upper word is all ones only with the correction.
+  auto expected = [](uint64_t q64, int32_t ref_bin_int, int32_t offset) {
+    const uint64_t k = static_cast<uint64_t>(static_cast<int64_t>(ref_bin_int) - offset);
+    return static_cast<uint32_t>((q64 * k) >> 32);
+  };
+  const SarBpTaylorFastPhaseCorrection one{1ull, 0.0f, 0u};
+  EXPECT_EQ(SarBpRefPhaseTicks(one, bin_offset - 1, bin_offset), 0xFFFFFFFFu);
+
+  std::mt19937_64 gen(5678);
+  std::uniform_int_distribution<int32_t> k_dist(-(1 << 24), 1 << 24);
+  for (int i = 0; i < 100000; i++) {
+    const SarBpTaylorFastPhaseCorrection c{gen(), 0.0f, 0u};
+    const int32_t J = bin_offset + k_dist(gen);
+    ASSERT_EQ(SarBpRefPhaseTicks(c, J, bin_offset), expected(c.Q64, J, bin_offset))
+        << "Q64=" << c.Q64 << " J=" << J;
+  }
+}
+
+TEST(SarBpPhaseSynthesis, MatchesDoubleReference)
+{
+  MATX_ENTER_HANDLER();
+  // X band with 0.36 m bins: about 23 revolutions per range bin, so the
+  // fractional-bin term spans up to ~146 rad. The error is dominated by
+  // __sincosf at that argument magnitude and by rounding alpha*w in fp32.
+  // The kernel forms w separately from n, so w can land outside [0, 1) by up
+  // to ulp(bin_loc)/2; the samples extend 1e-4 past both ends to cover that.
+  const double alpha = 4.0 * cuda::std::numbers::pi * 0.3623 * 9.6e9 / matx::constants::speed_of_light;
+  constexpr int32_t bin_offset = (1 << 24) / 2;
+  constexpr float excursion = 1.0e-4f;
+  const auto samples = SarBpPhaseSynthSamples(-excursion, 1.0f + excursion, 1 << 16);
+  EXPECT_LT(SarBpPhaseSynthMaxError(samples, alpha, bin_offset), 1.0e-4);
+
+  // A whole number of revolutions plus a quarter per bin makes Q*n exercise
+  // the integer wraparound with no fractional-tick rounding.
+  const double alpha_q = 2.0 * cuda::std::numbers::pi * 23.25;
+  EXPECT_LT(SarBpPhaseSynthMaxError(samples, alpha_q, bin_offset), 1.0e-4);
+  MATX_EXIT_HANDLER();
+}
+
+// A phase LUT is used exactly when PhaseLUTOptimization is set and the compute
+// type reads a table, which excludes TaylorFast. In particular Double uses one
+// only with the feature.
+TEST(SarBpPhaseLUT, UsesPhaseLUTFollowsFeatureAndComputeType)
+{
+  constexpr SarBpParams taylor_fast{SarBpComputeType::TaylorFast, SarBpFeature::PhaseLUTOptimization};
+  static_assert(!SarBpUsesPhaseLUT(taylor_fast));
+
+  for (const SarBpComputeType compute_type : {SarBpComputeType::Double, SarBpComputeType::Float,
+                                              SarBpComputeType::Mixed, SarBpComputeType::FloatFloat,
+                                              SarBpComputeType::TaylorFast}) {
+    SCOPED_TRACE(static_cast<int>(compute_type));
+    SarBpParams params;
+    params.compute_type = compute_type;
+    params.features = SarBpFeature::None;
+    EXPECT_FALSE(SarBpUsesPhaseLUT(params));
+    params.features = SarBpFeature::PhaseLUTOptimization;
+    EXPECT_EQ(SarBpUsesPhaseLUT(params), compute_type != SarBpComputeType::TaylorFast);
+  }
+}
+
+namespace {
+
+// Inputs for the range-profile addressing tests: a 48 x 48 grid at z = 0 whose
+// 24 m swath edges fall inside the image, 601 pulses (three 256-pulse blocks,
+// the last partial), and range profiles held as a column slice of a wider
+// tensor. Each row is padded on both sides with a sentinel that no in-range
+// sample read can reach, so the profile view has a padded row stride and an
+// offset base pointer.
+struct SarBpAddressingInputs {
+  using complex_t = cuda::std::complex<float>;
+  static constexpr index_t IMAGE = 48;
+  static constexpr index_t NUM_PULSES = 601;
+  static constexpr index_t NUM_BINS = 48;
+  static constexpr index_t PAD = 5;
+  static constexpr double DEL_R = 0.5;
+  static constexpr float SENTINEL = 1.0e30f;
+
+  tensor_t<double, 2> px = make_tensor<double>({IMAGE, IMAGE});
+  tensor_t<double, 2> py = make_tensor<double>({IMAGE, IMAGE});
+  tensor_t<double, 2> pz = make_tensor<double>({IMAGE, IMAGE});
+  tensor_t<double3, 1> platform_positions = make_tensor<double3>({NUM_PULSES});
+  tensor_t<double, 1> range_to_mcp = make_tensor<double>({NUM_PULSES});
+  tensor_t<complex_t, 2> padded = make_tensor<complex_t>({NUM_PULSES, NUM_BINS + 2 * PAD});
+
+  SarBpAddressingInputs()
+  {
+    for (index_t i = 0; i < IMAGE; i++) {
+      for (index_t j = 0; j < IMAGE; j++) {
+        px(i, j) = static_cast<double>(j) - IMAGE / 2;
+        py(i, j) = static_cast<double>(i) - IMAGE / 2;
+        pz(i, j) = 0.0;
+      }
+    }
+    for (index_t p = 0; p < NUM_PULSES; p++) {
+      const double3 a{-200.0 + 400.0 * static_cast<double>(p) / NUM_PULSES, -5000.0, 5000.0};
+      platform_positions(p) = a;
+      range_to_mcp(p) = std::sqrt(a.x * a.x + a.y * a.y + a.z * a.z);
+    }
+    std::mt19937 gen(2468);
+    std::normal_distribution<float> dist(0.0f, 1.0f);
+    for (index_t p = 0; p < NUM_PULSES; p++) {
+      for (index_t b = 0; b < NUM_BINS + 2 * PAD; b++) {
+        const bool in_row = b >= PAD && b < PAD + NUM_BINS;
+        padded(p, b) = in_row ? complex_t{dist(gen), dist(gen)} : complex_t{SENTINEL, SENTINEL};
+      }
+    }
+  }
+
+  // The profiles without the padding: unit inner stride, row stride NUM_BINS + 2*PAD.
+  auto Profiles() const { return slice(padded, {0, PAD}, {matxEnd, PAD + NUM_BINS}); }
+  auto Voxels() const { return zipvec(px, py, pz); }
+
+  // Number of pixel-pulse pairs whose exact lower interpolation bin is -1 and
+  // NUM_BINS - 1: the samples on either side of the swath that the bounds check
+  // must skip.
+  std::pair<int, int> EdgeSampleCounts() const
+  {
+    int below = 0, above = 0;
+    for (index_t p = 0; p < NUM_PULSES; p++) {
+      const double3 a = platform_positions(p);
+      for (index_t i = 0; i < IMAGE; i++) {
+        for (index_t j = 0; j < IMAGE; j++) {
+          const double dx = px(i, j) - a.x, dy = py(i, j) - a.y, dz = pz(i, j) - a.z;
+          const double bin = (std::sqrt(dx * dx + dy * dy + dz * dz) - range_to_mcp(p)) / DEL_R + NUM_BINS / 2;
+          const double floor_bin = std::floor(bin);
+          below += floor_bin == -1.0;
+          above += floor_bin == static_cast<double>(NUM_BINS - 1);
+        }
+      }
+    }
+    return {below, above};
+  }
+};
+
+constexpr SarBpComputeType kSarBpAllComputeTypes[] = {
+    SarBpComputeType::Double, SarBpComputeType::Float, SarBpComputeType::Mixed,
+    SarBpComputeType::FloatFloat, SarBpComputeType::TaylorFast};
+
+} // namespace
+
+// With PhaseLUTOptimization, unit-stride tensor views take a fast path that
+// carries each pulse's row offset across the pulse loop. Compare it with the
+// generic accessor path, reached by passing the same profiles through an
+// identity operator (conj of conj), across several pulse blocks and with a
+// padded row stride. Only the addressing differs, so the images must agree to
+// within a few ulps; the two kernel instantiations may contract floating-point
+// operations differently. A misaddressed sample changes a pixel by about one
+// sample's magnitude, far above the tolerance.
+TEST(SarBpAddressing, RowOffsetMatchesGenericAccessor)
+{
+  MATX_ENTER_HANDLER();
+  cudaExecutor exec{};
+  using complex_t = SarBpAddressingInputs::complex_t;
+  constexpr index_t IMAGE = SarBpAddressingInputs::IMAGE;
+  SarBpAddressingInputs in;
+  auto profiles = in.Profiles();
+  ASSERT_EQ(profiles.Stride(0), SarBpAddressingInputs::NUM_BINS + 2 * SarBpAddressingInputs::PAD);
+  ASSERT_EQ(profiles.Stride(1), 1);
+
+  auto zero_image = zeros<complex_t>({IMAGE, IMAGE});
+  auto fast = make_tensor<complex_t>({IMAGE, IMAGE});
+  auto generic = make_tensor<complex_t>({IMAGE, IMAGE});
+  for (const SarBpComputeType compute_type : kSarBpAllComputeTypes) {
+    SCOPED_TRACE(static_cast<int>(compute_type));
+    SarBpParams params;
+    params.compute_type = compute_type;
+    params.features = SarBpFeature::PhaseLUTOptimization;
+    params.center_frequency = 9.6e9;
+    params.del_r = SarBpAddressingInputs::DEL_R;
+    (fast = experimental::sar_bp(zero_image, profiles, in.platform_positions, in.Voxels(),
+                                 in.range_to_mcp, params)).run(exec);
+    (generic = experimental::sar_bp(zero_image, conj(conj(profiles)), in.platform_positions, in.Voxels(),
+                                    in.range_to_mcp, params)).run(exec);
+    exec.sync();
+    double max_mag = 0.0;
+    bool finite = true;
+    for (index_t i = 0; i < IMAGE; i++) {
+      for (index_t j = 0; j < IMAGE; j++) {
+        finite = finite && std::isfinite(fast(i, j).real()) && std::isfinite(fast(i, j).imag()) &&
+                 std::isfinite(generic(i, j).real()) && std::isfinite(generic(i, j).imag());
+        max_mag = std::max(max_mag, static_cast<double>(cuda::std::abs(generic(i, j))));
+      }
+    }
+    // NaN compares false against any tolerance and std::max drops it, so check
+    // finiteness explicitly. The bound keeps a sentinel read, which would also
+    // inflate the tolerance below, from passing unnoticed; SwathEdgesAndModes
+    // checks it in detail.
+    ASSERT_TRUE(finite);
+    ASSERT_GT(max_mag, 0.0);
+    ASSERT_LT(max_mag, 1.0e6);
+    // A few float ulps at the image's peak magnitude: rounding differences in
+    // the accumulation scale with the partial sums, not with a pixel's final
+    // value, which can be small after cancellation.
+    const double tol = 4.0 * std::numeric_limits<float>::epsilon() * max_mag;
+    int mismatches = 0;
+    double max_diff = 0.0;
+    for (index_t i = 0; i < IMAGE; i++) {
+      for (index_t j = 0; j < IMAGE; j++) {
+        const double dr = std::abs(static_cast<double>(fast(i, j).real()) - generic(i, j).real());
+        const double di = std::abs(static_cast<double>(fast(i, j).imag()) - generic(i, j).imag());
+        mismatches += !(dr <= tol && di <= tol);
+        max_diff = std::max(max_diff, std::max(dr, di));
+      }
+    }
+    EXPECT_EQ(mismatches, 0) << "max difference " << max_diff << ", tolerance " << tol;
+  }
+  MATX_EXIT_HANDLER();
+}
+
+// Run every compute type, with and without PhaseLUTOptimization, in the
+// variable-z and PixelZIsZero modes on the shared inputs:
+// - The samples just outside the swath sit next to the sentinel padding, so
+//   admitting a lower bin of -1 or NUM_BINS - 1 would read a sentinel and blow
+//   up the affected pixels. The geometry is checked to produce both edge cases.
+// - The grid is at z = 0, so across all pulse blocks the uniform-z kernels must
+//   match the variable-z ones.
+// - TaylorFast synthesizes its phase, so it accepts either feature setting and
+//   produces the same image; FloatFloat without the feature throws.
+TEST(SarBpAddressing, SwathEdgesAndModes)
+{
+  MATX_ENTER_HANDLER();
+  cudaExecutor exec{};
+  using complex_t = SarBpAddressingInputs::complex_t;
+  constexpr index_t IMAGE = SarBpAddressingInputs::IMAGE;
+  SarBpAddressingInputs in;
+  const auto [below, above] = in.EdgeSampleCounts();
+  ASSERT_GT(below, 0);
+  ASSERT_GT(above, 0);
+
+  auto zero_image = zeros<complex_t>({IMAGE, IMAGE});
+  auto variable_z = make_tensor<complex_t>({IMAGE, IMAGE});
+  auto zero_z = make_tensor<complex_t>({IMAGE, IMAGE});
+  auto taylor_without_feature = make_tensor<complex_t>({IMAGE, IMAGE});
+  auto run = [&](auto &image, const SarBpParams &params, bool pixel_z_is_zero) {
+    auto op = experimental::sar_bp(zero_image, in.Profiles(), in.platform_positions, in.Voxels(),
+                                   in.range_to_mcp, params);
+    if (pixel_z_is_zero) {
+      (image = op.template props<PropSarBpPixelZIsZero>()).run(exec);
+    } else {
+      (image = op).run(exec);
+    }
+    exec.sync();
+  };
+  // Every pixel sums at most NUM_PULSES unit-variance samples, so a sentinel
+  // read shows up as a huge or non-finite pixel.
+  auto expect_bounded = [&](auto &image) {
+    double max_mag = 0.0;
+    bool finite = true;
+    for (index_t i = 0; i < IMAGE; i++) {
+      for (index_t j = 0; j < IMAGE; j++) {
+        finite = finite && std::isfinite(image(i, j).real()) && std::isfinite(image(i, j).imag());
+        max_mag = std::max(max_mag, static_cast<double>(cuda::std::abs(image(i, j))));
+      }
+    }
+    EXPECT_TRUE(finite);
+    EXPECT_GT(max_mag, 0.0);
+    EXPECT_LT(max_mag, 1.0e6);
+    return max_mag;
+  };
+  // Propagates NaN, which std::max would drop, so a NaN difference fails the
+  // comparisons below.
+  auto max_abs_diff = [&](auto &a, auto &b) {
+    double max_diff = 0.0;
+    for (index_t i = 0; i < IMAGE; i++) {
+      for (index_t j = 0; j < IMAGE; j++) {
+        const double d = static_cast<double>(cuda::std::abs(a(i, j) - b(i, j)));
+        if (std::isnan(d) || d > max_diff) {
+          max_diff = d;
+        }
+      }
+    }
+    return max_diff;
+  };
+
+  for (const SarBpComputeType compute_type : kSarBpAllComputeTypes) {
+    for (const SarBpFeature features : {SarBpFeature::None, SarBpFeature::PhaseLUTOptimization}) {
+      SCOPED_TRACE(::testing::Message() << "compute_type=" << static_cast<int>(compute_type)
+                                        << ", phase_lut=" << (features == SarBpFeature::PhaseLUTOptimization));
+      SarBpParams params;
+      params.compute_type = compute_type;
+      params.features = features;
+      params.center_frequency = 9.6e9;
+      params.del_r = SarBpAddressingInputs::DEL_R;
+      if (compute_type == SarBpComputeType::FloatFloat && features == SarBpFeature::None) {
+        ASSERT_THROW(run(variable_z, params, false), matx::detail::matxException);
+        continue;
+      }
+      run(variable_z, params, false);
+      run(zero_z, params, true);
+      const double max_mag = expect_bounded(variable_z);
+      expect_bounded(zero_z);
+      EXPECT_LT(max_abs_diff(variable_z, zero_z), 1.0e-4 * max_mag);
+      if (compute_type == SarBpComputeType::TaylorFast) {
+        if (features == SarBpFeature::None) {
+          (taylor_without_feature = variable_z).run(exec);
+          exec.sync();
+        } else {
+          EXPECT_EQ(max_abs_diff(variable_z, taylor_without_feature), 0.0);
+        }
+      }
+    }
+  }
   MATX_EXIT_HANDLER();
 }
