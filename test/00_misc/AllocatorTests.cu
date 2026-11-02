@@ -36,6 +36,8 @@
 #include "utilities.h"
 #include "gtest/gtest.h"
 #include <iostream>
+#include <cstdlib>
+#include <thread>
 #include <vector>
 #include <unordered_map>
 
@@ -135,15 +137,422 @@ TEST_P(AsyncDeviceAllocatorTest, UnsupportedMemoryPoolsFallback) {
 
 INSTANTIATE_TEST_SUITE_P(FreeOverloads, AsyncDeviceAllocatorTest, ::testing::Bool());
 
+TEST(DeviceAllocatorTest, MemoryPoolSupportQueriedOnStreamDevice) {
+    MATX_ENTER_HANDLER();
+    if (CudaDeviceCount() < 2) {
+        GTEST_SKIP() << "Requires two CUDA devices";
+    }
+
+    const auto restore = detail::CudaDeviceGuard::RestoreCurrent();
+    ASSERT_EQ(cudaSetDevice(1), cudaSuccess);
+    cudaStream_t stream_on_device1;
+    ASSERT_EQ(cudaStreamCreateWithFlags(&stream_on_device1, cudaStreamNonBlocking), cudaSuccess);
+    ASSERT_EQ(cudaSetDevice(0), cudaSuccess);
+
+    auto allocate_on_device1 = [&]() {
+        // cudaMallocAsync allocates from the stream's device, so pool support
+        // must be checked there rather than on the current device.
+        void *ptr = nullptr;
+        int queried_device = -1;
+        GetAllocMap().allocate_internal(&ptr, 1024, MATX_ASYNC_DEVICE_MEMORY, stream_on_device1,
+            [&](int device) {
+                queried_device = device;
+                return false;
+            });
+        EXPECT_EQ(queried_device, 1);
+
+        // The cudaMalloc fallback must also land on the stream's device.
+        cudaPointerAttributes attrs{};
+        EXPECT_EQ(cudaPointerGetAttributes(&attrs, ptr), cudaSuccess);
+        EXPECT_EQ(attrs.device, 1);
+        matxFree(ptr);
+    };
+
+    // Afterwards the caller's context must be current again: device 0's primary
+    // context, or a context the application created on device 0, which a device
+    // switch back with cudaSetDevice would have replaced.
+    const CUcontext primary = CurrentDriverContext();
+    allocate_on_device1();
+    EXPECT_EQ(CurrentDriverContext(), primary);
+    std::thread([&]() {
+        try {
+            const CUcontext created = CreateDriverContext(0);
+            allocate_on_device1();
+            EXPECT_EQ(CurrentDriverContext(), created);
+            EXPECT_EQ(cuCtxDestroy(created), CUDA_SUCCESS);
+        } catch (const std::exception &e) {
+            ADD_FAILURE() << e.what();
+        }
+    }).join();
+
+    EXPECT_EQ(cudaStreamDestroy(stream_on_device1), cudaSuccess);
+    MATX_EXIT_HANDLER();
+}
+
+TEST(DeviceAllocatorTest, FallbackSwitchesDeviceWithoutContext) {
+    MATX_ENTER_HANDLER();
+    if (CudaDeviceCount() < 2) {
+        GTEST_SKIP() << "Requires two CUDA devices";
+    }
+
+    const auto restore = detail::CudaDeviceGuard::RestoreCurrent();
+    ASSERT_EQ(cudaSetDevice(1), cudaSuccess);
+    cudaStream_t stream_on_device1;
+    ASSERT_EQ(cudaStreamCreateWithFlags(&stream_on_device1, cudaStreamNonBlocking), cudaSuccess);
+
+    // Driver API code can empty a thread's context stack after cudaSetDevice(1).
+    // cudaGetDevice then still reports device 1, but the next runtime call runs
+    // on device 0, so the fallback must switch devices rather than trust
+    // cudaGetDevice to say device 1 is already current.
+    std::thread([&]() {
+        ASSERT_EQ(cudaSetDevice(1), cudaSuccess);
+        ASSERT_EQ(cuCtxSetCurrent(nullptr), CUDA_SUCCESS);
+        try {
+            void *ptr = nullptr;
+            GetAllocMap().allocate_internal(&ptr, 1024, MATX_ASYNC_DEVICE_MEMORY, stream_on_device1,
+                [](int) { return false; });
+            cudaPointerAttributes attrs{};
+            EXPECT_EQ(cudaPointerGetAttributes(&attrs, ptr), cudaSuccess);
+            EXPECT_EQ(attrs.device, 1);
+            matxFree(ptr);
+        } catch (const std::exception &e) {
+            ADD_FAILURE() << e.what();
+        }
+    }).join();
+
+    EXPECT_EQ(cudaStreamDestroy(stream_on_device1), cudaSuccess);
+    MATX_EXIT_HANDLER();
+}
+
+namespace {
+struct NamedLookup {
+    const char *name;
+    detail::StreamDeviceLookup lookup;
+};
+
+// The lookups a multi-GPU system makes: cuStreamGetCtx_v2 on 12.5+ drivers and
+// cuStreamGetCtx before that. The single-GPU fast path is off so single-GPU
+// systems reach them too. On drivers older than 12.5, both entries take the
+// cuStreamGetCtx path.
+std::vector<NamedLookup> MultiDeviceLookups() {
+    auto lookup = detail::GetStreamDeviceLookup();
+    lookup.single_device = false;
+    std::vector<NamedLookup> lookups{{"installed driver", lookup}};
+    lookup.get_ctx_v2 = nullptr;
+    lookups.push_back({"cuStreamGetCtx", lookup});
+    return lookups;
+}
+} // namespace
+
+TEST(DeviceAllocatorTest, StreamDeviceLookupResolvesStreams) {
+    MATX_ENTER_HANDLER();
+    const int device_count = CudaDeviceCount();
+    if (device_count == 0) {
+        GTEST_SKIP() << "CUDA device required";
+    }
+
+    // cuGetProcAddress would return the two-argument cuStreamGetCtx from a
+    // driver older than 12.5, so the three-argument version is only used on
+    // newer drivers. Availability follows the driver, not the toolkit.
+    int driver_version = 0;
+    ASSERT_EQ(cuDriverGetVersion(&driver_version), CUDA_SUCCESS);
+    EXPECT_EQ(detail::GetStreamDeviceLookup().get_ctx_v2 != nullptr, driver_version >= 12050)
+        << "driver version " << driver_version;
+
+    const cudaStream_t default_handles[] = {cudaStream_t{}, cudaStreamLegacy, cudaStreamPerThread};
+    const auto lookups = MultiDeviceLookups();
+    const auto restore = detail::CudaDeviceGuard::RestoreCurrent();
+    std::vector<cudaStream_t> streams(static_cast<size_t>(device_count));
+    for (int device = 0; device < device_count; ++device) {
+        ASSERT_EQ(cudaSetDevice(device), cudaSuccess);
+        ASSERT_EQ(cudaStreamCreateWithFlags(&streams[static_cast<size_t>(device)], cudaStreamNonBlocking),
+                  cudaSuccess);
+    }
+
+    // A created stream belongs to the device it was created on, whichever
+    // device is current. The default-stream handles name the current device.
+    for (int current = device_count - 1; current >= 0; --current) {
+        SCOPED_TRACE(current);
+        ASSERT_EQ(cudaSetDevice(current), cudaSuccess);
+        for (int device = 0; device < device_count; ++device) {
+            const cudaStream_t stream = streams[static_cast<size_t>(device)];
+            EXPECT_EQ(detail::GetStreamDevice(stream), device);
+            for (const auto &l : lookups) {
+                SCOPED_TRACE(l.name);
+                EXPECT_EQ(detail::GetStreamDevice(stream, l.lookup), device);
+            }
+        }
+        for (cudaStream_t stream : default_handles) {
+            EXPECT_EQ(detail::GetStreamDevice(stream), current);
+            for (const auto &l : lookups) {
+                SCOPED_TRACE(l.name);
+                EXPECT_EQ(detail::GetStreamDevice(stream, l.lookup), current);
+            }
+        }
+    }
+
+    // A new thread starts with no current context. Looking up a created stream
+    // must not leave the stream's context current, and the default-stream
+    // handles, which a driver lookup could not resolve, are on device 0.
+    bool threw = false;
+    CUcontext ctx_before = nullptr, ctx_after = nullptr;
+    CUresult before = CUDA_ERROR_UNKNOWN, after = CUDA_ERROR_UNKNOWN;
+    std::vector<int> expected, found;
+    std::thread([&]() {
+        try {
+            before = cuCtxGetCurrent(&ctx_before);
+            for (const auto &l : lookups) {
+                for (int device = 0; device < device_count; ++device) {
+                    expected.push_back(device);
+                    found.push_back(detail::GetStreamDevice(streams[static_cast<size_t>(device)], l.lookup));
+                }
+            }
+            after = cuCtxGetCurrent(&ctx_after);
+            for (const auto &l : lookups) {
+                for (cudaStream_t stream : default_handles) {
+                    expected.push_back(0);
+                    found.push_back(detail::GetStreamDevice(stream, l.lookup));
+                }
+            }
+        } catch (...) {
+            threw = true;
+        }
+    }).join();
+    EXPECT_FALSE(threw);
+    EXPECT_EQ(before, CUDA_SUCCESS);
+    EXPECT_EQ(ctx_before, nullptr);
+    EXPECT_EQ(after, CUDA_SUCCESS);
+    EXPECT_EQ(ctx_after, nullptr);
+    EXPECT_EQ(found, expected);
+
+    for (cudaStream_t stream : streams) {
+        EXPECT_EQ(cudaStreamDestroy(stream), cudaSuccess);
+    }
+    MATX_EXIT_HANDLER();
+}
+
+#if CUDA_VERSION >= 12050
+TEST(DeviceAllocatorTest, GreenContextStreamDevice) {
+    MATX_ENTER_HANDLER();
+    const int device_count = CudaDeviceCount();
+    if (device_count == 0) {
+        GTEST_SKIP() << "CUDA device required";
+    }
+    int driver_version = 0;
+    ASSERT_EQ(cuDriverGetVersion(&driver_version), CUDA_SUCCESS);
+    if (driver_version < 12050) {
+        GTEST_SKIP() << "cuGreenCtxStreamCreate requires a 12.5 or newer driver";
+    }
+
+    const auto restore = detail::CudaDeviceGuard::RestoreCurrent();
+    const int device = device_count - 1;
+    CUdevResource sm_resource;
+    ASSERT_EQ(cuDeviceGetDevResource(device, &sm_resource, CU_DEV_RESOURCE_TYPE_SM), CUDA_SUCCESS);
+    CUdevResourceDesc desc;
+    ASSERT_EQ(cuDevResourceGenerateDesc(&desc, &sm_resource, 1), CUDA_SUCCESS);
+    CUgreenCtx green_ctx;
+    ASSERT_EQ(cuGreenCtxCreate(&green_ctx, desc, device, CU_GREEN_CTX_DEFAULT_STREAM), CUDA_SUCCESS);
+    CUstream green_stream;
+    ASSERT_EQ(cuGreenCtxStreamCreate(&green_stream, green_ctx, CU_STREAM_NON_BLOCKING, 0), CUDA_SUCCESS);
+    // On multi-GPU systems, make a different device current so the lookup
+    // cannot pass by returning the current device.
+    ASSERT_EQ(cudaSetDevice(0), cudaSuccess);
+
+    // cuStreamGetCtx rejects green-context streams on 12.x drivers, so only the
+    // cuStreamGetCtx_v2 lookup is checked.
+    const auto stream = reinterpret_cast<cudaStream_t>(green_stream);
+    for (const auto &l : MultiDeviceLookups()) {
+        if (l.lookup.get_ctx_v2 == nullptr) {
+            continue;
+        }
+        SCOPED_TRACE(l.name);
+        EXPECT_EQ(detail::GetStreamDevice(stream, l.lookup), device);
+    }
+    EXPECT_EQ(cuStreamDestroy(green_stream), CUDA_SUCCESS);
+    EXPECT_EQ(cuGreenCtxDestroy(green_ctx), CUDA_SUCCESS);
+    MATX_EXIT_HANDLER();
+}
+#endif
+
+TEST(DeviceAllocatorTest, StreamDeviceLookupKeepsGraphCapture) {
+    MATX_ENTER_HANDLER();
+    if (CudaDeviceCount() == 0) {
+        GTEST_SKIP() << "CUDA device required";
+    }
+
+    // Allocations can happen while their stream is being captured into a CUDA
+    // graph. A query that fails on a capturing stream invalidates the capture,
+    // as cuStreamGetDevice does, so every lookup must leave the capture valid.
+    int device = -1;
+    ASSERT_EQ(cudaGetDevice(&device), cudaSuccess);
+    cudaStream_t stream;
+    ASSERT_EQ(cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking), cudaSuccess);
+    for (cudaStreamCaptureMode mode : {cudaStreamCaptureModeGlobal, cudaStreamCaptureModeThreadLocal,
+                                       cudaStreamCaptureModeRelaxed}) {
+        SCOPED_TRACE(static_cast<int>(mode));
+        for (const auto &l : MultiDeviceLookups()) {
+            SCOPED_TRACE(l.name);
+            ASSERT_EQ(cudaStreamBeginCapture(stream, mode), cudaSuccess);
+            int found = -1;
+            bool threw = false;
+            try {
+                found = detail::GetStreamDevice(stream, l.lookup);
+            } catch (...) {
+                threw = true;
+            }
+            cudaGraph_t graph = nullptr;
+            EXPECT_EQ(cudaStreamEndCapture(stream, &graph), cudaSuccess);
+            EXPECT_FALSE(threw);
+            EXPECT_EQ(found, device);
+            if (graph != nullptr) {
+                EXPECT_EQ(cudaGraphDestroy(graph), cudaSuccess);
+            }
+        }
+    }
+    EXPECT_EQ(cudaStreamDestroy(stream), cudaSuccess);
+    MATX_EXIT_HANDLER();
+}
+
+TEST(DeviceAllocatorTest, AsyncAllocationDuringGraphCapture) {
+    MATX_ENTER_HANDLER();
+    if (CudaDeviceCount() == 0) {
+        GTEST_SKIP() << "CUDA device required";
+    }
+    if (!detail::GetCurrentDeviceAttributes().memory_pools_supported) {
+        GTEST_SKIP() << "The cudaMalloc fallback cannot be captured";
+    }
+
+    cudaStream_t stream;
+    ASSERT_EQ(cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking), cudaSuccess);
+    // Cover matxAlloc, and the stream-device lookup that allocations take when
+    // some device lacks memory pools.
+    for (bool use_matx_alloc : {true, false}) {
+        SCOPED_TRACE(use_matx_alloc);
+        ASSERT_EQ(cudaStreamBeginCapture(stream, cudaStreamCaptureModeGlobal), cudaSuccess);
+        bool threw = false;
+        try {
+            void *ptr = nullptr;
+            if (use_matx_alloc) {
+                matxAlloc(&ptr, 1024, MATX_ASYNC_DEVICE_MEMORY, stream);
+            }
+            else {
+                GetAllocMap().allocate_internal(&ptr, 1024, MATX_ASYNC_DEVICE_MEMORY, stream,
+                    [](int) { return true; }, false);
+            }
+            EXPECT_EQ(cudaMemsetAsync(ptr, 0x5a, 1024, stream), cudaSuccess);
+            matxFree(ptr, stream);
+        } catch (...) {
+            threw = true;
+        }
+        cudaGraph_t graph = nullptr;
+        ASSERT_EQ(cudaStreamEndCapture(stream, &graph), cudaSuccess);
+        EXPECT_FALSE(threw);
+
+        // Launch the graph to check that the captured allocation is usable.
+        cudaGraphExec_t exec = nullptr;
+        ASSERT_EQ(cudaGraphInstantiate(&exec, graph, 0), cudaSuccess);
+        EXPECT_EQ(cudaGraphLaunch(exec, stream), cudaSuccess);
+        EXPECT_EQ(cudaStreamSynchronize(stream), cudaSuccess);
+        EXPECT_EQ(cudaGraphExecDestroy(exec), cudaSuccess);
+        EXPECT_EQ(cudaGraphDestroy(graph), cudaSuccess);
+    }
+    EXPECT_EQ(cudaStreamDestroy(stream), cudaSuccess);
+    MATX_EXIT_HANDLER();
+}
+
+namespace {
+// Stand-ins for TryGetDeviceAttributes in the all-devices memory pool check.
+cudaError_t AllDevicesHavePools(int, const detail::DeviceAttributes *&attrs) {
+    static const detail::DeviceAttributes with_pools = [] {
+        detail::DeviceAttributes a{};
+        a.memory_pools_supported = true;
+        return a;
+    }();
+    attrs = &with_pools;
+    return cudaSuccess;
+}
+
+cudaError_t NoDeviceHasPools(int, const detail::DeviceAttributes *&attrs) {
+    static const detail::DeviceAttributes without_pools{};
+    attrs = &without_pools;
+    return cudaSuccess;
+}
+
+// Fails the way a real query does, leaving an error for cudaGetLastError.
+cudaError_t AttributeQueryFails(int, const detail::DeviceAttributes *&) {
+    int value = 0;
+    return cudaDeviceGetAttribute(&value, cudaDevAttrMemoryPoolsSupported, -1);
+}
+} // namespace
+
+TEST(DeviceAllocatorTest, AllDevicesMemoryPoolCheck) {
+    MATX_ENTER_HANDLER();
+    const int device_count = CudaDeviceCount();
+    if (device_count == 0) {
+        GTEST_SKIP() << "CUDA device required";
+    }
+
+    // When every device has memory pools, async allocations skip finding the
+    // stream's device.
+    bool expected = true;
+    for (int device = 0; device < device_count; ++device) {
+        int supported = 0;
+        ASSERT_EQ(cudaDeviceGetAttribute(&supported, cudaDevAttrMemoryPoolsSupported, device), cudaSuccess);
+        expected = expected && supported != 0;
+    }
+    EXPECT_EQ(detail::AllDevicesSupportMemoryPools(), expected);
+    EXPECT_TRUE(detail::QueryAllDevicesSupportMemoryPools(&AllDevicesHavePools));
+    EXPECT_FALSE(detail::QueryAllDevicesSupportMemoryPools(&NoDeviceHasPools));
+
+    // A device whose attributes cannot be read sends allocations to the
+    // per-stream check rather than failing them all, and its error is cleared.
+    const detail::DeviceAttributes *unused = nullptr;
+    ASSERT_NE(AttributeQueryFails(0, unused), cudaSuccess);
+    ASSERT_NE(cudaGetLastError(), cudaSuccess);
+    bool all_supported = true;
+    EXPECT_NO_THROW(all_supported = detail::QueryAllDevicesSupportMemoryPools(&AttributeQueryFails));
+    EXPECT_FALSE(all_supported);
+    EXPECT_EQ(cudaGetLastError(), cudaSuccess);
+    MATX_EXIT_HANDLER();
+}
+
+#if GTEST_HAS_DEATH_TEST && !defined(_WIN32)
+TEST(DeviceAllocatorTest, HostPathsWithoutVisibleDevices) {
+    // Host allocations and host execution must not need a GPU, and
+    // TryGetComputeCapability must report 0 rather than throw. The threadsafe
+    // death test style runs the test binary again in a new process, and only
+    // that process hides the devices. CUDA has not started there yet, so the
+    // empty list applies.
+    const auto previous_style = GTEST_FLAG_GET(death_test_style);
+    GTEST_FLAG_SET(death_test_style, "threadsafe");
+    EXPECT_EXIT({
+        if (setenv("CUDA_VISIBLE_DEVICES", "", 1) != 0) {
+            std::exit(2);
+        }
+        // A visible device means CUDA started before the list was hidden, and
+        // the checks below would not show anything.
+        int device_count = 0;
+        if (cudaGetDeviceCount(&device_count) == cudaSuccess && device_count > 0) {
+            std::exit(3);
+        }
+        if (detail::TryGetComputeCapability() != 0) {
+            std::exit(4);
+        }
+        void *ptr = nullptr;
+        matxAlloc(&ptr, 64, MATX_HOST_MALLOC_MEMORY);
+        matxFree(ptr);
+        auto t = make_tensor<float>({16}, MATX_HOST_MALLOC_MEMORY);
+        (t = ones<float>({16})).run(SingleThreadedHostExecutor{});
+        std::exit(t(3) == 1.0f ? 0 : 1);
+    }, testing::ExitedWithCode(0), "");
+    GTEST_FLAG_SET(death_test_style, previous_style);
+}
+#endif
+
 TEST(DeviceAllocatorTest, CachedMemoryPoolSupportAcrossDevices) {
     MATX_ENTER_HANDLER();
 
-    int original_device = 0;
-    ASSERT_EQ(cudaGetDevice(&original_device), cudaSuccess);
-    struct RestoreDevice {
-        int device;
-        ~RestoreDevice() { (void)cudaSetDevice(device); }
-    } restore{original_device};
+    const auto restore = detail::CudaDeviceGuard::RestoreCurrent();
 
     int device_count = 0;
     ASSERT_EQ(cudaGetDeviceCount(&device_count), cudaSuccess);

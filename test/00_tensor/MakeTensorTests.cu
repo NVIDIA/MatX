@@ -130,8 +130,9 @@ TEST(IndexStrideTests, DynamicContiguityRejectsStrideOverflow)
     alignas(16) int data = 0;
     detail::dynamic_tensor_t<int> tensor(
         &data, {1, 65536, 65536}, std::vector<offset_t>{0, 65536, 1});
-    detail::capability_attributes<detail::OperatorCapability::ELEMENTS_PER_THREAD>::input_type query{};
-    query.jit = false;
+    // Dynamic tensors ignore the device's vector width.
+    const detail::capability_attributes<detail::OperatorCapability::ELEMENTS_PER_THREAD>::input_type query{
+        false, detail::DeviceAttributes{}};
     const auto ept = tensor.get_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(query);
     EXPECT_EQ(ept[0], detail::ElementsPerThread::ONE);
     EXPECT_EQ(ept[1], detail::ElementsPerThread::ONE);

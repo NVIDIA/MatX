@@ -129,22 +129,18 @@ namespace detail {
         vectors_shape_ = SolverShapeFromInput<RANK>(a_);
         values_shape_ = SolverVectorShapeFromMatrixShape<RANK>(vectors_shape_);
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
-        const int cc = GetComputeCapability();
-
         const index_t n = vectors_shape_[RANK - 1];
         // cuSolverDx HEEV is the dense Hermitian/symmetric eigensolver. HTEV is
         // the tridiagonal eigensolver and expects diagonal/off-diagonal storage.
         const auto eig_function = CUSOLVERDX_FUNCTION_HEEV;
         dx_heev_values_helper_.set_m(n);
         dx_heev_values_helper_.set_n(n);
-        dx_heev_values_helper_.set_cc(cc);
         dx_heev_values_helper_.set_function(eig_function);
         dx_heev_values_helper_.set_fill_mode(uplo_);
         dx_heev_values_helper_.set_job(CUSOLVERDX_JOB_NO_VECTORS);
 
         dx_heev_vectors_helper_.set_m(n);
         dx_heev_vectors_helper_.set_n(n);
-        dx_heev_vectors_helper_.set_cc(cc);
         dx_heev_vectors_helper_.set_function(eig_function);
         dx_heev_vectors_helper_.set_fill_mode(uplo_);
         dx_heev_vectors_helper_.set_job(CUSOLVERDX_JOB_OVERWRITE_VECTORS);

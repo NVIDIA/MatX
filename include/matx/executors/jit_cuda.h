@@ -486,7 +486,7 @@ namespace matx
                 MATX_THROW(matxInvalidParameter, "Operator does not support JIT compilation. Use cudaExecutor instead.");
               }
 
-              auto ept_type = detail::EPTQueryInput{true};
+              auto ept_type = detail::EPTQueryInput{true, detail::GetCurrentDeviceAttributes()};
               const auto jit_ept_bounds = detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(op, ept_type);
               if (jit_ept_bounds[0] == detail::ElementsPerThread::INVALID) {
                 MATX_THROW(matxInvalidParameter, "Operator does not support JIT compilation. Use cudaExecutor instead.");
@@ -678,7 +678,7 @@ namespace matx
                 MATX_THROW(matxInvalidParameter, "Operator does not support JIT compilation. Use cudaExecutor instead.");
               }
 
-              auto ept_type = detail::EPTQueryInput{true};
+              auto ept_type = detail::EPTQueryInput{true, detail::GetCurrentDeviceAttributes()};
               const auto jit_ept_bounds = detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(op, ept_type);
               if (jit_ept_bounds[0] == detail::ElementsPerThread::INVALID) {
                 MATX_THROW(matxInvalidParameter, "Operator does not support JIT compilation. Use cudaExecutor instead.");

@@ -40,7 +40,8 @@
 #include <fstream>
 #include <sstream>
 #include <unordered_map>
-#include <matx/core/cache.h>  
+#include <matx/core/cache.h>
+#include <matx/core/device_attributes.h>
 #include <matx/core/log.h>
 
 #include "matx/executors/jit_kernel.h"
@@ -85,34 +86,36 @@ inline bool is_valid_nvrtc_arch(const std::string &arch) {
 }
 
 inline std::string get_runtime_cuda_arch() {
-    int device = 0;
-    auto dev_result = cudaGetDevice(&device);
-    if (dev_result != cudaSuccess) {
-      MATX_LOG_WARN("cudaGetDevice failed while resolving NVRTC arch ({}). Falling back to sm_80",
-                    cudaGetErrorString(dev_result));
+    const DeviceAttributes *attrs = nullptr;
+    const auto attr_result = TryGetCurrentDeviceAttributes(attrs);
+    if (attr_result != cudaSuccess) {
+      MATX_LOG_WARN("Current device query failed while resolving NVRTC arch ({}). Falling back to sm_80",
+                    cudaGetErrorString(attr_result));
       return "80";
     }
 
-    cudaDeviceProp props{};
-    auto prop_result = cudaGetDeviceProperties(&props, device);
-    if (prop_result != cudaSuccess) {
-      MATX_LOG_WARN("cudaGetDeviceProperties failed while resolving NVRTC arch ({}). Falling back to sm_80",
-                    cudaGetErrorString(prop_result));
-      return "80";
-    }
-
-    return std::to_string(props.major * 10 + props.minor);
+    return std::to_string(attrs->cc_major * 10 + attrs->cc_minor);
 }
 
 inline std::string resolve_nvrtc_cuda_arch() {
 #ifdef NVRTC_CUDA_ARCH
-    const std::string configured = NVRTC_CUDA_ARCH;
-    if (is_valid_nvrtc_arch(configured)) {
-      return configured;
+    // Validate the configured arch once, so an invalid value warns only once.
+    // "native", the CMake default, means the runtime device's architecture.
+    static const bool use_configured = [] {
+      const std::string configured = NVRTC_CUDA_ARCH;
+      if (configured == "native") {
+        return false;
+      }
+      const bool valid = is_valid_nvrtc_arch(configured);
+      if (!valid) {
+        MATX_LOG_WARN("Configured NVRTC_CUDA_ARCH='{}' is invalid for NVRTC. Falling back to runtime device architecture",
+                      configured);
+      }
+      return valid;
+    }();
+    if (use_configured) {
+      return NVRTC_CUDA_ARCH;
     }
-
-    MATX_LOG_WARN("Configured NVRTC_CUDA_ARCH='{}' is invalid for NVRTC. Falling back to runtime device architecture",
-                  configured);
 #endif
 
     return get_runtime_cuda_arch();
@@ -1076,9 +1079,7 @@ launch_kernel:
     return kernel_static_shmem_size;
   }
 
-  // Get device attributes
-  int max_shared_memory_per_block;
-  CUDA_RT_CHECK(cudaDeviceGetAttribute(&max_shared_memory_per_block, cudaDevAttrMaxSharedMemoryPerBlock, current_device));
+  const int max_shared_memory_per_block = GetDeviceAttributes(current_device).max_smem_per_block;
 
   // Set dynamic shared memory if needed
   if (dynamic_shmem_size > max_shared_memory_per_block) {

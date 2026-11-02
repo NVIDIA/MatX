@@ -40,6 +40,7 @@
 #include <numeric>
 #include <vector>
 
+#include "matx/core/device_attributes.h"
 #include "matx/core/error.h"
 #include "matx/core/nvtx.h"
 #include "matx/core/tensor.h"
@@ -83,38 +84,38 @@ constexpr size_t SmemTiledOversampledFilterBytes = 4 * 1024;
 // 40-55 bits per SM, versus about 3-16 for GDDR and LPDDR parts).
 constexpr int HighBandwidthBusBitsPerSm = 32;
 
-// Device attributes used by dispatch and launch sizing. Each is queried at most
-// once per channelizer call, and only when a decision needs it.
-class DeviceAttrs {
-public:
-  int SmCount() { return Get(sms_, cudaDevAttrMultiProcessorCount); }
-  size_t L2Bytes()
-  {
-    return static_cast<size_t>(Get(l2_bytes_, cudaDevAttrL2CacheSize));
-  }
-  // GPUs whose FP64 rate is far below FP32 make FP64 channelizers arithmetic
-  // bound, so padded or idle lanes cost time directly.
-  bool LowFp64Throughput()
-  {
-    return Get(fp64_ratio_, cudaDevAttrSingleToDoublePrecisionPerfRatio) > 8;
-  }
-  // Bus width is a cheap proxy for bandwidth; memory clock queries are slow.
-  bool HighMemoryBandwidth()
-  {
-    return Get(bus_bits_, cudaDevAttrGlobalMemoryBusWidth) >= HighBandwidthBusBitsPerSm * SmCount();
-  }
-
-private:
-  static int Get(int &value, cudaDeviceAttr attr)
-  {
-    if (value < 0) value = GetDeviceAttr(attr);
-    return value;
-  }
-  int sms_ = -1;
-  int l2_bytes_ = -1;
-  int fp64_ratio_ = -1;
-  int bus_bits_ = -1;
+// Device properties used by dispatch and launch sizing, read once per
+// channelizer call. The SM count is not in the attribute cache because under
+// MPS per-context partitioning it is the share of the current context.
+struct DeviceInfo {
+  const DeviceAttributes &cached;
+  int sm_count;
 };
+
+inline DeviceInfo GetDeviceInfo()
+{
+  int device = 0;
+  MATX_CUDA_CHECK(cudaGetDevice(&device));
+  int sm_count = 0;
+  MATX_CUDA_CHECK(cudaDeviceGetAttribute(&sm_count, cudaDevAttrMultiProcessorCount, device));
+  return {GetDeviceAttributes(device), sm_count};
+}
+
+inline size_t L2Bytes(const DeviceInfo &attrs)
+{
+  return static_cast<size_t>(attrs.cached.l2_cache_bytes);
+}
+// GPUs whose FP64 rate is far below FP32 make FP64 channelizers arithmetic
+// bound, so padded or idle lanes cost time directly.
+inline bool LowFp64Throughput(const DeviceInfo &attrs)
+{
+  return attrs.cached.fp32_to_fp64_perf_ratio > 8;
+}
+// Bus width is a cheap proxy for bandwidth; memory clock queries are slow.
+inline bool HighMemoryBandwidth(const DeviceInfo &attrs)
+{
+  return attrs.cached.memory_bus_width_bits >= HighBandwidthBusBitsPerSm * attrs.sm_count;
+}
 
 // Filter-smem placement strategy chosen by the dispatcher and forwarded to
 // the kernel via template parameters.
@@ -371,7 +372,7 @@ template <int NOUT, bool MaximallyDecimated,
 inline void SmemTiledImpl(
     OutType o, const InType &i, const FilterType &filter,
     index_t decimation_factor, const SmemTiledPlan &plan,
-    cudaStream_t stream, index_t out_elem_offset, DeviceAttrs &attrs)
+    cudaStream_t stream, index_t out_elem_offset, const DeviceInfo &attrs)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
@@ -386,7 +387,7 @@ inline void SmemTiledImpl(
 
   const int channel_tiles = SmemTiledChannelTiles(num_channels);
   // Target spatial blocks across the whole batch, with bounded CTA work.
-  const index_t target_ctas = SmemTiledCtasPerSm * attrs.SmCount();
+  const index_t target_ctas = SmemTiledCtasPerSm * attrs.sm_count;
   int elem_per_block = static_cast<int>(SmemTiledElemsPerBlock(
       nout_per_channel, num_channels, num_batches, target_ctas));
   // Use the full time dimension of oversampled FIR tiles when possible.
@@ -466,7 +467,7 @@ template <typename OutType, typename InType, typename FilterType, typename Accum
 inline void SmemTiled(
     OutType o, const InType &i, const FilterType &filter,
     index_t decimation_factor, const SmemTiledPlan &plan,
-    cudaStream_t stream, index_t out_elem_offset, DeviceAttrs &attrs)
+    cudaStream_t stream, index_t out_elem_offset, const DeviceInfo &attrs)
 {
   const index_t num_channels = o.Size(OutType::Rank() - 1);
   auto launch = [&]<int NOUT, bool MaximallyDecimated>() {
@@ -578,7 +579,7 @@ inline bool ShouldUseSmem(const OutType &out, const InType &in, const FilterType
 
 template <typename OutType, typename InType, typename FilterType, typename AccumType>
 inline void Smem(OutType o, const InType &i, const FilterType &filter,
-                 cudaStream_t stream, index_t out_elem_offset, DeviceAttrs &attrs)
+                 cudaStream_t stream, index_t out_elem_offset, const DeviceInfo &attrs)
 {
 #ifdef __CUDACC__
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
@@ -593,8 +594,8 @@ inline void Smem(OutType o, const InType &i, const FilterType &filter,
   auto launch = [&](auto is_unit_c) {
     constexpr bool IsUnitStride = decltype(is_unit_c)::value;
     auto kernel = ChannelizePoly1D_Smem<IsUnitStride, OutType, InType, FilterType, AccumType>;
-    const index_t sms = attrs.SmCount();
-    const index_t l2_bytes = static_cast<index_t>(attrs.L2Bytes());
+    const index_t sms = attrs.sm_count;
+    const index_t l2_bytes = static_cast<index_t>(L2Bytes(attrs));
     const index_t row_bytes = num_channels * static_cast<index_t>(
         sizeof(typename InType::value_type) + 2 * sizeof(AccumType));
     const size_t batch_bytes = static_cast<size_t>(nout_per_channel) * row_bytes;
@@ -698,25 +699,25 @@ constexpr index_t SeparateFp64MinInputLength = 128 * 1024;
 
 template <int NUM_CHAN, typename InputType, typename AccumType>
 inline bool FusedRadixPreferred(index_t decimation_factor, index_t input_length,
-                                size_t input_bytes, DeviceAttrs &attrs)
+                                size_t input_bytes, const DeviceInfo &attrs)
 {
   if constexpr (NUM_CHAN <= 6) {
     return true;
   } else if constexpr (!is_complex_v<InputType>) {
     if constexpr (cuda::std::is_same_v<AccumType, double>) {
       return !(input_length >= SeparateFp64MinInputLength &&
-               attrs.LowFp64Throughput() && input_bytes <= attrs.L2Bytes());
+               LowFp64Throughput(attrs) && input_bytes <= L2Bytes(attrs));
     }
     return true;
   } else {
     using Config = FusedRadixConfig<NUM_CHAN, AccumType>;
     if (!Config::WarpFft || (decimation_factor == NUM_CHAN && Config::RowStride > 2 * NUM_CHAN)) {
-      if (input_bytes <= attrs.L2Bytes() || attrs.HighMemoryBandwidth()) {
+      if (input_bytes <= L2Bytes(attrs) || HighMemoryBandwidth(attrs)) {
         return false;
       }
     }
     if constexpr (cuda::std::is_same_v<AccumType, double>) {
-      return !attrs.LowFp64Throughput();
+      return !LowFp64Throughput(attrs);
     }
     return true;
   }
@@ -910,7 +911,7 @@ inline bool FusedRadixFeasible(
 // which dispatch reserves for outputs that cuFFT cannot produce.
 template <typename OutType, typename InType, typename FilterType, typename AccumType>
 inline bool PreferFusedRadix(const InType &in, const FilterType &filter, index_t num_channels,
-                             index_t decimation_factor, DeviceAttrs &attrs)
+                             index_t decimation_factor, const DeviceInfo &attrs)
 {
   using types = FusedRadixTypes<OutType, InType, FilterType, AccumType>;
   const index_t input_length = in.Size(InType::Rank() - 1);
@@ -1012,7 +1013,7 @@ inline bool SeparateFftSupported(index_t num_channels)
 template <typename OutType, typename InType, typename FilterType, typename AccumType>
 inline Plan SelectPlan(
     const OutType &out, const InType &in, const FilterType &filter,
-    index_t num_channels, index_t decimation_factor, DeviceAttrs &attrs)
+    index_t num_channels, index_t decimation_factor, const DeviceInfo &attrs)
 {
   Plan plan;
   if (FusedRadixFeasible<OutType, InType, FilterType, AccumType>(
@@ -1029,7 +1030,7 @@ inline Plan SelectPlan(
   bool smem_preferred = num_channels <= SmallChannelLimit;
   if constexpr (cuda::std::is_same_v<AccumType, double>) {
     smem_preferred = smem_preferred ||
-        (num_channels % SmemTiledCtile != 0 && attrs.LowFp64Throughput());
+        (num_channels % SmemTiledCtile != 0 && LowFp64Throughput(attrs));
   }
   if (critical && smem_preferred && ShouldUseSmem(out, in, filter)) {
     plan.backend = Backend::Smem;
@@ -1050,7 +1051,7 @@ inline Plan SelectPlan(
     const OutType &out, const InType &in, const FilterType &filter,
     index_t num_channels, index_t decimation_factor)
 {
-  DeviceAttrs attrs;
+  const auto attrs = GetDeviceInfo();
   return SelectPlan<OutType, InType, FilterType, AccumType>(
       out, in, filter, num_channels, decimation_factor, attrs);
 }
@@ -1092,7 +1093,7 @@ template <typename OutType, typename InType, typename FilterType, typename Accum
 inline void ExecutePlan(
     const Plan &plan, OutType out, const InType &in, const FilterType &f,
     index_t num_channels, index_t decimation_factor, cudaStream_t stream,
-    index_t out_elem_offset, DeviceAttrs &attrs)
+    index_t out_elem_offset, const DeviceInfo &attrs)
 {
   using input_t = typename InType::value_type;
   using filter_t = typename FilterType::value_type;
@@ -1190,7 +1191,7 @@ inline void ExecutePlan(
     index_t num_channels, index_t decimation_factor, cudaStream_t stream,
     index_t out_elem_offset = 0)
 {
-  DeviceAttrs attrs;
+  const auto attrs = GetDeviceInfo();
   ExecutePlan<OutType, InType, FilterType, AccumType>(
       plan, out, in, f, num_channels, decimation_factor, stream, out_elem_offset, attrs);
 }
@@ -1244,7 +1245,7 @@ inline void channelize_poly_impl(OutType out, const InType &in, const FilterType
     return;
   }
 
-  detail::cpoly::DeviceAttrs attrs;
+  const auto attrs = detail::cpoly::GetDeviceInfo();
   const auto plan = detail::cpoly::SelectPlan<
       OutputOp, InputOp, FilterOp, AccumType>(
           out, in, f, num_channels, decimation_factor, attrs);

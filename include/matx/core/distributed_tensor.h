@@ -1110,7 +1110,7 @@ auto make_distributed_tensor(
     matx::detail::DistributedCheck(
         context.IsLocalDevice(endpoint.device_id), matxInvalidParameter,
         "Distribution references a device outside the context");
-    matx::detail::distributed_device_guard guard{endpoint.device_id};
+    matx::detail::CudaDeviceGuard guard{endpoint.device_id};
     auto local = make_tensor<T>(distribution.LocalShape(i), memory_space);
     fragments.push_back({std::move(local), i, endpoint, {}});
   }
@@ -1148,7 +1148,7 @@ auto make_distributed_tensor(
         "Distributed pointers may bind only locally owned fragments");
     found[binding.distribution_index] = true;
 
-    matx::detail::distributed_device_guard guard{endpoint.device_id};
+    matx::detail::CudaDeviceGuard guard{endpoint.device_id};
     auto local = make_tensor<T>(
         binding.data, distribution.LocalShape(binding.distribution_index),
         false);

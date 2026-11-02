@@ -72,13 +72,10 @@ namespace detail {
       __MATX_INLINE__ CholOp(const OpA &a, SolverFillMode uplo) : a_(a), uplo_(uplo) {
         MATX_LOG_TRACE("{} constructor: uplo={}", str(), static_cast<int>(uplo));
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
-        const int cc = GetComputeCapability();
-
         if constexpr (OpA::Rank() >= 2) {
           dx_potrf_helper_.set_m(a_.Size(OpA::Rank() - 1));
           dx_potrf_helper_.set_n(a_.Size(OpA::Rank() - 1));
         }
-        dx_potrf_helper_.set_cc(cc);
         dx_potrf_helper_.set_function(CUSOLVERDX_FUNCTION_POTRF);
         dx_potrf_helper_.set_fill_mode(uplo_);
 #endif

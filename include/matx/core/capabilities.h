@@ -433,7 +433,7 @@ namespace detail {
   template <>
   struct capability_attributes<OperatorCapability::MAX_EPT_VEC_LOAD> {
     using type = int;
-    using input_type = VoidCapabilityType;
+    using input_type = EPTQueryInput;
     static constexpr int default_value = 32;
     static constexpr int min_identity = 32;
     static constexpr int max_identity = 1;

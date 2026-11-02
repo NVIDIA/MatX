@@ -137,8 +137,9 @@ TEST(CapabilitiesTests, DefaultCapabilitiesForNonMatXOps)
   EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::ASYNC_LOADS_REQUESTED>(op));
   EXPECT_TRUE(detail::get_operator_capability<detail::OperatorCapability::GLOBAL_KERNEL>(op));
   EXPECT_TRUE(detail::get_operator_capability<detail::OperatorCapability::UNIT_STRIDE_LAST>(op));
-  EXPECT_EQ(detail::get_operator_capability<detail::OperatorCapability::MAX_EPT_VEC_LOAD>(op), 32);
-  detail::EPTQueryInput ept_input{false};
+  // The device's vector width does not affect non-MatX operators.
+  detail::EPTQueryInput ept_input{false, detail::DeviceAttributes{}};
+  EXPECT_EQ(detail::get_operator_capability<detail::OperatorCapability::MAX_EPT_VEC_LOAD>(op, ept_input), 32);
   ExpectRange(detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(op, ept_input),
               detail::ElementsPerThread::ONE, detail::ElementsPerThread::MAX);
   EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::JIT_TYPE_QUERY>(op).empty());
@@ -255,7 +256,8 @@ TEST(CapabilitiesTests, GetsAndCombinesMatXOperatorCapabilities)
   op1.ept_range = {ElementsPerThread::FOUR, ElementsPerThread::THIRTY_TWO};
   op1.groups_range = {4, 16};
 
-  detail::EPTQueryInput ept_input{false};
+  // The test operators report fixed values, whatever the device.
+  detail::EPTQueryInput ept_input{false, detail::DeviceAttributes{}};
   const auto ops = cuda::std::make_tuple(op0, op1);
 
   EXPECT_TRUE(detail::get_operator_capability<detail::OperatorCapability::ASYNC_LOADS_REQUESTED>(op0));
@@ -263,7 +265,7 @@ TEST(CapabilitiesTests, GetsAndCombinesMatXOperatorCapabilities)
   EXPECT_FALSE(detail::get_combined_ops_capability<detail::OperatorCapability::SUPPORTS_JIT>(ops));
   EXPECT_TRUE(detail::get_combined_ops_capability<detail::OperatorCapability::ASYNC_LOADS_REQUESTED>(ops));
   EXPECT_FALSE(detail::get_combined_ops_capability<detail::OperatorCapability::GLOBAL_KERNEL>(ops));
-  EXPECT_EQ(detail::get_combined_ops_capability<detail::OperatorCapability::MAX_EPT_VEC_LOAD>(ops), 8);
+  EXPECT_EQ(detail::get_combined_ops_capability<detail::OperatorCapability::MAX_EPT_VEC_LOAD>(ept_input, ops), 8);
   EXPECT_EQ(detail::get_combined_ops_capability<detail::OperatorCapability::DYN_SHM_SIZE>(ops), 192);
   EXPECT_EQ(detail::get_combined_ops_capability<detail::OperatorCapability::JIT_TYPE_QUERY>(ops), "op0;op1;");
   ExpectRange(detail::get_combined_ops_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(ept_input, ops),

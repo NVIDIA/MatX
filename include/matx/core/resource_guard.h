@@ -35,10 +35,14 @@
 #include <memory>
 #include <type_traits>
 
+#include <cuda.h>
 #include <driver_types.h>
 #include <cuda_runtime_api.h>
 
 #include "matx/core/error.h"
+
+// RAII guards for CUDA resources: owning guards for stream and event handles,
+// and CudaDeviceGuard for the calling thread's current context.
 
 namespace matx {
 namespace detail {
@@ -69,6 +73,73 @@ inline constexpr auto CudaEventDeleter = [](cudaEvent_t event) noexcept {
 
 using CudaStreamGuard = std::unique_ptr<std::remove_pointer_t<cudaStream_t>, decltype(CudaStreamDeleter)>;
 using CudaEventGuard = std::unique_ptr<std::remove_pointer_t<cudaEvent_t>, decltype(CudaEventDeleter)>;
+
+/**
+ * @brief Restores the calling thread's current context when the guard goes out
+ * of scope.
+ *
+ * Devices are switched with cudaSetDevice, which makes the device's primary
+ * context current. Restoring the same way would replace a context the caller
+ * created with the driver API, so the guard restores the context itself.
+ */
+class CudaDeviceGuard {
+public:
+  /**
+   * Records the current context and restores it on scope exit, for code that
+   * may switch devices several times.
+   */
+  [[nodiscard]] static CudaDeviceGuard RestoreCurrent() {
+    return CudaDeviceGuard{};
+  }
+
+  /**
+   * Makes a device current for the guard's scope. Does nothing if a context on
+   * that device already is. With no context current, cudaGetDevice can report a
+   * device that the next runtime call will not use, so the guard switches.
+   */
+  explicit CudaDeviceGuard(int device) {
+    Record();
+    if (previous_ctx_ == nullptr || previous_device_ != device) {
+      MATX_CUDA_CHECK(cudaSetDevice(device));
+      restore_ = true;
+    }
+  }
+
+  CudaDeviceGuard(const CudaDeviceGuard &) = delete;
+  CudaDeviceGuard &operator=(const CudaDeviceGuard &) = delete;
+
+  ~CudaDeviceGuard() {
+    if (!restore_) {
+      return;
+    }
+    // Destructors must not throw. Log the error here instead of letting a
+    // failure to restore leak into an unrelated later call.
+    if (previous_ctx_ != nullptr) {
+      MATX_CUDA_DRIVER_CHECK_NOEXCEPT(cuCtxSetCurrent(previous_ctx_));
+    }
+    else {
+      // With no context current, set the device back rather than clearing the
+      // context, which would leave cudaGetDevice reporting the device switched
+      // to while the next runtime call ran on device 0.
+      MATX_CUDA_CHECK_NOEXCEPT(cudaSetDevice(previous_device_));
+    }
+  }
+
+private:
+  // Private, so a guard missing its device argument does not compile.
+  CudaDeviceGuard() : restore_(true) {
+    Record();
+  }
+
+  void Record() {
+    MATX_CUDA_CHECK(cudaGetDevice(&previous_device_));
+    MATX_CUDA_DRIVER_CHECK(cuCtxGetCurrent(&previous_ctx_));
+  }
+
+  CUcontext previous_ctx_ = nullptr;
+  int previous_device_ = 0;
+  bool restore_ = false;
+};
 
 } // namespace detail
 } // namespace matx

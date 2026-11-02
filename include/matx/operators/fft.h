@@ -184,11 +184,9 @@ namespace matx
           }
 
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
-            const int cc = GetComputeCapability();
             dx_fft_helper_.set_fft_size(fft_size_);
             dx_fft_helper_.set_fft_type(DeduceFFTTransformType<typename scalar_to_complex<typename OpA::value_type>::ctype, value_type>());
             dx_fft_helper_.set_direction(Direction);
-            dx_fft_helper_.set_cc(cc);
             dx_fft_helper_.set_method(cuFFTDxMethod::SHARED);
 
             bool contiguous = false;
@@ -868,13 +866,10 @@ namespace matx
             }
           }
 
-          const int cc = GetComputeCapability();
-
           dx_fft2_helper_.set_fft_size_y(out_dims_[Rank() - 2]);
           dx_fft2_helper_.set_fft_size_x(out_dims_[Rank() - 1]);
           dx_fft2_helper_.set_fft_type(Type);
           dx_fft2_helper_.set_direction(Direction);
-          dx_fft2_helper_.set_cc(cc);
 #endif
         }
 
