@@ -256,7 +256,14 @@ TEST(CopyTests, TypeConversion)
 #if MATX_CHECK_NARROWING_CONVERSIONS
   matx::copy(out, as_type<int>(in), exec);
 #else
+#ifdef __NVCC_DIAG_PRAGMA_SUPPORT__
+#pragma nv_diagnostic push
+#pragma nv_diag_suppress 2463
+#endif
   matx::copy(out, in, exec);
+#ifdef __NVCC_DIAG_PRAGMA_SUPPORT__
+#pragma nv_diagnostic pop
+#endif
 #endif
   exec.sync();
   for (index_t i = 0; i < 4; i++) {
