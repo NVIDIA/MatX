@@ -253,11 +253,7 @@ TEST(CopyTests, TypeConversion)
   }
   cudaExecutor exec{};
   matx::copy(wide_out, in, exec);
-#if MATX_CHECK_NARROWING_CONVERSIONS
   matx::copy(out, as_type<int>(in), exec);
-#else
-  matx::copy(out, in, exec);
-#endif
   exec.sync();
   for (index_t i = 0; i < 4; i++) {
     EXPECT_EQ(out(i), static_cast<int>(in(i)));
