@@ -164,8 +164,11 @@ void __MATX_INLINE__ percentile_impl(OutType dest, const InType &in, uint32_t q,
           break;
         }
         case PercentileMethod::NEAREST: {
-          // Ties round to the even index, as in NumPy
-          (dest = at(sort_out, static_cast<index_t>(std::nearbyint(base_index)))).run(exec);
+          // Round ties to even independently of the host rounding mode.
+          const index_t lo = static_cast<index_t>(cuda::std::floor(base_index));
+          const double fraction = base_index - static_cast<double>(lo);
+          const index_t nearest = lo + (fraction > 0.5 || (fraction == 0.5 && lo % 2 != 0));
+          (dest = at(sort_out, nearest)).run(exec);
           break;
         }        
         default:

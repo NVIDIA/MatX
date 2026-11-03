@@ -35,6 +35,7 @@
 #include "test_types.h"
 #include "utilities.h"
 #include "gtest/gtest.h"
+#include <cfenv>
 #include <type_traits>
 #include <random>
 
@@ -1028,6 +1029,39 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, PercentileMethodsAndBou
 #endif
   }
 
+  MATX_EXIT_HANDLER();
+}
+
+TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, PercentileNearestRoundingModes)
+{
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  ExecType exec{};
+
+  MATX_ENTER_HANDLER();
+  {
+    auto input = make_tensor<TestType>({6});
+    auto output = make_tensor<TestType>({});
+    input.SetVals({0, 10, 20, 30, 40, 50});
+
+    struct RestoreRoundingMode {
+      int original = std::fegetround();
+      ~RestoreRoundingMode() { std::fesetround(original); }
+    } restore;
+    ASSERT_NE(restore.original, -1);
+
+    for (int mode : {FE_TONEAREST, FE_UPWARD, FE_DOWNWARD, FE_TOWARDZERO}) {
+      ASSERT_EQ(std::fesetround(mode), 0);
+      for (auto [q, expected] : {cuda::std::pair{10, 0}, cuda::std::pair{25, 10},
+                                 cuda::std::pair{30, 20}, cuda::std::pair{35, 20},
+                                 cuda::std::pair{50, 20}, cuda::std::pair{70, 40}}) {
+        (output = percentile(input, q, PercentileMethod::NEAREST)).run(exec);
+        exec.sync();
+        EXPECT_EQ(output(), static_cast<TestType>(expected));
+        EXPECT_EQ(std::fegetround(), mode);
+      }
+    }
+  }
   MATX_EXIT_HANDLER();
 }
 
