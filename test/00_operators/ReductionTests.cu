@@ -987,8 +987,40 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, PercentileMethodsAndBou
     expect_percentile(25, PercentileMethod::WEIBULL, 5.0);
     expect_percentile(25, PercentileMethod::MEDIAN_UNBIASED, 6.6666666667);
     expect_percentile(25, PercentileMethod::NORMAL_UNBIASED, 6.875);
-    expect_percentile(25, PercentileMethod::MIDPOINT, 15.0);
+    expect_percentile(25, PercentileMethod::MIDPOINT, 10.0);
     expect_percentile(25, PercentileMethod::NEAREST, 10.0);
+
+    // Expected values from numpy.percentile. Upper percentiles of the HAZEN, WEIBULL,
+    // MEDIAN_UNBIASED, NORMAL_UNBIASED and MIDPOINT methods have an index at or past
+    // the last element and must clamp to it.
+    expect_percentile(10, PercentileMethod::MIDPOINT, 5.0);
+    expect_percentile(80, PercentileMethod::MIDPOINT, 35.0);
+    expect_percentile(10, PercentileMethod::WEIBULL, 0.0);
+    expect_percentile(90, PercentileMethod::WEIBULL, 40.0);
+    expect_percentile(95, PercentileMethod::HAZEN, 40.0);
+    expect_percentile(90, PercentileMethod::MEDIAN_UNBIASED, 40.0);
+    expect_percentile(90, PercentileMethod::NORMAL_UNBIASED, 40.0);
+
+    auto t1_4 = make_tensor<TestType>({4});
+    t1_4.SetVals({1, 2, 3, 4});
+    (t0 = percentile(t1_4, 50, PercentileMethod::MIDPOINT)).run(exec);
+    exec.sync();
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), static_cast<TestType>(2.5), 0.01));
+
+    // Ties in NEAREST round to the even index
+    auto t1_6 = make_tensor<TestType>({6});
+    t1_6.SetVals({0, 10, 20, 30, 40, 50});
+    (t0 = percentile(t1_6, 50, PercentileMethod::NEAREST)).run(exec);
+    exec.sync();
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), static_cast<TestType>(20.0), 0.01));
+
+    auto t1_1 = make_tensor<TestType>({1});
+    t1_1.SetVals({7});
+    for (auto method : {PercentileMethod::LINEAR, PercentileMethod::WEIBULL, PercentileMethod::MIDPOINT}) {
+      (t0 = percentile(t1_1, 50, method)).run(exec);
+      exec.sync();
+      EXPECT_TRUE(MatXUtils::MatXTypeCompare(t0(), static_cast<TestType>(7.0), 0.01));
+    }
 
 #ifndef NDEBUG
     EXPECT_THROW({ detail::percentile_impl(t0, t1, 50, static_cast<PercentileMethod>(99), exec); },
