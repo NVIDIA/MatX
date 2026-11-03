@@ -136,21 +136,17 @@ namespace detail {
         r_shape_ = q_shape_;
         q_shape_[RANK - 1] = q_shape_[RANK - 2];
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
-        const int cc = GetComputeCapability();
-
         const index_t m = r_shape_[RANK - 2];
         const index_t n = r_shape_[RANK - 1];
         const index_t k = m < n ? m : n;
         dx_geqrf_helper_.set_m(m);
         dx_geqrf_helper_.set_n(n);
         dx_geqrf_helper_.set_k(k);
-        dx_geqrf_helper_.set_cc(cc);
         dx_geqrf_helper_.set_function(CUSOLVERDX_FUNCTION_GEQRF);
 
         dx_ungqr_helper_.set_m(m);
         dx_ungqr_helper_.set_n(q_shape_[RANK - 1]);
         dx_ungqr_helper_.set_k(k);
-        dx_ungqr_helper_.set_cc(cc);
         dx_ungqr_helper_.set_function(CUSOLVERDX_FUNCTION_UNGQR);
 #endif
       }
@@ -303,10 +299,6 @@ namespace detail {
       void AddJITProjectionClasses(std::unordered_map<std::string, std::string> &in) const
       {
         const std::string class_name = GetJITProjectionClassName<Component>();
-        if (in.find(class_name) != in.end()) {
-          return;
-        }
-
         const std::string geqrf_func_name = std::string(SOLVER_DX_FUNC_PREFIX) + "_" + dx_geqrf_helper_.GetSymbolName();
         std::string externs =
           " extern \"C\" __device__ void " + geqrf_func_name + "(" + detail::type_to_string<value_type>() + "*, " + detail::type_to_string<value_type>() + "*);\n";
@@ -320,7 +312,7 @@ namespace detail {
         else {
           projection_body = dx_geqrf_helper_.GetQrRProjectionFuncStr(geqrf_func_name, QR_R, r_shape_[RANK - 2]);
         }
-        in[class_name] =
+        const std::string definition =
           externs +
           " template <typename OpA, int Component> struct " + class_name + "  {\n"
           "  using value_type = typename OpA::value_type;\n"
@@ -343,6 +335,7 @@ namespace detail {
           "    return a_.Size(dim);\n"
           "  }\n"
           "};\n";
+        detail::register_jit_class(in, class_name, definition);
       }
 #endif
   };
@@ -512,12 +505,9 @@ namespace detail {
         out_shape_ = SolverShapeFromInput<RANK>(a_);
         tau_shape_ = SolverVectorShapeFromMatrixShape<RANK>(out_shape_);
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
-        const int cc = GetComputeCapability();
-
         dx_geqrf_helper_.set_m(out_shape_[RANK - 2]);
         dx_geqrf_helper_.set_n(out_shape_[RANK - 1]);
         dx_geqrf_helper_.set_k(tau_shape_[RANK - 2]);
-        dx_geqrf_helper_.set_cc(cc);
         dx_geqrf_helper_.set_function(CUSOLVERDX_FUNCTION_GEQRF);
 #endif
       }
@@ -635,12 +625,8 @@ namespace detail {
       void AddJITProjectionClasses(std::unordered_map<std::string, std::string> &in) const
       {
         const std::string class_name = GetJITProjectionClassName<Component>();
-        if (in.find(class_name) != in.end()) {
-          return;
-        }
-
         const std::string solver_func_name = std::string(SOLVER_DX_FUNC_PREFIX) + "_" + dx_geqrf_helper_.GetSymbolName();
-        in[class_name] =
+        const std::string definition =
           " extern \"C\" __device__ void " + solver_func_name + "(" + detail::type_to_string<value_type>() + "*, " + detail::type_to_string<value_type>() + "*);\n"
           " template <typename OpA, int Component> struct " + class_name + "  {\n"
           "  using value_type = typename OpA::value_type;\n"
@@ -667,6 +653,7 @@ namespace detail {
           "    else { return a_.Size(dim); }\n"
           "  }\n"
           "};\n";
+        detail::register_jit_class(in, class_name, definition);
       }
 #endif
   };
@@ -844,18 +831,14 @@ namespace detail {
         q_shape_[RANK - 1] = k;
         r_shape_[RANK - 2] = k;
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
-        const int cc = GetComputeCapability();
-
         dx_geqrf_helper_.set_m(a_.Size(RANK - 2));
         dx_geqrf_helper_.set_n(a_.Size(RANK - 1));
         dx_geqrf_helper_.set_k(k);
-        dx_geqrf_helper_.set_cc(cc);
         dx_geqrf_helper_.set_function(CUSOLVERDX_FUNCTION_GEQRF);
 
         dx_ungqr_helper_.set_m(q_shape_[RANK - 2]);
         dx_ungqr_helper_.set_n(q_shape_[RANK - 1]);
         dx_ungqr_helper_.set_k(k);
-        dx_ungqr_helper_.set_cc(cc);
         dx_ungqr_helper_.set_function(CUSOLVERDX_FUNCTION_UNGQR);
 #endif
       }
@@ -1008,10 +991,6 @@ namespace detail {
       void AddJITProjectionClasses(std::unordered_map<std::string, std::string> &in) const
       {
         const std::string class_name = GetJITProjectionClassName<Component>();
-        if (in.find(class_name) != in.end()) {
-          return;
-        }
-
         const std::string geqrf_func_name = std::string(SOLVER_DX_FUNC_PREFIX) + "_" + dx_geqrf_helper_.GetSymbolName();
         std::string externs =
           " extern \"C\" __device__ void " + geqrf_func_name + "(" + detail::type_to_string<value_type>() + "*, " + detail::type_to_string<value_type>() + "*);\n";
@@ -1025,7 +1004,7 @@ namespace detail {
         else {
           projection_body = dx_geqrf_helper_.GetQrRProjectionFuncStr(geqrf_func_name, QR_ECON_R, r_shape_[RANK - 2]);
         }
-        in[class_name] =
+        const std::string definition =
           externs +
           " template <typename OpA, int Component> struct " + class_name + "  {\n"
           "  using value_type = typename OpA::value_type;\n"
@@ -1054,6 +1033,7 @@ namespace detail {
           "    return a_.Size(dim);\n"
           "  }\n"
           "};\n";
+        detail::register_jit_class(in, class_name, definition);
       }
 #endif
   };

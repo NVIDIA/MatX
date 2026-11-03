@@ -40,7 +40,8 @@
 #include <fstream>
 #include <sstream>
 #include <unordered_map>
-#include <matx/core/cache.h>  
+#include <matx/core/cache.h>
+#include <matx/core/device_attributes.h>
 #include <matx/core/log.h>
 
 #include "matx/executors/jit_kernel.h"
@@ -50,6 +51,7 @@
 #include <vector>
 #include <string>
 #include <string_view>
+#include <atomic>
 #include <mutex>
 #include <cctype>
 #include <regex>
@@ -84,34 +86,36 @@ inline bool is_valid_nvrtc_arch(const std::string &arch) {
 }
 
 inline std::string get_runtime_cuda_arch() {
-    int device = 0;
-    auto dev_result = cudaGetDevice(&device);
-    if (dev_result != cudaSuccess) {
-      MATX_LOG_WARN("cudaGetDevice failed while resolving NVRTC arch ({}). Falling back to sm_80",
-                    cudaGetErrorString(dev_result));
+    const DeviceAttributes *attrs = nullptr;
+    const auto attr_result = TryGetCurrentDeviceAttributes(attrs);
+    if (attr_result != cudaSuccess) {
+      MATX_LOG_WARN("Current device query failed while resolving NVRTC arch ({}). Falling back to sm_80",
+                    cudaGetErrorString(attr_result));
       return "80";
     }
 
-    cudaDeviceProp props{};
-    auto prop_result = cudaGetDeviceProperties(&props, device);
-    if (prop_result != cudaSuccess) {
-      MATX_LOG_WARN("cudaGetDeviceProperties failed while resolving NVRTC arch ({}). Falling back to sm_80",
-                    cudaGetErrorString(prop_result));
-      return "80";
-    }
-
-    return std::to_string(props.major * 10 + props.minor);
+    return std::to_string(attrs->cc_major * 10 + attrs->cc_minor);
 }
 
 inline std::string resolve_nvrtc_cuda_arch() {
 #ifdef NVRTC_CUDA_ARCH
-    const std::string configured = NVRTC_CUDA_ARCH;
-    if (is_valid_nvrtc_arch(configured)) {
-      return configured;
+    // Validate the configured arch once, so an invalid value warns only once.
+    // "native", the CMake default, means the runtime device's architecture.
+    static const bool use_configured = [] {
+      const std::string configured = NVRTC_CUDA_ARCH;
+      if (configured == "native") {
+        return false;
+      }
+      const bool valid = is_valid_nvrtc_arch(configured);
+      if (!valid) {
+        MATX_LOG_WARN("Configured NVRTC_CUDA_ARCH='{}' is invalid for NVRTC. Falling back to runtime device architecture",
+                      configured);
+      }
+      return valid;
+    }();
+    if (use_configured) {
+      return NVRTC_CUDA_ARCH;
     }
-
-    MATX_LOG_WARN("Configured NVRTC_CUDA_ARCH='{}' is invalid for NVRTC. Falling back to runtime device architecture",
-                  configured);
 #endif
 
     return get_runtime_cuda_arch();
@@ -271,6 +275,12 @@ std::vector<std::string> __MATX_HOST__ __MATX_INLINE__ get_preprocessor_options(
 
     std::vector<std::string> options;
     options.push_back("-DMATX_EN_JIT");
+#ifdef MATX_INDEX_32_BIT
+    options.push_back("-DMATX_INDEX_32_BIT");
+#endif
+#ifdef MATX_OFFSET_32_BIT
+    options.push_back("-DMATX_OFFSET_32_BIT");
+#endif
 #ifdef MATX_EN_MATHDX
     options.push_back("-DMATX_EN_MATHDX");
 #endif
@@ -644,6 +654,29 @@ inline std::string qualify_jit_type_names(const std::string& type_str) {
   return result;
 }
 
+/**
+ * @brief Callback that sees every JIT launch, such as the unit tests' class name check
+ *
+ * Receives the class definitions of the launched expression, its fixed-size cache key, its type string, and its
+ * launch configuration (kernel variant, elements per thread, block size, and groups per block). Some operators
+ * generate different code for different launch configurations, which is safe because every kernel cache key
+ * includes the configuration. Generating the definitions costs more than the rest of a warm launch, so they are
+ * generated only while an observer is installed.
+ */
+using JITLaunchObserver = void (*)(const std::unordered_map<std::string, std::string> &classes,
+                                   const JITCacheKey &jit_cache_key, const std::string &type_str,
+                                   const std::string &launch_config);
+
+/**
+ * @brief The installed JIT launch observer, or nullptr when none is installed
+ *
+ * Atomic so that an observer can be installed or removed while other threads launch JIT kernels.
+ */
+inline std::atomic<JITLaunchObserver> &jit_launch_observer() {
+  static std::atomic<JITLaunchObserver> observer{nullptr};
+  return observer;
+}
+
 struct JITKernelCacheKey {
   JITCacheKey op_key;
   int rank = 0;
@@ -738,13 +771,21 @@ auto nvrtc_compile_and_run([[maybe_unused]] const std::string &name,
   const std::string nvrtc_arch = resolve_nvrtc_cuda_arch();
   int current_device = 0;
   CUDA_RT_CHECK(cudaGetDevice(&current_device));
-  const std::string device_cache_prefix = "device_" + std::to_string(current_device) + "_sm_" + nvrtc_arch + "_";
+  const std::string device_cache_prefix = "device_" + std::to_string(current_device) + "_sm_" + nvrtc_arch +
+      "_index" + std::to_string(sizeof(index_t) * 8) + "_offset" + std::to_string(sizeof(offset_t) * 8) + "_";
   std::string kernel_name = get_kernel_name_for_rank<RANK>(stride, global_kernel, pass_through_threads,
                                                            pass_through_inner_rank, block_reduces_rank);
+  if (const auto observer = jit_launch_observer().load()) {
+    std::unordered_map<std::string, std::string> classes;
+    detail::get_operator_capability<OperatorCapability::JIT_CLASS_QUERY>(op, classes);
+    const std::string launch_config = kernel_name + "_ept" + std::to_string(static_cast<int>(ept)) + "_block" +
+                                      std::to_string(threads.x) + "_groups" + std::to_string(groups_per_block);
+    observer(classes, jit_cache_key, ensure_kernel_op_type(), launch_config);
+  }
   auto make_legacy_kernel_cache_key = [&]() {
     return device_cache_prefix + kernel_name + "_ept_" + std::to_string(static_cast<int>(ept)) +
            "_block_" + std::to_string(threads.x) + "_groups_" +
-           std::to_string(groups_per_block) + "_" + ensure_kernel_op_type();
+           std::to_string(groups_per_block) + "_" + ensure_kernel_op_type() + "_" + detail::JITCacheVersionTag();
   };
   auto make_jit_kernel_cache_key = [&]() {
     return JITKernelCacheKey{jit_cache_key, RANK, ept, static_cast<int>(threads.x), groups_per_block,
@@ -1038,9 +1079,7 @@ launch_kernel:
     return kernel_static_shmem_size;
   }
 
-  // Get device attributes
-  int max_shared_memory_per_block;
-  CUDA_RT_CHECK(cudaDeviceGetAttribute(&max_shared_memory_per_block, cudaDevAttrMaxSharedMemoryPerBlock, current_device));
+  const int max_shared_memory_per_block = GetDeviceAttributes(current_device).max_smem_per_block;
 
   // Set dynamic shared memory if needed
   if (dynamic_shmem_size > max_shared_memory_per_block) {

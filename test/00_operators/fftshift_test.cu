@@ -128,3 +128,83 @@ TYPED_TEST(OperatorTestsFloatNonHalf, FFTShiftWithTransform)
 
   MATX_EXIT_HANDLER();
 }
+
+TYPED_TEST(OperatorTestsFloatNonHalf, FFTShiftDifferentSizesInOneExpression)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  ExecType exec{};
+
+  // Shifts of inputs with different sizes can appear in the same expression. An odd length makes
+  // fftshift and ifftshift differ.
+  const index_t na = 7;
+  const index_t nb = 16;
+  auto a = make_tensor<TestType>({na});
+  auto b = make_tensor<TestType>({nb});
+  auto out = make_tensor<TestType>({na + nb});
+  for (index_t i = 0; i < na; i++) {
+    a(i) = static_cast<detail::value_promote_t<TestType>>(i);
+  }
+  for (index_t i = 0; i < nb; i++) {
+    b(i) = static_cast<detail::value_promote_t<TestType>>(na + i);
+  }
+
+  (out = concat(0, fftshift1D(a), fftshift1D(b))).run(exec);
+  exec.sync();
+  for (index_t i = 0; i < na; i++) {
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(out(i), a((i + (na + 1) / 2) % na)));
+  }
+  for (index_t i = 0; i < nb; i++) {
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(out(na + i), b((i + (nb + 1) / 2) % nb)));
+  }
+
+  (out = concat(0, ifftshift1D(a), ifftshift1D(b))).run(exec);
+  exec.sync();
+  for (index_t i = 0; i < na; i++) {
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(out(i), a((i + na / 2) % na)));
+  }
+  for (index_t i = 0; i < nb; i++) {
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(out(na + i), b((i + nb / 2) % nb)));
+  }
+
+  // 2D shifts move both dimensions
+  const index_t cols = 4;
+  auto c = make_tensor<TestType>({na, cols});
+  auto d = make_tensor<TestType>({nb, cols});
+  auto out2 = make_tensor<TestType>({na + nb, cols});
+  for (index_t i = 0; i < na; i++) {
+    for (index_t j = 0; j < cols; j++) {
+      c(i, j) = static_cast<detail::value_promote_t<TestType>>(i * cols + j);
+    }
+  }
+  for (index_t i = 0; i < nb; i++) {
+    for (index_t j = 0; j < cols; j++) {
+      d(i, j) = static_cast<detail::value_promote_t<TestType>>(100 + i * cols + j);
+    }
+  }
+
+  (out2 = concat(0, fftshift2D(c), fftshift2D(d))).run(exec);
+  exec.sync();
+  for (index_t j = 0; j < cols; j++) {
+    for (index_t i = 0; i < na; i++) {
+      EXPECT_TRUE(MatXUtils::MatXTypeCompare(out2(i, j), c((i + (na + 1) / 2) % na, (j + (cols + 1) / 2) % cols)));
+    }
+    for (index_t i = 0; i < nb; i++) {
+      EXPECT_TRUE(MatXUtils::MatXTypeCompare(out2(na + i, j), d((i + (nb + 1) / 2) % nb, (j + (cols + 1) / 2) % cols)));
+    }
+  }
+
+  (out2 = concat(0, ifftshift2D(c), ifftshift2D(d))).run(exec);
+  exec.sync();
+  for (index_t j = 0; j < cols; j++) {
+    for (index_t i = 0; i < na; i++) {
+      EXPECT_TRUE(MatXUtils::MatXTypeCompare(out2(i, j), c((i + na / 2) % na, (j + cols / 2) % cols)));
+    }
+    for (index_t i = 0; i < nb; i++) {
+      EXPECT_TRUE(MatXUtils::MatXTypeCompare(out2(na + i, j), d((i + nb / 2) % nb, (j + cols / 2) % cols)));
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}

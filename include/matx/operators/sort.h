@@ -53,10 +53,10 @@ namespace detail {
     private:
       typename detail::base_type_t<OpA> a_;
       SortDirection_t dir_;
+      mutable uint8_t lifecycle_depth_ = 0;
       cuda::std::array<index_t, OpA::Rank()> out_dims_;
       mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, OpA::Rank()> tmp_out_;
       mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr;
-      mutable uint8_t lifecycle_depth_ = 0;
       mutable ElementsPerThread current_ept_ = ElementsPerThread::ONE;
       mutable int current_groups_per_block_ = 1;
 
@@ -190,10 +190,7 @@ namespace detail {
 #ifdef MATX_EN_JIT
           static_assert(cuda::std::is_same_v<InType, std::unordered_map<std::string, std::string>>,
                         "JIT_CLASS_QUERY capability requires std::unordered_map<std::string, std::string> as input type");
-          const auto [key, value] = get_jit_op_str();
-          if (in.find(key) == in.end()) {
-            in[key] = value;
-          }
+          detail::register_jit_class(in, *this);
           detail::get_operator_capability<Cap>(a_, in);
           return true;
 #else

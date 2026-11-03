@@ -387,6 +387,9 @@ TYPED_TEST(FileIoTestsNonComplexFloatTypes, NPYReadUninitialized)
 
 TYPED_TEST(FileIoTestsNonComplexFloatTypes, NPYReadInitializedShapeMismatch)
 {
+#ifdef NDEBUG
+  GTEST_SKIP() << "NPY shape checks require assertions (NDEBUG must be undefined)";
+#else
   MATX_ENTER_HANDLER();
   using TestType = cuda::std::tuple_element_t<0, TypeParam>;
 
@@ -397,6 +400,7 @@ TYPED_TEST(FileIoTestsNonComplexFloatTypes, NPYReadInitializedShapeMismatch)
   }, matx::detail::matxException);
 
   MATX_EXIT_HANDLER();
+#endif
 }
 
 TYPED_TEST(FileIoTestsNonComplexFloatTypes, NPYReadFileNotFound)

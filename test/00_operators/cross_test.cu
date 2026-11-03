@@ -50,6 +50,20 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Cross)
     MATX_TEST_ASSERT_COMPARE(pb, out, "out", thresh);
   }
 
+  {//batched 4 x 2
+    pb->InitAndRunTVGenerator<TestType>("00_operators", "cross_operator", "run", {4, 2});
+    auto a = make_tensor<TestType>({4, 2});
+    auto b = make_tensor<TestType>({4, 2});
+    auto out = make_tensor<TestType>({4, 1});
+
+    pb->NumpyToTensorView(a, "a");
+    pb->NumpyToTensorView(b, "b");
+
+    (out = cross(a, b)).run(exec);
+    exec.sync();
+    MATX_TEST_ASSERT_COMPARE(pb, out, "out", thresh);
+  }
+
   {//non-batched 2
     pb->InitAndRunTVGenerator<TestType>("00_operators", "cross_operator", "run", {2});
     auto a = make_tensor<TestType>({2});
@@ -65,4 +79,4 @@ TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, Cross)
   }
 
   MATX_EXIT_HANDLER();
-} 
+}

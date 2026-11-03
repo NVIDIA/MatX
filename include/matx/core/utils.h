@@ -32,11 +32,14 @@
 
 #pragma once
 
+#include <charconv>
+#include <format>
 #include <type_traits>
 #include <string>
 #include <cuda_fp16.h>
 
 #include "matx/core/defines.h"
+#include "matx/core/device_attributes.h"
 #include "matx/core/error.h"
 
 namespace matx {
@@ -47,26 +50,30 @@ constexpr int VOLTA_CC = 7;
 constexpr int PASCAL_CC = 6;
 
 namespace detail {
-__MATX_INLINE__ int GetDeviceAttr(cudaDeviceAttr attr) {
-    int val;
-    int dev;
-    [[maybe_unused]] auto err = cudaGetDevice(&dev);
-    MATX_ASSERT(err == cudaSuccess, matxCudaError);
-    err = cudaDeviceGetAttribute(&val, attr, dev);
-    MATX_ASSERT(err == cudaSuccess, matxCudaError);
-    return val;
-}
-
 __MATX_INLINE__ int GetComputeCapabilityMajor() {
-    return GetDeviceAttr(cudaDevAttrComputeCapabilityMajor);
+    return GetCurrentDeviceAttributes().cc_major;
 }
 
 __MATX_INLINE__ int GetComputeCapabilityMinor() {
-    return GetDeviceAttr(cudaDevAttrComputeCapabilityMinor);
+    return GetCurrentDeviceAttributes().cc_minor;
 }
 
 __MATX_INLINE__ int GetComputeCapability() {
-    return GetComputeCapabilityMajor() * 100 + GetComputeCapabilityMinor() * 10;
+    return GetCurrentDeviceAttributes().ComputeCapability();
+}
+
+// Same as GetComputeCapability(), but returns 0 instead of throwing when no
+// device can be queried. For code that also runs with host executors on
+// machines without a GPU, such as the MathDx helpers.
+__MATX_INLINE__ int TryGetComputeCapability() {
+    const DeviceAttributes *attrs = nullptr;
+    if (TryGetCurrentDeviceAttributes(attrs) != cudaSuccess) {
+      // Clear the error, where CUDA allows it, so a later CUDA error check does
+      // not report it. Without a device, CUDA keeps reporting cudaErrorNoDevice.
+      cudaGetLastError();
+      return 0;
+    }
+    return attrs->ComputeCapability();
 }
 
 __MATX_INLINE__ bool IsHopperOrAbove() {
@@ -459,13 +466,59 @@ auto get_jit_class_or_pod_name(const T& op)
 }
 
 /**
+ * @brief Append a number to a string as characters that are valid in a C++ symbol/identifier
+ *
+ * Appends the same characters as number_to_symbol without building a temporary string, for JIT class names that
+ * are built on every launch.
+ *
+ * @tparam T Numeric type (can be complex or non-complex)
+ * @param str String to append to
+ * @param val Numeric value to append
+ */
+template <typename T>
+__MATX_INLINE__ void append_number_symbol(std::string &str, const T& val)
+{
+  // Helper lambdas to append a value with the characters that are invalid in variable names replaced
+  auto append_chars = [&str](std::string_view chars) {
+    for (const char c : chars) {
+      if (c == '.') str += 'p';
+      else if (c == '-') str += 'n';
+      else if (c != '+') str += c;
+    }
+  };
+  auto append_sanitized = [&append_chars](auto v) {
+    using V = decltype(v);
+    // to_chars gives the same characters as std::format("{}") without its overhead. It does not apply to bool,
+    // which std::format writes as "true" or "false", or to char, which std::format writes as a character.
+    if constexpr (!cuda::std::is_same_v<V, char> && requires(char *p, V x) { std::to_chars(p, p, x); }) {
+      char digits[64];
+      append_chars(std::string_view(digits, std::to_chars(digits, digits + sizeof(digits), v).ptr));
+    } else {
+      append_chars(std::format("{}", v));
+    }
+  };
+
+  if constexpr (is_complex_v<T>) {
+    // Format complex numbers as r{real}_i{imag}
+    str += 'r';
+    append_sanitized(val.real());
+    str += "_i";
+    append_sanitized(val.imag());
+  } else {
+    // Format non-complex numbers directly
+    append_sanitized(val);
+  }
+}
+
+/**
  * @brief Convert a number to a valid C++ symbol/identifier string
  *
  * Formats a numeric value as a string that can be used in C++ variable names.
  * For complex numbers, the format is "r{real}_i{imag}".
- * For non-complex numbers, the format is the string representation of the value.
+ * For non-complex numbers, the format is the shortest representation that
+ * converts back to the same value, so distinct values never share a symbol.
  * Special characters like '.' and '-' are replaced with 'p' (for point) and
- * 'n' (for negative) respectively.
+ * 'n' (for negative) respectively, and the '+' of a positive exponent is dropped.
  *
  * @tparam T Numeric type (can be complex or non-complex)
  * @param val Numeric value to convert
@@ -475,30 +528,61 @@ auto get_jit_class_or_pod_name(const T& op)
  * number_to_symbol(cuda::std::complex<float>{1.5, -2.3}) returns "r1p5_in2p3"
  * number_to_symbol(3.14f) returns "3p14"
  * number_to_symbol(-5) returns "n5"
+ * number_to_symbol(1e-7f) returns "1en07"
  */
 template <typename T>
 __MATX_INLINE__ std::string number_to_symbol(const T& val)
 {
-  // Helper lambda to sanitize floating point values for variable names
-  auto sanitize_float = [](auto v) -> std::string {
-    std::ostringstream oss;
-    oss << v;
-    std::string str = oss.str();
-    for (auto& c : str) {
-      if (c == '.') c = 'p';
-      else if (c == '-') c = 'n';
-    }
-    return str;
-  };
+  std::string str;
+  append_number_symbol(str, val);
+  return str;
+}
 
-  if constexpr (is_complex_v<T>) {
-    // Format complex numbers as r{real}_i{imag}
-    auto real_val = val.real();
-    auto imag_val = val.imag();
-    return std::string("r") + sanitize_float(real_val) + "_i" + sanitize_float(imag_val);
-  } else {
-    // Format non-complex numbers directly
-    return sanitize_float(val);
+/**
+ * @brief Suffix for the JIT class name of an operator whose generated code bakes in its rank and sizes
+ *
+ * A JIT class name must determine every value compiled into its definition, so operators that differ in shape
+ * must not share a name. Registering a different definition under an existing name throws (see
+ * register_jit_class), so a missing shape suffix shows up as an exception that names the class.
+ *
+ * @tparam Op Operator type
+ * @param op Operator to describe
+ * @param rank Rank to describe, such as get_dyn_rank() of an operand whose rank is only known at run time
+ * @return "_r{rank}_{size0}_{size1}..." for a ranked operator, or "_rNo" for one without a shape
+ */
+template <typename Op>
+__MATX_INLINE__ std::string jit_shape_suffix(const Op &op, int rank)
+{
+  if (rank < 0) {
+    return "_rNo";
+  }
+  // Built on every JIT launch through JIT_TYPE_QUERY, so numbers are appended in place rather than formatted
+  std::string suffix = "_r";
+  append_number_symbol(suffix, rank);
+  for (int i = 0; i < rank; i++) {
+    suffix += '_';
+    append_number_symbol(suffix, op.Size(i));
+  }
+  return suffix;
+}
+
+/**
+ * @brief Suffix for the JIT class name of an operator whose generated code bakes in its rank and sizes
+ *
+ * Uses the operator's jit_rank() when it has one, and its Rank() otherwise.
+ *
+ * @tparam Op Operator type
+ * @param op Operator to describe
+ * @return "_r{rank}_{size0}_{size1}..." for a ranked operator, or "_rNo" for one without a shape
+ */
+template <typename Op>
+__MATX_INLINE__ std::string jit_shape_suffix(const Op &op)
+{
+  if constexpr (requires { op.jit_rank(); }) {
+    return jit_shape_suffix(op, op.jit_rank());
+  }
+  else {
+    return jit_shape_suffix(op, op.Rank());
   }
 }
 
@@ -510,11 +594,12 @@ __MATX_INLINE__ std::string number_to_symbol(const T& val)
  * Format: JITTensorImpl_<type_c_name>_R<rank>_SI_<s0>_<s1>_...ST_<st0>_<st1>_...
  * The shape/stride values use '_' as separator.
  */
+template <typename StrideType>
 __MATX_INLINE__ std::string make_jit_tensor_class_name_str(
     const std::string &type_c_name,
     int rank,
     const index_t *shape,
-    const index_t *strides)
+    const StrideType *strides)
 {
   std::string name = "JITTensorImpl_" + type_c_name + "_";
   name += "R" + std::to_string(rank) + "_";
@@ -553,16 +638,16 @@ __MATX_INLINE__ std::string make_jit_tensor_struct_str(
         "  using matxop = bool;\n" +
         "  using stride_type = " + stride_type_str + ";\n" +
         "  T *ldata_;\n" +
-        "  constexpr static cuda::std::array<index_t, " + rank_str + "> strides_ = { " + strides_str + " };\n" +
+        "  constexpr static cuda::std::array<stride_type, " + rank_str + "> strides_ = { " + strides_str + " };\n" +
         "  constexpr static cuda::std::array<index_t, " + rank_str + "> sizes_ = { " + sizes_str + " };\n" +
         "  template <detail::ElementsPerThread EPT, int I = 0, typename ...Is>\n" +
         "  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type GetVal([[maybe_unused]] cuda::std::tuple<Is...> tup)  {\n" +
         "    if constexpr (I < sizeof...(Is)) {\n" +
         "      if constexpr (EPT != detail::ElementsPerThread::ONE && I == sizeof...(Is) - 1) {\n" +
-        "        return GetVal<EPT, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(strides_[I] * static_cast<index_t>(EPT));\n" +
+        "        return GetVal<EPT, I+1, Is...>(tup) + static_cast<stride_type>(cuda::std::get<I>(tup)) * (strides_[I] * static_cast<stride_type>(EPT));\n" +
         "      }\n" +
         "      else {\n" +
-        "        return GetVal<EPT, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(strides_[I]);\n" +
+        "        return GetVal<EPT, I+1, Is...>(tup) + static_cast<stride_type>(cuda::std::get<I>(tup)) * strides_[I];\n" +
         "      }\n" +
         "    }\n" +
         "    else {\n" +
@@ -573,10 +658,10 @@ __MATX_INLINE__ std::string make_jit_tensor_struct_str(
         "  __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ stride_type GetValC([[maybe_unused]] const cuda::std::tuple<Is...> tup) const {\n" +
         "    if constexpr (I < sizeof...(Is)) {\n" +
         "      if constexpr (EPT != detail::ElementsPerThread::ONE && I == sizeof...(Is) - 1) {\n" +
-        "        return GetValC<EPT, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(strides_[I] * static_cast<index_t>(EPT));\n" +
+        "        return GetValC<EPT, I+1, Is...>(tup) + static_cast<stride_type>(cuda::std::get<I>(tup)) * (strides_[I] * static_cast<stride_type>(EPT));\n" +
         "      }\n" +
         "      else {\n" +
-        "        return GetValC<EPT, I+1, Is...>(tup) + cuda::std::get<I>(tup)*(strides_[I]);\n" +
+        "        return GetValC<EPT, I+1, Is...>(tup) + static_cast<stride_type>(cuda::std::get<I>(tup)) * strides_[I];\n" +
         "      }\n" +
         "    }\n" +
         "    else {\n" +
@@ -591,30 +676,30 @@ __MATX_INLINE__ std::string make_jit_tensor_struct_str(
         "    \n" +
         "    if constexpr (rank == 1) {\n" +
         "        if constexpr (EPT != detail::ElementsPerThread::ONE) {\n" +
-        "          return idx[0] * (strides_[0] * EPT_int);\n" +
+        "          return static_cast<stride_type>(idx[0]) * (strides_[0] * static_cast<stride_type>(EPT_int));\n" +
         "      } else {\n" +
-        "        return idx[0] * strides_[0];\n" +
+        "        return static_cast<stride_type>(idx[0]) * strides_[0];\n" +
         "      }\n" +
         "    }\n" +
         "    else if constexpr (rank == 2) {\n" +
         "      if constexpr (EPT != detail::ElementsPerThread::ONE) {\n" +
-        "        return idx[0] * strides_[0] + idx[1] * (strides_[1] * EPT_int);\n" +
+        "        return static_cast<stride_type>(idx[0]) * strides_[0] + static_cast<stride_type>(idx[1]) * (strides_[1] * static_cast<stride_type>(EPT_int));\n" +
         "      } else {\n" +
-        "        return idx[0] * strides_[0] + idx[1] * strides_[1];\n" +
+        "        return static_cast<stride_type>(idx[0]) * strides_[0] + static_cast<stride_type>(idx[1]) * strides_[1];\n" +
         "      }\n" +
         "    }\n" +
         "    else if constexpr (rank == 3) {\n" +
         "      if constexpr (EPT != detail::ElementsPerThread::ONE) {\n" +
-        "        return idx[0] * strides_[0] + idx[1] * strides_[1] + idx[2] * (strides_[2] * EPT_int);\n" +
+        "        return static_cast<stride_type>(idx[0]) * strides_[0] + static_cast<stride_type>(idx[1]) * strides_[1] + static_cast<stride_type>(idx[2]) * (strides_[2] * static_cast<stride_type>(EPT_int));\n" +
         "      } else {\n" +
-        "        return idx[0] * strides_[0] + idx[1] * strides_[1] + idx[2] * strides_[2];\n" +
+        "        return static_cast<stride_type>(idx[0]) * strides_[0] + static_cast<stride_type>(idx[1]) * strides_[1] + static_cast<stride_type>(idx[2]) * strides_[2];\n" +
         "      }\n" +
         "    }\n" +
         "    else if constexpr (rank == 4) {\n" +
         "      if constexpr (EPT != detail::ElementsPerThread::ONE) {\n" +
-        "        return idx[0] * strides_[0] + idx[1] * strides_[1] + idx[2] * strides_[2] + idx[3] * (strides_[3] * EPT_int);\n" +
+        "        return static_cast<stride_type>(idx[0]) * strides_[0] + static_cast<stride_type>(idx[1]) * strides_[1] + static_cast<stride_type>(idx[2]) * strides_[2] + static_cast<stride_type>(idx[3]) * (strides_[3] * static_cast<stride_type>(EPT_int));\n" +
         "      } else {\n" +
-        "        return idx[0] * strides_[0] + idx[1] * strides_[1] + idx[2] * strides_[2] + idx[3] * strides_[3];\n" +
+        "        return static_cast<stride_type>(idx[0]) * strides_[0] + static_cast<stride_type>(idx[1]) * strides_[1] + static_cast<stride_type>(idx[2]) * strides_[2] + static_cast<stride_type>(idx[3]) * strides_[3];\n" +
         "      }\n" +
         "    }\n" +
         "    else {\n" +
@@ -645,7 +730,7 @@ __MATX_INLINE__ std::string make_jit_tensor_struct_str(
         "        return ReturnType{};\n" +
         "      }\n" +
         "    }\n" +
-        "    const index_t offset = GetOffsetOptimized<CapType::ept>(indices...);\n" +
+        "    const stride_type offset = GetOffsetOptimized<CapType::ept>(indices...);\n" +
         "    if constexpr (CapType::ept == detail::ElementsPerThread::ONE) {\n" +
         "      return ldata_[offset];\n" +
         "    } else if constexpr (EPT_int * sizeof(T) <= MAX_VEC_WIDTH_BYTES ) {\n" +
@@ -671,7 +756,7 @@ __MATX_INLINE__ std::string make_jit_tensor_struct_str(
         "        return dummy_;\n" +
         "      }\n" +
         "    }\n" +
-        "    const index_t offset = GetOffsetOptimized<CapType::ept>(indices...);\n" +
+        "    const stride_type offset = GetOffsetOptimized<CapType::ept>(indices...);\n" +
         "    if constexpr (CapType::ept == detail::ElementsPerThread::ONE) {\n" +
         "      return ldata_[offset];\n" +
         "    } else {\n" +

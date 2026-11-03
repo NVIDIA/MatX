@@ -85,7 +85,7 @@ namespace matx
         }
 
         __MATX_INLINE__ std::string get_jit_class_name() const {
-          return "JITCastOp";
+          return "JITCastOp" + detail::jit_shape_suffix(*this);
         }
 
         __MATX_INLINE__ auto get_jit_op_str() const {
@@ -108,9 +108,12 @@ namespace matx
                 "  template <typename CapType, typename... Is>\n" +
                 "  __MATX_INLINE__ __MATX_DEVICE__ decltype(auto) operator()(Is... indices) const\n" +
                 "  {\n" +
+                // Threads past the end of the data can call this operator in some kernels. Check the index this operator
+                // received, not threadIdx.x, so the check also holds when a parent operator such as kron, repmat, or
+                // concat remaps indices into a child with a different size.
                 (actual_rank > 0 ?
                 "    if constexpr (!CapType::pass_through_threads) {\n"
-                "      if ((threadIdx.x * static_cast<int>(CapType::ept)) > Size(Rank_ - 1)) {\n"
+                "      if (static_cast<index_t>(pp_get<Rank_ - 1>(indices...)) * static_cast<index_t>(CapType::ept) >= Size(Rank_ - 1)) {\n"
                 "        return detail::GetJitSentinelValue<CapType, value_type>();\n"
                 "      }\n"
                 "    }\n" : "") +
@@ -170,10 +173,7 @@ namespace matx
           }
           else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
 #ifdef MATX_EN_JIT
-            const auto [key, value] = get_jit_op_str();
-            if (in.find(key) == in.end()) {
-              in[key] = value;
-            }
+            detail::register_jit_class(in, *this);
             detail::get_operator_capability<Cap>(op_, in);
             return true;
 #else
@@ -250,7 +250,7 @@ namespace matx
         }
 
         __MATX_INLINE__ std::string get_jit_class_name() const {
-          return "JITComplexCastOp";
+          return "JITComplexCastOp" + detail::jit_shape_suffix(*this);
         }
 
         __MATX_INLINE__ auto get_jit_op_str() const {
@@ -273,9 +273,12 @@ namespace matx
                 "  template <typename CapType, typename... Is>\n" +
                 "  __MATX_INLINE__ __MATX_DEVICE__ auto operator()(Is... indices) const\n" +
                 "  {\n" +
+                // Threads past the end of the data can call this operator in some kernels. Check the index this operator
+                // received, not threadIdx.x, so the check also holds when a parent operator such as kron, repmat, or
+                // concat remaps indices into a child with a different size.
                 (actual_rank > 0 ?
                 "    if constexpr (!CapType::pass_through_threads) {\n"
-                "      if ((threadIdx.x * static_cast<int>(CapType::ept)) > Size(Rank() - 1)) {\n"
+                "      if (static_cast<index_t>(pp_get<Rank() - 1>(indices...)) * static_cast<index_t>(CapType::ept) >= Size(Rank() - 1)) {\n"
                 "        return detail::GetJitSentinelValue<CapType, value_type>();\n"
                 "      }\n"
                 "    }\n" : "") +
@@ -351,10 +354,7 @@ namespace matx
           }
           else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
 #ifdef MATX_EN_JIT
-            const auto [key, value] = get_jit_op_str();
-            if (in.find(key) == in.end()) {
-              in[key] = value;
-            }
+            detail::register_jit_class(in, *this);
             detail::get_operator_capability<Cap>(real_op_, in);
             detail::get_operator_capability<Cap>(imag_op_, in);
             return true;

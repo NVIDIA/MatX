@@ -307,3 +307,36 @@ TYPED_TEST(OperatorTestsNumericAllExecsWithoutJIT, ShiftOperatorAmount)
 
   MATX_EXIT_HANDLER();
 }
+
+TYPED_TEST(OperatorTestsNumericAllExecs, ShiftDifferentSizesInOneExpression)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  ExecType exec{};
+
+  // Shifts of inputs with different sizes can appear in the same expression
+  const index_t na = 8;
+  const index_t nb = 16;
+  auto a = make_tensor<TestType>({na});
+  auto b = make_tensor<TestType>({nb});
+  auto out = make_tensor<TestType>({na + nb});
+  for (index_t i = 0; i < na; i++) {
+    a(i) = static_cast<detail::value_promote_t<TestType>>(i);
+  }
+  for (index_t i = 0; i < nb; i++) {
+    b(i) = static_cast<detail::value_promote_t<TestType>>(na + i);
+  }
+
+  (out = concat(0, shift<0>(a, -3), shift<0>(b, -3))).run(exec);
+  exec.sync();
+
+  for (index_t i = 0; i < na; i++) {
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(out(i), a((i + 3) % na)));
+  }
+  for (index_t i = 0; i < nb; i++) {
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(out(na + i), b((i + 3) % nb)));
+  }
+
+  MATX_EXIT_HANDLER();
+}

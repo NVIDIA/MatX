@@ -227,7 +227,12 @@ public:
         return false;
       }
 
-      ttl *= Size(i);
+      if (i > 0) {
+        if (ttl != 0 && Size(i) > cuda::std::numeric_limits<stride_type>::max() / ttl) {
+          return false;
+        }
+        ttl *= static_cast<stride_type>(Size(i));
+      }
     }
 
     return true;
@@ -240,12 +245,14 @@ public:
    *    The size of all dimensions combined. Note that this does not include the
    *    size of the data type itself, but only the product of the lengths of each dimension
    */
-  constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto TotalSize() const noexcept
+  constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto TotalSize() const
   {
     // The stride_type is expected to be able to hold this without overflowing
     stride_type size = 1;
     for (int i = 0; i < RANK; i++) {
-      size *= Size(i);
+      MATX_ASSERT_STR(size == 0 || Size(i) <= cuda::std::numeric_limits<stride_type>::max() / size,
+                      matxInvalidSize, "Tensor size cannot be represented by stride_type");
+      size *= static_cast<stride_type>(Size(i));
     }
     return size;
   }
@@ -271,7 +278,9 @@ public:
 
     MATX_LOOP_UNROLL
     for (int i = RANK - 2; i >= 0; i--) {
-      *(stride_.begin() + i) = Stride(i+1) * Size(i+1);
+      MATX_ASSERT_STR(Size(i+1) <= cuda::std::numeric_limits<stride_type>::max() / Stride(i+1),
+                      matxInvalidSize, "Tensor stride cannot be represented by stride_type");
+      *(stride_.begin() + i) = Stride(i+1) * static_cast<stride_type>(Size(i+1));
     }
 
   }
@@ -365,9 +374,9 @@ template <index_t I, index_t... Is>
 class static_tensor_desc_t {
 public:
   using shape_container = cuda::std::array<index_t, sizeof...(Is) + 1>;  ///< Type trait of shape type
-  using stride_container = cuda::std::array<index_t, sizeof...(Is) + 1>; ///< Type trait of stride type
+  using stride_container = cuda::std::array<offset_t, sizeof...(Is) + 1>; ///< Type trait of stride type
   using shape_type  = index_t; ///< Type trait of shape container
-  using stride_type = index_t; ///< Type trait of stride container
+  using stride_type = offset_t; ///< Type trait of stride container
   using matx_descriptor = bool; ///< Type trait to indicate this is a tensor descriptor
   using matx_static_descriptor = bool; ///< Type trait to indicate this is a static tensor descriptor
 
@@ -426,8 +435,14 @@ public:
    *
    * @return Product of all sizes
    */
-  static constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto TotalSize() {
-      return (I * ... * Is);
+  static constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto TotalSize()
+  {
+    static_assert(sizes_fit());
+    offset_t total = 1;
+    for (const auto dim : make_shape()) {
+      total *= static_cast<offset_t>(dim);
+    }
+    return total;
   }
 
 private:
@@ -435,13 +450,25 @@ private:
       return cuda::std::array{I, Is...};
   }
 
+  static constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ bool sizes_fit() {
+      offset_t total = 1;
+      for (const auto dim : make_shape()) {
+        if (dim <= 0 || dim > cuda::std::numeric_limits<offset_t>::max() / total) {
+          return false;
+        }
+        total *= static_cast<offset_t>(dim);
+      }
+      return true;
+  }
+
   static constexpr __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ auto make_strides(){
-      cuda::std::array<index_t, 1 + sizeof...(Is)> m{};
+      static_assert(sizes_fit());
+      cuda::std::array<offset_t, 1 + sizeof...(Is)> m{};
       const auto shape = make_shape();
       m[m.size()-1] = 1;
       if constexpr (m.size() > 1) {
         for (int i = static_cast<int>(m.size())-2; i >= 0; i--) {
-            m[i] = m[i+1] * shape[i + 1];
+            m[i] = m[i+1] * static_cast<offset_t>(shape[i + 1]);
         }
       }
       return m;
@@ -461,7 +488,7 @@ using tensor_desc_cr_ds_t =
                   RANK>;
 
 /**
- * @brief 32-bit size and stride descriptor
+ * @brief 32-bit size and 32-bit stride descriptor
  *
  * @tparam RANK Rank of shape
  */
@@ -470,7 +497,7 @@ using tensor_desc_cr_ds_32_32_t =
     tensor_desc_cr_ds_t<int32_t, int32_t, RANK>;
 
 /**
- * @brief 64-bit size and stride descriptor
+ * @brief 64-bit size and 64-bit stride descriptor
  *
  * @tparam RANK Rank of shape
  */
@@ -487,25 +514,32 @@ template <int RANK>
 using tensor_desc_cr_ds_32_64_t =
     tensor_desc_cr_ds_t<int32_t, long long int, RANK>;
 
+
+/**
+ * @brief 64-bit size and 32-bit stride descriptor
+ *
+ * @tparam RANK Rank of shape
+ */
+template <int RANK>
+using tensor_desc_cr_ds_64_32_t =
+  tensor_desc_cr_ds_t<long long int, int32_t, RANK>;
+
 /**
  * @brief index_t size and stride descriptor
  *
  * @tparam RANK Rank of shape
  */
 template <int RANK>
-using tensor_desc_cr_disi_dist = tensor_desc_cr_ds_t<index_t, index_t, RANK>;
+using tensor_desc_cr_disi_dist =
+  tensor_desc_cr_ds_t<index_t, offset_t, RANK>;
 
 /**
- * @brief Default descriptor type
+ * @brief Default descriptor using the configured size and stride types
  *
  * @tparam RANK Rank of shape
  */
-#ifdef MATX_INDEX_32_BIT
-  template <int RANK>
-  using DefaultDescriptor = tensor_desc_cr_ds_32_32_t<RANK>;
-#else
-  template <int RANK>
-  using DefaultDescriptor = tensor_desc_cr_ds_64_64_t<RANK>;
-#endif
+template <int RANK>
+using DefaultDescriptor = tensor_desc_cr_disi_dist<RANK>;
+
 
 }; // namespace matx

@@ -154,7 +154,7 @@ namespace matx {
       fprintf(fp, "%s{%s} Rank: %d, Sizes:[", type.c_str(), detail::GetTensorTypeString<typename Op::value_type>().c_str(), op.Rank());
       for (index_t dimIdx = 0; dimIdx < op.Rank(); dimIdx++)
       {
-        fprintf(fp, "%" MATX_INDEX_T_FMT, op.Size(static_cast<int>(dimIdx)) );
+        fprintf(fp, "%" PRId64, static_cast<int64_t>(op.Size(static_cast<int>(dimIdx))) );
         if( dimIdx < (op.Rank() - 1) )
           fprintf(fp, ", ");
       }
@@ -180,7 +180,7 @@ namespace matx {
         {
           for (index_t dimIdx = 0; dimIdx < (op.Rank() ); dimIdx++ )
           {
-            fprintf(fp, "%" MATX_INDEX_T_FMT, op.Stride(static_cast<int>(dimIdx)) );
+            fprintf(fp, "%" PRId64, static_cast<int64_t>(op.Stride(static_cast<int>(dimIdx))) );
             if( dimIdx < (op.Rank() - 1) )
             {
               fprintf(fp, ",");

@@ -66,7 +66,8 @@ namespace matx
         }
 
         __MATX_INLINE__ std::string get_jit_class_name() const {
-          return std::format("JITLCollapse_dim{}_size{}", DIM, size_);
+          // The input sizes are compiled into the generated code, so collapses of different inputs need distinct names
+          return std::format("JITLCollapse_dim{}_size{}_in", DIM, size_) + detail::jit_shape_suffix(op_, detail::get_dyn_rank(op_));
         }
 
         __MATX_INLINE__ auto get_jit_op_str() const {
@@ -275,10 +276,7 @@ namespace matx
           }
           else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
 #ifdef MATX_EN_JIT
-            const auto [key, value] = get_jit_op_str();
-            if (in.find(key) == in.end()) {
-              in[key] = value;
-            }
+            detail::register_jit_class(in, *this);
             detail::get_operator_capability<Cap>(op_, in);
             return true;
 #else
@@ -354,7 +352,8 @@ namespace matx
         }
 
         __MATX_INLINE__ std::string get_jit_class_name() const {
-          return std::format("JITRCollapse_dim{}_size{}", DIM, size_);
+          // The input sizes are compiled into the generated code, so collapses of different inputs need distinct names
+          return std::format("JITRCollapse_dim{}_size{}_in", DIM, size_) + detail::jit_shape_suffix(op_, detail::get_dyn_rank(op_));
         }
 
         __MATX_INLINE__ auto get_jit_op_str() const {
@@ -567,10 +566,7 @@ MATX_LOOP_UNROLL
           }
           else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
 #ifdef MATX_EN_JIT
-            const auto [key, value] = get_jit_op_str();
-            if (in.find(key) == in.end()) {
-              in[key] = value;
-            }
+            detail::register_jit_class(in, *this);
             detail::get_operator_capability<Cap>(op_, in);
             return true;
 #else

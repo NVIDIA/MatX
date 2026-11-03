@@ -146,4 +146,39 @@ __MATX_INLINE__ void CheckTestTensorCoreTypeSupport() {
   }
 }
 
+/**
+ * @brief Number of visible CUDA devices, or 0 when CUDA reports an error
+ *
+ * Clears the error so later CUDA checks in the test do not report it.
+ */
+inline int CudaDeviceCount() {
+  int device_count = 0;
+  if (cudaGetDeviceCount(&device_count) != cudaSuccess) {
+    cudaGetLastError();
+    return 0;
+  }
+  return device_count;
+}
+
+/**
+ * @brief Create a driver API context on a device and make it current, as an
+ * application that manages its own contexts would. Destroy it with cuCtxDestroy.
+ */
+inline CUcontext CreateDriverContext(int device) {
+  CUcontext ctx = nullptr;
+#if CUDA_VERSION >= 13000
+  MATX_CUDA_DRIVER_CHECK(cuCtxCreate(&ctx, nullptr, 0, device));
+#else
+  MATX_CUDA_DRIVER_CHECK(cuCtxCreate(&ctx, 0, device));
+#endif
+  return ctx;
+}
+
+/** @brief The calling thread's current context, or nullptr if none is current */
+inline CUcontext CurrentDriverContext() {
+  CUcontext ctx = nullptr;
+  MATX_CUDA_DRIVER_CHECK(cuCtxGetCurrent(&ctx));
+  return ctx;
+}
+
 } // end namespace matx

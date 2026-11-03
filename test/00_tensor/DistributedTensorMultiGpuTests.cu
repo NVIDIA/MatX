@@ -81,7 +81,7 @@ void FillMultiGpu(Distributed &tensor, Generator &&generator) {
           distribution.LocalToGlobal(fragment.distribution_index, {i});
       host[static_cast<size_t>(i)] = generator(global[0]);
     }
-    matx::detail::distributed_device_guard guard{fragment.endpoint.device_id};
+    matx::detail::CudaDeviceGuard guard{fragment.endpoint.device_id};
     MATX_CUDA_CHECK(cudaMemcpy(tensor.LocalView(local).Data(), host.data(),
                                host.size() * sizeof(float), cudaMemcpyDefault));
   }
@@ -141,7 +141,7 @@ TEST(DistributedTensorMultiGpu, BlackScholesUnevenFragments) {
   executor.sync();
   EXPECT_EQ(executor.TransferCount(), 0U);
 
-  matx::detail::distributed_device_guard destination_guard{0};
+  matx::detail::CudaDeviceGuard destination_guard{0};
   auto gathered = make_tensor<float>({count}, MATX_DEVICE_MEMORY);
   (gathered = output).run(executor);
   executor.sync();
@@ -203,7 +203,7 @@ TEST(DistributedTensorMultiGpu, BatchedMatmulEightGpuSharded) {
         }
       }
     }
-    matx::detail::distributed_device_guard guard{fragment.endpoint.device_id};
+    matx::detail::CudaDeviceGuard guard{fragment.endpoint.device_id};
     MATX_CUDA_CHECK(cudaMemcpy(a.LocalView(local).Data(), host_a.data(),
                                elements * sizeof(float), cudaMemcpyDefault));
     MATX_CUDA_CHECK(cudaMemcpy(b.LocalView(local).Data(), host_b.data(),
@@ -220,7 +220,7 @@ TEST(DistributedTensorMultiGpu, BatchedMatmulEightGpuSharded) {
     const size_t elements =
         static_cast<size_t>(shape[0] * shape[1] * shape[2]);
     std::vector<float> host(elements);
-    matx::detail::distributed_device_guard guard{fragment.endpoint.device_id};
+    matx::detail::CudaDeviceGuard guard{fragment.endpoint.device_id};
     MATX_CUDA_CHECK(cudaMemcpy(host.data(), output.LocalView(local).Data(),
                                elements * sizeof(float), cudaMemcpyDefault));
     for (index_t batch = 0; batch < shape[0]; ++batch) {
@@ -292,7 +292,7 @@ TEST(DistributedTensorMultiGpu, BatchedCholTwoGpuSharded) {
             root * root;
       }
     }
-    matx::detail::distributed_device_guard guard{fragment.endpoint.device_id};
+    matx::detail::CudaDeviceGuard guard{fragment.endpoint.device_id};
     MATX_CUDA_CHECK(cudaMemcpy(input.LocalView(local).Data(), host.data(),
                                elements * sizeof(float), cudaMemcpyDefault));
   }
@@ -307,7 +307,7 @@ TEST(DistributedTensorMultiGpu, BatchedCholTwoGpuSharded) {
     const size_t elements =
         static_cast<size_t>(shape[0] * shape[1] * shape[2]);
     std::vector<float> host(elements);
-    matx::detail::distributed_device_guard guard{fragment.endpoint.device_id};
+    matx::detail::CudaDeviceGuard guard{fragment.endpoint.device_id};
     MATX_CUDA_CHECK(cudaMemcpy(host.data(), output.LocalView(local).Data(),
                                elements * sizeof(float), cudaMemcpyDefault));
     for (index_t batch = 0; batch < shape[0]; ++batch) {
@@ -374,7 +374,7 @@ TEST(DistributedTensorMultiGpu, BatchedFftEightGpuSharded) {
           complex_type{static_cast<float>(global[0] + 1),
                        -static_cast<float>(global[0] + 1)};
     }
-    matx::detail::distributed_device_guard guard{fragment.endpoint.device_id};
+    matx::detail::CudaDeviceGuard guard{fragment.endpoint.device_id};
     MATX_CUDA_CHECK(cudaMemcpy(input.LocalView(local).Data(), host.data(),
                                host.size() * sizeof(complex_type),
                                cudaMemcpyDefault));
@@ -406,7 +406,7 @@ TEST(DistributedTensorMultiGpu, BatchedFftEightGpuSharded) {
     const auto shape = distribution.LocalShape(fragment.distribution_index);
     std::vector<complex_type> first_bins(static_cast<size_t>(shape[0]));
     std::vector<complex_type> last_bins(static_cast<size_t>(shape[0]));
-    matx::detail::distributed_device_guard guard{fragment.endpoint.device_id};
+    matx::detail::CudaDeviceGuard guard{fragment.endpoint.device_id};
     const size_t row_bytes =
         static_cast<size_t>(fft_size) * sizeof(complex_type);
     MATX_CUDA_CHECK(cudaMemcpy2D(
@@ -512,7 +512,7 @@ TEST(DistributedTensorMultiGpu, LargePointwiseEightGpu) {
     const auto &fragment = values.LocalFragment(local);
     const index_t local_size = values.LocalView(local).Size(0);
     float samples[2]{};
-    matx::detail::distributed_device_guard guard{fragment.endpoint.device_id};
+    matx::detail::CudaDeviceGuard guard{fragment.endpoint.device_id};
     MATX_CUDA_CHECK(cudaMemcpy(&samples[0], values.LocalView(local).Data(),
                                sizeof(float), cudaMemcpyDefault));
     MATX_CUDA_CHECK(cudaMemcpy(&samples[1],

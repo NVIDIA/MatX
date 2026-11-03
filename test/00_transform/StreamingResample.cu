@@ -317,8 +317,9 @@ TEST(StreamingResample, IdentityPassesSegmentsThrough)
 {
   cudaExecutor exec{};
   SingleThreadedHostExecutor host_exec{};
-  for (auto [up, down, L] : {std::tuple<index_t, index_t, index_t>{1, 1, 41},
-                             {2, 2, 5}, {3, 3, 1}}) {
+  // Type every element: nvcc 12.x cannot deduce the list from the first one.
+  using Case = std::tuple<index_t, index_t, index_t>;
+  for (auto [up, down, L] : {Case{1, 1, 41}, Case{2, 2, 5}, Case{3, 3, 1}}) {
     run_identity_case(exec, up, down, L);
     run_identity_case(host_exec, up, down, L);
   }

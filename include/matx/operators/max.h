@@ -116,6 +116,8 @@ namespace detail {
         for (int r = 0; r < ORank; r++) {
           symbol_name += "_" + std::to_string(out_dims_[r]);
         }
+        // Whether the input needs scalar loads is compiled into the generated code, so it is part of the name
+        symbol_name += detail::get_operator_capability<OperatorCapability::GLOBAL_KERNEL>(a_) ? "_SL" : "_VL";
         return symbol_name;
       }
 
@@ -185,10 +187,7 @@ namespace detail {
 #ifdef MATX_EN_JIT
           static_assert(cuda::std::is_same_v<InType, std::unordered_map<std::string, std::string>>,
                         "JIT_CLASS_QUERY capability requires std::unordered_map<std::string, std::string> as input type");
-          const auto [key, value] = get_jit_op_str();
-          if (in.find(key) == in.end()) {
-            in[key] = value;
-          }
+          detail::register_jit_class(in, *this);
           detail::get_operator_capability<Cap>(a_, in);
           return true;
 #else

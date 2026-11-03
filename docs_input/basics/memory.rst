@@ -17,3 +17,28 @@ The memory type is typically chosen when creating a tensor with `make_tensor`. T
 immediately, but it is not guaranteed. The memory is guaranteed to be available before it used used, however.
 
 .. doxygenenum:: matxMemorySpace_t
+
+Internal device allocations
+---------------------------
+
+MatX requests ``MATX_ASYNC_DEVICE_MEMORY`` for internal device allocations such as
+transform workspaces and temporary outputs. On devices that support CUDA memory
+pools, these allocations use ``cudaMallocAsync`` and ``cudaFreeAsync`` with the
+associated CUDA stream.
+Memory pool support is queried once per device and cached across threads. When
+every visible device supports memory pools, MatX calls ``cudaMallocAsync``
+directly, and CUDA allocates from the pool of the stream's device. Otherwise MatX
+first finds the device that owns the allocation's stream, since that device's
+pool is used even when a different device is current, and checks its support.
+If the capability query fails, MatX logs a warning and uses the fallback below.
+
+When the stream's device reports ``cudaDevAttrMemoryPoolsSupported == 0``, MatX
+automatically falls back to ``cudaMalloc`` and ``cudaFree``, and allocates on the
+stream's device rather than the current device. This also applies to
+explicit requests for ``MATX_ASYNC_DEVICE_MEMORY`` through ``matxAlloc`` or
+``make_tensor``. No build option or application change is required. The fallback
+may synchronize and can be slower than stream-ordered allocation. Because
+``cudaMalloc`` is not stream-ordered, fallback allocations cannot be captured into
+a CUDA graph. A fallback allocation is recorded as ``MATX_DEVICE_MEMORY``, which
+is also the value returned by ``GetPointerKind``.
+Other CUDA allocation errors are still reported to the caller.

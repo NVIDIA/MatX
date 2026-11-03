@@ -129,22 +129,18 @@ namespace detail {
         vectors_shape_ = SolverShapeFromInput<RANK>(a_);
         values_shape_ = SolverVectorShapeFromMatrixShape<RANK>(vectors_shape_);
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
-        const int cc = GetComputeCapability();
-
         const index_t n = vectors_shape_[RANK - 1];
         // cuSolverDx HEEV is the dense Hermitian/symmetric eigensolver. HTEV is
         // the tridiagonal eigensolver and expects diagonal/off-diagonal storage.
         const auto eig_function = CUSOLVERDX_FUNCTION_HEEV;
         dx_heev_values_helper_.set_m(n);
         dx_heev_values_helper_.set_n(n);
-        dx_heev_values_helper_.set_cc(cc);
         dx_heev_values_helper_.set_function(eig_function);
         dx_heev_values_helper_.set_fill_mode(uplo_);
         dx_heev_values_helper_.set_job(CUSOLVERDX_JOB_NO_VECTORS);
 
         dx_heev_vectors_helper_.set_m(n);
         dx_heev_vectors_helper_.set_n(n);
-        dx_heev_vectors_helper_.set_cc(cc);
         dx_heev_vectors_helper_.set_function(eig_function);
         dx_heev_vectors_helper_.set_fill_mode(uplo_);
         dx_heev_vectors_helper_.set_job(CUSOLVERDX_JOB_OVERWRITE_VECTORS);
@@ -314,10 +310,6 @@ namespace detail {
       void AddJITProjectionClasses(std::unordered_map<std::string, std::string> &in) const
       {
         const std::string class_name = GetJITProjectionClassName<Component>();
-        if (in.find(class_name) != in.end()) {
-          return;
-        }
-
         std::string externs;
         std::string projection_body;
         if constexpr (Component == EIG_VALUES) {
@@ -332,7 +324,7 @@ namespace detail {
             " extern \"C\" __device__ void " + vectors_func_name + "(" + detail::type_to_string<a_value_type>() + "*, " + detail::type_to_string<w_value_type>() + "*, " + detail::type_to_string<a_value_type>() + "*, int*);\n";
           projection_body = dx_heev_vectors_helper_.GetHeevProjectionFuncStr(vectors_func_name, EIG_VECTORS, EIG_VALUES);
         }
-        in[class_name] =
+        const std::string definition =
           externs +
           " template <typename OpA, int Component> struct " + class_name + "  {\n"
           "  using solver_value_type = typename OpA::value_type;\n"
@@ -359,6 +351,7 @@ namespace detail {
           "    else { return a_.Size(dim); }\n"
           "  }\n"
           "};\n";
+        detail::register_jit_class(in, class_name, definition);
       }
 #endif
   };
