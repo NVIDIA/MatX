@@ -1117,10 +1117,9 @@ constexpr SarBpComputeType kSarBpAllComputeTypes[] = {
 // within a few ulps; the two kernel instantiations may contract floating-point
 // operations differently. A misaddressed sample changes a pixel by about one
 // sample's magnitude, far above the tolerance.
-TEST(SarBpAddressing, RowOffsetMatchesGenericAccessor)
+TYPED_TEST(SarBpTestDoubleType, RowOffsetMatchesGenericAccessor)
 {
   MATX_ENTER_HANDLER();
-  cudaExecutor exec{};
   using complex_t = SarBpAddressingInputs::complex_t;
   constexpr index_t IMAGE = SarBpAddressingInputs::IMAGE;
   SarBpAddressingInputs in;
@@ -1139,10 +1138,10 @@ TEST(SarBpAddressing, RowOffsetMatchesGenericAccessor)
     params.center_frequency = 9.6e9;
     params.del_r = SarBpAddressingInputs::DEL_R;
     (fast = experimental::sar_bp(zero_image, profiles, in.platform_positions, in.Voxels(),
-                                 in.range_to_mcp, params)).run(exec);
+                                 in.range_to_mcp, params)).run(this->exec);
     (generic = experimental::sar_bp(zero_image, conj(conj(profiles)), in.platform_positions, in.Voxels(),
-                                    in.range_to_mcp, params)).run(exec);
-    exec.sync();
+                                    in.range_to_mcp, params)).run(this->exec);
+    this->exec.sync();
     double max_mag = 0.0;
     bool finite = true;
     for (index_t i = 0; i < IMAGE; i++) {
@@ -1187,10 +1186,9 @@ TEST(SarBpAddressing, RowOffsetMatchesGenericAccessor)
 //   match the variable-z ones.
 // - TaylorFast synthesizes its phase, so it accepts either feature setting and
 //   produces the same image; FloatFloat without the feature throws.
-TEST(SarBpAddressing, SwathEdgesAndModes)
+TYPED_TEST(SarBpTestDoubleType, SwathEdgesAndModes)
 {
   MATX_ENTER_HANDLER();
-  cudaExecutor exec{};
   using complex_t = SarBpAddressingInputs::complex_t;
   constexpr index_t IMAGE = SarBpAddressingInputs::IMAGE;
   SarBpAddressingInputs in;
@@ -1206,11 +1204,11 @@ TEST(SarBpAddressing, SwathEdgesAndModes)
     auto op = experimental::sar_bp(zero_image, in.Profiles(), in.platform_positions, in.Voxels(),
                                    in.range_to_mcp, params);
     if (pixel_z_is_zero) {
-      (image = op.template props<PropSarBpPixelZIsZero>()).run(exec);
+      (image = op.template props<PropSarBpPixelZIsZero>()).run(this->exec);
     } else {
-      (image = op).run(exec);
+      (image = op).run(this->exec);
     }
-    exec.sync();
+    this->exec.sync();
   };
   // Every pixel sums at most NUM_PULSES unit-variance samples, so a sentinel
   // read shows up as a huge or non-finite pixel.
@@ -1263,8 +1261,8 @@ TEST(SarBpAddressing, SwathEdgesAndModes)
       EXPECT_LT(max_abs_diff(variable_z, zero_z), 1.0e-4 * max_mag);
       if (compute_type == SarBpComputeType::TaylorFast) {
         if (features == SarBpFeature::None) {
-          (taylor_without_feature = variable_z).run(exec);
-          exec.sync();
+          (taylor_without_feature = variable_z).run(this->exec);
+          this->exec.sync();
         } else {
           EXPECT_EQ(max_abs_diff(variable_z, taylor_without_feature), 0.0);
         }
