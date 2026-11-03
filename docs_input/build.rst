@@ -143,6 +143,19 @@ to compare common Numpy and Scipy results with MatX without reimplementing compl
 Both Google Test and pybind11 will be automatically downloaded by CPM when unit tests are enabled. If an offline copy of them exists, 
 ``CPM_USE_LOCAL_PACKAGES`` can be used to override the download. 
 
+The Python packages used to generate test vectors are listed in ``test/requirements.txt`` and can be installed with:
+
+.. code-block:: shell
+
+    pip install -r test/requirements.txt
+
+The solver (``test/00_solver``) and radar pipeline tests additionally require CuPy, which is not part of ``test/requirements.txt``
+because its package name depends on the CUDA major version. Install the package matching your CUDA version, for example:
+
+.. code-block:: shell
+
+    pip install cupy-cuda13x
+
 To build unit tests, pass the argument ``-DMATX_BUILD_TESTS=ON`` to CMake to configure the build environment, then issue:
 
 .. code-block:: shell

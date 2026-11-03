@@ -1,8 +1,13 @@
 #!/usr/bin/env python
 
+import os
+import shlex
+
 import hpccm
 from hpccm.building_blocks import gnu, mlnx_ofed, nvshmem, cmake
 from hpccm.primitives import baseimage
+
+TEST_REQUIREMENTS = os.path.join('..', 'test', 'requirements.txt')
 
 DOXYGEN_VER = "1.14.0"
 GDRCOPY_HOME = "/usr/local/gdrcopy"
@@ -90,18 +95,19 @@ pip_packages=[
     'breathe',
     'cupy-cuda13x',
     'hpccm',
-    'numpy',
     'pandas',
     'plotly==5.2.1',
     'pybind11',
-    'scipy',
     'sphinx',
     'sphinx_book_theme',
     'sphinx-rtd-theme'
 ]
 
+with open(TEST_REQUIREMENTS) as f:
+    test_pip_packages = [line.split('#')[0].strip() for line in f if line.split('#')[0].strip()]
+
 Stage0 += shell(commands=[
-    'pip3 --no-cache-dir install --break-system-packages --upgrade ' + ' '.join(pip_packages)
+    'pip3 --no-cache-dir install --break-system-packages --upgrade ' + ' '.join(map(shlex.quote, pip_packages + test_pip_packages))
 ])
 
 
