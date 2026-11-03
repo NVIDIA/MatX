@@ -54,9 +54,9 @@ namespace detail {
     private:
       typename detail::base_type_t<OpA> a_;
       SolverFillMode uplo_;
+      mutable uint8_t lifecycle_depth_ = 0;
       mutable detail::tensor_impl_t<typename OpA::value_type, OpA::Rank()> tmp_out_;
       mutable typename OpA::value_type *ptr = nullptr;
-      mutable uint8_t lifecycle_depth_ = 0;
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
       mutable cuSolverDxHelper<typename OpA::value_type> dx_potrf_helper_;
 #endif
@@ -72,13 +72,10 @@ namespace detail {
       __MATX_INLINE__ CholOp(const OpA &a, SolverFillMode uplo) : a_(a), uplo_(uplo) {
         MATX_LOG_TRACE("{} constructor: uplo={}", str(), static_cast<int>(uplo));
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
-        const int cc = GetComputeCapability();
-
         if constexpr (OpA::Rank() >= 2) {
           dx_potrf_helper_.set_m(a_.Size(OpA::Rank() - 1));
           dx_potrf_helper_.set_n(a_.Size(OpA::Rank() - 1));
         }
-        dx_potrf_helper_.set_cc(cc);
         dx_potrf_helper_.set_function(CUSOLVERDX_FUNCTION_POTRF);
         dx_potrf_helper_.set_fill_mode(uplo_);
 #endif
@@ -163,10 +160,7 @@ namespace detail {
         }
         else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
 #ifdef MATX_EN_JIT
-          const auto [key, value] = get_jit_op_str();
-          if (in.find(key) == in.end()) {
-            in[key] = value;
-          }
+          detail::register_jit_class(in, *this);
           detail::get_operator_capability<Cap>(a_, in);
           return true;
 #else

@@ -34,6 +34,43 @@ TYPED_TEST(OperatorTestsFloatNonComplexNonHalfAllExecs, PolyVal)
   MATX_EXIT_HANDLER();
 }
 
+TYPED_TEST(OperatorTestsFloatNonComplexNonHalfAllExecs, PolyValDifferentSizesInOneExpression)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  ExecType exec{};
+
+  // Polyvals of inputs with different lengths can appear in the same expression
+  const index_t na = 5;
+  const index_t nb = 8;
+  auto a = make_tensor<TestType>({na});
+  auto b = make_tensor<TestType>({nb});
+  auto c = make_tensor<TestType>({3});
+  auto out = make_tensor<TestType>({na + nb});
+  for (index_t i = 0; i < na; i++) {
+    a(i) = static_cast<TestType>(i) * static_cast<TestType>(0.5);
+  }
+  for (index_t i = 0; i < nb; i++) {
+    b(i) = static_cast<TestType>(i) - static_cast<TestType>(4);
+  }
+  c.SetVals({2, -1, 3});
+
+  (out = concat(0, polyval(a, c), polyval(b, c))).run(exec);
+  exec.sync();
+
+  // The first coefficient is for the highest power: 2x^2 - x + 3
+  const auto expected = [](TestType x) { return static_cast<double>(2 * x * x - x + 3); };
+  for (index_t i = 0; i < na; i++) {
+    ASSERT_NEAR(static_cast<double>(out(i)), expected(a(i)), 1e-5) << "mismatch at index " << i;
+  }
+  for (index_t i = 0; i < nb; i++) {
+    ASSERT_NEAR(static_cast<double>(out(na + i)), expected(b(i)), 1e-5) << "mismatch at index " << na + i;
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
 // Verify polyval forwards PreRun/PostRun to both of its operands (input values
 // and coefficients) by wrapping each in a lifecycle probe.
 TYPED_TEST(OperatorTestsFloatNonComplexNonHalfAllExecsWithoutJIT, PolyValOperatorCoeffs)

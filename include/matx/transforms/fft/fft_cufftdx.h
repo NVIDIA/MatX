@@ -65,7 +65,6 @@ namespace matx {
       FFTDirection direction_;
       ElementsPerThread current_elements_per_thread_ = ElementsPerThread::INVALID;
       int ffts_per_block_ = 1;
-      int cc_;
       bool contiguous_input_;
       cuFFTDxMethod method_;
     public:
@@ -78,7 +77,10 @@ namespace matx {
       FFTDirection get_direction() const { return direction_; }
       ElementsPerThread get_current_elements_per_thread() const { return current_elements_per_thread_; }
       int get_ffts_per_block() const { return ffts_per_block_; }
-      int get_cc() const { return cc_; }
+      // Target compute capability, from the current device when it is needed.
+      // JIT kernels launch on the current device, which can differ from the
+      // device that was current when the operator was built.
+      int get_cc() const { return TryGetComputeCapability(); }
       bool get_contiguous_input() const { return contiguous_input_; }
       cuFFTDxMethod get_method() const { return method_; }
 
@@ -88,7 +90,6 @@ namespace matx {
       void set_direction(FFTDirection dir) { direction_ = dir; }
       void set_current_elements_per_thread(ElementsPerThread ept) { current_elements_per_thread_ = ept; }
       void set_ffts_per_block(int ffts_per_block) { ffts_per_block_ = ffts_per_block; }
-      void set_cc(int cc) { cc_ = cc; }
       void set_contiguous_input(bool contiguous_input) { contiguous_input_ = contiguous_input; }
       void set_method(cuFFTDxMethod method) { method_ = method; }
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
@@ -146,7 +147,7 @@ namespace matx {
         }
 
         // Compute capability to target
-        LIBMATHDX_CHECK(cufftdxSetOperatorInt64(h_, CUFFTDX_OPERATOR_SM, cc_));
+        LIBMATHDX_CHECK(cufftdxSetOperatorInt64(h_, CUFFTDX_OPERATOR_SM, get_cc()));
         return h_;
       }
 
@@ -158,7 +159,7 @@ namespace matx {
         symbol_name += "_D";
         symbol_name += std::to_string(static_cast<int>(direction_));
         symbol_name += "_CC";
-        symbol_name += std::to_string(cc_);
+        symbol_name += std::to_string(get_cc());
         symbol_name += "_E";
         symbol_name += std::to_string(static_cast<int>(current_elements_per_thread_));
         symbol_name += "_FPB";
@@ -181,7 +182,7 @@ namespace matx {
         std::cout << "fft_size_ = " << fft_size_ << std::endl;
         std::cout << "fft_type_ = " << static_cast<int>(fft_type_) << std::endl;
         std::cout << "direction_ = " << static_cast<int>(direction_) << std::endl;
-        std::cout << "cc_ = " << cc_ << std::endl;
+        std::cout << "cc = " << get_cc() << std::endl;
         std::cout << "current_elements_per_thread_ = " << static_cast<int>(current_elements_per_thread_) << std::endl;
         std::cout << "ffts_per_block_ = " << ffts_per_block_ << std::endl;
       }
@@ -292,7 +293,7 @@ namespace matx {
         commondxCode code;
         LIBMATHDX_CHECK(commondxCreateCode(&code));
 
-        LIBMATHDX_CHECK(commondxSetCodeOptionInt64(code, COMMONDX_OPTION_TARGET_SM, cc_));
+        LIBMATHDX_CHECK(commondxSetCodeOptionInt64(code, COMMONDX_OPTION_TARGET_SM, get_cc()));
         LIBMATHDX_CHECK(cufftdxFinalizeCode(code, handle));
 
         LIBMATHDX_CHECK(commondxGetCodeLTOIRSize(code, &ltoir.length));
@@ -443,7 +444,6 @@ namespace matx {
       index_t fft_size_y_ = 0;
       FFTType fft_type_ = FFTType::C2C;
       FFTDirection direction_ = FFTDirection::FORWARD;
-      int cc_ = 0;
       mutable cuFFTDxHelper<InputType> fft_x_helper_;
       mutable cuFFTDxHelper<InputType> fft_y_helper_;
       mutable bool helpers_configured_ = false;
@@ -465,7 +465,7 @@ namespace matx {
           return;
         }
 
-        if (fft_size_x_ <= 0 || fft_size_y_ <= 0 || cc_ <= 0) {
+        if (fft_size_x_ <= 0 || fft_size_y_ <= 0 || get_cc() <= 0) {
           return;
         }
 
@@ -473,7 +473,6 @@ namespace matx {
         fft_x_helper_.set_fft_type(fft_type_);
         fft_x_helper_.set_direction(direction_);
         fft_x_helper_.set_ffts_per_block(static_cast<int>(fft_size_y_));
-        fft_x_helper_.set_cc(cc_);
         fft_x_helper_.set_contiguous_input(false);
         fft_x_helper_.set_method(cuFFTDxMethod::SHARED);
 
@@ -481,7 +480,6 @@ namespace matx {
         fft_y_helper_.set_fft_type(fft_type_);
         fft_y_helper_.set_direction(direction_);
         fft_y_helper_.set_ffts_per_block(static_cast<int>(fft_size_x_));
-        fft_y_helper_.set_cc(cc_);
         fft_y_helper_.set_contiguous_input(false);
         fft_y_helper_.set_method(cuFFTDxMethod::SHARED);
         helpers_configured_ = true;
@@ -494,13 +492,15 @@ namespace matx {
       index_t get_fft_size_y() const { return fft_size_y_; }
       FFTType get_fft_type() const { return fft_type_; }
       FFTDirection get_direction() const { return direction_; }
-      int get_cc() const { return cc_; }
+      // Target compute capability, from the current device when it is needed.
+      // JIT kernels launch on the current device, which can differ from the
+      // device that was current when the operator was built.
+      int get_cc() const { return TryGetComputeCapability(); }
 
       void set_fft_size_x(index_t size) { fft_size_x_ = size; helpers_configured_ = false; }
       void set_fft_size_y(index_t size) { fft_size_y_ = size; helpers_configured_ = false; }
       void set_fft_type(FFTType type) { fft_type_ = type; helpers_configured_ = false; }
       void set_direction(FFTDirection dir) { direction_ = dir; helpers_configured_ = false; }
-      void set_cc(int cc) { cc_ = cc; helpers_configured_ = false; }
 
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
       std::string GetSymbolName() const {
@@ -513,7 +513,7 @@ namespace matx {
         symbol_name += "_D";
         symbol_name += std::to_string(static_cast<int>(direction_));
         symbol_name += "_CC";
-        symbol_name += std::to_string(cc_);
+        symbol_name += std::to_string(get_cc());
 
 #if defined(CUDA_VERSION)
         symbol_name += "_CUDA";

@@ -921,13 +921,13 @@ TYPED_TEST(FFTTestComplexTypes, FFT2D16R2C)
 
 #if defined(MATX_EN_JIT) && defined(MATX_EN_MATHDX)
 namespace {
-using FFT2JITComplex = cuda::std::complex<float>;
+using FFTJITComplex = cuda::std::complex<float>;
 
 void FillFFT2JITInput2D(auto &in, index_t fft_dim)
 {
   for (index_t row = 0; row < fft_dim; row++) {
     for (index_t col = 0; col < fft_dim; col++) {
-      in(row, col) = FFT2JITComplex{
+      in(row, col) = FFTJITComplex{
         static_cast<float>((row + 1) * (col + 2) % 17),
         static_cast<float>((2 * row + col) % 11)};
     }
@@ -939,7 +939,7 @@ void FillFFT2JITInput3D(auto &in, index_t batches, index_t fft_dim)
   for (index_t batch = 0; batch < batches; batch++) {
     for (index_t row = 0; row < fft_dim; row++) {
       for (index_t col = 0; col < fft_dim; col++) {
-        in(batch, row, col) = FFT2JITComplex{
+        in(batch, row, col) = FFTJITComplex{
           static_cast<float>((batch + 1) * (row + 2) + col),
           static_cast<float>((batch + row + 2 * col) % 13)};
       }
@@ -976,13 +976,13 @@ TEST(FFTJIT, CuFFTDx2DFFT2Fusion)
 
   constexpr index_t fft_dim = 4;
 
-  auto in = make_tensor<FFT2JITComplex>({fft_dim, fft_dim});
-  auto jit_out = make_tensor<FFT2JITComplex>({fft_dim, fft_dim});
-  auto ref_out = make_tensor<FFT2JITComplex>({fft_dim, fft_dim});
+  auto in = make_tensor<FFTJITComplex>({fft_dim, fft_dim});
+  auto jit_out = make_tensor<FFTJITComplex>({fft_dim, fft_dim});
+  auto ref_out = make_tensor<FFTJITComplex>({fft_dim, fft_dim});
 
   FillFFT2JITInput2D(in, fft_dim);
 
-  auto expr = fft2(in) + FFT2JITComplex{1.0f, -1.0f};
+  auto expr = fft2(in) + FFTJITComplex{1.0f, -1.0f};
   if (!jit_supported(expr)) {
     GTEST_SKIP();
   }
@@ -990,7 +990,7 @@ TEST(FFTJIT, CuFFTDx2DFFT2Fusion)
   CUDAJITExecutor jit_exec{};
   cudaExecutor cuda_exec{};
   (jit_out = expr).run(jit_exec);
-  (ref_out = fft2(in) + FFT2JITComplex{1.0f, -1.0f}).run(cuda_exec);
+  (ref_out = fft2(in) + FFTJITComplex{1.0f, -1.0f}).run(cuda_exec);
   jit_exec.sync();
   cuda_exec.sync();
 
@@ -1005,13 +1005,13 @@ TEST(FFTJIT, CuFFTDx2DIFFT2Fusion)
 
   constexpr index_t fft_dim = 4;
 
-  auto in = make_tensor<FFT2JITComplex>({fft_dim, fft_dim});
-  auto jit_out = make_tensor<FFT2JITComplex>({fft_dim, fft_dim});
-  auto ref_out = make_tensor<FFT2JITComplex>({fft_dim, fft_dim});
+  auto in = make_tensor<FFTJITComplex>({fft_dim, fft_dim});
+  auto jit_out = make_tensor<FFTJITComplex>({fft_dim, fft_dim});
+  auto ref_out = make_tensor<FFTJITComplex>({fft_dim, fft_dim});
 
   FillFFT2JITInput2D(in, fft_dim);
 
-  auto expr = ifft2(in, FFTNorm::BACKWARD) * FFT2JITComplex{0.5f, 0.0f};
+  auto expr = ifft2(in, FFTNorm::BACKWARD) * FFTJITComplex{0.5f, 0.0f};
   if (!jit_supported(expr)) {
     GTEST_SKIP();
   }
@@ -1019,7 +1019,7 @@ TEST(FFTJIT, CuFFTDx2DIFFT2Fusion)
   CUDAJITExecutor jit_exec{};
   cudaExecutor cuda_exec{};
   (jit_out = expr).run(jit_exec);
-  (ref_out = ifft2(in, FFTNorm::BACKWARD) * FFT2JITComplex{0.5f, 0.0f}).run(cuda_exec);
+  (ref_out = ifft2(in, FFTNorm::BACKWARD) * FFTJITComplex{0.5f, 0.0f}).run(cuda_exec);
   jit_exec.sync();
   cuda_exec.sync();
 
@@ -1034,13 +1034,13 @@ TEST(FFTJIT, CuFFTDx2DFFT2OrthoBoundary)
 
   constexpr index_t fft_dim = 32;
 
-  auto in = make_tensor<FFT2JITComplex>({fft_dim, fft_dim});
-  auto jit_out = make_tensor<FFT2JITComplex>({fft_dim, fft_dim});
-  auto ref_out = make_tensor<FFT2JITComplex>({fft_dim, fft_dim});
+  auto in = make_tensor<FFTJITComplex>({fft_dim, fft_dim});
+  auto jit_out = make_tensor<FFTJITComplex>({fft_dim, fft_dim});
+  auto ref_out = make_tensor<FFTJITComplex>({fft_dim, fft_dim});
 
   FillFFT2JITInput2D(in, fft_dim);
 
-  auto expr = fft2(in, FFTNorm::ORTHO) - FFT2JITComplex{0.25f, 0.75f};
+  auto expr = fft2(in, FFTNorm::ORTHO) - FFTJITComplex{0.25f, 0.75f};
   if (!jit_supported(expr)) {
     GTEST_SKIP();
   }
@@ -1048,7 +1048,7 @@ TEST(FFTJIT, CuFFTDx2DFFT2OrthoBoundary)
   CUDAJITExecutor jit_exec{};
   cudaExecutor cuda_exec{};
   (jit_out = expr).run(jit_exec);
-  (ref_out = fft2(in, FFTNorm::ORTHO) - FFT2JITComplex{0.25f, 0.75f}).run(cuda_exec);
+  (ref_out = fft2(in, FFTNorm::ORTHO) - FFTJITComplex{0.25f, 0.75f}).run(cuda_exec);
   jit_exec.sync();
   cuda_exec.sync();
 
@@ -1064,13 +1064,13 @@ TEST(FFTJIT, CuFFTDx2DFFT2BatchedForwardNorm)
   constexpr index_t batches = 3;
   constexpr index_t fft_dim = 8;
 
-  auto in = make_tensor<FFT2JITComplex>({batches, fft_dim, fft_dim});
-  auto jit_out = make_tensor<FFT2JITComplex>({batches, fft_dim, fft_dim});
-  auto ref_out = make_tensor<FFT2JITComplex>({batches, fft_dim, fft_dim});
+  auto in = make_tensor<FFTJITComplex>({batches, fft_dim, fft_dim});
+  auto jit_out = make_tensor<FFTJITComplex>({batches, fft_dim, fft_dim});
+  auto ref_out = make_tensor<FFTJITComplex>({batches, fft_dim, fft_dim});
 
   FillFFT2JITInput3D(in, batches, fft_dim);
 
-  auto expr = fft2(in, FFTNorm::FORWARD) + FFT2JITComplex{0.125f, -0.5f};
+  auto expr = fft2(in, FFTNorm::FORWARD) + FFTJITComplex{0.125f, -0.5f};
   if (!jit_supported(expr)) {
     GTEST_SKIP();
   }
@@ -1078,11 +1078,49 @@ TEST(FFTJIT, CuFFTDx2DFFT2BatchedForwardNorm)
   CUDAJITExecutor jit_exec{};
   cudaExecutor cuda_exec{};
   (jit_out = expr).run(jit_exec);
-  (ref_out = fft2(in, FFTNorm::FORWARD) + FFT2JITComplex{0.125f, -0.5f}).run(cuda_exec);
+  (ref_out = fft2(in, FFTNorm::FORWARD) + FFTJITComplex{0.125f, -0.5f}).run(cuda_exec);
   jit_exec.sync();
   cuda_exec.sync();
 
   AssertFFT2JITClose3D(jit_out, ref_out, batches, fft_dim, 0.01f);
+
+  MATX_EXIT_HANDLER();
+}
+
+TEST(FFTJIT, CuFFTDxTensorAndOperatorInputsInOneExpression)
+{
+  MATX_ENTER_HANDLER();
+
+  // FFTs of a tensor and of an operator expression with the same size can appear in the same expression
+  constexpr index_t batches = 2;
+  constexpr index_t fft_dim = 16;
+
+  auto in = make_tensor<FFTJITComplex>({batches, fft_dim});
+  auto jit_out = make_tensor<FFTJITComplex>({batches});
+  auto ref_out = make_tensor<FFTJITComplex>({batches});
+
+  for (index_t i = 0; i < batches; i++) {
+    for (index_t j = 0; j < fft_dim; j++) {
+      in(i, j) = FFTJITComplex{static_cast<float>(i + j), static_cast<float>(j % 3)};
+    }
+  }
+
+  auto expr = sum(fft(in) + fft(in * FFTJITComplex{2.0f, 0.0f}), {1});
+  if (!jit_supported(expr)) {
+    GTEST_SKIP();
+  }
+
+  CUDAJITExecutor jit_exec{};
+  cudaExecutor cuda_exec{};
+  (jit_out = expr).run(jit_exec);
+  (ref_out = sum(fft(in) + fft(in * FFTJITComplex{2.0f, 0.0f}), {1})).run(cuda_exec);
+  jit_exec.sync();
+  cuda_exec.sync();
+
+  for (index_t i = 0; i < batches; i++) {
+    ASSERT_NEAR(jit_out(i).real(), ref_out(i).real(), 0.01f);
+    ASSERT_NEAR(jit_out(i).imag(), ref_out(i).imag(), 0.01f);
+  }
 
   MATX_EXIT_HANDLER();
 }

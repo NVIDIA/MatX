@@ -369,13 +369,7 @@ namespace matx
           }
           else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
 #ifdef MATX_EN_JIT
-          // Get the key/value pair from get_jit_op_str()
-          const auto [key, value] = get_jit_op_str();
-          
-          // Insert into the map if the key doesn't exist
-          if (in.find(key) == in.end()) {
-            in[key] = value;
-          }
+          detail::register_jit_class(in, *this);
           
           // Also handle child operators
           cuda::std::apply([&in](const auto&... ops) {

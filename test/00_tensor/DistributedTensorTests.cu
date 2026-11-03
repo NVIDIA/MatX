@@ -112,7 +112,7 @@ void FillDistributed(Distributed &tensor, Generator &&generator) {
           distribution.LocalToGlobal(fragment.distribution_index, local_index);
       host[static_cast<size_t>(linear)] = generator(global_index);
     }
-    matx::detail::distributed_device_guard guard{fragment.endpoint.device_id};
+    matx::detail::CudaDeviceGuard guard{fragment.endpoint.device_id};
     MATX_CUDA_CHECK(cudaMemcpy(tensor.LocalView(local).Data(), host.data(),
                                host.size() * sizeof(host[0]),
                                cudaMemcpyDefault));
@@ -364,6 +364,40 @@ TEST(DistributedTensor, MaterializesToStridedRegularView) {
     EXPECT_FLOAT_EQ(device_result[static_cast<size_t>(2 * i)],
                     10.0F + static_cast<float>(i));
     EXPECT_FLOAT_EQ(device_result[static_cast<size_t>(2 * i + 1)], -1.0F);
+  }
+}
+
+TEST(DistributedTensor, CustomDescriptorMemoryOffset) {
+  using Desc = tensor_desc_cr_ds_64_64_t<2>;
+  const long long wide = 1LL << 32;
+  const Desc desc{cuda::std::array<long long, 2>{3, 4},
+                  cuda::std::array<long long, 2>{wide, 1}};
+  const distributed_index_t<2> index{2, 3};
+  const auto offset = matx::experimental::detail::DistributedMemoryOffset(desc, index);
+  static_assert(std::is_same_v<decltype(offset), const long long>);
+  EXPECT_EQ(offset, 2 * wide + 3);
+}
+
+TEST(DistributedTensor, MaterializesToCustomDescriptor) {
+  distributed_context context{{0}};
+  distributedCUDAExecutor executor{context};
+  auto distribution = block_distribution_t<1>::Slab({17}, {{0, 0}});
+  auto source = make_distributed_tensor<float>(distribution, context);
+  FillDistributed(source, [](const auto &index) {
+    return 10.0F + static_cast<float>(index[0]);
+  });
+  auto storage = make_tensor<float>({34}, MATX_HOST_MEMORY);
+  for (index_t i = 0; i < storage.Size(0); ++i) {
+    storage(i) = -1.0F;
+  }
+  using Desc = tensor_desc_cr_ds_64_64_t<1>;
+  auto destination = make_tensor(storage.Data(),
+      Desc{cuda::std::array<long long, 1>{17}, cuda::std::array<long long, 1>{2}});
+  (destination = source).run(executor);
+  executor.sync();
+  for (index_t i = 0; i < 17; ++i) {
+    EXPECT_FLOAT_EQ(storage(2 * i), 10.0F + static_cast<float>(i));
+    EXPECT_FLOAT_EQ(storage(2 * i + 1), -1.0F);
   }
 }
 

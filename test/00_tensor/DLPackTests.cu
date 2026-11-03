@@ -40,6 +40,45 @@
 
 using namespace matx;
 
+TEST(DLPackMetadata, LogicalCountUsesIndexWidth)
+{
+  DLTensor dt{};
+  int64_t dims[]{65536, 65536};
+  int64_t input_strides[]{65536, 1};
+  dt.shape = dims;
+  dt.strides = input_strides;
+  index_t shape[2]{};
+  offset_t strides[2]{};
+  if constexpr (sizeof(index_t) == 4 || sizeof(offset_t) == 4) {
+    EXPECT_THROW((detail::dlpack_shape_and_strides<tensor_t<int, 2>>(dt, shape, strides)),
+                 detail::matxException);
+  }
+  else {
+    EXPECT_EQ((detail::dlpack_shape_and_strides<tensor_t<int, 2>>(dt, shape, strides)),
+              uint64_t{1} << 32);
+  }
+}
+
+TEST(DLPackMetadata, SmallLogicalCountAllowsWideMemorySpan)
+{
+  if constexpr (sizeof(offset_t) == 8 && sizeof(size_t) == 8) {
+    DLTensor dt{};
+    int64_t dims[]{2, 1};
+    int64_t input_strides[]{int64_t{1} << 32, 1};
+    dt.shape = dims;
+    dt.strides = input_strides;
+    index_t shape[2]{};
+    offset_t strides[2]{};
+    EXPECT_EQ((detail::dlpack_shape_and_strides<tensor_t<int, 2>>(dt, shape, strides)),
+              (uint64_t{1} << 32) + 1);
+    EXPECT_EQ(shape[0], 2);
+    EXPECT_EQ(static_cast<int64_t>(strides[0]), int64_t{1} << 32);
+  }
+  else {
+    GTEST_SKIP() << "Requires 64-bit offsets and storage sizes";
+  }
+}
+
 template <typename T>
 struct DLPackOwningImportContext {
   int *deleter_calls;
@@ -690,6 +729,15 @@ TYPED_TEST(DLPackTestsFloatNonComplex, OwningImportRejectsInvalidShapeMetadata)
     SetManagedTensorShapeAndStrides<TestType>(
         dl, {std::numeric_limits<index_t>::max(), 2}, {2, 1});
 
+    tensor_t<TestType, 2> t;
+    ASSERT_THROW({ make_tensor(t, dl); }, matx::detail::matxException);
+    ASSERT_EQ(deleter_calls, 1);
+  }
+
+  if constexpr (sizeof(index_t) == 4) {
+    int deleter_calls = 0;
+    auto *dl = MakeManagedTensorForOwningImportTest<TestType>(&deleter_calls, 4);
+    SetManagedTensorShapeAndStrides<TestType>(dl, {65536, 65536}, {65536, 1});
     tensor_t<TestType, 2> t;
     ASSERT_THROW({ make_tensor(t, dl); }, matx::detail::matxException);
     ASSERT_EQ(deleter_calls, 1);

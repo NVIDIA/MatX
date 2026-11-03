@@ -274,6 +274,14 @@ void sparse_matmul_impl(TensorTypeC &C, const TensorTypeA &a,
                         const TensorTypeB &B, const cudaExecutor &exec,
                         float alpha = 1.0, float beta = 0.0) {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+  // cuSPARSE's mixed-precision SpMM algorithms do not support CSC.
+  // Keep this check active in release builds, before allocating temporaries
+  // or constructing a cuSPARSE plan.
+  if constexpr (TensorTypeA::Format::isCSC() &&
+                is_matx_half_v<typename TensorTypeA::value_type>) {
+    MATX_THROW(matxNotSupported,
+               "Half-precision CSC SpMM is not supported by cuSPARSE; use COO or CSR");
+  }
   const auto stream = exec.getStream();
 
   // Transform into supported form.

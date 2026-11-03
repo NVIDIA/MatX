@@ -516,7 +516,7 @@ TEST(TensorStats, CubBlockJIT)
   (ndiv_max_out = max(ndiv_in, {2})).run(exec);
   (mixed_out = sum(in, {2}) + fftshift1D(shift_in) + 5.0f).run(exec);
   auto scan_op = cumsum(in);
-  auto scan_ept_query = detail::EPTQueryInput{true};
+  auto scan_ept_query = detail::EPTQueryInput{true, detail::GetCurrentDeviceAttributes()};
   const auto scan_ept_bounds =
       detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(scan_op, scan_ept_query);
   EXPECT_GT(static_cast<int>(scan_ept_bounds[1]), 1);

@@ -89,7 +89,8 @@ namespace matx
             sizes_str += std::to_string(sizes_[i]);
             if (i < Rank() - 1) sizes_str += "_";
           }
-          return "JITReshape_sizes" + sizes_str;
+          // The input sizes are compiled into the generated code, so reshapes of different inputs need distinct names
+          return "JITReshape_sizes" + sizes_str + "_in" + detail::jit_shape_suffix(op_, detail::get_dyn_rank(op_));
         }
 
         __MATX_INLINE__ auto get_jit_op_str() const {
@@ -244,10 +245,7 @@ MATX_LOOP_UNROLL
           }
           else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
 #ifdef MATX_EN_JIT
-            const auto [key, value] = get_jit_op_str();
-            if (in.find(key) == in.end()) {
-              in[key] = value;
-            }
+            detail::register_jit_class(in, *this);
             detail::get_operator_capability<Cap>(op_, in);
             return true;
 #else

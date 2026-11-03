@@ -48,7 +48,7 @@ namespace matx
     {
       private:
         mutable typename detail::base_type_t<Op> op_;
-        mutable Coeffs coeffs_;
+        mutable typename detail::base_type_t<Coeffs> coeffs_;
 
       public:
         using matxop = bool;
@@ -63,7 +63,7 @@ namespace matx
 #ifdef MATX_EN_JIT
         struct JIT_Storage {
           typename detail::inner_storage_or_self_t<detail::base_type_t<Op>> op_;
-          typename detail::inner_storage_or_self_t<Coeffs> coeffs_;
+          typename detail::inner_storage_or_self_t<detail::base_type_t<Coeffs>> coeffs_;
         };
 
         JIT_Storage ToJITStorage() const {
@@ -71,7 +71,8 @@ namespace matx
         }
 
         __MATX_INLINE__ std::string get_jit_class_name() const {
-          return std::format("JITPolyval_ncoeffs{}", coeffs_.Size(0));
+          // The input length is compiled into the generated code, so polyvals of different lengths need distinct names
+          return std::format("JITPolyval_ncoeffs{}", coeffs_.Size(0)) + detail::jit_shape_suffix(*this);
         }
 
         __MATX_INLINE__ auto get_jit_op_str() const {
@@ -199,10 +200,7 @@ namespace matx
           }
           else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
 #ifdef MATX_EN_JIT
-            const auto [key, value] = get_jit_op_str();
-            if (in.find(key) == in.end()) {
-              in[key] = value;
-            }
+            detail::register_jit_class(in, *this);
             detail::get_operator_capability<Cap>(op_, in);
             detail::get_operator_capability<Cap>(coeffs_, in);
             return true;

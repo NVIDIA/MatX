@@ -59,7 +59,7 @@ namespace detail {
       using out_t = get_property_or<PropOutput, default_out_t, CurrentProps...>::type;
       static_assert(is_complex_v<out_t>, "Output type of channelize_poly must be complex");
       typename detail::base_type_t<OpA> a_;
-      FilterType f_;
+      typename detail::base_type_t<FilterType> f_;
       index_t num_channels_;
       index_t decimation_factor_;
       cuda::std::array<index_t, OpA::Rank() + 1> out_dims_;
@@ -125,10 +125,10 @@ namespace detail {
         // due to the IFFT, but the filtering that is applied prior to the IFFT can be either real or complex.
         using accum_type = get_property_or<PropAccum, typename inner_op_type_t<value_type>::type, CurrentProps...>::type;
         if constexpr (is_cuda_executor_v<Executor>) {
-          channelize_poly_impl<decltype(cuda::std::get<0>(out)), decltype(a_), FilterType, accum_type>(
+          channelize_poly_impl<decltype(cuda::std::get<0>(out)), decltype(a_), decltype(f_), accum_type>(
             cuda::std::get<0>(out), a_, f_, num_channels_, decimation_factor_, ex.getStream());
         } else {
-          channelize_poly_impl<decltype(cuda::std::get<0>(out)), decltype(a_), FilterType, accum_type>(
+          channelize_poly_impl<decltype(cuda::std::get<0>(out)), decltype(a_), decltype(f_), accum_type>(
             cuda::std::get<0>(out), a_, f_, num_channels_, decimation_factor_, ex);
         }
       }

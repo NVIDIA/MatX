@@ -40,6 +40,7 @@
 #include <vector>
 
 #include "matx/core/error.h"
+#include "matx/core/resource_guard.h"
 #include "matx/executors/cuda.h"
 
 namespace matx {
@@ -132,38 +133,6 @@ private:
   std::shared_ptr<const state_t> state_;
 };
 
-namespace detail {
-
-class distributed_device_guard {
-public:
-  explicit distributed_device_guard(int device) {
-    MATX_CUDA_CHECK(cudaGetDevice(&previous_));
-    if (previous_ != device) {
-      MATX_CUDA_CHECK(cudaSetDevice(device));
-      changed_ = true;
-    }
-  }
-
-  distributed_device_guard(const distributed_device_guard &) = delete;
-  distributed_device_guard &
-  operator=(const distributed_device_guard &) = delete;
-
-  ~distributed_device_guard() {
-    if (changed_) {
-      // Destructors must not throw. Log and drain the sticky error here
-      // instead of letting a failure to restore the original device leak
-      // into an unrelated later call.
-      MATX_CUDA_CHECK_NOEXCEPT(cudaSetDevice(previous_));
-    }
-  }
-
-private:
-  int previous_ = 0;
-  bool changed_ = false;
-};
-
-} // namespace detail
-
 /**
  * Experimental single-process, multi-GPU executor.
  *
@@ -180,7 +149,7 @@ public:
     try {
       streams_.reserve(context_.LocalDevices().size());
       for (int device : context_.LocalDevices()) {
-        detail::distributed_device_guard guard{device};
+        detail::CudaDeviceGuard guard{device};
         cudaStream_t stream{};
         MATX_CUDA_CHECK(
             cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking));
@@ -231,13 +200,13 @@ public:
   void ForEndpoint(const distributed_endpoint_t &endpoint,
                    Callable &&callable) const {
     auto local_executor = LocalExecutor(endpoint);
-    detail::distributed_device_guard guard{endpoint.device_id};
+    detail::CudaDeviceGuard guard{endpoint.device_id};
     callable(local_executor);
   }
 
   void sync() {
     for (const auto &entry : streams_) {
-      detail::distributed_device_guard guard{entry.device_id};
+      detail::CudaDeviceGuard guard{entry.device_id};
       MATX_CUDA_CHECK(cudaStreamSynchronize(entry.stream));
     }
   }

@@ -49,10 +49,10 @@ namespace detail {
       typename detail::base_type_t<OpA> a_;
       cuda::std::array<FilterType, NR> h_rec_;
       cuda::std::array<FilterType, NNR> h_nonrec_;
+      mutable uint8_t lifecycle_depth_ = 0;
       cuda::std::array<index_t, OpA::Rank()> out_dims_;
       mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, OpA::Rank()> tmp_out_;
       mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr;
-      mutable uint8_t lifecycle_depth_ = 0;
 
     public:
       using matxop = bool;

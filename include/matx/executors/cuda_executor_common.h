@@ -34,6 +34,7 @@
 #include <cuda_runtime.h>
 #include "matx/core/capabilities.h"
 #include "matx/core/defines.h"
+#include "matx/core/device_attributes.h"
 #include "matx/core/get_grid_dims.h"
 #include "matx/executors/kernel.h"
 #include "matx/core/log.h"
@@ -312,6 +313,13 @@ namespace detail
     };
   }
 
+  // Declared in core/operator_options.h. Host dispatch may select a 32B vector
+  // width on CC100+, but 256b instructions are only generated when the binary
+  // contains an sm_100+ device image.
+  inline EPTQueryInput::EPTQueryInput(bool jit_query, const DeviceAttributes &attrs)
+      : jit(jit_query),
+        max_vec_width_bytes(attrs.ComputeCapability() >= 1000 ? 32 : MAX_VEC_WIDTH_BYTES) {}
+
   /**
    * Find the best launch parameters by testing EPT values for optimal occupancy
    *
@@ -333,26 +341,22 @@ namespace detail
     // Get device properties for constraints
     constexpr int min_occupancy = 2;
     int groups_per_block = 1;
-    int max_default_shared_memory_per_block, max_optin_shared_memory_per_block, max_shared_memory_per_multiprocessor;
-    int max_threads_per_block, regs_per_multiprocessor;
-    int dev;
-    MATX_CUDA_CHECK(cudaGetDevice(&dev));
-    MATX_CUDA_CHECK(cudaDeviceGetAttribute(&max_default_shared_memory_per_block, cudaDevAttrMaxSharedMemoryPerBlock, dev));
-    MATX_CUDA_CHECK(cudaDeviceGetAttribute(&max_optin_shared_memory_per_block, cudaDevAttrMaxSharedMemoryPerBlockOptin, dev));
-    MATX_CUDA_CHECK(cudaDeviceGetAttribute(&max_shared_memory_per_multiprocessor, cudaDevAttrMaxSharedMemoryPerMultiprocessor, dev));
-    MATX_CUDA_CHECK(cudaDeviceGetAttribute(&max_threads_per_block, cudaDevAttrMaxThreadsPerBlock, dev));
-    MATX_CUDA_CHECK(cudaDeviceGetAttribute(&regs_per_multiprocessor, cudaDevAttrMaxRegistersPerMultiprocessor, dev));
+    const auto &dev_attrs = GetCurrentDeviceAttributes();
+    const int max_default_shared_memory_per_block = dev_attrs.max_smem_per_block;
+    const int max_optin_shared_memory_per_block = dev_attrs.max_smem_per_block_optin;
+    const int max_shared_memory_per_multiprocessor = dev_attrs.max_smem_per_sm;
+    const int regs_per_multiprocessor = dev_attrs.max_regs_per_sm;
     const int max_total_shared_memory_per_block =
       max_optin_shared_memory_per_block > max_default_shared_memory_per_block ?
       max_optin_shared_memory_per_block : max_default_shared_memory_per_block;
 
-    const auto jit_query_in = detail::EPTQueryInput{use_jit};
+    const EPTQueryInput jit_query_in{use_jit, dev_attrs};
     auto ept_bounds = detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(op, jit_query_in);
 
     // If we don't need async loads we don't want ILP to be higher than an individual vector load
     bool async_loads_requested = detail::get_operator_capability<detail::OperatorCapability::ASYNC_LOADS_REQUESTED>(op);
     if (!async_loads_requested) {
-      int max_vec_load = detail::get_operator_capability<detail::OperatorCapability::MAX_EPT_VEC_LOAD>(op);
+      int max_vec_load = detail::get_operator_capability<detail::OperatorCapability::MAX_EPT_VEC_LOAD>(op, jit_query_in);
       ept_bounds[1] = static_cast<detail::ElementsPerThread>(cuda::std::min(static_cast<int>(ept_bounds[1]), max_vec_load));
       MATX_LOG_DEBUG("Async loads not needed. Max EPT for vector load: {}", max_vec_load);
     }

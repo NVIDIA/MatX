@@ -311,3 +311,41 @@ TEST(OperatorValidationTests, PadInvalidAxis)
 
   MATX_EXIT_HANDLER();
 }
+
+TYPED_TEST(OperatorTestsFloatNonComplexAllExecs, PadDifferentSizesInOneExpression)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using ExecType = cuda::std::tuple_element_t<1, TypeParam>;
+  ExecType exec{};
+
+  // Pads of inputs with different sizes can appear in the same expression
+  const index_t na = 8;
+  const index_t nb = 16;
+  const TestType pad_value = TestType{-1};
+  auto a = make_tensor<TestType>({na});
+  auto b = make_tensor<TestType>({nb});
+  auto out = make_tensor<TestType>({na + nb + 4});
+  for (index_t i = 0; i < na; i++) {
+    a(i) = static_cast<TestType>(i);
+  }
+  for (index_t i = 0; i < nb; i++) {
+    b(i) = static_cast<TestType>(na + i);
+  }
+
+  (out = concat(0, pad(a, 0, {1, 1}, pad_value), pad(b, 0, {1, 1}, pad_value))).run(exec);
+  exec.sync();
+
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(out(0), pad_value));
+  for (index_t i = 0; i < na; i++) {
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(out(1 + i), a(i)));
+  }
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(out(na + 1), pad_value));
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(out(na + 2), pad_value));
+  for (index_t i = 0; i < nb; i++) {
+    EXPECT_TRUE(MatXUtils::MatXTypeCompare(out(na + 3 + i), b(i)));
+  }
+  EXPECT_TRUE(MatXUtils::MatXTypeCompare(out(na + nb + 3), pad_value));
+
+  MATX_EXIT_HANDLER();
+}

@@ -34,12 +34,17 @@
 #include <pybind11/embed.h>
 
 #include "matx.h"
+#include "jit_class_name_check.h"
 
 int main(int argc, char **argv) 
 {
   printf("Running MatX unit tests. Press Ctrl+\\ (SIGQUIT) to kill tests\n");
 
   ::testing::InitGoogleTest(&argc, argv);
+#ifdef MATX_EN_JIT
+  // Fail any test whose JIT launches reuse a class name or cache key for different code
+  matx::InstallJITClassNameCheck();
+#endif
   const int result = RUN_ALL_TESTS();
 
   matx::ClearCachesAndAllocations();

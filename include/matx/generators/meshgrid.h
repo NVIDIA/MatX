@@ -43,7 +43,7 @@ namespace matx
     template <typename T1, int RANK, int AXIS> 
       class MeshGridOp : public BaseOp<MeshGridOp<T1, RANK, AXIS>> {
         private:
-          mutable T1 t1_;
+          mutable typename detail::base_type_t<T1> t1_;
           cuda::std::array<index_t, RANK> shape_;
           int idx_;
 
@@ -53,7 +53,7 @@ namespace matx
 
 #ifdef MATX_EN_JIT
           struct JIT_Storage {
-            typename detail::inner_storage_or_self_t<T1> t1_;
+            typename detail::inner_storage_or_self_t<detail::base_type_t<T1>> t1_;
           };
 
           JIT_Storage ToJITStorage() const {
@@ -136,10 +136,7 @@ namespace matx
           }
           else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
 #ifdef MATX_EN_JIT
-              const auto [key, value] = get_jit_op_str();
-              if (in.find(key) == in.end()) {
-                in[key] = value;
-              }
+              detail::register_jit_class(in, *this);
               detail::get_operator_capability<Cap>(t1_, in);
               return true;
 #else

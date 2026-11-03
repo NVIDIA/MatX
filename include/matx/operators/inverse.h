@@ -67,15 +67,12 @@ namespace detail {
       __MATX_INLINE__ InvOp(const OpA &a) : a_(a) {
         MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
-        const int cc = GetComputeCapability();
-
         if constexpr (OpA::Rank() >= 2) {
           const index_t n = a_.Size(OpA::Rank() - 1);
           dx_solver_helper_.set_m(n);
           dx_solver_helper_.set_n(n);
           dx_solver_helper_.set_k(n);
         }
-        dx_solver_helper_.set_cc(cc);
         if constexpr (ALGO == MAT_INVERSE_ALGO_POSV) {
           dx_solver_helper_.set_function(CUSOLVERDX_FUNCTION_POSV);
           dx_solver_helper_.set_fill_mode(SolverFillMode::LOWER);
@@ -170,10 +167,7 @@ namespace detail {
         }
         else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
 #ifdef MATX_EN_JIT
-          const auto [key, value] = get_jit_op_str();
-          if (in.find(key) == in.end()) {
-            in[key] = value;
-          }
+          detail::register_jit_class(in, *this);
           detail::get_operator_capability<Cap>(a_, in);
           return true;
 #else

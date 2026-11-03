@@ -46,6 +46,14 @@ namespace matx {
     #define MATX_INDEX_T_FMT "lld"
 #endif
 
+#ifdef MATX_OFFSET_32_BIT
+    using offset_t = int32_t;
+    #define MATX_OFFSET_T_FMT "d"
+#else
+    using offset_t = long long int;
+    #define MATX_OFFSET_T_FMT "lld"
+#endif
+
 // By default, MatX opts out of additional handling of NaNs and infinite values
 // in complex multiplication and division. These checks are defined in Annex G
 // as an optional part of the C11 standard, but are not specified in the C++

@@ -3,7 +3,7 @@
 Tensor Type
 ###########
 
-A tensor in MatX ``tensor_t``` is a memory-backed, reference-counted operator that contains metadata about the 
+A tensor in MatX ``tensor_t`` is a memory-backed, reference-counted operator that contains metadata about the
 size, rank, and other properties. The type of memory can be anything that is accessible to where the tensor is 
 being used, including device memory, managed memory, and host memory. MatX tensors are very similar to NumPy's 
 `ndarray` type in that common operations like slicing and cloning can be performed on them. Since MatX tensors 
@@ -24,5 +24,5 @@ needed for device code.
 For information on creating tensors, please see :ref:`creating` or :ref:`quickstart` for common usage.
 For information on experimental sparse tensor support, please see :ref:`sparse_tensor_api`.
 
-.. doxygenclass:: matx::tensor_t
-    :members:
+For the public methods, including inherited methods such as ``IsContiguous()``,
+see :ref:`tensor_methods`.

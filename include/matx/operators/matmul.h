@@ -62,12 +62,12 @@ namespace matx
         float alpha_;
         float beta_;
         PermDims perm_;
+        mutable uint8_t lifecycle_depth_ = 0;
         static constexpr int out_rank = cuda::std::max(OpA::Rank(), OpB::Rank());
         cuda::std::array<index_t, out_rank> out_dims_;
         // This should be tensor_impl_t, but need to work around issues with temp types returned in matmul
         mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, out_rank> tmp_out_;
         mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr;
-        mutable uint8_t lifecycle_depth_ = 0;
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
         mutable cuBLASDxHelper<typename OpA::value_type> dx_gemm_helper_;
 #endif
@@ -101,14 +101,9 @@ namespace matx
 
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
         __MATX_INLINE__ std::string get_jit_class_name() const {
-          std::string symbol_name = "JITMatMulOp_";
-          symbol_name += std::to_string(dx_gemm_helper_.get_m());
-          symbol_name += "_";
-          symbol_name += std::to_string(dx_gemm_helper_.get_n());
-          symbol_name += "_";
-          symbol_name += std::to_string(dx_gemm_helper_.get_k());
-          symbol_name += dx_gemm_helper_.get_is_complex() ? "_C" : "_R";
-          return symbol_name;
+          // The GEMM symbol (sizes, precision, and target) and alpha and beta are compiled into the generated code
+          return "JITMatMulOp_" + dx_gemm_helper_.GetSymbolName() + "_a" + detail::number_to_symbol(alpha_) + "_b" +
+                 detail::number_to_symbol(beta_) + detail::jit_shape_suffix(*this);
         }
 
         __MATX_INLINE__ auto get_jit_op_str() const {
@@ -185,12 +180,9 @@ namespace matx
           // m = rows of output (from A's second-to-last dim)
           // n = cols of output (from B's last dim)
           // k = inner dimension (A's last dim = B's second-to-last dim)
-          const int cc = GetComputeCapability();  // Compute capability as __CUDA_ARCH__ digits (e.g., 890 for SM 8.9)
-
           dx_gemm_helper_.set_m(a_.Size(OpA::Rank() - 2));
           dx_gemm_helper_.set_n(b_.Size(OpB::Rank() - 1));
           dx_gemm_helper_.set_k(a_.Size(OpA::Rank() - 1));
-          dx_gemm_helper_.set_cc(cc);
           dx_gemm_helper_.set_is_complex(is_complex_v<typename OpA::value_type>);
 #endif
         }
@@ -244,12 +236,7 @@ namespace matx
           }
           else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
             // Get the capability string and add to map
-            const auto [key, value] = get_jit_op_str();
-
-            // Insert into the map if the key doesn't exist
-            if (in.find(key) == in.end()) {
-              in[key] = value;
-            }
+            detail::register_jit_class(in, *this);
 
             // Also handle child operators
             detail::get_operator_capability<Cap>(a_, in);

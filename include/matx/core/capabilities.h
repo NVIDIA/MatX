@@ -63,6 +63,16 @@ namespace detail {
     int block_size;
   };
 
+  // Version of the on-disk JIT cache. Bump it when generated JIT code changes in a way that makes
+  // entries cached by older versions unusable, such as a JIT_Storage layout change.
+  inline constexpr int JIT_CACHE_VERSION = 2;
+
+  // Tag hashed into every on-disk JIT cache entry (kernels and launch metadata), whether keyed by
+  // JIT_CACHE_KEY or by type string
+  __MATX_INLINE__ __MATX_HOST__ std::string JITCacheVersionTag() {
+    return "matx_jit_cache_key_v" + std::to_string(JIT_CACHE_VERSION);
+  }
+
   struct JITCacheKey {
     uint64_t h1 = 14695981039346656037ull;
     uint64_t h2 = 1099511628211ull;
@@ -78,6 +88,42 @@ namespace detail {
       return static_cast<std::size_t>(key.h1 ^ (key.h2 + 0x9e3779b97f4a7c15ull + (key.h1 << 6) + (key.h1 >> 2)));
     }
   };
+
+  /**
+   * @brief Registers a JIT class definition under its class name
+   *
+   * Kernels are cached by the names of the classes they use, and each name is compiled once, so a class name
+   * must determine every value compiled into its definition. Registering a second, different definition under
+   * an existing name means the name is missing one of those values, so this throws instead of letting one
+   * operator run with another's code.
+   *
+   * @param classes Map from class name to definition being collected for one expression
+   * @param name Class name
+   * @param definition Generated class definition
+   */
+  template <typename ClassMap>
+  __MATX_INLINE__ __MATX_HOST__ void register_jit_class(ClassMap &classes, const std::string &name,
+                                                        const std::string &definition) {
+    const auto [it, inserted] = classes.try_emplace(name, definition);
+    if (!inserted && it->second != definition) {
+      MATX_THROW(matxInvalidParameter,
+                 std::format("JIT class {} has two different definitions, so its name is missing a value that is "
+                             "compiled into it", name));
+    }
+  }
+
+  /**
+   * @brief Registers the JIT class definition that an operator generates under its class name
+   *
+   * @param classes Map from class name to definition being collected for one expression
+   * @param op Operator whose get_jit_op_str() returns its class name and definition
+   */
+  template <typename ClassMap, typename Op>
+    requires requires(const Op &o) { o.get_jit_op_str(); }
+  __MATX_INLINE__ __MATX_HOST__ void register_jit_class(ClassMap &classes, const Op &op) {
+    const auto [name, definition] = op.get_jit_op_str();
+    register_jit_class(classes, name, definition);
+  }
 
   __MATX_INLINE__ __MATX_HOST__ JITCacheKey MakeInvalidJITCacheKey() {
     return {};
@@ -125,7 +171,7 @@ namespace detail {
     static const auto base_key = []() {
       auto key = JITCacheKey{};
       key.valid = true;
-      HashJITCacheString(key, "matx_jit_cache_key_v1");
+      HashJITCacheString(key, JITCacheVersionTag());
       HashJITCacheType<T>(key);
       return key;
     }();
@@ -387,7 +433,7 @@ namespace detail {
   template <>
   struct capability_attributes<OperatorCapability::MAX_EPT_VEC_LOAD> {
     using type = int;
-    using input_type = VoidCapabilityType;
+    using input_type = EPTQueryInput;
     static constexpr int default_value = 32;
     static constexpr int min_identity = 32;
     static constexpr int max_identity = 1;

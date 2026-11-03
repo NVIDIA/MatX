@@ -123,11 +123,8 @@ namespace detail {
         factors_shape_ = SolverShapeFromInput<RANK>(a_);
         piv_shape_ = SolverVectorShapeFromMatrixShape<RANK>(factors_shape_);
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
-        const int cc = GetComputeCapability();
-
         dx_lu_helper_.set_m(factors_shape_[RANK - 2]);
         dx_lu_helper_.set_n(factors_shape_[RANK - 1]);
-        dx_lu_helper_.set_cc(cc);
         dx_lu_helper_.set_function(CUSOLVERDX_FUNCTION_GETRF_PARTIAL_PIVOT);
 #endif
       }
@@ -275,12 +272,8 @@ namespace detail {
       void AddJITProjectionClasses(std::unordered_map<std::string, std::string> &in) const
       {
         const std::string class_name = GetJITProjectionClassName<Component>();
-        if (in.find(class_name) != in.end()) {
-          return;
-        }
-
         const std::string solver_func_name = std::string(SOLVER_DX_FUNC_PREFIX) + "_" + dx_lu_helper_.GetSymbolName();
-        in[class_name] =
+        const std::string definition =
           " extern \"C\" __device__ void " + solver_func_name + "(" + detail::type_to_string<a_value_type>() + "*, int*, int*);\n"
           " template <typename OpA, int Component> struct " + class_name + "  {\n"
           "  using solver_value_type = typename OpA::value_type;\n"
@@ -308,6 +301,7 @@ namespace detail {
           "    else { return a_.Size(dim); }\n"
           "  }\n"
           "};\n";
+        detail::register_jit_class(in, class_name, definition);
       }
 #endif
   };

@@ -36,6 +36,44 @@
 
 using namespace matx;
 
+TEST(TensorAccessor, CustomDescriptorStrideWidth)
+{
+    using Desc = tensor_desc_cr_ds_64_64_t<2>;
+    const long long wide = 1LL << 32;
+    int data[]{3, 4, 5, 6};
+    auto t = make_tensor(data, Desc{cuda::std::array<long long, 2>{1, 4},
+                                   cuda::std::array<long long, 2>{wide, 1}});
+    detail::TensorAccessor<decltype(t), true> acc(t);
+    static_assert(cuda::std::is_same_v<decltype(acc.outer_strides_[0]), long long &>);
+    EXPECT_EQ(acc.outer_strides_[0], wide);
+    EXPECT_EQ(acc(0, 3), 6);
+    detail::BoundAccessor<decltype(t), true, 1> bound(acc, 0);
+    bound(2) = 19;
+    EXPECT_EQ(data[2], 19);
+
+    int padded[16]{};
+    auto rows = make_tensor(padded, Desc{cuda::std::array<long long, 2>{2, 4},
+                                        cuda::std::array<long long, 2>{8, 1}});
+    detail::TensorAccessor<decltype(rows), true> row_acc(rows);
+    row_acc.bind(1)(3) = 27;
+    EXPECT_EQ(padded[11], 27);
+    detail::TensorAccessor<decltype(rows), true, int32_t> narrow_acc(rows);
+    EXPECT_EQ(narrow_acc(1, 3), 27);
+
+    using NarrowDesc = tensor_desc_cr_ds_32_32_t<2>;
+    auto narrow_rows = make_tensor(padded,
+        NarrowDesc{cuda::std::array<int32_t, 2>{2, 4},
+                   cuda::std::array<int32_t, 2>{8, 1}});
+    detail::TensorAccessor<decltype(narrow_rows), true> default_narrow_acc(narrow_rows);
+    static_assert(cuda::std::is_same_v<decltype(default_narrow_acc.outer_strides_[0]), int32_t &>);
+    EXPECT_EQ(default_narrow_acc.bind(1)(3), 27);
+
+    auto computed = zeros<int>({2, 4});
+    static_assert(cuda::std::is_same_v<detail::accessor_offset_type_t<decltype(computed)>, offset_t>);
+    detail::TensorAccessor<decltype(computed), false> computed_acc(computed);
+    EXPECT_EQ(computed_acc.bind(1)(3), 0);
+}
+
 // ---- Fast path ----------------------------------------------------------
 
 TEST(TensorAccessor, FastPathRank1)

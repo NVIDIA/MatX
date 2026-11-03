@@ -22,7 +22,8 @@ set(examples
     qr
     black_scholes
     print_styles
-    streaming)
+    streaming
+    window_functions)
 
 
 

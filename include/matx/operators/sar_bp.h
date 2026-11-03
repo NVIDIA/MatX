@@ -192,11 +192,11 @@ namespace detail {
     private:
       using out_t = typename detail::base_type_t<ImageType>;
       SarBpParams params_;
-      ImageType initial_image_;
-      RangeProfilesType range_profiles_;
-      PlatPosType platform_positions_;
-      VoxLocType voxel_locations_;
-      RangeToMcpType range_to_mcp_;
+      typename detail::base_type_t<ImageType> initial_image_;
+      typename detail::base_type_t<RangeProfilesType> range_profiles_;
+      typename detail::base_type_t<PlatPosType> platform_positions_;
+      typename detail::base_type_t<VoxLocType> voxel_locations_;
+      typename detail::base_type_t<RangeToMcpType> range_to_mcp_;
       cuda::std::array<index_t, RangeProfilesType::Rank()> out_dims_;
       mutable detail::tensor_impl_t<out_t, RangeProfilesType::Rank()> tmp_out_;
       mutable out_t *ptr = nullptr;
@@ -347,7 +347,8 @@ namespace detail {
       template <typename... NewProps>
       constexpr auto props() const {
         using AllProps = typename merge_props_unique<type_list<CurrentProps...>, NewProps...>::type;
-        return make_sar_bp_op<ImageType, RangeProfilesType, PlatPosType, VoxLocType, RangeToMcpType, AllProps>::make(
+        return make_sar_bp_op<decltype(initial_image_), decltype(range_profiles_), decltype(platform_positions_),
+                              decltype(voxel_locations_), decltype(range_to_mcp_), AllProps>::make(
           initial_image_, range_profiles_, platform_positions_, voxel_locations_, range_to_mcp_, params_);
       }
 

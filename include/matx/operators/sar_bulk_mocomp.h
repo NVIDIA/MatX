@@ -409,10 +409,7 @@ private:
     } else if constexpr (Cap ==
                          matx::detail::OperatorCapability::JIT_CLASS_QUERY) {
 #ifdef MATX_EN_JIT
-      const auto [key, value] = get_jit_op_str();
-      if (in.find(key) == in.end()) {
-        in[key] = value;
-      }
+      ::matx::detail::register_jit_class(in, *this);
       matx::detail::get_operator_capability<Cap>(fx_, in);
       matx::detail::get_operator_capability<Cap>(range_offset_, in);
       return true;

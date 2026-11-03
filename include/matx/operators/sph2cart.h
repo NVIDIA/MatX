@@ -73,7 +73,7 @@ namespace matx
         }
 
         __MATX_INLINE__ std::string get_jit_class_name() const {
-          return std::format("JITSph2Cart_which{}", WHICH);
+          return std::format("JITSph2Cart_which{}", WHICH) + detail::jit_shape_suffix(*this);
         }
 
         __MATX_INLINE__ auto get_jit_op_str() const {
@@ -235,10 +235,7 @@ namespace matx
           }
           else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
 #ifdef MATX_EN_JIT
-            const auto [key, value] = get_jit_op_str();
-            if (in.find(key) == in.end()) {
-              in[key] = value;
-            }
+            detail::register_jit_class(in, *this);
             detail::get_operator_capability<Cap>(theta_, in);
             detail::get_operator_capability<Cap>(phi_, in);
             detail::get_operator_capability<Cap>(r_, in);

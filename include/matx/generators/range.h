@@ -60,12 +60,7 @@ namespace matx
         }
 
         __MATX_INLINE__ std::string get_jit_class_name() const {
-          auto float_to_str = [](auto v) {
-            std::string s = std::to_string(v);
-            std::replace(s.begin(), s.end(), '.', '_');
-            return s;
-          };
-          return "JITRange_first" + float_to_str(first_) + "_step" + float_to_str(step_);
+          return "JITRange_first" + number_to_symbol(first_) + "_step" + number_to_symbol(step_);
         }
 
         __MATX_INLINE__ auto get_jit_op_str() const {
@@ -139,10 +134,7 @@ MATX_IGNORE_WARNING_POP_GCC
           }
           else if constexpr (Cap == OperatorCapability::JIT_CLASS_QUERY) {
 #ifdef MATX_EN_JIT
-            const auto [key, value] = get_jit_op_str();
-            if (in.find(key) == in.end()) {
-              in[key] = value;
-            }
+            detail::register_jit_class(in, *this);
             return true;
 #else
             return false;
