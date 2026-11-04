@@ -142,6 +142,49 @@ TEST(TensorAccessor, FastPathWriteThrough)
     }
 }
 
+// outer_stride() and at_offset() on a padded column slice: the row stride is
+// the parent's width and the data pointer is offset by the slice start, and a
+// row offset carried across rows reaches the same elements as operator().
+TEST(TensorAccessor, FastPathOuterStrideAndAtOffset)
+{
+    auto exec = cudaExecutor{};
+    auto t = make_tensor<int>({4, 12});
+    (t = 12 * range<0>({4, 12}, 0, 1) + range<1>({4, 12}, 0, 1)).run(exec);
+    exec.sync();
+    auto cols = slice(t, {0, 2}, {matxEnd, 10});
+    detail::TensorAccessor<decltype(cols), true> acc(cols);
+    ASSERT_EQ(acc.outer_stride(0), 12);
+    index_t row_offset = 0;
+    for (index_t r = 0; r < 4; ++r, row_offset += acc.outer_stride(0)) {
+        for (index_t c = 0; c < 8; ++c) {
+            ASSERT_EQ(acc.at_offset(row_offset + c), acc(r, c));
+            ASSERT_EQ(acc.at_offset(row_offset + c), cols(r, c));
+        }
+    }
+
+    auto t3 = make_tensor<int>({3, 4, 5});
+    (t3 = 20 * range<0>({3, 4, 5}, 0, 1)
+            + 5 * range<1>({3, 4, 5}, 0, 1)
+            +     range<2>({3, 4, 5}, 0, 1)).run(exec);
+    exec.sync();
+    detail::TensorAccessor<decltype(t3), true> acc3(t3);
+    ASSERT_EQ(acc3.outer_stride(0), 20);
+    ASSERT_EQ(acc3.outer_stride(1), 5);
+    ASSERT_EQ(acc3.at_offset(2 * acc3.outer_stride(0) + 3 * acc3.outer_stride(1) + 4), t3(2, 3, 4));
+}
+
+// The offset accessors exist only on the fast path, which has a data pointer
+// and strides to expose. outer_stride() also needs an outer dimension.
+template <typename Acc>
+concept TensorAccessorHasAtOffset = requires(const Acc &a) { a.at_offset(0); };
+template <typename Acc>
+concept TensorAccessorHasOuterStride = requires(const Acc &a) { a.outer_stride(0); };
+static_assert(TensorAccessorHasAtOffset<detail::TensorAccessor<tensor_t<int, 2>, true>>);
+static_assert(TensorAccessorHasOuterStride<detail::TensorAccessor<tensor_t<int, 2>, true>>);
+static_assert(!TensorAccessorHasAtOffset<detail::TensorAccessor<tensor_t<int, 2>, false>>);
+static_assert(!TensorAccessorHasOuterStride<detail::TensorAccessor<tensor_t<int, 2>, false>>);
+static_assert(!TensorAccessorHasOuterStride<detail::TensorAccessor<tensor_t<int, 1>, true>>);
+
 // ---- Slow path ----------------------------------------------------------
 
 // IsUnitStride=false falls through to op_(indices...) regardless of the

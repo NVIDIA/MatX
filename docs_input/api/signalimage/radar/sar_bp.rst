@@ -17,6 +17,7 @@ namespace as its API is subject to change.
 .. doxygenstruct:: matx::PropSarBpPixelZIsFixed
 .. doxygenstruct:: matx::SarBpParams
    :members:
+.. doxygenfunction:: matx::SarBpUsesPhaseLUT
 
 TaylorFast Range Approximation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -371,6 +372,57 @@ For shorter stand-off ranges, larger image tiles, or geometries where the look d
 a thread block, the third-order term becomes more important. The third-order
 property uses a separate kernel instantiation, which avoids a run-time order
 dispatch inside the backprojection kernel.
+
+TaylorFast Phase Synthesis
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Each backprojected sample is multiplied by the phase factor
+:math:`e^{i\phi}` with :math:`\phi = \alpha (b - b_{\mathrm{offset}})`, where
+:math:`\alpha = 4 \pi f_c \Delta r / c` is the phase advance per range bin and
+:math:`b` is the sample's range-bin coordinate. The full angle spans many
+revolutions, so it cannot be formed directly in single precision. The other
+reduced-precision compute types gather the integer-bin phase from a
+precomputed lookup table (the ``PhaseLUTOptimization`` feature). ``TaylorFast``
+instead synthesizes the phase from quantities it already has, and so ignores
+the feature.
+
+``TaylorFast`` splits each pixel's bin as :math:`b = J + n + w`, where
+:math:`J` is the per-pulse integer bin of the thread block's reference pixel,
+:math:`n` is the pixel's integer offset from it, and :math:`w` is the
+interpolation weight. Then
+
+.. math::
+
+   \phi = \alpha (J - b_{\mathrm{offset}}) + \alpha n + \alpha w,
+
+and each term may be reduced modulo :math:`2\pi` independently.
+
+- With :math:`\alpha / 2\pi = h + \rho_{\mathrm{frac}}` revolutions per bin and
+  :math:`h` an integer, only :math:`\rho_{\mathrm{frac}}` matters for an
+  integer number of bins. It is quantized once on the host as the fixed-point
+  fractions :math:`Q` (32 bits) and :math:`Q_{64}` (64 bits), in which one
+  revolution is :math:`2^{32}` and :math:`2^{64}`, respectively.
+- The reference term :math:`\alpha (J - b_{\mathrm{offset}})` is formed once per
+  pulse per thread block as the ``uint64_t`` product
+  :math:`Q_{64} (J - b_{\mathrm{offset}})`, whose upper 32 bits give a 32-bit
+  binary angle in which one revolution is :math:`2^{32}` ticks. Truncating
+  rather than rounding to ticks costs at most one tick
+  (:math:`1.5 \times 10^{-9}` rad).
+- The integer-bin phase is the ``uint32_t`` product :math:`Q n`. Rounding
+  :math:`\rho_{\mathrm{frac}}` to :math:`Q` leaves at most half a tick of error
+  per bin, so this term's error grows with :math:`|n|`, up to
+  :math:`|n| \pi / 2^{32}` rad (about :math:`10^{-6}` rad for
+  :math:`|n| \approx 1300`).
+- In both products, unsigned wraparound performs the reduction modulo one
+  revolution exactly, including for negative offsets.
+- The reference ticks and :math:`Q n` are added as integers, converted to
+  radians, and the fractional-bin term :math:`\alpha w` is added in single
+  precision before the ``__sincosf`` evaluation.
+
+The same :math:`n` and :math:`w` select and weight the two range-profile
+samples used for linear interpolation. ``TaylorFast`` therefore reads no
+lookup table, allocates no workspace for one, and needs no complex multiply to
+apply the integer-bin phase.
 
 Pixel Height (Z) Assumptions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
