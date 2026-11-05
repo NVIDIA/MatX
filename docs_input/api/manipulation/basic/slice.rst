@@ -8,6 +8,14 @@ be used to drop ranks, for operations such as selecting a single row. Negative i
 to indicate starting at the end and going backward.
 
 When slicing along any given tensor dimension, the start index is treated as inclusive, and the end index as exclusive.
+Start, end, and stride arrays always refer to the input dimensions, including dimensions removed with
+``matxDropDim``. For example, for an input whose values are ``10 * row + column``,
+``slice<1>(input + 0, {1, 2}, {matxDropDim, matxEnd})`` selects row 1 starting at column 2.
+For a 3 by 5 input this produces ``12, 13, 14``; adding strides ``{1, 2}`` produces ``12, 14``.
+
+With the CUDA JIT executor (``MATX_EN_JIT=ON``), expression slice starts and strides are compiled
+into the generated kernel. Different resolved starts or strides therefore require separate JIT
+kernel specializations, even when the output shapes match.
 
 .. versionadded:: 0.3.0
 
