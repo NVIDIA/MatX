@@ -803,6 +803,24 @@ namespace detail {
   // Helper function to check if an operator supports JIT compilation.
   template <typename Op>
   __MATX_INLINE__ __MATX_HOST__ bool jit_supported(const Op &op) {
-    return detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op);
+    if (!detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op)) {
+      return false;
+    }
+    if constexpr (!detail::is_matx_jit_class<Op>) {
+      return true;
+    }
+    else {
+      const detail::DeviceAttributes *attrs = nullptr;
+      if (detail::TryGetCurrentDeviceAttributes(attrs) != cudaSuccess) {
+        cudaGetLastError();
+        return false;
+      }
+      // Individual operators can support JIT while requiring disjoint EPT
+      // ranges. Check the whole expression before the caller selects JIT.
+      const detail::EPTQueryInput query{true, *attrs};
+      const auto range = detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(op, query);
+      return range[0] != detail::ElementsPerThread::INVALID &&
+             range[1] != detail::ElementsPerThread::INVALID && range[0] <= range[1];
+    }
   }
 } // namespace matx

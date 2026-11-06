@@ -1391,9 +1391,10 @@ MATX_IGNORE_WARNING_POP_GCC
           }
         }
 
-        // Maybe relax this constraint later, but for now the tensor has to be contiguous. This should prevent clones
-        // and strides from vectorizing.
-        if (!IsContiguous()) {
+        // Non-JIT dispatch still requires a contiguous tensor. JIT tensors index
+        // each row by its strides, so broadcast and padded rows can vectorize
+        // when every row starts at a compatible alignment.
+        if (!in.jit && !IsContiguous()) {
           return cuda::std::array<detail::ElementsPerThread, 2>{detail::ElementsPerThread::ONE, detail::ElementsPerThread::ONE};
         }
 
@@ -1408,8 +1409,17 @@ MATX_IGNORE_WARNING_POP_GCC
           const int type_width_bytes = static_cast<int>(sizeof(T));
           int width = in.jit ? 32 : in.max_vec_width_bytes / type_width_bytes;
           while (width > 1) {
+            bool aligned_rows = true;
+            if (in.jit) {
+              for (int dim = 0; dim < Rank() - 1; ++dim) {
+                if (Size(dim) > 1 && Stride(dim) % width != 0) {
+                  aligned_rows = false;
+                  break;
+                }
+              }
+            }
             if (((Lsize() % width) == 0) &&                                       // Last dim is a multiple of vector load size
-              ((reinterpret_cast<uintptr_t>(data_.ldata_) % (sizeof(T) * width)) == 0)) {
+              ((reinterpret_cast<uintptr_t>(data_.ldata_) % (sizeof(T) * width)) == 0) && aligned_rows) {
               break;
             }
 

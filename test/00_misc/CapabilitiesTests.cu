@@ -115,6 +115,31 @@ struct CapabilityTestOp {
   }
 };
 
+struct JITSupportTestOp {
+  using emits_jit_str = void;
+  bool supports_jit = true;
+  mutable int ept_queries = 0;
+  mutable bool queried_jit_ept = false;
+  cuda::std::array<detail::ElementsPerThread, 2> ept_range{
+      detail::ElementsPerThread::ONE, detail::ElementsPerThread::MAX};
+
+  template <detail::OperatorCapability Cap, typename InType>
+  __MATX_HOST__ auto get_capability(InType &in) const
+  {
+    if constexpr (Cap == detail::OperatorCapability::SUPPORTS_JIT) {
+      return supports_jit;
+    }
+    else if constexpr (Cap == detail::OperatorCapability::ELEMENTS_PER_THREAD) {
+      ++ept_queries;
+      queried_jit_ept = in.jit;
+      return ept_range;
+    }
+    else {
+      return detail::capability_attributes<Cap>::default_value;
+    }
+  }
+};
+
 template <typename T>
 void ExpectRange(const cuda::std::array<T, 2> &actual, T lower, T upper)
 {
@@ -144,6 +169,96 @@ TEST(CapabilitiesTests, DefaultCapabilitiesForNonMatXOps)
               detail::ElementsPerThread::ONE, detail::ElementsPerThread::MAX);
   EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::JIT_TYPE_QUERY>(op).empty());
   EXPECT_TRUE(detail::get_operator_capability<detail::OperatorCapability::JIT_CACHE_KEY>(op).valid);
+}
+
+TEST(CapabilitiesTests, JITSupportChecksEPTRange)
+{
+  using detail::ElementsPerThread;
+  JITSupportTestOp op;
+  op.supports_jit = false;
+  EXPECT_FALSE(jit_supported(op));
+  EXPECT_EQ(op.ept_queries, 0);
+
+  op.supports_jit = true;
+  const detail::DeviceAttributes *attrs = nullptr;
+  if (detail::TryGetCurrentDeviceAttributes(attrs) != cudaSuccess) {
+    cudaGetLastError();
+    EXPECT_FALSE(jit_supported(op));
+    EXPECT_EQ(op.ept_queries, 0);
+    return;
+  }
+
+  EXPECT_TRUE(jit_supported(op));
+  EXPECT_TRUE(op.queried_jit_ept);
+  EXPECT_EQ(op.ept_queries, 1);
+  op.ept_range = {ElementsPerThread::INVALID, ElementsPerThread::INVALID};
+  EXPECT_TRUE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op));
+  EXPECT_FALSE(jit_supported(op));
+  op.ept_range = {ElementsPerThread::EIGHT, ElementsPerThread::FOUR};
+  EXPECT_FALSE(jit_supported(op));
+}
+
+TEST(CapabilitiesTests, JITTensorEPTSupportsBroadcastAndAlignedRows)
+{
+  using detail::ElementsPerThread;
+  const detail::DeviceAttributes attrs{};
+  const detail::EPTQueryInput jit_query{true, attrs};
+  const detail::EPTQueryInput cuda_query{false, attrs};
+  const auto check = [&]<typename T>() {
+    // Non-owning host views make these capability checks independent of CUDA.
+    alignas(512) static T data[4096]{};
+    auto model = make_tensor<T>(data, {512});
+    auto scalar = make_tensor<T>(data, cuda::std::array<index_t, 0>{});
+    ExpectRange(detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(scalar, jit_query),
+                ElementsPerThread::ONE, ElementsPerThread::ONE);
+    for (index_t batches : {1, 3}) {
+      const index_t shape[] = {batches, matxKeepDim};
+      auto view = clone<2>(model, shape);
+      EXPECT_EQ(view.Stride(0), 0);
+      ExpectRange(detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(view, jit_query),
+                  ElementsPerThread::ONE, ElementsPerThread::THIRTY_TWO);
+      ExpectRange(detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(view, cuda_query),
+                  ElementsPerThread::ONE, ElementsPerThread::ONE);
+      auto cloned_expression = clone<2>(conj(model), shape);
+      ExpectRange(detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(cloned_expression, jit_query),
+                  ElementsPerThread::ONE, ElementsPerThread::ONE);
+    }
+    const index_t shape3[] = {2, 3, matxKeepDim};
+    auto view3 = clone<3>(model, shape3);
+    ExpectRange(detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(view3, jit_query),
+                ElementsPerThread::ONE, ElementsPerThread::THIRTY_TWO);
+    ExpectRange(detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(view3, cuda_query),
+                ElementsPerThread::ONE, ElementsPerThread::ONE);
+
+    const struct {
+      index_t rows;
+      index_t columns;
+      index_t row_stride;
+      index_t column_stride;
+      index_t offset;
+      ElementsPerThread max_ept;
+    } cases[] = {
+      {3, 512, 544, 1, 0, ElementsPerThread::THIRTY_TWO},
+      {3, 512, 520, 1, 0, ElementsPerThread::EIGHT},
+      {3, 512, 513, 1, 0, ElementsPerThread::ONE},
+      {1, 512, 513, 1, 0, ElementsPerThread::THIRTY_TWO},
+      {3, 512, 544, 1, 1, ElementsPerThread::ONE},
+      {3, 512, 1088, 2, 0, ElementsPerThread::ONE},
+      {3, 512, 1, 0, 0, ElementsPerThread::ONE},
+      {3, 510, 544, 1, 0, ElementsPerThread::TWO},
+    };
+    for (const auto &c : cases) {
+      SCOPED_TRACE(::testing::Message() << "shape " << c.rows << 'x' << c.columns
+                   << " strides " << c.row_stride << ',' << c.column_stride << " offset " << c.offset);
+      auto view = make_tensor<T>(data + c.offset, {c.rows, c.columns}, {c.row_stride, c.column_stride});
+      ExpectRange(detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(view, jit_query),
+                  ElementsPerThread::ONE, c.max_ept);
+      ExpectRange(detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(view, cuda_query),
+                  ElementsPerThread::ONE, ElementsPerThread::ONE);
+    }
+  };
+  check.template operator()<cuda::std::complex<float>>();
+  check.template operator()<cuda::std::complex<double>>();
 }
 
 TEST(CapabilitiesTests, QueryTypeMappingCoversEveryCapability)
@@ -258,7 +373,7 @@ TEST(CapabilitiesTests, GetsAndCombinesMatXOperatorCapabilities)
 
   // The test operators report fixed values, whatever the device.
   detail::EPTQueryInput ept_input{false, detail::DeviceAttributes{}};
-  const auto ops = cuda::std::make_tuple(op0, op1);
+  const auto ops = cuda::std::tie(op0, op1);
 
   EXPECT_TRUE(detail::get_operator_capability<detail::OperatorCapability::ASYNC_LOADS_REQUESTED>(op0));
   EXPECT_FALSE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(op1));
