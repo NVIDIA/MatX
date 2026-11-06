@@ -3,10 +3,9 @@
 Build Integration
 =================
 
-As MatX is a header-only library, using it in your own projects is as simple as including only the core ``matx.h`` file. 
-The ``matx.h`` include file gives full functionality of all MatX features, without requiring additional includes or API 
-dependencies that the user must navigate. All classes required to use the MatX API is available from the ``matx.h`` include;
-This includes arithmetic expressions, and all libraries included with CUDA (cuFFT, cuBLAS, CUB, cuSolver, cuRAND). 
+MatX is a header-only library. Include ``matx.h`` for the full API, including arithmetic expressions and CUDA-backed transforms.
+For tensor creation and unary or binary elementwise operations without the broader operator and transform headers, include
+``matx/core/matx_tensor.h`` instead. The system requirements below still apply.
 Optional features of MatX that require downloading separate libraries use additional include files to
 be explicit about their requirements.
 

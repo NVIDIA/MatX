@@ -43,8 +43,7 @@
 
 
 #include <memory>
-#include <cublas_v2.h>
-#include <cusparse.h>
+#include <library_types.h>
 
 #include "cuda_fp16.h"
 #include "matx/executors/jit_cuda.h"
@@ -430,45 +429,6 @@ template <typename T> constexpr cudaDataType_t MatXTypeToCudaType()
 MATX_IGNORE_WARNING_NEXT_LINE_MSVC(4702)
   return CUDA_C_32F;
 }
-
-template <typename T> constexpr cublasComputeType_t MatXTypeToCudaComputeType()
-{
-  if constexpr (cuda::std::is_same_v<T, cuda::std::complex<float>> ||
-                cuda::std::is_same_v<T, float> || is_matx_half_v<T> ||
-                cuda::std::is_same_v<T, matxFp16Complex> ||
-                cuda::std::is_same_v<T, matxBf16Complex> ||
-                cuda::std::is_same_v<T, matxFp16ComplexPlanar> ||
-                cuda::std::is_same_v<T, matxBf16ComplexPlanar>) {
-    return CUBLAS_COMPUTE_32F;
-  }
-  if constexpr (cuda::std::is_same_v<T, cuda::std::complex<double>> ||
-                cuda::std::is_same_v<T, double>) {
-    return CUBLAS_COMPUTE_64F;
-  }
-
-MATX_IGNORE_WARNING_NEXT_LINE_MSVC(4702)
-  return CUBLAS_COMPUTE_32F;
-}
-
-template <typename T>
-constexpr cusparseIndexType_t MatXTypeToCuSparseIndexType() {
-  if constexpr (cuda::std::is_same_v<T, uint16_t>) {
-    return CUSPARSE_INDEX_16U;
-  }
-  if constexpr (cuda::std::is_same_v<T, int32_t>) {
-    return CUSPARSE_INDEX_32I;
-  }
-  if constexpr (cuda::std::is_same_v<T, int64_t>) {
-    return CUSPARSE_INDEX_64I;
-  }
-  if constexpr (cuda::std::is_same_v<T, index_t>) {
-    return CUSPARSE_INDEX_64I;
-  }
-  else { // Should not happen
-    return CUSPARSE_INDEX_32I;
-  }
-}
-
 
 } // end namespace detail
 

@@ -40,6 +40,7 @@
 #include "matx/core/cache.h"
 #include "matx/core/sparse_tensor.h"
 #include "matx/core/tensor.h"
+#include "matx/transforms/cuda_type_utils.h"
 
 namespace matx {
 

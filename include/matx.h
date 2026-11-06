@@ -50,7 +50,7 @@
 #include "matx/core/nvtx.h"
 #include "matx/core/print.h"
 #include "matx/core/pybind.h"
-#include "matx/core/tensor.h"
+#include "matx/core/matx_tensor.h"
 #include "matx/core/dynamic_tensor.h"
 #include "matx/core/sparse_tensor.h"  // sparse support is experimental
 #include "matx/core/make_sparse_tensor.h"
@@ -61,12 +61,7 @@
 #include "matx/executors/executors.h"
 #include "matx/generators/generators.h"
 #include "matx/operators/operators.h"
+#include "matx/transforms/cuda_type_utils.h"
 #include "matx/transforms/transforms.h"
 #include "matx/streaming/streaming.h"
 #include "matx/core/distributed_tensor.h" // distributed support is experimental
-
-#include <cuda/std/complex>
-namespace matx {
-  using fcomplex = cuda::std::complex<float>;
-  using dcomplex = cuda::std::complex<double>;
-}
