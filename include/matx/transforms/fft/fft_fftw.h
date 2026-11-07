@@ -66,7 +66,6 @@ struct FftFFTWParams_t {
   int irank, orank;
   int n[MAX_FFT_RANK] = {0};
   int batch;
-  int       batch_dims;
   int inembed[MAX_FFT_RANK] = {0};
   int onembed[MAX_FFT_RANK] = {0};
   int istride, ostride;
@@ -98,7 +97,6 @@ struct FftFFTWParams_t {
     params.dir = dir;
 
     if (fft_rank == 1) {
-      params.batch_dims = 0;
       params.n[0] = (params.transform_type == FFTType::C2R)
                         ? static_cast<int>(o.Size(RANK - 1))
                         : static_cast<int>(i.Size(RANK - 1));
@@ -106,18 +104,15 @@ struct FftFFTWParams_t {
       if (i.IsContiguous() && o.IsContiguous()) {
         params.batch = 1;
         for (int dim = i.Rank() - 2; dim >= 0; dim--) {
-          params.batch_dims++;
           params.batch *= static_cast<int>(i.Size(dim));
         }
       }
       else {
         if (RANK == 1) {
           params.batch = 1;
-          params.batch_dims = 0;
         }
         else {
           params.batch = static_cast<int>(TotalSize(i) / i.Size(RANK - 1));
-          params.batch_dims = 1;
         }
       }
 
@@ -157,61 +152,35 @@ struct FftFFTWParams_t {
       params.in_place = false;
     }
 
-    if (params.fft_rank == 1) {
-      if (params.transform_type == FFTType::C2R) {
-        if (is_cuda_complex_v<T1> || !is_cuda_complex_v<T2>) {
-          MATX_THROW(matxInvalidType, "FFT types inconsistent with C2R transform");
-        }
-        if (params.n[0] != o.Size(OutTensorType::Rank()-1) ||
-          (params.n[0]/2)+1 != i.Size(InTensorType::Rank()-1)) {
-          MATX_THROW(matxInvalidSize, "Tensor sizes inconsistent with C2R transform");
-        }
+    if (params.transform_type == FFTType::C2R) {
+      if (is_cuda_complex_v<T1> || !is_cuda_complex_v<T2>) {
+        MATX_THROW(matxInvalidType, "FFT types inconsistent with C2R transform");
       }
-      else if (params.transform_type == FFTType::R2C) {
-        if (is_cuda_complex_v<T2> || !is_cuda_complex_v<T1>) {
-          MATX_THROW(matxInvalidType, "FFT types inconsistent with R2C transform");
-        }
-        if (params.n[0] != i.Size(InTensorType::Rank()-1) ||
-          (params.n[0]/2)+1 != o.Size(OutTensorType::Rank()-1)) {
-          MATX_THROW(matxInvalidSize, "Tensor sizes inconsistent with R2C transform");
-        }
-      }
-      else {
-        if (!is_complex_v<T2> || !is_complex_v<T1> || !cuda::std::is_same_v<T1, T2>) {
-          MATX_THROW(matxInvalidType, "FFT types inconsistent with C2C transform");
-        }
-        if (params.n[0] != o.Size(OutTensorType::Rank()-1) ||
-            params.n[0] != i.Size(OutTensorType::Rank()-1)) {
-          MATX_THROW(matxInvalidSize, "Tensor sizes inconsistent with C2C transform");
-        }
+    }
+    else if (params.transform_type == FFTType::R2C) {
+      if (is_cuda_complex_v<T2> || !is_cuda_complex_v<T1>) {
+        MATX_THROW(matxInvalidType, "FFT types inconsistent with R2C transform");
       }
     }
     else {
-      if (params.transform_type == FFTType::C2R) {
-        MATX_ASSERT((o.Size(RANK-2) * (o.Size(RANK-1) / 2 + 1)) == i.Size(RANK-1) * i.Size(RANK-2),
-                    matxInvalidSize);
-        MATX_ASSERT(!is_cuda_complex_v<T1> && is_cuda_complex_v<T2>,
-                    matxInvalidType);
-      }
-      else if (params.transform_type == FFTType::R2C) {
-        MATX_ASSERT(o.Size(RANK-1) * o.Size(RANK-2) == (i.Size(RANK-2) * (i.Size(RANK-1) / 2 + 1)),
-                    matxInvalidSize);
-        MATX_ASSERT(!is_cuda_complex_v<T2> && is_cuda_complex_v<T1>,
-                    matxInvalidType);
-      }
-      else {
-        MATX_ASSERT((cuda::std::is_same_v<T1, T2>), matxInvalidType);
-        MATX_ASSERT(is_complex_v<T2> && is_complex_v<T1>, matxInvalidType);
-        MATX_ASSERT(o.Size(RANK-2) * o.Size(RANK-1) == i.Size(RANK-2) * i.Size(RANK-1),
-                    matxInvalidSize);
-      }
-
-      for (int r = 0; r < RANK - 2; r++) {
-        MATX_ASSERT(o.Size(r) == i.Size(r), matxInvalidSize);
+      if (!is_complex_v<T2> || !is_complex_v<T1> || !cuda::std::is_same_v<T1, T2>) {
+        MATX_THROW(matxInvalidType, "FFT types inconsistent with C2C transform");
       }
     }
 
-    MATX_ASSERT_STR(params.idist > 0, matxInvalidDim, "FFTs do not support batch strides of 0 (no cloned views)");
+    // GetFFTParams runs on every call, so this also covers cached plans
+    if (fft_rank == 1) {
+      CheckFFTSizes<1>(o, i);
+    }
+    else {
+      CheckFFTSizes<2>(o, i);
+    }
+
+    // Zero batch distances come from cloned views, which are not supported.
+    // Check in all build types rather than passing them to FFTW.
+    if (params.idist == 0 || params.odist == 0) {
+      MATX_THROW(matxInvalidDim, "FFTs do not support batch strides of 0 (no cloned views)");
+    }
 
     return params;
   }
@@ -224,12 +193,20 @@ struct FftFFTWParams_t {
 struct FftFFTWParamsKeyHash {
   std::size_t operator()(const FftFFTWParams_t &k) const noexcept
   {
-    return (std::hash<uint64_t>()(k.n[0])) + (std::hash<uint64_t>()(k.n[1])) +
-           (std::hash<uint64_t>()(k.fft_rank)) +
-           (std::hash<uint64_t>()(k.batch)) + (std::hash<uint64_t>()(k.istride)) +
-           (std::hash<uint64_t>()(static_cast<uint64_t>(k.dir))) +
-           (std::hash<uint64_t>()(static_cast<uint64_t>(k.is_fp32))) +
-           (std::hash<uint64_t>()(static_cast<uint64_t>(k.num_threads)));
+    std::size_t h = 0;
+    FFTHashCombine(h, k.n[0]);
+    FFTHashCombine(h, k.n[1]);
+    FFTHashCombine(h, k.fft_rank);
+    FFTHashCombine(h, k.transform_type);
+    FFTHashCombine(h, k.dir);
+    FFTHashCombine(h, k.is_fp32);
+    FFTHashCombine(h, k.num_threads);
+    FFTHashCombine(h, k.batch);
+    FFTHashCombine(h, k.istride);
+    FFTHashCombine(h, k.ostride);
+    FFTHashCombine(h, k.idist);
+    FFTHashCombine(h, k.odist);
+    return h;
   }
 };
 

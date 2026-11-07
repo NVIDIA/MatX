@@ -135,6 +135,8 @@ void ChannelizePolyBench(matx::index_t num_channels, matx::index_t decimation_fa
 
   cudaEventDestroy(start);
   cudaEventDestroy(stop);
+  // Transform workspaces are cached per stream, so release them before the stream
+  matx::ClearCaches();
   cudaStreamDestroy(stream);
 }
 

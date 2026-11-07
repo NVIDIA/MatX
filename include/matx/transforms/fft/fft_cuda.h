@@ -46,7 +46,6 @@
 #include <cstdio>
 #include <functional>
 #include <optional>
-#include <mutex>
 
   #define MATX_CUFFT_ASSERT_STR_EXP(a, expected) \
   {                                    \
@@ -87,7 +86,6 @@ struct FftCUDAParams_t {
   long long irank, orank;
   long long n[MAX_FFT_RANK] = {0};
   long long batch;
-  int       batch_dims;
   long long inembed[MAX_FFT_RANK] = {0};
   long long onembed[MAX_FFT_RANK] = {0};
   long long istride, ostride;
@@ -97,7 +95,6 @@ struct FftCUDAParams_t {
   cudaDataType output_type;
   cudaDataType exec_type;
   int fft_rank;
-  cudaStream_t stream = 0;
 };
 
 /* Base class for FFTs. This should not be used directly. */
@@ -127,7 +124,6 @@ public:
                       const InTensorType &i, cudaStream_t stream, FFTNorm norm = FFTNorm::BACKWARD)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-    cufftSetStream(this->plan_, stream);
 
     // Normalize input if necessary
     using s_type = typename detail::value_promote_t<typename InTensorType::value_type>;
@@ -138,6 +134,7 @@ public:
       factor = static_cast<s_type>(params_.n[0] * params_.n[1]);
     }
 
+    this->BindToStream(stream);
     Exec(o, i, CUFFT_FORWARD);
 
     if (norm == FFTNorm::ORTHO) {
@@ -166,7 +163,7 @@ public:
                       const InTensorType &i, cudaStream_t stream, FFTNorm norm = FFTNorm::BACKWARD)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-    cufftSetStream(this->plan_, stream);
+    this->BindToStream(stream);
     Exec(o, i, CUFFT_INVERSE);
 
     // cuFFT doesn't scale IFFT the same as MATLAB/Python. Scale it here to
@@ -191,10 +188,17 @@ public:
                           const InTensorType &i, int fft_rank)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
-    FftCUDAParams_t params;
 
-    // Default to default stream, but caller will generally overwrite this
-    params.stream = 0;
+    // Called on every FFT before the plan cache lookup, so invalid shapes are
+    // rejected before a plan or workspace is created, and cached plans are
+    // covered too. A mismatch could otherwise write out of bounds.
+    if (fft_rank == 1) {
+      CheckFFTSizes<1>(o, i);
+    } else {
+      CheckFFTSizes<2>(o, i);
+    }
+
+    FftCUDAParams_t params;
 
     params.irank = i.Rank();
     params.orank = o.Rank();
@@ -205,29 +209,16 @@ public:
     params.fft_rank =  fft_rank;
 
     if (fft_rank == 1) {
-      params.batch_dims = 0;
       params.n[0] = (params.transform_type == FFTType::C2R)
                         ? o.Size(RANK - 1)
                         : i.Size(RANK - 1);
 
-      if (i.IsContiguous() && o.IsContiguous()) {
-        // Previously we used cudaMemGetInfo to get free memory to determine batch size. This can be very slow,
-        // and for small FFTs this call can create extra latency. For now we'll just assume the user knows what
-        // they're doing and not try to batch FFTs that are too small
-        const auto shape = i.Shape();
-        params.batch = std::accumulate(std::begin(shape), std::end(shape) - 1, static_cast<index_t>(1), std::multiplies<index_t>());
-        params.batch_dims = i.Rank() - 1;
-      }
-      else {
-        if (RANK == 1) {
-          params.batch = 1;
-          params.batch_dims = 0;
-        }
-        else {
-          params.batch = i.Size(RANK-2);
-          params.batch_dims = 1;
-        }
-      }
+      // Previously we used cudaMemGetInfo to get free memory to determine batch size. This can be very slow,
+      // and for small FFTs this call can create extra latency. For now we'll just assume the user knows what
+      // they're doing and not try to batch FFTs that are too small
+      const int batch_dims = GetBatchDims1D(o, i);
+      const auto shape = i.Shape();
+      params.batch = std::accumulate(std::end(shape) - 1 - batch_dims, std::end(shape) - 1, static_cast<index_t>(1), std::multiplies<index_t>());
 
       params.inembed[0] = i.Size(RANK - 1); // Unused
       params.onembed[0] = o.Size(RANK - 1); // Unused
@@ -270,7 +261,11 @@ public:
       }
     }
 
-    MATX_ASSERT_STR(params.idist > 0, matxInvalidDim, "FFTs do not support batch strides of 0 (no cloned views)");
+    // Zero (cloned views) and negative batch distances are rejected by cuFFT
+    // with a generic error at plan creation. Give a clear error instead.
+    if (params.idist <= 0 || params.odist <= 0) {
+      MATX_THROW(matxInvalidDim, "FFTs require positive batch strides (no cloned views)");
+    }
 
     return params;
   }
@@ -278,18 +273,46 @@ public:
 protected:
   matxCUDAFFTPlan_t(){};
 
+  /**
+   * Number of dimensions preceding the transform dimension that a 1D FFT folds
+   * into the batch of a single cuFFT call. Contiguous tensors fold all of them;
+   * otherwise only dimension RANK-2 is batched and Exec loops over the rest.
+   *
+   * This depends on the layout of the tensors in each call, not on the cached
+   * plan. A plan is shared by every call with the same cuFFT parameters, so
+   * Exec recomputes this rather than reading it from params_.
+   */
+  static int GetBatchDims1D(const OutTensorType &o, const InTensorType &i)
+  {
+    if (i.IsContiguous() && o.IsContiguous()) {
+      return RANK - 1;
+    }
+    return (RANK == 1) ? 0 : 1;
+  }
+
   virtual void Exec(OutTensorType &o, const InTensorType &i, int dir) = 0;
+
+  /**
+   * Bind the plan to a stream and to that stream's workspace before executing.
+   *
+   * Plans are shared across streams, so the workspace must come from the stream
+   * the transform executes on. Sharing one workspace across streams would let
+   * concurrent FFTs corrupt each other's scratch data.
+   *
+   * No lock is needed: plans are cached per host thread, and the plan cache
+   * holds its mutex for the whole Forward/Inverse call.
+   */
+  inline void BindToStream(cudaStream_t stream)
+  {
+    cufftSetStream(this->plan_, stream);
+    auto workspace = GetCache().GetStreamAlloc(stream, this->workspaceSize);
+    MATX_ASSERT_STR(workspace != nullptr, matxCudaError, "Failed to get workspace for stream");
+    cufftSetWorkArea(this->plan_, workspace);
+  }
 
   inline void InternalExec(const void *idata, void *odata, int dir)
   {
-    // We reuse plans across streams if the plan is identical. This mutex prevents the plan from colliding across streams.
-    std::lock_guard<std::mutex> lock(mutex_);
-    [[maybe_unused]] cufftResult res;
-    auto workspace = GetCache().GetStreamAlloc(params_.stream, this->workspaceSize);
-    MATX_ASSERT_STR(workspace != nullptr, matxCudaError, "Failed to get workspace for stream");
-
-    cufftSetWorkArea(this->plan_, workspace);
-    res = cufftXtExec(this->plan_, (void *)idata, (void *)odata, dir);
+    [[maybe_unused]] cufftResult res = cufftXtExec(this->plan_, (void *)idata, (void *)odata, dir);
     MATX_CUFFT_ASSERT_STR_EXP(res, CUFFT_SUCCESS);
   }
 
@@ -330,7 +353,6 @@ protected:
   void *workspace_;
   size_t workspaceSize;
   int fftrank_ = 0;
-  std::mutex mutex_;
 };
 
 /**
@@ -381,31 +403,20 @@ matxCUDAFFTPlan1D_t(OutTensorType &o, const InTensorType &i)
   this->workspace_ = nullptr;
   this->params_ = this->GetFFTParams(o, i, 1);
 
+  // Sizes are checked in GetFFTParams, which runs on every call before the cache lookup
   if (this->params_.transform_type == FFTType::C2R) {
     if (is_complex_v<T1> || !is_complex_v<T2>) {
       MATX_THROW(matxInvalidType, "FFT types inconsistent with C2R transform");
-    }
-    if (this->params_.n[0] != o.Size(OutTensorType::Rank()-1) ||
-       (this->params_.n[0]/2)+1 != i.Size(InTensorType::Rank()-1)) {
-      MATX_THROW(matxInvalidSize, "Tensor sizes inconsistent with C2R transform");
     }
   }
   else if (this->params_.transform_type == FFTType::R2C) {
     if (is_complex_v<T2> || !is_complex_v<T1>) {
       MATX_THROW(matxInvalidType, "FFT types inconsistent with R2C transform");
     }
-    if (this->params_.n[0] != i.Size(InTensorType::Rank()-1) ||
-       (this->params_.n[0]/2)+1 != o.Size(OutTensorType::Rank()-1)) {
-      MATX_THROW(matxInvalidSize, "Tensor sizes inconsistent with R2C transform");
-    }
   }
   else {
     if (!is_complex_v<T2> || !is_complex_v<T1> || !cuda::std::is_same_v<T1, T2>) {
       MATX_THROW(matxInvalidType, "FFT types inconsistent with C2C transform");
-    }
-    if (this->params_.n[0] != o.Size(InTensorType::Rank()-1) ||
-        this->params_.n[0] != i.Size(InTensorType::Rank()-1)) {
-      MATX_THROW(matxInvalidSize, "Tensor sizes inconsistent with C2C transform");
     }
   }
 
@@ -440,7 +451,8 @@ virtual void inline Exec(OutTensorType &o, const InTensorType &i,
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
-  if (OutTensorType::Rank() == this->params_.batch_dims + 1) {
+  const int batch_dims = this->GetBatchDims1D(o, i);
+  if (OutTensorType::Rank() == batch_dims + 1) {
     this->InternalExec(static_cast<const void *>(i.Data()),
                       static_cast<void *>(o.Data()), dir);
   }
@@ -449,14 +461,14 @@ virtual void inline Exec(OutTensorType &o, const InTensorType &i,
     cuda::std::array<shape_type, InTensorType::Rank()> idx{0};
     auto i_shape = i.Shape();
     // Get total number of batches
-    size_t total_iter = std::accumulate(i_shape.begin(), i_shape.begin() + InTensorType::Rank() - (this->params_.batch_dims + 1), static_cast<shape_type>(1), std::multiplies<shape_type>());
+    size_t total_iter = std::accumulate(i_shape.begin(), i_shape.begin() + InTensorType::Rank() - (batch_dims + 1), static_cast<shape_type>(1), std::multiplies<shape_type>());
     for (size_t iter = 0; iter < total_iter; iter++) {
       auto ip = cuda::std::apply([&i](auto... param) { return i.GetPointer(param...); }, idx);
       auto op = cuda::std::apply([&o](auto... param) { return o.GetPointer(param...); }, idx);
       this->InternalExec(static_cast<const void *>(ip), static_cast<void *>(op), dir);
 
       // Update all but the last 2 indices
-      UpdateIndices<InTensorType, shape_type, InTensorType::Rank()>(i, idx, this->params_.batch_dims + 1);
+      UpdateIndices<InTensorType, shape_type, InTensorType::Rank()>(i, idx, batch_dims + 1);
     }
   }
 
@@ -514,27 +526,21 @@ public:
     this->workspace_ = nullptr;
     this->params_ = this->GetFFTParams(o, i, 2);
 
+    // Sizes are checked in GetFFTParams, which runs on every call before the cache lookup
     if (this->params_.transform_type == FFTType::C2R) {
-      MATX_ASSERT((o.Size(RANK-2) * (o.Size(RANK-1) / 2 + 1)) == i.Size(RANK-1) * i.Size(RANK-2),
-                  matxInvalidSize);
-      MATX_ASSERT(!is_complex_v<T1> && is_complex_v<T2>,
-                  matxInvalidType);
+      if (is_complex_v<T1> || !is_complex_v<T2>) {
+        MATX_THROW(matxInvalidType, "FFT types inconsistent with C2R transform");
+      }
     }
     else if (this->params_.transform_type == FFTType::R2C) {
-      MATX_ASSERT(o.Size(RANK-1) * o.Size(RANK-2) == (i.Size(RANK-2) * (i.Size(RANK-1) / 2 + 1)),
-                  matxInvalidSize);
-      MATX_ASSERT(!is_complex_v<T2> && is_complex_v<T1>,
-                  matxInvalidType);
+      if (is_complex_v<T2> || !is_complex_v<T1>) {
+        MATX_THROW(matxInvalidType, "FFT types inconsistent with R2C transform");
+      }
     }
     else {
-      MATX_ASSERT((cuda::std::is_same_v<T1, T2>), matxInvalidType);
-      MATX_ASSERT(is_complex_v<T2> && is_complex_v<T1>, matxInvalidType);
-      MATX_ASSERT(o.Size(RANK-2) * o.Size(RANK-1) == i.Size(RANK-2) * i.Size(RANK-1),
-                  matxInvalidSize);
-    }
-
-    for (int r = 0; r < RANK - 2; r++) {
-      MATX_ASSERT(o.Size(r) == i.Size(r), matxInvalidSize);
+      if (!is_complex_v<T2> || !is_complex_v<T1> || !cuda::std::is_same_v<T1, T2>) {
+        MATX_THROW(matxInvalidType, "FFT types inconsistent with C2C transform");
+      }
     }
 
     cufftCreate(&this->plan_);
@@ -617,10 +623,18 @@ private:
 struct FftCUDAParamsKeyHash {
   std::size_t operator()(const FftCUDAParams_t &k) const noexcept
   {
-    return (std::hash<uint64_t>()(k.n[0])) + (std::hash<uint64_t>()(k.n[1])) +
-           (std::hash<uint64_t>()(k.fft_rank)) +
-           (std::hash<uint64_t>()(k.exec_type)) +
-           (std::hash<uint64_t>()(k.batch)) + (std::hash<uint64_t>()(k.istride));
+    std::size_t h = 0;
+    FFTHashCombine(h, k.n[0]);
+    FFTHashCombine(h, k.n[1]);
+    FFTHashCombine(h, k.fft_rank);
+    FFTHashCombine(h, k.exec_type);
+    FFTHashCombine(h, k.transform_type);
+    FFTHashCombine(h, k.batch);
+    FFTHashCombine(h, k.istride);
+    FFTHashCombine(h, k.ostride);
+    FFTHashCombine(h, k.idist);
+    FFTHashCombine(h, k.odist);
+    return h;
   }
 };
 
@@ -703,7 +717,6 @@ __MATX_INLINE__ void fft_impl(OutputTensor o, const InputTensor i,
 
   // Get parameters required by these tensors
   auto params = detail::matxCUDAFFTPlan_t<decltype(out), decltype(in)>::GetFFTParams(out, in, 1);
-  params.stream = stream;
 
   using cache_val_type = detail::matxCUDAFFTPlan1D_t<decltype(out), decltype(in)>;
   auto cache_id = detail::GetCacheIdFromType<detail::fft_cuda_cache_t>();
@@ -751,7 +764,6 @@ __MATX_INLINE__ void ifft_impl(OutputTensor o, const InputTensor i,
 
   // Get parameters required by these tensors
   auto params = detail::matxCUDAFFTPlan_t<decltype(out), decltype(in)>::GetFFTParams(out, in, 1);
-  params.stream = stream;
 
   using cache_val_type = detail::matxCUDAFFTPlan1D_t<decltype(out), decltype(in)>;
   auto cache_id = detail::GetCacheIdFromType<detail::fft_cuda_cache_t>();
@@ -794,7 +806,6 @@ __MATX_INLINE__ void fft2_impl(OutputTensor o, const InputTensor i, FFTNorm norm
 
   // Get parameters required by these tensors
   auto params = detail::matxCUDAFFTPlan_t<decltype(out), decltype(in)>::GetFFTParams(out, in, 2);
-  params.stream = stream;
 
   using cache_val_type = detail::matxCUDAFFTPlan2D_t<decltype(out), decltype(in)>;
   auto cache_id = detail::GetCacheIdFromType<detail::fft_cuda_cache_t>();
@@ -837,7 +848,6 @@ __MATX_INLINE__ void ifft2_impl(OutputTensor o, const InputTensor i, FFTNorm nor
 
     // Get parameters required by these tensors
   auto params = detail::matxCUDAFFTPlan_t<decltype(out), decltype(in)>::GetFFTParams(out, in, 2);
-  params.stream = stream;
 
   // Get cache or new FFT plan if it doesn't exist
   using cache_val_type = detail::matxCUDAFFTPlan2D_t<decltype(out), decltype(in)>;
