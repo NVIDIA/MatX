@@ -304,10 +304,10 @@ protected:
    */
   inline void BindToStream(cudaStream_t stream)
   {
-    cufftSetStream(this->plan_, stream);
+    MATX_CUFFT_ASSERT_STR_EXP(cufftSetStream(this->plan_, stream), CUFFT_SUCCESS);
     auto workspace = GetCache().GetStreamAlloc(stream, this->workspaceSize);
     MATX_ASSERT_STR(workspace != nullptr, matxCudaError, "Failed to get workspace for stream");
-    cufftSetWorkArea(this->plan_, workspace);
+    MATX_CUFFT_ASSERT_STR_EXP(cufftSetWorkArea(this->plan_, workspace), CUFFT_SUCCESS);
   }
 
   inline void InternalExec(const void *idata, void *odata, int dir)

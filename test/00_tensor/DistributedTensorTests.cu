@@ -458,3 +458,40 @@ TEST(DistributedTensor, RejectsContextMismatchAndAliasing) {
 }
 
 TEST(DistributedTensor, BlackScholesOneGpu) { RunBlackScholes({0}); }
+
+// FFTs cache a cuFFT workspace for each stream they run on, allocated in that
+// stream's order. The executor destroys its streams, and a later ClearCaches()
+// must still free the workspace without using the destroyed stream.
+TEST(DistributedTensor, FFTWorkspaceReleasedWithExecutor) {
+  using complex_type = cuda::std::complex<float>;
+  constexpr index_t batches = 4;
+  constexpr index_t fft_size = 64;
+
+  ClearCaches();
+  {
+    distributed_context context{{0}};
+    distributedCUDAExecutor executor{context};
+    auto distribution =
+        block_distribution_t<2>::Slab({batches, fft_size}, {{0, 0}}, 0);
+    auto input = make_distributed_tensor<complex_type>(distribution, context);
+    auto output = make_distributed_tensor<complex_type>(distribution, context);
+    FillDistributed(input, [](const auto &) { return complex_type{1, 0}; });
+    (output = fft(input)).run(executor);
+
+    auto regular = make_tensor<complex_type>({batches, fft_size});
+    (regular = output).run(executor);
+    executor.sync();
+    for (index_t b = 0; b < batches; ++b) {
+      for (index_t k = 0; k < fft_size; ++k) {
+        const float expected = (k == 0) ? static_cast<float>(fft_size) : 0.0f;
+        ASSERT_NEAR(regular(b, k).real(), expected, 1e-3f) << b << "," << k;
+        ASSERT_NEAR(regular(b, k).imag(), 0.0f, 1e-3f) << b << "," << k;
+      }
+    }
+  }
+
+  // The executor and its streams are gone. Clearing the caches must not free
+  // anything on those streams.
+  ClearCaches();
+  EXPECT_EQ(cudaGetLastError(), cudaSuccess);
+}

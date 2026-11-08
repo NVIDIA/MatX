@@ -1531,20 +1531,93 @@ TEST(FFTCUDA, MultiStreamFFT1D)
   e1.sync();
   e2.sync();
 
+  // Check on the default stream so that no other cached transform holds memory
+  // allocated on s1 or s2
+  cudaExecutor e0{};
   auto err = make_tensor<float>({});
-  (err = max(abs(o1 - clone<3>(r1, {iters, matxKeepDim, matxKeepDim})))).run(e1);
-  e1.sync();
+  (err = max(abs(o1 - clone<3>(r1, {iters, matxKeepDim, matxKeepDim})))).run(e0);
+  e0.sync();
   EXPECT_LT(err(), 1e-2f) << "stream 1 results differ from the single-stream reference";
-  (err = max(abs(o2 - clone<3>(r2, {iters, matxKeepDim, matxKeepDim})))).run(e1);
-  e1.sync();
+  (err = max(abs(o2 - clone<3>(r2, {iters, matxKeepDim, matxKeepDim})))).run(e0);
+  e0.sync();
   EXPECT_LT(err(), 1e-2f) << "stream 2 results differ from the single-stream reference";
 
-  // Release cached per-stream resources before the streams are destroyed
-  ClearCaches();
+  // The cache holds the cuFFT workspaces allocated on s1 and s2. ClearCaches()
+  // must not free them on the destroyed streams.
   ASSERT_EQ(cudaStreamDestroy(s1), cudaSuccess);
   ASSERT_EQ(cudaStreamDestroy(s2), cudaSuccess);
+  ClearCaches();
+  EXPECT_EQ(cudaGetLastError(), cudaSuccess);
   MATX_EXIT_HANDLER();
 }
+
+#if CUDA_VERSION >= 12050
+// Runs an FFT on a green-context stream. The plan cache records the stream's
+// context for its cuFFT workspace, which cuStreamGetCtx rejects for
+// green-context streams on 12.x drivers.
+TEST(FFTCUDA, GreenContextStreamFFT1D)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::complex<float>;
+  int driver_version = 0;
+  ASSERT_EQ(cuDriverGetVersion(&driver_version), CUDA_SUCCESS);
+  if (driver_version < 12050) {
+    GTEST_SKIP() << "cuGreenCtxStreamCreate requires a 12.5 or newer driver";
+  }
+
+  int device = 0;
+  ASSERT_EQ(cudaGetDevice(&device), cudaSuccess);
+  // Green contexts are unavailable in some configurations, such as under MPS
+  CUdevResource sm_resource;
+  CUdevResourceDesc desc;
+  if (cuDeviceGetDevResource(device, &sm_resource, CU_DEV_RESOURCE_TYPE_SM) != CUDA_SUCCESS ||
+      cuDevResourceGenerateDesc(&desc, &sm_resource, 1) != CUDA_SUCCESS) {
+    GTEST_SKIP() << "Green context resources are not supported";
+  }
+  CUgreenCtx green_ctx;
+  if (cuGreenCtxCreate(&green_ctx, desc, device, CU_GREEN_CTX_DEFAULT_STREAM) != CUDA_SUCCESS) {
+    GTEST_SKIP() << "Green contexts are not supported";
+  }
+  CUstream green_stream;
+  if (cuGreenCtxStreamCreate(&green_stream, green_ctx, CU_STREAM_NON_BLOCKING, 0) != CUDA_SUCCESS) {
+    EXPECT_EQ(cuGreenCtxDestroy(green_ctx), CUDA_SUCCESS);
+    GTEST_SKIP() << "Green context streams are not supported";
+  }
+  // Destroy the stream and context however the test exits
+  struct GreenContextGuard {
+    CUstream stream;
+    CUgreenCtx ctx;
+    ~GreenContextGuard() {
+      ClearCaches();
+      EXPECT_EQ(cuStreamDestroy(stream), CUDA_SUCCESS);
+      EXPECT_EQ(cuGreenCtxDestroy(ctx), CUDA_SUCCESS);
+    }
+  } guard{green_stream, green_ctx};
+
+  const index_t fft_dim = 4099;
+  const index_t batch = 16;
+  cudaExecutor e0{};
+  cudaExecutor eg{reinterpret_cast<cudaStream_t>(green_stream)};
+  auto a = make_tensor<TestType>({batch, fft_dim});
+  auto ref = make_tensor<TestType>({batch, fft_dim});
+  auto out = make_tensor<TestType>({batch, fft_dim});
+  (a = random<TestType>({batch, fft_dim}, NORMAL, 1)).run(e0);
+  (ref = fft(a)).run(e0);
+  e0.sync();
+
+  (out = fft(a)).run(eg);
+  eg.sync();
+  auto err = make_tensor<float>({});
+  (err = max(abs(out - ref))).run(e0);
+  e0.sync();
+  EXPECT_LT(err(), 1e-2f) << "green-context stream results differ from the default-stream reference";
+
+  // Free the workspace allocated on the green-context stream
+  ClearCaches();
+  EXPECT_EQ(cudaGetLastError(), cudaSuccess);
+  MATX_EXIT_HANDLER();
+}
+#endif
 
 TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, IFFT1D1024C2CShort)
 {

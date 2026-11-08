@@ -520,14 +520,14 @@ int main(int argc, char **argv)
     BENCH_CUFFT_CHECK(cufftDestroy(plan));
     BENCH_CUDA_CHECK(cudaFree(normalized));
     BENCH_CUDA_CHECK(cudaFree(fft_output));
-    // Transform workspaces are cached per stream, so release them before the stream
-    matx::ClearCaches();
     BENCH_CUDA_CHECK(cudaStreamDestroy(stream));
   }
   catch (const std::exception &error) {
     std::cerr << "fft_benchmark: " << error.what() << "\n";
+    matx::ClearCachesAndAllocations();
     return 1;
   }
 
+  matx::ClearCachesAndAllocations();
   return 0;
 }
