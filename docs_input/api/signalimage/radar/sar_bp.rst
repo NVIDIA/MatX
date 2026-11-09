@@ -416,13 +416,41 @@ and each term may be reduced modulo :math:`2\pi` independently.
 - In both products, unsigned wraparound performs the reduction modulo one
   revolution exactly, including for negative offsets.
 - The reference ticks and :math:`Q n` are added as integers, converted to
-  radians, and the fractional-bin term :math:`\alpha w` is added in single
-  precision before the ``__sincosf`` evaluation.
+  the units of the fast sine/cosine intrinsic (revolutions or radians; see
+  :ref:`sar_bp_fast_sincos`), and the fractional-bin term :math:`\alpha w`
+  is added in single precision, in the same units, before the sine/cosine
+  evaluation.
 
 The same :math:`n` and :math:`w` select and weight the two range-profile
 samples used for linear interpolation. ``TaylorFast`` therefore reads no
 lookup table, allocates no workspace for one, and needs no complex multiply to
 apply the integer-bin phase.
+
+.. _sar_bp_fast_sincos:
+
+Fast Sine/Cosine and CUDA Toolkit Version
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The single-precision phase evaluations (the per-sample fractional-bin phase
+increment applied with ``PhaseLUTOptimization`` in the ``Float``, ``Mixed``,
+and ``FloatFloat`` compute types, and the synthesized phase in ``TaylorFast``)
+use a fast hardware sine/cosine approximation. Which intrinsic is used depends
+on the CUDA toolkit:
+
+- With CUDA 13.5 or later, MatX forms these phases in revolutions and uses
+  ``__sincos2pif``. This saves one multiply per pixel per pulse compared with
+  ``__sincosf``, which scales its radian argument by :math:`1/2\pi` before
+  the hardware evaluation.
+- With earlier toolkits, MatX forms the phases in radians and uses
+  ``__sincosf``.
+
+The two paths have the same magnitude error, but the revolution path avoids
+the rounding of the :math:`1/2\pi` prescale. This rounding dominates the phase
+error when the argument spans many revolutions, as the fractional-bin term
+does at X band. Images formed by these compute types are therefore slightly
+more accurate, and not bit-identical, when built with CUDA 13.5 or later. The
+``Double`` compute type and the direct (non-LUT) phase paths use full-accuracy
+sine/cosine and are unaffected.
 
 Pixel Height (Z) Assumptions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

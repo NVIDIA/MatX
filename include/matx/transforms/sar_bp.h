@@ -194,6 +194,21 @@ inline void sar_bp_impl(OutImageType &out, const InitialImageType &initial_image
       const double phase_correction_partial =
           4.0 * cuda::std::numbers::pi * params.del_r *
           (params.center_frequency / matx::constants::speed_of_light);
+      // Phase advance per range bin in revolutions (rev_per_bin) and in phase units
+      // (phase_units_per_bin, see SarBpPhaseUnitsPerRev).
+#if MATX_HAS_SINCOS2PIF
+      const double rev_per_bin =
+          2.0 * params.del_r * (params.center_frequency / matx::constants::speed_of_light);
+      const double phase_units_per_bin = rev_per_bin;
+#else
+      // Radian builds derive both from the radian phase advance, as MatX did before
+      // revolution support, so that their results are unchanged.
+      const double rev_per_bin = phase_correction_partial * (0.5 * cuda::std::numbers::inv_pi_v<double>);
+      const double phase_units_per_bin = phase_correction_partial;
+#endif
+      // The fp32 phase-LUT kernels (Mixed, FloatFloat, Float) take the fractional-bin
+      // phase increment per range bin in phase units.
+      const float lut_phase_increment = static_cast<float>(phase_units_per_bin);
 
       const size_t workspace_elem_size = (params.compute_type == SarBpComputeType::Double) ?
         sizeof(cuda::std::complex<double>) : sizeof(cuda::std::complex<float>);
@@ -211,25 +226,25 @@ inline void sar_bp_impl(OutImageType &out, const InitialImageType &initial_image
         cuda::std::complex<float> *phase_lut = static_cast<cuda::std::complex<float> *>(workspace);
         SarBpFillPhaseLUT<double, float><<<lut_grid, lut_block, 0, stream>>>(phase_lut, params.center_frequency, params.del_r, range_profiles.Size(1));
         SarBp<SarBpComputeType::Mixed, OutImageType, InitialImageType, RangeProfilesType, PlatPosType, VoxLocType, RangeToMcpType, PhaseLUT, IsUnitStride, NoTaylorFastThirdOrder, PixelZMode, IdxT><<<grid, block, 0, stream>>>(
-          out, initial_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, dr_inv, static_cast<float>(phase_correction_partial), phase_lut);
+          out, initial_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, dr_inv, lut_phase_increment, phase_lut);
       } else if (params.compute_type == SarBpComputeType::FloatFloat) {
         cuda::std::complex<float> *phase_lut = static_cast<cuda::std::complex<float> *>(workspace);
         SarBpFillPhaseLUT<double, float><<<lut_grid, lut_block, 0, stream>>>(phase_lut, params.center_frequency, params.del_r, range_profiles.Size(1));
         SarBp<SarBpComputeType::FloatFloat, OutImageType, InitialImageType, RangeProfilesType, PlatPosType, VoxLocType, RangeToMcpType, PhaseLUT, IsUnitStride, NoTaylorFastThirdOrder, PixelZMode, IdxT><<<grid, block, 0, stream>>>(
-          out, initial_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, static_cast<fltflt>(dr_inv), static_cast<float>(phase_correction_partial), phase_lut);
+          out, initial_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, static_cast<fltflt>(dr_inv), lut_phase_increment, phase_lut);
       } else if (params.compute_type == SarBpComputeType::TaylorFast) {
         // TaylorFast synthesizes its phase and reads no LUT (detail::SarBpSynthesizesPhase).
         cuda::std::complex<float> *phase_lut = nullptr;
         SarBp<SarBpComputeType::TaylorFast, OutImageType, InitialImageType, RangeProfilesType, PlatPosType, VoxLocType, RangeToMcpType, PhaseLUT, IsUnitStride, TaylorFastAddThirdOrder, PixelZMode, IdxT><<<grid, block, 0, stream>>>(
           out, initial_image, range_profiles, platform_positions, voxel_locations, range_to_mcp,
           SarBpTaylorFastDrInv{dr_inv, static_cast<float>(dr_inv)},
-          SarBpTaylorFastPhaseCorrection::Make(phase_correction_partial), phase_lut);
+          SarBpTaylorFastPhaseCorrection::MakeFromRevolutions(rev_per_bin, phase_units_per_bin), phase_lut);
       } else {
         cuda::std::complex<float> *phase_lut = static_cast<cuda::std::complex<float> *>(workspace);
         SarBpFillPhaseLUT<float, float><<<lut_grid, lut_block, 0, stream>>>(phase_lut, static_cast<float>(params.center_frequency), static_cast<float>(params.del_r), range_profiles.Size(1));
         SarBp<SarBpComputeType::Float, OutImageType, InitialImageType, RangeProfilesType, PlatPosType, VoxLocType, RangeToMcpType, PhaseLUT, IsUnitStride, NoTaylorFastThirdOrder, PixelZMode, IdxT><<<grid, block, 0, stream>>>(
           out, initial_image, range_profiles, platform_positions, voxel_locations, range_to_mcp,
-          static_cast<float>(dr_inv), static_cast<float>(phase_correction_partial), phase_lut);
+          static_cast<float>(dr_inv), lut_phase_increment, phase_lut);
       }
     } else {
       constexpr bool PhaseLUT = false;
