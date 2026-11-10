@@ -102,6 +102,34 @@ the expression will not be JIT compiled. To determine if an operator can be JIT 
       printf("FFT is not supported by JIT\n");
     }
 
+``jit_supported()`` checks both operator support and the expression's combined elements-per-thread (EPT) range on
+the current CUDA device. For MatX expressions it returns false if device attributes are unavailable or the EPT
+requirements do not intersect. It does not compile a kernel or perform a complete launch-resource check.
+Check the complete assignment, including its output layout, when choosing an executor.
+
+For example, with ``-DMATX_EN_MATHDX=ON``, a forward FFT, conjugated frequency-domain model, and inverse FFT can
+execute in one kernel for supported complex types and power-of-two FFT sizes:
+
+.. code-block:: cpp
+
+    // input and output have shape [batches, length]; model has shape [length].
+    // For example: cuda::std::complex<float> tensors with length = 512.
+    const matx::index_t model_shape[] = {input.Size(0), matx::matxKeepDim};
+    auto model_matrix = matx::clone<2>(model, model_shape);
+    auto op = (output = matx::ifft(matx::fft(input) * matx::conj(model_matrix)));
+    if (matx::jit_supported(op)) {
+      op.run(matx::CUDAJITExecutor{});
+    } else {
+      op.run(matx::cudaExecutor{});
+    }
+
+Cloning a tensor across batch dimensions gives those dimensions zero stride. JIT tensor access can use multiple
+EPT for these views when the final dimension has unit stride, its length is divisible by EPT, and every row starts
+at a compatible alignment. Padded rows can also qualify; outer strides for dimensions with more than one element
+must be divisible by EPT. Non-unit final strides and incompatible alignment can restrict a tensor to one EPT.
+Cloning an operator expression retains its existing scalar-EPT restriction. Non-JIT tensor vectorization still
+requires a contiguous layout.
+
 Even if the MathDx library supports a particular operation, other operators in the expression may prevent JIT compilation. For 
 example: 
 
@@ -110,7 +138,8 @@ example:
     auto my_op = (fftshift1D(fft(b)));
 
 In this case the MathDx library requires at least 2 elements per thread for the FFT, but the ``fftshift1D`` operator requires 
-only 1 element per thread. Therefore, the entire expression cannot be JIT-compiled with ``CUDAJITExecutor``. Use a normal
+only 1 element per thread. Therefore, ``jit_supported()`` returns false and the entire expression cannot be JIT-compiled
+with ``CUDAJITExecutor``. Use a normal
 ``CUDAExecutor`` to run the same expression through the non-JIT path. Some of these restrictions may be relaxed in newer
 versions of MatX or the MathDx library.
 

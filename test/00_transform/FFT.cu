@@ -968,7 +968,237 @@ void AssertFFT2JITClose3D(auto &jit_out, auto &ref_out, index_t batches, index_t
     }
   }
 }
+void AssertFFTJITClose(const auto &actual, const auto &reference, double tolerance)
+{
+  for (index_t i = 0; i < TotalSize(reference); ++i) {
+    SCOPED_TRACE(i);
+    const auto expected = reference.Data()[i];
+    ASSERT_NEAR(actual.Data()[i].real(), expected.real(), tolerance * (1.0 + cuda::std::abs(expected.real())));
+    ASSERT_NEAR(actual.Data()[i].imag(), expected.imag(), tolerance * (1.0 + cuda::std::abs(expected.imag())));
+  }
+}
+
+template <typename Complex, int Rank>
+void CheckFusedFFTConjugatedModel()
+{
+  const detail::DeviceAttributes *attrs = nullptr;
+  if (detail::TryGetCurrentDeviceAttributes(attrs) != cudaSuccess) {
+    cudaGetLastError();
+    GTEST_SKIP() << "CUDA device required";
+  }
+  using Scalar = typename Complex::value_type;
+  const double tolerance = cuda::std::is_same_v<Scalar, float> ? 5e-4 : 1e-10;
+  CUDAJITExecutor jit_exec{};
+  cudaExecutor cuda_exec{};
+  for (index_t length : {32, 512}) {
+    for (index_t batches : {1, 3}) {
+      SCOPED_TRACE(::testing::Message() << "rank " << Rank << " batches " << batches << " length " << length);
+      cuda::std::array<index_t, Rank> shape{};
+      shape.fill(2);
+      shape[Rank - 2] = batches;
+      shape[Rank - 1] = length;
+      auto input = make_tensor<Complex>(shape);
+      auto model = make_tensor<Complex>({length});
+      auto output = make_tensor<Complex>(shape);
+      auto reference = make_tensor<Complex>(shape);
+      for (index_t i = 0; i < TotalSize(input); ++i) {
+        input.Data()[i] = Complex{static_cast<Scalar>((i * 7) % 23) / Scalar{23},
+                                  static_cast<Scalar>((i * 3) % 17) / Scalar{17}};
+      }
+      for (index_t i = 0; i < length; ++i) {
+        model(i) = Complex{static_cast<Scalar>((i * 5) % 19) / Scalar{19},
+                           static_cast<Scalar>((i * 11) % 13) / Scalar{13}};
+      }
+
+      // Only an unsupported backend may skip the test. A false result for the
+      // complete assignment is the regression this test must catch.
+      if (!detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(fft(input)) ||
+          !detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(ifft(input))) {
+        GTEST_SKIP() << "cuFFTDx does not support this FFT configuration";
+      }
+      auto model_shape = shape;
+      model_shape[Rank - 1] = matxKeepDim;
+      auto model_matrix = clone<Rank>(model, model_shape);
+      auto assignment = (output = ifft(fft(input) * conj(model_matrix)));
+      for (int launch = 0; launch < 2; ++launch) {
+        SCOPED_TRACE(launch);
+        ASSERT_TRUE(jit_supported(assignment));
+        assignment.run(jit_exec);
+        // Use a separate expression so JIT launch-parameter updates cannot
+        // affect the trusted non-JIT reference path.
+        (reference = ifft(fft(input) * conj(model_matrix))).run(cuda_exec);
+        jit_exec.sync();
+        cuda_exec.sync();
+        AssertFFTJITClose(output, reference, tolerance);
+        for (index_t i = 0; i < TotalSize(input); ++i) {
+          input.Data()[i] += Complex{Scalar{0.125}, Scalar{-0.0625}};
+        }
+      }
+    }
+  }
+}
 } // namespace
+
+TEST(FFTJIT, CuFFTDxFusedFFTConjugatedModelFloat)
+{
+  MATX_ENTER_HANDLER();
+  CheckFusedFFTConjugatedModel<cuda::std::complex<float>, 2>();
+  MATX_EXIT_HANDLER();
+}
+
+TEST(FFTJIT, CuFFTDxFusedFFTConjugatedModelDouble)
+{
+  MATX_ENTER_HANDLER();
+  CheckFusedFFTConjugatedModel<cuda::std::complex<double>, 2>();
+  MATX_EXIT_HANDLER();
+}
+
+TEST(FFTJIT, CuFFTDxFusedFFTConjugatedModelRank3Float)
+{
+  MATX_ENTER_HANDLER();
+  CheckFusedFFTConjugatedModel<cuda::std::complex<float>, 3>();
+  MATX_EXIT_HANDLER();
+}
+
+TEST(FFTJIT, CuFFTDxFusedFFTConjugatedModelRank3Double)
+{
+  MATX_ENTER_HANDLER();
+  CheckFusedFFTConjugatedModel<cuda::std::complex<double>, 3>();
+  MATX_EXIT_HANDLER();
+}
+
+TEST(FFTJIT, CuFFTDxPaddedInputAndOutputRows)
+{
+  MATX_ENTER_HANDLER();
+  const detail::DeviceAttributes *attrs = nullptr;
+  if (detail::TryGetCurrentDeviceAttributes(attrs) != cudaSuccess) {
+    cudaGetLastError();
+    GTEST_SKIP() << "CUDA device required";
+  }
+  constexpr index_t batches = 3;
+  constexpr index_t length = 512;
+  constexpr index_t guard = 32;
+  constexpr index_t input_stride = length + 2 * guard;
+  constexpr index_t output_stride = length + 3 * guard;
+  const FFTJITComplex input_sentinel{12345.0f, -6789.0f};
+  const FFTJITComplex output_sentinel{-23456.0f, 7890.0f};
+  auto input_storage = make_tensor<FFTJITComplex>({batches, input_stride});
+  auto output_storage = make_tensor<FFTJITComplex>({batches, output_stride});
+  auto input = make_tensor<FFTJITComplex>(input_storage.Data() + guard,
+                                         {batches, length}, {input_stride, 1});
+  auto output = make_tensor<FFTJITComplex>(output_storage.Data() + guard,
+                                          {batches, length}, {output_stride, 1});
+  auto reference_input = make_tensor<FFTJITComplex>({batches, length});
+  auto reference = make_tensor<FFTJITComplex>({batches, length});
+  ASSERT_FALSE(input.IsContiguous());
+  ASSERT_FALSE(output.IsContiguous());
+  // Check backend eligibility independently so a regression in padded-row
+  // support fails the assignment assertion instead of skipping the test.
+  if (!detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(fft(reference_input))) {
+    GTEST_SKIP() << "cuFFTDx does not support this FFT configuration";
+  }
+  for (index_t i = 0; i < TotalSize(input_storage); ++i) {
+    input_storage.Data()[i] = input_sentinel;
+  }
+  CUDAJITExecutor jit_exec{};
+  cudaExecutor cuda_exec{};
+  auto assignment = (output = fft(input));
+  for (int launch = 0; launch < 2; ++launch) {
+    SCOPED_TRACE(launch);
+    for (index_t i = 0; i < TotalSize(output_storage); ++i) {
+      output_storage.Data()[i] = output_sentinel;
+    }
+    for (index_t row = 0; row < batches; ++row) {
+      for (index_t col = 0; col < length; ++col) {
+        const FFTJITComplex value{
+            static_cast<float>(((row + 1) * (col + 2)) % 23) / 23.0f + 0.125f * static_cast<float>(launch),
+            static_cast<float>((3 * row + 7 * col) % 17) / 17.0f};
+        input_storage(row, guard + col) = value;
+        reference_input(row, col) = value;
+      }
+    }
+    ASSERT_TRUE(jit_supported(assignment));
+    const detail::EPTQueryInput query{true, *attrs};
+    const auto ept = detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(assignment, query);
+    ASSERT_GT(static_cast<int>(ept[0]), 1);
+    assignment.run(jit_exec);
+    (reference = fft(reference_input)).run(cuda_exec);
+    jit_exec.sync();
+    cuda_exec.sync();
+
+    for (index_t row = 0; row < batches; ++row) {
+      SCOPED_TRACE(row);
+      for (index_t col = 0; col < length; ++col) {
+        SCOPED_TRACE(col);
+        const auto actual = output(row, col);
+        const auto expected = reference(row, col);
+        ASSERT_NEAR(actual.real(), expected.real(), 5e-4f * (1.0f + cuda::std::abs(expected.real())));
+        ASSERT_NEAR(actual.imag(), expected.imag(), 5e-4f * (1.0f + cuda::std::abs(expected.imag())));
+      }
+      for (index_t col = 0; col < input_stride; ++col) {
+        SCOPED_TRACE(col);
+        if (col < guard || col >= guard + length) {
+          EXPECT_EQ(input_storage(row, col), input_sentinel);
+        }
+      }
+      for (index_t col = 0; col < output_stride; ++col) {
+        SCOPED_TRACE(col);
+        if (col < guard || col >= guard + length) {
+          EXPECT_EQ(output_storage(row, col), output_sentinel);
+        }
+      }
+    }
+  }
+  MATX_EXIT_HANDLER();
+}
+
+TEST(FFTJIT, IncompatibleEPTUsesExplicitCUDAFallback)
+{
+  MATX_ENTER_HANDLER();
+  const detail::DeviceAttributes *attrs = nullptr;
+  if (detail::TryGetCurrentDeviceAttributes(attrs) != cudaSuccess) {
+    cudaGetLastError();
+    GTEST_SKIP() << "CUDA device required";
+  }
+  // More than 1024 elements guarantees the block FFT needs multiple EPT.
+  constexpr index_t length = 2048;
+  auto input = make_tensor<FFTJITComplex>({1, length});
+  auto storage = make_tensor<FFTJITComplex>({2 * length});
+  auto model = make_tensor<FFTJITComplex>(storage.Data(), {length}, {2});
+  const index_t model_shape[] = {1, matxKeepDim};
+  auto model_matrix = clone<2>(model, model_shape);
+  auto output = make_tensor<FFTJITComplex>({1, length});
+  auto reference = make_tensor<FFTJITComplex>({1, length});
+  auto spectrum = make_tensor<FFTJITComplex>({1, length});
+  for (index_t i = 0; i < length; ++i) {
+    input(0, i) = FFTJITComplex{static_cast<float>(i % 23) / 23.0f, static_cast<float>(i % 17) / 17.0f};
+    model(i) = FFTJITComplex{static_cast<float>(i % 19) / 19.0f, static_cast<float>(i % 13) / 13.0f};
+  }
+  if (!detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(fft(input)) ||
+      !detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(ifft(input))) {
+    GTEST_SKIP() << "cuFFTDx does not support this FFT configuration";
+  }
+  cudaExecutor cuda_exec{};
+  auto assignment = (output = ifft(fft(input) * conj(model_matrix)));
+  EXPECT_TRUE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(assignment));
+  ASSERT_FALSE(jit_supported(assignment));
+  assignment.run(cuda_exec);
+  (spectrum = fft(input)).run(cuda_exec);
+  (spectrum = spectrum * conj(model_matrix)).run(cuda_exec);
+  (reference = ifft(spectrum)).run(cuda_exec);
+  cuda_exec.sync();
+  AssertFFTJITClose(output, reference, 5e-4);
+
+  auto shifted = (output = fftshift1D(fft(input)));
+  EXPECT_TRUE(detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(shifted));
+  ASSERT_FALSE(jit_supported(shifted));
+  shifted.run(cuda_exec);
+  (spectrum = fft(input)).run(cuda_exec);
+  (reference = fftshift1D(spectrum)).run(cuda_exec);
+  cuda_exec.sync();
+  AssertFFTJITClose(output, reference, 5e-4);
+  MATX_EXIT_HANDLER();
+}
 
 TEST(FFTJIT, CuFFTDx2DFFT2Fusion)
 {
