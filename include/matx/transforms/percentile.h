@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cfloat>
+#include <cmath>
 
 #include "matx/core/cache.h"
 #include "matx/core/error.h"
@@ -118,13 +119,24 @@ void __MATX_INLINE__ percentile_impl(OutType dest, const InType &in, uint32_t q,
         case PercentileMethod::NORMAL_UNBIASED:
         {
           subidx = q/100. * (static_cast<double>(insize) - alpha - beta + 1) + alpha - 1; 
-          auto int_val = at(sort_out, static_cast<index_t>(subidx));
-          (dest = at(sort_out,  static_cast<index_t>(subidx)) + 
-                                as_type<typename InType::value_type>(
-                                  (subidx - std::floor(subidx)) * 
-                                  as_type<double>(at(sort_out, static_cast<index_t>(subidx + 1)) - int_val)
-                                )
-          ).run(exec);
+          // As in NumPy, a virtual index outside [0, n - 1] selects the first or last
+          // element. Without this, the interpolation below would read past the end.
+          if (subidx <= 0.) {
+            (dest = at(sort_out, 0)).run(exec);
+          }
+          else if (subidx >= static_cast<double>(insize - 1)) {
+            (dest = at(sort_out, insize - 1)).run(exec);
+          }
+          else {
+            const index_t lo = static_cast<index_t>(subidx);
+            auto int_val = at(sort_out, lo);
+            (dest = at(sort_out, lo) +
+                                  as_type<typename InType::value_type>(
+                                    (subidx - std::floor(subidx)) *
+                                    as_type<double>(at(sort_out, lo + 1) - int_val)
+                                  )
+            ).run(exec);
+          }
           break;
         }
         case PercentileMethod::LOWER: {
@@ -136,15 +148,27 @@ void __MATX_INLINE__ percentile_impl(OutType dest, const InType &in, uint32_t q,
           break;
         }
         case PercentileMethod::MIDPOINT: {
-          (dest = as_type<typename InType::value_type>(
-                  (at(sort_out, static_cast<index_t>(cuda::std::ceil(base_index))) + 
-                   at(sort_out, static_cast<index_t>(cuda::std::ceil(base_index + 1)))) / 
-                   static_cast<typename InType::value_type>(2))
-          ).run(exec);
+          // Mean of the two elements around the index, or the element itself when the
+          // index is integral
+          const index_t lo = static_cast<index_t>(cuda::std::floor(base_index));
+          const index_t hi = static_cast<index_t>(cuda::std::ceil(base_index));
+          if (lo == hi) {
+            (dest = at(sort_out, lo)).run(exec);
+          }
+          else {
+            (dest = as_type<typename InType::value_type>(
+                    (at(sort_out, lo) + at(sort_out, hi)) /
+                     static_cast<typename InType::value_type>(2))
+            ).run(exec);
+          }
           break;
         }
         case PercentileMethod::NEAREST: {
-          (dest = at(sort_out, static_cast<index_t>(cuda::std::round(base_index)))).run(exec);
+          // Round ties to even independently of the host rounding mode.
+          const index_t lo = static_cast<index_t>(cuda::std::floor(base_index));
+          const double fraction = base_index - static_cast<double>(lo);
+          const index_t nearest = lo + (fraction > 0.5 || (fraction == 0.5 && lo % 2 != 0));
+          (dest = at(sort_out, nearest)).run(exec);
           break;
         }        
         default:
