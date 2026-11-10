@@ -217,6 +217,8 @@ The SER and correlation numbers are produced by the example's own `--gold`/`--cm
 | `taylor_fast` (3rd) | 87.2 dB | 0.99999881 | 0.99999982 | 91.0 dB | 0.99999958 | 0.99999982 |
 | `float` | -1.8 dB | 3.0e-5 | 0.026 | -2.2 dB | 1.9e-5 | 0.021 |
 
+The single-precision modes (`mixed`, `fltflt`, `float` and `taylor_fast`) give slightly different results depending on the CUDA toolkit: with CUDA 13.5 or later they use the `__sincos2pif` intrinsic, which has lower phase error than the `__sincosf` intrinsic used with earlier toolkits (see https://nvidia.github.io/MatX/api/signalimage/radar/sar_bp.html#fast-sine-cosine-and-cuda-toolkit-version). SER values can therefore differ slightly from the table depending on the toolkit used.
+
 Observations:
 
 - `float` is not usable for these spaceborne geometries: a negative SER and near-zero correlation mean the image is effectively decorrelated from the reference. It is included only to make the point concrete. Note that `float` is a bit of a misnomer since `fltflt` and `taylor_fast` also use float, but with compensated arithmetic and reformulations to maintain accuracy. `float` is a direct single-precision implementation with no attempt to improve accuracy.

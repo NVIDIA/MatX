@@ -81,6 +81,34 @@ namespace matx {
     #define __MATX_INLINE__ inline
 #endif
 
+// CUDA 13.5 added fast-approximate trigonometric intrinsics whose argument is
+// measured in cycles (units of 2*pi): __sin2pif, __cos2pif and __sincos2pif.
+// The radian intrinsics (__sinf, __cosf, __sincosf) scale their argument by
+// 1/(2*pi) with a round-toward-zero FMUL before the MUFU.SIN/MUFU.COS
+// instructions; the cycle variants feed MUFU directly and so save that FMUL
+// when the caller can supply the argument in cycles. Skipping the prescale
+// also skips its rounding, so for arguments spanning more than one revolution
+// the cycle variants have markedly lower phase error. The magnitude error of
+// the results is the same for both.
+//
+// MATX_HAS_SINCOS2PIF is normally derived from the toolkit version and is not a
+// user option. The #ifndef guard exists so that MatX's own tests can force the
+// radian fallback (-DMATX_HAS_SINCOS2PIF=0) on CUDA 13.5 or later. Host and
+// device code derive their phase units from this macro independently, so every
+// translation unit in a program, and both the host and device compilation
+// passes, must see the same value.
+#if defined(__CUDACC_VER_MAJOR__) && \
+    (__CUDACC_VER_MAJOR__ > 13 || (__CUDACC_VER_MAJOR__ == 13 && __CUDACC_VER_MINOR__ >= 5))
+  #define MATX_DETAIL_TOOLKIT_HAS_SINCOS2PIF 1
+#else
+  #define MATX_DETAIL_TOOLKIT_HAS_SINCOS2PIF 0
+#endif
+#ifndef MATX_HAS_SINCOS2PIF
+  #define MATX_HAS_SINCOS2PIF MATX_DETAIL_TOOLKIT_HAS_SINCOS2PIF
+#elif MATX_HAS_SINCOS2PIF && !MATX_DETAIL_TOOLKIT_HAS_SINCOS2PIF && defined(__CUDACC__)
+  #error "MATX_HAS_SINCOS2PIF=1 requires nvcc from CUDA 13.5 or later (__sincos2pif is unavailable)"
+#endif
+
 
 #define MATX_STRINGIFY(x) #x
 #define MATX_TOSTRING(x) MATX_STRINGIFY(x)

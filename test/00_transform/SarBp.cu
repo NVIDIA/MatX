@@ -85,6 +85,19 @@ class SarBpTestDoubleType
 TYPED_TEST_SUITE(SarBpTestNonComplexNonHalfFloatTypes, MatXFloatNonComplexNonHalfTypesCUDAExec);
 TYPED_TEST_SUITE(SarBpTestDoubleType, MatXDoubleOnlyTypeCUDAExec);
 
+// Tolerance on the real part of a focused point target formed from num_pulses
+// unit-magnitude samples by the compute types that accumulate in fp32 (Mixed,
+// with or without the phase LUT, FloatFloat and TaylorFast): three fp32
+// epsilons per pulse. The error comes from the magnitude error of each
+// phasor (e.g. ~7.5e-8 for the fast sincos intrinsics on the LUT and
+// TaylorFast paths) plus the rounding of num_pulses fp32 accumulations, which
+// depends on the low-order bits of each phasor and has been observed to reach
+// two epsilons per pulse (128 pulses: 127.99996948, four ulps in [64, 128)).
+static double SarBpF32FocusThreshold(matx::index_t num_pulses)
+{
+  return 3.0 * static_cast<double>(std::numeric_limits<float>::epsilon()) * static_cast<double>(num_pulses);
+}
+
 // Verify the num_range_bins boundary at 2^24 for compute types that compute
 // the per-pulse bin_offset in fp32 (Float, Mixed, FloatFloat, TaylorFast). fp32 can
 // exactly represent all integers in [-2^24, 2^24] but not above, so those
@@ -344,9 +357,7 @@ TYPED_TEST(SarBpTestDoubleType, PointTarget)
       }
     }
   };
-  // Allow a little under two fp32 epsilons per pulse at the focused target.
-  // The precise accumulation error depends on the interpolated-bin phases.
-  const double f32_accum_re_thresh = 2.0e-7 * static_cast<double>(num_pulses);
+  const double f32_accum_re_thresh = SarBpF32FocusThreshold(num_pulses);
 
   // Start with fully fp64 backprojector. The range profiles and all position values are double precision.
   {
@@ -657,8 +668,7 @@ TYPED_TEST(SarBpTestDoubleType, PixelZIsFixedNonZeroHeight)
   MATX_CUDA_CHECK(cudaMemcpy(platform_positions.Data(), h_apc.data(), num_pulses * sizeof(double3), cudaMemcpyHostToDevice));
   MATX_CUDA_CHECK(cudaMemcpy(range_to_mcp.Data(), h_rtm.data(), num_pulses * sizeof(double), cudaMemcpyHostToDevice));
 
-  // Allow a little under two fp32 epsilons per pulse at the focused target.
-  const double f32_accum_re_thresh = 2.0e-7 * static_cast<double>(num_pulses);
+  const double f32_accum_re_thresh = SarBpF32FocusThreshold(num_pulses);
 
   // Confirm the property-enabled reconstruction focuses the point target and is
   // free of spurious energy away from it -- the same structure used by the
@@ -868,15 +878,16 @@ __global__ void SarBpPhaseSynthTestKernel(const SarBpPhaseSynthSample *samples, 
 }
 
 // Largest |P - e^{i*phi}| over the samples, which for unit phasors is the
-// phase error in radians to first order, or the first non-finite error.
-double SarBpPhaseSynthMaxError(const std::vector<SarBpPhaseSynthSample> &h_samples, double alpha, int32_t bin_offset)
+// phase error in radians to first order, or the first non-finite error. rev is
+// the phase advance per range bin in revolutions.
+double SarBpPhaseSynthMaxError(const std::vector<SarBpPhaseSynthSample> &h_samples, double rev, int32_t bin_offset)
 {
   const int count = static_cast<int>(h_samples.size());
   auto samples = make_tensor<SarBpPhaseSynthSample>({count});
   auto out = make_tensor<cuda::std::complex<float>>({count});
   MATX_CUDA_CHECK(cudaMemcpy(samples.Data(), h_samples.data(), count * sizeof(SarBpPhaseSynthSample), cudaMemcpyHostToDevice));
   SarBpPhaseSynthTestKernel<<<(count + 255) / 256, 256>>>(
-      samples.Data(), count, SarBpTaylorFastPhaseCorrection::Make(alpha), bin_offset, out.Data());
+      samples.Data(), count, SarBpTaylorFastPhaseCorrection::MakeFromRevolutions(rev), bin_offset, out.Data());
   MATX_CUDA_CHECK(cudaDeviceSynchronize());
 
   std::vector<cuda::std::complex<float>> h_out(count);
@@ -886,7 +897,7 @@ double SarBpPhaseSynthMaxError(const std::vector<SarBpPhaseSynthSample> &h_sampl
     const SarBpPhaseSynthSample &s = h_samples[i];
     // Reduce the integer-bin part exactly before forming the angle so that
     // the reference itself is accurate for |J| up to 2^24.
-    const double rev = alpha / (2.0 * cuda::std::numbers::pi);
+    const double alpha = 2.0 * cuda::std::numbers::pi * rev;
     const double k = static_cast<double>(s.J) + static_cast<double>(s.n) - static_cast<double>(bin_offset);
     const double int_rev = std::fmod(std::fmod(rev, 1.0) * k, 1.0);
     const double phi = 2.0 * cuda::std::numbers::pi * int_rev + alpha * static_cast<double>(s.w);
@@ -928,26 +939,25 @@ TEST(SarBpPhaseSynthesis, IncrementWrapsAtOneRevolution)
 {
   // A fractional revolution per bin within half a tick of one rounds to
   // 2^32, which must narrow to the phase-equivalent increment 0.
-  const SarBpTaylorFastPhaseCorrection c = SarBpTaylorFastPhaseCorrection::Make(
-      2.0 * cuda::std::numbers::pi * (23.0 + (1.0 - 0x1p-40)));
+  const SarBpTaylorFastPhaseCorrection c = SarBpTaylorFastPhaseCorrection::MakeFromRevolutions(
+      23.0 + (1.0 - 0x1p-40));
   EXPECT_EQ(c.Q, 0u);
 
-  const SarBpTaylorFastPhaseCorrection c2 = SarBpTaylorFastPhaseCorrection::Make(
-      2.0 * cuda::std::numbers::pi * 23.25);
+  const SarBpTaylorFastPhaseCorrection c2 = SarBpTaylorFastPhaseCorrection::MakeFromRevolutions(23.25);
   EXPECT_EQ(c2.Q, 0x40000000u);
   EXPECT_EQ(c2.Q64, 0x4000000000000000ull);
 
-  // For a tiny negative alpha, frac(alpha / 2pi) rounds to exactly 1, which
+  // For a tiny negative rho, frac(rho) rounds to exactly 1, which
   // must also wrap to a zero increment in both widths.
-  const SarBpTaylorFastPhaseCorrection c3 = SarBpTaylorFastPhaseCorrection::Make(-1.0e-300);
+  const SarBpTaylorFastPhaseCorrection c3 = SarBpTaylorFastPhaseCorrection::MakeFromRevolutions(-1.0e-300);
   EXPECT_EQ(c3.Q64, 0ull);
   EXPECT_EQ(c3.Q, 0u);
 
-  // A non-finite alpha has no meaningful increment; Make must still produce a
+  // A non-finite rho has no meaningful increment; MakeFromRevolutions must still produce a
   // defined value rather than convert NaN to an integer.
   for (const double bad : {std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::infinity(),
                            -std::numeric_limits<double>::infinity()}) {
-    const SarBpTaylorFastPhaseCorrection c4 = SarBpTaylorFastPhaseCorrection::Make(bad);
+    const SarBpTaylorFastPhaseCorrection c4 = SarBpTaylorFastPhaseCorrection::MakeFromRevolutions(bad);
     EXPECT_EQ(c4.Q64, 0ull);
     EXPECT_EQ(c4.Q, 0u);
   }
@@ -958,8 +968,7 @@ TEST(SarBpPhaseSynthesis, ReferenceTicks)
   // A quarter revolution per bin: the reference angle for J - bin_offset = k is
   // k/4 revolutions, reduced modulo one revolution for negative k as well.
   constexpr int32_t bin_offset = 1 << 23;
-  const SarBpTaylorFastPhaseCorrection quarter = SarBpTaylorFastPhaseCorrection::Make(
-      2.0 * cuda::std::numbers::pi * 23.25);
+  const SarBpTaylorFastPhaseCorrection quarter = SarBpTaylorFastPhaseCorrection::MakeFromRevolutions(23.25);
   EXPECT_EQ(SarBpRefPhaseTicks(quarter, bin_offset, bin_offset), 0u);
   EXPECT_EQ(SarBpRefPhaseTicks(quarter, bin_offset + 2, bin_offset), 0x80000000u);
   EXPECT_EQ(SarBpRefPhaseTicks(quarter, bin_offset + 3, bin_offset), 0xC0000000u);
@@ -992,19 +1001,19 @@ TEST(SarBpPhaseSynthesis, MatchesDoubleReference)
   MATX_ENTER_HANDLER();
   // X band with 0.36 m bins: about 23 revolutions per range bin, so the
   // fractional-bin term spans up to ~146 rad. The error is dominated by
-  // __sincosf at that argument magnitude and by rounding alpha*w in fp32.
+  // the fast sincos intrinsic at that argument magnitude and by rounding
+  // alpha32*w in fp32.
   // The kernel forms w separately from n, so w can land outside [0, 1) by up
   // to ulp(bin_loc)/2; the samples extend 1e-4 past both ends to cover that.
-  const double alpha = 4.0 * cuda::std::numbers::pi * 0.3623 * 9.6e9 / matx::constants::speed_of_light;
+  const double rev = 2.0 * 0.3623 * 9.6e9 / matx::constants::speed_of_light;
   constexpr int32_t bin_offset = (1 << 24) / 2;
   constexpr float excursion = 1.0e-4f;
   const auto samples = SarBpPhaseSynthSamples(-excursion, 1.0f + excursion, 1 << 16);
-  EXPECT_LT(SarBpPhaseSynthMaxError(samples, alpha, bin_offset), 1.0e-4);
+  EXPECT_LT(SarBpPhaseSynthMaxError(samples, rev, bin_offset), 1.0e-4);
 
   // A whole number of revolutions plus a quarter per bin makes Q*n exercise
   // the integer wraparound with no fractional-tick rounding.
-  const double alpha_q = 2.0 * cuda::std::numbers::pi * 23.25;
-  EXPECT_LT(SarBpPhaseSynthMaxError(samples, alpha_q, bin_offset), 1.0e-4);
+  EXPECT_LT(SarBpPhaseSynthMaxError(samples, 23.25, bin_offset), 1.0e-4);
   MATX_EXIT_HANDLER();
 }
 

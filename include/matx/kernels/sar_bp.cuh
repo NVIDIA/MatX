@@ -193,24 +193,46 @@ using loose_compute_param_t = typename std::conditional<
     ComputeType == SarBpComputeType::Double,
     double, float>::type;
 
-// TaylorFast synthesizes its phase (see below) from the phase-correction factor
-// alpha (radians per range bin). It uses alpha in single precision for the
-// fractional-bin term in the inner pulse loop, and the fractional revolutions per
-// bin, frac(alpha / 2*pi), in fixed point: Q0.64 to form the per-pulse reference
-// ticks (Q0.32) and Q0.32 for the per-bin increment Q. As with dr_inv, all three
-// are formed on the host, here by Make, so the kernel performs no conversions or
-// FP64 rounding to obtain them.
+// The single-precision phase paths (the PhaseLUT fractional-bin increment for
+// Float, Mixed and FloatFloat, and TaylorFast phase synthesis) evaluate sine and
+// cosine with SarBpFastSinCos, whose argument is in "phase units":
+// revolutions with __sincos2pif when MATX_HAS_SINCOS2PIF, otherwise radians with
+// __sincosf. The host (sar_bp_impl) supplies the phase advances in the same
+// units, selected by the same macro. SarBpPhaseUnitsPerRev is the number of
+// phase units in one revolution.
+inline constexpr double SarBpPhaseUnitsPerRev =
+    MATX_HAS_SINCOS2PIF ? 1.0 : 2.0 * cuda::std::numbers::pi_v<double>;
+
+__device__ __forceinline__ void SarBpFastSinCos(float phase, float *sinx, float *cosx)
+{
+#if MATX_HAS_SINCOS2PIF
+    __sincos2pif(phase, sinx, cosx);
+#else
+    __sincosf(phase, sinx, cosx);
+#endif
+}
+
+// TaylorFast synthesizes its phase (see below) from the phase advance per range
+// bin, rho, in revolutions. It uses the fractional revolutions per bin, frac(rho),
+// in fixed point: Q0.64 to form the per-pulse reference ticks (Q0.32) and Q0.32
+// for the per-bin increment Q. It also uses the phase advance per bin in single
+// precision and phase units (alpha32, see SarBpPhaseUnitsPerRev) for the
+// fractional-bin term in the inner pulse loop. As with dr_inv, all three are
+// formed on the host, here by MakeFromRevolutions, so the kernel performs no
+// conversions or FP64 rounding to obtain them.
 struct SarBpTaylorFastPhaseCorrection {
     uint64_t Q64;     // fractional revolutions per bin, Q0.64
-    float    alpha32; // radians per bin
+    float    alpha32; // phase advance per bin in phase units (SarBpPhaseUnitsPerRev)
     uint32_t Q;       // fractional revolutions per bin, Q0.32
 
-    static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ SarBpTaylorFastPhaseCorrection Make(double alpha)
+    // rho is the phase advance per range bin in revolutions, and phase_units the
+    // same advance in phase units (see SarBpPhaseUnitsPerRev). Both are taken so
+    // that the caller controls how each is rounded.
+    static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ SarBpTaylorFastPhaseCorrection MakeFromRevolutions(
+        double rho, double phase_units)
     {
-        constexpr double inv_two_pi = 0.5 * cuda::std::numbers::inv_pi_v<double>;
-        const double rho = alpha * inv_two_pi;
         // frac(rho) reaches 1 only by rounding when rho is a tiny negative value,
-        // and is NaN for a non-finite alpha. Map both to 0 (a whole revolution, or
+        // and is NaN for a non-finite rho. Map both to 0 (a whole revolution, or
         // no increment) so that the conversion stays in range. Scaling by 2^64 is
         // exact, and the conversion truncates only when frac(rho) < 2^-12, by less
         // than 2^-64 revolutions.
@@ -220,7 +242,13 @@ struct SarBpTaylorFastPhaseCorrection {
         // 2^32, which wraps to 0, the phase-equivalent increment. We add half
         // of one Q0.32 step (0x80000000ull) to properly round the last bit of q32.
         const uint32_t q32 = static_cast<uint32_t>((q64 + 0x80000000ull) >> 32);
-        return SarBpTaylorFastPhaseCorrection{q64, static_cast<float>(alpha), q32};
+        return SarBpTaylorFastPhaseCorrection{q64, static_cast<float>(phase_units), q32};
+    }
+
+    // As above, with the phase-unit advance derived from rho.
+    static __MATX_HOST__ __MATX_DEVICE__ __MATX_INLINE__ SarBpTaylorFastPhaseCorrection MakeFromRevolutions(double rho)
+    {
+        return MakeFromRevolutions(rho, SarBpPhaseUnitsPerRev * rho);
     }
 };
 
@@ -300,16 +328,16 @@ __MATX_INLINE__ __MATX_HOST__ __MATX_DEVICE__ uint32_t SarBpRefPhaseTicks(
 __device__ __forceinline__ cuda::std::complex<float> SarBpSynthesizePhase(
     const SarBpTaylorFastPhaseCorrection &c, uint32_t ref_ticks, int32_t n, float w)
 {
-    // 2*pi/2^32 is a power-of-two rescaling of float(pi), so the float constant
-    // carries only the rounding of pi itself.
-    constexpr float rad_per_tick =
-        static_cast<float>(cuda::std::numbers::pi_v<double>) * 0x1p-31f;
     // The uint32 product wraps modulo one revolution for any n, including
     // negative n via the int32 -> uint32 conversion. Reading the tick count as
     // int32 centres it to [-1/2, 1/2) revolutions.
     const int32_t z = static_cast<int32_t>(ref_ticks + c.Q * static_cast<uint32_t>(n));
+    // One tick is 2^-32 revolutions. In revolutions the scale is exact; in
+    // radians it is a power-of-two rescaling of float(2*pi), so the constant
+    // carries only the rounding of pi itself.
+    constexpr float units_per_tick = static_cast<float>(SarBpPhaseUnitsPerRev) * 0x1p-32f;
     float sn, cs;
-    __sincosf(__fmaf_rn(static_cast<float>(z), rad_per_tick, c.alpha32 * w), &sn, &cs);
+    SarBpFastSinCos(__fmaf_rn(static_cast<float>(z), units_per_tick, c.alpha32 * w), &sn, &cs);
     return cuda::std::complex<float>{cs, sn};
 }
 
@@ -625,7 +653,8 @@ __device__ inline SarBpBinAndWeight<float> ComputeBinWeightToPixelTaylorFast(
     const float bin_loc = fmaf(dR, thread_state.dr_inv_f32, ref_bin_frac);
     // Convert the floored integer back to float rather than calling floorf:
     // the int-to-float conversion issues on the FMA pipe, while FRND would
-    // share the conversion/MUFU pipe with the phase's __sincosf.
+    // share the conversion/MUFU pipe with the phase's sine/cosine
+    // (SarBpFastSinCos).
     bin_floor_local = __float2int_rd(bin_loc);
     const float bin_floor = static_cast<float>(bin_floor_local);
     // Re-form the weight against the integer bin rather than taking
@@ -930,8 +959,9 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
         } else {
             // The lambda is also checked when PhaseLUT is false, where the phase
             // factor can be double. On the LUT path this cast is a no-op because
-            // the host already supplies loose_compute_t.
-            __sincosf(static_cast<loose_compute_t>(phase_correction_scalar) * w, &incr_sinx, &incr_cosx);
+            // the host already supplies loose_compute_t, in phase units (see
+            // SarBpPhaseUnitsPerRev).
+            SarBpFastSinCos(static_cast<loose_compute_t>(phase_correction_scalar) * w, &incr_sinx, &incr_cosx);
         }
 
         return loose_complex_compute_t{
