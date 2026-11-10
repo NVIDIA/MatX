@@ -1067,6 +1067,91 @@ TEST(FFTJIT, CuFFTDxFusedFFTConjugatedModelRank3Double)
   MATX_EXIT_HANDLER();
 }
 
+TEST(FFTJIT, CuFFTDxPaddedInputAndOutputRows)
+{
+  MATX_ENTER_HANDLER();
+  const detail::DeviceAttributes *attrs = nullptr;
+  if (detail::TryGetCurrentDeviceAttributes(attrs) != cudaSuccess) {
+    cudaGetLastError();
+    GTEST_SKIP() << "CUDA device required";
+  }
+  constexpr index_t batches = 3;
+  constexpr index_t length = 512;
+  constexpr index_t guard = 32;
+  constexpr index_t input_stride = length + 2 * guard;
+  constexpr index_t output_stride = length + 3 * guard;
+  const FFTJITComplex input_sentinel{12345.0f, -6789.0f};
+  const FFTJITComplex output_sentinel{-23456.0f, 7890.0f};
+  auto input_storage = make_tensor<FFTJITComplex>({batches, input_stride});
+  auto output_storage = make_tensor<FFTJITComplex>({batches, output_stride});
+  auto input = make_tensor<FFTJITComplex>(input_storage.Data() + guard,
+                                         {batches, length}, {input_stride, 1});
+  auto output = make_tensor<FFTJITComplex>(output_storage.Data() + guard,
+                                          {batches, length}, {output_stride, 1});
+  auto reference_input = make_tensor<FFTJITComplex>({batches, length});
+  auto reference = make_tensor<FFTJITComplex>({batches, length});
+  ASSERT_FALSE(input.IsContiguous());
+  ASSERT_FALSE(output.IsContiguous());
+  // Check backend eligibility independently so a regression in padded-row
+  // support fails the assignment assertion instead of skipping the test.
+  if (!detail::get_operator_capability<detail::OperatorCapability::SUPPORTS_JIT>(fft(reference_input))) {
+    GTEST_SKIP() << "cuFFTDx does not support this FFT configuration";
+  }
+  for (index_t i = 0; i < TotalSize(input_storage); ++i) {
+    input_storage.Data()[i] = input_sentinel;
+  }
+  CUDAJITExecutor jit_exec{};
+  cudaExecutor cuda_exec{};
+  auto assignment = (output = fft(input));
+  for (int launch = 0; launch < 2; ++launch) {
+    SCOPED_TRACE(launch);
+    for (index_t i = 0; i < TotalSize(output_storage); ++i) {
+      output_storage.Data()[i] = output_sentinel;
+    }
+    for (index_t row = 0; row < batches; ++row) {
+      for (index_t col = 0; col < length; ++col) {
+        const FFTJITComplex value{
+            static_cast<float>(((row + 1) * (col + 2)) % 23) / 23.0f + 0.125f * static_cast<float>(launch),
+            static_cast<float>((3 * row + 7 * col) % 17) / 17.0f};
+        input_storage(row, guard + col) = value;
+        reference_input(row, col) = value;
+      }
+    }
+    ASSERT_TRUE(jit_supported(assignment));
+    const detail::EPTQueryInput query{true, *attrs};
+    const auto ept = detail::get_operator_capability<detail::OperatorCapability::ELEMENTS_PER_THREAD>(assignment, query);
+    ASSERT_GT(static_cast<int>(ept[0]), 1);
+    assignment.run(jit_exec);
+    (reference = fft(reference_input)).run(cuda_exec);
+    jit_exec.sync();
+    cuda_exec.sync();
+
+    for (index_t row = 0; row < batches; ++row) {
+      SCOPED_TRACE(row);
+      for (index_t col = 0; col < length; ++col) {
+        SCOPED_TRACE(col);
+        const auto actual = output(row, col);
+        const auto expected = reference(row, col);
+        ASSERT_NEAR(actual.real(), expected.real(), 5e-4f * (1.0f + cuda::std::abs(expected.real())));
+        ASSERT_NEAR(actual.imag(), expected.imag(), 5e-4f * (1.0f + cuda::std::abs(expected.imag())));
+      }
+      for (index_t col = 0; col < input_stride; ++col) {
+        SCOPED_TRACE(col);
+        if (col < guard || col >= guard + length) {
+          EXPECT_EQ(input_storage(row, col), input_sentinel);
+        }
+      }
+      for (index_t col = 0; col < output_stride; ++col) {
+        SCOPED_TRACE(col);
+        if (col < guard || col >= guard + length) {
+          EXPECT_EQ(output_storage(row, col), output_sentinel);
+        }
+      }
+    }
+  }
+  MATX_EXIT_HANDLER();
+}
+
 TEST(FFTJIT, IncompatibleEPTUsesExplicitCUDAFallback)
 {
   MATX_ENTER_HANDLER();
