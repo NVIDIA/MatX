@@ -1055,7 +1055,7 @@ TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, PercentileNearestRoundi
       for (auto [q, expected] : {cuda::std::pair{10, 0}, cuda::std::pair{25, 10},
                                  cuda::std::pair{30, 20}, cuda::std::pair{35, 20},
                                  cuda::std::pair{50, 20}, cuda::std::pair{70, 40}}) {
-        (output = percentile(input, q, PercentileMethod::NEAREST)).run(exec);
+        (output = percentile(input, static_cast<unsigned char>(q), PercentileMethod::NEAREST)).run(exec);
         exec.sync();
         EXPECT_EQ(output(), static_cast<TestType>(expected));
         EXPECT_EQ(std::fegetround(), mode);
