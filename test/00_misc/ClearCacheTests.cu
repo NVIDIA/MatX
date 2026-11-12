@@ -38,6 +38,7 @@
 #include <iostream>
 #include <vector>
 #include <unordered_map>
+#include <thread>
 
 using namespace matx;
 
@@ -82,5 +83,32 @@ TEST(ClearCacheTests, TestCase) {
     ASSERT_GE(allocated, static_cast<ptrdiff_t>(2 * four_MiB));
     ASSERT_GE(freed, static_cast<ptrdiff_t>(2 * four_MiB));
 
+    MATX_EXIT_HANDLER();
+}
+// A thread whose first CUDA work is a cached transform workspace on the
+// default stream. The default-stream handles resolve their context through
+// the thread's current context, which the thread has not created yet.
+// ClearCaches() must then free the workspace.
+TEST(ClearCacheTests, StreamAllocOnDefaultStreamWithoutContext) {
+    MATX_ENTER_HANDLER();
+    void *ptr = nullptr;
+    bool had_context = false;
+    std::thread([&]() {
+        try {
+            CUcontext ctx = nullptr;
+            had_context = cuCtxGetCurrent(&ctx) == CUDA_SUCCESS && ctx != nullptr;
+            ptr = detail::GetCache().GetStreamAlloc(0, 1024);
+        } catch (const std::exception &e) {
+            ADD_FAILURE() << e.what();
+        }
+    }).join();
+    if (had_context) {
+        GTEST_SKIP() << "New threads start with a current context";
+    }
+    ASSERT_NE(ptr, nullptr);
+    EXPECT_TRUE(IsAllocated(ptr));
+
+    ClearCaches();
+    EXPECT_FALSE(IsAllocated(ptr));
     MATX_EXIT_HANDLER();
 }

@@ -524,8 +524,10 @@ int main(int argc, char **argv)
   }
   catch (const std::exception &error) {
     std::cerr << "fft_benchmark: " << error.what() << "\n";
+    matx::ClearCachesAndAllocations();
     return 1;
   }
 
+  matx::ClearCachesAndAllocations();
   return 0;
 }
