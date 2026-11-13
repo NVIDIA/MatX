@@ -42,9 +42,7 @@ jobs:
     outputs:
       args: ${{ env.args }}
 
-    # This job only runs for pull request merges or manually via the Actions tab
-    if: |
-         contains( 'cliffburdick,awthomp,tbensonatl,tylera-nvidia,luitjens,tmartin-gh,', format('{0},', github.actor))
+
     steps:
       - name: Check if comment is issued by authorized person
         run: blossom-ci
@@ -55,7 +53,9 @@ jobs:
 
   deploy:
     name: Deploy Github Pages
-    needs: [Authorization]
+    # Only these users can trigger a docs deploy
+    if: |
+         contains( 'cliffburdick,awthomp,tbensonatl,tylera-nvidia,luitjens,tmartin-gh,', format('{0},', github.actor))        
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
