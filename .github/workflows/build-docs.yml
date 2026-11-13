@@ -36,26 +36,10 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  Authorization:
-    name: Authorization
-    runs-on: blossom
-    outputs:
-      args: ${{ env.args }}
-
-    # This job only runs for pull request merges or manually via the Actions tab
-    if: |
-         contains( 'cliffburdick,awthomp,tbensonatl,tylera-nvidia,luitjens,tmartin-gh,', format('{0},', github.actor))
-    steps:
-      - name: Check if comment is issued by authorized person
-        run: blossom-ci
-        env:
-          OPERATION: 'AUTH'
-          REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO_KEY_DATA: ${{ secrets.BLOSSOM_KEY }}
-
   deploy:
     name: Deploy Github Pages
-    needs: [Authorization]
+    if: |
+         contains( 'cliffburdick,awthomp,tbensonatl,tylera-nvidia,luitjens,tmartin-gh,', format('{0},', github.actor))
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
