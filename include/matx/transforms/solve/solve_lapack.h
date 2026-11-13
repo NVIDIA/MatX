@@ -70,10 +70,16 @@ __MATX_INLINE__ void DenseSolveGesvDispatch(lapack_int_t *n,
   }
 }
 
+/**
+ * Run gesv on every matrix. With `status_infos`, matrix i's gesv info is
+ * written to status_infos[i] and stage 1 (getrs, which gesv includes) to zero,
+ * instead of being checked.
+ */
 template <typename ATensor, typename BTensor, ThreadsMode MODE>
 void DenseSolveLapackLoop(ATensor &a_col,
                           BTensor &b_col,
-                          [[maybe_unused]] const HostExecutor<MODE> &exec)
+                          [[maybe_unused]] const HostExecutor<MODE> &exec,
+                          int *status_infos = nullptr)
 {
   using T = typename remove_cvref_t<ATensor>::value_type;
   constexpr int ARANK = remove_cvref_t<ATensor>::Rank();
@@ -81,7 +87,7 @@ void DenseSolveLapackLoop(ATensor &a_col,
   lapack_int_t n = static_cast<lapack_int_t>(a_col.Size(ARANK - 1));
   lapack_int_t nrhs = static_cast<lapack_int_t>(GetDenseSolveNumRhs<ATensor, BTensor>(b_col));
   lapack_int_t info = 0;
-  const auto batch_size = GetNumBatches(a_col);
+  const auto batch_size = static_cast<size_t>(GetNumBatches(a_col));
 
   std::vector<T *> a_ptrs;
   std::vector<T *> b_ptrs;
@@ -94,30 +100,56 @@ void DenseSolveLapackLoop(ATensor &a_col,
   }
 
   std::vector<lapack_int_t> piv(static_cast<size_t>(n));
-  for (uint32_t i = 0; i < batch_size; i++) {
+  for (size_t i = 0; i < batch_size; i++) {
     DenseSolveGesvDispatch(&n, &nrhs, a_ptrs[i], &n, piv.data(), b_ptrs[i],
                            &n, &info);
-    CheckDenseSolveInfo(static_cast<int>(info), "LAPACK", "gesv");
+    if (status_infos != nullptr) {
+      status_infos[i] = static_cast<int>(info);
+      status_infos[batch_size + i] = 0;
+    }
+    else {
+      CheckDenseSolveInfo(static_cast<int>(info), "LAPACK", "gesv");
+    }
   }
 }
 #endif
 
 } // end namespace detail
 
+/**
+ * Solve A * X = B for dense square A on a host executor.
+ *
+ * @param out
+ *   Output tensor X, shaped like B
+ * @param a
+ *   Square coefficient matrices A of shape `... x n x n`
+ * @param b
+ *   Right-hand sides B of shape `... x n` or `... x n x nrhs`
+ * @param exec
+ *   Host executor
+ * @param status
+ *   Optional solver status. When given, gesv info is stored in stage 0 and
+ *   stage 1 is zeroed, instead of being checked.
+ */
 template <typename OutputTensor, typename ATensor, typename BTensor,
           ThreadsMode MODE>
 void dense_solve_impl([[maybe_unused]] OutputTensor &&out,
                       [[maybe_unused]] const ATensor &a,
                       [[maybe_unused]] const BTensor &b,
-                      [[maybe_unused]] const HostExecutor<MODE> &exec)
+                      [[maybe_unused]] const HostExecutor<MODE> &exec,
+                      [[maybe_unused]] detail::SolverStatusState *status = nullptr)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  MATX_ASSERT_STR(MATX_EN_CPU_SOLVER, matxInvalidExecutor,
-    "Trying to run a host Solver executor but host Solver support is not configured");
+  detail::RequireCpuSolver();
 #if MATX_EN_CPU_SOLVER
   using T = typename remove_cvref_t<OutputTensor>::value_type;
 
   detail::ValidateDenseSolve(out, a, b);
+
+  // Validate the status before any work, as the CUDA path does. Two stages,
+  // as on CUDA executors: gesv's factorization, then its solve.
+  const auto status_run = detail::BeginStatusRun(detail::ExecutorKind::Host, status, 2, a);
+  int *status_infos = status_run.Info();
 
   auto a_new = OpToTensor(a, exec);
   auto b_new = OpToTensor(b, exec);
@@ -145,7 +177,7 @@ void dense_solve_impl([[maybe_unused]] OutputTensor &&out,
     auto b_work = make_tensor<T>(b_ptr.get(), b_new.Shape());
     (b_work = b_new).run(exec);
 
-    detail::DenseSolveLapackLoop(a_col, b_work, exec);
+    detail::DenseSolveLapackLoop(a_col, b_work, exec, status_infos);
     matx::copy(out, b_work, exec);
   }
   else {
@@ -154,7 +186,7 @@ void dense_solve_impl([[maybe_unused]] OutputTensor &&out,
     auto b_work_t = detail::TransposeCopy(b_ptr.get(), b_new, exec);
     auto b_col = b_work_t.PermuteMatrix();
 
-    detail::DenseSolveLapackLoop(a_col, b_col, exec);
+    detail::DenseSolveLapackLoop(a_col, b_col, exec, status_infos);
     matx::copy(out, b_work_t.PermuteMatrix(), exec);
   }
 #endif

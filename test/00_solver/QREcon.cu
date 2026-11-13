@@ -353,3 +353,26 @@ TYPED_TEST(QREconSolverTestNonHalfTypes, ProjectionAPI)
   ASSERT_NEAR(mdiff(), SType(0), SType(0.0001));
   MATX_EXIT_HANDLER();
 }
+
+// qr_solver and qr_econ plans with the same shape, type, and stream are cached
+// separately, so each call finds its own plan type
+TEST(QREconSolverCacheTest, QrSolverAndQrEconShareShapes)
+{
+  MATX_ENTER_HANDLER();
+  using T = float;
+  cudaExecutor exec{};
+  auto A = make_tensor<T>({6, 6});
+  (A = random<T>(A.Shape(), NORMAL)).run(exec);
+  auto out = make_tensor<T>({6, 6});
+  auto tau = make_tensor<T>({6});
+  auto q = make_tensor<T>({6, 6});
+  auto r = make_tensor<T>({6, 6});
+  EXPECT_NO_THROW((mtie(out, tau) = qr_solver(A)).run(exec));
+  EXPECT_NO_THROW((mtie(q, r) = qr_econ(A)).run(exec));
+  EXPECT_NO_THROW((mtie(out, tau) = qr_solver(A)).run(exec));
+  // The projection API calls the same transforms with different output tensor types
+  EXPECT_NO_THROW((out = qr_solver(A).Out).run(exec));
+  EXPECT_NO_THROW((q = qr_econ(A).Q).run(exec));
+  exec.sync();
+  MATX_EXIT_HANDLER();
+}

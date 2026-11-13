@@ -129,13 +129,13 @@ __MATX_INLINE__ bool DenseSolveCanUseCublasBatched(const ATensor &a,
   return batches > 1 &&
          n <= std::numeric_limits<int>::max() &&
          nrhs <= std::numeric_limits<int>::max() &&
-         batches <= static_cast<uint32_t>(std::numeric_limits<int>::max());
+         batches <= static_cast<index_t>(std::numeric_limits<int>::max());
 }
 
 struct DenseSolveCUDAParams_t {
   int64_t n;
   int64_t nrhs;
-  uint32_t batch_size;
+  index_t batch_size;
   MatXDataType_t dtype;
   cudaStream_t stream;
 };
@@ -192,8 +192,10 @@ public:
 
   void Create()
   {
-    [[maybe_unused]] const auto ret = cublasCreate(&handle_);
-    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxSolverError);
+    // Create into a local so a failed call leaves handle_ null for the destructor
+    cublasHandle_t handle = nullptr;
+    CheckSolverCublasStatus(cublasCreate(&handle), "cublasCreate");
+    handle_ = handle;
   }
 
   __MATX_INLINE__ cublasHandle_t get() const noexcept
@@ -220,8 +222,10 @@ public:
 
   void Create()
   {
-    [[maybe_unused]] const auto ret = cusolverDnCreate(&handle_);
-    MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
+    // Create into a local so a failed call leaves handle_ null for the destructor
+    cusolverDnHandle_t handle = nullptr;
+    CheckSolverLibraryStatus(cusolverDnCreate(&handle), "cusolverDnCreate");
+    handle_ = handle;
   }
 
   __MATX_INLINE__ cusolverDnHandle_t get() const noexcept
@@ -248,8 +252,10 @@ public:
 
   void Create()
   {
-    [[maybe_unused]] const auto ret = cusolverDnCreateParams(&params_);
-    MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
+    // Create into a local so a failed call leaves params_ null for the destructor
+    cusolverDnParams_t params = nullptr;
+    CheckSolverLibraryStatus(cusolverDnCreateParams(&params), "cusolverDnCreateParams");
+    params_ = params;
   }
 
   __MATX_INLINE__ cusolverDnParams_t get() const noexcept
@@ -282,8 +288,18 @@ public:
     d_info_.Alloc(batch_size * sizeof(int), MATX_ASYNC_DEVICE_MEMORY, stream);
   }
 
+  /**
+   * Run getrfBatched and getrsBatched.
+   *
+   * @param status_info If non-null, getrf info for matrix i is written to
+   * status_info[i] and stage 1 (getrs) is zeroed on the stream, since
+   * getrsBatched reports only one host-side value, which throws here if
+   * nonzero. The call then does not synchronize, and getrs runs whatever
+   * getrf reported. Otherwise getrf info is copied back after a stream
+   * synchronization and checked in debug builds only.
+   */
   template <typename ATensor, typename BTensor>
-  void Exec(ATensor &a_col, BTensor &b_col, const cudaExecutor &exec)
+  void Exec(ATensor &a_col, BTensor &b_col, const cudaExecutor &exec, int *status_info = nullptr)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
@@ -309,25 +325,35 @@ public:
                     h_b_array.size() * sizeof(T *), cudaMemcpyHostToDevice,
                     stream));
 
-    [[maybe_unused]] auto ret = cublasSetStream(handle_.get(), stream);
-    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxSolverError);
+    CheckSolverCublasStatus(cublasSetStream(handle_.get(), stream), "cublasSetStream");
 
-    ret = DenseSolveGetrfBatched(handle_.get(), n, d_a_array_.get(), n,
-                                 d_piv_.get(), d_info_.get(), batch_size);
-    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxSolverError);
+    int *getrf_info = status_info != nullptr ? status_info : d_info_.get();
+    CheckSolverCublasStatus(DenseSolveGetrfBatched(handle_.get(), n, d_a_array_.get(), n,
+                                                   d_piv_.get(), getrf_info, batch_size),
+                            "cuBLAS getrfBatched");
 
-    std::vector<int> h_info(batch_size);
-    MATX_CUDA_CHECK(cudaMemcpyAsync(h_info.data(), d_info_.get(), sizeof(int) * batch_size,
-                    cudaMemcpyDeviceToHost, stream));
-    MATX_CUDA_CHECK(cudaStreamSynchronize(stream));
-    CheckDenseSolveInfos(h_info, "cuBLAS", "getrfBatched");
+    if (status_info == nullptr) {
+      std::vector<int> h_info(static_cast<size_t>(batch_size));
+      CheckSolverInfosOnHost(d_info_.get(), h_info, stream, "cuBLAS getrfBatched", DescribeSingularU);
+    }
 
     int h_getrs_info = 0;
-    ret = DenseSolveGetrsBatched(handle_.get(), n, nrhs, d_a_array_.get(), n,
-                                 d_piv_.get(), d_b_array_.get(), n,
-                                 &h_getrs_info, batch_size);
-    MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxSolverError);
-    CheckDenseSolveInfo(h_getrs_info, "cuBLAS", "getrsBatched");
+    CheckSolverCublasStatus(DenseSolveGetrsBatched(handle_.get(), n, nrhs, d_a_array_.get(), n,
+                                                   d_piv_.get(), d_b_array_.get(), n,
+                                                   &h_getrs_info, batch_size),
+                            "cuBLAS getrsBatched");
+    if (status_info != nullptr) {
+      // getrsBatched checks its arguments on the host and reports one value for
+      // the whole batch, so a failure throws here, and stage 1 holds no
+      // per-matrix failures
+      if (h_getrs_info != 0) {
+        MATX_THROW(matxSolverError, "cuBLAS getrsBatched: " + DescribeSolverInfo(h_getrs_info));
+      }
+      MATX_CUDA_CHECK(cudaMemsetAsync(status_info + batch_size, 0, sizeof(int) * static_cast<size_t>(batch_size), stream));
+    }
+    else {
+      CheckDenseSolveInfo(h_getrs_info, "cuBLAS", "getrsBatched");
+    }
   }
 
 private:
@@ -354,14 +380,11 @@ public:
     handle_.Create();
     dn_params_.Create();
 
-    [[maybe_unused]] auto ret = cusolverDnSetStream(handle_.get(), stream);
-    MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
-
-    ret = cusolverDnXgetrf_bufferSize(
+    CheckSolverLibraryStatus(cusolverDnSetStream(handle_.get(), stream), "cusolverDnSetStream");
+    CheckSolverLibraryStatus(cusolverDnXgetrf_bufferSize(
         handle_.get(), dn_params_.get(), params_.n, params_.n,
         MatXTypeToCudaType<T>(), a_col.Data(), params_.n,
-        MatXTypeToCudaType<T>(), &dspace_, &hspace_);
-    MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
+        MatXTypeToCudaType<T>(), &dspace_, &hspace_), "cuSolver Xgetrf_bufferSize");
 
     const auto batch_size = static_cast<size_t>(params_.batch_size);
     if (dspace_ > 0) {
@@ -377,14 +400,22 @@ public:
     d_info_.Alloc(batch_size * sizeof(int), MATX_ASYNC_DEVICE_MEMORY, stream);
   }
 
+  /**
+   * Run Xgetrf, then Xgetrs, on every matrix.
+   *
+   * @param status_info If non-null, getrf info for matrix i is written to
+   * status_info[i] and getrs info to status_info[batches + i], and the call
+   * does not synchronize; getrs runs whatever getrf reported. Otherwise each
+   * stage's info is copied back after a stream synchronization and checked in
+   * debug builds only. cuSolver return-status errors throw in every build type.
+   */
   template <typename ATensor, typename BTensor>
-  void Exec(ATensor &a_col, BTensor &b_col, const cudaExecutor &exec)
+  void Exec(ATensor &a_col, BTensor &b_col, const cudaExecutor &exec, int *status_info = nullptr)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
     const auto stream = exec.getStream();
-    [[maybe_unused]] auto ret = cusolverDnSetStream(handle_.get(), stream);
-    MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
+    CheckSolverLibraryStatus(cusolverDnSetStream(handle_.get(), stream), "cusolverDnSetStream");
 
     std::vector<T *> h_a_array;
     std::vector<T *> h_b_array;
@@ -396,40 +427,42 @@ public:
       SetBatchPointers<BatchType::MATRIX>(b_col, h_b_array);
     }
 
-    for (uint32_t i = 0; i < params_.batch_size; i++) {
+    const auto batch_size = static_cast<size_t>(params_.batch_size);
+    // With a status, getrf info is its stage 0 and getrs info its stage 1
+    int *getrf_info = status_info != nullptr ? status_info : d_info_.get();
+    int *getrs_info = status_info != nullptr ? status_info + batch_size : d_info_.get();
+    for (size_t i = 0; i < batch_size; i++) {
       auto *d_work = dspace_ > 0 ? d_workspace_.get() + i * dspace_ : nullptr;
       auto *h_work = hspace_ > 0 ? h_workspace_.get() + i * hspace_ : nullptr;
-      ret = cusolverDnXgetrf(
+      const auto ret = cusolverDnXgetrf(
           handle_.get(), dn_params_.get(), params_.n, params_.n,
           MatXTypeToCudaType<T>(), h_a_array[i], params_.n,
           d_piv_.get() + static_cast<size_t>(i) * params_.n,
           MatXTypeToCudaType<T>(), d_work, dspace_, h_work, hspace_,
-          d_info_.get() + i);
-      MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
+          getrf_info + i);
+      CheckSolverLibraryStatus(ret, "cuSolver Xgetrf");
     }
 
-    std::vector<int> h_info(params_.batch_size);
-    MATX_CUDA_CHECK(cudaMemcpyAsync(h_info.data(), d_info_.get(),
-                    sizeof(int) * params_.batch_size, cudaMemcpyDeviceToHost,
-                    stream));
-    MATX_CUDA_CHECK(cudaStreamSynchronize(stream));
-    CheckDenseSolveInfos(h_info, "cuSolver", "Xgetrf");
+    std::vector<int> h_info(status_info != nullptr ? 0 : batch_size);
+    if (status_info == nullptr) {
+      CheckSolverInfosOnHost(d_info_.get(), h_info, stream, "cuSolver Xgetrf", DescribeSingularU);
+    }
 
-    for (uint32_t i = 0; i < params_.batch_size; i++) {
-      ret = cusolverDnXgetrs(
+    for (size_t i = 0; i < batch_size; i++) {
+      const auto ret = cusolverDnXgetrs(
           handle_.get(), dn_params_.get(), CUBLAS_OP_N, params_.n,
           params_.nrhs, MatXTypeToCudaType<T>(), h_a_array[i], params_.n,
           d_piv_.get() + static_cast<size_t>(i) * params_.n,
           MatXTypeToCudaType<T>(), h_b_array[i], params_.n,
-          d_info_.get() + i);
-      MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
+          getrs_info + i);
+      CheckSolverLibraryStatus(ret, "cuSolver Xgetrs");
     }
 
-    MATX_CUDA_CHECK(cudaMemcpyAsync(h_info.data(), d_info_.get(),
-                    sizeof(int) * params_.batch_size, cudaMemcpyDeviceToHost,
-                    stream));
-    MATX_CUDA_CHECK(cudaStreamSynchronize(stream));
-    CheckDenseSolveInfos(h_info, "cuSolver", "Xgetrs");
+    if (status_info != nullptr) {
+      return;
+    }
+
+    CheckSolverInfosOnHost(d_info_.get(), h_info, stream, "cuSolver Xgetrs");
   }
 
 private:
@@ -454,7 +487,8 @@ using dense_solve_cusolver_cuda_cache_t =
 template <typename ATensor, typename BTensor>
 void DenseSolveCublasBatched(ATensor &a_col,
                              BTensor &b_col,
-                             const cudaExecutor &exec)
+                             const cudaExecutor &exec,
+                             int *status_info)
 {
   using T = typename remove_cvref_t<ATensor>::value_type;
   auto params = GetDenseSolveCUDAParams(a_col, b_col, exec);
@@ -468,7 +502,7 @@ void DenseSolveCublasBatched(ATensor &a_col,
         return std::make_shared<cache_val_type>(params, exec);
       },
       [&](std::shared_ptr<cache_val_type> ctype) {
-        ctype->Exec(a_col, b_col, exec);
+        ctype->Exec(a_col, b_col, exec, status_info);
       },
       exec);
 }
@@ -476,7 +510,8 @@ void DenseSolveCublasBatched(ATensor &a_col,
 template <typename ATensor, typename BTensor>
 void DenseSolveCusolverLoop(ATensor &a_col,
                             BTensor &b_col,
-                            const cudaExecutor &exec)
+                            const cudaExecutor &exec,
+                            int *status_info)
 {
   using T = typename remove_cvref_t<ATensor>::value_type;
   auto params = GetDenseSolveCUDAParams(a_col, b_col, exec);
@@ -490,24 +525,46 @@ void DenseSolveCusolverLoop(ATensor &a_col,
         return std::make_shared<cache_val_type>(params, a_col, exec);
       },
       [&](std::shared_ptr<cache_val_type> ctype) {
-        ctype->Exec(a_col, b_col, exec);
+        ctype->Exec(a_col, b_col, exec, status_info);
       },
       exec);
 }
 
 } // end namespace detail
 
+/**
+ * Solve A * X = B for dense square A on a CUDA executor.
+ *
+ * @param out
+ *   Output tensor X, shaped like B
+ * @param a
+ *   Square coefficient matrices A of shape `... x n x n`
+ * @param b
+ *   Right-hand sides B of shape `... x n` or `... x n x nrhs`
+ * @param exec
+ *   CUDA executor
+ * @param status
+ *   Optional solver status. When given, getrf info is written to stage 0 and
+ *   getrs info to stage 1 on the stream, and the call does not synchronize the
+ *   stream.
+ */
 template <typename OutputTensor, typename ATensor, typename BTensor>
 void dense_solve_impl(OutputTensor &&out,
                       const ATensor &a,
                       const BTensor &b,
-                      const cudaExecutor &exec)
+                      const cudaExecutor &exec,
+                      detail::SolverStatusState *status = nullptr)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
   using T = typename remove_cvref_t<OutputTensor>::value_type;
 
   detail::ValidateDenseSolve(out, a, b);
+
+  // Validate the status before any work, so a rejected status allocates nothing.
+  // Two stages: getrf, then getrs.
+  const auto status_run = detail::BeginStatusRun(detail::ExecutorKind::Cuda, status, 2, a);
+  int *status_info = status_run.Info();
 
   auto a_new = OpToTensor(a, exec);
   auto b_new = OpToTensor(b, exec);
@@ -538,10 +595,10 @@ void dense_solve_impl(OutputTensor &&out,
     (b_work = b_new).run(exec);
 
     if (detail::DenseSolveCanUseCublasBatched<decltype(a_col), decltype(b_work)>(a_col, b_work)) {
-      detail::DenseSolveCublasBatched(a_col, b_work, exec);
+      detail::DenseSolveCublasBatched(a_col, b_work, exec, status_info);
     }
     else {
-      detail::DenseSolveCusolverLoop(a_col, b_work, exec);
+      detail::DenseSolveCusolverLoop(a_col, b_work, exec, status_info);
     }
 
     matx::copy(out, b_work, exec);
@@ -553,10 +610,10 @@ void dense_solve_impl(OutputTensor &&out,
     auto b_col = b_work_t.PermuteMatrix();
 
     if (detail::DenseSolveCanUseCublasBatched<decltype(a_col), decltype(b_col)>(a_col, b_col)) {
-      detail::DenseSolveCublasBatched(a_col, b_col, exec);
+      detail::DenseSolveCublasBatched(a_col, b_col, exec, status_info);
     }
     else {
-      detail::DenseSolveCusolverLoop(a_col, b_col, exec);
+      detail::DenseSolveCusolverLoop(a_col, b_col, exec, status_info);
     }
 
     matx::copy(out, b_work_t.PermuteMatrix(), exec);

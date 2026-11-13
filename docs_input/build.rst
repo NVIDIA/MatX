@@ -91,6 +91,8 @@ Host support is provided by the C++ standard library and different CPU math libr
 be used for FFT, BLAS, and LAPACK support on ARM. Other supported libraries include FFTW_ for FFT support, OpenBLAS_ or BLIS_
 for BLAS support, and OpenBLAS for LAPACK support. BLAS enables matrix and vector product functions like ``matmul``, ``outer``,
 and ``matvec``. LAPACK enables all matrix decomposition/factorization functions like ``chol``, ``qr``, ``svd``, and others.
+Without LAPACK support (NVPL, or OpenBLAS built with LAPACK), these functions throw ``matxInvalidExecutor`` when run
+on a host executor, in every build type.
 
 Below are the CMake options to enable each library:
 

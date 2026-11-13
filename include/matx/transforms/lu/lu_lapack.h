@@ -123,9 +123,16 @@ public:
     return params;
   }
 
+  /**
+   * Run getrf on every matrix.
+   *
+   * @param status_infos If non-null, matrix i's info is written to
+   * status_infos[i] instead of being checked. Otherwise nonzero info fails a
+   * debug-only assert.
+   */
   template <ThreadsMode MODE>
   void Exec(OutputTensor &out, PivotTensor &piv,
-            const ATensor &a, const HostExecutor<MODE> &exec)
+            const ATensor &a, const HostExecutor<MODE> &exec, int *status_infos = nullptr)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
@@ -151,7 +158,10 @@ public:
       getrf_dispatch(&params.m, &params.n, reinterpret_cast<T1*>(this->batch_a_ptrs[i]),
                      &params.m, reinterpret_cast<T2*>(this->batch_piv_ptrs[i]), &info);
 
-      if (info < 0) {
+      if (status_infos != nullptr) {
+        status_infos[i] = static_cast<int>(info);
+      }
+      else if (info < 0) {
         MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
           ("Parameter " + std::to_string(-info) + " had an illegal value in LAPACK getrf").c_str());
       } else {
@@ -218,19 +228,26 @@ private:
  *   Input matrix A
  * @param exec
  *   Host Executor
+ * @param status
+ *   Optional solver status. When given, getrf info is stored in it instead of
+ *   being checked.
  */
 template <typename OutputTensor, typename PivotTensor, typename ATensor, ThreadsMode MODE>
 void lu_impl([[maybe_unused]] OutputTensor &&out,
              [[maybe_unused]] PivotTensor &&piv,
              [[maybe_unused]] const ATensor &a,
-             [[maybe_unused]] const HostExecutor<MODE> &exec)
+             [[maybe_unused]] const HostExecutor<MODE> &exec,
+             [[maybe_unused]] detail::SolverStatusState *status = nullptr)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  MATX_ASSERT_STR(MATX_EN_CPU_SOLVER, matxInvalidExecutor,
-    "Trying to run a host Solver executor but host Solver support is not configured");
+  detail::RequireCpuSolver();
 #if MATX_EN_CPU_SOLVER
 
   using T1 = typename remove_cvref_t<OutputTensor>::value_type;
+
+  // Validate the status before any work, as the CUDA path does. One stage: getrf.
+  const auto status_run = detail::BeginStatusRun(detail::ExecutorKind::Host, status, 1, a);
+  int *status_infos = status_run.Info();
 
   auto piv_new = OpToTensor(piv, exec);
   auto a_new = OpToTensor(a, exec);
@@ -243,19 +260,19 @@ void lu_impl([[maybe_unused]] OutputTensor &&out,
      LAPACK doesn't support row-major layouts. Since we want to make the
      library appear as though everything is row-major, we take a performance hit
      to transpose in and out of the function. LAPACKE, however, supports both formats.
+     The tensor owns the transpose buffer, so an exception frees it.
   */
-  T1 *tp;
-  matxAlloc(reinterpret_cast<void **>(&tp), a_new.Bytes(), MATX_HOST_MALLOC_MEMORY);
+  auto tp_tensor = make_tensor<T1>(a_new.Shape(), MATX_HOST_MALLOC_MEMORY);
+  T1 *tp = tp_tensor.Data();
   auto tv = TransposeCopy(tp, a_new, exec);
   auto tvt = tv.PermuteMatrix();
 
   detail::matxDnLUHostPlan_t<OutputTensor, decltype(piv_new), decltype(a_new)> lu_plan(piv_new, tvt);
-  lu_plan.Exec(tvt, piv_new, tvt, exec);
+  lu_plan.Exec(tvt, piv_new, tvt, exec, status_infos);
 
   /* Temporary WAR
-   * Copy and free async buffer for transpose */
+   * Copy out of the transpose buffer, which tp_tensor frees on return */
   matx::copy(out, tv.PermuteMatrix(), exec);
-  matxFree(tp);
 #endif
 }
 

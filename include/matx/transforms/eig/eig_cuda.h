@@ -128,14 +128,14 @@ public:
   {
 #if CUSOLVER_VERSION > 11701 || (CUSOLVER_VERSION == 11701 && CUSOLVER_VER_BUILD >=2)
     // Use vector mode for a larger workspace size that works for both modes
-    [[maybe_unused]] cusolverStatus_t ret = cusolverDnXsyevBatched_bufferSize(
+    const cusolverStatus_t ret = cusolverDnXsyevBatched_bufferSize(
                     this->handle, this->dn_params, CUSOLVER_EIG_MODE_VECTOR,
                     params.uplo, params.n, MatXTypeToCudaType<T1>(), params.A,
                     params.n, MatXTypeToCudaType<T2>(), params.W,
                     MatXTypeToCudaType<T1>(), &this->dspace,
                     &this->hspace, params.batch_size);
 #else
-    [[maybe_unused]] cusolverStatus_t ret = cusolverDnXsyevd_bufferSize(
+    const cusolverStatus_t ret = cusolverDnXsyevd_bufferSize(
                     this->handle, this->dn_params, CUSOLVER_EIG_MODE_VECTOR,
                     params.uplo, params.n, MatXTypeToCudaType<T1>(), params.A,
                     params.n, MatXTypeToCudaType<T2>(), params.W,
@@ -143,7 +143,7 @@ public:
                     &this->hspace);
 #endif
 
-    MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
+    CheckSolverLibraryStatus(ret, "cuSolver syev bufferSize");
   }
 
   static DnEigCUDAParams_t GetEigParams(WTensor &w,
@@ -166,11 +166,20 @@ public:
     return params;
   }
 
+  /**
+   * Run the symmetric eigensolver on every matrix.
+   *
+   * @param status_info If non-null, each matrix's info is written to
+   * status_info[i], and the call does not synchronize. Otherwise info is copied
+   * back after a stream synchronization and checked in debug builds only.
+   * cuSolver return-status errors throw in every build type.
+   */
   void Exec(OutputTensor &out, WTensor &w,
             const ATensor &a,
             const cudaExecutor &exec,
             cusolverEigMode_t jobz = CUSOLVER_EIG_MODE_VECTOR,
-            cublasFillMode_t uplo = CUBLAS_FILL_MODE_UPPER)
+            cublasFillMode_t uplo = CUBLAS_FILL_MODE_UPPER,
+            int *status_info = nullptr)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
@@ -189,56 +198,46 @@ public:
     }
 
     const auto stream = exec.getStream();
-    cusolverDnSetStream(this->handle, stream);
+    CheckSolverLibraryStatus(cusolverDnSetStream(this->handle, stream), "cusolverDnSetStream");
+
+    // With a status, info goes into it instead of being checked here
+    int *infos = status_info != nullptr ? status_info : this->d_info;
 
 #if CUSOLVER_VERSION > 11701 || ( CUSOLVER_VERSION == 11701 && CUSOLVER_VER_BUILD >=2)
-    [[maybe_unused]] auto ret = cusolverDnXsyevBatched(
+    const auto ret = cusolverDnXsyevBatched(
         this->handle, this->dn_params, jobz, uplo, params.n, MatXTypeToCudaType<T1>(),
         out.Data(), params.n, MatXTypeToCudaType<T2>(), w.Data(),
         MatXTypeToCudaType<T1>(),
         reinterpret_cast<uint8_t *>(this->d_workspace), this->dspace,
         reinterpret_cast<uint8_t *>(this->h_workspace), this->hspace,
-        this->d_info, params.batch_size);
-
-    MATX_ASSERT_STR_EXP(ret, CUSOLVER_STATUS_SUCCESS, matxSolverError,
-      ("cusolverDnXsyevBatched failed with error " + std::to_string(ret)).c_str());
-
-    std::vector<int> h_info(params.batch_size);
-    MATX_CUDA_CHECK(cudaMemcpyAsync(h_info.data(), this->d_info, sizeof(int) * params.batch_size, cudaMemcpyDeviceToHost, stream));
+        infos, params.batch_size);
+    CheckSolverLibraryStatus(ret, "cuSolver XsyevBatched");
 #else
     SetBatchPointers<BatchType::MATRIX>(out, this->batch_a_ptrs);
     SetBatchPointers<BatchType::VECTOR>(w, this->batch_w_ptrs);
 
     // Older cuSolver versions do not support batching with cusolverDnXsyevd
     for (size_t i = 0; i < this->batch_a_ptrs.size(); i++) {
-      [[maybe_unused]] auto ret = cusolverDnXsyevd(
+      const auto ret = cusolverDnXsyevd(
           this->handle, this->dn_params, jobz, uplo, params.n, MatXTypeToCudaType<T1>(),
           this->batch_a_ptrs[i], params.n, MatXTypeToCudaType<T2>(), this->batch_w_ptrs[i],
           MatXTypeToCudaType<T1>(),
           reinterpret_cast<uint8_t *>(this->d_workspace) + i * this->dspace, this->dspace,
           reinterpret_cast<uint8_t *>(this->h_workspace) + i * this->hspace, this->hspace,
-          this->d_info + i);
-
-      MATX_ASSERT_STR_EXP(ret, CUSOLVER_STATUS_SUCCESS, matxSolverError,
-        ("cusolverDnXsyevBatched failed with error " + std::to_string(ret)).c_str());
+          infos + i);
+      CheckSolverLibraryStatus(ret, "cuSolver Xsyevd");
     }
-
-    std::vector<int> h_info(this->batch_a_ptrs.size());
-    MATX_CUDA_CHECK(cudaMemcpyAsync(h_info.data(), this->d_info, sizeof(int) * this->batch_a_ptrs.size(), cudaMemcpyDeviceToHost, stream));
 #endif
 
-    // This will block. Figure this out later
-    MATX_CUDA_CHECK(cudaStreamSynchronize(stream));
-
-    for (const auto& info : h_info) {
-      if (info < 0) {
-        MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
-          ("Parameter " + std::to_string(-info) + " had an illegal value in cuSolver Xsyevd").c_str());
-      } else {
-        MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
-            (std::to_string(info) + " off-diagonal elements of an intermediate tridiagonal form did not converge to zero in cuSolver Xsyevd").c_str());
-      }
+    if (status_info != nullptr) {
+      return;
     }
+
+    std::vector<int> h_info(params.batch_size);
+    CheckSolverInfosOnHost(this->d_info, h_info, stream, "cuSolver Xsyevd",
+        [](int info) -> std::string {
+          return std::to_string(info) + " off-diagonal elements of an intermediate tridiagonal form did not converge to zero";
+        });
   }
 
   /**
@@ -311,15 +310,25 @@ using eig_cuda_cache_t = std::unordered_map<DnEigCUDAParams_t, std::any, DnEigCU
  *   EigenMode::NO_VECTOR to not compute
  * @param uplo
  *   Where to store data in A
+ * @param status
+ *   Optional solver status. When given, each matrix's eigensolver info is
+ *   written into it on the stream, and the call does not synchronize the
+ *   stream.
  */
 template <typename OutputTensor, typename WTensor, typename ATensor>
 void eig_impl(OutputTensor &&out, WTensor &&w,
          const ATensor &a, const cudaExecutor &exec,
          EigenMode jobz = EigenMode::VECTOR,
-         SolverFillMode uplo = SolverFillMode::UPPER)
+         SolverFillMode uplo = SolverFillMode::UPPER,
+         detail::SolverStatusState *status = nullptr)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   using T1 = typename remove_cvref_t<OutputTensor>::value_type;
+
+  // Validate the status before any work, so a rejected status allocates nothing.
+  // One stage: syevd (or its batched form).
+  const auto status_run = detail::BeginStatusRun(detail::ExecutorKind::Cuda, status, 1, a);
+  int *status_info = status_run.Info();
 
   auto w_new = OpToTensor(w, exec);
   auto a_new = OpToTensor(a, exec);
@@ -333,10 +342,10 @@ void eig_impl(OutputTensor &&out, WTensor &&w,
      library appear as though everything is row-major, we take a performance hit
      to transpose in and out of the function. Eventually this may be fixed in
      cuSolver.
+     The tensor owns the transpose buffer, so an exception frees it.
   */
-  T1 *tp;
-  matxAlloc(reinterpret_cast<void **>(&tp), a_new.Bytes(), MATX_ASYNC_DEVICE_MEMORY,
-              exec.getStream());
+  auto tp_tensor = make_tensor<T1>(a_new.Shape(), MATX_ASYNC_DEVICE_MEMORY, exec.getStream());
+  T1 *tp = tp_tensor.Data();
   auto tv = TransposeCopy(tp, a_new, exec);
 
   cusolverEigMode_t jobz_cusolver = (jobz == EigenMode::VECTOR) ? CUSOLVER_EIG_MODE_VECTOR : CUSOLVER_EIG_MODE_NOVECTOR;
@@ -357,14 +366,13 @@ void eig_impl(OutputTensor &&out, WTensor &&w,
       return std::make_shared<cache_val_type>(w_new, tv, exec, jobz_cusolver, uplo_cusolver);
     },
     [&](std::shared_ptr<cache_val_type> ctype) {
-      ctype->Exec(tv, w_new, tv, exec, jobz_cusolver, uplo_cusolver);
+      ctype->Exec(tv, w_new, tv, exec, jobz_cusolver, uplo_cusolver, status_info);
     },
     exec
   );
 
-  /* Copy and free async buffer for transpose */
+  /* Copy out of the transpose buffer, which tp_tensor frees on return */
   matx::copy(out, tv.PermuteMatrix(), exec);
-  matxFree(tp);
 }
 
 } // end namespace matx

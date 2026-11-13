@@ -72,8 +72,9 @@ void det_impl(OutputTensor &out, const InputTensor &a,
          const Executor &exec)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  MATX_ASSERT_STR(!(is_host_executor_v<Executor> && !MATX_EN_CPU_SOLVER), matxInvalidExecutor,
-    "Trying to run a host Solver executor but host Solver support is not configured");
+  if constexpr (is_host_executor_v<Executor>) {
+    detail::RequireCpuSolver();
+  }
 
   static_assert(OutputTensor::Rank() == InputTensor::Rank() - 2, "Output tensor rank must be 2 less than input for det()");
   constexpr int RANK = InputTensor::Rank();

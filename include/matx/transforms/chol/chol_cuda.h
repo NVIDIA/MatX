@@ -111,12 +111,12 @@ public:
 
   void GetWorkspaceSize() override
   {
-    [[maybe_unused]] cusolverStatus_t ret = cusolverDnXpotrf_bufferSize(this->handle, this->dn_params, params.uplo,
+    CheckSolverLibraryStatus(cusolverDnXpotrf_bufferSize(this->handle, this->dn_params, params.uplo,
                                             params.n, MatXTypeToCudaType<T1>(),
                                             params.A, params.n,
                                             MatXTypeToCudaType<T1>(), &this->dspace,
-                                            &this->hspace);
-    MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
+                                            &this->hspace),
+                             "cuSolver Xpotrf_bufferSize");
   }
 
   static DnCholCUDAParams_t GetCholParams(const ATensor &a,
@@ -134,8 +134,17 @@ public:
     return params;
   }
 
+  /**
+   * Run potrf on every matrix.
+   *
+   * @param status_info If non-null, each matrix's info is written to
+   * status_info[i], and the call does not synchronize. Otherwise info is copied
+   * back after a stream synchronization and checked in debug builds only.
+   * cuSolver return-status errors throw in every build type.
+   */
   void Exec(OutputTensor &out, const ATensor &a,
-            const cudaExecutor &exec, cublasFillMode_t uplo = CUBLAS_FILL_MODE_UPPER)
+            const cudaExecutor &exec, cublasFillMode_t uplo = CUBLAS_FILL_MODE_UPPER,
+            int *status_info = nullptr)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
@@ -153,36 +162,32 @@ public:
     }
 
     const auto stream = exec.getStream();
-    cusolverDnSetStream(this->handle, stream);
+    CheckSolverLibraryStatus(cusolverDnSetStream(this->handle, stream), "cusolverDnSetStream");
+
+    // With a status, info goes into it instead of being checked here
+    int *infos = status_info != nullptr ? status_info : this->d_info;
 
     // At this time cuSolver does not have a batched 64-bit cholesky interface.
     // Change this to use the batched version once available.
     for (size_t i = 0; i < this->batch_a_ptrs.size(); i++) {
-      [[maybe_unused]] auto ret = cusolverDnXpotrf(
+      const auto ret = cusolverDnXpotrf(
           this->handle, this->dn_params, uplo, params.n, MatXTypeToCudaType<T1>(),
           this->batch_a_ptrs[i], params.n, MatXTypeToCudaType<T1>(),
           reinterpret_cast<uint8_t *>(this->d_workspace) + i * this->dspace, this->dspace,
           reinterpret_cast<uint8_t *>(this->h_workspace) + i * this->hspace, this->hspace,
-          this->d_info + i);
+          infos + i);
+      CheckSolverLibraryStatus(ret, "cuSolver Xpotrf");
+    }
 
-      MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
+    if (status_info != nullptr) {
+      return;
     }
 
     std::vector<int> h_info(this->batch_a_ptrs.size());
-    MATX_CUDA_CHECK(cudaMemcpyAsync(h_info.data(), this->d_info, sizeof(int) * this->batch_a_ptrs.size(), cudaMemcpyDeviceToHost, stream));
-
-    // This will block. Figure this out later
-    MATX_CUDA_CHECK(cudaStreamSynchronize(stream));
-
-    for (const auto& info : h_info) {
-      if (info < 0) {
-        MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
-          ("Parameter " + std::to_string(-info) + " had an illegal value in cuSolver Xpotrf").c_str());
-      } else {
-        MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
-          (std::to_string(info) + "-th leading minor is not positive definite in cuSolver Xpotrf").c_str());
-      }
-    }
+    CheckSolverInfosOnHost(this->d_info, h_info, stream, "cuSolver Xpotrf",
+        [](int info) -> std::string {
+          return "the leading minor of order " + std::to_string(info) + " is not positive definite";
+        });
   }
 
   /**
@@ -255,17 +260,26 @@ using chol_cuda_cache_t = std::unordered_map<DnCholCUDAParams_t, std::any, DnCho
  *   CUDA executor
  * @param uplo
  *   Part of matrix to fill
+ * @param status
+ *   Optional solver status. When given, potrf info is written into it on the
+ *   stream, and the call does not synchronize the stream.
  */
 template <typename OutputTensor, typename ATensor>
 void chol_impl(OutputTensor &&out, const ATensor &a,
           const cudaExecutor &exec,
-          SolverFillMode uplo = SolverFillMode::UPPER)
+          SolverFillMode uplo = SolverFillMode::UPPER,
+          detail::SolverStatusState *status = nullptr)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
   using OutputTensor_t = remove_cvref_t<OutputTensor>;
   using T1 = typename OutputTensor_t::value_type;
   constexpr int RANK = ATensor::Rank();
+
+  // Validate the status before any work, so a rejected status allocates nothing.
+  // One stage: potrf.
+  const auto status_run = detail::BeginStatusRun(detail::ExecutorKind::Cuda, status, 1, a);
+  int *status_info = status_run.Info();
 
   auto a_new = OpToTensor(a, exec);
 
@@ -283,7 +297,8 @@ void chol_impl(OutputTensor &&out, const ATensor &a,
   // contiguous tensor for use with cuSolver.
   uplo = (uplo == SolverFillMode::UPPER) ? SolverFillMode::LOWER : SolverFillMode::UPPER;
 
-  T1 *out_ptr = nullptr;
+  // The tensor owns the temporary buffer, so an exception frees it
+  tensor_t<T1, RANK> tmp_storage;
   detail::tensor_impl_t<T1, RANK> tmp_out;
   const bool allContiguous = a_new.IsContiguous() && out.IsContiguous();
 
@@ -292,8 +307,8 @@ void chol_impl(OutputTensor &&out, const ATensor &a,
     (out = a_new).run(exec);
   }
   else {
-    matxAlloc((void**)&out_ptr, a_new.Bytes(), MATX_ASYNC_DEVICE_MEMORY, exec.getStream());
-    make_tensor(tmp_out, out_ptr, a_new.Shape());
+    make_tensor(tmp_storage, a_new.Shape(), MATX_ASYNC_DEVICE_MEMORY, exec.getStream());
+    make_tensor(tmp_out, tmp_storage.Data(), a_new.Shape());
     (tmp_out = a_new).run(exec);
   }
 
@@ -312,14 +327,13 @@ void chol_impl(OutputTensor &&out, const ATensor &a,
       return std::make_shared<cache_val_type>(tmp_out, exec, uplo_cusolver);
     },
     [&](std::shared_ptr<cache_val_type> ctype) {
-      ctype->Exec(tmp_out, tmp_out, exec, uplo_cusolver);
+      ctype->Exec(tmp_out, tmp_out, exec, uplo_cusolver, status_info);
     },
     exec
   );
 
   if (!allContiguous) {
     matx::copy(out, tmp_out, exec);
-    matxFree(out_ptr);
   }
 }
 

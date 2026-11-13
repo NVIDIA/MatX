@@ -170,14 +170,5 @@ __MATX_INLINE__ void CheckDenseSolveInfo(const int info,
   }
 }
 
-__MATX_INLINE__ void CheckDenseSolveInfos(const std::vector<int> &infos,
-                                          const char *provider,
-                                          const char *routine)
-{
-  for (const auto info : infos) {
-    CheckDenseSolveInfo(info, provider, routine);
-  }
-}
-
 } // end namespace detail
 } // end namespace matx

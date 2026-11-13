@@ -11,6 +11,7 @@ set(bench_sources
     00_transform/resample_poly.cu
     00_transform/svd_power.cu
     00_transform/qr.cu
+    00_transform/solver_status.cu
     00_operators/operators.cu
     00_operators/reduction.cu
     01_radar/SingleChanSimplePipeline.cu

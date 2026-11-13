@@ -54,6 +54,7 @@ namespace detail {
     private:
       typename detail::base_type_t<OpA> a_;
       SolverFillMode uplo_;
+      SolverStatus status_;
       mutable uint8_t lifecycle_depth_ = 0;
       mutable detail::tensor_impl_t<typename OpA::value_type, OpA::Rank()> tmp_out_;
       mutable typename OpA::value_type *ptr = nullptr;
@@ -69,7 +70,8 @@ namespace detail {
       using can_alias = bool; // Chol is allowed to use the same input/output memory
 
       __MATX_INLINE__ std::string str() const { return "chol()"; }
-      __MATX_INLINE__ CholOp(const OpA &a, SolverFillMode uplo) : a_(a), uplo_(uplo) {
+      __MATX_INLINE__ CholOp(const OpA &a, SolverFillMode uplo, SolverStatus status = {}) :
+        a_(a), uplo_(uplo), status_(std::move(status)) {
         MATX_LOG_TRACE("{} constructor: uplo={}", str(), static_cast<int>(uplo));
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
         if constexpr (OpA::Rank() >= 2) {
@@ -151,7 +153,9 @@ namespace detail {
           return result;
         }
         else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
-          const bool supported = (OpA::Rank() >= 2) && (OpA::Rank() <= 4) &&
+          // A status forces the non-JIT path
+          const bool supported = detail::SolverStatusAllowsJit(status_.state()) &&
+                                 (OpA::Rank() >= 2) && (OpA::Rank() <= 4) &&
                                  (a_.Size(OpA::Rank() - 2) == a_.Size(OpA::Rank() - 1)) &&
                                  dx_potrf_helper_.IsSupported();
           auto result = combine_capabilities<Cap>(supported, detail::get_operator_capability<Cap>(a_, in));
@@ -194,6 +198,7 @@ namespace detail {
           auto key = detail::MakeJITCacheKeyForType<CholOp<OpA>>("JITChol");
           detail::HashJITCacheValue(key, Rank());
           detail::HashJITCacheValue(key, static_cast<int>(uplo_));
+          detail::HashSolverStatusJitKey(key, status_.state());
           for (int i = 0; i < Rank(); ++i) {
             detail::HashJITCacheValue(key, Size(i));
           }
@@ -209,7 +214,8 @@ namespace detail {
         else if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
 #ifdef MATX_EN_JIT
           const auto inner_op_jit_name = detail::get_operator_capability<Cap>(a_, in);
-          auto result = get_jit_class_name() + "<" + inner_op_jit_name + ">";
+          auto result = get_jit_class_name() + "<" + inner_op_jit_name + ">" +
+                        detail::SolverStatusJitTypeSuffix(status_.state());
           MATX_LOG_DEBUG("cuSolverDx POTRF JIT_TYPE_QUERY: {}", result);
           return result;
 #else
@@ -233,7 +239,7 @@ namespace detail {
 
       template <typename Out, typename Executor>
       void Exec(Out &&out, Executor &&ex) const {
-        chol_impl(cuda::std::get<0>(out),  a_, ex, uplo_);  
+        chol_impl(cuda::std::get<0>(out),  a_, ex, uplo_, status_.state());
       }
 
       __MATX_HOST__ __MATX_INLINE__ auto Data() const noexcept { return ptr; }
@@ -333,6 +339,36 @@ __MATX_INLINE__ auto chol(const OpA &a, SolverFillMode uplo = SolverFillMode::UP
   else {
     return detail::CholOp(a, uplo);
   }
+}
+
+/**
+ * Performs a Cholesky factorization, reporting per-matrix errors through a
+ * solver status.
+ *
+ * Same as chol(a, uplo), except each matrix's potrf `info` value is written to
+ * stage 0 of `status` and, on CUDA executors, the call does not synchronize the
+ * stream (see the Solver Status docs for when it can). A positive value i means
+ * the leading minor of order i is not positive definite. Check the result after
+ * synchronizing, as for qr_solver(a, status). Not supported with
+ * CUDAJITExecutor or distributed tensors.
+ *
+ * @tparam OpA
+ *   Data type of input a tensor or operator
+ *
+ * @param a
+ *   Input tensor or operator of shape `... x n x n`
+ * @param status
+ *   Solver status created with make_solver_status() for an input shaped like `a`
+ * @param uplo
+ *   Part of matrix to fill
+ *
+ * @return
+ *   Operator that produces the factorization output of shape `... x n x n`.
+ */
+template<typename OpA>
+__MATX_INLINE__ auto chol(const OpA &a, const SolverStatus &status, SolverFillMode uplo = SolverFillMode::UPPER) {
+  static_assert(!is_distributed_tensor_v<OpA>, "Solver statuses do not support distributed tensors");
+  return detail::CholOp(a, uplo, status);
 }
 
 }

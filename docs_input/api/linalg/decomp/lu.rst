@@ -13,7 +13,13 @@ Perform an LU factorization.
    runtime shape/type is supported by cuSolverDx. Projection JIT currently supports ranks 2 through 4 and
    ``float``, ``double``, ``complex<float>``, and ``complex<double>`` inputs.
 
-.. doxygenfunction:: lu
+.. doxygenfunction:: lu(const OpA &a)
+.. doxygenfunction:: lu(const OpA &a, const SolverStatus &status)
+
+.. note::
+   The overload that takes a :ref:`solver status <solver_status_func>` writes each matrix's getrf ``info`` value
+   into the status instead of synchronizing the stream to check it. A positive value i means U(i,i) is exactly zero. It is not supported with
+   ``CUDAJITExecutor``.
 
 Examples
 ~~~~~~~~

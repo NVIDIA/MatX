@@ -73,6 +73,7 @@ namespace detail {
       mutable a_value_type *vt_ptr_ = nullptr;
       mutable bool materialized_ = false;
       mutable int materialize_count_ = 0;
+      SolverStatus status_;
 
       template <typename T, typename Executor>
       void FreeTempBuffer(T *&ptr, Executor &&ex) const
@@ -119,7 +120,8 @@ namespace detail {
     public:
       using input_type = OpA;
 
-      SVDState(const OpA &a, const SVDMode jobz, const SVDHostAlgo algo) : a_(a), jobz_(jobz), algo_(algo)
+      SVDState(const OpA &a, const SVDMode jobz, const SVDHostAlgo algo, SolverStatus status = {}) :
+        a_(a), jobz_(jobz), algo_(algo), status_(std::move(status))
       {
         auto a_shape = SolverShapeFromInput<RANK>(a_);
         u_shape_ = a_shape;
@@ -134,6 +136,7 @@ namespace detail {
       }
 
       const auto &Input() const { return a_; }
+      SolverStatusState *Status() const { return status_.state(); }
       const auto &UShape() const { return u_shape_; }
       const auto &SShape() const { return s_shape_; }
       const auto &VTShape() const { return vt_shape_; }
@@ -229,10 +232,10 @@ namespace detail {
               auto u_dummy = make_tensor(u_dummy_ptr, u_dummy_shape);
               auto vt_dummy = make_tensor(vt_dummy_ptr, vt_dummy_shape);
               if constexpr (is_cuda_executor_v<Executor>) {
-                svd_impl(u_dummy, s_, vt_dummy, a_, std::forward<Executor>(ex), jobz_);
+                svd_impl(u_dummy, s_, vt_dummy, a_, std::forward<Executor>(ex), jobz_, Status());
               }
               else {
-                svd_impl(u_dummy, s_, vt_dummy, a_, std::forward<Executor>(ex), jobz_, algo_);
+                svd_impl(u_dummy, s_, vt_dummy, a_, std::forward<Executor>(ex), jobz_, algo_, Status());
               }
             }
             catch (...) {
@@ -245,10 +248,10 @@ namespace detail {
             detail::AllocateTempTensor(u_, std::forward<Executor>(ex), u_shape_, &u_ptr_);
             detail::AllocateTempTensor(vt_, std::forward<Executor>(ex), vt_shape_, &vt_ptr_);
             if constexpr (is_cuda_executor_v<Executor>) {
-              svd_impl(u_, s_, vt_, a_, std::forward<Executor>(ex), jobz_);
+              svd_impl(u_, s_, vt_, a_, std::forward<Executor>(ex), jobz_, Status());
             }
             else {
-              svd_impl(u_, s_, vt_, a_, std::forward<Executor>(ex), jobz_, algo_);
+              svd_impl(u_, s_, vt_, a_, std::forward<Executor>(ex), jobz_, algo_, Status());
             }
           }
         }
@@ -313,8 +316,8 @@ namespace detail {
       SolverProjectionOp<state_type, SVD_VT, vt_type> VT;
 
       __MATX_INLINE__ std::string str() const { return "svd(" + get_type_str(state_->Input()) + ")"; }
-      __MATX_INLINE__ SVDOp(const OpA &a, const SVDMode jobz, const SVDHostAlgo algo) :
-        state_(std::make_shared<state_type>(a, jobz, algo)),
+      __MATX_INLINE__ SVDOp(const OpA &a, const SVDMode jobz, const SVDHostAlgo algo, SolverStatus status = {}) :
+        state_(std::make_shared<state_type>(a, jobz, algo, std::move(status))),
         U(state_, state_->UShape(), "svd().U"),
         S(state_, state_->SShape(), "svd().S"),
         VT(state_, state_->VTShape(), "svd().VT")
@@ -342,9 +345,11 @@ namespace detail {
       void Exec(Out &&out, Executor &&ex) const {
         static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 4, "Must use mtie with 3 outputs on svd(). ie: (mtie(U, S, VT) = svd(A))");
         if constexpr (is_cuda_executor_v<Executor>) {
-          svd_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), cuda::std::get<2>(out), state_->Input(), ex, state_->Jobz());
+          svd_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), cuda::std::get<2>(out), state_->Input(), ex, state_->Jobz(),
+                   state_->Status());
         } else {
-          svd_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), cuda::std::get<2>(out), state_->Input(), ex, state_->Jobz(), state_->Algo());
+          svd_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), cuda::std::get<2>(out), state_->Input(), ex, state_->Jobz(),
+                   state_->Algo(), state_->Status());
         }
       }
 
@@ -418,6 +423,37 @@ template<typename OpA>
 __MATX_INLINE__ auto svd(const OpA &a, const SVDMode jobz = SVDMode::ALL,
                         const SVDHostAlgo algo = SVDHostAlgo::DC) {
   return detail::SVDOp(a, jobz, algo);
+}
+
+/**
+ * Perform a singular value decomposition, reporting per-matrix errors through a
+ * solver status.
+ *
+ * Same as svd(a, jobz, algo), except each matrix's SVD `info` value is written
+ * to stage 0 of `status` and, on CUDA executors, the call does not synchronize
+ * the stream (see the Solver Status docs for when it can). A positive value
+ * means the algorithm did not converge. Check the result after synchronizing,
+ * as for qr_solver(a, status).
+ *
+ * @tparam OpA
+ *   Operator input type
+ *
+ * @param a
+ *   Input operator of shape `... x m x n`
+ * @param status
+ *   Solver status created with make_solver_status() for an input shaped like `a`
+ * @param jobz
+ *   Compute all, part, or none of matrices *U* and *VT*
+ * @param algo
+ *   Host SVD algorithm, as for svd(a, jobz, algo). Ignored for CUDA SVD calls.
+ *
+ * @return
+ *   Operator that produces *U*, *S*, and *VT* tensors, as for svd(a, jobz, algo).
+ */
+template<typename OpA>
+__MATX_INLINE__ auto svd(const OpA &a, const SolverStatus &status, const SVDMode jobz = SVDMode::ALL,
+                        const SVDHostAlgo algo = SVDHostAlgo::DC) {
+  return detail::SVDOp(a, jobz, algo, status);
 }
 
 

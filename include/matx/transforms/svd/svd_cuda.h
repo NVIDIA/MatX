@@ -653,20 +653,24 @@ public:
     params        = GetSVDParams(u, s, vt, a, jobz, exec);
     params.method = method;
 
-    if (params.method == SVDMethod::GESVDJ_BATCHED) {
-      [[maybe_unused]] cusolverStatus_t ret;
-      ret = cusolverDnCreateGesvdjInfo(&batch_params);
-      MATX_ASSERT_STR_EXP(ret, CUSOLVER_STATUS_SUCCESS, matxSolverError, "Failure in cusolverDnCreateGesvdjInfo");
+    // The destructor does not run for a constructor that throws, so destroy
+    // batch_params before rethrowing. The base class frees the rest.
+    try {
+      if (params.method == SVDMethod::GESVDJ_BATCHED) {
+        gesvdjInfo_t info = nullptr;
+        CheckSolverLibraryStatus(cusolverDnCreateGesvdjInfo(&info), "cusolverDnCreateGesvdjInfo");
+        batch_params = info;
+        CheckSolverLibraryStatus(cusolverDnXgesvdjSetTolerance(batch_params, 1e-9), "cusolverDnXgesvdjSetTolerance");
+        CheckSolverLibraryStatus(cusolverDnXgesvdjSetMaxSweeps(batch_params, 15), "cusolverDnXgesvdjSetMaxSweeps");
+      }
 
-      ret = cusolverDnXgesvdjSetTolerance(batch_params, 1e-9);
-      MATX_ASSERT_STR_EXP(ret, CUSOLVER_STATUS_SUCCESS, matxSolverError, "Failure in cusolverDnXgesvdjSetTolerance");
-
-      ret = cusolverDnXgesvdjSetMaxSweeps(batch_params, 15);
-      MATX_ASSERT_STR_EXP(ret, CUSOLVER_STATUS_SUCCESS, matxSolverError, "Failure in cusolverDnXgesvdjSetMaxSweeps");
+      this->GetWorkspaceSize();
+      this->AllocateWorkspace(params.batch_size, params.method == SVDMethod::GESVDJ_BATCHED, exec);
     }
-
-    this->GetWorkspaceSize();
-    this->AllocateWorkspace(params.batch_size, params.method == SVDMethod::GESVDJ_BATCHED, exec);
+    catch (...) {
+      DestroyBatchParams();
+      throw;
+    }
   }
 
   void GetWorkspaceSize() override
@@ -683,8 +687,10 @@ public:
               MatXTypeToCudaType<T1>(), &this->dspace, &this->hspace);
     }
     else {
+      // The plan cache key does not include jobz, so size for vector mode,
+      // which needs at least as much workspace as values-only mode.
       int i_dspace = 0;
-      const cusolverEigMode_t eig_mode = params.jobz == 'N' ? CUSOLVER_EIG_MODE_NOVECTOR : CUSOLVER_EIG_MODE_VECTOR;
+      const cusolverEigMode_t eig_mode = CUSOLVER_EIG_MODE_VECTOR;
 
       if constexpr (cuda::std::is_same_v<float, T1>) {
         ret = cusolverDnSgesvdjBatched_bufferSize(
@@ -722,11 +728,12 @@ public:
         MATX_THROW(matxInvalidType, "Invalid data type passed to svd()");
       }
 
-      this->dspace = sizeof(T1) * i_dspace;
+      gesvdj_lwork = i_dspace;
+      this->dspace = sizeof(T1) * static_cast<size_t>(i_dspace);
       this->hspace = 0;
     }
 
-    MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
+    CheckSolverLibraryStatus(ret, "cuSolver gesvd bufferSize");
   }
 
 
@@ -749,9 +756,17 @@ public:
     return params;
   }
 
+  /**
+   * Run the SVD on every matrix.
+   *
+   * @param status_info If non-null, each matrix's info is written to
+   * status_info[i], and the call does not synchronize. Otherwise info is copied
+   * back after a stream synchronization and checked in debug builds only.
+   * cuSolver return-status errors throw in every build type.
+   */
   void Exec(UTensor &u, STensor &s, VtTensor &vt,
             const ATensor &a, const cudaExecutor &exec,
-            const char jobz = 'A')
+            const char jobz = 'A', int *status_info = nullptr)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
@@ -776,7 +791,10 @@ public:
     MATX_ASSERT_STR(s.Size(RANK-2) == cuda::std::min(params.m, params.n), matxInvalidSize, "S must be ... x min(m,n)");
 
     const auto stream = exec.getStream();
-    cusolverDnSetStream(this->handle, stream);
+    CheckSolverLibraryStatus(cusolverDnSetStream(this->handle, stream), "cusolverDnSetStream");
+
+    // With a status, info goes into it instead of being checked here
+    int *infos = status_info != nullptr ? status_info : this->d_info;
 
     SetBatchPointers<BatchType::MATRIX>(a, this->batch_a_ptrs);
     if (jobz == 'N') {
@@ -803,73 +821,80 @@ public:
             ldvt, MatXTypeToCudaType<T1>(),
             reinterpret_cast<uint8_t *>(this->d_workspace) + i * this->dspace, this->dspace,
             reinterpret_cast<uint8_t *>(this->h_workspace) + i * this->hspace, this->hspace,
-            this->d_info + i);
-
-        MATX_ASSERT_STR_EXP(ret, CUSOLVER_STATUS_SUCCESS, matxSolverError, "cusolverDnXgesvd failed");
+            infos + i);
+        CheckSolverLibraryStatus(ret, "cuSolver Xgesvd");
       }
     }
     else if (params.method == SVDMethod::GESVDJ_BATCHED) {
+      // Use this call's buffers. The plan is cached by shape, type, and stream,
+      // so the pointers it was created with may belong to an earlier call.
+      void *A_ptr = const_cast<void *>(static_cast<const void *>(a.Data()));
+      void *S_ptr = static_cast<void *>(s.Data());
+      void *U_ptr = static_cast<void *>(u.Data());
+      void *VT_ptr = static_cast<void *>(vt.Data());
       const cusolverEigMode_t eig_mode = jobz == 'N' ? CUSOLVER_EIG_MODE_NOVECTOR : CUSOLVER_EIG_MODE_VECTOR;
       if constexpr (cuda::std::is_same_v<float, T1>) {
         ret = cusolverDnSgesvdjBatched(
                 this->handle, eig_mode, static_cast<int>(params.m), static_cast<int>(params.n),
-                reinterpret_cast<float *>(params.A), static_cast<int>(params.m),
-                reinterpret_cast<float *>(params.S), reinterpret_cast<float *>(params.U),
-                static_cast<int>(params.m), reinterpret_cast<float *>(params.VT), static_cast<int>(params.n),
-                reinterpret_cast<float *>(this->d_workspace), static_cast<int>(this->dspace),
-                this->d_info, batch_params, static_cast<int>(params.batch_size));
+                reinterpret_cast<float *>(A_ptr), static_cast<int>(params.m),
+                reinterpret_cast<float *>(S_ptr), reinterpret_cast<float *>(U_ptr),
+                static_cast<int>(params.m), reinterpret_cast<float *>(VT_ptr), static_cast<int>(params.n),
+                reinterpret_cast<float *>(this->d_workspace), gesvdj_lwork,
+                infos, batch_params, static_cast<int>(params.batch_size));
       }
       else if constexpr (cuda::std::is_same_v<double, T1>) {
         ret = cusolverDnDgesvdjBatched(
                 this->handle, eig_mode, static_cast<int>(params.m), static_cast<int>(params.n),
-                reinterpret_cast<double *>(params.A), static_cast<int>(params.m),
-                reinterpret_cast<double *>(params.S), reinterpret_cast<double *>(params.U),
-                static_cast<int>(params.m), reinterpret_cast<double *>(params.VT), static_cast<int>(params.n),
-                reinterpret_cast<double *>(this->d_workspace), static_cast<int>(this->dspace),
-                this->d_info, batch_params, static_cast<int>(params.batch_size));
+                reinterpret_cast<double *>(A_ptr), static_cast<int>(params.m),
+                reinterpret_cast<double *>(S_ptr), reinterpret_cast<double *>(U_ptr),
+                static_cast<int>(params.m), reinterpret_cast<double *>(VT_ptr), static_cast<int>(params.n),
+                reinterpret_cast<double *>(this->d_workspace), gesvdj_lwork,
+                infos, batch_params, static_cast<int>(params.batch_size));
       }
       else if constexpr (cuda::std::is_same_v<cuda::std::complex<float>, T1>) {
         ret = cusolverDnCgesvdjBatched(
                 this->handle, eig_mode, static_cast<int>(params.m), static_cast<int>(params.n),
-                reinterpret_cast<cuComplex *>(params.A), static_cast<int>(params.m),
-                reinterpret_cast<float *>(params.S), reinterpret_cast<cuComplex *>(params.U),
-                static_cast<int>(params.m), reinterpret_cast<cuComplex *>(params.VT), static_cast<int>(params.n),
-                reinterpret_cast<cuComplex *>(this->d_workspace), static_cast<int>(this->dspace),
-                this->d_info, batch_params, static_cast<int>(params.batch_size));
+                reinterpret_cast<cuComplex *>(A_ptr), static_cast<int>(params.m),
+                reinterpret_cast<float *>(S_ptr), reinterpret_cast<cuComplex *>(U_ptr),
+                static_cast<int>(params.m), reinterpret_cast<cuComplex *>(VT_ptr), static_cast<int>(params.n),
+                reinterpret_cast<cuComplex *>(this->d_workspace), gesvdj_lwork,
+                infos, batch_params, static_cast<int>(params.batch_size));
       }
       else if constexpr (cuda::std::is_same_v<cuda::std::complex<double>, T1>) {
         ret = cusolverDnZgesvdjBatched(
                 this->handle, eig_mode, static_cast<int>(params.m), static_cast<int>(params.n),
-                reinterpret_cast<cuDoubleComplex *>(params.A), static_cast<int>(params.m),
-                reinterpret_cast<double *>(params.S), reinterpret_cast<cuDoubleComplex *>(params.U),
-                static_cast<int>(params.m), reinterpret_cast<cuDoubleComplex *>(params.VT), static_cast<int>(params.n),
-                reinterpret_cast<cuDoubleComplex *>(this->d_workspace), static_cast<int>(this->dspace),
-                this->d_info, batch_params, static_cast<int>(params.batch_size));
+                reinterpret_cast<cuDoubleComplex *>(A_ptr), static_cast<int>(params.m),
+                reinterpret_cast<double *>(S_ptr), reinterpret_cast<cuDoubleComplex *>(U_ptr),
+                static_cast<int>(params.m), reinterpret_cast<cuDoubleComplex *>(VT_ptr), static_cast<int>(params.n),
+                reinterpret_cast<cuDoubleComplex *>(this->d_workspace), gesvdj_lwork,
+                infos, batch_params, static_cast<int>(params.batch_size));
       }
       else {
         MATX_THROW(matxInvalidType, "Invalid data type passed to svd()");
       }
 
-      MATX_ASSERT_STR_EXP(ret, CUSOLVER_STATUS_SUCCESS, matxSolverError, "cusolverDnSgesvdjBatched failed");
+      CheckSolverLibraryStatus(ret, "cuSolver gesvdjBatched");
     }
     else {
       MATX_THROW(matxInvalidType, "Invalid backend for SVD");
     }
 
+    if (status_info != nullptr) {
+      return;
+    }
+
     std::vector<int> h_info(this->batch_a_ptrs.size());
-    MATX_CUDA_CHECK(cudaMemcpyAsync(h_info.data(), this->d_info, sizeof(int) * this->batch_a_ptrs.size(), cudaMemcpyDeviceToHost, stream));
-
-    // This will block. Figure this out later
-    MATX_CUDA_CHECK(cudaStreamSynchronize(stream));
-
-    for (const auto& info : h_info) {
-      if (info < 0) {
-        MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
-          ("Parameter " + std::to_string(-info) + " had an illegal value in cuSolver Xgesvd").c_str());
-      } else {
-        MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
-          (std::to_string(info) + " superdiagonals of an intermediate bidiagonal form did not converge to zero in cuSolver Xgesvd").c_str());
-      }
+    if (params.method == SVDMethod::GESVDJ_BATCHED) {
+      CheckSolverInfosOnHost(this->d_info, h_info, stream, "cuSolver gesvdjBatched",
+          [](int) -> std::string {
+            return "the Jacobi method did not converge";
+          });
+    }
+    else {
+      CheckSolverInfosOnHost(this->d_info, h_info, stream, "cuSolver Xgesvd",
+          [](int info) -> std::string {
+            return std::to_string(info) + " superdiagonals of an intermediate bidiagonal form did not converge to zero";
+          });
     }
   }
 
@@ -880,14 +905,23 @@ public:
    * created
    *
    */
-  ~matxDnSVDCUDAPlan_t() {}
+  ~matxDnSVDCUDAPlan_t() { DestroyBatchParams(); }
 
 private:
+  void DestroyBatchParams() noexcept
+  {
+    if (batch_params != nullptr) {
+      cusolverDnDestroyGesvdjInfo(batch_params);
+      batch_params = nullptr;
+    }
+  }
+
   std::vector<T2 *> batch_u_ptrs;
   std::vector<T3 *> batch_s_ptrs;
   std::vector<T4 *> batch_vt_ptrs;
   gesvdjInfo_t batch_params = nullptr;
   DnSVDCUDAParams_t params;
+  int gesvdj_lwork = 0; // gesvdjBatched workspace size in elements of T1
 };
 
 /**
@@ -947,17 +981,26 @@ using svd_cuda_cache_t = std::unordered_map<DnSVDCUDAParams_t, std::any, DnSVDCU
  * @param jobz
  *   Specifies options for computing all, part, or none of the matrices U and VT. See
  * SVDMode documentation for more info
+ * @param status
+ *   Optional solver status. When given, each matrix's SVD info is written into
+ *   it on the stream, and the call does not synchronize the stream.
  *
  */
 template <typename UTensor, typename STensor, typename VtTensor, typename ATensor>
 void svd_impl(UTensor &&u, STensor &&s,
          VtTensor &&vt, const ATensor &a,
-         const cudaExecutor &exec, const SVDMode jobz = SVDMode::ALL)
+         const cudaExecutor &exec, const SVDMode jobz = SVDMode::ALL,
+         detail::SolverStatusState *status = nullptr)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   using T1 = typename ATensor::value_type;
   constexpr int RANK = ATensor::Rank();
   const auto stream = exec.getStream();
+
+  // Validate the status before any work, so a rejected status allocates nothing.
+  // One stage: gesvd or gesvdjBatched.
+  const auto status_run = detail::BeginStatusRun(detail::ExecutorKind::Cuda, status, 1, a);
+  int *status_info = status_run.Info();
 
   auto s_new = getSolverSupportedTensor(s, exec);
 
@@ -986,11 +1029,11 @@ void svd_impl(UTensor &&u, STensor &&s,
     //svdbpi_impl(u, s, vt, a, 10, 0.f, exec);
   }
 
-  // cuSolver destroys the input, so we need to make a copy of A regardless
-  T1 *tp;
+  // cuSolver destroys the input, so we need to make a copy of A regardless.
+  // The tensor owns the copy, so an exception frees it.
   auto a_shape = a.Shape();
-  auto a_total_size = std::accumulate(a_shape.begin(), a_shape.begin() + ATensor::Rank(), static_cast<index_t>(1), std::multiplies<index_t>());
-  matxAlloc(reinterpret_cast<void **>(&tp), sizeof(T1) * a_total_size, MATX_ASYNC_DEVICE_MEMORY, stream);
+  auto tp_tensor = make_tensor<T1>(a_shape, MATX_ASYNC_DEVICE_MEMORY, stream);
+  T1 *tp = tp_tensor.Data();
 
   if (m_leq_n) {
     // get col-major AT
@@ -1025,7 +1068,7 @@ void svd_impl(UTensor &&u, STensor &&s,
         return std::make_shared<cache_val_type>(u_in, s_new, vt_in, at_col_maj, method, exec, job_cusolver);
       },
       [&](std::shared_ptr<cache_val_type> ctype) {
-        ctype->Exec(u_in, s_new, vt_in, at_col_maj, exec, job_cusolver);
+        ctype->Exec(u_in, s_new, vt_in, at_col_maj, exec, job_cusolver, status_info);
       },
       exec
     );
@@ -1062,7 +1105,7 @@ void svd_impl(UTensor &&u, STensor &&s,
           return std::make_shared<cache_val_type>(u, s_new, vt, tvt, method, exec, job_cusolver);
         },
         [&](std::shared_ptr<cache_val_type> ctype) {
-          ctype->Exec(u, s_new, vt, tvt, exec, job_cusolver);
+          ctype->Exec(u, s_new, vt, tvt, exec, job_cusolver, status_info);
         },
         exec
       );
@@ -1087,7 +1130,7 @@ void svd_impl(UTensor &&u, STensor &&s,
           return std::make_shared<cache_val_type>(u_col_maj, s_new, vt_col_maj, tvt, method, exec, job_cusolver);
         },
         [&](std::shared_ptr<cache_val_type> ctype) {
-          ctype->Exec(u_col_maj, s_new, vt_col_maj, tvt, exec, job_cusolver);
+          ctype->Exec(u_col_maj, s_new, vt_col_maj, tvt, exec, job_cusolver, status_info);
         },
         exec
       );
@@ -1116,8 +1159,6 @@ void svd_impl(UTensor &&u, STensor &&s,
   if(!s_new.isSameView(s)) {
     (s = s_new).run(exec);
   }
-
-  matxFree(tp);
 }
 
 } // end namespace matx

@@ -13,7 +13,13 @@ Perform a singular value decomposition (SVD).
    members such as ``svd(A).U``, ``svd(A).S``, and ``svd(A).VT`` are available on normal executors and can be used
    in expressions with other operators.
 
-.. doxygenfunction:: svd
+.. doxygenfunction:: svd(const OpA &a, const SVDMode jobz = SVDMode::ALL, const SVDHostAlgo algo = SVDHostAlgo::DC)
+.. doxygenfunction:: svd(const OpA &a, const SolverStatus &status, const SVDMode jobz = SVDMode::ALL, const SVDHostAlgo algo = SVDHostAlgo::DC)
+
+.. note::
+   The overload that takes a :ref:`solver status <solver_status_func>` writes each matrix's SVD ``info`` value
+   into the status instead of synchronizing the stream to check it. A positive value means the algorithm did not converge. It is not supported with
+   ``CUDAJITExecutor``.
 
 Enums
 ~~~~~

@@ -68,6 +68,7 @@ namespace detail {
       mutable detail::tensor_impl_t<piv_value_type, RANK - 1> piv_;
       mutable a_value_type *factors_ptr_ = nullptr;
       mutable piv_value_type *piv_ptr_ = nullptr;
+      SolverStatus status_;
       mutable bool materialized_ = false;
       mutable int materialize_count_ = 0;
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
@@ -118,7 +119,8 @@ namespace detail {
     public:
       using input_type = OpA;
 
-      LUState(const OpA &a) : a_(a)
+      LUState(const OpA &a, SolverStatus status = {}) :
+        a_(a), status_(std::move(status))
       {
         factors_shape_ = SolverShapeFromInput<RANK>(a_);
         piv_shape_ = SolverVectorShapeFromMatrixShape<RANK>(factors_shape_);
@@ -132,6 +134,7 @@ namespace detail {
       const auto &FactorsShape() const { return factors_shape_; }
       const auto &PivShape() const { return piv_shape_; }
       const auto &Input() const { return a_; }
+      SolverStatusState *Status() const { return status_.state(); }
 
       template <typename Executor>
       void Materialize(Executor &&ex) const
@@ -149,19 +152,19 @@ namespace detail {
           detail::AllocateTempTensor(factors_, std::forward<Executor>(ex), factors_shape_, &factors_ptr_);
           detail::AllocateTempTensor(piv_, std::forward<Executor>(ex), piv_shape_, &piv_ptr_);
           if constexpr (is_cuda_executor_v<Executor>) {
-            lu_impl(factors_, piv_, a_, std::forward<Executor>(ex));
+            lu_impl(factors_, piv_, a_, std::forward<Executor>(ex), Status());
           }
           else {
 #if MATX_EN_CPU_SOLVER
             if constexpr (cuda::std::is_same_v<piv_value_type, lapack_int_t>) {
-              lu_impl(factors_, piv_, a_, std::forward<Executor>(ex));
+              lu_impl(factors_, piv_, a_, std::forward<Executor>(ex), Status());
             }
             else {
               detail::tensor_impl_t<lapack_int_t, RANK - 1> lapack_piv;
               lapack_int_t *lapack_piv_ptr = nullptr;
               try {
                 detail::AllocateTempTensor(lapack_piv, std::forward<Executor>(ex), piv_shape_, &lapack_piv_ptr);
-                lu_impl(factors_, lapack_piv, a_, std::forward<Executor>(ex));
+                lu_impl(factors_, lapack_piv, a_, std::forward<Executor>(ex), Status());
                 for (index_t i = 0; i < lapack_piv.TotalSize(); i++) {
                   piv_.Data()[i] = static_cast<piv_value_type>(lapack_piv.Data()[i]);
                 }
@@ -176,7 +179,7 @@ namespace detail {
               }
             }
 #else
-            lu_impl(factors_, piv_, a_, std::forward<Executor>(ex));
+            lu_impl(factors_, piv_, a_, std::forward<Executor>(ex), Status());
 #endif
           }
         }
@@ -217,7 +220,8 @@ namespace detail {
       template <int Component>
       bool SupportsJITProjection() const
       {
-        return (RANK >= 2) && (RANK <= 4) && dx_lu_helper_.IsSupported();
+        // A status forces the non-JIT path
+        return detail::SolverStatusAllowsJit(Status()) && (RANK >= 2) && (RANK <= 4) && dx_lu_helper_.IsSupported();
       }
 
       template <int Component>
@@ -252,7 +256,8 @@ namespace detail {
       template <int Component>
       std::string GetJITProjectionTypeName(const std::string &inner_op_jit_name) const
       {
-        return GetJITProjectionClassName<Component>() + "<" + inner_op_jit_name + ", " + std::to_string(Component) + ">";
+        return GetJITProjectionClassName<Component>() + "<" + inner_op_jit_name + ", " + std::to_string(Component) + ">" +
+               detail::SolverStatusJitTypeSuffix(Status());
       }
 
       template <int Component>
@@ -261,6 +266,7 @@ namespace detail {
         auto key = detail::MakeJITCacheKeyForType<LUState<OpA>>("JITLUProjection_v3");
         detail::HashJITCacheValue(key, Component);
         detail::HashJITCacheValue(key, RANK);
+        detail::HashSolverStatusJitKey(key, Status());
         for (int i = 0; i < RANK; ++i) {
           detail::HashJITCacheValue(key, factors_shape_[i]);
         }
@@ -325,8 +331,8 @@ namespace detail {
       SolverProjectionOp<state_type, LU_PIV, piv_type> Piv;
 
       __MATX_INLINE__ std::string str() const { return "lu()"; }
-      __MATX_INLINE__ LUOp(const OpA &a) :
-        state_(std::make_shared<state_type>(a)),
+      __MATX_INLINE__ LUOp(const OpA &a, SolverStatus status = {}) :
+        state_(std::make_shared<state_type>(a, std::move(status))),
         LU(state_, state_->FactorsShape(), "lu().LU"),
         Piv(state_, state_->PivShape(), "lu().Piv")
       {
@@ -347,7 +353,7 @@ namespace detail {
       void Exec(Out &&out, Executor &&ex) const {
         static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 2 outputs on lu(). ie: (mtie(O, piv) = lu(A))");
 
-        lu_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), state_->Input(), ex);
+        lu_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), state_->Input(), ex, state_->Status());
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -409,6 +415,33 @@ namespace detail {
 template<typename OpA>
 __MATX_INLINE__ auto lu(const OpA &a) {
   return detail::LUOp(a);
+}
+
+/**
+ * Performs an LU factorization, reporting per-matrix errors through a solver
+ * status.
+ *
+ * Same as lu(a), except each matrix's getrf `info` value is written to stage 0
+ * of `status` and, on CUDA executors, the call does not synchronize the stream
+ * (see the Solver Status docs for when it can). A positive value i means U(i,i)
+ * is exactly zero: the factorization completed, but U is singular. Check the
+ * result after synchronizing, as for qr_solver(a, status). Not supported with
+ * CUDAJITExecutor.
+ *
+ * @tparam OpA
+ *   Data type of input a tensor or operator
+ *
+ * @param a
+ *   Input tensor or operator of shape `... x m x n`
+ * @param status
+ *   Solver status created with make_solver_status() for an input shaped like `a`
+ *
+ * @return
+ *   Operator that produces the LU factors and pivot indices, as for lu(a).
+ */
+template<typename OpA>
+__MATX_INLINE__ auto lu(const OpA &a, const SolverStatus &status) {
+  return detail::LUOp(a, status);
 }
 
 }

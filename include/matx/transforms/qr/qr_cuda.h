@@ -304,11 +304,11 @@ public:
 
   void GetWorkspaceSize() override
   {
-    [[maybe_unused]] cusolverStatus_t ret = cusolverDnXgeqrf_bufferSize(
+    CheckSolverLibraryStatus(cusolverDnXgeqrf_bufferSize(
             this->handle, this->dn_params, params.m, params.n, MatXTypeToCudaType<T1>(),
             params.A, params.m, MatXTypeToCudaType<T2>(), params.tau,
-            MatXTypeToCudaType<T1>(), &this->dspace, &this->hspace);
-    MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
+            MatXTypeToCudaType<T1>(), &this->dspace, &this->hspace),
+        "cuSolver Xgeqrf_bufferSize");
   }
 
   static DnQRCUDAParams_t GetQRParams(TauTensor &tau,
@@ -327,8 +327,16 @@ public:
     return params;
   }
 
+  /**
+   * Run geqrf on every matrix.
+   *
+   * @param status_info If non-null, each matrix's info is written to
+   * status_info[i], and the call does not synchronize. Otherwise info is copied
+   * back after a stream synchronization and checked in debug builds only.
+   * cuSolver return-status errors throw in every build type.
+   */
   void Exec(OutTensor &out, TauTensor &tau,
-            const ATensor &a, const cudaExecutor &exec)
+            const ATensor &a, const cudaExecutor &exec, int *status_info = nullptr)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
@@ -350,31 +358,28 @@ public:
     }
 
     const auto stream = exec.getStream();
-    cusolverDnSetStream(this->handle, stream);
+    CheckSolverLibraryStatus(cusolverDnSetStream(this->handle, stream), "cusolverDnSetStream");
+
+    // With a status, info goes into it instead of being checked here
+    const bool has_status = status_info != nullptr;
+    int *infos = has_status ? status_info : this->d_info;
 
     // At this time cuSolver does not have a batched 64-bit LU interface. Change
     // this to use the batched version once available.
     for (size_t i = 0; i < this->batch_a_ptrs.size(); i++) {
-      [[maybe_unused]] auto ret = cusolverDnXgeqrf(
+      const auto ret = cusolverDnXgeqrf(
           this->handle, this->dn_params, params.m, params.n, MatXTypeToCudaType<T1>(),
           this->batch_a_ptrs[i], params.m, MatXTypeToCudaType<T2>(),
           this->batch_tau_ptrs[i], MatXTypeToCudaType<T1>(),
           reinterpret_cast<uint8_t *>(this->d_workspace) + i * this->dspace, this->dspace,
           reinterpret_cast<uint8_t *>(this->h_workspace) + i * this->hspace, this->hspace,
-          this->d_info + i);
-
-      MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
+          infos + i);
+      CheckSolverLibraryStatus(ret, "cuSolver Xgeqrf");
     }
 
-    std::vector<int> h_info(this->batch_a_ptrs.size());
-    MATX_CUDA_CHECK(cudaMemcpyAsync(h_info.data(), this->d_info, sizeof(int) * this->batch_a_ptrs.size(), cudaMemcpyDeviceToHost, stream));
-
-    // This will block. Figure this out later
-    MATX_CUDA_CHECK(cudaStreamSynchronize(stream));
-
-    for ([[maybe_unused]] const auto& info : h_info) {
-      MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
-        ("Parameter " + std::to_string(-info) + " had an illegal value in cuSolver Xgeqrf").c_str());
+    if (!has_status) {
+      std::vector<int> h_info(this->batch_a_ptrs.size());
+      CheckSolverInfosOnHost(this->d_info, h_info, stream, "cuSolver Xgeqrf");
     }
   }
 
@@ -419,6 +424,12 @@ struct DnQRCUDAParamsKeyEq {
 
 using qr_cuda_cache_t = std::unordered_map<DnQRCUDAParams_t, std::any, DnQRCUDAParamsKeyHash, DnQRCUDAParamsKeyEq>;
 
+// qr_solver and qr_econ use the same key type but store different plan types,
+// so qr_econ needs its own cache. The distinct hash type gives this map, and so
+// its cache ID, a type distinct from qr_cuda_cache_t.
+struct DnEconQRCUDAParamsKeyHash : DnQRCUDAParamsKeyHash {};
+using qr_econ_cuda_cache_t = std::unordered_map<DnQRCUDAParams_t, std::any, DnEconQRCUDAParamsKeyHash, DnQRCUDAParamsKeyEq>;
+
 } // end namespace detail
 
 /**
@@ -443,13 +454,21 @@ using qr_cuda_cache_t = std::unordered_map<DnQRCUDAParams_t, std::any, DnQRCUDAP
  *   Input tensor A
  * @param exec
  *   CUDA executor
+ * @param status
+ *   Optional solver status. When given, geqrf info is written into it on the
+ *   stream, and the call does not synchronize the stream.
  */
 template <typename OutTensor, typename TauTensor, typename ATensor>
 void qr_solver_impl(OutTensor &&out, TauTensor &&tau,
-        const ATensor &a, const cudaExecutor &exec)
+        const ATensor &a, const cudaExecutor &exec, detail::SolverStatusState *status = nullptr)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   using T1 = typename remove_cvref_t<OutTensor>::value_type;
+
+  // Validate the status before any work, so a rejected status allocates nothing.
+  // One stage: geqrf.
+  const auto status_run = detail::BeginStatusRun(detail::ExecutorKind::Cuda, status, 1, a);
+  int *status_info = status_run.Info();
 
   auto tau_new = OpToTensor(tau, exec);
   auto a_new = OpToTensor(a, exec);
@@ -463,10 +482,10 @@ void qr_solver_impl(OutTensor &&out, TauTensor &&tau,
      library appear as though everything is row-major, we take a performance hit
      to transpose in and out of the function. Eventually this may be fixed in
      cuSolver.
+     The tensor owns the transpose buffer, so an exception frees it.
   */
-  T1 *tp;
-  matxAlloc(reinterpret_cast<void **>(&tp), a_new.Bytes(), MATX_ASYNC_DEVICE_MEMORY,
-            exec.getStream());
+  auto tp_tensor = make_tensor<T1>(a_new.Shape(), MATX_ASYNC_DEVICE_MEMORY, exec.getStream());
+  T1 *tp = tp_tensor.Data();
   auto tv = TransposeCopy(tp, a_new, exec);
   auto tvt = tv.PermuteMatrix();
 
@@ -484,15 +503,14 @@ void qr_solver_impl(OutTensor &&out, TauTensor &&tau,
       return std::make_shared<cache_val_type>(tau_new, tvt, exec);
     },
     [&](std::shared_ptr<cache_val_type> ctype) {
-      ctype->Exec(tvt, tau_new, tvt, exec);
+      ctype->Exec(tvt, tau_new, tvt, exec, status_info);
     },
     exec
   );
 
   /* Temporary WAR
-   * Copy and free async buffer for transpose */
+   * Copy out of the transpose buffer, which tp_tensor frees on return */
   matx::copy(out, tv.PermuteMatrix(), exec);
-  matxFree(tp);
 }
 
 /********************************************** Economic QR
@@ -555,25 +573,26 @@ public:
 
     params = GetQRParams(tau, a, exec);
     this->GetWorkspaceSize();
-    this->AllocateWorkspace(params.batch_size, false, exec);
+    this->AllocateWorkspace(params.batch_size, false, exec, 2);
   }
 
   void GetWorkspaceSize() override
   {
-    [[maybe_unused]] cusolverStatus_t ret = cusolverDnXgeqrf_bufferSize(
+    CheckSolverLibraryStatus(cusolverDnXgeqrf_bufferSize(
             this->handle, this->dn_params, params.m, params.n, MatXTypeToCudaType<T1>(),
             params.A, params.m, MatXTypeToCudaType<T2>(), params.tau,
-            MatXTypeToCudaType<T1>(), &this->dspace, &this->hspace);
-    MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
-    int dspace_orgqr;
+            MatXTypeToCudaType<T1>(), &this->dspace, &this->hspace),
+        "cuSolver Xgeqrf_bufferSize");
 
-    ret = orgqr_bufferSize_dispatch(
-      params.m, params.n, std::min(params.m, params.n),
-      params.A, params.m, params.tau, &dspace_orgqr);
-    MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
+    // Query orgqr with the same sizes Exec passes it. orgqr's lwork counts
+    // elements of T1, while dspace counts bytes.
+    const int64_t k = std::min(params.m, params.n);
+    CheckSolverLibraryStatus(orgqr_bufferSize_dispatch(
+            params.m, k, k, params.A, params.m, params.tau, &orgqr_lwork),
+        "cuSolver orgqr_bufferSize");
 
-    this->dspace = std::max(this->dspace, static_cast<size_t>(dspace_orgqr));
-
+    this->dspace = std::max(this->dspace,
+        static_cast<size_t>(orgqr_lwork) * sizeof(T1));
   }
 
   static DnQRCUDAParams_t GetQRParams(TauTensor &tau,
@@ -592,8 +611,17 @@ public:
     return params;
   }
 
+  /**
+   * Run geqrf, extract R, then run orgqr on every matrix.
+   *
+   * @param status_info If non-null, geqrf info for matrix i is written to
+   * status_info[i] and orgqr info to status_info[batches + i], and the call
+   * does not synchronize. Otherwise info is copied back after each stage with a
+   * stream synchronization and checked in debug builds only. cuSolver
+   * return-status errors throw in every build type.
+   */
   void Exec(OutTensor &out, RTensor &out_r, TauTensor &tau,
-            const ATensor &a, const cudaExecutor &exec)
+            const ATensor &a, const cudaExecutor &exec, int *status_info = nullptr)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
@@ -617,33 +645,33 @@ public:
     }
 
     const auto stream = exec.getStream();
-    cusolverDnSetStream(this->handle, stream);
+    CheckSolverLibraryStatus(cusolverDnSetStream(this->handle, stream), "cusolverDnSetStream");
+
+    // With a status, info goes into it instead of being checked here.
+    // geqrf info is the first `batches` entries and orgqr info the next, in
+    // either d_info or the status's two stages.
+    const bool has_status = status_info != nullptr;
+    const size_t batches = this->batch_a_ptrs.size();
+    int *geqrf_info = has_status ? status_info : this->d_info;
+    int *orgqr_info = geqrf_info + batches;
 
     // At this time cuSolver does not have a batched 64-bit LU interface. Change
     // this to use the batched version once available.
-    for (size_t i = 0; i < this->batch_a_ptrs.size(); i++) {
-      [[maybe_unused]] auto ret = cusolverDnXgeqrf(
+    for (size_t i = 0; i < batches; i++) {
+      const auto ret = cusolverDnXgeqrf(
           this->handle, this->dn_params, params.m, params.n, MatXTypeToCudaType<T1>(),
           this->batch_a_ptrs[i], params.m, MatXTypeToCudaType<T2>(),
           this->batch_tau_ptrs[i], MatXTypeToCudaType<T1>(),
           reinterpret_cast<uint8_t *>(this->d_workspace) + i * this->dspace, this->dspace,
           reinterpret_cast<uint8_t *>(this->h_workspace) + i * this->hspace, this->hspace,
-          this->d_info + i);
-
-      MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
-
-
+          geqrf_info + i);
+      CheckSolverLibraryStatus(ret, "cuSolver Xgeqrf");
     }
 
-    std::vector<int> h_info(this->batch_a_ptrs.size());
-    MATX_CUDA_CHECK(cudaMemcpyAsync(h_info.data(), this->d_info, sizeof(int) * this->batch_a_ptrs.size(), cudaMemcpyDeviceToHost, stream));
-
-    // This will block. Figure this out later
-    MATX_CUDA_CHECK(cudaStreamSynchronize(stream));
-
-    for ([[maybe_unused]] const auto& info : h_info) {
-      MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
-        ("Parameter " + std::to_string(-info) + " had an illegal value in cuSolver Xgeqrf").c_str());
+    // Without a status, each stage's info is checked on the host, reusing one buffer
+    std::vector<int> h_info(has_status ? 0 : batches);
+    if (!has_status) {
+      CheckSolverInfosOnHost(geqrf_info, h_info, stream, "cuSolver Xgeqrf");
     }
 
     // at this point, R is stored in the upper triangular part of out
@@ -661,26 +689,17 @@ public:
       (slice<RANK-1>(out_r, rSliceB, rSliceE) = as_type<typename OutTensor_t::value_type>(index(RANK-2) >= i)*slice<RANK-1>(out, rSliceB, rSliceE)).run(exec);
     }
 
-    // Intentionally looping AGAIN, so we can reuse h_info and d_info without
-    // having to copy to host with each iteration of the loop
-    for (size_t i = 0; i < this->batch_a_ptrs.size(); i++) {
-      [[maybe_unused]] auto ret = orgqr_dispatch(
+    for (size_t i = 0; i < batches; i++) {
+      const auto ret = orgqr_dispatch(
             params.m, std::min(params.m, params.n), std::min(params.m, params.n),
             this->batch_a_ptrs[i], params.m, this->batch_tau_ptrs[i],
-            this->d_workspace, this->dspace, this->d_info + this->batch_a_ptrs.size() + i);
-        MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
+            this->d_workspace, orgqr_lwork, orgqr_info + i);
+      CheckSolverLibraryStatus(ret, "cuSolver orgqr");
     }
 
-    MATX_CUDA_CHECK(cudaMemcpyAsync(h_info.data(), this->d_info, sizeof(int) * this->batch_a_ptrs.size(), cudaMemcpyDeviceToHost, stream));
-
-    // This will block. Figure this out later
-    MATX_CUDA_CHECK(cudaStreamSynchronize(stream));
-
-    for ([[maybe_unused]] const auto& info : h_info) {
-      MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
-        ("Parameter " + std::to_string(-info) + " had an illegal value in cuSolver Xorgqr").c_str());
+    if (!has_status) {
+      CheckSolverInfosOnHost(orgqr_info, h_info, stream, "cuSolver orgqr");
     }
-
   }
 
   /**
@@ -784,6 +803,7 @@ private:
 
   std::vector<T2 *> batch_tau_ptrs;
   DnQRCUDAParams_t params;
+  int orgqr_lwork = 0; // orgqr workspace size in elements of T1
 };
 
 
@@ -811,14 +831,23 @@ private:
  *   Input tensor A
  * @param exec
  *   CUDA executor
+ * @param status
+ *   Optional solver status. When given, geqrf info is written to stage 0 and
+ *   orgqr info to stage 1, and the call does not
+ *   synchronize the stream.
  */
 template <typename OutTensor, typename RTensor, typename ATensor>
 void qr_econ_impl(OutTensor &&out, RTensor &&out_r,
-        const ATensor &a, const cudaExecutor &exec)
+        const ATensor &a, const cudaExecutor &exec, detail::SolverStatusState *status = nullptr)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   using T1 = typename remove_cvref_t<OutTensor>::value_type;
   const int RANK = ATensor::Rank();
+
+  // Validate the status before any work, so a rejected status allocates nothing.
+  // Two stages: geqrf, then orgqr.
+  const auto status_run = detail::BeginStatusRun(detail::ExecutorKind::Cuda, status, 2, a);
+  int *status_info = status_run.Info();
 
   cuda::std::array<index_t, RANK-1> tau_shape;
   for(int i = 0; i < RANK-2; i++) {
@@ -826,7 +855,8 @@ void qr_econ_impl(OutTensor &&out, RTensor &&out_r,
   }
   tau_shape[RANK-2] = cuda::std::min(a.Size(RANK-1), a.Size(RANK-2));
 
-  auto tau_new = make_tensor<T1>(tau_shape);
+  // Stream-ordered allocation, so freeing tau does not synchronize the device
+  auto tau_new = make_tensor<T1>(tau_shape, MATX_ASYNC_DEVICE_MEMORY, exec.getStream());
   auto a_new = OpToTensor(a, exec);
 
   if(!is_matx_transform_op<ATensor>() && !a_new.isSameView(a)) {
@@ -838,10 +868,10 @@ void qr_econ_impl(OutTensor &&out, RTensor &&out_r,
      library appear as though everything is row-major, we take a performance hit
      to transpose in and out of the function. Eventually this may be fixed in
      cuSolver.
+     The tensor owns the transpose buffer, so an exception frees it.
   */
-  T1 *tp;
-  matxAlloc(reinterpret_cast<void **>(&tp), a_new.Bytes(), MATX_ASYNC_DEVICE_MEMORY,
-            exec.getStream());
+  auto tp_tensor = make_tensor<T1>(a_new.Shape(), MATX_ASYNC_DEVICE_MEMORY, exec.getStream());
+  T1 *tp = tp_tensor.Data();
   auto tv = TransposeCopy(tp, a_new, exec);
   auto tvt = tv.PermuteMatrix();
 
@@ -850,28 +880,27 @@ void qr_econ_impl(OutTensor &&out, RTensor &&out_r,
 
   // Get cache or new QR plan if it doesn't exist
   using cache_val_type = detail::matxDnEconQRCUDAPlan_t<OutTensor, RTensor, decltype(tau_new), decltype(a_new)>;
-  auto cache_id = detail::GetCacheIdFromType<detail::qr_cuda_cache_t>();
+  auto cache_id = detail::GetCacheIdFromType<detail::qr_econ_cuda_cache_t>();
   MATX_LOG_DEBUG("QR transform (economic): cache_id={}", cache_id);
-  detail::GetCache().LookupAndExec<detail::qr_cuda_cache_t>(
+  detail::GetCache().LookupAndExec<detail::qr_econ_cuda_cache_t>(
     cache_id,
     params,
     [&]() {
       return std::make_shared<cache_val_type>(tau_new, tvt, exec);
     },
     [&](std::shared_ptr<cache_val_type> ctype) {
-      ctype->Exec(tvt, out_r, tau_new, tvt, exec);
+      ctype->Exec(tvt, out_r, tau_new, tvt, exec, status_info);
     },
     exec
   );
 
   /* Temporary WAR
-   * Copy and free async buffer for transpose */
+   * Copy out of the transpose buffer, which tp_tensor frees on return */
   cuda::std::array<index_t, RANK> rSliceB, rSliceE;
   rSliceB.fill(0); rSliceE.fill(matxEnd);
   rSliceE[RANK-2] = params.m;
   rSliceE[RANK-1] = std::min(params.m, params.n);
   matx::copy(out, slice(tv.PermuteMatrix(), rSliceB, rSliceE), exec);
-  matxFree(tp);
 }
 
 } // end namespace matx

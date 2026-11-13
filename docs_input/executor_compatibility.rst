@@ -21,7 +21,8 @@ Legend:
 Note that there can be small differences in results between host executors and CUDA executors because floating-point arithmetic is
 performed by different libraries and devices. HostExecutor covers SingleThreadedHostExecutor, SelectThreadsHostExecutor, and
 AllThreadsHostExecutor. Host executor support for FFT, BLAS, and solver routines depends on the corresponding CPU backend CMake
-options. Optional backend dependencies such as CPU BLAS, CPU solver libraries, or MathDx requirements are documented in the notes while
+options. Without the CPU solver backend, solver routines throw ``matxInvalidExecutor`` on host executors. Optional backend dependencies
+such as CPU BLAS, CPU solver libraries, or MathDx requirements are documented in the notes while
 still using |yes| when the operator is supported for that executor. CUDAJITExecutor support means the operator can participate in a
 fused JIT expression; non-JIT CUDA execution through cudaExecutor remains available for the broader CUDA library paths.
 
@@ -84,7 +85,7 @@ existing operators do not implicitly become distributed operations.
    "cgsolve", "|no|", "|yes|", "|no|", "|no|", "CUDA iterative solver path."
    "channelize_poly", "|yes|", "|yes|", "|no|", "|no|", "Polyphase channelizer; host path directly computes the per-branch FIR and DFT stages. CUDA has limitations for half-precision outputs; see :ref:`channelize_poly_func`."
    "chirp", "|yes|", "|yes|", "|yes|", "|no|", "Generator expression."
-   "chol", "|yes|", "|yes|", "|yes|", "|partial|", "Host support requires the CPU solver backend. CUDAJITExecutor support uses cuSolverDx through MathDx for supported rank 2-4 square float, double, complex-float, and complex-double matrices. Experimental distributedCUDAExecutor support is limited to aligned batch sharding with fully local matrix dimensions."
+   "chol", "|yes|", "|yes|", "|yes|", "|partial|", "Host support requires the CPU solver backend. CUDAJITExecutor support uses cuSolverDx through MathDx for supported rank 2-4 square float, double, complex-float, and complex-double matrices. Experimental distributedCUDAExecutor support is limited to aligned batch sharding with fully local matrix dimensions. A solver status is supported on host and CUDA executors, not on CUDAJITExecutor or distributedCUDAExecutor."
    "clone", "|yes|", "|yes|", "|yes|", "|no|", "View expression. JIT tensor clones with a unit-stride final dimension can use multiple elements per thread when row alignment permits, including zero-stride batch dimensions. Cloned operator expressions retain scalar-EPT restrictions."
    "concat", "|yes|", "|yes|", "|yes|", "|no|", "View/expression composition."
    "conj", "|yes|", "|yes|", "|yes|", "|no|", "Element-wise expression."
@@ -102,7 +103,7 @@ existing operators do not implicitly become distributed operations.
    "det", "|yes|", "|yes|", "|yes|", "|no|", "Built from solver functionality; host support requires the CPU solver backend. JIT support follows cuSolverDx matrix type and shape limits."
    "diag", "|yes|", "|yes|", "|yes|", "|no|", "Generator/view expression."
    "downsample", "|yes|", "|yes|", "|yes|", "|no|", "View/reindex expression."
-   "eig", "|yes|", "|yes|", "|yes|", "|no|", "Host support requires the CPU solver backend. CUDAJITExecutor supports the cuSolverDx-backed projection path for supported types and shapes."
+   "eig", "|yes|", "|yes|", "|yes|", "|no|", "Host support requires the CPU solver backend. CUDAJITExecutor supports the cuSolverDx-backed projection path for supported types and shapes. A solver status is supported on host and CUDA executors, not on CUDAJITExecutor."
    "einsum", "|no|", "|yes|", "|partial|", "|no|", "CUDA transform. JIT support is available when the expression lowers to supported fused element-wise or matmul-style work."
    "erf", "|yes|", "|yes|", "|yes|", "|no|", "Element-wise expression."
    "exp", "|yes|", "|yes|", "|yes|", "|no|", "Element-wise expression."
@@ -139,7 +140,7 @@ existing operators do not implicitly become distributed operations.
    "imag", "|yes|", "|yes|", "|yes|", "|no|", "Element-wise expression."
    "index", "|yes|", "|yes|", "|yes|", "|no|", "Index generator expression."
    "interp1", "|partial|", "|yes|", "|partial|", "|no|", "Linear interpolation is expression-friendly. Spline interpolation uses CUDA-only transform support."
-   "inv", "|no|", "|yes|", "|yes|", "|no|", "CUDA solver transform. CUDAJITExecutor support uses cuSolverDx through MathDx for supported rank 2-4 square float, double, complex-float, and complex-double matrices. ``MAT_INVERSE_ALGO_POSV`` is available only on the MathDx JIT path and requires Hermitian positive-definite inputs."
+   "inv", "|no|", "|yes|", "|yes|", "|no|", "CUDA solver transform. CUDAJITExecutor support uses cuSolverDx through MathDx for supported rank 2-4 square float, double, complex-float, and complex-double matrices. ``MAT_INVERSE_ALGO_POSV`` is available only on the MathDx JIT path and requires Hermitian positive-definite inputs. A solver status is supported with the LU algorithm on CUDA executors, not on CUDAJITExecutor."
    "isclose", "|yes|", "|yes|", "|yes|", "|no|", "Element-wise comparison expression."
    "isinf", "|yes|", "|yes|", "|yes|", "|no|", "Element-wise predicate expression."
    "isnan", "|yes|", "|yes|", "|yes|", "|no|", "Element-wise predicate expression."
@@ -151,7 +152,7 @@ existing operators do not implicitly become distributed operations.
    "log10", "|yes|", "|yes|", "|yes|", "|no|", "Element-wise expression."
    "log2", "|yes|", "|yes|", "|yes|", "|no|", "Element-wise expression."
    "logspace", "|yes|", "|yes|", "|yes|", "|no|", "Generator expression."
-   "lu", "|yes|", "|yes|", "|yes|", "|no|", "Host support requires the CPU solver backend. CUDAJITExecutor supports cuSolverDx-backed lazy projections for supported types and shapes."
+   "lu", "|yes|", "|yes|", "|yes|", "|no|", "Host support requires the CPU solver backend. CUDAJITExecutor supports cuSolverDx-backed lazy projections for supported types and shapes. A solver status is supported on host and CUDA executors, not on CUDAJITExecutor."
    "make_channelize_poly_stream", "|yes|", "|yes|", "|no|", "|no|", "Streaming (segmented) polyphase channelizer object; feeds segments through the one-shot channelize_poly over a retained history. Host and CUDA executors; the streaming object is a stateful driver, not a JIT-fusable expression."
    "make_conv1d_stream", "|yes|", "|yes|", "|no|", "|no|", "Streaming (segmented) 1D convolution object built on the direct conv1d; host and CUDA executors. The direct method limits the filter to 1024 taps. The streaming object is a stateful driver, not a JIT-fusable expression."
    "make_resample_poly_stream", "|yes|", "|yes|", "|no|", "|no|", "Streaming (segmented) polyphase resampler object; feeds segments through the one-shot resample_poly over a retained history. Host and CUDA executors; the streaming object is a stateful driver, not a JIT-fusable expression."
@@ -177,8 +178,8 @@ existing operators do not implicitly become distributed operations.
    "prod", "|partial|", "|yes|", "|no|", "|no|", "Reduction transform; host execution is available but reductions are not generally parallelized across host threads."
    "pwelch", "|no|", "|yes|", "|no|", "|no|", "CUDA-only spectral estimation transform."
    "qr", "|no|", "|yes|", "|yes|", "|no|", "CUDA solver transform. CUDAJITExecutor supports cuSolverDx-backed lazy projections for supported types and shapes."
-   "qr_econ", "|no|", "|yes|", "|yes|", "|no|", "CUDA solver transform. CUDAJITExecutor supports cuSolverDx-backed lazy projections for supported types and shapes; the Q projection is limited to non-wide matrices where m >= n."
-   "qr_solver", "|yes|", "|yes|", "|yes|", "|no|", "Host support requires the CPU solver backend. CUDAJITExecutor supports cuSolverDx-backed lazy projections for supported types and shapes."
+   "qr_econ", "|no|", "|yes|", "|yes|", "|no|", "CUDA solver transform. CUDAJITExecutor supports cuSolverDx-backed lazy projections for supported types and shapes; the Q projection is limited to non-wide matrices where m >= n. A solver status is not supported on CUDAJITExecutor."
+   "qr_solver", "|yes|", "|yes|", "|yes|", "|no|", "Host support requires the CPU solver backend. CUDAJITExecutor supports cuSolverDx-backed lazy projections for supported types and shapes. A solver status is supported on host and CUDA executors, not on CUDAJITExecutor."
    "r2c", "|yes|", "|yes|", "|yes|", "|no|", "Real-to-complex view/cast expression."
    "random", "|yes|", "|yes|", "|partial|", "|no|", "Direct CUDA tensor assignment uses a low-memory fill path reproducible for the same shape/layout/path. CUDAJITExecutor uses cuRANDDx through MathDx for floating-point and complex random expressions with at most 1024 elements; larger random tensors materialize temporary values on the non-JIT CUDA path."
    "randomi", "|yes|", "|yes|", "|no|", "|no|", "Direct CUDA tensor assignment uses a low-memory fill path reproducible for the same shape/layout/path; generic CUDA expressions materialize temporary random integer values and are not JIT-fused."
@@ -203,14 +204,14 @@ existing operators do not implicitly become distributed operations.
    "sinh", "|yes|", "|yes|", "|yes|", "|no|", "Element-wise expression."
    "slice", "|yes|", "|yes|", "|yes|", "|no|", "View expression; JIT specializes starts and strides."
    "softmax", "|no|", "|yes|", "|no|", "|no|", "CUDA-only reduction-style transform."
-   "solve", "|yes|", "|yes|", "|yes|", "|no|", "Solver transform; host support requires the CPU solver backend. JIT support follows the underlying cuSolverDx factorization limits when it lowers to a supported solver projection."
+   "solve", "|yes|", "|yes|", "|yes|", "|no|", "Solver transform; host support requires the CPU solver backend. JIT support follows the underlying cuSolverDx factorization limits when it lowers to a supported solver projection. A solver status is supported for dense A on host and CUDA executors, not on CUDAJITExecutor."
    "sort", "|partial|", "|yes|", "|no|", "|no|", "Sort transform; host execution is available but does not generally use multithreaded host executor paths."
    "sph2cart", "|yes|", "|yes|", "|yes|", "|no|", "Element-wise coordinate conversion expression."
    "sqrt", "|yes|", "|yes|", "|yes|", "|no|", "Element-wise expression."
    "stack", "|yes|", "|yes|", "|yes|", "|no|", "View/expression composition."
    "stdd", "|partial|", "|yes|", "|no|", "|no|", "Reduction/statistics transform; host execution is available but reductions are not generally parallelized across host threads."
    "sum", "|partial|", "|yes|", "|no|", "|no|", "Reduction transform; host execution is available but reductions are not generally parallelized across host threads."
-   "svd", "|yes|", "|yes|", "|no|", "|no|", "Host support requires the CPU solver backend. CUDAJITExecutor SVD projection is not currently enabled."
+   "svd", "|yes|", "|yes|", "|no|", "|no|", "Host support requires the CPU solver backend. CUDAJITExecutor SVD projection is not currently enabled. A solver status is supported on host and CUDA executors."
    "svdbpi", "|no|", "|yes|", "|no|", "|no|", "CUDA-only batched power-iteration SVD transform."
    "svdpi", "|no|", "|yes|", "|no|", "|no|", "CUDA-only power-iteration SVD transform."
    "tan", "|yes|", "|yes|", "|yes|", "|no|", "Element-wise expression."
