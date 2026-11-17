@@ -267,6 +267,40 @@ private:
   cusolverDnParams_t params_ = nullptr;
 };
 
+/**
+ * Write the batch pointers of `t` into the device array `d_ptrs` with a fill
+ * queued on the executor's stream. The fill takes its values as kernel
+ * arguments, so a captured CUDA graph keeps them; a copy from a host array
+ * would read that array again on every replay, after the call freed it.
+ *
+ * The batch dimensions of `t` must collapse to one with a uniform stride, as
+ * those of the contiguous work buffers dense_solve_impl builds do.
+ */
+template <BatchType BTYPE, typename T, typename TensorType>
+__MATX_INLINE__ void FillBatchPointersOnDevice(T **d_ptrs, const TensorType &t, const cudaExecutor &exec)
+{
+  static_assert(sizeof(T *) == sizeof(uint64_t), "Batch pointers are filled as 64-bit integers");
+  constexpr int batch_dims = TensorType::Rank() - static_cast<int>(BTYPE);
+  index_t batches = 1;
+  index_t stride = 0;
+  if constexpr (batch_dims > 0) {
+    for (int d = 0; d < batch_dims; d++) {
+      batches *= t.Size(d);
+    }
+    for (int d = 0; d < batch_dims - 1; d++) {
+      if (t.Stride(d) != t.Stride(d + 1) * t.Size(d + 1)) {
+        MATX_THROW(matxInvalidParameter, "Dense solve batch dimensions must collapse to one with a uniform stride");
+      }
+    }
+    stride = t.Stride(batch_dims - 1);
+  }
+  const auto first = reinterpret_cast<uint64_t>(t.Data());
+  // Unsigned arithmetic wraps, so a negative stride also gives the right addresses
+  const auto step = static_cast<uint64_t>(stride) * sizeof(T);
+  auto ptrs = make_tensor<uint64_t>(reinterpret_cast<uint64_t *>(d_ptrs), {batches});
+  (ptrs = range<0>({batches}, first, step)).run(exec);
+}
+
 template <typename T>
 class DenseSolveCublasBatchedPlan_t {
 public:
@@ -289,7 +323,8 @@ public:
   }
 
   /**
-   * Run getrfBatched and getrsBatched.
+   * Run getrfBatched and getrsBatched. The device pointer arrays are filled on
+   * the stream, so a captured call can be replayed.
    *
    * @param status_info If non-null, getrf info for matrix i is written to
    * status_info[i] and stage 1 (getrs) is zeroed on the stream, since
@@ -308,22 +343,13 @@ public:
     const int nrhs = static_cast<int>(params_.nrhs);
     const int batch_size = static_cast<int>(params_.batch_size);
 
-    std::vector<T *> h_a_array;
-    std::vector<T *> h_b_array;
-    SetBatchPointers<BatchType::MATRIX>(a_col, h_a_array);
+    FillBatchPointersOnDevice<BatchType::MATRIX>(d_a_array_.get(), a_col, exec);
     if constexpr (IsDenseSolveVectorRHS<ATensor, BTensor>()) {
-      SetBatchPointers<BatchType::VECTOR>(b_col, h_b_array);
+      FillBatchPointersOnDevice<BatchType::VECTOR>(d_b_array_.get(), b_col, exec);
     }
     else {
-      SetBatchPointers<BatchType::MATRIX>(b_col, h_b_array);
+      FillBatchPointersOnDevice<BatchType::MATRIX>(d_b_array_.get(), b_col, exec);
     }
-
-    MATX_CUDA_CHECK(cudaMemcpyAsync(d_a_array_.get(), h_a_array.data(),
-                    h_a_array.size() * sizeof(T *), cudaMemcpyHostToDevice,
-                    stream));
-    MATX_CUDA_CHECK(cudaMemcpyAsync(d_b_array_.get(), h_b_array.data(),
-                    h_b_array.size() * sizeof(T *), cudaMemcpyHostToDevice,
-                    stream));
 
     CheckSolverCublasStatus(cublasSetStream(handle_.get(), stream), "cublasSetStream");
 

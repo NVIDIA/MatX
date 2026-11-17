@@ -1035,6 +1035,80 @@ TEST(SolverStatusTest, StageCountRules)
   MATX_EXIT_HANDLER();
 }
 
+// A status lets a batched dense solve run without synchronizing, so it can be
+// captured in a CUDA graph. The captured graph must not copy from host memory
+// that the call freed when it returned, so replays after later direct calls
+// still solve the captured matrices.
+TEST(SolverStatusTest, BatchedSolveGraphReplay)
+{
+  MATX_ENTER_HANDLER();
+  using T = float;
+  constexpr index_t batch = 4;
+  constexpr index_t n = 8;
+  constexpr index_t nrhs = 3;
+  TestStream stream;
+  cudaExecutor exec{stream};
+  auto A = make_tensor<T>({batch, n, n});
+  MakeHermitianPD<T>(A, exec);
+  auto B = make_tensor<T>({batch, n, nrhs});
+  (B = random<T>(B.Shape(), NORMAL)).run(exec);
+  auto X = make_tensor<T>(B.Shape());
+  auto ref = make_tensor<T>(B.Shape());
+  auto st = make_solver_status(A, exec);
+  // Create the cached plan before capturing
+  (X = solve(A, B, st)).run(exec);
+  exec.sync();
+
+  struct Graph {
+    cudaGraph_t graph = nullptr;
+    cudaGraphExec_t exec = nullptr;
+    ~Graph()
+    {
+      if (exec != nullptr) {
+        cudaGraphExecDestroy(exec);
+      }
+      if (graph != nullptr) {
+        cudaGraphDestroy(graph);
+      }
+    }
+  } g;
+  ASSERT_EQ(cudaStreamBeginCapture(stream, cudaStreamCaptureModeThreadLocal), cudaSuccess);
+  (X = solve(A, B, st)).run(exec);
+  ASSERT_EQ(cudaStreamEndCapture(stream, &g.graph), cudaSuccess);
+
+  size_t count = 0;
+  ASSERT_EQ(cudaGraphGetNodes(g.graph, nullptr, &count), cudaSuccess);
+  std::vector<cudaGraphNode_t> nodes(count);
+  ASSERT_EQ(cudaGraphGetNodes(g.graph, nodes.data(), &count), cudaSuccess);
+  for (const auto node : nodes) {
+    cudaGraphNodeType type;
+    ASSERT_EQ(cudaGraphNodeGetType(node, &type), cudaSuccess);
+    if (type == cudaGraphNodeTypeMemcpy) {
+      cudaMemcpy3DParms params{};
+      ASSERT_EQ(cudaGraphMemcpyNodeGetParams(node, &params), cudaSuccess);
+      EXPECT_NE(params.kind, cudaMemcpyHostToDevice) << "The graph copies from host memory";
+    }
+  }
+  ASSERT_EQ(cudaGraphInstantiate(&g.exec, g.graph, 0), cudaSuccess);
+
+  // Direct solves of other matrices before the replay
+  auto A2 = make_tensor<T>({batch, n, n});
+  MakeHermitianPD<T>(A2, exec);
+  auto X2 = make_tensor<T>(B.Shape());
+  for (int i = 0; i < 3; i++) {
+    (X2 = solve(A2, B, st)).run(exec);
+  }
+
+  // The replay solves the captured A for new right-hand sides
+  (B = random<T>(B.Shape(), NORMAL)).run(exec);
+  (ref = solve(A, B)).run(exec);
+  ASSERT_EQ(cudaGraphLaunch(g.exec, stream), cudaSuccess);
+  exec.sync();
+  EXPECT_TRUE(st.ok());
+  EXPECT_EQ(MaxAbsDiff<T>(X, ref, exec), 0);
+  MATX_EXIT_HANDLER();
+}
+
 // Statuses support host executors and cudaExecutor. Creating a status with a
 // JIT or distributed executor throws, and reading one with it is a mismatch.
 TEST(SolverStatusTest, RejectsJitAndDistributedExecutors)
