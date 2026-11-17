@@ -1046,6 +1046,14 @@ TEST(SolverStatusTest, BatchedSolveGraphReplay)
   constexpr index_t batch = 4;
   constexpr index_t n = 8;
   constexpr index_t nrhs = 3;
+  // Without stream-ordered memory pools, the solve's temporary buffers fall back
+  // to cudaMalloc and cudaFree instead of becoming graph allocation nodes, so a
+  // captured graph cannot keep them for replay
+  int device = 0;
+  ASSERT_EQ(cudaGetDevice(&device), cudaSuccess);
+  if (!detail::GetDeviceAttributes(device).memory_pools_supported) {
+    GTEST_SKIP() << "Device " << device << " does not support stream-ordered memory pools, so a solve cannot be captured";
+  }
   TestStream stream;
   cudaExecutor exec{stream};
   auto A = make_tensor<T>({batch, n, n});
