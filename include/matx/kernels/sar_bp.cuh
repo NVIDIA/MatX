@@ -1209,8 +1209,7 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
             row_offset = pulse_base * row_step;
         }
 
-        // The row offset advances in the loop header so that samples skipped
-        // by the bounds check below still step it.
+        // The row offset advances in the loop header, once per pulse.
         #pragma unroll 4
         for (IdxT ip = 0; ip < num_pulses_in_block; ++ip, row_offset += row_step) {
             [[maybe_unused]] const IdxT p = pulse_base + ip;
@@ -1260,21 +1259,25 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
             // 2 <= num_range_bins <= INT32_MAX on the host, so num_range_bins - 1
             // lies in [1, 2^31 - 2], below every negative bin read as uint32_t
             // (at least 2^31).
-            if (static_cast<uint32_t>(bin_weight.bin_floor_int) >=
-                static_cast<uint32_t>(num_range_bins - 1)) {
-                continue;
-            }
+            //
+            // Out-of-range samples are read from bin 0 and their contribution
+            // is discarded below, rather than skipped with a branch. Without
+            // the branch, the loads of the unrolled pulses can be issued
+            // together and overlap their latency.
+            const bool in_range = static_cast<uint32_t>(bin_weight.bin_floor_int) <
+                static_cast<uint32_t>(num_range_bins - 1);
+            const int32_t read_bin = in_range ? bin_weight.bin_floor_int : 0;
 
             // rp accessor picks the fast pointer path on IsUnitStride or
             // falls through to operator().
             range_profiles_t sample_lo, sample_hi;
             if constexpr (UseRowOffset) {
-                const IdxT offset = row_offset + bin_weight.bin_floor_int;
+                const IdxT offset = row_offset + read_bin;
                 sample_lo = rp.at_offset(offset);
                 sample_hi = rp.at_offset(offset + 1);
             } else {
-                sample_lo = rp(p, bin_weight.bin_floor_int);
-                sample_hi = rp(p, bin_weight.bin_floor_int + 1);
+                sample_lo = rp(p, read_bin);
+                sample_hi = rp(p, read_bin + 1);
             }
 
             const loose_complex_compute_t sample = [&sample_lo, &sample_hi, &bin_weight]() -> loose_complex_compute_t {
@@ -1301,13 +1304,18 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
                 if constexpr (SynthesizePhase) {
                     return SarBpSynthesizePhase(phase_correction_partial, ref_phase_ticks, bin_floor_local, bin_weight.w);
                 } else if constexpr (PhaseLUT) {
-                    return get_reference_phase_lut(bin_weight.bin_floor_int, bin_weight.w);
+                    // read_bin keeps the LUT read in bounds; the result is
+                    // discarded when the sample is out of range.
+                    return get_reference_phase_lut(read_bin, bin_weight.w);
                 } else {
                     return get_reference_phase_direct(thread_state.range_delta);
                 }
             }();
 
-            accum = accumulate_contribution(accum, sample, ref_phase);
+            // Select rather than multiply by zero, so that non-finite values in
+            // a discarded sample or phase cannot reach the accumulator.
+            const loose_complex_compute_t updated = accumulate_contribution(accum, sample, ref_phase);
+            accum = in_range ? updated : accum;
         } // pulse
     } // pulse block
 
