@@ -383,19 +383,23 @@ TEST(SolverStatusTest, RejectsInvalidStatusTensors)
 
   // A zero-size batch dimension, for both overloads and both executor kinds.
   // Zero-size matrix dimensions do not affect the status's shape and are allowed.
+  // The inputs are generators because debug builds reject zero-size tensors.
   {
-    const auto zero_batch = make_tensor<T>({0, 4, 4});
-    const auto msg = ExceptionText([&] { make_solver_status(zero_batch, exec); });
-    EXPECT_NE(msg.find("batch sizes must be positive"), std::string::npos) << msg;
-    EXPECT_THROW(make_solver_status(zero_batch, host_exec), detail::matxException);
-    EXPECT_THROW(make_solver_status(make_tensor<T>({2, 0, 4, 4}), exec), detail::matxException);
-    auto zinfo = make_tensor<int>({2, 0}, MATX_DEVICE_MEMORY);
-    EXPECT_THROW(make_solver_status(zero_batch, zinfo, exec), detail::matxException);
+    const auto zero_batch = zeros<T>({0, 4, 4});
+    const auto expect_zero_batch_rejected = [](auto &&create) {
+      const auto msg = ExceptionText(create);
+      EXPECT_NE(msg.find("batch sizes must be positive"), std::string::npos) << msg;
+    };
+    expect_zero_batch_rejected([&] { (void)make_solver_status(zero_batch, exec); });
+    expect_zero_batch_rejected([&] { (void)make_solver_status(zero_batch, host_exec); });
+    expect_zero_batch_rejected([&] { (void)make_solver_status(zeros<T>({2, 0, 4, 4}), exec); });
+    auto info = make_tensor<int>({2, 1}, MATX_DEVICE_MEMORY);
+    expect_zero_batch_rejected([&] { (void)make_solver_status(zero_batch, info, exec); });
 
-    EXPECT_NO_THROW(make_solver_status(make_tensor<T>({3, 0, 4}), exec));
-    EXPECT_NO_THROW(make_solver_status(make_tensor<T>({3, 4, 0}), exec));
-    EXPECT_NO_THROW(make_solver_status(make_tensor<T>({0, 0}), exec));
-    EXPECT_NO_THROW(make_solver_status(make_tensor<T>({3, 0, 4}), make_tensor<int>({2, 3}, MATX_DEVICE_MEMORY), exec));
+    EXPECT_NO_THROW(make_solver_status(zeros<T>({3, 0, 4}), exec));
+    EXPECT_NO_THROW(make_solver_status(zeros<T>({3, 4, 0}), exec));
+    EXPECT_NO_THROW(make_solver_status(zeros<T>({0, 0}), exec));
+    EXPECT_NO_THROW(make_solver_status(zeros<T>({3, 0, 4}), make_tensor<int>({2, 3}, MATX_DEVICE_MEMORY), exec));
   }
 
   // A CUDA executor needs device or host-pinned memory
