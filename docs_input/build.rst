@@ -82,7 +82,7 @@ Optional Third-party Dependencies
 - `pybind11 <https://github.com/pybind/pybind11>`_ 3.0.3+ (Required for file I/O and some unit tests)
 - `nvbench <https://github.com/NVIDIA/nvbench>`_ tag ``python-0.2.0`` / commit dc59f98 (Required to run benchmarks)
 - `cutensor <https://developer.nvidia.com/cutensor>`_ 2.3.1.0+ (Required when using `einsum`)
-- `cutensornet <https://docs.nvidia.com/cuda/cuquantum/cutensornet>`_ 25.09.1.12+ (Required when using `einsum`)
+- `cutensornet <https://docs.nvidia.com/cuda/cuquantum/latest/cutensornet/>`_ 25.09.1.12+ (Required when using `einsum`)
 - `cuDSS <https://developer.nvidia.com/cudss>`_ 0.7.0.20+ (Required when using `solve` on sparse matrices)
 
 Host (CPU) Support
