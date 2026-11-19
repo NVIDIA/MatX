@@ -1090,6 +1090,14 @@ struct SarBpAddressingInputs {
   auto Profiles() const { return slice(padded, {0, PAD}, {matxEnd, PAD + NUM_BINS}); }
   auto Voxels() const { return zipvec(px, py, pz); }
 
+  // Exact lower interpolation bin of pixel (i, j) for pulse p.
+  double LowerBin(index_t p, index_t i, index_t j) const
+  {
+    const double3 a = platform_positions(p);
+    const double dx = px(i, j) - a.x, dy = py(i, j) - a.y, dz = pz(i, j) - a.z;
+    return std::floor((std::sqrt(dx * dx + dy * dy + dz * dz) - range_to_mcp(p)) / DEL_R + NUM_BINS / 2);
+  }
+
   // Number of pixel-pulse pairs whose exact lower interpolation bin is -1 and
   // NUM_BINS - 1: the samples on either side of the swath that the bounds check
   // must skip.
@@ -1097,12 +1105,9 @@ struct SarBpAddressingInputs {
   {
     int below = 0, above = 0;
     for (index_t p = 0; p < NUM_PULSES; p++) {
-      const double3 a = platform_positions(p);
       for (index_t i = 0; i < IMAGE; i++) {
         for (index_t j = 0; j < IMAGE; j++) {
-          const double dx = px(i, j) - a.x, dy = py(i, j) - a.y, dz = pz(i, j) - a.z;
-          const double bin = (std::sqrt(dx * dx + dy * dy + dz * dz) - range_to_mcp(p)) / DEL_R + NUM_BINS / 2;
-          const double floor_bin = std::floor(bin);
+          const double floor_bin = LowerBin(p, i, j);
           below += floor_bin == -1.0;
           above += floor_bin == static_cast<double>(NUM_BINS - 1);
         }
@@ -1275,6 +1280,103 @@ TYPED_TEST(SarBpTestDoubleType, SwathEdgesAndModes)
         } else {
           EXPECT_EQ(max_abs_diff(variable_z, taylor_without_feature), 0.0);
         }
+      }
+    }
+  }
+  MATX_EXIT_HANDLER();
+}
+
+// The pulse loop reads every sample unconditionally: an out-of-range sample is
+// read from fallback bins 0 and 1, and its contribution is then discarded with
+// a select. Put NaN and infinity in those bins, move every pixel-pulse pair out
+// of the swath, and start from a finite image. The output must equal the
+// initial image bit for bit in every compute type, with and without
+// PhaseLUTOptimization, in each pixel-z mode, with the third-order TaylorFast
+// term, and on the generic accessor path. Discarding the contribution by
+// multiplying it by zero instead would turn every pixel into NaN.
+TYPED_TEST(SarBpTestDoubleType, DiscardedNonFiniteSamplesLeaveImageUnchanged)
+{
+  MATX_ENTER_HANDLER();
+  using complex_t = SarBpAddressingInputs::complex_t;
+  constexpr index_t IMAGE = SarBpAddressingInputs::IMAGE;
+  constexpr index_t NUM_PULSES = SarBpAddressingInputs::NUM_PULSES;
+  constexpr index_t NUM_BINS = SarBpAddressingInputs::NUM_BINS;
+  constexpr index_t PAD = SarBpAddressingInputs::PAD;
+  constexpr float kNaN = std::numeric_limits<float>::quiet_NaN();
+  constexpr float kInf = std::numeric_limits<float>::infinity();
+  SarBpAddressingInputs in;
+  // The grid spans about 70 range bins around the swath centre. Moving the
+  // swath 60 m (120 bins) away from or toward the platform on alternate pulses
+  // puts every lower interpolation bin well below 0 or above NUM_BINS - 2.
+  for (index_t p = 0; p < NUM_PULSES; p++) {
+    in.range_to_mcp(p) += (p % 2 == 0) ? 60.0 : -60.0;
+    in.padded(p, PAD) = complex_t{kNaN, kNaN};
+    in.padded(p, PAD + 1) = complex_t{kInf, -kInf};
+  }
+  // Exact bins, with a margin that the fp32 and Taylor bin computations cannot
+  // cross.
+  constexpr double MARGIN = 8.0;
+  int below = 0, above = 0;
+  for (index_t p = 0; p < NUM_PULSES; p++) {
+    for (index_t i = 0; i < IMAGE; i++) {
+      for (index_t j = 0; j < IMAGE; j++) {
+        const double bin = in.LowerBin(p, i, j);
+        below += bin <= -MARGIN;
+        above += bin >= static_cast<double>(NUM_BINS - 2) + MARGIN;
+      }
+    }
+  }
+  const int near_swath = static_cast<int>(NUM_PULSES * IMAGE * IMAGE) - below - above;
+  ASSERT_EQ(near_swath, 0);
+  ASSERT_GT(below, 0);
+  ASSERT_GT(above, 0);
+
+  // Non-zero, so that adding a zero accumulator of either sign keeps the bits.
+  const complex_t initial_value{0.75f, -1.25f};
+  auto initial_image = fill<complex_t>({IMAGE, IMAGE}, initial_value);
+  auto image = make_tensor<complex_t>({IMAGE, IMAGE});
+  const auto profiles = in.Profiles();
+  auto expect_unchanged = [&](const char *mode) {
+    SCOPED_TRACE(mode);
+    this->exec.sync();
+    int changed = 0;
+    for (index_t i = 0; i < IMAGE; i++) {
+      for (index_t j = 0; j < IMAGE; j++) {
+        // Exact comparison: NaN compares unequal, so it counts as changed.
+        changed += !(image(i, j).real() == initial_value.real() &&
+                     image(i, j).imag() == initial_value.imag());
+      }
+    }
+    EXPECT_EQ(changed, 0);
+  };
+
+  for (const SarBpComputeType compute_type : kSarBpAllComputeTypes) {
+    for (const SarBpFeature features : {SarBpFeature::None, SarBpFeature::PhaseLUTOptimization}) {
+      // FloatFloat requires PhaseLUTOptimization (see SwathEdgesAndModes).
+      if (compute_type == SarBpComputeType::FloatFloat && features == SarBpFeature::None) {
+        continue;
+      }
+      SCOPED_TRACE(::testing::Message() << "compute_type=" << static_cast<int>(compute_type)
+                                        << ", phase_lut=" << (features == SarBpFeature::PhaseLUTOptimization));
+      SarBpParams params;
+      params.compute_type = compute_type;
+      params.features = features;
+      params.center_frequency = 9.6e9;
+      params.del_r = SarBpAddressingInputs::DEL_R;
+      auto op = experimental::sar_bp(initial_image, profiles, in.platform_positions, in.Voxels(),
+                                     in.range_to_mcp, params);
+      (image = op).run(this->exec);
+      expect_unchanged("variable z");
+      (image = op.template props<PropSarBpPixelZIsZero>()).run(this->exec);
+      expect_unchanged("PixelZIsZero");
+      (image = op.template props<PropSarBpPixelZIsFixed>()).run(this->exec);
+      expect_unchanged("PixelZIsFixed");
+      (image = experimental::sar_bp(initial_image, conj(conj(profiles)), in.platform_positions, in.Voxels(),
+                                    in.range_to_mcp, params)).run(this->exec);
+      expect_unchanged("generic accessor");
+      if (compute_type == SarBpComputeType::TaylorFast) {
+        (image = op.template props<PropSarBpTaylorFastAddThirdOrder>()).run(this->exec);
+        expect_unchanged("third order");
       }
     }
   }
