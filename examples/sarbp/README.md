@@ -122,6 +122,7 @@ real/imag, row-major), written to `output_image.raw` in this example.
 | `--precision {double,float,fltflt,mixed,taylor_fast}` | Backprojection compute precision (default: taylor_fast) |
 | `--pixel-z {variable,zero,fixed}` | Compile-time assumption for the pixel Z coordinate. `zero` skips per-pixel Z work and is valid (and faster) for a flat, Z=0 image grid like this example's (default: variable) |
 | `--warmup` | Warmup GPU kernels and FFT plans before timed run |
+| `--no-overlap` | Issue all host/device transfers on the compute stream instead of overlapping them with GPU work (see [Transfer overlap](#transfer-overlap)) |
 | `--gold FILE` | Validate the output against a golden image (raw `complex<float>`, same format the example writes) and report accuracy metrics (3x3-window correlation and signal-to-error ratio) |
 | `--cmap FILE` | Write the correlation map (raw `float32`) to a file; requires `--gold` |
 
@@ -129,6 +130,24 @@ real/imag, row-major), written to `output_image.raw` in this example.
 compensated to the stored reference ranges. Applying bulk motion compensation
 to data that has already been motion compensated is not idempotent and results
 in an incorrect phase reference.
+
+### Transfer overlap
+
+By default the example overlaps host/device transfers with GPU work. The input data is already in pinned host
+memory, so the copies can run asynchronously on the GPU's copy engines:
+
+- Host-to-device: when there is more than one pulse block, the per-block upload buffers (platform positions,
+  `range_to_mcp`, and samples) are double-buffered. Block `k+1` is uploaded on a separate copy stream while block
+  `k` is range compressed and backprojected. A single-block run (`-b all` or `-b 0`) uses one set of upload buffers,
+  and its upload is not overlapped because there is no earlier block to hide it behind. `--no-overlap` also uses
+  one set and uploads each block just before it is processed.
+- Device-to-host: the image accumulates over every pulse block, so it can only be read back once the final block
+  has been applied. During the final block, each image tile (see `--image-tiles`) is copied to the host on a
+  second copy stream as soon as it is finished, while the remaining tiles are still being backprojected. Only the
+  last tile's copy is exposed; an untiled (1 x 1) image is read back after the final block completes.
+
+With overlapping, much of the transfer time is likely to be hidden behind GPU kernels. Use `--no-overlap` to
+issue every transfer on the compute stream for comparison.
 
 The `--precision` flag controls the arithmetic used by the `sar_bp` operator. For spaceborne SAR, `float` does not provide enough precision to store fractional wavelengths at the range-to-MCP magnitudes (hundreds of km), so pure `float` is not sufficient to produce focused images. The available modes are:
 
