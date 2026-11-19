@@ -84,8 +84,10 @@ struct SarBpBinAndWeight {
     int32_t bin_floor_int;
 };
 
-template <typename PlatPosAccessor, SarBpComputeType ComputeType, typename strict_compute_t, typename loose_compute_t, typename IdxT>
-__device__ inline strict_compute_t ComputeRangeToPixel(const PlatPosAccessor &ant_pos, const IdxT pulse_idx, const loose_compute_t px, const loose_compute_t py, const loose_compute_t pz) {
+// pixel_coord_t is the kernel's pixel coordinate type (see SarBpPixelCoord), so
+// Mixed receives fp64 coordinates when the voxel locations are fp64.
+template <typename PlatPosAccessor, SarBpComputeType ComputeType, typename strict_compute_t, typename pixel_coord_t, typename IdxT>
+__device__ inline strict_compute_t ComputeRangeToPixel(const PlatPosAccessor &ant_pos, const IdxT pulse_idx, const pixel_coord_t px, const pixel_coord_t py, const pixel_coord_t pz) {
     using plat_pos_t = typename PlatPosAccessor::value_type;
     constexpr int Rank = PlatPosAccessor::Rank;
     constexpr bool IsFloat = ComputeType == SarBpComputeType::Float;
@@ -192,6 +194,20 @@ template <SarBpComputeType ComputeType>
 using loose_compute_param_t = typename std::conditional<
     ComputeType == SarBpComputeType::Double,
     double, float>::type;
+
+// Type in which the kernel holds a pixel's coordinates for the pulse-to-pixel
+// range computation. FP64 voxel locations are held in FP64 for mixed and as
+// fltflt for FloatFloat. FP32 voxel locations stay FP32. TaylorFast forms its
+// offsets from a CTA reference pixel in FP64.
+template <SarBpComputeType ComputeType, typename voxel_loc_t, typename loose_compute_t>
+using SarBpPixelCoord = typename std::conditional<
+    // voxel_loc_t is double3/double4 or float3/float4 (asserted).
+    cuda::std::is_same_v<cuda::std::remove_cvref_t<decltype(cuda::std::declval<voxel_loc_t>().x)>, double>,
+    typename std::conditional<
+        ComputeType == SarBpComputeType::Mixed, double,
+        typename std::conditional<ComputeType == SarBpComputeType::FloatFloat, fltflt,
+                                  loose_compute_t>::type>::type,
+    loose_compute_t>::type;
 
 // The single-precision phase paths (the PhaseLUT fractional-bin increment for
 // Float, Mixed and FloatFloat, and TaylorFast phase synthesis) evaluate sine and
@@ -439,6 +455,27 @@ struct SarBpThreadState<SarBpComputeType::TaylorFast, true> {
     float dr_inv_f32 = 0.0f;
 };
 
+// Loose fltflt difference p - a of a pixel coordinate p and an antenna
+// coordinate a on the FloatFloat path: TwoSum on the hi words (exact for any
+// magnitudes) with the lo words added to its error term and no trailing
+// renormalization. The result may be non-canonical after cancellation, which
+// the callers' squared-norm accumulation tolerates.
+template <typename pixel_coord_t>
+__device__ inline fltflt SarBpLooseDiffFF(pixel_coord_t p, fltflt a)
+{
+    if constexpr (cuda::std::is_same_v<pixel_coord_t, fltflt>) {
+        fltflt d = fltflt_two_sum(p.hi, -a.hi);
+        d.lo = detail::fadd_rn(d.lo, detail::fadd_rn(p.lo, -a.lo));
+        return d;
+    } else {
+        static_assert(cuda::std::is_same_v<pixel_coord_t, float>,
+                      "SarBpLooseDiffFF: pixel coordinates must be float or fltflt");
+        fltflt d = fltflt_two_sum(p, -a.hi);
+        d.lo = detail::fadd_rn(d.lo, -a.lo);
+        return d;
+    }
+}
+
 // ComputeBinWeightToPixelFloatFloat() fuses the FloatFloat path's
 // coordinate-difference, squared-norm, sqrt, and scale/add steps that would
 // otherwise be a separate norm3d + fma_approx pair. The kernel only needs the
@@ -469,11 +506,15 @@ struct SarBpThreadState<SarBpComputeType::TaylorFast, true> {
 // Domain: at least one of dx/dy/dz must not fully cancel (sum of squared
 // distances must be strictly positive) -- three-way simultaneous
 // cancellation is not a meaningful SAR geometry and is not supported.
-template <bool UseCachedPz2 = false, bool PixelZIsUniform = false, typename IdxT = index_t>
+//
+// px/py/pz are fp32 for fp32 voxel locations and fltflt for fp64 voxel
+// locations (see SarBpPixelCoord and SarBpLooseDiffFF).
+template <bool UseCachedPz2 = false, bool PixelZIsUniform = false, typename pixel_coord_t = float,
+          typename IdxT = index_t>
 __device__ inline SarBpBinAndWeight<float> ComputeBinWeightToPixelFloatFloat(
     const SarBpPulseBlockCache<SarBpComputeType::FloatFloat, true, PixelZIsUniform> &sh_mem,
     IdxT ip,
-    float px, float py, [[maybe_unused]] float pz,
+    pixel_coord_t px, pixel_coord_t py, [[maybe_unused]] pixel_coord_t pz,
     fltflt dr_inv)
 {
     const fltflt apx = sh_mem.ant_pos[ip][0];
@@ -481,12 +522,9 @@ __device__ inline SarBpBinAndWeight<float> ComputeBinWeightToPixelFloatFloat(
     const fltflt mcp_partial = sh_mem.ant_pos[ip][3];
 
     // Stage 1: loose dx/dy. dz is only formed here when the per-pulse dz^2 is
-    // not cached. We use the general fltflt_two_sum (6 fp32 ops) for each
-    // dimension.
-    fltflt dx = fltflt_two_sum(px, -apx.hi);
-    fltflt dy = fltflt_two_sum(py, -apy.hi);
-    dx.lo = detail::fadd_rn(dx.lo, -apx.lo);
-    dy.lo = detail::fadd_rn(dy.lo, -apy.lo);
+    // not cached.
+    fltflt dx = SarBpLooseDiffFF(px, apx);
+    fltflt dy = SarBpLooseDiffFF(py, apy);
 
     // dz is formed here (unless the per-pulse dz^2 is cached) so that the
     // non-cached path keeps the original dx/dy/dz -> px2/py2/pz2 ordering and
@@ -495,8 +533,7 @@ __device__ inline SarBpBinAndWeight<float> ComputeBinWeightToPixelFloatFloat(
     [[maybe_unused]] fltflt dz{};
     if constexpr (!UseCachedPz2) {
         const fltflt apz = sh_mem.ant_pos[ip][2];
-        dz = fltflt_two_sum(pz, -apz.hi);
-        dz.lo = detail::fadd_rn(dz.lo, -apz.lo);
+        dz = SarBpLooseDiffFF(pz, apz);
     }
 
     // Stage 2: squared-norm accumulation. Same body as the canonical
@@ -670,13 +707,16 @@ __device__ inline SarBpBinAndWeight<float> ComputeBinWeightToPixelTaylorFast(
     };
 }
 
-template <SarBpComputeType ComputeType, bool PixelZIsZero, bool UseCachedDz2, bool PixelZIsUniform, typename strict_compute_t, typename loose_compute_t, typename IdxT>
+// pixel_coord_t is the kernel's pixel coordinate type (see SarBpPixelCoord): fp64
+// for Mixed with fp64 voxel locations, otherwise loose_compute_t.
+template <SarBpComputeType ComputeType, bool PixelZIsZero, bool UseCachedDz2, bool PixelZIsUniform,
+          typename strict_compute_t, typename loose_compute_t, typename pixel_coord_t, typename IdxT>
 __device__ inline SarBpBinAndWeight<loose_compute_t> ComputeBinWeightToPixelPulseBlockCache(
     const SarBpPulseBlockCache<ComputeType, true, PixelZIsUniform> &sh_mem,
     IdxT ip,
-    loose_compute_t px,
-    loose_compute_t py,
-    [[maybe_unused]] loose_compute_t pz,
+    pixel_coord_t px,
+    pixel_coord_t py,
+    [[maybe_unused]] pixel_coord_t pz,
     strict_compute_t dr_inv)
 {
     constexpr bool IsFloat = ComputeType == SarBpComputeType::Float;
@@ -904,11 +944,15 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
             voxel_loc.z = voxel_locations(origin_y, origin_x).z;
         }
     }
-    const loose_compute_t py = static_cast<loose_compute_t>(voxel_loc.y);
-    const loose_compute_t px = static_cast<loose_compute_t>(voxel_loc.x);
+    // Pixel coordinates for the range helpers. Mixed and FloatFloat keep fp64
+    // voxel locations at fp64 / fltflt precision (see SarBpPixelCoord).
+    // TaylorFast does not use these; it forms fp64 offsets from voxel_loc below.
+    using pixel_coord_t = SarBpPixelCoord<ComputeType, voxel_loc_t, loose_compute_t>;
+    const pixel_coord_t py = static_cast<pixel_coord_t>(voxel_loc.y);
+    const pixel_coord_t px = static_cast<pixel_coord_t>(voxel_loc.x);
     // When PixelZIsZero is known, pz folds to a compile-time 0 so the z terms in
     // the range/bin helpers are dropped.
-    const loose_compute_t pz = PixelZIsZero ? static_cast<loose_compute_t>(0) : static_cast<loose_compute_t>(voxel_loc.z);
+    const pixel_coord_t pz = PixelZIsZero ? static_cast<pixel_coord_t>(0.0f) : static_cast<pixel_coord_t>(voxel_loc.z);
 
     // TensorAccessor wraps each hot tensor and picks the fast pointer path
     // when IsUnitStride && is_tensor_view_v<Op>, otherwise forwards to
@@ -1087,8 +1131,7 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
                         // only difference from Variable is that the z low-order
                         // terms are summed here once per pulse rather than per
                         // pixel. In the Zero mode pz is the compile-time 0.
-                        fltflt dz = fltflt_two_sum(pz, -apz.hi);
-                        dz.lo = detail::fadd_rn(dz.lo, -apz.lo);
+                        const fltflt dz = SarBpLooseDiffFF(pz, apz);
                         const fltflt dz2hi = fltflt_two_prod_fma(dz.hi, dz.hi);
                         float pz2_lo = dz2hi.lo;
                         pz2_lo = detail::fmaf_rn(detail::fadd_rn(dz.hi, dz.hi), dz.lo, pz2_lo);
@@ -1229,7 +1272,9 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
                     TaylorFastAddThirdOrder, PixelZIsUniform>(
                         sh_mem, thread_state, ip, bin_floor_local, ref_phase_ticks);
             } else if constexpr (UsePulseBlockCache) {
-                bin_weight = ComputeBinWeightToPixelPulseBlockCache<ComputeType, PixelZIsZero, UseCachedDz2, PixelZIsUniform>(sh_mem, ip, px, py, pz, dr_inv);
+                bin_weight = ComputeBinWeightToPixelPulseBlockCache<ComputeType, PixelZIsZero, UseCachedDz2, PixelZIsUniform,
+                                                                    strict_compute_t, loose_compute_t>(
+                    sh_mem, ip, px, py, pz, dr_inv);
             } else {
                 // Below is the most direct / standard path for backprojection. We compute the distance
                 // from the antenna phase center to the pixel for this pulse and from that the differential range
@@ -1238,7 +1283,7 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
                 // and accumulate the contribution to the pixel. All other paths implement similar logic using various
                 // optimizations.
                 const strict_compute_t range_delta =
-                    ComputeRangeToPixel<decltype(pp), ComputeType, strict_compute_t, loose_compute_t>(
+                    ComputeRangeToPixel<decltype(pp), ComputeType, strict_compute_t, pixel_coord_t>(
                         pp, p, px, py, pz) - static_cast<strict_compute_t>(r_to_mcp(p));
                 if constexpr (!PhaseLUT) {
                     thread_state.range_delta = range_delta;
