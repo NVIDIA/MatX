@@ -170,12 +170,20 @@ public:
     return params;
   }
 
+  /**
+   * Run syevd on every matrix.
+   *
+   * @param status_infos If non-null, matrix i's info is written to
+   * status_infos[i] instead of being checked. Otherwise nonzero info fails a
+   * debug-only assert.
+   */
   template <ThreadsMode MODE>
   void Exec(OutputTensor &out, WTensor &w,
             const ATensor &a,
             const HostExecutor<MODE> &exec,
             const char jobz = 'V',
-            const char uplo = 'U')
+            const char uplo = 'U',
+            int *status_infos = nullptr)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
@@ -205,6 +213,10 @@ public:
                       reinterpret_cast<T2*>(this->rwork), &this->lrwork,
                       reinterpret_cast<lapack_int_t*>(this->iwork), &this->liwork, &info);
 
+      if (status_infos != nullptr) {
+        status_infos[i] = static_cast<int>(info);
+        continue;
+      }
       MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
           (std::to_string(info) + " off-diagonal elements of an intermediate tridiagonal form did not converge to zero in LAPACK syevd").c_str());
     }
@@ -305,6 +317,9 @@ using eig_host_cache_t = std::unordered_map<DnEigHostParams_t, std::any, DnEigHo
  *   EigenMode::NO_VECTOR to not compute
  * @param uplo
  *   Where to store data in A
+ * @param status
+ *   Optional solver status. When given, syevd info is stored in it instead of
+ *   being checked.
  */
 template <typename OutputTensor, typename WTensor, typename ATensor, ThreadsMode MODE>
 void eig_impl([[maybe_unused]] OutputTensor &&out,
@@ -312,14 +327,18 @@ void eig_impl([[maybe_unused]] OutputTensor &&out,
               [[maybe_unused]] const ATensor &a,
               [[maybe_unused]] const HostExecutor<MODE> &exec,
               [[maybe_unused]] EigenMode jobz = EigenMode::VECTOR,
-              [[maybe_unused]] SolverFillMode uplo = SolverFillMode::UPPER)
+              [[maybe_unused]] SolverFillMode uplo = SolverFillMode::UPPER,
+              [[maybe_unused]] detail::SolverStatusState *status = nullptr)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  MATX_ASSERT_STR(MATX_EN_CPU_SOLVER, matxInvalidExecutor,
-    "Trying to run a host Solver executor but host Solver support is not configured");
+  detail::RequireCpuSolver();
 #if MATX_EN_CPU_SOLVER
 
   using T1 = typename remove_cvref_t<OutputTensor>::value_type;
+
+  // Validate the status before any work, as the CUDA path does. One stage: syevd.
+  const auto status_run = detail::BeginStatusRun(detail::ExecutorKind::Host, status, 1, a);
+  int *status_infos = status_run.Info();
 
   auto w_new = OpToTensor(w, exec);
   auto a_new = OpToTensor(a, exec);
@@ -332,9 +351,10 @@ void eig_impl([[maybe_unused]] OutputTensor &&out,
      LAPACK doesn't support row-major layouts. Since we want to make the
      library appear as though everything is row-major, we take a performance hit
      to transpose in and out of the function. LAPACKE, however, supports both formats.
+     The tensor owns the transpose buffer, so an exception frees it.
   */
-  T1 *tp;
-  matxAlloc(reinterpret_cast<void **>(&tp), a_new.Bytes(), MATX_HOST_MALLOC_MEMORY);
+  auto tp_tensor = make_tensor<T1>(a_new.Shape(), MATX_HOST_MALLOC_MEMORY);
+  T1 *tp = tp_tensor.Data();
   auto tv = TransposeCopy(tp, a_new, exec);
 
   const char jobz_lapack = (jobz == EigenMode::VECTOR) ? 'V' : 'N';
@@ -353,14 +373,13 @@ void eig_impl([[maybe_unused]] OutputTensor &&out,
       return std::make_shared<cache_val_type>(w_new, tv, jobz_lapack, uplo_lapack);
     },
     [&](std::shared_ptr<cache_val_type> ctype) {
-      ctype->Exec(tv, w_new, tv, exec, jobz_lapack, uplo_lapack);
+      ctype->Exec(tv, w_new, tv, exec, jobz_lapack, uplo_lapack, status_infos);
     },
     exec
   );
 
-  /* Copy and free async buffer for transpose */
+  /* Copy out of the transpose buffer, which tp_tensor frees on return */
   matx::copy(out, tv.PermuteMatrix(), exec);
-  matxFree(tp);
 #endif
 }
 

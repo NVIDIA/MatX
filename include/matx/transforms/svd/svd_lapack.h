@@ -222,10 +222,17 @@ public:
     return params;
   }
 
+  /**
+   * Run gesvd or gesdd on every matrix.
+   *
+   * @param status_infos If non-null, matrix i's info is written to
+   * status_infos[i] instead of being checked. Otherwise nonzero info fails a
+   * debug-only assert.
+   */
   template<ThreadsMode MODE>
   void Exec(UTensor &u, STensor &s, VtTensor &vt,
             const ATensor &a, [[maybe_unused]] const HostExecutor<MODE> &exec,
-            const char jobz = 'A')
+            const char jobz = 'A', int *status_infos = nullptr)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
@@ -259,7 +266,7 @@ public:
     SetBatchPointers<BatchType::VECTOR>(s, this->batch_s_ptrs);
 
     lapack_int_t info;
-    lapack_int_t ldvt = jobz == 'N' ? 1 : vt.Size(RANK-2);
+    lapack_int_t ldvt = jobz == 'N' ? 1 : static_cast<lapack_int_t>(vt.Size(RANK-2));
     if (params.algo == SVDHostAlgo::QR) {
       for (size_t i = 0; i < this->batch_a_ptrs.size(); i++) {
         gesvd_dispatch(&jobz, &jobz, &params.m, &params.n,
@@ -270,7 +277,10 @@ public:
                         reinterpret_cast<T1*>(this->work), &this->lwork,
                         reinterpret_cast<T3*>(this->rwork), &info);
 
-
+        if (status_infos != nullptr) {
+          status_infos[i] = static_cast<int>(info);
+          continue;
+        }
         MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
           (std::to_string(info) + " superdiagonals of an intermediate bidiagonal form did not converge to zero in LAPACK").c_str());
       }
@@ -285,6 +295,10 @@ public:
                         reinterpret_cast<T3*>(this->rwork),
                         reinterpret_cast<lapack_int_t*>(this->iwork), &info);
 
+        if (status_infos != nullptr) {
+          status_infos[i] = static_cast<int>(info);
+          continue;
+        }
         MATX_ASSERT_STR_EXP(info, 0, matxSolverError, "gesdd error in LAPACK");
       }
     }
@@ -405,6 +419,9 @@ using svd_host_cache_t = std::unordered_map<DnSVDHostParams_t, std::any, DnSVDHo
  * @param algo
  *   Specifies the algorithm to use for computing SVD. Either QR based 'gesvd' or
  * divide-and-conquer based 'gesdd'. See SVDHostAlgo documentation for more info
+ * @param status
+ *   Optional solver status. When given, gesvd or gesdd info is stored in it
+ *   instead of being checked.
  */
 template <typename UTensor, typename STensor, typename VtTensor, typename ATensor, ThreadsMode MODE>
 void svd_impl([[maybe_unused]] UTensor &&u,
@@ -413,12 +430,17 @@ void svd_impl([[maybe_unused]] UTensor &&u,
               [[maybe_unused]] const ATensor &a,
               [[maybe_unused]] const HostExecutor<MODE> &exec,
               [[maybe_unused]] const SVDMode jobz = SVDMode::ALL,
-              [[maybe_unused]] const SVDHostAlgo algo = SVDHostAlgo::DC)
+              [[maybe_unused]] const SVDHostAlgo algo = SVDHostAlgo::DC,
+              [[maybe_unused]] detail::SolverStatusState *status = nullptr)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  MATX_ASSERT_STR(MATX_EN_CPU_SOLVER, matxInvalidExecutor,
-    "Trying to run a host Solver executor but host Solver support is not configured");
+  detail::RequireCpuSolver();
 #if MATX_EN_CPU_SOLVER
+
+  // Validate the status before any work, as the CUDA path does. One stage:
+  // gesvd or gesdd.
+  const auto status_run = detail::BeginStatusRun(detail::ExecutorKind::Host, status, 1, a);
+  int *status_infos = status_run.Info();
 
   using T1 = typename ATensor::value_type;
   constexpr int RANK = ATensor::Rank();
@@ -461,7 +483,7 @@ void svd_impl([[maybe_unused]] UTensor &&u,
       return std::make_shared<cache_val_type>(u_in, s_new, vt_in, at_col_maj, job_lapack, algo);
     },
     [&](std::shared_ptr<cache_val_type> ctype) {
-      ctype->Exec(u_in, s_new, vt_in, at_col_maj, exec, job_lapack);
+      ctype->Exec(u_in, s_new, vt_in, at_col_maj, exec, job_lapack, status_infos);
     },
     exec
   );

@@ -452,6 +452,7 @@ namespace detail {
       mutable value_type *tau_ptr_ = nullptr;
       mutable bool materialized_ = false;
       mutable int materialize_count_ = 0;
+      SolverStatus status_;
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
       mutable cuSolverDxHelper<value_type> dx_geqrf_helper_;
 #endif
@@ -500,7 +501,8 @@ namespace detail {
     public:
       using input_type = OpA;
 
-      SolverQRState(const OpA &a) : a_(a)
+      SolverQRState(const OpA &a, SolverStatus status = {}) :
+        a_(a), status_(std::move(status))
       {
         out_shape_ = SolverShapeFromInput<RANK>(a_);
         tau_shape_ = SolverVectorShapeFromMatrixShape<RANK>(out_shape_);
@@ -515,6 +517,7 @@ namespace detail {
       const auto &Input() const { return a_; }
       const auto &OutShape() const { return out_shape_; }
       const auto &TauShape() const { return tau_shape_; }
+      SolverStatusState *Status() const { return status_.state(); }
 
       template <typename Executor>
       void Materialize(Executor &&ex) const
@@ -531,7 +534,7 @@ namespace detail {
         try {
           detail::AllocateTempTensor(out_, std::forward<Executor>(ex), out_shape_, &out_ptr_);
           detail::AllocateTempTensor(tau_, std::forward<Executor>(ex), tau_shape_, &tau_ptr_);
-          qr_solver_impl(out_, tau_, a_, std::forward<Executor>(ex));
+          qr_solver_impl(out_, tau_, a_, std::forward<Executor>(ex), Status());
         }
         catch (...) {
           CleanupMaterializeFailure(std::forward<Executor>(ex));
@@ -570,7 +573,8 @@ namespace detail {
       template <int Component>
       bool SupportsJITProjection() const
       {
-        return (RANK >= 2) && (RANK <= 4) && dx_geqrf_helper_.IsSupported();
+        // A status forces the non-JIT path
+        return detail::SolverStatusAllowsJit(Status()) && (RANK >= 2) && (RANK <= 4) && dx_geqrf_helper_.IsSupported();
       }
 
       template <int Component>
@@ -605,7 +609,8 @@ namespace detail {
       template <int Component>
       std::string GetJITProjectionTypeName(const std::string &inner_op_jit_name) const
       {
-        return GetJITProjectionClassName<Component>() + "<" + inner_op_jit_name + ", " + std::to_string(Component) + ">";
+        return GetJITProjectionClassName<Component>() + "<" + inner_op_jit_name + ", " + std::to_string(Component) + ">" +
+               detail::SolverStatusJitTypeSuffix(Status());
       }
 
       template <int Component>
@@ -614,6 +619,7 @@ namespace detail {
         auto key = detail::MakeJITCacheKeyForType<SolverQRState<OpA>>("JITQRSolverProjection");
         detail::HashJITCacheValue(key, Component);
         detail::HashJITCacheValue(key, RANK);
+        detail::HashSolverStatusJitKey(key, Status());
         for (int i = 0; i < RANK; ++i) {
           detail::HashJITCacheValue(key, out_shape_[i]);
         }
@@ -677,8 +683,8 @@ namespace detail {
       SolverProjectionOp<state_type, QR_SOLVER_TAU, tau_type> Tau;
 
       __MATX_INLINE__ std::string str() const { return "qr_solver()"; }
-      __MATX_INLINE__ SolverQROp(const OpA &a) :
-        state_(std::make_shared<state_type>(a)),
+      __MATX_INLINE__ SolverQROp(const OpA &a, SolverStatus status = {}) :
+        state_(std::make_shared<state_type>(a, std::move(status))),
         Out(state_, state_->OutShape(), "qr_solver().Out"),
         Tau(state_, state_->TauShape(), "qr_solver().Tau")
       {
@@ -699,7 +705,7 @@ namespace detail {
       void Exec(Out &&out, Executor &&ex) const {
         static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 2 outputs on qr_solver(). ie: (mtie(A, tau) = qr_solver(A))");     
 
-        qr_solver_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), state_->Input(), ex);
+        qr_solver_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), state_->Input(), ex, state_->Status());
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -755,6 +761,34 @@ __MATX_INLINE__ auto qr_solver(const OpA &a) {
   return detail::SolverQROp(a);
 }
 
+/**
+ * Perform a QR decomposition on a matrix using cuSolver or a LAPACK host library,
+ * reporting per-matrix errors through a solver status.
+ *
+ * Same as qr_solver(a), except each matrix's geqrf `info` value is written to
+ * stage 0 of `status` and, on CUDA executors, the call does not synchronize the
+ * stream (see the Solver Status docs for when it can). Check the result after
+ * synchronizing, with status.ok(exec) or status.check(exec), or with
+ * status.ok() or status.check() after your own stream or event
+ * synchronization. Not supported with CUDAJITExecutor.
+ *
+ * @tparam OpA
+ *   Data type of input a tensor or operator
+ *
+ * @param a
+ *   Input tensor or operator of shape `... x m x n`
+ * @param status
+ *   Solver status created with make_solver_status() for an input shaped like `a`,
+ *   used only with qr_solver()
+ *
+ * @return
+ *   Operator that produces R/householder vectors and tau tensor outputs.
+ */
+template<typename OpA>
+__MATX_INLINE__ auto qr_solver(const OpA &a, const SolverStatus &status) {
+  return detail::SolverQROp(a, status);
+}
+
 
 namespace detail {
   template<typename OpA>
@@ -774,6 +808,7 @@ namespace detail {
       mutable value_type *r_ptr_ = nullptr;
       mutable bool materialized_ = false;
       mutable int materialize_count_ = 0;
+      SolverStatus status_;
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
       mutable cuSolverDxHelper<value_type> dx_geqrf_helper_;
       mutable cuSolverDxHelper<value_type> dx_ungqr_helper_;
@@ -823,7 +858,8 @@ namespace detail {
     public:
       using input_type = OpA;
 
-      EconQRState(const OpA &a) : a_(a)
+      EconQRState(const OpA &a, SolverStatus status = {}) :
+        a_(a), status_(std::move(status))
       {
         q_shape_ = SolverShapeFromInput<RANK>(a_);
         r_shape_ = q_shape_;
@@ -846,6 +882,7 @@ namespace detail {
       const auto &Input() const { return a_; }
       const auto &QShape() const { return q_shape_; }
       const auto &RShape() const { return r_shape_; }
+      SolverStatusState *Status() const { return status_.state(); }
 
       template <typename Executor>
       void Materialize(Executor &&ex) const
@@ -862,7 +899,7 @@ namespace detail {
         try {
           detail::AllocateTempTensor(q_, std::forward<Executor>(ex), q_shape_, &q_ptr_);
           detail::AllocateTempTensor(r_, std::forward<Executor>(ex), r_shape_, &r_ptr_);
-          qr_econ_impl(q_, r_, a_, std::forward<Executor>(ex));
+          qr_econ_impl(q_, r_, a_, std::forward<Executor>(ex), Status());
         }
         catch (...) {
           CleanupMaterializeFailure(std::forward<Executor>(ex));
@@ -901,6 +938,10 @@ namespace detail {
       template <int Component>
       bool SupportsJITProjection() const
       {
+        // A status forces the non-JIT path
+        if (!detail::SolverStatusAllowsJit(Status())) {
+          return false;
+        }
         const bool q_layout_safe = a_.Size(RANK - 2) >= a_.Size(RANK - 1);
         if constexpr (Component == QR_ECON_Q) {
           if ((RANK < 2) || (RANK > 4) || !q_layout_safe ||
@@ -961,7 +1002,8 @@ namespace detail {
       template <int Component>
       std::string GetJITProjectionTypeName(const std::string &inner_op_jit_name) const
       {
-        return GetJITProjectionClassName<Component>() + "<" + inner_op_jit_name + ", " + std::to_string(Component) + ">";
+        return GetJITProjectionClassName<Component>() + "<" + inner_op_jit_name + ", " + std::to_string(Component) + ">" +
+               detail::SolverStatusJitTypeSuffix(Status());
       }
 
       template <int Component>
@@ -970,6 +1012,7 @@ namespace detail {
         auto key = detail::MakeJITCacheKeyForType<EconQRState<OpA>>("JITEconQRProjection");
         detail::HashJITCacheValue(key, Component);
         detail::HashJITCacheValue(key, RANK);
+        detail::HashSolverStatusJitKey(key, Status());
         if constexpr (Component == QR_ECON_Q) {
           for (int i = 0; i < RANK; ++i) {
             detail::HashJITCacheValue(key, q_shape_[i]);
@@ -1056,8 +1099,8 @@ namespace detail {
       SolverProjectionOp<state_type, QR_ECON_R, tensor_type> R;
 
       __MATX_INLINE__ std::string str() const { return "qr_econ()"; }
-      __MATX_INLINE__ EconQROp(const OpA &a) :
-        state_(std::make_shared<state_type>(a)),
+      __MATX_INLINE__ EconQROp(const OpA &a, SolverStatus status = {}) :
+        state_(std::make_shared<state_type>(a, std::move(status))),
         Q(state_, state_->QShape(), "qr_econ().Q"),
         R(state_, state_->RShape(), "qr_econ().R")
       {
@@ -1077,7 +1120,7 @@ namespace detail {
       void Exec(Out &&out, Executor &&ex) const {
         static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 2 outputs on qr_econ(). ie: (mtie(Q, R) = qr_econ(A))");     
 
-        qr_econ_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), state_->Input(), ex);
+        qr_econ_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), state_->Input(), ex, state_->Status());
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -1130,6 +1173,33 @@ namespace detail {
 template<typename OpA>
 __MATX_INLINE__ auto qr_econ(const OpA &a) {
   return detail::EconQROp(a);
+}
+
+/**
+ * Perform an economic QR decomposition on a matrix using cuSolver, reporting
+ * per-matrix errors through a solver status.
+ *
+ * Same as qr_econ(a), except each matrix's geqrf `info` value is written to
+ * stage 0 of `status`, its orgqr `info` value to stage 1, and, on CUDA
+ * executors, the call does not synchronize the stream (see the Solver Status
+ * docs for when it can). Check the result after synchronizing, as for
+ * qr_solver(a, status). Not supported with CUDAJITExecutor.
+ *
+ * @tparam OpA
+ *   Data type of input a tensor or operator
+ *
+ * @param a
+ *   Input tensor or operator of shape `... x m x n`
+ * @param status
+ *   Solver status with at least two stages, created with make_solver_status()
+ *   for an input shaped like `a`, used only with qr_econ()
+ *
+ * @return
+ *   Operator that produces QR outputs.
+ */
+template<typename OpA>
+__MATX_INLINE__ auto qr_econ(const OpA &a, const SolverStatus &status) {
+  return detail::EconQROp(a, status);
 }
 
 }

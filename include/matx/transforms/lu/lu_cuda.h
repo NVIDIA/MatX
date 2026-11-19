@@ -114,12 +114,12 @@ public:
 
   void GetWorkspaceSize() override
   {
-    [[maybe_unused]] cusolverStatus_t ret = cusolverDnXgetrf_bufferSize(this->handle, this->dn_params, params.m,
+    CheckSolverLibraryStatus(cusolverDnXgetrf_bufferSize(this->handle, this->dn_params, params.m,
                                             params.n, MatXTypeToCudaType<T1>(),
                                             params.A, params.m,
                                             MatXTypeToCudaType<T1>(), &this->dspace,
-                                            &this->hspace);
-    MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
+                                            &this->hspace),
+                             "cuSolver Xgetrf_bufferSize");
   }
 
   static DnLUCUDAParams_t GetLUParams(PivotTensor &piv,
@@ -137,8 +137,16 @@ public:
     return params;
   }
 
+  /**
+   * Run getrf on every matrix.
+   *
+   * @param status_info If non-null, each matrix's info is written to
+   * status_info[i], and the call does not synchronize. Otherwise info is copied
+   * back after a stream synchronization and checked in debug builds only.
+   * cuSolver return-status errors throw in every build type.
+   */
   void Exec(OutputTensor &out, PivotTensor &piv,
-            const ATensor &a, const cudaExecutor &exec)
+            const ATensor &a, const cudaExecutor &exec, int *status_info = nullptr)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
@@ -160,37 +168,30 @@ public:
     }
 
     const auto stream = exec.getStream();
-    cusolverDnSetStream(this->handle, stream);
+    CheckSolverLibraryStatus(cusolverDnSetStream(this->handle, stream), "cusolverDnSetStream");
+
+    // With a status, info goes into it instead of being checked here
+    int *infos = status_info != nullptr ? status_info : this->d_info;
 
     // At this time cuSolver does not have a batched 64-bit LU interface. Change
     // this to use the batched version once available.
     for (size_t i = 0; i < this->batch_a_ptrs.size(); i++) {
-      [[maybe_unused]] auto ret = cusolverDnXgetrf(
+      const auto ret = cusolverDnXgetrf(
           this->handle, this->dn_params, params.m, params.n, MatXTypeToCudaType<T1>(),
           this->batch_a_ptrs[i], params.m, this->batch_piv_ptrs[i],
           MatXTypeToCudaType<T1>(),
           reinterpret_cast<uint8_t *>(this->d_workspace) + i * this->dspace, this->dspace,
           reinterpret_cast<uint8_t *>(this->h_workspace) + i * this->hspace, this->hspace,
-          this->d_info + i);
+          infos + i);
+      CheckSolverLibraryStatus(ret, "cuSolver Xgetrf");
+    }
 
-      MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
+    if (status_info != nullptr) {
+      return;
     }
 
     std::vector<int> h_info(this->batch_a_ptrs.size());
-    MATX_CUDA_CHECK(cudaMemcpyAsync(h_info.data(), this->d_info, sizeof(int) * this->batch_a_ptrs.size(), cudaMemcpyDeviceToHost, stream));
-
-    // This will block. Figure this out later
-    MATX_CUDA_CHECK(cudaStreamSynchronize(stream));
-
-    for (const auto& info : h_info) {
-      if (info < 0) {
-        MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
-          ("Parameter " + std::to_string(-info) + " had an illegal value in cuSolver Xgetrf").c_str());
-      } else {
-        MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
-          ("U is singular: U(" + std::to_string(info) + "," + std::to_string(info) + ") = 0 in cuSolver Xgetrf").c_str());
-      }
-    }
+    CheckSolverInfosOnHost(this->d_info, h_info, stream, "cuSolver Xgetrf", DescribeSingularU);
   }
 
   /**
@@ -259,14 +260,22 @@ using lu_cuda_cache_t = std::unordered_map<DnLUCUDAParams_t, std::any, DnLUCUDAP
  *   Input matrix A
  * @param exec
  *   CUDA executor
+ * @param status
+ *   Optional solver status. When given, getrf info is written into it on the
+ *   stream, and the call does not synchronize the stream.
  */
 template <typename OutputTensor, typename PivotTensor, typename ATensor>
 void lu_impl(OutputTensor &&out, PivotTensor &&piv,
-        const ATensor &a, const cudaExecutor &exec)
+        const ATensor &a, const cudaExecutor &exec, detail::SolverStatusState *status = nullptr)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
   using T1 = typename remove_cvref_t<OutputTensor>::value_type;
+
+  // Validate the status before any work, so a rejected status allocates nothing.
+  // One stage: getrf.
+  const auto status_run = detail::BeginStatusRun(detail::ExecutorKind::Cuda, status, 1, a);
+  int *status_info = status_run.Info();
 
   auto piv_new = OpToTensor(piv, exec);
   auto a_new = OpToTensor(a, exec);
@@ -280,10 +289,10 @@ void lu_impl(OutputTensor &&out, PivotTensor &&piv,
      library appear as though everything is row-major, we take a performance hit
      to transpose in and out of the function. Eventually this may be fixed in
      cuSolver.
+     The tensor owns the transpose buffer, so an exception frees it.
   */
-  T1 *tp;
-  matxAlloc(reinterpret_cast<void **>(&tp), a_new.Bytes(), MATX_ASYNC_DEVICE_MEMORY,
-            exec.getStream());
+  auto tp_tensor = make_tensor<T1>(a_new.Shape(), MATX_ASYNC_DEVICE_MEMORY, exec.getStream());
+  T1 *tp = tp_tensor.Data();
   auto tv = TransposeCopy(tp, a_new, exec);
   auto tvt = tv.PermuteMatrix();
 
@@ -301,15 +310,14 @@ void lu_impl(OutputTensor &&out, PivotTensor &&piv,
       return std::make_shared<cache_val_type>(piv_new, tvt, exec);
     },
     [&](std::shared_ptr<cache_val_type> ctype) {
-      ctype->Exec(tvt, piv_new, tvt, exec);
+      ctype->Exec(tvt, piv_new, tvt, exec, status_info);
     },
     exec
   );
 
   /* Temporary WAR
-   * Copy and free async buffer for transpose */
+   * Copy out of the transpose buffer, which tp_tensor frees on return */
   matx::copy(out, tv.PermuteMatrix(), exec);
-  matxFree(tp);
 }
 
 } // end namespace matx

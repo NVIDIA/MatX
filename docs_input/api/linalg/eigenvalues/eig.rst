@@ -14,7 +14,13 @@ Perform an eigenvalue decomposition for Hermitian or real symmetric matrices.
    Hermitian or real symmetric matrices with ``float``, ``double``, ``complex<float>``, and ``complex<double>``
    inputs. Expressions that only reference ``Values`` use the cuSolverDx no-vectors job.
 
-.. doxygenfunction:: eig
+.. doxygenfunction:: eig(const OpA &a, EigenMode jobz = EigenMode::VECTOR, SolverFillMode uplo = SolverFillMode::UPPER)
+.. doxygenfunction:: eig(const OpA &a, const SolverStatus &status, EigenMode jobz = EigenMode::VECTOR, SolverFillMode uplo = SolverFillMode::UPPER)
+
+.. note::
+   The overload that takes a :ref:`solver status <solver_status_func>` writes each matrix's eigensolver ``info`` value
+   into the status instead of synchronizing the stream to check it. A positive value means the algorithm did not converge. It is not supported with
+   ``CUDAJITExecutor``.
 
 Enums
 ~~~~~

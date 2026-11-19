@@ -75,6 +75,7 @@ namespace detail {
       mutable w_value_type *values_ptr_ = nullptr;
       mutable bool materialized_ = false;
       mutable int materialize_count_ = 0;
+      SolverStatus status_;
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
       mutable cuSolverDxHelper<a_value_type> dx_heev_values_helper_;
       mutable cuSolverDxHelper<a_value_type> dx_heev_vectors_helper_;
@@ -124,7 +125,8 @@ namespace detail {
     public:
       using input_type = OpA;
 
-      EigState(const OpA &a, EigenMode jobz, SolverFillMode uplo) : a_(a), jobz_(jobz), uplo_(uplo)
+      EigState(const OpA &a, EigenMode jobz, SolverFillMode uplo, SolverStatus status = {}) :
+        a_(a), jobz_(jobz), uplo_(uplo), status_(std::move(status))
       {
         vectors_shape_ = SolverShapeFromInput<RANK>(a_);
         values_shape_ = SolverVectorShapeFromMatrixShape<RANK>(vectors_shape_);
@@ -148,6 +150,7 @@ namespace detail {
       }
 
       const auto &Input() const { return a_; }
+      SolverStatusState *Status() const { return status_.state(); }
       const auto &VectorsShape() const { return vectors_shape_; }
       const auto &ValuesShape() const { return values_shape_; }
       EigenMode Jobz() const { return jobz_; }
@@ -178,7 +181,7 @@ namespace detail {
         try {
           detail::AllocateTempTensor(vectors_, std::forward<Executor>(ex), vectors_shape_, &vectors_ptr_);
           detail::AllocateTempTensor(values_, std::forward<Executor>(ex), values_shape_, &values_ptr_);
-          eig_impl(vectors_, values_, a_, std::forward<Executor>(ex), jobz_, uplo_);
+          eig_impl(vectors_, values_, a_, std::forward<Executor>(ex), jobz_, uplo_, Status());
         }
         catch (...) {
           CleanupMaterializeFailure(std::forward<Executor>(ex));
@@ -219,6 +222,10 @@ namespace detail {
       template <int Component>
       bool SupportsJITProjection() const
       {
+        // A status forces the non-JIT path
+        if (!detail::SolverStatusAllowsJit(Status())) {
+          return false;
+        }
         const bool square = vectors_shape_[RANK - 2] == vectors_shape_[RANK - 1];
         if constexpr (Component == EIG_VECTORS) {
           return (RANK >= 2) && (RANK <= 4) && square &&
@@ -278,7 +285,8 @@ namespace detail {
       template <int Component>
       std::string GetJITProjectionTypeName(const std::string &inner_op_jit_name) const
       {
-        return GetJITProjectionClassName<Component>() + "<" + inner_op_jit_name + ", " + std::to_string(Component) + ">";
+        return GetJITProjectionClassName<Component>() + "<" + inner_op_jit_name + ", " + std::to_string(Component) + ">" +
+               detail::SolverStatusJitTypeSuffix(Status());
       }
 
       template <int Component>
@@ -287,6 +295,7 @@ namespace detail {
         auto key = detail::MakeJITCacheKeyForType<EigState<OpA>>("JITEigProjection_v2");
         detail::HashJITCacheValue(key, Component);
         detail::HashJITCacheValue(key, RANK);
+        detail::HashSolverStatusJitKey(key, Status());
         if constexpr (Component == EIG_VECTORS) {
           detail::HashJITCacheValue(key, static_cast<int>(jobz_));
         }
@@ -376,8 +385,8 @@ namespace detail {
       SolverProjectionOp<state_type, EIG_VALUES, values_type> Values;
 
       __MATX_INLINE__ std::string str() const { return "eig()"; }
-      __MATX_INLINE__ EigOp(const OpA &a, EigenMode jobz, SolverFillMode uplo) :
-        state_(std::make_shared<state_type>(a, jobz, uplo)),
+      __MATX_INLINE__ EigOp(const OpA &a, EigenMode jobz, SolverFillMode uplo, SolverStatus status = {}) :
+        state_(std::make_shared<state_type>(a, jobz, uplo, std::move(status))),
         Vectors(state_, state_->VectorsShape(), "eig().Vectors"),
         Values(state_, state_->ValuesShape(), "eig().Values")
       {
@@ -398,7 +407,8 @@ namespace detail {
       void Exec(Out &&out, Executor &&ex) const {
         static_assert(cuda::std::tuple_size_v<remove_cvref_t<Out>> == 3, "Must use mtie with 2 outputs on eig(). ie: (mtie(O, w) = eig(A))");     
 
-        eig_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), state_->Input(), ex, state_->Jobz(), state_->Uplo());
+        eig_impl(cuda::std::get<0>(out), cuda::std::get<1>(out), state_->Input(), ex, state_->Jobz(), state_->Uplo(),
+                 state_->Status());
       }
 
       static __MATX_INLINE__ constexpr __MATX_HOST__ __MATX_DEVICE__ int32_t Rank()
@@ -462,6 +472,40 @@ __MATX_INLINE__ auto eig(const OpA &a,
                           EigenMode jobz = EigenMode::VECTOR, 
                           SolverFillMode uplo  = SolverFillMode::UPPER) {
   return detail::EigOp(a, jobz, uplo);
+}
+
+/**
+ * Performs an eigenvalue decomposition, reporting per-matrix errors through a
+ * solver status.
+ *
+ * Same as eig(a, jobz, uplo), except each matrix's eigensolver `info` value is
+ * written to stage 0 of `status` and, on CUDA executors, the call does not
+ * synchronize the stream (see the Solver Status docs for when it can). A
+ * positive value means the algorithm did not converge. Check the result after
+ * synchronizing, as for qr_solver(a, status). Not supported with
+ * CUDAJITExecutor.
+ *
+ * @tparam OpA
+ *   Data type of input a tensor or operator
+ *
+ * @param a
+ *   Input Hermitian/symmetric tensor or operator of shape `... x n x n`
+ * @param status
+ *   Solver status created with make_solver_status() for an input shaped like `a`
+ * @param jobz
+ *   Whether to compute eigenvectors.
+ * @param uplo
+ *   Part of matrix to fill
+ *
+ * @return
+ *   Operator that produces eigenvectors and eigenvalues tensors, as for eig(a, jobz, uplo).
+ */
+template<typename OpA>
+__MATX_INLINE__ auto eig(const OpA &a,
+                          const SolverStatus &status,
+                          EigenMode jobz = EigenMode::VECTOR,
+                          SolverFillMode uplo = SolverFillMode::UPPER) {
+  return detail::EigOp(a, jobz, uplo, status);
 }
 
 }

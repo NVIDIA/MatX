@@ -58,6 +58,7 @@ private:
   mutable ::matx::detail::tensor_impl_t<typename OpA::value_type, out_rank> tmp_out_;
   mutable typename OpA::value_type *ptr = nullptr;
   mutable uint8_t lifecycle_depth_ = 0;
+  SolverStatus status_;
 
 public:
   using matxop = bool;
@@ -65,7 +66,8 @@ public:
   using solve_xform_op = bool;
   using value_type = typename OpA::value_type;
 
-  __MATX_INLINE__ SolveOp(const OpA &a, const OpB &b) : a_(a), b_(b) {
+  __MATX_INLINE__ SolveOp(const OpA &a, const OpB &b, SolverStatus status = {}) :
+    a_(a), b_(b), status_(std::move(status)) {
     MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
     for (int r = 0, rank = Rank(); r < rank; r++) {
       out_dims_[r] = b_.Size(r);
@@ -125,7 +127,7 @@ public:
 #endif
       }
     } else {
-      dense_solve_impl(cuda::std::get<0>(out), a_, b_, ex);
+      dense_solve_impl(cuda::std::get<0>(out), a_, b_, ex, status_.state());
     }
   }
 
@@ -204,6 +206,40 @@ public:
 template <typename OpA, typename OpB>
 __MATX_INLINE__ auto solve(const OpA &A, const OpB &B) {
   return detail::SolveOp(A, B);
+}
+
+/**
+ * Solve A X = B for dense A, reporting per-matrix errors through a solver
+ * status.
+ *
+ * Same as solve(A, B) for dense A, except each system's factorization `info`
+ * value is written to stage 0 of `status` and its solve `info` value to stage
+ * 1, and, on CUDA executors, the call does not synchronize the stream (see the
+ * Solver Status docs for when it can). A positive stage 0 value i means U(i,i)
+ * is exactly zero, so A is singular and that system's X is not valid; the
+ * solve still runs. Check the result after synchronizing, as for
+ * qr_solver(a, status). Sparse A is not supported.
+ *
+ * @tparam OpA
+ *    Data type of A tensor
+ * @tparam OpB
+ *    Data type of B tensor
+ *
+ * @param A
+ *   Dense A tensor with system coefficients, of shape `... x n x n`
+ * @param B
+ *   B Dense tensor of known values
+ * @param status
+ *   Solver status with at least two stages, created with make_solver_status()
+ *   for an input shaped like A
+ *
+ * @return
+ *   Operator that produces the output tensor X with the solution
+ */
+template <typename OpA, typename OpB>
+__MATX_INLINE__ auto solve(const OpA &A, const OpB &B, const SolverStatus &status) {
+  static_assert(!is_sparse_tensor_v<OpA>, "Solver statuses support dense solve() only");
+  return detail::SolveOp(A, B, status);
 }
 
 } // end namespace matx

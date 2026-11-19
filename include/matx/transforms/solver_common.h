@@ -32,6 +32,14 @@
 
 #pragma once
 
+#include <string>
+#include <vector>
+
+#include <cublas_v2.h>
+#include <cusolverDn.h>
+
+#include "matx/transforms/solver_status.h"
+
 namespace matx {
 
 #ifdef MATX_EN_NVPL
@@ -60,6 +68,70 @@ namespace matx {
 #include "matx/core/operator_options.h"
 
 namespace detail {
+
+/**
+ * Check a cuSolver call's return status: a failure throws matxSolverError in
+ * every build type.
+ */
+inline void CheckSolverLibraryStatus(cusolverStatus_t status, const char *routine)
+{
+  if (status != CUSOLVER_STATUS_SUCCESS) {
+    MATX_THROW(matxSolverError,
+               std::string(routine) + " failed with cusolverStatus_t " + std::to_string(static_cast<int>(status)));
+  }
+}
+
+/**
+ * Check a cuBLAS call's return status in a solver: a failure throws
+ * matxSolverError in every build type.
+ */
+inline void CheckSolverCublasStatus(cublasStatus_t status, const char *routine)
+{
+  if (status != CUBLAS_STATUS_SUCCESS) {
+    MATX_THROW(matxSolverError,
+               std::string(routine) + " failed with cublasStatus_t " + std::to_string(static_cast<int>(status)));
+  }
+}
+
+/**
+ * Throw if MatX was built without a CPU solver backend (NVPL, or OpenBLAS with
+ * LAPACK), in every build type. Without one a host solver call cannot run, and
+ * returning would leave its outputs, and any status, looking valid.
+ */
+inline void RequireCpuSolver()
+{
+#if !MATX_EN_CPU_SOLVER
+  MATX_THROW(matxInvalidExecutor,
+    "Trying to run a host Solver executor but host Solver support is not configured; "
+    "build with -DMATX_EN_NVPL=ON, or -DMATX_EN_OPENBLAS=ON with an OpenBLAS that provides LAPACK");
+#endif
+}
+
+/**
+ * Check `info` values for a CUDA solver call without a status: copy
+ * `h_info.size()` values from `d_info` to `h_info`, synchronize the stream, and
+ * in debug builds assert that each is zero. The copy and synchronization run in
+ * every build type. If given, `describe_positive` describes a positive value in
+ * the routine's own terms; other values use DescribeSolverInfo().
+ */
+inline void CheckSolverInfosOnHost(const int *d_info, std::vector<int> &h_info, cudaStream_t stream,
+                                   [[maybe_unused]] const char *routine,
+                                   [[maybe_unused]] std::string (*describe_positive)(int) = nullptr)
+{
+  MATX_CUDA_CHECK(cudaMemcpyAsync(h_info.data(), d_info, sizeof(int) * h_info.size(), cudaMemcpyDeviceToHost, stream));
+  MATX_CUDA_CHECK(cudaStreamSynchronize(stream));
+  for ([[maybe_unused]] const auto &info : h_info) {
+    MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
+      (std::string(routine) + ": " +
+       (info > 0 && describe_positive != nullptr ? describe_positive(info) : DescribeSolverInfo(info))).c_str());
+  }
+}
+
+/** Describe a positive getrf `info` value: U(info,info) is exactly zero */
+inline std::string DescribeSingularU(int info)
+{
+  return "U is singular: U(" + std::to_string(info) + "," + std::to_string(info) + ") = 0";
+}
 
 __MATX_INLINE__ char SVDModeToChar(SVDMode jobz) {
   switch (jobz) {
@@ -166,18 +238,6 @@ __MATX_INLINE__ void SetBatchPointers(const TensorType &a, std::vector<PointerTy
   }
 }
 
-template <typename TensorType>
-__MATX_INLINE__ uint32_t GetNumBatches(const TensorType &a)
-{
-  uint32_t cnt = 1;
-  for (int i = 3; i <= TensorType::Rank(); i++) {
-    cnt *= static_cast<uint32_t>(a.Size(TensorType::Rank() - i));
-  }
-
-  return cnt;
-}
-
-
 /**
  * Dense cuSolver base class that all dense cuda solver types inherit common methods
  * and structures from. The dense solvers used in the 64-bit cuSolver API all
@@ -190,32 +250,40 @@ public:
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
-    [[maybe_unused]] cusolverStatus_t  ret;
-    ret = cusolverDnCreate(&handle);
-    MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
-
-    ret = cusolverDnCreateParams(&dn_params);
-    MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
+    CheckSolverLibraryStatus(cusolverDnCreate(&handle), "cusolverDnCreate");
+    const cusolverStatus_t ret = cusolverDnCreateParams(&dn_params);
+    if (ret != CUSOLVER_STATUS_SUCCESS) {
+      // The destructor does not run for a constructor that throws
+      cusolverDnDestroy(handle);
+      CheckSolverLibraryStatus(ret, "cusolverDnCreateParams");
+    }
   }
 
   matxError_t SetAdvancedOptions(cusolverDnFunction_t function,
                                  cusolverAlgMode_t algo)
   {
-    [[maybe_unused]] cusolverStatus_t ret = cusolverDnSetAdvOptions(dn_params, function, algo);
-    MATX_ASSERT(ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
-
+    CheckSolverLibraryStatus(cusolverDnSetAdvOptions(dn_params, function, algo), "cusolverDnSetAdvOptions");
     return matxSuccess;
   }
 
+  // Also runs when a derived plan's constructor throws, such as from a failed
+  // workspace query, before any workspace is allocated
   virtual ~matxDnCUDASolver_t()
   {
-    matxFree(d_workspace, cudaStreamDefault);
-    matxFree(h_workspace, cudaStreamDefault);
-    matxFree(d_info, cudaStreamDefault);
+    if (d_workspace != nullptr) {
+      matxFree(d_workspace, cudaStreamDefault);
+    }
+    if (h_workspace != nullptr) {
+      matxFree(h_workspace, cudaStreamDefault);
+    }
+    if (d_info != nullptr) {
+      matxFree(d_info, cudaStreamDefault);
+    }
+    cusolverDnDestroyParams(dn_params);
     cusolverDnDestroy(handle);
   }
 
-  void AllocateWorkspace([[maybe_unused]] size_t batches, [[maybe_unused]] bool batched_api, const cudaExecutor &exec)
+  void AllocateWorkspace([[maybe_unused]] size_t batches, [[maybe_unused]] bool batched_api, const cudaExecutor &exec, size_t info_per_batch = 1)
   {
     const auto stream = exec.getStream();
     if (batched_api) {
@@ -227,7 +295,7 @@ public:
       // cuSolver has a bug where the workspace needs to be zeroed before using it when the type is complex.
       // Zero it out for all types for now.
       cudaMemsetAsync(d_workspace, 0, dspace, stream);
-      matxAlloc((void **)&d_info, sizeof(*d_info) * batches, MATX_ASYNC_DEVICE_MEMORY, stream);
+      matxAlloc((void **)&d_info, sizeof(*d_info) * batches * info_per_batch, MATX_ASYNC_DEVICE_MEMORY, stream);
 
       if (hspace > 0) {
         matxAlloc(&h_workspace, hspace, MATX_HOST_MEMORY);
@@ -238,7 +306,7 @@ public:
         matxAlloc(&d_workspace, batches * dspace, MATX_ASYNC_DEVICE_MEMORY, stream);
       }
 
-      matxAlloc((void **)&d_info, batches * sizeof(*d_info), MATX_ASYNC_DEVICE_MEMORY, stream);
+      matxAlloc((void **)&d_info, batches * info_per_batch * sizeof(*d_info), MATX_ASYNC_DEVICE_MEMORY, stream);
 
       if (hspace > 0) {
         matxAlloc(&h_workspace, batches * hspace, MATX_HOST_MEMORY);
@@ -252,11 +320,11 @@ protected:
   cusolverDnHandle_t handle;
   cusolverDnParams_t dn_params;
   std::vector<void *> batch_a_ptrs;
-  int *d_info;
+  int *d_info = nullptr;
   void *d_workspace = nullptr;
   void *h_workspace = nullptr;
-  size_t hspace;
-  size_t dspace;
+  size_t hspace = 0;
+  size_t dspace = 0;
 };
 
 #if MATX_EN_CPU_SOLVER

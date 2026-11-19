@@ -16,6 +16,11 @@ Perform a QR decomposition.
    ``complex<double>`` inputs. The full ``qr`` projection path is limited to square matrices to preserve its full
    Q/R output contract. ``qr_econ(A).Q`` JIT fusion is currently limited to non-wide matrices where ``m >= n``;
    ``qr_econ(A).R`` and ``qr_solver`` projections support rectangular matrices when cuSolverDx supports the shape.
+   Projections created with a :ref:`solver status <solver_status_func>` do not support JIT fusion.
+
+.. note::
+   QR completes for singular and rank-deficient inputs. The ``info`` values reported by cuSolver and LAPACK only
+   flag illegal arguments, so rank deficiency or ill-conditioning must be detected from the diagonal of R.
 
 .. doxygenfunction:: qr
 
@@ -45,7 +50,12 @@ Lazy ``Q`` and ``R`` projections can be used directly with other operators. This
    :end-before: example-end qr-projection-test-1
    :dedent:
 
-.. doxygenfunction:: qr_econ
+.. doxygenfunction:: qr_econ(const OpA &a)
+.. doxygenfunction:: qr_econ(const OpA &a, const SolverStatus &status)
+
+.. note::
+   The overload that takes a :ref:`solver status <solver_status_func>` writes each matrix's geqrf and orgqr ``info``
+   values into the status instead of synchronizing the stream to check them. The status needs at least two stages.
 
 .. note::
    This function is currently not supported with host-based executors (CPU). It returns an economic 
@@ -73,7 +83,12 @@ to reconstruct the original input. This example is included from the ``Projectio
    :end-before: example-end qr-econ-projection-test-1
    :dedent:
 
-.. doxygenfunction:: qr_solver
+.. doxygenfunction:: qr_solver(const OpA &a)
+.. doxygenfunction:: qr_solver(const OpA &a, const SolverStatus &status)
+
+.. note::
+   The overload that takes a :ref:`solver status <solver_status_func>` writes each matrix's geqrf ``info`` value into
+   the status instead of synchronizing the stream to check it.
 
 .. note::
    This function does not return `Q` explicitly as it only runs :literal:`geqrf` from LAPACK/cuSolver.

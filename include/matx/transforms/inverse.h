@@ -36,6 +36,7 @@
 #include "matx/core/error.h"
 #include "matx/core/nvtx.h"
 #include "matx/core/tensor.h"
+#include "matx/transforms/solver_common.h"
 #include <cstdio>
 #include <numeric>
 
@@ -117,6 +118,20 @@ public:
 
     params = GetInverseParams(a_inv, a, stream);
 
+    // The destructor does not run for a constructor that throws, so free what
+    // was created before rethrowing
+    try {
+      Setup(a_inv, a, stream);
+    }
+    catch (...) {
+      Release();
+      throw;
+    }
+  }
+
+  /** Choose the backend and create its handles and buffers */
+  void Setup(TensorTypeAInv &a_inv, const TensorTypeA &a, cudaStream_t stream)
+  {
     if constexpr (ALGO == MAT_INVERSE_ALGO_LU) {
       // If we're doing a single batch, use cuSolver since it's faster than cuBLAS. Otherwise if we're operating on a small
       // matrix, use the cuBLAS Inv API. If neither of those works, fall back to the regular cuBlasGetRf path
@@ -137,14 +152,16 @@ public:
       }
 
       if (backend == MatInverseLUBackend::cuSolverGetRfRs) {
-        [[maybe_unused]] cusolverStatus_t solver_ret;
-        solver_ret = cusolverDnCreate(&cusolver_handle);
-        MATX_ASSERT(solver_ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
+        // Create into locals so a failed call leaves the members null for Release()
+        cusolverDnHandle_t new_handle = nullptr;
+        CheckSolverLibraryStatus(cusolverDnCreate(&new_handle), "cusolverDnCreate");
+        cusolver_handle = new_handle;
 
-        solver_ret = cusolverDnCreateParams(&dn_params);
-        MATX_ASSERT(solver_ret == CUSOLVER_STATUS_SUCCESS, matxSolverError);
+        cusolverDnParams_t new_params = nullptr;
+        CheckSolverLibraryStatus(cusolverDnCreateParams(&new_params), "cusolverDnCreateParams");
+        dn_params = new_params;
 
-        solver_ret = cusolverDnXgetrf_bufferSize(
+        const cusolverStatus_t solver_ret = cusolverDnXgetrf_bufferSize(
             cusolver_handle,
             dn_params,
             static_cast<int64_t>(params.n),
@@ -156,7 +173,7 @@ public:
             &dspace,
             &hspace);
 
-        MATX_ASSERT_STR_EXP(solver_ret, CUSOLVER_STATUS_SUCCESS, matxSolverError, "Error in cusolverDnXgetrf_bufferSize");
+        CheckSolverLibraryStatus(solver_ret, "cuSolver Xgetrf_bufferSize");
 
         if (hspace > 0) {
           matxAlloc(&h_workspace, hspace, MATX_HOST_MEMORY);
@@ -178,8 +195,9 @@ public:
         std::vector<const T1 *> in_pointers;
         std::vector<T1 *> out_pointers;
 
-        ret = cublasCreate(&cublas_handle);
-        MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxInverseError);
+        cublasHandle_t new_cublas_handle = nullptr;
+        CheckSolverCublasStatus(cublasCreate(&new_cublas_handle), "cublasCreate");
+        cublas_handle = new_cublas_handle;
 
         if constexpr (RANK == 2) {
           if (use_input_workbuf) {
@@ -231,10 +249,10 @@ public:
                     MATX_ASYNC_DEVICE_MEMORY, stream);
         }
 
-        cudaMemcpyAsync(d_A_array, in_pointers.data(),
-                        in_pointers.size() * sizeof(T1 *), cudaMemcpyHostToDevice, stream);
-        cudaMemcpyAsync(d_A_inv_array, out_pointers.data(),
-                        out_pointers.size() * sizeof(T1 *), cudaMemcpyHostToDevice, stream);
+        MATX_CUDA_CHECK(cudaMemcpyAsync(d_A_array, in_pointers.data(),
+                        in_pointers.size() * sizeof(T1 *), cudaMemcpyHostToDevice, stream));
+        MATX_CUDA_CHECK(cudaMemcpyAsync(d_A_inv_array, out_pointers.data(),
+                        out_pointers.size() * sizeof(T1 *), cudaMemcpyHostToDevice, stream));
       }
 
       matxAlloc((void **)&d_info, params.batch_size * sizeof(*d_info),
@@ -297,20 +315,22 @@ public:
    */
   ~matxInversePlan_t()
   {
-    if (backend == MatInverseLUBackend::cuBLASGetRf || backend == MatInverseLUBackend::cuBLASMatInv) {
-      if (d_A_array) { matxFree(d_A_array, cudaStreamDefault); d_A_array = nullptr; }
-      if (d_A_inv_array) { matxFree(d_A_inv_array, cudaStreamDefault); d_A_inv_array = nullptr; }
-      if (d_pivot) { matxFree(d_pivot, cudaStreamDefault); d_pivot = nullptr; }
-      cublasDestroy(cublas_handle);
-    }
-    else if (backend == MatInverseLUBackend::cuSolverGetRfRs) {
-      cusolverDnDestroy(cusolver_handle);
-      if (d_workspace) matxFree(d_workspace, cudaStreamDefault);
-      if (h_workspace) matxFree(h_workspace, cudaStreamDefault);
-    }
+    Release();
+  }
 
+  /** Free every handle and buffer that was created, whichever backend created it */
+  void Release() noexcept
+  {
+    if (d_A_array) { matxFree(d_A_array, cudaStreamDefault); d_A_array = nullptr; }
+    if (d_A_inv_array) { matxFree(d_A_inv_array, cudaStreamDefault); d_A_inv_array = nullptr; }
+    if (d_pivot) { matxFree(d_pivot, cudaStreamDefault); d_pivot = nullptr; }
+    if (d_workspace) { matxFree(d_workspace, cudaStreamDefault); d_workspace = nullptr; }
+    if (h_workspace) { matxFree(h_workspace, cudaStreamDefault); h_workspace = nullptr; }
     if (d_info) { matxFree(d_info, cudaStreamDefault); d_info = nullptr; }
     if (h_info) { matxFree(h_info); h_info = nullptr; }
+    if (cublas_handle) { cublasDestroy(cublas_handle); cublas_handle = nullptr; }
+    if (dn_params) { cusolverDnDestroyParams(dn_params); dn_params = nullptr; }
+    if (cusolver_handle) { cusolverDnDestroy(cusolver_handle); cusolver_handle = nullptr; }
   }
 
   /**
@@ -331,13 +351,25 @@ public:
    *   CUDA stream
    *
    */
-  inline void Exec([[maybe_unused]] TensorTypeAInv &a_inv, const TensorTypeA &a, cudaStream_t stream)
+  inline void Exec([[maybe_unused]] TensorTypeAInv &a_inv, const TensorTypeA &a, cudaStream_t stream,
+                   int *status_info = nullptr)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
     if (backend == MatInverseLUBackend::cuBLASGetRf || backend == MatInverseLUBackend::cuBLASMatInv) {
-      cublasSetStream(cublas_handle, stream);
+      CheckSolverCublasStatus(cublasSetStream(cublas_handle, stream), "cublasSetStream");
     }
+    else if (backend == MatInverseLUBackend::cuSolverGetRfRs) {
+      // Without this, getrf and getrs run on the default stream, unordered with
+      // the work buffer copy and the status reads on `stream`
+      CheckSolverLibraryStatus(cusolverDnSetStream(cusolver_handle, stream), "cusolverDnSetStream");
+    }
+
+    // With a status, the factorization's info goes into its stage 0 and the
+    // inversion step's into stage 1, instead of being checked here, and the
+    // call does not synchronize
+    [[maybe_unused]] int *factor_info = status_info != nullptr ? status_info : d_info;
+    [[maybe_unused]] int *invert_info = status_info != nullptr ? status_info + params.batch_size : d_info;
 
     if (UseInputWorkBuffer(a)) {
       (a_workbuf = a).run(stream);
@@ -348,42 +380,42 @@ public:
         if constexpr (cuda::std::is_same_v<T1, float>) {
           ret =
               cublasSgetrfBatched(cublas_handle, static_cast<int>(params.n), d_A_array, static_cast<int>(params.n), d_pivot,
-                                  d_info, static_cast<int>(params.batch_size));
+                                  factor_info, static_cast<int>(params.batch_size));
         }
         else if constexpr (cuda::std::is_same_v<T1, double>) {
           ret =
               cublasDgetrfBatched(cublas_handle, static_cast<int>(params.n), d_A_array, static_cast<int>(params.n), d_pivot,
-                                  d_info, static_cast<int>(params.batch_size));
+                                  factor_info, static_cast<int>(params.batch_size));
         }
         else if constexpr (cuda::std::is_same_v<T1, cuda::std::complex<float>>) {
           ret =
               cublasCgetrfBatched(cublas_handle, static_cast<int>(params.n),
                                   reinterpret_cast<cuComplex *const *>(d_A_array),
-                                  static_cast<int>(params.n), d_pivot, d_info,
+                                  static_cast<int>(params.n), d_pivot, factor_info,
                                   static_cast<int>(params.batch_size));
         }
         else if constexpr (cuda::std::is_same_v<T1, cuda::std::complex<double>>) {
           ret = cublasZgetrfBatched(
               cublas_handle, static_cast<int>(params.n),
               reinterpret_cast<cuDoubleComplex *const *>(d_A_array),
-              static_cast<int>(params.n), d_pivot, d_info,
+              static_cast<int>(params.n), d_pivot, factor_info,
               static_cast<int>(params.batch_size));
         }
 
-        MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxLUError);
+        CheckSolverCublasStatus(ret, "cuBLAS getrfBatched");
 
         // Perform LU factorization
         if constexpr (cuda::std::is_same_v<T1, float>) {
           ret = cublasSgetriBatched(cublas_handle, static_cast<int>(params.n), d_A_array,
                                     static_cast<int>(params.n), d_pivot,
                                     d_A_inv_array, static_cast<int>(params.n),
-                                    d_info, static_cast<int>(params.batch_size));
+                                    invert_info, static_cast<int>(params.batch_size));
         }
         else if constexpr (cuda::std::is_same_v<T1, double>) {
           ret = cublasDgetriBatched(cublas_handle, static_cast<int>(params.n), d_A_array,
                                     static_cast<int>(params.n), d_pivot,
                                     d_A_inv_array, static_cast<int>(params.n),
-                                    d_info, static_cast<int>(params.batch_size));
+                                    invert_info, static_cast<int>(params.batch_size));
         }
         else if constexpr (cuda::std::is_same_v<T1, cuda::std::complex<float>>) {
           ret = cublasCgetriBatched(
@@ -391,7 +423,7 @@ public:
               reinterpret_cast<cuComplex *const *>(d_A_array),
               static_cast<int>(params.n), d_pivot,
               reinterpret_cast<cuComplex *const *>(d_A_inv_array),
-              static_cast<int>(params.n), d_info,
+              static_cast<int>(params.n), invert_info,
               static_cast<int>(params.batch_size));
         }
         else if constexpr (cuda::std::is_same_v<T1, cuda::std::complex<double>>) {
@@ -400,18 +432,14 @@ public:
               reinterpret_cast<cuDoubleComplex *const *>(d_A_array),
               static_cast<int>(params.n), d_pivot,
               reinterpret_cast<cuDoubleComplex *const *>(d_A_inv_array),
-              static_cast<int>(params.n), d_info,
+              static_cast<int>(params.n), invert_info,
               static_cast<int>(params.batch_size));
         }
 
-        MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxInverseError);
+        CheckSolverCublasStatus(ret, "cuBLAS getriBatched");
 
-        MATX_CUDA_CHECK(cudaMemcpyAsync(h_info, d_info, sizeof(int) * params.batch_size, cudaMemcpyDeviceToHost, stream));
-        MATX_CUDA_CHECK(cudaStreamSynchronize(stream));
-        for (size_t i = 0; i < params.batch_size; i++) {
-          if (h_info[i] != 0) {
-            MATX_THROW(matxLUError, "inverse failed");
-          }
+        if (status_info == nullptr) {
+          ThrowOnHostInfos(stream, "cuBLAS getriBatched");
         }
       }
       else if (backend == MatInverseLUBackend::cuBLASMatInv) {
@@ -421,13 +449,13 @@ public:
           ret = cublasSmatinvBatched(cublas_handle, static_cast<int>(params.n), d_A_array,
                                     static_cast<int>(params.n),
                                     d_A_inv_array, static_cast<int>(params.n),
-                                    d_info, static_cast<int>(params.batch_size));
+                                    factor_info, static_cast<int>(params.batch_size));
         }
         else if constexpr (cuda::std::is_same_v<T1, double>) {
           ret = cublasDmatinvBatched(cublas_handle, static_cast<int>(params.n), d_A_array,
                                     static_cast<int>(params.n),
                                     d_A_inv_array, static_cast<int>(params.n),
-                                    d_info, static_cast<int>(params.batch_size));
+                                    factor_info, static_cast<int>(params.batch_size));
         }
         else if constexpr (cuda::std::is_same_v<T1, cuda::std::complex<float>>) {
           ret = cublasCmatinvBatched(cublas_handle, static_cast<int>(params.n),
@@ -435,7 +463,7 @@ public:
                                     static_cast<int>(params.n),
                                     reinterpret_cast<cuComplex *const *>(d_A_inv_array),
                                     static_cast<int>(params.n),
-                                    d_info, static_cast<int>(params.batch_size));
+                                    factor_info, static_cast<int>(params.batch_size));
         }
         else if constexpr (cuda::std::is_same_v<T1, cuda::std::complex<double>>) {
           ret = cublasZmatinvBatched(cublas_handle, static_cast<int>(params.n),
@@ -443,23 +471,24 @@ public:
                                     static_cast<int>(params.n),
                                     reinterpret_cast<cuDoubleComplex *const *>(d_A_inv_array),
                                     static_cast<int>(params.n),
-                                    d_info, static_cast<int>(params.batch_size));
+                                    factor_info, static_cast<int>(params.batch_size));
         }
-        MATX_ASSERT(ret == CUBLAS_STATUS_SUCCESS, matxInverseError);
+        CheckSolverCublasStatus(ret, "cuBLAS matinvBatched");
 
-        MATX_CUDA_CHECK(cudaMemcpyAsync(h_info, d_info, sizeof(int) * params.batch_size, cudaMemcpyDeviceToHost, stream));
-        MATX_CUDA_CHECK(cudaStreamSynchronize(stream));
-        for (size_t i = 0; i < params.batch_size; i++) {
-          if (h_info[i] != 0) {
-            MATX_THROW(matxLUError, "inverse failed");
-          }
+        if (status_info != nullptr) {
+          // matinvBatched reports one info value per matrix for the whole
+          // inversion, so stage 1 holds no failures
+          MATX_CUDA_CHECK(cudaMemsetAsync(invert_info, 0, sizeof(int) * params.batch_size, stream));
+        }
+        else {
+          ThrowOnHostInfos(stream, "cuBLAS matinvBatched");
         }
       }
       else if (backend == MatInverseLUBackend::cuSolverGetRfRs) {
         MATX_ASSERT_STR(params.batch_size == 1, matxInvalidParameter, "cuSolverGetRfRs backend only used for single batches");
 
         // cuSolver has a bug that requires this workspace to be zeroed each time
-        cudaMemsetAsync(d_workspace, 0, this->dspace, stream);
+        MATX_CUDA_CHECK(cudaMemsetAsync(d_workspace, 0, this->dspace, stream));
 
         [[maybe_unused]] cusolverStatus_t solver_ret;
         solver_ret = cusolverDnXgetrf(
@@ -476,15 +505,11 @@ public:
             dspace,
             h_workspace,
             hspace,
-            d_info);
-        MATX_ASSERT_STR_EXP(solver_ret, CUSOLVER_STATUS_SUCCESS, matxSolverError, "Error in cusolverDnXgetrf");
+            factor_info);
+        CheckSolverLibraryStatus(solver_ret, "cuSolver Xgetrf");
 
-        MATX_CUDA_CHECK(cudaMemcpyAsync(h_info, d_info, sizeof(int) * params.batch_size, cudaMemcpyDeviceToHost, stream));
-        MATX_CUDA_CHECK(cudaStreamSynchronize(stream));
-        for (size_t i = 0; i < params.batch_size; i++) {
-          if (h_info[i] != 0) {
-            MATX_THROW(matxLUError, "inverse failed");
-          }
+        if (status_info == nullptr) {
+          ThrowOnHostInfos(stream, "cuSolver Xgetrf");
         }
 
         // We're Solving Ax = b, so setting "b" to the identity matrix will give us A^-1
@@ -503,9 +528,9 @@ public:
             MatXTypeToCudaType<typename TensorTypeA::value_type>(),
             a_inv.Data(),
             static_cast<int64_t>(params.n),
-            d_info);
+            invert_info);
 
-          MATX_ASSERT_STR_EXP(solver_ret, CUSOLVER_STATUS_SUCCESS, matxSolverError, "Error in cusolverDnXgetrs");
+          CheckSolverLibraryStatus(solver_ret, "cuSolver Xgetrs");
       }
       else {
         MATX_THROW(matxInvalidParameter, "Invalid LU backend for inv()");
@@ -514,13 +539,30 @@ public:
   }
 
 private:
+  /**
+   * Without a status: copy d_info to the host, synchronize the stream, and
+   * throw matxLUError for the first nonzero value. Unlike other solvers, inv
+   * checks in every build type, since a singular matrix has no inverse.
+   */
+  void ThrowOnHostInfos(cudaStream_t stream, const char *routine)
+  {
+    MATX_CUDA_CHECK(cudaMemcpyAsync(h_info, d_info, sizeof(int) * params.batch_size, cudaMemcpyDeviceToHost, stream));
+    MATX_CUDA_CHECK(cudaStreamSynchronize(stream));
+    for (size_t i = 0; i < params.batch_size; i++) {
+      if (h_info[i] != 0) {
+        MATX_THROW(matxLUError, "inverse failed: " + std::string(routine) + ", matrix " + std::to_string(i) + ": " +
+                   (h_info[i] > 0 ? DescribeSingularU(h_info[i]) : DescribeSolverInfo(h_info[i])));
+      }
+    }
+  }
+
   // Member variables
   cublasStatus_t ret = CUBLAS_STATUS_SUCCESS;
   MatInverseLUBackend backend;
 
   // cuSolver's getrf is faster than cuBLAS's
-  cusolverDnHandle_t cusolver_handle;
-  cusolverDnParams_t dn_params;
+  cusolverDnHandle_t cusolver_handle = nullptr;
+  cusolverDnParams_t dn_params = nullptr;
   size_t hspace = 0;
   size_t dspace = 0;
   void *d_workspace = nullptr;
@@ -528,7 +570,7 @@ private:
   matx::tensor_t<typename TensorTypeA::value_type, TensorTypeA::Rank()> d_B;
 
   InverseParams_t params;
-  cublasHandle_t cublas_handle;
+  cublasHandle_t cublas_handle = nullptr;
   matx::tensor_t<typename TensorTypeA::value_type, TensorTypeA::Rank()> a_workbuf;
   int *d_pivot { nullptr };
   int *d_info { nullptr };
@@ -580,14 +622,23 @@ using inv_cache_t = std::unordered_map<InverseParams_t, std::any, InverseParamsK
  * @param a_inv Inverse tensor
  * @param a Input tensor
  * @param exec CUDA executor
+ * @param status Optional solver status. When given, the factorization's info
+ * is written to stage 0 and the inversion step's to stage 1 on the stream,
+ * instead of being checked, and the call does not synchronize the stream.
  */
 template <typename TensorTypeAInv, typename TensorTypeA, MatInverseAlgo_t ALGO = MAT_INVERSE_ALGO_LU>
 void inv_impl(TensorTypeAInv &a_inv, const TensorTypeA &a,
-              const cudaExecutor &exec)
+              const cudaExecutor &exec, detail::SolverStatusState *status = nullptr)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
   static_assert(TensorTypeAInv::Rank() == TensorTypeA::Rank(), "Input and output ranks must match");
   const auto stream = exec.getStream();
+
+  // Validate the status before any work, so a rejected status allocates
+  // nothing. Two stages: getrf, then getri or getrs; matinvBatched writes
+  // stage 0 and zeroes stage 1.
+  const auto status_run = detail::BeginStatusRun(detail::ExecutorKind::Cuda, status, 2, a);
+  int *status_info = status_run.Info();
 
   // Get parameters required by these tensors
   auto params = detail::matxInversePlan_t<TensorTypeAInv, TensorTypeA, ALGO>::GetInverseParams(a_inv, a, stream);
@@ -602,7 +653,7 @@ void inv_impl(TensorTypeAInv &a_inv, const TensorTypeA &a,
       return std::make_shared<cache_val_type>(a_inv, a, stream);
     },
     [&](std::shared_ptr<cache_val_type> ctype) {
-      ctype->Exec(a_inv, a, stream);
+      ctype->Exec(a_inv, a, stream, status_info);
     },
     exec
   );

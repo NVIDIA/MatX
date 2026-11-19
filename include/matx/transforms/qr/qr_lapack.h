@@ -149,9 +149,16 @@ public:
     return params;
   }
 
+  /**
+   * Run geqrf on every matrix.
+   *
+   * @param status_infos If non-null, matrix i's info is written to
+   * status_infos[i] instead of being checked. Otherwise nonzero info fails a
+   * debug-only assert.
+   */
   template <ThreadsMode MODE>
   void Exec(OutTensor &out, TauTensor &tau,
-            const ATensor &a, const HostExecutor<MODE> &exec)
+            const ATensor &a, const HostExecutor<MODE> &exec, int *status_infos = nullptr)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
@@ -178,7 +185,13 @@ public:
                      &params.m, reinterpret_cast<T1*>(this->batch_tau_ptrs[i]),
                      reinterpret_cast<T1*>(this->work), &this->lwork, &info);
 
-      MATX_ASSERT_STR_EXP(info, 0, matxSolverError, "LAPACK geqrf error");
+      if (status_infos != nullptr) {
+        status_infos[i] = static_cast<int>(info);
+      }
+      else {
+        MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
+          ("Parameter " + std::to_string(-info) + " had an illegal value in LAPACK geqrf").c_str());
+      }
     }
   }
 
@@ -262,19 +275,26 @@ using qr_host_cache_t = std::unordered_map<DnQRHostParams_t, std::any, DnQRHostP
  *   Input tensor A
  * @param exec
  *   Host executor
+ * @param status
+ *   Optional solver status. When given, geqrf info is stored in it instead of
+ *   being checked.
  */
 template <typename OutTensor, typename TauTensor, typename ATensor, ThreadsMode MODE>
 void qr_solver_impl([[maybe_unused]] OutTensor &&out,
                       [[maybe_unused]] TauTensor &&tau,
                       [[maybe_unused]] const ATensor &a,
-                      [[maybe_unused]] const HostExecutor<MODE> &exec)
+                      [[maybe_unused]] const HostExecutor<MODE> &exec,
+                      [[maybe_unused]] detail::SolverStatusState *status = nullptr)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  MATX_ASSERT_STR(MATX_EN_CPU_SOLVER, matxInvalidExecutor,
-    "Trying to run a host Solver executor but host Solver support is not configured");
+  detail::RequireCpuSolver();
 #if MATX_EN_CPU_SOLVER
 
   using T1 = typename remove_cvref_t<OutTensor>::value_type;
+
+  // Validate the status before any work, as the CUDA path does. One stage: geqrf.
+  const auto status_run = detail::BeginStatusRun(detail::ExecutorKind::Host, status, 1, a);
+  int *status_infos = status_run.Info();
 
   auto tau_new = OpToTensor(tau, exec);
   auto a_new = OpToTensor(a, exec);
@@ -287,9 +307,10 @@ void qr_solver_impl([[maybe_unused]] OutTensor &&out,
      LAPACK doesn't support row-major layouts. Since we want to make the
      library appear as though everything is row-major, we take a performance hit
      to transpose in and out of the function. LAPACKE, however, supports both formats.
+     The tensor owns the transpose buffer, so an exception frees it.
   */
-  T1 *tp;
-  matxAlloc(reinterpret_cast<void **>(&tp), a_new.Bytes(), MATX_HOST_MALLOC_MEMORY);
+  auto tp_tensor = make_tensor<T1>(a_new.Shape(), MATX_HOST_MALLOC_MEMORY);
+  T1 *tp = tp_tensor.Data();
   auto tv = TransposeCopy(tp, a_new, exec);
   auto tvt = tv.PermuteMatrix();
 
@@ -305,15 +326,14 @@ void qr_solver_impl([[maybe_unused]] OutTensor &&out,
       return std::make_shared<cache_val_type>(tau_new, tvt);
     },
     [&](std::shared_ptr<cache_val_type> ctype) {
-      ctype->Exec(tvt, tau_new, tvt, exec);
+      ctype->Exec(tvt, tau_new, tvt, exec, status_infos);
     },
     exec
   );
 
   /* Temporary WAR
-   * Copy and free async buffer for transpose */
+   * Copy out of the transpose buffer, which tp_tensor frees on return */
   matx::copy(out, tv.PermuteMatrix(), exec);
-  matxFree(tp);
 #endif
 }
 

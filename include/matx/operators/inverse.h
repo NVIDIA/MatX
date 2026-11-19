@@ -53,6 +53,7 @@ namespace detail {
       mutable detail::tensor_impl_t<typename remove_cvref_t<OpA>::value_type, OpA::Rank()> tmp_out_;
       mutable typename remove_cvref_t<OpA>::value_type *ptr = nullptr;
       mutable uint8_t lifecycle_depth_ = 0;
+      SolverStatus status_;
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
       mutable cuSolverDxHelper<typename OpA::value_type> dx_solver_helper_;
 #endif
@@ -64,7 +65,7 @@ namespace detail {
       using inv_xform_op = bool;
 
       __MATX_INLINE__ std::string str() const { return "inv()"; }
-      __MATX_INLINE__ InvOp(const OpA &a) : a_(a) {
+      __MATX_INLINE__ InvOp(const OpA &a, SolverStatus status = {}) : a_(a), status_(std::move(status)) {
         MATX_LOG_TRACE("{} constructor: rank={}", str(), Rank());
 #if defined(MATX_EN_MATHDX) && defined(__CUDACC__)
         if constexpr (OpA::Rank() >= 2) {
@@ -160,7 +161,9 @@ namespace detail {
           return combine_capabilities<Cap>(shm_required, detail::get_operator_capability<Cap>(a_, in));
         }
         else if constexpr (Cap == OperatorCapability::SUPPORTS_JIT) {
-          const bool supported = (OpA::Rank() >= 2) && (OpA::Rank() <= 4) &&
+          // A status forces the non-JIT path
+          const bool supported = detail::SolverStatusAllowsJit(status_.state()) &&
+                                 (OpA::Rank() >= 2) && (OpA::Rank() <= 4) &&
                                  (a_.Size(OpA::Rank() - 2) == a_.Size(OpA::Rank() - 1)) &&
                                  dx_solver_helper_.IsSupported();
           return combine_capabilities<Cap>(supported, detail::get_operator_capability<Cap>(a_, in));
@@ -197,7 +200,8 @@ namespace detail {
         else if constexpr (Cap == OperatorCapability::JIT_TYPE_QUERY) {
 #ifdef MATX_EN_JIT
           const auto inner_op_jit_name = detail::get_operator_capability<Cap>(a_, in);
-          return get_jit_class_name() + "<" + inner_op_jit_name + ">";
+          return get_jit_class_name() + "<" + inner_op_jit_name + ">" +
+                 detail::SolverStatusJitTypeSuffix(status_.state());
 #else
           return std::string{};
 #endif
@@ -207,6 +211,7 @@ namespace detail {
           auto key = detail::MakeJITCacheKeyForType<InvOp<OpA, ALGO>>("JITInv");
           detail::HashJITCacheValue(key, static_cast<int>(ALGO));
           detail::HashJITCacheValue(key, Rank());
+          detail::HashSolverStatusJitKey(key, status_.state());
           for (int i = 0; i < Rank(); ++i) {
             detail::HashJITCacheValue(key, Size(i));
           }
@@ -247,7 +252,7 @@ namespace detail {
         static_assert(ALGO == MAT_INVERSE_ALGO_LU || is_cuda_jit_executor_v<Executor>,
                       "MAT_INVERSE_ALGO_POSV requires CUDAJITExecutor with MathDx");
         if constexpr (ALGO == MAT_INVERSE_ALGO_LU) {
-          inv_impl(cuda::std::get<0>(out), a_, ex);
+          inv_impl(cuda::std::get<0>(out), a_, ex, status_.state());
         }
       }
 
@@ -338,6 +343,37 @@ namespace detail {
 template<MatInverseAlgo_t ALGO = MAT_INVERSE_ALGO_LU, typename OpA>
 __MATX_INLINE__ auto inv(const OpA &a) {
   return detail::InvOp<OpA, ALGO>(a);
+}
+
+/**
+ * Performs a matrix inverse on a square matrix, reporting per-matrix errors
+ * through a solver status.
+ *
+ * Same as inv(a) with the LU algorithm, except each matrix's factorization
+ * `info` value is written to stage 0 of `status` and its inversion `info`
+ * value to stage 1 (zero when cuBLAS matinvBatched does both), instead of the
+ * call synchronizing the stream and throwing for a singular matrix. A positive
+ * stage 0 value i means U(i,i) is exactly zero, so that matrix is singular and
+ * its output is not valid. The call does not synchronize the stream (see the
+ * Solver Status docs for when it can). Check the result after synchronizing,
+ * as for qr_solver(a, status). Not supported with CUDAJITExecutor, so
+ * `MAT_INVERSE_ALGO_POSV` is not available.
+ *
+ * @tparam OpA
+ *   Data type of input a tensor or operator
+ *
+ * @param a
+ *   Input tensor or operator of shape `... x n x n`
+ * @param status
+ *   Solver status with at least two stages, created with make_solver_status()
+ *   for an input shaped like `a`
+ *
+ * @return
+ *   Operator that produces the inverse tensor of shape `... x n x n`.
+ */
+template<typename OpA>
+__MATX_INLINE__ auto inv(const OpA &a, const SolverStatus &status) {
+  return detail::InvOp<OpA, MAT_INVERSE_ALGO_LU>(a, status);
 }
 
 }

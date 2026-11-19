@@ -118,9 +118,17 @@ public:
     return params;
   }
 
+  /**
+   * Run potrf on every matrix.
+   *
+   * @param status_infos If non-null, matrix i's info is written to
+   * status_infos[i] instead of being checked. Otherwise nonzero info fails a
+   * debug-only assert.
+   */
   template <ThreadsMode MODE>
   void Exec(OutputTensor &out, const ATensor &a,
-            const HostExecutor<MODE> &exec, const char uplo = 'U')
+            const HostExecutor<MODE> &exec, const char uplo = 'U',
+            int *status_infos = nullptr)
   {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
@@ -144,7 +152,10 @@ public:
                      reinterpret_cast<T1*>(this->batch_a_ptrs[i]),
                      &params.n, &info);
 
-      if (info < 0) {
+      if (status_infos != nullptr) {
+        status_infos[i] = static_cast<int>(info);
+      }
+      else if (info < 0) {
         MATX_ASSERT_STR_EXP(info, 0, matxSolverError,
           ("Parameter " + std::to_string(-info) + " had an illegal value in LAPACK potrf").c_str());
       } else {
@@ -211,17 +222,24 @@ private:
  *   Host executor
  * @param uplo
  *   Part of matrix to fill
+ * @param status
+ *   Optional solver status. When given, potrf info is stored in it instead of
+ *   being checked.
  */
 template <typename OutputTensor, typename ATensor, ThreadsMode MODE>
 void chol_impl([[maybe_unused]] OutputTensor &&out,
                [[maybe_unused]] const ATensor &a,
                [[maybe_unused]] const HostExecutor<MODE> &exec,
-               [[maybe_unused]] SolverFillMode uplo = SolverFillMode::UPPER)
+               [[maybe_unused]] SolverFillMode uplo = SolverFillMode::UPPER,
+               [[maybe_unused]] detail::SolverStatusState *status = nullptr)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  MATX_ASSERT_STR(MATX_EN_CPU_SOLVER, matxInvalidExecutor,
-    "Trying to run a host Solver executor but host Solver support is not configured");
+  detail::RequireCpuSolver();
 #if MATX_EN_CPU_SOLVER
+
+  // Validate the status before any work, as the CUDA path does. One stage: potrf.
+  const auto status_run = detail::BeginStatusRun(detail::ExecutorKind::Host, status, 1, a);
+  int *status_infos = status_run.Info();
 
   using OutputTensor_t = remove_cvref_t<OutputTensor>;
   using T1 = typename OutputTensor_t::value_type;
@@ -243,26 +261,26 @@ void chol_impl([[maybe_unused]] OutputTensor &&out,
   // contiguous tensor for use with LAPACK.
   uplo = (uplo == SolverFillMode::UPPER) ? SolverFillMode::LOWER : SolverFillMode::UPPER;
 
-  T1 *out_ptr = nullptr;
+  // The tensor owns the temporary buffer, so an exception frees it
+  tensor_t<T1, RANK> tmp_storage;
   detail::tensor_impl_t<T1, RANK> tmp_out;
   const bool allContiguous = a_new.IsContiguous() && out.IsContiguous();
   if (allContiguous) {
     make_tensor(tmp_out, out.Data(), out.Shape());
     (out = a_new).run(exec);
   } else{
-    matxAlloc((void**)&out_ptr, a_new.Bytes(), MATX_HOST_MALLOC_MEMORY);
-    make_tensor(tmp_out, out_ptr, a_new.Shape());
+    make_tensor(tmp_storage, a_new.Shape(), MATX_HOST_MALLOC_MEMORY);
+    make_tensor(tmp_out, tmp_storage.Data(), a_new.Shape());
     (tmp_out = a_new).run(exec);
   }
 
   const char uplo_lapack = (uplo == SolverFillMode::UPPER)? 'U' : 'L';
 
   detail::matxDnCholHostPlan_t<OutputTensor, decltype(tmp_out)> chol_plan(tmp_out, uplo_lapack);
-  chol_plan.Exec(tmp_out, tmp_out, exec, uplo_lapack);
+  chol_plan.Exec(tmp_out, tmp_out, exec, uplo_lapack, status_infos);
 
   if (!allContiguous) {
     matx::copy(out, tmp_out, exec);
-    matxFree(out_ptr);
   }
 #endif
 }

@@ -79,8 +79,9 @@ void pinv_impl(OutputTensor &out,
               float rcond)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
-  MATX_ASSERT_STR(!(is_host_executor_v<Executor> && !MATX_EN_CPU_SOLVER), matxInvalidExecutor,
-    "Trying to run a host Solver executor but host Solver support is not configured");
+  if constexpr (is_host_executor_v<Executor>) {
+    detail::RequireCpuSolver();
+  }
 
   using T1 = typename InputTensor::value_type;
   using inner_type = typename inner_op_type_t<T1>::type;

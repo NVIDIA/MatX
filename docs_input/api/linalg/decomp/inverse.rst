@@ -27,6 +27,13 @@ Compute the inverse of a square matrix.
 .. versionadded:: 0.6.0
 
 .. doxygenfunction:: inv(const OpA &a)
+.. doxygenfunction:: inv(const OpA &a, const SolverStatus &status)
+
+.. note::
+   The overload that takes a :ref:`solver status <solver_status_func>` writes each matrix's factorization ``info``
+   value into stage 0 and its inversion ``info`` value into stage 1, instead of synchronizing the stream and throwing
+   for a singular matrix. The status needs at least two stages. It supports the LU algorithm only and is not
+   supported with ``CUDAJITExecutor``.
 
 Examples
 ~~~~~~~~

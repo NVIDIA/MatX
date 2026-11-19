@@ -8,6 +8,12 @@ Solves the system of equations AX=Y, where X is the unknown.
 .. versionadded:: 0.9.1
 
 .. doxygenfunction:: solve(const OpA &A, const OpB &B)
+.. doxygenfunction:: solve(const OpA &A, const OpB &B, const SolverStatus &status)
+
+.. note::
+   The overload that takes a :ref:`solver status <solver_status_func>` writes each system's factorization ``info``
+   value into stage 0 and its solve ``info`` value into stage 1, instead of synchronizing the stream to check them.
+   The status needs at least two stages. It supports dense A only.
 
 For dense ``A``, ``A`` must have shape ``... x n x n``. ``B`` may have shape
 ``... x n`` for a vector right-hand side or ``... x n x nrhs`` for one or more
