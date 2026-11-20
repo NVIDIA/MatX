@@ -98,6 +98,8 @@
 #include <cuda/cmath>
 #include <algorithm>
 #include <array>
+#include <cctype>
+#include <cerrno>
 #include <charconv>
 #include <cmath>
 #include <cstdio>
@@ -107,6 +109,7 @@
 #include <iomanip>
 #include <iostream>
 #include <limits>
+#include <numbers>
 #include <string>
 #include <vector>
 
@@ -153,6 +156,24 @@ static bool parse_index_arg(const std::string &arg, index_t &value, index_t min_
   const auto *end = arg.data() + arg.size();
   const auto [ptr, ec] = std::from_chars(begin, end, parsed);
   if (arg.empty() || ec != std::errc{} || ptr != end || parsed < min_value) {
+    return false;
+  }
+
+  value = parsed;
+  return true;
+}
+
+// Uses strtod rather than std::from_chars, whose floating-point overloads are
+// missing from some C++20 standard libraries.
+static bool parse_double_arg(const std::string &arg, double &value)
+{
+  if (arg.empty() || std::isspace(static_cast<unsigned char>(arg.front()))) {
+    return false;
+  }
+  char *end = nullptr;
+  errno = 0;
+  const double parsed = std::strtod(arg.c_str(), &end);
+  if (errno == ERANGE || end != arg.c_str() + arg.size()) {
     return false;
   }
 
@@ -251,6 +272,9 @@ static double estimate_max_image_range_span(const double3 *positions,
   return max_range_span;
 }
 
+// Window applied to the FX samples during range compression.
+enum class RangeWindow { None, Hamming, Taylor };
+
 // Aggregate of non-tensor state needed by run_bp_device(). Kept separate from
 // the tensor and host-buffer parameters because most members are scalar
 // configuration values whose call-site reads cleanly as a brace-initializer.
@@ -270,7 +294,8 @@ struct BpRunCtx {
   index_t image_tiles;
   bool is_fx_domain;
   bool is_int16_mode;
-  bool apply_window;
+  RangeWindow window;
+  matx::TaylorWindowParams taylor_params;  // used when window == Taylor
   bool apply_bulk_mocomp;
   bool taylor_fast_add_third_order;
   SarBpPixelZMode pixel_z_mode;  // compile-time pixel-z assumption to apply
@@ -497,20 +522,106 @@ static int run_bp_device(std::array<PosTensor, NUM_UPLOAD_SLOTS> &blk_positions,
     return matx::slice(profiles_buf(slot), {0, 0}, {npulses, ctx.output_range_bins});
   };
 
-  // complex<float> FX samples are uploaded directly in complex64 mode, but are
-  // produced on the compute stream by the int16 conversion in int16 mode.
-  tensor_t<complex_t, 2> blk_compressed;
+  // Range compression of FX-domain input is
+  //
+  //   profiles = fftshift(FFT(pad(ifftshift(window * fx))))
+  //
+  // and is implemented with no separate data-movement passes:
+  //
+  //   - The FX samples are written straight into the FFT input buffer at their
+  //     ifftshifted positions. The zero padding between the two halves is never
+  //     written by the per-block work, and the out-of-place FFT does not
+  //     overwrite its input, so the buffer is zeroed once here.
+  //   - The output fftshift is folded into a per-sample weight. Rotating the
+  //     FFT output by h = floor(N/2) bins equals modulating its input by
+  //     exp(sgn * j*2*pi*p*h/N) at FFT input index p, where N = fft_size and the
+  //     transform's exponent sign is -sgn. FX sample n lands at
+  //     p = (n - ifft_shift) mod N, so the weight depends only on n. For even
+  //     N it is exactly (-1)^p.
+  //   - The inverse FFT's 1/N normalization is folded into the same weight, and
+  //     the inverse FFT is run unnormalized. For power-of-two N the scale is an
+  //     exact power of two.
+  //   - The window is multiplied into the weight as well, so the per-block
+  //     work is a single weighted, scattered write followed by the FFT.
+  //
+  // complex<float> FX samples are uploaded directly in complex64 mode. In
+  // int16 mode they are converted on the fly while being written into the FFT
+  // input, and blk_fx is only needed as the bulk mocomp output.
+  tensor_t<complex_t, 2> blk_padded_fx;
+  tensor_t<complex_t, 1> fx_weights;
   std::array<tensor_t<complex_t, 2>, NUM_UPLOAD_SLOTS> blk_fx;
   const int num_fx_bufs = ctx.is_int16_mode ? 1 : num_upload_slots;
   if (ctx.is_fx_domain) {
     make_tensor(
-        blk_compressed, {ctx.block_size, ctx.fft_size},
+        blk_padded_fx, {ctx.block_size, ctx.fft_size},
         matx::MATX_DEVICE_MEMORY);
-    for (int s = 0; s < num_fx_bufs; s++) {
-      make_tensor(
-          blk_fx[s], {ctx.block_size, ctx.num_samples_raw},
-          matx::MATX_DEVICE_MEMORY);
+    (blk_padded_fx = matx::zeros<complex_t>({ctx.block_size, ctx.fft_size})).run(ctx.exec);
+
+    if (!ctx.is_int16_mode || ctx.apply_bulk_mocomp) {
+      for (int s = 0; s < num_fx_bufs; s++) {
+        make_tensor(
+            blk_fx[s], {ctx.block_size, ctx.num_samples_raw},
+            matx::MATX_DEVICE_MEMORY);
+      }
     }
+
+    // fftshift modulation. The phase index is computed in 64-bit integer
+    // arithmetic so that p * rotation cannot overflow when index_t is 32 bits,
+    // and so that the even-N case (and quarter turns) are exact. Each weight,
+    // including the 1/N scale and the window, is formed in double and rounded
+    // to float once. main() rejects headers whose sgn is not -1 or +1.
+    const int64_t n_fft = static_cast<int64_t>(ctx.fft_size);
+    const int64_t rotation = n_fft / 2;
+    const int64_t shift = static_cast<int64_t>(ctx.ifft_shift);
+    const double sgn = (ctx.sgn == -1) ? -1.0 : 1.0;
+    const double scale = (ctx.sgn == -1) ? 1.0 / static_cast<double>(n_fft) : 1.0;
+    using complex_double_t = cuda::std::complex<double>;
+    std::vector<complex_double_t> h_weights(static_cast<size_t>(ctx.num_samples_raw));
+    for (int64_t n = 0; n < static_cast<int64_t>(ctx.num_samples_raw); n++) {
+      const int64_t p = ((n - shift) % n_fft + n_fft) % n_fft;
+      const int64_t r = (p * rotation) % n_fft;
+      double w_re;
+      double w_im;
+      if (r == 0) {
+        w_re = 1.0;
+        w_im = 0.0;
+      } else if (2 * r == n_fft) {
+        w_re = -1.0;
+        w_im = 0.0;
+      } else if (4 * r == n_fft) {
+        w_re = 0.0;
+        w_im = sgn;
+      } else if (4 * r == 3 * n_fft) {
+        w_re = 0.0;
+        w_im = -sgn;
+      } else {
+        const double phase = sgn * 2.0 * std::numbers::pi *
+                             static_cast<double>(r) / static_cast<double>(n_fft);
+        w_re = std::cos(phase);
+        w_im = std::sin(phase);
+      }
+      h_weights[static_cast<size_t>(n)] = complex_double_t(w_re * scale, w_im * scale);
+    }
+    auto weights_d = make_tensor<complex_double_t>({ctx.num_samples_raw}, matx::MATX_DEVICE_MEMORY);
+    MATX_CUDA_CHECK(cudaMemcpyAsync(
+        weights_d.Data(), h_weights.data(), h_weights.size() * sizeof(complex_double_t),
+        cudaMemcpyHostToDevice, ctx.stream));
+    // Fold in the window, evaluated in double. Bulk mocomp is a per-sample
+    // phase multiply, so the window commutes with it and is applied here in
+    // every mode.
+    using WindowShape = cuda::std::array<index_t, 1>;
+    if (ctx.window == RangeWindow::Hamming) {
+      (weights_d = weights_d * matx::hamming<0, WindowShape, double>({ctx.num_samples_raw}))
+          .run(ctx.exec);
+    } else if (ctx.window == RangeWindow::Taylor) {
+      (weights_d = weights_d * matx::taylor<0, double>({ctx.num_samples_raw}, ctx.taylor_params))
+          .run(ctx.exec);
+    }
+    make_tensor(fx_weights, {ctx.num_samples_raw}, matx::MATX_DEVICE_MEMORY);
+    (fx_weights = matx::as_complex_float(weights_d)).run(ctx.exec);
+    // h_weights is a pageable host buffer, and weights_d is a temporary; both
+    // go out of scope.
+    ctx.exec.sync();
   }
   auto fx_buf = [&](int slot) -> tensor_t<complex_t, 2> & {
     return blk_fx[slot % num_fx_bufs];
@@ -545,12 +656,9 @@ static int run_bp_device(std::array<PosTensor, NUM_UPLOAD_SLOTS> &blk_positions,
     }
   }
 
-  const bool window_in_conversion =
-      ctx.is_int16_mode && ctx.apply_window && !ctx.apply_bulk_mocomp;
-
-  // Convert int16 -> float, scale by AmpSF, (optionally window) and combine to
-  // complex<float>.
-  auto convert_int16 = [&](auto &cur_fx, int slot, index_t npulses) {
+  // int16 -> float, scaled by AmpSF and combined to complex<float>. Returns a
+  // lazy expression; nothing is materialized.
+  auto int16_samples = [&](int slot, index_t npulses) {
     auto cur_fx_i16 = matx::slice(blk_fx_i16[slot], {0, 0}, {npulses, ctx.num_samples_raw * 2});
     auto cur_ampsf = matx::slice(blk_ampsf[slot], {0}, {npulses});
     // Strided views: even indices = I, odd indices = Q
@@ -560,47 +668,77 @@ static int run_bp_device(std::array<PosTensor, NUM_UPLOAD_SLOTS> &blk_positions,
                               {npulses, ctx.num_samples_raw * 2}, {1, 2});
     // Broadcast ampsf across range samples
     auto ampsf_b = matx::clone<2>(cur_ampsf, {matxKeepDim, ctx.num_samples_raw});
-    if (window_in_conversion) {
-      auto win = matx::hamming<1>({npulses, ctx.num_samples_raw});
-      (cur_fx = matx::as_complex_float(
-          matx::as_float(i_vals) * ampsf_b * win,
-          matx::as_float(q_vals) * ampsf_b * win)).run(ctx.exec);
-    } else {
-      (cur_fx = matx::as_complex_float(
-          matx::as_float(i_vals) * ampsf_b,
-          matx::as_float(q_vals) * ampsf_b)).run(ctx.exec);
-    }
+    return matx::as_complex_float(
+        matx::as_float(i_vals) * ampsf_b,
+        matx::as_float(q_vals) * ampsf_b);
   };
 
-  auto apply_fx_preprocessing = [&](auto &cur_fx, auto &cur_rtm, int slot, index_t npulses, bool window_already_applied) {
-    if (!ctx.apply_bulk_mocomp) {
-      if (ctx.apply_window && !window_already_applied) {
-        (cur_fx = cur_fx * matx::hamming<1>({npulses, ctx.num_samples_raw})).run(ctx.exec);
-        MATX_CUDA_CHECK(cudaGetLastError());
-      }
-      return;
-    }
-
-    auto run_mocomp = [&](const auto &fx_input, const auto &mocomp_rtm) {
-      (cur_fx = matx::experimental::sar_bulk_mocomp(fx_input, mocomp_rtm, ctx.bulk_mocomp_params)).run(ctx.exec);
+  // Bulk motion compensation, in place on cur_fx. The window is applied
+  // afterwards with the fftshift weights.
+  auto run_bulk_mocomp = [&](auto &cur_fx, auto &cur_rtm, int slot, index_t npulses) {
+    auto run_mocomp = [&](const auto &mocomp_rtm) {
+      (cur_fx = matx::experimental::sar_bulk_mocomp(
+           cur_fx, mocomp_rtm, ctx.bulk_mocomp_params)).run(ctx.exec);
     };
 
     if constexpr (pos_is_fltflt) {
       auto cur_bulk_mocomp_rtm = matx::slice(
           blk_bulk_mocomp_rtm[slot], {0}, {npulses});
-      if (ctx.apply_window && !window_already_applied) {
-        run_mocomp(cur_fx * matx::hamming<1>({npulses, ctx.num_samples_raw}), cur_bulk_mocomp_rtm);
-      } else {
-        run_mocomp(cur_fx, cur_bulk_mocomp_rtm);
-      }
+      run_mocomp(cur_bulk_mocomp_rtm);
       (cur_rtm = matx::as_type<matx::fltflt>(cur_bulk_mocomp_rtm))
           .run(ctx.exec);
     } else {
-      if (ctx.apply_window && !window_already_applied) {
-        run_mocomp(cur_fx * matx::hamming<1>({npulses, ctx.num_samples_raw}), cur_rtm);
-      } else {
-        run_mocomp(cur_fx, cur_rtm);
+      run_mocomp(cur_rtm);
+    }
+  };
+
+  // Write weighted FX samples into the FFT input at their ifftshifted
+  // positions: samples [s, M) go to columns [0, M - s) and samples [0, s) go
+  // to columns [N - s, N). The zero padding in between is left untouched.
+  auto write_padded_fx = [&](auto &cur_padded, const auto &samples, index_t npulses) {
+    const index_t m = ctx.num_samples_raw;
+    const index_t s = ctx.ifft_shift;
+    const index_t n_fft = ctx.fft_size;
+    auto weighted = samples * matx::clone<2>(fx_weights, {npulses, matxKeepDim});
+    (matx::slice(cur_padded, {0, 0}, {npulses, m - s}) =
+         matx::slice(weighted, {0, s}, {npulses, m})).run(ctx.exec);
+    if (s > 0) {
+      (matx::slice(cur_padded, {0, n_fft - s}, {npulses, n_fft}) =
+           matx::slice(weighted, {0, 0}, {npulses, s})).run(ctx.exec);
+    }
+  };
+
+  // FX-domain range compression of one block into cur_profiles. The mocomp
+  // events, when given, bracket the bulk mocomp work for timing.
+  auto range_compress = [&](auto &cur_profiles, auto &cur_rtm, int slot, index_t npulses,
+                            cudaEvent_t mocomp_start, cudaEvent_t mocomp_stop) {
+    auto cur_padded = matx::slice(blk_padded_fx, {0, 0}, {npulses, ctx.fft_size});
+
+    if (ctx.apply_bulk_mocomp) {
+      auto cur_fx = fx_slice(slot, npulses);
+      if (ctx.is_int16_mode) {
+        (cur_fx = int16_samples(slot, npulses)).run(ctx.exec);
       }
+      if (mocomp_start != nullptr) {
+        MATX_CUDA_CHECK(cudaEventRecord(mocomp_start, ctx.stream));
+      }
+      run_bulk_mocomp(cur_fx, cur_rtm, slot, npulses);
+      if (mocomp_stop != nullptr) {
+        MATX_CUDA_CHECK(cudaEventRecord(mocomp_stop, ctx.stream));
+      }
+      write_padded_fx(cur_padded, cur_fx, npulses);
+    } else if (ctx.is_int16_mode) {
+      write_padded_fx(cur_padded, int16_samples(slot, npulses), npulses);
+    } else {
+      write_padded_fx(cur_padded, fx_slice(slot, npulses), npulses);
+    }
+
+    // IFFT (SGN=-1) or FFT (SGN=+1). The result is already fftshifted, and the
+    // inverse FFT's 1/N scale is already applied by the weights.
+    if (ctx.sgn == -1) {
+      (cur_profiles = matx::ifft(cur_padded, 0, matx::FFTNorm::FORWARD)).run(ctx.exec);
+    } else {
+      (cur_profiles = matx::fft(cur_padded)).run(ctx.exec);
     }
   };
 
@@ -676,29 +814,20 @@ static int run_bp_device(std::array<PosTensor, NUM_UPLOAD_SLOTS> &blk_positions,
         }
       }
       if (ctx.is_fx_domain) {
-        auto cur_fx = fx_slice(slot, npulses);
+        // Initialize the uploaded inputs to avoid uninitialized memory reads
+        // in warmup kernels.
         if (ctx.is_int16_mode) {
-          // Warmup int16 -> complex<float> conversion kernel
           auto cur_fx_i16 = matx::slice(blk_fx_i16[slot], {0, 0}, {npulses, ctx.num_samples_raw * 2});
           auto cur_ampsf = matx::slice(blk_ampsf[slot], {0}, {npulses});
           (cur_fx_i16 = static_cast<int16_t>(0)).run(ctx.exec);
           (cur_ampsf = 1.0f).run(ctx.exec);
-          convert_int16(cur_fx, slot, npulses);
         } else {
-          // Initialize cur_fx to avoid uninitialized memory reads in warmup
-          // kernels.
+          auto cur_fx = fx_slice(slot, npulses);
           (cur_fx = matx::zeros<complex_t>(
                {npulses, ctx.num_samples_raw}))
               .run(ctx.exec);
         }
-        apply_fx_preprocessing(cur_fx, cur_rtm, slot, npulses, window_in_conversion);
-        auto cur_compressed = matx::slice(blk_compressed, {0, 0}, {npulses, ctx.fft_size});
-        if (ctx.sgn == -1) {
-          (cur_compressed = matx::ifft(cur_profiles)).run(ctx.exec);
-        } else {
-          (cur_compressed = matx::fft(cur_profiles)).run(ctx.exec);
-        }
-        (cur_profiles = matx::fftshift1D(cur_compressed)).run(ctx.exec);
+        range_compress(cur_profiles, cur_rtm, slot, npulses, nullptr, nullptr);
       }
 
       run_bp_tiles(cur_profiles, cur_positions, cur_rtm, no_tile_callback);
@@ -883,61 +1012,9 @@ static int run_bp_device(std::array<PosTensor, NUM_UPLOAD_SLOTS> &blk_positions,
     auto cur_rtm       = rtm_slice(slot, npulses);
 
     if (ctx.is_fx_domain) {
-      auto cur_fx = fx_slice(slot, npulses);
-      if (ctx.is_int16_mode) {
-        convert_int16(cur_fx, slot, npulses);
-      }
-
-      if (ctx.apply_bulk_mocomp) {
-        MATX_CUDA_CHECK(cudaEventRecord(ev_mocomp_start[blk], ctx.stream));
-      }
-      apply_fx_preprocessing(cur_fx, cur_rtm, slot, npulses, window_in_conversion);
-      if (ctx.apply_bulk_mocomp) {
-        MATX_CUDA_CHECK(cudaEventRecord(ev_mocomp_stop[blk], ctx.stream));
-      }
-
-      // Zero only the padding region (middle of each row after ifftshift)
-      const index_t pad_size = ctx.fft_size - ctx.num_samples_raw;
-      if (pad_size > 0) {
-        MATX_CUDA_CHECK(cudaMemset2DAsync(
-            cur_profiles.Data() + (ctx.num_samples_raw - ctx.ifft_shift),
-            static_cast<size_t>(ctx.fft_size) * sizeof(complex_t),
-            0,
-            static_cast<size_t>(pad_size) * sizeof(complex_t),
-            static_cast<size_t>(npulses),
-            ctx.stream));
-      }
-
-      // Second half of spectrum (indices shift..N-1) -> start of padded row
-      MATX_CUDA_CHECK(cudaMemcpy2DAsync(
-          cur_profiles.Data(),
-          static_cast<size_t>(ctx.fft_size) * sizeof(complex_t),
-          cur_fx.Data() + ctx.ifft_shift,
-          static_cast<size_t>(ctx.num_samples_raw) * sizeof(complex_t),
-          static_cast<size_t>(ctx.num_samples_raw - ctx.ifft_shift) * sizeof(complex_t),
-          static_cast<size_t>(npulses),
-          cudaMemcpyDeviceToDevice, ctx.stream));
-
-      // First half of spectrum (indices 0..shift-1) -> end of padded row
-      MATX_CUDA_CHECK(cudaMemcpy2DAsync(
-          cur_profiles.Data() + (ctx.fft_size - ctx.ifft_shift),
-          static_cast<size_t>(ctx.fft_size) * sizeof(complex_t),
-          cur_fx.Data(),
-          static_cast<size_t>(ctx.num_samples_raw) * sizeof(complex_t),
-          static_cast<size_t>(ctx.ifft_shift) * sizeof(complex_t),
-          static_cast<size_t>(npulses),
-          cudaMemcpyDeviceToDevice, ctx.stream));
-
-      // IFFT (SGN=-1) or FFT (SGN=+1) for range compression
-      auto cur_compressed = matx::slice(blk_compressed, {0, 0}, {npulses, ctx.fft_size});
-      if (ctx.sgn == -1) {
-        (cur_compressed = matx::ifft(cur_profiles)).run(ctx.exec);
-      } else {
-        (cur_compressed = matx::fft(cur_profiles)).run(ctx.exec);
-      }
-
-      // fftshift to centre the zero-range bin (write result back to cur_profiles)
-      (cur_profiles = matx::fftshift1D(cur_compressed)).run(ctx.exec);
+      range_compress(cur_profiles, cur_rtm, slot, npulses,
+                     ctx.apply_bulk_mocomp ? ev_mocomp_start[blk] : nullptr,
+                     ctx.apply_bulk_mocomp ? ev_mocomp_stop[blk] : nullptr);
     }
 
     // Backprojection - accumulates this block's pulses into image. During the
@@ -1004,8 +1081,7 @@ static int run_bp_device(std::array<PosTensor, NUM_UPLOAD_SLOTS> &blk_positions,
             << " (num_pixels * num_pulses)" << std::endl;
   if (ctx.apply_bulk_mocomp) {
     std::cout << "Bulk mocomp          : " << mocomp_elapsed_ms / 1000.0f
-              << " s (" << (ctx.apply_window ? "mocomp+window" : "mocomp only")
-              << ") (summed over " << ctx.num_blocks << " block"
+              << " s (summed over " << ctx.num_blocks << " block"
               << (ctx.num_blocks > 1 ? "s" : "") << ")" << std::endl;
   }
   std::cout << "BP kernels only      : " << bp_elapsed_ms / 1000.0f << " s (summed over "
@@ -1145,7 +1221,9 @@ int main(int argc, char **argv) {
         << "                          reports correlation-map and signal-to-error metrics\n"
         << "  --cmap <file>          Write the correlation map (raw float32) to a file (requires --gold)\n"
         << "  -u, --upsample <N>     Range upsample factor via zero-padding (default: 1)\n"
-        << "  -w, --window <type>    Window for range compression: hamming, none (default: hamming)\n"
+        << "  -w, --window <type>    Window for range compression: hamming, taylor, none (default: hamming)\n"
+        << "  --taylor-nbar <N>      Taylor window nearly constant-level sidelobes, 1-24 (default: 4)\n"
+        << "  --taylor-sll <dB>      Taylor window sidelobe suppression in dB, > 0 (default: 30)\n"
         << "  --bulk-mocomp         Apply bulk motion compensation using per-pulse range_to_mcp\n"
         << "  -b, --block-size <N|0|auto|all>\n"
         << "                          Pulses per block; 0/all use all pulses, auto jointly tunes blocking and tiling for L2 (default: auto)\n"
@@ -1170,6 +1248,8 @@ int main(int argc, char **argv) {
   std::string cmap_file;
   int upsample_factor = 1;
   std::string window_type = "hamming";
+  matx::TaylorWindowParams taylor_params{};
+  bool taylor_params_given = false;
   std::string block_size_arg = "auto";
   std::string image_tiles_arg = "auto";
   bool do_warmup = false;
@@ -1199,6 +1279,22 @@ int main(int argc, char **argv) {
     } else if (std::strcmp(argv[i], "-w") == 0 || std::strcmp(argv[i], "--window") == 0) {
       if (!needs_value(i)) return 1;
       window_type = argv[++i];
+    } else if (std::strcmp(argv[i], "--taylor-nbar") == 0) {
+      if (!needs_value(i)) return 1;
+      if (!parse_index_arg(argv[++i], taylor_params.nbar, 1)) {
+        std::cerr << "ERROR: invalid --taylor-nbar '" << argv[i] << "'" << std::endl;
+        print_usage();
+        return 1;
+      }
+      taylor_params_given = true;
+    } else if (std::strcmp(argv[i], "--taylor-sll") == 0) {
+      if (!needs_value(i)) return 1;
+      if (!parse_double_arg(argv[++i], taylor_params.sll)) {
+        std::cerr << "ERROR: invalid --taylor-sll '" << argv[i] << "'" << std::endl;
+        print_usage();
+        return 1;
+      }
+      taylor_params_given = true;
     } else if (std::strcmp(argv[i], "-o") == 0 || std::strcmp(argv[i], "--output") == 0) {
       if (!needs_value(i)) return 1;
       output_file = argv[++i];
@@ -1283,6 +1379,48 @@ int main(int argc, char **argv) {
     return 1;
   }
 
+  RangeWindow window = RangeWindow::Hamming;
+  if (window_type == "hamming") {
+    window = RangeWindow::Hamming;
+  } else if (window_type == "taylor") {
+    window = RangeWindow::Taylor;
+  } else if (window_type == "none") {
+    window = RangeWindow::None;
+  } else {
+    std::cerr << "ERROR: invalid --window '" << window_type
+              << "' (use hamming, taylor, or none)" << std::endl;
+    print_usage();
+    return 1;
+  }
+  if (taylor_params_given && window != RangeWindow::Taylor) {
+    std::cerr << "ERROR: --taylor-nbar and --taylor-sll require --window taylor" << std::endl;
+    print_usage();
+    return 1;
+  }
+  // 24 is matx::taylor()'s default MaxNbar, the largest nbar it supports.
+  if (taylor_params.nbar < 1 || taylor_params.nbar > 24) {
+    std::cerr << "ERROR: --taylor-nbar must be in [1, 24]" << std::endl;
+    print_usage();
+    return 1;
+  }
+  // matx::taylor() also requires 10^(sll/20) to be finite (sll below about 6165 dB).
+  const double taylor_b = std::pow(10.0, taylor_params.sll / 20.0);
+  if (!(taylor_params.sll > 0.0) || !std::isfinite(taylor_b)) {
+    std::cerr << "ERROR: --taylor-sll must be positive and below about 6165 dB" << std::endl;
+    print_usage();
+    return 1;
+  }
+  if (window == RangeWindow::Taylor) {
+    // A taper that falls off monotonically needs nbar >= 2*A^2 + 0.5.
+    const double taylor_a = std::acosh(taylor_b) / std::numbers::pi;
+    const double min_nbar = 2.0 * taylor_a * taylor_a + 0.5;
+    if (static_cast<double>(taylor_params.nbar) < min_nbar) {
+      std::cerr << "WARNING: --taylor-nbar " << taylor_params.nbar << " is below "
+                << min_nbar << " for --taylor-sll " << taylor_params.sll
+                << " dB; the window will not taper monotonically" << std::endl;
+    }
+  }
+
   if (pixel_z_arg == "variable") {
     pixel_z_mode = SarBpPixelZMode::Variable;
   } else if (pixel_z_arg == "zero") {
@@ -1323,6 +1461,11 @@ int main(int argc, char **argv) {
               << ", samples=" << num_range_bins
               << ", image=" << image_height << " x " << image_width
               << std::endl;
+    return 1;
+  }
+
+  if (sgn != -1 && sgn != 1) {
+    std::cerr << "ERROR: invalid .sarbp sgn: " << sgn << " (must be -1 or +1)" << std::endl;
     return 1;
   }
 
@@ -1530,7 +1673,11 @@ int main(int argc, char **argv) {
     std::cout << "  Upsample factor: " << upsample_factor << std::endl;
     std::cout << "  FFT size       : " << fft_size << std::endl;
     std::cout << "  SGN            : " << sgn << std::endl;
-    std::cout << "  Window         : " << window_type << std::endl;
+    std::cout << "  Window         : " << window_type;
+    if (window == RangeWindow::Taylor) {
+      std::cout << " (nbar=" << taylor_params.nbar << ", sll=" << taylor_params.sll << " dB)";
+    }
+    std::cout << std::endl;
     std::cout << "  Output bins    : " << fft_size << std::endl;
     std::cout << "  del_r          : " << hdr.del_r << " -> " << del_r << " m" << std::endl;
   } else if (upsample_factor > 1) {
@@ -1670,7 +1817,6 @@ int main(int argc, char **argv) {
   MATX_CUDA_CHECK(cudaStreamCreate(&stream));
   cudaExecutor exec{stream};
 
-  const bool apply_window = is_fx_domain && window_type != "none";
   const index_t ifft_shift = num_samples_raw / 2;
 
   // Bundle non-tensor state for run_bp_device(). The platform-positions and
@@ -1701,7 +1847,8 @@ int main(int argc, char **argv) {
       .image_tiles           = image_tiles,
       .is_fx_domain          = is_fx_domain,
       .is_int16_mode         = is_int16_mode,
-      .apply_window          = apply_window,
+      .window                = is_fx_domain ? window : RangeWindow::None,
+      .taylor_params         = taylor_params,
       .apply_bulk_mocomp     = apply_bulk_mocomp,
       .taylor_fast_add_third_order = taylor_fast_add_third_order,
       .pixel_z_mode          = pixel_z_mode,

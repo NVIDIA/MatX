@@ -114,7 +114,9 @@ real/imag, row-major), written to `output_image.raw` in this example.
 |------|-------------|
 | `-o OUTPUT` | Output file path (default: input with `.raw` extension) |
 | `-u N` | Range upsample factor via zero-padding (default: 1) |
-| `-w {hamming,none}` | Window for range compression (default: hamming) |
+| `-w {hamming,taylor,none}` | Window for range compression (default: hamming) |
+| `--taylor-nbar N` | Number of nearly constant-level sidelobes for `-w taylor`, 1-24 (default: 4) |
+| `--taylor-sll DB` | Sidelobe suppression in dB for `-w taylor` (default: 30) |
 | `--bulk-mocomp` | Apply bulk motion compensation to FX-domain input using the per-pulse `range_to_mcp` values stored by the CPHD converter |
 | `-b {auto,all,0,N}` | Pulses per processing block. `auto` jointly tunes pulse blocking and automatic image tiling for the GPU's L2 cache; `all` and `0` use all pulses (default: auto) |
 | `--image-tiles {auto,N}` | Process the image as an N x N grid. `auto` jointly tunes image tiling and automatic pulse blocking for the GPU's L2 cache (default: auto) |
@@ -130,6 +132,13 @@ real/imag, row-major), written to `output_image.raw` in this example.
 compensated to the stored reference ranges. Applying bulk motion compensation
 to data that has already been motion compensated is not idempotent and results
 in an incorrect phase reference.
+
+### Range compression
+
+For FX-domain input, each pulse is range compressed as
+`fftshift(fft(zero_pad(ifftshift(window * fx))))`, with an inverse FFT when the header's `sgn` is -1. The `-u`
+zero padding is placed between the two halves of the ifftshifted samples. The fftshift is folded into the
+window weights via a phase ramp to avoid re-reading the data.
 
 ### Transfer overlap
 
