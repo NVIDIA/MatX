@@ -773,6 +773,147 @@ TYPED_TEST(SarBpTestDoubleType, PixelZIsFixedNonZeroHeight)
   MATX_EXIT_HANDLER();
 }
 
+// Pixel coordinates kilometres from the origin are not representable in fp32:
+// here the target pixel's x and y each round by about 0.12 mm, and its height by
+// about 4 um. With double voxel locations, the compute types that form the
+// pulse-to-pixel range in fp64 or fltflt (Mixed and FloatFloat) must use the
+// full-precision coordinates. Rounding them to fp32 shifts the pixel enough to
+// add a phase error of several hundredths of a radian per pulse at X band, which
+// defocuses the target well beyond the thresholds below.
+TYPED_TEST(SarBpTestDoubleType, DoubleVoxelLocationsKeepFullPrecision)
+{
+  MATX_ENTER_HANDLER();
+
+  constexpr matx::index_t image_width = 64;
+  constexpr matx::index_t image_height = 64;
+  const matx::index_t num_pulses = 128;
+  const matx::index_t num_range_bins = 128;
+
+  const double pix_dx = 0.5;
+  const double pix_dy = 0.5;
+  // The scene centre and pixel height are chosen so that the target pixel's
+  // coordinates have close to the largest possible fp32 rounding error.
+  const double scene_x = 3014.3302;
+  const double scene_y = 2719.9198;
+  const double pixel_z = 100.766819;
+  const double pix_x_min = scene_x - pix_dx * static_cast<double>(image_width / 2);
+  const double pix_y_min = scene_y - pix_dy * static_cast<double>(image_height / 2);
+  const double target_x = pix_x_min + pix_dx * static_cast<double>(image_width / 4);
+  const double target_y = pix_y_min + pix_dy * static_cast<double>(image_height / 4);
+
+  const auto f32_round_err = [](double v) {
+    return std::abs(static_cast<double>(static_cast<float>(v)) - v);
+  };
+  ASSERT_GT(f32_round_err(target_x), 1.0e-4);
+  ASSERT_GT(f32_round_err(target_y), 1.0e-4);
+  ASSERT_GT(f32_round_err(pixel_z), 3.0e-6);
+
+  matx::SarBpParams bp_params{};
+  bp_params.del_r = ::sqrt((image_width * pix_dx) * (image_width * pix_dx) +
+                           (image_height * pix_dy) * (image_height * pix_dy)) / num_range_bins;
+  bp_params.center_frequency = 10.0e9;
+  const double bin_offset = static_cast<double>(num_range_bins / 2);
+
+  // Ideal point-target range profiles for the target at (target_x, target_y,
+  // pixel_z), with the motion-compensation point at the scene centre.
+  std::vector<double3> h_apc(num_pulses);
+  std::vector<double> h_rtm(num_pulses);
+  std::vector<cuda::std::complex<float>> h_rp(num_pulses * num_range_bins, cuda::std::complex<float>{0.0f, 0.0f});
+  for (matx::index_t i = 0; i < num_pulses; i++) {
+    h_apc[i] = double3{scene_x - 20.0 + 40.0 * static_cast<double>(i) / static_cast<double>(num_pulses),
+                       scene_y - 7000.0, 7000.0};
+    const double mx = h_apc[i].x - scene_x;
+    const double my = h_apc[i].y - scene_y;
+    const double mz = h_apc[i].z - pixel_z;
+    h_rtm[i] = ::sqrt(mx * mx + my * my + mz * mz);
+    const double tx = h_apc[i].x - target_x;
+    const double ty = h_apc[i].y - target_y;
+    const double dR = ::sqrt(tx * tx + ty * ty + mz * mz) - h_rtm[i];
+    const double ideal_bin = dR / bp_params.del_r + bin_offset;
+    const double ideal_phase =
+        -4.0 * cuda::std::numbers::pi * dR *
+        (bp_params.center_frequency / matx::constants::speed_of_light);
+    double sinx, cosx;
+    ::sincos(ideal_phase, &sinx, &cosx);
+    const cuda::std::complex<float> sample{static_cast<float>(cosx), static_cast<float>(sinx)};
+    const int b = static_cast<int>(floor(ideal_bin));
+    ASSERT_TRUE(b >= 0 && b + 1 < num_range_bins);
+    h_rp[i * num_range_bins + b] = sample;
+    h_rp[i * num_range_bins + b + 1] = sample;
+  }
+
+  auto platform_positions = matx::make_tensor<double3>({num_pulses});
+  auto range_to_mcp = matx::make_tensor<double>({num_pulses});
+  auto range_profiles = matx::make_tensor<cuda::std::complex<float>>({num_pulses, num_range_bins});
+  MATX_CUDA_CHECK(cudaMemcpy(platform_positions.Data(), h_apc.data(), num_pulses * sizeof(double3), cudaMemcpyHostToDevice));
+  MATX_CUDA_CHECK(cudaMemcpy(range_to_mcp.Data(), h_rtm.data(), num_pulses * sizeof(double), cudaMemcpyHostToDevice));
+  MATX_CUDA_CHECK(cudaMemcpy(range_profiles.Data(), h_rp.data(), h_rp.size() * sizeof(cuda::std::complex<float>), cudaMemcpyHostToDevice));
+
+  auto px = matx::linspace<double>(pix_x_min, pix_x_min + (image_width - 1) * pix_dx, image_width);
+  auto py = matx::linspace<double>(pix_y_min, pix_y_min + (image_height - 1) * pix_dy, image_height);
+  auto voxel_locations = matx::zipvec(matx::clone<2>(px, {image_height, matx::matxKeepDim}),
+                                      matx::clone<2>(py, {matx::matxKeepDim, image_width}),
+                                      pixel_z * matx::ones<double>({image_height, image_width}));
+  auto zero_image = matx::zeros<cuda::std::complex<float>>({image_height, image_width});
+  auto image = matx::make_tensor<cuda::std::complex<float>>({image_height, image_width});
+
+  const double f32_accum_re_thresh = SarBpF32FocusThreshold(num_pulses);
+  auto check_target = [&](double re_thresh, double im_thresh) {
+    const auto v = image(image_height / 4, image_width / 4);
+    EXPECT_NEAR(static_cast<double>(num_pulses), static_cast<double>(v.real()), re_thresh);
+    EXPECT_NEAR(0.0, static_cast<double>(v.imag()), im_thresh);
+  };
+
+  // The Double compute type checks that the data model matches the grid; the
+  // fp32 range profiles and image limit it to fp32-level agreement.
+  {
+    SCOPED_TRACE("Double");
+    bp_params.compute_type = matx::SarBpComputeType::Double;
+    bp_params.features = matx::SarBpFeature::None;
+    (image = matx::experimental::sar_bp(zero_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, bp_params)).run(this->exec);
+    this->exec.sync();
+    check_target(f32_accum_re_thresh, 1.0e-4);
+  }
+
+  // Each compute type runs with per-pixel z (the default) and with
+  // PropSarBpPixelZIsFixed, which caches the per-pulse z term from the fixed
+  // pixel height. Mixed also runs without the phase LUT, which takes the direct
+  // range path.
+  struct Case {
+    const char *name;
+    matx::SarBpComputeType compute_type;
+    matx::SarBpFeature features;
+    double re_thresh;
+    double im_thresh;
+  };
+  const Case cases[] = {
+    {"Mixed no PhaseLUT", matx::SarBpComputeType::Mixed, matx::SarBpFeature::None, f32_accum_re_thresh, 1.0e-4},
+    {"Mixed PhaseLUT", matx::SarBpComputeType::Mixed, matx::SarBpFeature::PhaseLUTOptimization, f32_accum_re_thresh, 1.0e-2},
+    {"FloatFloat", matx::SarBpComputeType::FloatFloat, matx::SarBpFeature::PhaseLUTOptimization, f32_accum_re_thresh, 1.0e-2},
+    {"TaylorFast", matx::SarBpComputeType::TaylorFast, matx::SarBpFeature::PhaseLUTOptimization, 1.0e-3, 1.8e-2},
+  };
+  for (const auto &c : cases) {
+    SCOPED_TRACE(c.name);
+    bp_params.compute_type = c.compute_type;
+    bp_params.features = c.features;
+    {
+      SCOPED_TRACE("variable pixel z");
+      (image = matx::experimental::sar_bp(zero_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, bp_params)).run(this->exec);
+      this->exec.sync();
+      check_target(c.re_thresh, c.im_thresh);
+    }
+    {
+      SCOPED_TRACE("PropSarBpPixelZIsFixed");
+      (image = matx::experimental::sar_bp(zero_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, bp_params)
+        .props<matx::PropSarBpPixelZIsFixed>()).run(this->exec);
+      this->exec.sync();
+      check_target(c.re_thresh, c.im_thresh);
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
 // Verify sar_bp forwards PreRun/PostRun to ALL of its operands by wrapping each
 // in a lifecycle probe.
 TYPED_TEST(SarBpTestNonComplexNonHalfFloatTypes, RangeToMcpOperatorInput)

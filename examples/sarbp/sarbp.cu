@@ -1687,13 +1687,13 @@ int main(int argc, char **argv) {
   // -------------------------------------------------------------------
   // Construct voxel grid
   // -------------------------------------------------------------------
-  auto pix_coords_x = matx::linspace<float>(
-      static_cast<float>(hdr.voxel_start_x),
-      static_cast<float>(voxel_end_x),
+  auto pix_coords_x = matx::linspace<double>(
+      static_cast<double>(hdr.voxel_start_x),
+      static_cast<double>(voxel_end_x),
       image_width);
-  auto pix_coords_y = matx::linspace<float>(
-      static_cast<float>(hdr.voxel_start_y),
-      static_cast<float>(voxel_end_y),
+  auto pix_coords_y = matx::linspace<double>(
+      static_cast<double>(hdr.voxel_start_y),
+      static_cast<double>(voxel_end_y),
       image_height);
 
   auto pix_coords_xclone = matx::clone<2>(pix_coords_x, {image_height, matxKeepDim});
@@ -1701,7 +1701,7 @@ int main(int argc, char **argv) {
 
   auto voxel_locations = matx::zipvec(
       pix_coords_xclone, pix_coords_yclone,
-      matx::zeros<float>({image_height, image_width}));
+      matx::zeros<double>({image_height, image_width}));
 
   // -------------------------------------------------------------------
   // Configure sar_bp parameters
