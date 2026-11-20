@@ -351,6 +351,30 @@ TYPED_TEST(ReductionTestsFloatNonComplex, Softmax)
   MATX_EXIT_HANDLER();
 }
 
+// softmax over a leading dimension. The input is not square, so the per-column
+// maximum cannot line up with the wrong axis by accident.
+TEST(ReductionTests, SoftmaxDim0)
+{
+  MATX_ENTER_HANDLER();
+  cudaExecutor exec{};
+
+  auto in = make_tensor<float>({3, 2});
+  in.SetVals({{0, 1}, {3, 0}, {1, 5}});
+  auto out = make_tensor<float>({3, 2});
+  (out = softmax(in, {0})).run(exec);
+  exec.sync();
+
+  // scipy.special.softmax(in, axis=0)
+  const float expected[3][2] = {{0.042010f, 0.017868f}, {0.843795f, 0.006573f}, {0.114195f, 0.975559f}};
+  for (index_t r = 0; r < 3; r++) {
+    for (index_t c = 0; c < 2; c++) {
+      ASSERT_NEAR(out(r, c), expected[r][c], 1e-5) << "at " << r << ", " << c;
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, PermutedReduce)
 {
   MATX_ENTER_HANDLER();
