@@ -327,23 +327,46 @@ TEST(NormalizeTests, NormalizeDim1)
   in.SetVals({{1, 2, 3}, {10, 20, 40}});
   auto out = make_tensor<float>({2, 3});
 
+  const auto check = [&out](const float (&expected)[2][3], const char *what) {
+    for (index_t r = 0; r < 2; r++) {
+      for (index_t c = 0; c < 3; c++) {
+        ASSERT_NEAR(out(r, c), expected[r][c], 1e-4) << what << " at " << r << ", " << c;
+      }
+    }
+  };
+
   (out = normalize<1>(in, NORMALIZE_RANGE::CENTER)).run(exec);
   exec.sync();
   const float center[2][3] = {{-1.0f, 0.0f, 1.0f}, {-40.0f / 3, -10.0f / 3, 50.0f / 3}};
-  for (index_t r = 0; r < 2; r++) {
-    for (index_t c = 0; c < 3; c++) {
-      ASSERT_NEAR(out(r, c), center[r][c], 1e-4) << "center at " << r << ", " << c;
-    }
-  }
+  check(center, "center");
 
   (out = normalize<1>(in, NORMALIZE_RANGE::RANGE, 0.0f, 1.0f)).run(exec);
   exec.sync();
   const float range[2][3] = {{0.0f, 0.5f, 1.0f}, {0.0f, 1.0f / 3, 1.0f}};
-  for (index_t r = 0; r < 2; r++) {
-    for (index_t c = 0; c < 3; c++) {
-      ASSERT_NEAR(out(r, c), range[r][c], 1e-4) << "range at " << r << ", " << c;
-    }
-  }
+  check(range, "range");
+
+  // Row means are 2 and 70/3, sample standard deviations 1 and sqrt(700/3)
+  (out = normalize<1>(in, NORMALIZE_RANGE::ZSCORE)).run(exec);
+  exec.sync();
+  const float zscore[2][3] = {{-1.0f, 0.0f, 1.0f}, {-0.872872f, -0.218218f, 1.091089f}};
+  check(zscore, "zscore");
+
+  (out = normalize<1>(in, NORMALIZE_RANGE::SCALE)).run(exec);
+  exec.sync();
+  const float scale[2][3] = {{1.0f, 2.0f, 3.0f}, {0.654654f, 1.309307f, 2.618615f}};
+  check(scale, "scale");
+
+  // max norm: row maxima are 3 and 40
+  (out = normalize<1>(in, NORMALIZE_RANGE::NORM)).run(exec);
+  exec.sync();
+  const float maxnorm[2][3] = {{1.0f / 3, 2.0f / 3, 1.0f}, {0.25f, 0.5f, 1.0f}};
+  check(maxnorm, "max norm");
+
+  // L2 norm: row norms are sqrt(14) and sqrt(2100)
+  (out = normalize<1>(in, NORMALIZE_RANGE::NORM, 2.0f)).run(exec);
+  exec.sync();
+  const float l2norm[2][3] = {{0.267261f, 0.534522f, 0.801784f}, {0.218218f, 0.436436f, 0.872872f}};
+  check(l2norm, "l2 norm");
 
   MATX_EXIT_HANDLER();
 }
