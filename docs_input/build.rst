@@ -61,6 +61,9 @@ server or pre-populate the client cache on an internet-enabled system before tra
 
 System Requirements
 -------------------
+
+Configuring the MatX source tree requires `CMake <https://cmake.org/>`_ 3.30.4 or later.
+
 **Linux**: MatX requires **CUDA 12.2.1** or higher, and **g++ 9.3+**, **clang 17+**, or **nvc++ 24.5** for the host compiler. See the CUDA toolkit documentation
 for supported host compilers. Other requirements for optional components are listed below.
 
@@ -77,7 +80,6 @@ Required Third-party Dependencies
 
 Optional Third-party Dependencies
 ---------------------------------
-- `CMake <https://cmake.org/>`_ 3.30.4+ (Required for running unit tests, benchmarks, or examples)
 - `GoogleTest <https://github.com/google/googletest>`_ 1.11.0+ (Required to run unit tests)
 - `pybind11 <https://github.com/pybind/pybind11>`_ 3.0.3+ (Required for file I/O and some unit tests)
 - `nvbench <https://github.com/NVIDIA/nvbench>`_ tag ``python-0.2.0`` / commit dc59f98 (Required to run benchmarks)
