@@ -272,6 +272,36 @@ TEST(InterpTests, Interp)
   MATX_EXIT_HANDLER();
 }
 
+// With three sample points both not-a-knot end conditions are the same equation, so
+// the spline is the parabola through the points (this is what SciPy's CubicSpline gives)
+TEST(InterpTests, InterpSplineThreePoints)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = double;
+  cudaExecutor exec{};
+
+  auto x = make_tensor<TestType>({3});
+  x.SetVals({0.0, 1.0, 3.0});
+  auto v = make_tensor<TestType>({3});
+  v.SetVals({0.0, 2.0, 1.0});
+  auto xq = make_tensor<TestType>({5});
+  xq.SetVals({0.0, 0.5, 2.0, 2.5, 3.0});
+
+  // p(x) = (17x - 5x^2) / 6
+  auto expected = make_tensor<TestType>({5});
+  expected.SetVals({0.0, 29.0 / 24.0, 7.0 / 3.0, 15.0 / 8.0, 1.0});
+
+  auto out = make_tensor<TestType>({xq.Size(0)});
+  (out = interp1(x, v, xq, InterpMethod::SPLINE)).run(exec);
+  exec.sync();
+
+  for (index_t i = 0; i < xq.Size(0); i++) {
+    ASSERT_NEAR(out(i), expected(i), 1e-9) << "mismatch at index " << i;
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
 // Verify that interp1 forwards PreRun/PostRun to ALL of its operands (sample
 // points, sample values, query points) by wrapping each one in a lifecycle
 // probe. A single invocation covers every forwarded operand.

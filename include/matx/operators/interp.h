@@ -106,9 +106,18 @@ namespace matx {
             v_val_type delta1 = (v2 - v1) / h1;
 
             dl_(indices...) = static_cast<typename O::value_type>(0);
-            d_(indices...) = h1;
-            du_(indices...) = h1 + h0;
-            b_(indices...) = ((2*h1 + 3*h0)*h1*delta0 + h0*h0*delta1) / (h1 + h0);
+            if (x_.Size(AXIS_X) == 3) {
+              // With three points both not-a-knot conditions are the same equation and the
+              // system is singular. Fit the parabola through the points instead, as SciPy does.
+              d_(indices...) = static_cast<typename O::value_type>(1);
+              du_(indices...) = static_cast<typename O::value_type>(1);
+              b_(indices...) = 2 * delta0;
+            }
+            else {
+              d_(indices...) = h1;
+              du_(indices...) = h1 + h0;
+              b_(indices...) = ((2*h1 + 3*h0)*h1*delta0 + h0*h0*delta1) / (h1 + h0);
+            }
           }
           else if (idxInterp == x_.Size(AXIS_X) - 1) { // right boundary condition
             idx0[AXIS] = idxInterp - 2;
@@ -128,10 +137,17 @@ namespace matx {
             v_val_type delta0 = (v1 - v0) / h0;
             v_val_type delta1 = (v2 - v1) / h1;
 
-            dl_(indices...) = h0 + h1;
-            d_(indices...) = h0;
+            if (x_.Size(AXIS_X) == 3) {
+              dl_(indices...) = static_cast<typename O::value_type>(1);
+              d_(indices...) = static_cast<typename O::value_type>(1);
+              b_(indices...) = 2 * delta1;
+            }
+            else {
+              dl_(indices...) = h0 + h1;
+              d_(indices...) = h0;
+              b_(indices...) = ((2*h0 + 3*h1)*h0*delta1 + h1*h1*delta0) / (h0 + h1);
+            }
             du_(indices...) = static_cast<typename O::value_type>(0);
-            b_(indices...) = ((2*h0 + 3*h1)*h0*delta1 + h1*h1*delta0) / (h0 + h1);
           }
           else { // interior points
             idx0[AXIS] = idxInterp - 1;
