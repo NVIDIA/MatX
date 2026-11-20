@@ -420,19 +420,12 @@ void __MATX_INLINE__ softmax_impl(OutType dest, const InType &in, PermDims dims,
 
   // With the sum calculated, we have a tensor that's not compatible in sizes with the new one for dividing.
   // We need to clone the summed tensor on the appropriate dims for the final divide.
+  // The reduced axes are the last dims.size() entries of perm, in the order the caller gave them.
   cuda::std::array<index_t, InType::Rank()> clone_dims;
-  int axis_ptr = 0;
+  clone_dims.fill(matxKeepDim);
   MATX_LOOP_UNROLL
-  for (int r = 0; r < InType::Rank(); r++) {
-    if (axis_ptr >= 0 && dims[axis_ptr] == r) {
-      clone_dims[r] = in.Size(r);
-      if (static_cast<decltype(dims.size())>(++axis_ptr) == dims.size()) {
-        axis_ptr = -1;
-      }
-    }
-    else {
-      clone_dims[r] = matxKeepDim;
-    }
+  for (int r = InType::Rank() - (int)dims.size(); r < InType::Rank(); r++) {
+    clone_dims[perm[r]] = in.Size(perm[r]);
   }
 
   auto tmp_sum = make_tensor<typename InType::value_type>(red_shape, MATX_ASYNC_DEVICE_MEMORY, stream);

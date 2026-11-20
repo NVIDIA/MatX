@@ -375,6 +375,61 @@ TEST(ReductionTests, SoftmaxDim0)
   MATX_EXIT_HANDLER();
 }
 
+// softmax over two axes of a rank-3 tensor. The axes must give the same result in either order.
+TEST(ReductionTests, SoftmaxMultiAxis)
+{
+  MATX_ENTER_HANDLER();
+  cudaExecutor exec{};
+
+  auto in = make_tensor<float>({2, 3, 4});
+  for (index_t i = 0; i < 2; i++) {
+    for (index_t j = 0; j < 3; j++) {
+      for (index_t k = 0; k < 4; k++) {
+        in(i, j, k) = static_cast<float>((i * 7 + j * 5 + k * 3) % 11) * 0.25f;
+      }
+    }
+  }
+
+  // Reference: for each j, softmax over the 2 x 4 values in(:, j, :)
+  float expected[2][3][4];
+  for (index_t j = 0; j < 3; j++) {
+    float mx = in(0, j, 0);
+    for (index_t i = 0; i < 2; i++) {
+      for (index_t k = 0; k < 4; k++) {
+        mx = std::max(mx, in(i, j, k));
+      }
+    }
+    float sum = 0;
+    for (index_t i = 0; i < 2; i++) {
+      for (index_t k = 0; k < 4; k++) {
+        sum += std::exp(in(i, j, k) - mx);
+      }
+    }
+    for (index_t i = 0; i < 2; i++) {
+      for (index_t k = 0; k < 4; k++) {
+        expected[i][j][k] = std::exp(in(i, j, k) - mx) / sum;
+      }
+    }
+  }
+
+  auto out02 = make_tensor<float>({2, 3, 4});
+  auto out20 = make_tensor<float>({2, 3, 4});
+  (out02 = softmax(in, {0, 2})).run(exec);
+  (out20 = softmax(in, {2, 0})).run(exec);
+  exec.sync();
+
+  for (index_t i = 0; i < 2; i++) {
+    for (index_t j = 0; j < 3; j++) {
+      for (index_t k = 0; k < 4; k++) {
+        ASSERT_NEAR(out02(i, j, k), expected[i][j][k], 1e-5) << "{0, 2} at " << i << ", " << j << ", " << k;
+        ASSERT_NEAR(out20(i, j, k), expected[i][j][k], 1e-5) << "{2, 0} at " << i << ", " << j << ", " << k;
+      }
+    }
+  }
+
+  MATX_EXIT_HANDLER();
+}
+
 TYPED_TEST(ReductionTestsFloatNonComplexNonHalfAllExecs, PermutedReduce)
 {
   MATX_ENTER_HANDLER();
