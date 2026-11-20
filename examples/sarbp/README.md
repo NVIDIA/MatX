@@ -136,7 +136,7 @@ in an incorrect phase reference.
 ### Range compression
 
 For FX-domain input, each pulse is range compressed as
-`fftshift(FFT(zero_pad(ifftshift(window * fx))))`, with an inverse FFT when the header's `sgn` is -1. The `-u`
+`fftshift(fft(zero_pad(ifftshift(window * fx))))`, with an inverse FFT when the header's `sgn` is -1. The `-u`
 zero padding is placed between the two halves of the ifftshifted samples. The fftshift is folded into the
 window weights via a phase ramp to avoid re-reading the data.
 
