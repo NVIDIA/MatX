@@ -125,6 +125,22 @@ inline const StreamDeviceLookup &GetStreamDeviceLookup() {
   return lookup;
 }
 
+// Context that owns a stream. cuStreamGetCtx rejects green-context streams;
+// cuStreamGetCtx_v2 returns the primary context of their device, and
+// synchronizing that context also synchronizes its green contexts.
+inline CUcontext GetStreamContext(cudaStream_t stream,
+                                  const StreamDeviceLookup &lookup = GetStreamDeviceLookup()) {
+  const auto cu_stream = reinterpret_cast<CUstream>(stream);
+  CUcontext ctx = nullptr;
+  if (lookup.get_ctx_v2 != nullptr) {
+    void *green_ctx = nullptr;
+    MATX_CUDA_DRIVER_CHECK(lookup.get_ctx_v2(cu_stream, &ctx, &green_ctx));
+  } else {
+    MATX_CUDA_DRIVER_CHECK(cuStreamGetCtx(cu_stream, &ctx));
+  }
+  return ctx;
+}
+
 // Device that owns a stream. cudaMallocAsync allocates from this device's
 // memory pool, which can differ from the current device. Tests pass a lookup
 // to take each branch.
@@ -141,16 +157,7 @@ inline int GetStreamDevice(cudaStream_t stream,
     MATX_CUDA_CHECK(cudaGetDevice(&device));
     return device;
   }
-  // Read the stream's context. cuStreamGetCtx rejects green-context streams;
-  // cuStreamGetCtx_v2 returns the primary context of their device.
-  const auto cu_stream = reinterpret_cast<CUstream>(stream);
-  CUcontext ctx = nullptr;
-  if (lookup.get_ctx_v2 != nullptr) {
-    void *green_ctx = nullptr;
-    MATX_CUDA_DRIVER_CHECK(lookup.get_ctx_v2(cu_stream, &ctx, &green_ctx));
-  } else {
-    MATX_CUDA_DRIVER_CHECK(cuStreamGetCtx(cu_stream, &ctx));
-  }
+  CUcontext ctx = GetStreamContext(stream, lookup);
   // cuCtxGetDevice reads the current context, so make ctx current briefly.
   MATX_CUDA_DRIVER_CHECK(cuCtxPushCurrent(ctx));
   CUdevice device = 0;
@@ -217,8 +224,14 @@ struct MemTracker {
   }
 
   // deallocate_internal assumes that the caller has already acquired the memory_mtx mutex.
+  // is_synced_for_teardown means the caller synchronized the context that owns
+  // ptr after its last use, and the stream ptr was allocated on may already be
+  // destroyed. Async memory is then released with cudaFree, since a
+  // stream-ordered free would need that stream. cudaFree does not wait for
+  // queued work that uses async memory, so it is safe only after that sync;
+  // everywhere else the free stays stream-ordered.
   template <typename StreamType>
-  auto deallocate_internal(void *ptr, [[maybe_unused]] StreamType st) {
+  auto deallocate_internal(void *ptr, [[maybe_unused]] StreamType st, bool is_synced_for_teardown = false) {
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
 
     auto iter = allocationMap.find(ptr);
@@ -264,7 +277,12 @@ struct MemTracker {
       break;
     case MATX_ASYNC_DEVICE_MEMORY:
       if (is_cuda_free()) {
-        if constexpr (cuda::std::is_same_v<no_stream_t, StreamType>) {
+        if (is_synced_for_teardown) {
+          // All uses are complete. cudaFree is valid for cudaMallocAsync memory
+          // and does not need the allocation's stream.
+          MATX_CUDA_CHECK_NOEXCEPT(cudaFree(ptr));
+        }
+        else if constexpr (cuda::std::is_same_v<no_stream_t, StreamType>) {
           MATX_CUDA_CHECK_NOEXCEPT(cudaFreeAsync(ptr, iter->second.stream));
         }
         else {
@@ -290,6 +308,11 @@ struct MemTracker {
   auto deallocate(void *ptr, cudaStream_t stream) {
     [[maybe_unused]] std::unique_lock lck(memory_mtx);
     deallocate_internal(ptr, valid_stream_t{stream});
+  }
+
+  auto deallocate_synced_for_teardown(void *ptr) {
+    [[maybe_unused]] std::unique_lock lck(memory_mtx);
+    deallocate_internal(ptr, no_stream_t{}, true);
   }
 
   void allocate(void **ptr, size_t bytes,
@@ -577,6 +600,23 @@ __MATX_INLINE__ void matxFree(void *ptr, cudaStream_t stream)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
   return GetAllocMap().deallocate(ptr, stream);
+}
+
+namespace detail {
+/**
+ * Free cached memory whose stream may already be destroyed, such as the
+ * per-stream workspaces the plan cache frees in ClearAll(). The caller must
+ * make the owning context current and synchronize it first.
+ *
+ * Async memory is released with cudaFree, which needs no stream but also does
+ * not wait for queued work that uses the memory, so calling this before that
+ * sync is a use-after-free. Use matxFree() everywhere else.
+ */
+__MATX_INLINE__ void matxFreeSyncedForTeardown(void *ptr)
+{
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_INTERNAL)
+  return GetAllocMap().deallocate_synced_for_teardown(ptr);
+}
 }
 
 /**

@@ -42,3 +42,11 @@ may synchronize and can be slower than stream-ordered allocation. Because
 a CUDA graph. A fallback allocation is recorded as ``MATX_DEVICE_MEMORY``, which
 is also the value returned by ``GetPointerKind``.
 Other CUDA allocation errors are still reported to the caller.
+
+CUDA FFTs cache one cuFFT workspace for each combination of device, host
+thread, and stream they run on, allocated in that stream's order. ``matx::ClearCaches()`` frees these workspaces without
+using their streams: it first waits for all work in the CUDA context that owned
+each stream, then frees the workspace. Freeing them is therefore safe after the
+streams have been destroyed, and ``matx::ClearCaches()`` also runs at program
+exit. Because it waits for that work, it should not be called in
+performance-critical code.
