@@ -74,40 +74,51 @@ namespace matx
       }
     }
 
+    // Reductions over norm_dim drop that dimension. Clone them back along norm_dim so
+    // they line up with the input; plain broadcasting would align them with the last
+    // dimensions instead.
+    cuda::std::array<index_t, InputOp::Rank()> clone_dims;
+    for (int r = 0; r < InputOp::Rank(); r++) {
+      clone_dims[r] = (r == norm_dim) ? in.Size(r) : matxKeepDim;
+    }
+    const auto expand = [&clone_dims](const auto &red) {
+      return clone<InputOp::Rank()>(red, clone_dims);
+    };
+
     if (method == NORMALIZE_RANGE::NORM) {
       if (p < 0.0f) {
         // max norm
         const auto absOp = abs(in);
         auto norm_factor = max<decltype(absOp), 1>(absOp, {norm_dim});
-        (out = in / norm_factor).run(ex);
+        (out = in / expand(norm_factor)).run(ex);
       }
       else {
         MATX_ASSERT_STR(p > 0.0f, matxInvalidParameter, "p should be positive non zero");
         auto absOp = abs(in);
         auto norm_factor = pow(sum(pow(absOp, p), {norm_dim}), 1/p);
-        (out = in / norm_factor).run(ex);
+        (out = in / expand(norm_factor)).run(ex);
       }
     }
     else if (method == NORMALIZE_RANGE::ZSCORE) {
       auto mu = mean(in, {norm_dim});
       auto sigma = stdd(in, {norm_dim}, 1);
-      (out = (in-mu)/sigma).run(ex);
+      (out = (in - expand(mu)) / expand(sigma)).run(ex);
     }
     else if (method == NORMALIZE_RANGE::RANGE) {
       // rescale in range [a, b]; by default [0.0, 1.0]
       auto min_in = min(in, {norm_dim});
       auto max_in = max(in, {norm_dim});
-      auto scale_factor = (in - min_in) / (max_in - min_in);
+      auto scale_factor = (in - expand(min_in)) / (expand(max_in) - expand(min_in));
       (out = a + scale_factor*(b-a)).run(ex);
     }
     else if (method == NORMALIZE_RANGE::SCALE) {
       // scale data to have standard deviation 1
       auto scale_factor = stdd(in, {norm_dim}, 1);
-      (out = in / scale_factor).run(ex);
+      (out = in / expand(scale_factor)).run(ex);
     }
     else if (method == NORMALIZE_RANGE::CENTER) {
       auto offset = mean(in, {norm_dim});
-      (out = in - offset).run(ex);
+      (out = in - expand(offset)).run(ex);
     }
   }
 }
