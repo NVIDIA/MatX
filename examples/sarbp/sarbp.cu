@@ -1234,6 +1234,7 @@ int main(int argc, char **argv) {
         << "  --no-overlap           Issue all transfers on the compute stream (no H2D/D2H overlap)\n"
         << "  --precision <type>     Compute precision: double, float, fltflt, mixed, taylor_fast (default: taylor_fast)\n"
         << "  --pixel-z <mode>       Compile-time pixel-z assumption: variable, zero, fixed (default: variable)\n"
+        << "  --vox-precision <type> Voxel location precision: double, or float/single (default: double)\n"
         << "  -h, --help             Print this help message and exit\n";
   };
 
@@ -1259,6 +1260,7 @@ int main(int argc, char **argv) {
   std::string precision_type = "taylor_fast";
   std::string pixel_z_arg = "variable";
   SarBpPixelZMode pixel_z_mode = SarBpPixelZMode::Variable;
+  std::string vox_precision_arg = "double";
 
   auto needs_value = [&](int i) -> bool {
     if (i + 1 >= argc) {
@@ -1324,6 +1326,9 @@ int main(int argc, char **argv) {
     } else if (std::strcmp(argv[i], "--pixel-z") == 0) {
       if (!needs_value(i)) return 1;
       pixel_z_arg = argv[++i];
+    } else if (std::strcmp(argv[i], "--vox-precision") == 0) {
+      if (!needs_value(i)) return 1;
+      vox_precision_arg = argv[++i];
     } else if (argv[i][0] == '-') {
       std::cerr << "ERROR: unknown option '" << argv[i] << "'" << std::endl;
       print_usage();
@@ -1430,6 +1435,21 @@ int main(int argc, char **argv) {
   } else {
     std::cerr << "ERROR: invalid --pixel-z '" << pixel_z_arg
               << "' (use variable, zero, or fixed)" << std::endl;
+    print_usage();
+    return 1;
+  }
+
+  // Voxel locations default to double, which keeps full precision for scenes
+  // far from the origin; float rounds each coordinate to fp32.
+  bool double_voxels = true;
+  if (vox_precision_arg == "double") {
+    double_voxels = true;
+  } else if (vox_precision_arg == "float" || vox_precision_arg == "single") {
+    double_voxels = false;
+    vox_precision_arg = "float";
+  } else {
+    std::cerr << "ERROR: invalid --vox-precision '" << vox_precision_arg
+              << "' (use double, float, or single)" << std::endl;
     print_usage();
     return 1;
   }
@@ -1687,21 +1707,25 @@ int main(int argc, char **argv) {
   // -------------------------------------------------------------------
   // Construct voxel grid
   // -------------------------------------------------------------------
-  auto pix_coords_x = matx::linspace<double>(
-      static_cast<double>(hdr.voxel_start_x),
-      static_cast<double>(voxel_end_x),
-      image_width);
-  auto pix_coords_y = matx::linspace<double>(
-      static_cast<double>(hdr.voxel_start_y),
-      static_cast<double>(voxel_end_y),
-      image_height);
+  // The tag argument selects the coordinate type (--vox-precision).
+  auto make_voxel_locations = [&](auto coord_tag) {
+    using coord_t = decltype(coord_tag);
+    auto pix_coords_x = matx::linspace<coord_t>(
+        static_cast<coord_t>(hdr.voxel_start_x),
+        static_cast<coord_t>(voxel_end_x),
+        image_width);
+    auto pix_coords_y = matx::linspace<coord_t>(
+        static_cast<coord_t>(hdr.voxel_start_y),
+        static_cast<coord_t>(voxel_end_y),
+        image_height);
 
-  auto pix_coords_xclone = matx::clone<2>(pix_coords_x, {image_height, matxKeepDim});
-  auto pix_coords_yclone = matx::clone<2>(pix_coords_y, {matxKeepDim, image_width});
+    auto pix_coords_xclone = matx::clone<2>(pix_coords_x, {image_height, matxKeepDim});
+    auto pix_coords_yclone = matx::clone<2>(pix_coords_y, {matxKeepDim, image_width});
 
-  auto voxel_locations = matx::zipvec(
-      pix_coords_xclone, pix_coords_yclone,
-      matx::zeros<double>({image_height, image_width}));
+    return matx::zipvec(
+        pix_coords_xclone, pix_coords_yclone,
+        matx::zeros<coord_t>({image_height, image_width}));
+  };
 
   // -------------------------------------------------------------------
   // Configure sar_bp parameters
@@ -1801,6 +1825,7 @@ int main(int argc, char **argv) {
   }
   std::cout << std::endl;
   std::cout << "Pixel-z mode     : " << pixel_z_arg << std::endl;
+  std::cout << "Voxel precision  : " << vox_precision_arg << std::endl;
   std::cout << "Bulk mocomp      : ";
   if (apply_bulk_mocomp) {
     std::cout << "enabled";
@@ -1868,25 +1893,29 @@ int main(int argc, char **argv) {
       .h_ampsf               = h_ampsf,
   };
 
-  int dev_status;
   // One positions / range-to-mcp buffer per upload slot (see run_bp_device()).
-  if (use_fltflt_platform_inputs) {
-    std::array<tensor_t<matx::fltflt, 2>, NUM_UPLOAD_SLOTS> blk_positions;
-    std::array<tensor_t<matx::fltflt, 1>, NUM_UPLOAD_SLOTS> blk_rtm;
-    for (int s = 0; s < NUM_UPLOAD_SLOTS; s++) {
-      make_tensor(blk_positions[s], {block_size, 3}, matx::MATX_DEVICE_MEMORY);
-      make_tensor(blk_rtm[s],       {block_size},    matx::MATX_DEVICE_MEMORY);
+  auto run_with_voxels = [&](const auto &voxel_locations) -> int {
+    if (use_fltflt_platform_inputs) {
+      std::array<tensor_t<matx::fltflt, 2>, NUM_UPLOAD_SLOTS> blk_positions;
+      std::array<tensor_t<matx::fltflt, 1>, NUM_UPLOAD_SLOTS> blk_rtm;
+      for (int s = 0; s < NUM_UPLOAD_SLOTS; s++) {
+        make_tensor(blk_positions[s], {block_size, 3}, matx::MATX_DEVICE_MEMORY);
+        make_tensor(blk_rtm[s],       {block_size},    matx::MATX_DEVICE_MEMORY);
+      }
+      return run_bp_device(blk_positions, blk_rtm, voxel_locations, ctx);
+    } else {
+      std::array<tensor_t<double3, 1>, NUM_UPLOAD_SLOTS> blk_positions;
+      std::array<tensor_t<double, 1>, NUM_UPLOAD_SLOTS> blk_rtm;
+      for (int s = 0; s < NUM_UPLOAD_SLOTS; s++) {
+        make_tensor(blk_positions[s], {block_size}, matx::MATX_DEVICE_MEMORY);
+        make_tensor(blk_rtm[s],       {block_size}, matx::MATX_DEVICE_MEMORY);
+      }
+      return run_bp_device(blk_positions, blk_rtm, voxel_locations, ctx);
     }
-    dev_status = run_bp_device(blk_positions, blk_rtm, voxel_locations, ctx);
-  } else {
-    std::array<tensor_t<double3, 1>, NUM_UPLOAD_SLOTS> blk_positions;
-    std::array<tensor_t<double, 1>, NUM_UPLOAD_SLOTS> blk_rtm;
-    for (int s = 0; s < NUM_UPLOAD_SLOTS; s++) {
-      make_tensor(blk_positions[s], {block_size}, matx::MATX_DEVICE_MEMORY);
-      make_tensor(blk_rtm[s],       {block_size}, matx::MATX_DEVICE_MEMORY);
-    }
-    dev_status = run_bp_device(blk_positions, blk_rtm, voxel_locations, ctx);
-  }
+  };
+  const int dev_status = double_voxels
+      ? run_with_voxels(make_voxel_locations(double{}))
+      : run_with_voxels(make_voxel_locations(float{}));
   if (dev_status != 0) return dev_status;
 
 
