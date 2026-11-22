@@ -74,7 +74,7 @@ namespace matx
           query.rank = T::Rank();
           query.element_bytes = sizeof(value_type);
           query.size = [](const void *view, int dim) -> index_t {
-            return static_cast<const T *>(view)->Size(dim);
+            return static_cast<index_t>(static_cast<const T *>(view)->Size(dim));
           };
           query.stride = [](const void *view, int dim) -> int64_t {
             return static_cast<const T *>(view)->Stride(dim);

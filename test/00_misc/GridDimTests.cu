@@ -224,6 +224,9 @@ TEST(GridDimTests, RejectsInvalidBlockGridDims)
   };
   EXPECT_THROW(oversized_batch_dim(), matx::detail::matxException);
 
+#ifndef MATX_INDEX_32_BIT
+  // A 32-bit index_t cannot represent more than INT_MAX outputs, so this
+  // overflow path is only reachable with 64-bit sizes.
   auto oversized_block_reduce_grid = []() {
     dim3 blocks{};
     dim3 threads{};
@@ -232,4 +235,5 @@ TEST(GridDimTests, RejectsInvalidBlockGridDims)
         blocks, threads, cuda::std::array<index_t, 1>{too_many_outputs}, 1, 1);
   };
   EXPECT_THROW(oversized_block_reduce_grid(), matx::detail::matxException);
+#endif
 }

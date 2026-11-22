@@ -34,8 +34,8 @@ __global__ void transpose_kernel_oop(OutputTensor out,
   extern __shared__ float
       tile[]; // Need to swap complex types also, so cast when needed
   T *shm_tile = reinterpret_cast<T *>(&tile[0]);
-  index_t x = blockIdx.x * TILE_DIM + threadIdx.x;
-  index_t y = blockIdx.y * TILE_DIM + threadIdx.y;
+  index_t x = static_cast<index_t>(blockIdx.x * TILE_DIM + threadIdx.x);
+  index_t y = static_cast<index_t>(blockIdx.y * TILE_DIM + threadIdx.y);
 
   if constexpr (RANK == 2) {
     if (x < in.Size(RANK - 1) && y < in.Size(RANK - 2)) {
@@ -44,8 +44,8 @@ __global__ void transpose_kernel_oop(OutputTensor out,
 
     __syncthreads();
 
-    x = blockIdx.y * TILE_DIM + threadIdx.x;
-    y = blockIdx.x * TILE_DIM + threadIdx.y;
+    x = static_cast<index_t>(blockIdx.y * TILE_DIM + threadIdx.x);
+    y = static_cast<index_t>(blockIdx.x * TILE_DIM + threadIdx.y);
 
     if (y < out.Size(RANK - 2) && x < out.Size(RANK - 1)) {
       out(y, x) = shm_tile[threadIdx.x * (TILE_DIM + 1) + threadIdx.y];
@@ -60,8 +60,8 @@ __global__ void transpose_kernel_oop(OutputTensor out,
 
     __syncthreads();
 
-    x = blockIdx.y * TILE_DIM + threadIdx.x;
-    y = blockIdx.x * TILE_DIM + threadIdx.y;
+    x = static_cast<index_t>(blockIdx.y * TILE_DIM + threadIdx.x);
+    y = static_cast<index_t>(blockIdx.x * TILE_DIM + threadIdx.y);
 
     if (y < out.Size(RANK - 2) && x < out.Size(RANK - 1)) {
       out(z, y, x) = shm_tile[threadIdx.x * (TILE_DIM + 1) + threadIdx.y];
@@ -77,8 +77,8 @@ __global__ void transpose_kernel_oop(OutputTensor out,
 
     __syncthreads();
 
-    x = blockIdx.y * TILE_DIM + threadIdx.x;
-    y = blockIdx.x * TILE_DIM + threadIdx.y;
+    x = static_cast<index_t>(blockIdx.y * TILE_DIM + threadIdx.x);
+    y = static_cast<index_t>(blockIdx.x * TILE_DIM + threadIdx.y);
 
     if (y < out.Size(RANK - 2) && x < out.Size(RANK - 1)) {
       out(w, z, y, x) = shm_tile[threadIdx.x * (TILE_DIM + 1) + threadIdx.y];

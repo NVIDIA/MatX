@@ -281,6 +281,9 @@ TEST(TensorStats, SortLegacyRank2AndOversizedGuards)
     ASSERT_EQ(outv(i, outv.Size(1) - 1), static_cast<int>(i + 1));
   }
 
+#ifndef MATX_INDEX_32_BIT
+  // The oversized-sort guards reject more than INT_MAX items, which a 32-bit
+  // index_t cannot represent, so they are only reachable with 64-bit sizes.
   int *ptr = nullptr;
   index_t *idx_ptr = nullptr;
   auto huge_in = make_tensor<int>(ptr, {2048, 2048, 1024}, false);
@@ -292,6 +295,7 @@ TEST(TensorStats, SortLegacyRank2AndOversizedGuards)
                detail::matxException);
   EXPECT_THROW({ detail::sort_pairs_impl_inner(huge_idx_out, huge_idx_in, huge_out, huge_in, SORT_DIR_ASC, exec); },
                detail::matxException);
+#endif
 
   tensor_t<int, 2> noncontig_base({2, 3});
   tensor_t<int, 2> noncontig_out({3, 2});

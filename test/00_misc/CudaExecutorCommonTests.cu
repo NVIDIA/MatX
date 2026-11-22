@@ -255,12 +255,15 @@ TEST(CudaExecutorCommonTests, KernelProviderCoversStrideAndJitGridPaths)
 {
   int *ptr = nullptr;
   auto t2 = make_tensor<int>(ptr, {70000, 2}, false);
-  auto t3 = make_tensor<int>(ptr, {70000, 70000, 2}, false);
-  auto t4 = make_tensor<int>(ptr, {70000, 70000, 2, 2}, false);
+  // A full 256-thread inner dimension leaves one thread in z, so a 70000-long
+  // outer dimension exceeds the 65535 gridDim.z limit and takes the stride
+  // path while keeping the total size representable with 32-bit index_t.
+  auto t3 = make_tensor<int>(ptr, {70000, 1, 256}, false);
+  auto t4 = make_tensor<int>(ptr, {70000, 1, 1, 256}, false);
 
   ExpectProviderForSizes<decltype(t2)>(cuda::std::array<index_t, 2>{70000, 2});
-  ExpectProviderForSizes<decltype(t3)>(cuda::std::array<index_t, 3>{70000, 70000, 2});
-  ExpectProviderForSizes<decltype(t4)>(cuda::std::array<index_t, 4>{70000, 70000, 2, 2});
+  ExpectProviderForSizes<decltype(t3)>(cuda::std::array<index_t, 3>{70000, 1, 256});
+  ExpectProviderForSizes<decltype(t4)>(cuda::std::array<index_t, 4>{70000, 1, 1, 256});
 
   auto non_global_jit = make_tensor<int>(ptr, {8, 32}, false);
   ExpectProviderForSizes<decltype(non_global_jit)>(cuda::std::array<index_t, 2>{8, 32}, true, false);
