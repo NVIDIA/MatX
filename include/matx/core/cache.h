@@ -44,6 +44,9 @@
 #include <memory>
 #include <cstring>
 #include <thread>
+#include <vector>
+#include <algorithm>
+#include <cuda.h>
 
 #include "matx/core/error.h"
 #include "matx/core/allocator.h"
@@ -155,6 +158,7 @@ CacheId GetCacheIdFromType()
 struct StreamAllocation {
   void* ptr;
   size_t size;
+  CUcontext ctx; ///< Context that owns the stream, synchronized before freeing ptr
 };
 
 /**
@@ -187,33 +191,29 @@ public:
   }
 
   void ClearAll() {
+    // Held through the workspace frees too: cuFFT plans bind their stream's
+    // workspace and queue work on it inside LookupAndExec, which holds this
+    // lock, so no plan can queue work on a workspace after its context is
+    // synchronized below and before it is freed
+    [[maybe_unused]] std::lock_guard<std::recursive_mutex> cache_lock(cache_mtx);
+
     // Clear all cache entries for all cache types
-    {
-      [[maybe_unused]] std::lock_guard<std::recursive_mutex> lock(cache_mtx);
-      for (auto &[id, v]: cache) {
-        auto entry = CacheRegistry().find(id);
-        if (entry == CacheRegistry().end()) {
-          continue;
-        }
-        auto &info = entry->second;
-        info.free(v);
+    for (auto &[id, v]: cache) {
+      auto entry = CacheRegistry().find(id);
+      if (entry == CacheRegistry().end()) {
+        continue;
       }
-      cache.clear();
+      auto &info = entry->second;
+      info.free(v);
+    }
+    cache.clear();
+
+    {
+      [[maybe_unused]] std::lock_guard<std::recursive_mutex> alloc_lock(stream_alloc_mutex);
+      FreeStreamAllocations();
     }
     {
-      [[maybe_unused]] std::lock_guard<std::recursive_mutex> lock(stream_alloc_mutex);
-      for (auto &[outer_key, inner_map]: stream_alloc_cache) {
-        for (auto &[inner_key, value]: inner_map) {
-          if (value.ptr) {
-            matxFree(value.ptr);
-          }
-        }
-        inner_map.clear();
-      }
-      stream_alloc_cache.clear();
-    }
-    {
-      [[maybe_unused]] std::lock_guard<std::recursive_mutex> lock(ltoir_mutex);
+      [[maybe_unused]] std::lock_guard<std::recursive_mutex> ltoir_lock(ltoir_mutex);
       ltoir_cache.clear();
     }
   }
@@ -275,16 +275,32 @@ public:
       size = std::max(size, (size_t)(1ULL << 21));
       matxAlloc(&ptr, size, MATX_ASYNC_DEVICE_MEMORY, stream);
 
+      // Look up the context after allocating. The default-stream handles
+      // resolve through the current context, which the allocation creates if
+      // this thread has none yet.
+      try {
+        alloc.ctx = GetStreamContext(stream);
+      } catch (...) {
+        matxFree(ptr, stream);
+        throw;
+      }
+
       alloc.size = size;
       alloc.ptr = ptr;
       common_params_cache[stream] = alloc;
     }
     else if (el->second.size < size) {
-      // Free the old allocation and allocate a new one
-      matxFree(el->second.ptr);
+      // Free the old allocation and allocate a new one. The stream is in use,
+      // so the free can stay ordered after the work already queued on it.
+      // Drop the entry before allocating, so that a failed allocation does
+      // not leave the freed pointer cached.
+      StreamAllocation alloc = el->second;
+      common_params_cache.erase(el);
+      matxFree(alloc.ptr);
       matxAlloc(&ptr, size, MATX_ASYNC_DEVICE_MEMORY, stream);
-      el->second.size = size;
-      el->second.ptr = ptr;
+      alloc.size = size;
+      alloc.ptr = ptr;
+      common_params_cache[stream] = alloc;
     }
     else {
       ptr = el->second.ptr;
@@ -712,6 +728,56 @@ public:
 
 
 private:
+  /**
+   * Free the cached per-stream workspaces.
+   *
+   * Each workspace was allocated in the order of a stream that may since have
+   * been destroyed, so it cannot be freed on that stream. Instead, the
+   * context that owned the stream is made current and synchronized, which
+   * also waits for work left on destroyed streams, and the workspace is then
+   * freed with cudaFree. The context is pushed and popped, so the caller's
+   * current context is unchanged.
+   *
+   * If a context cannot be made current or synchronized, for example because
+   * it was destroyed, its workspaces are dropped from the cache without being
+   * freed. Leaking them is better than freeing memory that queued work may
+   * still use.
+   *
+   * The caller must hold stream_alloc_mutex.
+   */
+  void FreeStreamAllocations() {
+    std::vector<CUcontext> synced;
+    std::vector<CUcontext> failed;
+    const auto contains = [](const std::vector<CUcontext> &ctxs, CUcontext ctx) {
+      return std::find(ctxs.begin(), ctxs.end(), ctx) != ctxs.end();
+    };
+    for (auto &[outer_key, inner_map]: stream_alloc_cache) {
+      for (auto &[inner_key, value]: inner_map) {
+        if (value.ptr == nullptr || value.ctx == nullptr || contains(failed, value.ctx)) {
+          continue;
+        }
+        if (cuCtxPushCurrent(value.ctx) != CUDA_SUCCESS) {
+          failed.push_back(value.ctx);
+          continue;
+        }
+        if (!contains(synced, value.ctx)) {
+          if (cuCtxSynchronize() == CUDA_SUCCESS) {
+            synced.push_back(value.ctx);
+          } else {
+            failed.push_back(value.ctx);
+          }
+        }
+        if (contains(synced, value.ctx)) {
+          matxFreeSyncedForTeardown(value.ptr);
+        }
+        CUcontext popped;
+        (void)cuCtxPopCurrent(&popped);
+      }
+      inner_map.clear();
+    }
+    stream_alloc_cache.clear();
+  }
+
   // Static cache for in-memory storage
   std::unordered_map<std::string, LTOIRData> ltoir_cache;
   std::unordered_map<CacheId, std::any> cache;
@@ -751,6 +817,10 @@ __MATX_INLINE__ matxCache_t &GetCache() {
 // function does not clear the allocator cache (i.e., allocations made with matxAlloc
 // other than those created to support transforms).
 // To free the allocator cache, use matx::FreeAllocations().
+// The cuFFT workspaces cached for each stream are freed without using their
+// streams, which may already be destroyed: each CUDA context that owned one of
+// those streams is synchronized first, so this function blocks until that
+// context's outstanding work completes.
 MATX_VISIBILITY_DEFAULT
 __MATX_INLINE__ void ClearCaches() {
   detail::GetCache().ClearAll();

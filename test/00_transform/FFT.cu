@@ -1443,6 +1443,412 @@ TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, FFT1D1024C2CShort)
   MATX_EXIT_HANDLER();
 }
 
+// A cached 1D plan is shared by every call with the same cuFFT parameters,
+// including a contiguous call that batches all outer dims in one cuFFT call and
+// a strided call that batches only dim R-2 and loops over the rest. Each case
+// clears the plan caches, runs a contiguous call to cache the plan, and then
+// runs a strided call that reuses it.
+TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, FFT1DContiguousThenStridedBatch)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::tuple_element_t<0, TypeParam>;
+  using RealType = typename inner_op_type_t<TestType>::type;
+
+  const index_t fft_dim = 8;
+  const index_t half_dim = fft_dim / 2 + 1;
+  const auto n = static_cast<RealType>(fft_dim);
+
+  // Checks every element along the last dim against expected(k), where k is the
+  // index in the last dim. Complex outputs must have a zero imaginary part.
+  auto check = [&](const auto &out, auto expected) {
+    using OutType = typename std::decay_t<decltype(out)>::value_type;
+    auto c = make_tensor<OutType>(out.Shape());
+    (c = out).run(this->exec);
+    this->exec.sync();
+    const index_t len = c.Size(c.Rank() - 1);
+    for (index_t idx = 0; idx < c.TotalSize(); idx++) {
+      const double want = expected(idx % len);
+      if constexpr (is_complex_v<OutType>) {
+        ASSERT_NEAR(static_cast<double>(c.Data()[idx].real()), want, this->thresh) << "flat index " << idx;
+        ASSERT_NEAR(static_cast<double>(c.Data()[idx].imag()), 0.0, this->thresh) << "flat index " << idx;
+      }
+      else {
+        ASSERT_NEAR(static_cast<double>(c.Data()[idx]), want, this->thresh) << "flat index " << idx;
+      }
+    }
+  };
+  // Forward transform of all ones: bin 0 is fft_dim, every other bin is 0
+  const auto fwd_ones = [&](index_t k) { return k == 0 ? static_cast<double>(fft_dim) : 0.0; };
+  // Inverse transform of all ones: bin 0 is 1, every other bin is 0
+  const auto inv_ones = [&](index_t k) { return k == 0 ? 1.0 : 0.0; };
+  // Inverse transform of a spectrum with only bin 0 set to fft_dim: all ones
+  const auto all_ones = [&](index_t) { return 1.0; };
+
+  // Fills a complex half-spectrum tensor with fft_dim in bin 0 and 0 elsewhere
+  auto make_dc_spectrum = [&](auto shape) {
+    auto t = make_tensor<TestType>(shape);
+    (t = zeros<TestType>(t.Shape())).run(this->exec);
+    auto bin0 = slice(t, {0, 0, 0}, {matxEnd, matxEnd, 1});
+    (bin0 = ones<TestType>(bin0.Shape()) * n).run(this->exec);
+    return t;
+  };
+
+  // C2C forward, rank 3, strided input: {4,2,8} view of a {4,3,8} tensor
+  {
+    ClearCaches();
+    auto ac = make_tensor<TestType>({1, 2, fft_dim});
+    auto oc = make_tensor<TestType>({1, 2, fft_dim});
+    (ac = ones<TestType>(ac.Shape())).run(this->exec);
+    (oc = fft(ac)).run(this->exec);
+    check(oc, fwd_ones);
+
+    auto a_full = make_tensor<TestType>({4, 3, fft_dim});
+    (a_full = ones<TestType>(a_full.Shape())).run(this->exec);
+    auto a = slice(a_full, {0, 0, 0}, {matxEnd, 2, matxEnd});
+    ASSERT_FALSE(a.IsContiguous());
+    auto o = make_tensor<TestType>({4, 2, fft_dim});
+    (o = zeros<TestType>(o.Shape())).run(this->exec);
+    (o = fft(a)).run(this->exec);
+    check(o, fwd_ones);
+  }
+
+  // C2C forward, rank 3, strided output: {4,2,8} view of a {4,3,8} tensor
+  {
+    ClearCaches();
+    auto ac = make_tensor<TestType>({1, 2, fft_dim});
+    auto oc = make_tensor<TestType>({1, 2, fft_dim});
+    (ac = ones<TestType>(ac.Shape())).run(this->exec);
+    (oc = fft(ac)).run(this->exec);
+    check(oc, fwd_ones);
+
+    auto a = make_tensor<TestType>({4, 2, fft_dim});
+    (a = ones<TestType>(a.Shape())).run(this->exec);
+    auto o_full = make_tensor<TestType>({4, 3, fft_dim});
+    (o_full = zeros<TestType>(o_full.Shape())).run(this->exec);
+    auto o = slice(o_full, {0, 0, 0}, {matxEnd, 2, matxEnd});
+    ASSERT_FALSE(o.IsContiguous());
+    (o = fft(a)).run(this->exec);
+    check(o, fwd_ones);
+  }
+
+  // C2C forward, rank 4, strided input with two looped outer dims: {3,2,2,8} view of a {3,2,3,8} tensor
+  {
+    ClearCaches();
+    auto ac = make_tensor<TestType>({1, 1, 2, fft_dim});
+    auto oc = make_tensor<TestType>({1, 1, 2, fft_dim});
+    (ac = ones<TestType>(ac.Shape())).run(this->exec);
+    (oc = fft(ac)).run(this->exec);
+    check(oc, fwd_ones);
+
+    auto a_full = make_tensor<TestType>({3, 2, 3, fft_dim});
+    (a_full = ones<TestType>(a_full.Shape())).run(this->exec);
+    auto a = slice(a_full, {0, 0, 0, 0}, {matxEnd, matxEnd, 2, matxEnd});
+    ASSERT_FALSE(a.IsContiguous());
+    auto o = make_tensor<TestType>({3, 2, 2, fft_dim});
+    (o = zeros<TestType>(o.Shape())).run(this->exec);
+    (o = fft(a)).run(this->exec);
+    check(o, fwd_ones);
+  }
+
+  // C2C inverse, rank 3, strided input: {4,2,8} view of a {4,3,8} tensor
+  {
+    ClearCaches();
+    auto ac = make_tensor<TestType>({1, 2, fft_dim});
+    auto oc = make_tensor<TestType>({1, 2, fft_dim});
+    (ac = ones<TestType>(ac.Shape())).run(this->exec);
+    (oc = ifft(ac)).run(this->exec);
+    check(oc, inv_ones);
+
+    auto a_full = make_tensor<TestType>({4, 3, fft_dim});
+    (a_full = ones<TestType>(a_full.Shape())).run(this->exec);
+    auto a = slice(a_full, {0, 0, 0}, {matxEnd, 2, matxEnd});
+    ASSERT_FALSE(a.IsContiguous());
+    auto o = make_tensor<TestType>({4, 2, fft_dim});
+    (o = zeros<TestType>(o.Shape())).run(this->exec);
+    (o = ifft(a)).run(this->exec);
+    check(o, inv_ones);
+  }
+
+  // R2C, rank 3, strided input: {4,2,8} view of a real {4,3,8} tensor
+  {
+    ClearCaches();
+    auto ac = make_tensor<RealType>({1, 2, fft_dim});
+    auto oc = make_tensor<TestType>({1, 2, half_dim});
+    (ac = ones<RealType>(ac.Shape())).run(this->exec);
+    (oc = fft(ac)).run(this->exec);
+    check(oc, fwd_ones);
+
+    auto a_full = make_tensor<RealType>({4, 3, fft_dim});
+    (a_full = ones<RealType>(a_full.Shape())).run(this->exec);
+    auto a = slice(a_full, {0, 0, 0}, {matxEnd, 2, matxEnd});
+    ASSERT_FALSE(a.IsContiguous());
+    auto o = make_tensor<TestType>({4, 2, half_dim});
+    (o = zeros<TestType>(o.Shape())).run(this->exec);
+    (o = fft(a)).run(this->exec);
+    check(o, fwd_ones);
+  }
+
+  // C2R, rank 3, strided input: {4,2,5} view of a complex {4,3,5} tensor
+  {
+    ClearCaches();
+    auto ac = make_dc_spectrum(cuda::std::array<index_t, 3>{1, 2, half_dim});
+    auto oc = make_tensor<RealType>({1, 2, fft_dim});
+    (oc = irfft(ac)).run(this->exec);
+    check(oc, all_ones);
+
+    auto a_full = make_dc_spectrum(cuda::std::array<index_t, 3>{4, 3, half_dim});
+    auto a = slice(a_full, {0, 0, 0}, {matxEnd, 2, matxEnd});
+    ASSERT_FALSE(a.IsContiguous());
+    auto o = make_tensor<RealType>({4, 2, fft_dim});
+    (o = zeros<RealType>(o.Shape())).run(this->exec);
+    (o = irfft(a)).run(this->exec);
+    check(o, all_ones);
+  }
+  MATX_EXIT_HANDLER();
+}
+
+// The cuFFT plan for a strided input describes only dimension R-2, so the
+// output's other batch dimensions are indexed with the input's. Mismatched
+// batch dimensions must be rejected on every call, including when the plan is
+// already cached. The public fft() operator checks shapes before reaching the
+// plan, so this calls the transform directly.
+TEST(FFTCUDA, FFT1DMismatchedBatchDimsThrow)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::complex<float>;
+  const index_t fft_dim = 8;
+  cudaExecutor exec{};
+
+  ClearCaches();
+  auto a_full = make_tensor<TestType>({4, 3, fft_dim});
+  (a_full = ones<TestType>(a_full.Shape())).run(exec);
+  auto a = slice(a_full, {0, 0, 0}, {matxEnd, 2, matxEnd});
+  auto o = make_tensor<TestType>({2, 2, fft_dim});
+
+  // Caches a plan with the same cuFFT parameters as the mismatched call below
+  auto a_ok = slice(a_full, {0, 0, 0}, {2, 2, matxEnd});
+  detail::fft_impl(o, a_ok, 0, FFTNorm::BACKWARD, exec);
+  exec.sync();
+
+  EXPECT_THROW(detail::fft_impl(o, a, 0, FFTNorm::BACKWARD, exec), matx::detail::matxException);
+
+  // Contiguous input with more batch rows than the output
+  auto a_contig = make_tensor<TestType>({4, 2, fft_dim});
+  EXPECT_THROW(detail::fft_impl(o, a_contig, 0, FFTNorm::BACKWARD, exec), matx::detail::matxException);
+  exec.sync();
+  MATX_EXIT_HANDLER();
+}
+
+// 2D variant of FFT1DMismatchedBatchDimsThrow. The 2D plan batches dimension
+// R-3 using the input's size, so a smaller output batch must be rejected even
+// when the plan is already cached.
+TEST(FFTCUDA, FFT2DMismatchedBatchDimsThrow)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::complex<float>;
+  const index_t fft_dim = 8;
+  cudaExecutor exec{};
+
+  ClearCaches();
+  auto a = make_tensor<TestType>({4, fft_dim, fft_dim});
+  (a = ones<TestType>(a.Shape())).run(exec);
+
+  // Caches a plan with the same cuFFT parameters as the mismatched call below
+  auto o_ok = make_tensor<TestType>({4, fft_dim, fft_dim});
+  detail::fft2_impl(o_ok, a, FFTNorm::BACKWARD, exec);
+  exec.sync();
+
+  auto o = make_tensor<TestType>({2, fft_dim, fft_dim});
+  EXPECT_THROW(detail::fft2_impl(o, a, FFTNorm::BACKWARD, exec), matx::detail::matxException);
+  exec.sync();
+  MATX_EXIT_HANDLER();
+}
+
+// The 2D size checks used to compare element counts only, and only in Debug
+// builds. These outputs have the right element count but the wrong shape.
+TEST(FFTCUDA, FFT2DMismatchedSizesThrow)
+{
+  MATX_ENTER_HANDLER();
+  const index_t fft_dim = 8;
+  cudaExecutor exec{};
+
+  ClearCaches();
+  auto c = make_tensor<cuda::std::complex<float>>({fft_dim, fft_dim});
+  auto r = make_tensor<float>({fft_dim, fft_dim});
+  (c = ones<cuda::std::complex<float>>(c.Shape())).run(exec);
+  (r = ones<float>(r.Shape())).run(exec);
+
+  // C2C: 16x4 output for an 8x8 input
+  auto c_out = make_tensor<cuda::std::complex<float>>({2 * fft_dim, fft_dim / 2});
+  EXPECT_THROW(detail::fft2_impl(c_out, c, FFTNorm::BACKWARD, exec), matx::detail::matxException);
+
+  // R2C: 4x10 output for an 8x8 input (expected 8x5)
+  auto r2c_out = make_tensor<cuda::std::complex<float>>({fft_dim / 2, 10});
+  EXPECT_THROW(detail::fft2_impl(r2c_out, r, FFTNorm::BACKWARD, exec), matx::detail::matxException);
+
+  // C2R: 8x8 output from a 4x10 input (expected 8x5)
+  auto c2r_in = make_tensor<cuda::std::complex<float>>({fft_dim / 2, 10});
+  EXPECT_THROW(detail::ifft2_impl(r, c2r_in, FFTNorm::BACKWARD, exec), matx::detail::matxException);
+  exec.sync();
+  MATX_EXIT_HANDLER();
+}
+
+// Cloned views give a batch distance of 0, which cuFFT rejects with a generic
+// error. MatX should throw its own error in every build type, for both inputs
+// and outputs.
+TEST(FFTCUDA, FFT1DClonedBatchThrows)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::complex<float>;
+  const index_t fft_dim = 8;
+  const index_t batch = 4;
+  cudaExecutor exec{};
+
+  auto row = make_tensor<TestType>({fft_dim});
+  (row = ones<TestType>(row.Shape())).run(exec);
+  auto dense = make_tensor<TestType>({batch, fft_dim});
+  (dense = ones<TestType>(dense.Shape())).run(exec);
+
+  auto cloned_in = row.Clone<2>({batch, matxKeepDim});
+  ASSERT_EQ(cloned_in.Stride(0), 0);
+  auto out = make_tensor<TestType>({batch, fft_dim});
+  EXPECT_THROW(detail::fft_impl(out, cloned_in, 0, FFTNorm::BACKWARD, exec), matx::detail::matxException);
+
+  auto cloned_out = row.Clone<2>({batch, matxKeepDim});
+  EXPECT_THROW(detail::fft_impl(cloned_out, dense, 0, FFTNorm::BACKWARD, exec), matx::detail::matxException);
+  exec.sync();
+  MATX_EXIT_HANDLER();
+}
+
+// Runs the same FFT plan on two streams and checks every result against a
+// single-stream reference.
+TEST(FFTCUDA, MultiStreamFFT1D)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::complex<float>;
+
+  // Prime length so the FFT uses cuFFT's non-power-of-2 (Bluestein) path
+  const index_t fft_dim = 4099;
+  const index_t batch = 64;
+  const int iters = 8;
+
+  cudaStream_t s1, s2;
+  ASSERT_EQ(cudaStreamCreateWithFlags(&s1, cudaStreamNonBlocking), cudaSuccess);
+  ASSERT_EQ(cudaStreamCreateWithFlags(&s2, cudaStreamNonBlocking), cudaSuccess);
+  cudaExecutor e1{s1};
+  cudaExecutor e2{s2};
+
+  auto a1 = make_tensor<TestType>({batch, fft_dim});
+  auto a2 = make_tensor<TestType>({batch, fft_dim});
+  auto r1 = make_tensor<TestType>({batch, fft_dim});
+  auto r2 = make_tensor<TestType>({batch, fft_dim});
+  (a1 = random<TestType>({batch, fft_dim}, NORMAL, 1)).run(e1);
+  (a2 = random<TestType>({batch, fft_dim}, NORMAL, 2)).run(e1);
+
+  // References computed sequentially on a single stream
+  (r1 = fft(a1)).run(e1);
+  (r2 = fft(a2)).run(e1);
+  e1.sync();
+
+  auto o1 = make_tensor<TestType>({iters, batch, fft_dim});
+  auto o2 = make_tensor<TestType>({iters, batch, fft_dim});
+  for (int it = 0; it < iters; it++) {
+    auto o1_it = slice<2>(o1, {it, 0, 0}, {matxDropDim, matxEnd, matxEnd});
+    auto o2_it = slice<2>(o2, {it, 0, 0}, {matxDropDim, matxEnd, matxEnd});
+    (o1_it = fft(a1)).run(e1);
+    (o2_it = fft(a2)).run(e2);
+  }
+  e1.sync();
+  e2.sync();
+
+  // Check on the default stream so that no other cached transform holds memory
+  // allocated on s1 or s2
+  cudaExecutor e0{};
+  auto err = make_tensor<float>({});
+  (err = max(abs(o1 - clone<3>(r1, {iters, matxKeepDim, matxKeepDim})))).run(e0);
+  e0.sync();
+  EXPECT_LT(err(), 1e-2f) << "stream 1 results differ from the single-stream reference";
+  (err = max(abs(o2 - clone<3>(r2, {iters, matxKeepDim, matxKeepDim})))).run(e0);
+  e0.sync();
+  EXPECT_LT(err(), 1e-2f) << "stream 2 results differ from the single-stream reference";
+
+  // The cache holds the cuFFT workspaces allocated on s1 and s2. ClearCaches()
+  // must not free them on the destroyed streams.
+  ASSERT_EQ(cudaStreamDestroy(s1), cudaSuccess);
+  ASSERT_EQ(cudaStreamDestroy(s2), cudaSuccess);
+  ClearCaches();
+  EXPECT_EQ(cudaGetLastError(), cudaSuccess);
+  MATX_EXIT_HANDLER();
+}
+
+#if CUDA_VERSION >= 12050
+// Runs an FFT on a green-context stream. The plan cache records the stream's
+// context for its cuFFT workspace, which cuStreamGetCtx rejects for
+// green-context streams on 12.x drivers.
+TEST(FFTCUDA, GreenContextStreamFFT1D)
+{
+  MATX_ENTER_HANDLER();
+  using TestType = cuda::std::complex<float>;
+  int driver_version = 0;
+  ASSERT_EQ(cuDriverGetVersion(&driver_version), CUDA_SUCCESS);
+  if (driver_version < 12050) {
+    GTEST_SKIP() << "cuGreenCtxStreamCreate requires a 12.5 or newer driver";
+  }
+
+  int device = 0;
+  ASSERT_EQ(cudaGetDevice(&device), cudaSuccess);
+  // Green contexts are unavailable in some configurations, such as under MPS
+  CUdevResource sm_resource;
+  CUdevResourceDesc desc;
+  if (cuDeviceGetDevResource(device, &sm_resource, CU_DEV_RESOURCE_TYPE_SM) != CUDA_SUCCESS ||
+      cuDevResourceGenerateDesc(&desc, &sm_resource, 1) != CUDA_SUCCESS) {
+    GTEST_SKIP() << "Green context resources are not supported";
+  }
+  CUgreenCtx green_ctx;
+  if (cuGreenCtxCreate(&green_ctx, desc, device, CU_GREEN_CTX_DEFAULT_STREAM) != CUDA_SUCCESS) {
+    GTEST_SKIP() << "Green contexts are not supported";
+  }
+  CUstream green_stream;
+  if (cuGreenCtxStreamCreate(&green_stream, green_ctx, CU_STREAM_NON_BLOCKING, 0) != CUDA_SUCCESS) {
+    EXPECT_EQ(cuGreenCtxDestroy(green_ctx), CUDA_SUCCESS);
+    GTEST_SKIP() << "Green context streams are not supported";
+  }
+  // Destroy the stream and context however the test exits
+  struct GreenContextGuard {
+    CUstream stream;
+    CUgreenCtx ctx;
+    ~GreenContextGuard() {
+      ClearCaches();
+      EXPECT_EQ(cuStreamDestroy(stream), CUDA_SUCCESS);
+      EXPECT_EQ(cuGreenCtxDestroy(ctx), CUDA_SUCCESS);
+    }
+  } guard{green_stream, green_ctx};
+
+  const index_t fft_dim = 4099;
+  const index_t batch = 16;
+  cudaExecutor e0{};
+  cudaExecutor eg{reinterpret_cast<cudaStream_t>(green_stream)};
+  auto a = make_tensor<TestType>({batch, fft_dim});
+  auto ref = make_tensor<TestType>({batch, fft_dim});
+  auto out = make_tensor<TestType>({batch, fft_dim});
+  (a = random<TestType>({batch, fft_dim}, NORMAL, 1)).run(e0);
+  (ref = fft(a)).run(e0);
+  e0.sync();
+
+  (out = fft(a)).run(eg);
+  eg.sync();
+  auto err = make_tensor<float>({});
+  (err = max(abs(out - ref))).run(e0);
+  e0.sync();
+  EXPECT_LT(err(), 1e-2f) << "green-context stream results differ from the default-stream reference";
+
+  // Free the workspace allocated on the green-context stream
+  ClearCaches();
+  EXPECT_EQ(cudaGetLastError(), cudaSuccess);
+  MATX_EXIT_HANDLER();
+}
+#endif
+
 TYPED_TEST(FFTTestComplexNonHalfTypesAllExecs, IFFT1D1024C2CShort)
 {
   MATX_ENTER_HANDLER();

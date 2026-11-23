@@ -175,6 +175,63 @@ namespace detail {
       return FFTType::C2C;
     }
   }
+
+  /**
+   * Check that input and output sizes are consistent for an FFT over the
+   * innermost NUM_FFT_DIMS dimensions.
+   *
+   * Plans index the output with the input's batch indices and use the
+   * input/output sizes stored at plan creation, so a mismatch can write out of
+   * bounds. Cached plans skip plan construction, so this must run on every call
+   * and in every build type.
+   */
+  template <int NUM_FFT_DIMS, typename OutputTensor, typename InputTensor>
+  __MATX_INLINE__ void CheckFFTSizes(const OutputTensor &o, const InputTensor &i)
+  {
+    constexpr int RANK = OutputTensor::Rank();
+    static_assert(RANK == InputTensor::Rank(), "FFT input and output ranks must match");
+
+    if constexpr (RANK < NUM_FFT_DIMS) {
+      MATX_THROW(matxInvalidDim, "FFT tensor rank is smaller than the number of transformed dimensions");
+    }
+    else {
+      // Batch dimensions and every transformed dimension except the last are
+      // the same size in and out. Only the last can differ (R2C/C2R).
+      for (int r = 0; r < RANK - 1; r++) {
+        if (o.Size(r) != i.Size(r)) {
+          MATX_THROW(matxInvalidSize, "FFT input and output sizes must match in all but the last dimension");
+        }
+      }
+
+      constexpr FFTType type = DeduceFFTTransformType<OutputTensor, InputTensor>();
+      const index_t osize = o.Size(RANK - 1);
+      const index_t isize = i.Size(RANK - 1);
+      if constexpr (type == FFTType::C2R) {
+        if (osize / 2 + 1 != isize) {
+          MATX_THROW(matxInvalidSize, "Tensor sizes inconsistent with C2R transform");
+        }
+      }
+      else if constexpr (type == FFTType::R2C) {
+        if (isize / 2 + 1 != osize) {
+          MATX_THROW(matxInvalidSize, "Tensor sizes inconsistent with R2C transform");
+        }
+      }
+      else {
+        if (osize != isize) {
+          MATX_THROW(matxInvalidSize, "Tensor sizes inconsistent with C2C transform");
+        }
+      }
+    }
+  }
+
+  /**
+   * Mix one value into a plan-cache hash (boost::hash_combine style)
+   */
+  template <typename T>
+  __MATX_INLINE__ void FFTHashCombine(std::size_t &h, T v)
+  {
+    h ^= std::hash<uint64_t>()(static_cast<uint64_t>(v)) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+  }
 }
 
 
