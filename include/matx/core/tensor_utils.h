@@ -77,7 +77,7 @@ namespace matx
     MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
     if constexpr (is_tensor_view_v<Op>) {
-      return static_cast<size_t>(op.TotalSize());
+      return static_cast<index_t>(op.TotalSize());
     }
     else {
       index_t total = 1;

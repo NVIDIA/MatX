@@ -99,19 +99,19 @@ Args parse_args(int argc, char **argv)
       else if (v == "channelize_poly") a.op = StreamOp::ChannelizePoly;
       else usage(argv[0]);
     } else if (!std::strcmp(argv[i], "--n")) {
-      a.n = std::stoll(need(i));
+      a.n = static_cast<index_t>(std::stoll(need(i)));
     } else if (!std::strcmp(argv[i], "--filter")) {
-      a.filter_len = std::stoll(need(i));
+      a.filter_len = static_cast<index_t>(std::stoll(need(i)));
     } else if (!std::strcmp(argv[i], "--chunk")) {
-      a.chunk = std::stoll(need(i));
+      a.chunk = static_cast<index_t>(std::stoll(need(i)));
     } else if (!std::strcmp(argv[i], "--up")) {
-      a.up = std::stoll(need(i));
+      a.up = static_cast<index_t>(std::stoll(need(i)));
     } else if (!std::strcmp(argv[i], "--down")) {
-      a.down = std::stoll(need(i));
+      a.down = static_cast<index_t>(std::stoll(need(i)));
     } else if (!std::strcmp(argv[i], "--channels")) {
-      a.channels = std::stoll(need(i));
+      a.channels = static_cast<index_t>(std::stoll(need(i)));
     } else if (!std::strcmp(argv[i], "--decim")) {
-      a.decim = std::stoll(need(i));
+      a.decim = static_cast<index_t>(std::stoll(need(i)));
     } else {
       usage(argv[0]);
     }
