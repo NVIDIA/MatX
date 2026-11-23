@@ -123,6 +123,7 @@ real/imag, row-major), written to `output_image.raw` in this example.
 | `--taylor-fast-third-order` | Add the third-order range term when using `--precision taylor_fast` |
 | `--precision {double,float,fltflt,mixed,taylor_fast}` | Backprojection compute precision (default: taylor_fast) |
 | `--pixel-z {variable,zero,fixed}` | Compile-time assumption for the pixel Z coordinate. `zero` skips per-pixel Z work and is valid (and faster) for a flat, Z=0 image grid like this example's (default: variable) |
+| `--vox-precision {double,float,single}` | Precision of the voxel (pixel) locations passed to `sar_bp`. `double` keeps full precision for scenes far from the origin; `float` (or `single`) rounds each coordinate to fp32, which resolves a coordinate a few km from the origin only to about 0.1 mm (default: double) |
 | `--warmup` | Warmup GPU kernels and FFT plans before timed run |
 | `--no-overlap` | Issue all host/device transfers on the compute stream instead of overlapping them with GPU work (see [Transfer overlap](#transfer-overlap)) |
 | `--gold FILE` | Validate the output against a golden image (raw `complex<float>`, same format the example writes) and report accuracy metrics (3x3-window correlation and signal-to-error ratio) |
@@ -221,7 +222,7 @@ All results use the Umbra open-data collection referenced above, processed into 
 | 8192 x 8192 | ~5.73 km | 0.699 m | 1.0° | 11,566 | 776 |
 | 20800 x 20800 | ~8.22 km | 0.395 m | 2.0° | 23,178 | 10,028 |
 
-A backprojection is the unit of computation required for a single pixel-pulse contribution. For the "small" scene, there are 8192 x 8192 x 11566 = 776.18 billion backprojections, or ~776 giga backprojections. Both scenarios are X-band (9.6 GHz), ~770 km slant range, ~43° grazing angle. All runs use `--warmup`, `--pixel-z zero` (the image grid is planar at Z=0, so `zero` is exact here and is a few percent faster than `variable`), a 256-pulse block (`-b 256`), and the optimal `--image-tiles` for each configuration.
+A backprojection is the unit of computation required for a single pixel-pulse contribution. For the "small" scene, there are 8192 x 8192 x 11566 = 776.18 billion backprojections, or ~776 giga backprojections. Both scenarios are X-band (9.6 GHz), ~770 km slant range, ~43° grazing angle. All runs use `--warmup` and the automatic pulse-block and image-tiling selection (`-b auto --image-tiles auto`, the defaults; see the [Appendix](#appendix-per-configuration-run-times) for the values chosen on each GPU), and all were built with CUDA 13.5. Unless noted, results use `--pixel-z zero`: the image grid is planar at Z=0, so `zero` is exact here and is usually a few percent faster than `variable`.
 
 > **Note:** All compute types except `double` enable the `PhaseLUT` feature. For `mixed`, `fltflt` and `float` this means a phase lookup table, which precomputes the per-range-bin phase ramp once and then applies a per-pixel per-pulse correction. `taylor_fast` ignores the feature: it always synthesizes its phase from a per-pulse reference phase and each pixel's local bin offset, which reads no table (see https://nvidia.github.io/MatX/api/signalimage/radar/sar_bp.html#taylorfast-phase-synthesis). `double` runs without the feature, as it serves as the reference for accuracy comparisons.
 
@@ -232,26 +233,31 @@ Metric definitions:
 - **SER**: Signal-to-error ratio in dB versus a `double`-precision reference image: `10*log10( sum|gold|^2 / sum|image - gold|^2 )`.
 - **Min / 1% correlation**: The minimum and 1st-percentile values of a 3x3-window complex coherence (`corrmap`) between the image and the `double` reference. 1.0 is a perfect match.
 
-The SER and correlation numbers are produced by the example's own `--gold`/`--cmap` validation. They are independent of GPU, and -- for every mode except `taylor_fast` -- independent of tiling, so they are reported once per (scene, compute type). The values below are for the untiled (1 tile) configuration; `taylor_fast` shifts by at most ~0.04 dB SER under tiling (see [Image Tiling](#image-tiling)), which does not change its rounded entries in the table. The `double` mode is the reference, so it has no SER/correlation of its own.
+The SER and correlation numbers are produced by the example's own `--gold`/`--cmap` validation. For a given pulse-block size they are independent of GPU, and -- for every mode except `taylor_fast` -- independent of tiling, so they are reported once per (scene, compute type). The values below use 256-pulse blocks and no tiling, which is the automatic selection on the H200. Two settings shift them slightly:
+
+- Pulse-block size: each pixel accumulates a block's pulses in the compute type's working precision (single precision for every mode except `double`) before adding them to the image, so a larger block means longer single-precision sums. On the 8192 x 8192 scene, `fltflt` loses about 0.8 dB SER going from 256- to 3072-pulse blocks, and the 512-pulse blocks chosen automatically on the RTX PRO 6000 lower `mixed` and `fltflt` by about 0.1 dB. Even `double` no longer matches its 256-pulse-block reference exactly when run with a different block size (about 135 dB SER).
+- Tiling: `taylor_fast` shifts by up to ~0.15 dB SER under tiling (see [Image tiling](#image-tiling)).
+
+The `double` mode is the reference, so it has no SER/correlation of its own.
 
 ### Accuracy by compute type
 
 | ComputeType | SER (8k) | min corr (8k) | 1% corr (8k) | SER (20k) | min corr (20k) | 1% corr (20k) |
 |-------------|---------:|--------------:|-------------:|----------:|---------------:|--------------:|
 | `double` (reference) | -- | -- | -- | -- | -- | -- |
-| `mixed` | 102.0 dB | 0.99999958 | 0.99999982 | 101.8 dB | 0.99999952 | 0.99999982 |
-| `fltflt` | 101.3 dB | 0.99999958 | 0.99999982 | 101.2 dB | 0.99999958 | 0.99999982 |
-| `taylor_fast` (2nd) | 87.2 dB | 0.99999881 | 0.99999982 | 91.0 dB | 0.99999958 | 0.99999982 |
-| `taylor_fast` (3rd) | 87.2 dB | 0.99999881 | 0.99999982 | 91.0 dB | 0.99999958 | 0.99999982 |
-| `float` | -1.8 dB | 3.0e-5 | 0.026 | -2.2 dB | 1.9e-5 | 0.021 |
+| `mixed` | 112.1 dB | 0.99999958 | 0.99999982 | 109.8 dB | 0.99999952 | 0.99999982 |
+| `fltflt` | 111.2 dB | 0.99999958 | 0.99999982 | 108.3 dB | 0.99999958 | 0.99999982 |
+| `taylor_fast` (2nd) | 86.9 dB | 0.99999917 | 0.99999982 | 91.4 dB | 0.99999958 | 0.99999982 |
+| `taylor_fast` (3rd) | 86.9 dB | 0.99999917 | 0.99999982 | 91.4 dB | 0.99999958 | 0.99999982 |
+| `float` | -1.8 dB | 3.1e-5 | 0.026 | -2.2 dB | 1.7e-5 | 0.021 |
 
-The single-precision modes (`mixed`, `fltflt`, `float` and `taylor_fast`) give slightly different results depending on the CUDA toolkit: with CUDA 13.5 or later they use the `__sincos2pif` intrinsic, which has lower phase error than the `__sincosf` intrinsic used with earlier toolkits (see https://nvidia.github.io/MatX/api/signalimage/radar/sar_bp.html#fast-sine-cosine-and-cuda-toolkit-version). SER values can therefore differ slightly from the table depending on the toolkit used.
+The single-precision modes (`mixed`, `fltflt`, `float` and `taylor_fast`) give different results depending on the CUDA toolkit: with CUDA 13.5 or later they use the `__sincos2pif` intrinsic, which has lower phase error than the `__sincosf` intrinsic used with earlier toolkits (see https://nvidia.github.io/MatX/api/signalimage/radar/sar_bp.html#fast-sine-cosine-and-cuda-toolkit-version). For example, on Thor a CUDA 13.0 build gives about 10 dB lower `fltflt` SER (101.3 dB at 8k, 98.6 dB at 20k) and about 0.1-0.5 dB lower `taylor_fast` SER than the table. Run times can change as well: the same CUDA 13.0 build was 4-20% slower for `taylor_fast` (2nd order) and about 1.5% faster for `fltflt` on Thor.
 
 Observations:
 
 - `float` is not usable for these spaceborne geometries: a negative SER and near-zero correlation mean the image is effectively decorrelated from the reference. It is included only to make the point concrete. Note that `float` is a bit of a misnomer since `fltflt` and `taylor_fast` also use float, but with compensated arithmetic and reformulations to maintain accuracy. `float` is a direct single-precision implementation with no attempt to improve accuracy.
 - `taylor_fast` is the fastest mode at slightly reduced accuracy (87-91 dB SER, still > 0.99999 correlation). Its accuracy improves on the larger/wider-aperture frame because each patch of pixels that corresponds to a CUDA thread block covers a smaller spatial extent. The third-order term provides no measurable accuracy gain over second order here, and is slightly slower, so second order is the better default. The third-order Taylor term is useful for short-range imaging scenarios; see https://nvidia.github.io/MatX/api/signalimage/radar/sar_bp.html#taylorfast-range-approximation for details.
-- `mixed` and `fltflt` are both essentially reference-quality (~100+ dB SER, correlation > 0.9999995). It is the `PhaseLUT` optimization that caps these accuracy values (for `mixed` and `fltflt`; `taylor_fast` reads no table and is capped by its range approximation instead). For example, `mixed` without `PhaseLUT` produces an SER of 127 dB, albeit at reduced performance. We do have options for optimized implementations at higher accuracy levels (> 100 dB), but it is unclear if they are needed. If you have a use case that requires higher accuracy than is provided by the current optimized variants, then please file a MatX issue with details or reach out to the developers.
+- `mixed` and `fltflt` are both essentially reference-quality (~108-112 dB SER, correlation > 0.9999995). It is the `PhaseLUT` optimization that caps these accuracy values (for `mixed` and `fltflt`; `taylor_fast` reads no table and is capped by its range approximation instead). For example, `mixed` without `PhaseLUT` produces an SER of 127 dB, albeit at reduced performance.
 
 ### Throughput by compute type
 
@@ -263,7 +269,7 @@ The figure below summarizes throughput (Gbp/s) and full-frame run time across GP
 
 Observations:
 
-- `taylor_fast` (2nd order) is the throughput leader on every GPU and is the right choice when its ~87-91 dB SER is acceptable. Note that although we see 10+ dB SER difference between `taylor_fast` and `fltflt`/`mixed`, the minimum and 1% correlation values are still very close to 1. `taylor_fast` uses FP32 for inner loop calculations, which makes it fast on all GPUs.
+- `taylor_fast` (2nd order) is the throughput leader on every GPU and is the right choice when its ~87-91 dB SER is acceptable. Note that although we see a 17-25 dB SER difference between `taylor_fast` and `fltflt`/`mixed`, the minimum and 1% correlation values are still very close to 1. `taylor_fast` uses FP32 for inner loop calculations, which makes it fast on all GPUs.
 - If higher accuracy is needed, the best compute type is GPU-dependent:
   - On GPUs with full-rate FP64 (e.g. H200), `mixed` is both accurate and fast.
   - On GPUs with reduced FP64 (e.g. RTX PRO 6000, DGX Spark, Thor), `fltflt` recovers near-`double` accuracy using all-FP32 math.
@@ -274,16 +280,16 @@ Our recommendation is to use `taylor_fast` for maximum throughput, and `mixed` (
 
 `--image-tiles N` processes the image as an N x N grid of sub-tiles, one backprojection launch per tile. Its value is purely a cache-locality effect. In backprojection the reused data is the per-pulse range profiles; each output pixel reads two samples per pulse indexed by range to the platform. Neighboring pixels reuse overlapping range bins, and that reuse has to stay resident in L2 to be cheap. A larger scene sweeps a wider span of range bins before a given bin is reused, and once that working set exceeds L2 the misses fall through to DRAM and the (memory-bound) fast modes stall. Tiling shrinks each launch's range-bin working set back under L2, restoring the hit rate.
 
-This makes the benefit a function of L2 size vs. scene size:
+This makes the benefit a function of L2 size vs. scene size. In the plot below, each point uses the automatic pulse-block size for that tile count, which grows with N on GPUs with larger L2 caches (up to 3072 pulses on the RTX PRO 6000 at 6 x 6):
 
 ![Image-tiling speedup vs. tile count, taylor_fast 2nd order, across GPUs](tiling_performance.png)
 
-- Smaller L2 -> larger benefit. On the 20800 x 20800 scene, `taylor_fast` recovers about +61% on the DGX Spark (24 MiB L2) and +22% on Thor (32 MiB), a milder +11% on the H200 (60 MiB), and nothing on the RTX PRO 6000 (128 MiB).
-- The benefit also depends on scene size. The smaller 8192 x 8192 frame has a smaller working set, so only the DGX Spark (with the smallest L2 cache) gains from tiling there (+16%); Thor, H200, and PRO 6000 are flat because their larger L2 already holds it. Tiling matters most when the scene working set exceeds L2. The `PhaseLUT`, used by every compute type except `double` and `taylor_fast`, has the same footprint as one per-pulse range profile, and tiling reduces the actively used range-bin span of both. Image pixels also occupy L2, so it is best to test multiple tiling factors on a given GPU rather than simply compare the estimated working set to the L2 size.
-- It only helps the memory-bound modes. `taylor_fast`, `float`, and (partly) `fltflt` benefit; the compute-bound `double`/`mixed` are flat because their FP64/extended-precision work already hides the memory latency.
+- Smaller L2 -> larger benefit. On the 20800 x 20800 scene, `taylor_fast` gains about +15% on the DGX Spark (24 MiB L2) and +4% on Thor (32 MiB), and +2% or less on the H200 (60 MiB) and RTX PRO 6000 (128 MiB).
+- The benefit also depends on scene size. The smaller 8192 x 8192 frame has a smaller working set, so only the DGX Spark (with the smallest L2 cache) gains from tiling there (+3%). Thor is flat, and the H200 and PRO 6000 slow down as tiles are added because their larger L2 already holds the working set. Tiling matters most when the scene working set exceeds L2. The `PhaseLUT`, used by every compute type except `double` and `taylor_fast`, has the same footprint as one per-pulse range profile, and tiling reduces the actively used range-bin span of both. Image pixels also occupy L2, so it is best to test multiple tiling factors on a given GPU rather than simply compare the estimated working set to the L2 size.
+- It only helps the memory-bound modes. `taylor_fast`, `float`, and (partly) `fltflt` benefit (`fltflt` gains about +8% on the DGX Spark and +2% on Thor at 20800 x 20800). The compute-bound `double`/`mixed` are flat or slightly slower because their FP64/extended-precision work already hides the memory latency.
 - Over-tiling hurts. Once L2 pressure is relieved, finer tiling only adds launch overhead and other inefficiencies.
 
-For most modes, tiling has no impact on the backprojection result and should be bit-equivalent to a non-tiled backprojection on the same GPU. However, there can be a small impact for some pixels for `taylor_fast`. This is because introducing tile boundaries can yield slightly different reference range locations for the boundary tiles (the reference range is to the center of a thread block, but that thread block may be smaller due to the tile boundary). In these cases, the spatial extent of the thread block is smaller and thus the approximations will be slightly more accurate. The impact is small (0.01-0.04 dB SER).
+For most modes, tiling has no impact on the backprojection result and should be bit-equivalent to a non-tiled backprojection on the same GPU with the same pulse-block size. However, there can be a small impact for some pixels for `taylor_fast`. This is because introducing tile boundaries can yield slightly different reference range locations for the boundary tiles (the reference range is to the center of a thread block, but that thread block may be smaller due to the tile boundary). In these cases, the spatial extent of the thread block is smaller and thus the approximations will be slightly more accurate. The impact is small (up to ~0.15 dB SER in these scenes).
 
 ### Pulse-block size
 
@@ -296,8 +302,10 @@ Because both compete for the same L2, the optimal block size depends on the tili
 
 ![Pulse-block size sweep at several tiling factors on the DGX Spark](pulse_block_performance.png)
 
+Each tiling factor has a block-size knee. Throughput stays near its peak until a block's range profiles no longer fit in L2, then drops to the untiled rate of about 254 Gbp/s. Each doubling of N roughly doubles the largest block that fits: 128 pulses untiled, 256 at 2 x 2 and 512 at 4 x 4. The fastest point, 4 x 4 tiles with 512-pulse blocks, reaches 290 Gbp/s, 14% faster than untiled with 256-pulse blocks. The automatic choice for this scene (3 x 3 tiles, 256-pulse blocks, 287 Gbp/s) is within 1% of it.
+
 - While pulse blocking alone may be sufficient for GPUs with more L2 cache, both image tiling and pulse blocking are beneficial for smaller L2 caches.
-- Sweeps on GH200 and DGX Spark did not show a benefit below 256 pulses. The backprojection kernel amortizes work in 256-pulse units, so automatic selection uses 256 pulses as both its minimum and its block-size granularity. If that minimum creates too much L2 pressure, the heuristic increases image tiling instead of selecting a smaller pulse block.
+- Blocks smaller than 256 pulses help only when nothing else relieves L2 pressure. Untiled, 128-pulse blocks run at 282 Gbp/s, 11% faster than 256-pulse blocks. With tiling, 128-pulse blocks are 2-3% slower than 256-pulse blocks, because the backprojection kernel amortizes work in 256-pulse units. Automatic selection therefore uses 256 pulses as both its minimum and its block-size granularity. If that minimum creates too much L2 pressure, the heuristic increases image tiling instead of selecting a smaller pulse block.
 
 By default, `-b auto` and `--image-tiles auto` auto selects both values. For an N x N image grid, the heuristic estimates the reusable working set as `(phase lookup table + pulse-profile working set) / N`, since each tile covers approximately 1/N of the range-bin span. The automatic heuristic attempts to trade off working set sizes (smaller for better L2 hit rates) and kernel launch overhead (smaller for fewer launches). An explicit value for either option is preserved while the other automatic option is selected around it.
 
@@ -305,26 +313,37 @@ The automatic pulse blocking / image tiling logic in the `sarbp` example may cha
 
 ## Appendix: Per-configuration run times
 
-Full-frame backprojection run times in seconds for every GPU and ComputeType, using a 256-pulse block (`-b 256`) and the optimal `--image-tiles` per configuration (see [Image Tiling](#image-tiling)). Each cell is `pixel-z variable / pixel-z zero`; `zero` is exact for this planar Z=0 grid and is the value plotted in the figure above. Throughput in Gbp/s can be recovered as (work) / (run time), where the work is 776.2 Gbp for the 8192 x 8192 frame and 10,027.7 Gbp for the 20800 x 20800 frame. `n/r` = not run (`double` at 20k on Thor would take ~3.5 hours).
+Full-frame backprojection run times in seconds for every GPU and ComputeType, using the automatic pulse-block and image-tiling selection (`-b auto --image-tiles auto`, the defaults). Each cell is `pixel-z variable / pixel-z zero`; `zero` is exact for this planar Z=0 grid and is the value plotted in the figure above. Throughput in Gbp/s can be recovered as (work) / (run time), where the work is 776.2 Gbp for the 8192 x 8192 frame and 10,027.7 Gbp for the 20800 x 20800 frame. `n/r` = not run (`double` and `mixed` at 20k on Thor would take ~3 hours and ~1 hour, respectively).
+
+The automatic selection depends on the GPU's L2 cache size and the scene:
+
+| GPU (L2) | 8192 x 8192 | 20800 x 20800 |
+|----------|-------------|---------------|
+| RTX PRO 6000 (128 MiB) | 1 x 1 tiles, 512-pulse blocks | 1 x 1 tiles, 256-pulse blocks |
+| H200 (60 MiB) | 1 x 1 tiles, 256-pulse blocks | 1 x 1 tiles, 256-pulse blocks |
+| DGX Spark (24 MiB) | 2 x 2 tiles, 256-pulse blocks | 3 x 3 tiles, 256-pulse blocks |
+| Thor (32 MiB) | 2 x 2 tiles, 256-pulse blocks | 2 x 2 tiles, 256-pulse blocks |
+
+In the `taylor_fast` tiling sweeps (see [Image tiling](#image-tiling)), the best manual tiling was within 2% of the automatic selection on every GPU.
 
 <h4 align="center">8192 x 8192 pixels, 11,566 pulses</h4>
 
 | ComputeType | RTX PRO 6000 | H200 | DGX Spark | Thor |
 |-------------|--------------|------|-----------|------|
-| `double` | 54.31 / 54.29 | 4.22 / 4.06 | 214 / 214 | 927 / 927 |
-| `mixed` | 17.48 / 16.50 | 2.24 / 2.20 | 68.52 / 64.62 | 287 / 271 |
-| `fltflt` | 2.13 / 1.93 | 3.50 / 3.22 | 8.45 / 7.65 | 33.08 / 30.04 |
-| `taylor_fast` (2nd) | 0.98 / 0.95 | 1.70 / 1.52 | 3.92 / 3.79 | 14.33 / 13.91 |
-| `taylor_fast` (3rd) | 1.03 / 1.00 | 1.70 / 1.62 | 4.14 / 3.99 | 15.14 / 14.76 |
-| `float` | 1.04 / 1.03 | 1.69 / 1.65 | 4.17 / 4.14 | 15.89 / 15.29 |
+| `double` | 58.36 / 57.30 | 3.91 / 3.91 | 212 / 207 | 910 / 893 |
+| `mixed` | 17.47 / 16.50 | 2.04 / 2.00 | 66.94 / 63.17 | 288 / 271 |
+| `fltflt` | 2.07 / 1.83 | 3.32 / 2.96 | 8.24 / 7.29 | 31.59 / 28.49 |
+| `taylor_fast` (2nd) | 0.76 / 0.70 | 1.16 / 1.08 | 3.05 / 2.81 | 10.90 / 10.00 |
+| `taylor_fast` (3rd) | 0.80 / 0.76 | 1.19 / 1.14 | 3.18 / 3.03 | 11.25 / 10.50 |
+| `float` | 0.95 / 0.93 | 1.47 / 1.48 | 3.80 / 3.72 | 13.47 / 13.30 |
 
 <h4 align="center">20800 x 20800 pixels, 23,178 pulses</h4>
 
 | ComputeType | RTX PRO 6000 | H200 | DGX Spark | Thor |
 |-------------|--------------|------|-----------|------|
-| `double` | 701 / 701 | 54.48 / 52.33 | 2762 / 2761 | n/r |
-| `mixed` | 226 / 213 | 28.86 / 28.26 | 846 / 802 | 3699 / 3505 |
-| `fltflt` | 27.70 / 25.31 | 45.14 / 41.59 | 111 / 103 | 427 / 388 |
-| `taylor_fast` (2nd) | 12.47 / 12.08 | 21.52 / 19.47 | 49.82 / 48.46 | 178 / 173 |
-| `taylor_fast` (3rd) | 13.23 / 12.78 | 21.94 / 20.91 | 53.29 / 50.80 | 191 / 186 |
-| `float` | 13.48 / 13.34 | 21.90 / 21.41 | 53.36 / 53.45 | 205 / 197 |
+| `double` | 754 / 740 | 51.58 / 51.49 | 2737 / 2684 | n/r |
+| `mixed` | 226 / 213 | 26.78 / 26.23 | 866 / 819 | n/r |
+| `fltflt` | 26.72 / 23.77 | 43.06 / 38.25 | 107 / 96 | 407 / 367 |
+| `taylor_fast` (2nd) | 9.39 / 8.78 | 13.85 / 13.22 | 37.39 / 34.91 | 132 / 120 |
+| `taylor_fast` (3rd) | 10.07 / 9.81 | 15.08 / 14.78 | 40.22 / 39.16 | 144 / 135 |
+| `float` | 12.12 / 11.88 | 19.13 / 19.29 | 48.82 / 47.73 | 173 / 170 |

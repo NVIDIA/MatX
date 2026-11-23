@@ -50,21 +50,22 @@ namespace matx {
 enum class SarBpComputeType {
   Double, /**< Uses double precision for all intermediate calculations. The backprojection kernel works with user-provided input
               for the range profiles, platform positions, ranges to mocomp point, and voxel locations. Thus, the user should provide
-              values in double precision if needed. Typically, the platform positions and ranges to mocomp point will be double
-              precision and range profiles and voxel locations will be single precision, but users can provide double precision
-              range profiles and voxel locations if needed. */
+              values in double precision if needed. */
   Mixed, /**< Uses mixed precision for intermediate calculations. This compute type offers a trade-off between
               performance and precision. With \p Mixed precision, the range calculated per pixel-pulse pair will 
               still typically be done in double-precision, but interpolation and accumulation will be single-precision.
               When combined with \p PhaseLUTOptimization, the sine/cosine calculations will no longer be double-precision
-              either. */
+              either. Double precision voxel locations (double3 or double4) are used at full precision in the range
+              calculation. */
   FloatFloat, /**< The \p FloatFloat compute type combines mixed precision (i.e., fp32 when possible) with a
               float-float handling of the values for which fp64 would otherwise be needed. The float-float
               representation offers increased precision relative to fp32, but not full fp64 precision,
               through the use of increased fp32 computation and representing each value as an unevaluated
               sum of two fp32 components. For optimal performance, users can provide any inputs that require
               additional precision (e.g., platform positions and range to mocomp point) directly in \c fltflt format.
-              Otherwise, the kernel will perform double-to-fltflt conversions internally.
+              Otherwise, the kernel will perform double-to-fltflt conversions internally. Double precision voxel
+              locations (double3 or double4) are converted to float-float, so they keep near-double precision in the
+              range calculation, at the cost of one additional fp32 addition per coordinate per pixel-pulse pair.
               FloatFloat requires \p PhaseLUTOptimization. */
   TaylorFast, /**< Uses a local Taylor approximation of the pulse-to-pixel range about a centered per-thread-block
               reference point. This mode prioritizes throughput. It synthesizes its reference phase rather than
