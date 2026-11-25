@@ -2,8 +2,6 @@
 
 import os
 import numpy as np
-import cupy as cp
-from cupyx.scipy import linalg as cplinalg
 from numpy import random
 import math
 import matx_common
@@ -166,6 +164,10 @@ class lu:
         np.random.seed(1234)
 
     def run(self):
+        # Lazy import only where needed
+        import cupy as cp
+        from cupyx.scipy import linalg as cplinalg
+
         m, n = self.size[-2:]
         if len(self.size) == 2:
             shape = (m, n)

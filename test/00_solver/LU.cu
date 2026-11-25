@@ -56,7 +56,11 @@ protected:
       exec = SelectThreadsHostExecutor{params};
     }
 
+#ifdef CUPY_INSTALLED
     pb = std::make_unique<detail::MatXPybind>();
+#else
+    GTEST_SKIP() << "CuPy is required to generate LU reference data";
+#endif
   }
 
   void TearDown() override { pb.reset(); }

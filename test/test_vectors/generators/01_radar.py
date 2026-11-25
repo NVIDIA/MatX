@@ -7,7 +7,6 @@ from numpy import random
 import math
 import os
 import matx_common
-import cupy as cp
 from typing import Dict, List
 
 
@@ -128,12 +127,15 @@ class simple_radar_pipeline:
 class ambgfun:
 
     def __init__(self, dtype: str, size: List[int]):
+        # Lazy import only where needed
+        import cupy as cp
         cp.random.seed(1234)
         self.size = size
         self.dtype = dtype
         os.environ['CUPY_CACHE_DIR'] = "/tmp"
 
     def run(self):
+        import cupy as cp
         siglen = self.size[0]
         x = matx_common.randn_ndarray((siglen,), self.dtype)
         y = None
