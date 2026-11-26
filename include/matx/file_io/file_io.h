@@ -51,6 +51,16 @@
 #if defined(MATX_ENABLE_FILEIO) || defined(DOXYGEN_ONLY)
 
 namespace matx {
+namespace detail {
+
+inline void SaveMatDictionary(const pybind11::dict &variables, const std::string &filename)
+{
+  auto scipy = pybind11::module_::import("scipy.io");
+  scipy.attr("savemat")(filename, variables);
+}
+
+} // namespace detail
+
 namespace io {
 
 using namespace pybind11::literals;
@@ -296,14 +306,11 @@ void write_mat(const TensorType &t, const std::string fname,
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
   auto pb = std::make_unique<detail::MatXPybind>();
-  auto np = pybind11::module_::import("numpy");
-  auto sp = pybind11::module_::import("scipy.io");
-
   auto np_ten = pb->TensorViewToNumpy(t);
 
   auto td = pybind11::dict{};
   td[var.c_str()] = np_ten;
-  auto obj = sp.attr("savemat")("file_name"_a = fname, "mdict"_a = td);
+  detail::SaveMatDictionary(td, fname);
 }
 
 /**
