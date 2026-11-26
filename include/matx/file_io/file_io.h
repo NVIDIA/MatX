@@ -51,6 +51,16 @@
 #if defined(MATX_ENABLE_FILEIO) || defined(DOXYGEN_ONLY)
 
 namespace matx {
+namespace detail {
+
+inline void SaveMatDictionary(const pybind11::dict &variables, const std::string &filename)
+{
+  auto scipy = pybind11::module_::import("scipy.io");
+  scipy.attr("savemat")(filename, variables);
+}
+
+} // namespace detail
+
 namespace io {
 
 using namespace pybind11::literals;
@@ -276,6 +286,45 @@ auto read_mat(const std::string fname,
 }
 
 /**
+ * @brief Copy a tensor into a MAT variable dictionary
+ * @param variables Dictionary to update
+ * @param name MATLAB variable name
+ * @param tensor Tensor with host-accessible data and completed writes
+ * @pre Python is initialized and the caller holds the GIL
+ */
+template <typename TensorType>
+void add_mat_variable(pybind11::dict &variables, const std::string &name,
+                      const TensorType &tensor)
+{
+  variables[name.c_str()] = detail::MatXPybind::TensorViewToNumpy(tensor);
+}
+
+/**
+ * @brief Write a dictionary of named variables to one MAT file
+ * @param variables Dictionary of names and values to save
+ * @param filename MAT file to write or replace
+ * @pre Python is initialized and the caller holds the GIL
+ * @throws pybind11::type_error If a key is not a string
+ * @throws pybind11::value_error If a name is empty or starts with an underscore
+ */
+inline void write_mat(const pybind11::dict &variables, const std::string &filename)
+{
+  MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+
+  for (const auto &variable : variables) {
+    if (!pybind11::isinstance<pybind11::str>(variable.first)) {
+      throw pybind11::type_error("MAT variable names must be strings");
+    }
+    const auto name = variable.first.cast<std::string>();
+    if (name.empty() || name.front() == '_') {
+      throw pybind11::value_error("MAT variable names must be nonempty and cannot start with '_'");
+    }
+  }
+
+  detail::SaveMatDictionary(variables, filename);
+}
+
+/**
  * @brief Write a MAT file from a tensor view
  *
  * Writes a single tensor value into a .mat file.
@@ -283,7 +332,7 @@ auto read_mat(const std::string fname,
  * @tparam TensorType
  *   Data type of tensor
  * @param t
- *   Tensor to read data into
+ *   Tensor to write
  * @param fname
  *   File name of .mat file
  * @param var
@@ -295,15 +344,10 @@ void write_mat(const TensorType &t, const std::string fname,
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
 
-  auto pb = std::make_unique<detail::MatXPybind>();
-  auto np = pybind11::module_::import("numpy");
-  auto sp = pybind11::module_::import("scipy.io");
-
-  auto np_ten = pb->TensorViewToNumpy(t);
-
-  auto td = pybind11::dict{};
-  td[var.c_str()] = np_ten;
-  auto obj = sp.attr("savemat")("file_name"_a = fname, "mdict"_a = td);
+  detail::MatXPybind python;
+  pybind11::dict variables;
+  add_mat_variable(variables, var, t);
+  detail::SaveMatDictionary(variables, fname);
 }
 
 /**

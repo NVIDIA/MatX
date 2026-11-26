@@ -36,7 +36,186 @@
 #include "utilities.h"
 #include "gtest/gtest.h"
 
+#include <chrono>
+#include <cstdint>
+#include <filesystem>
+
 using namespace matx;
+
+class FileIoMatHost : public ::testing::Test {
+protected:
+  void SetUp() override
+  {
+    const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
+    const auto name = ::testing::UnitTest::GetInstance()->current_test_info()->name();
+    const auto path = std::filesystem::temp_directory_path() /
+                      (std::string("matx_") + name + "_" + std::to_string(stamp));
+    ASSERT_TRUE(std::filesystem::create_directory(path));
+    directory = path;
+  }
+
+  void TearDown() override
+  {
+    if (!directory.empty()) {
+      std::filesystem::remove_all(directory);
+    }
+  }
+
+  static pybind11::dict LoadVariables(const std::string &filename)
+  {
+    auto scipy = pybind11::module_::import("scipy.io");
+    auto variables = scipy.attr("loadmat")(filename).cast<pybind11::dict>();
+    variables.attr("pop")("__header__", pybind11::none());
+    variables.attr("pop")("__version__", pybind11::none());
+    variables.attr("pop")("__globals__", pybind11::none());
+    return variables;
+  }
+
+  std::filesystem::path directory;
+};
+
+TEST_F(FileIoMatHost, LegacyWriteRoundTrip)
+{
+  auto input = make_tensor<float>({2, 3}, MATX_HOST_MALLOC_MEMORY);
+  for (index_t row = 0; row < 2; ++row) {
+    for (index_t col = 0; col < 3; ++col) {
+      input(row, col) = static_cast<float>(10 * row + col);
+    }
+  }
+
+  const auto filename = (directory / "legacy.mat").string();
+  io::write_mat(input, filename, "samples");
+
+  const auto variables = LoadVariables(filename);
+  ASSERT_EQ(variables.size(), 1U);
+  ASSERT_TRUE(variables.contains("samples"));
+  const auto samples = variables["samples"].cast<pybind11::array>();
+  ASSERT_EQ(samples.ndim(), 2);
+  ASSERT_EQ(samples.shape(0), 2);
+  ASSERT_EQ(samples.shape(1), 3);
+  ASSERT_TRUE(samples.dtype().equal(pybind11::dtype::of<float>()));
+
+  const auto values = samples.unchecked<float, 2>();
+  auto readback = make_tensor<float>({2, 3}, MATX_HOST_MALLOC_MEMORY);
+  io::read_mat(readback, filename, "samples");
+  for (index_t row = 0; row < 2; ++row) {
+    for (index_t col = 0; col < 3; ++col) {
+      EXPECT_EQ(values(row, col), input(row, col));
+      EXPECT_EQ(readback(row, col), input(row, col));
+    }
+  }
+}
+
+TEST_F(FileIoMatHost, LegacyWriteReplacesFile)
+{
+  auto input = make_tensor<float>({1, 1}, MATX_HOST_MALLOC_MEMORY);
+  const auto filename = (directory / "replace.mat").string();
+  input(0, 0) = 1.0f;
+  io::write_mat(input, filename, "first");
+  input(0, 0) = 2.0f;
+  io::write_mat(input, filename, "second");
+
+  const auto variables = LoadVariables(filename);
+  ASSERT_EQ(variables.size(), 1U);
+  EXPECT_TRUE(variables.contains("second"));
+}
+
+TEST_F(FileIoMatHost, WriteDictionaryRoundTrip)
+{
+  detail::MatXPybind python;
+  const auto filename = (directory / "dictionary.mat").string();
+  pybind11::dict variables;
+  {
+    auto matrix = make_tensor<float>({2, 3}, MATX_HOST_MALLOC_MEMORY);
+    auto storage = make_tensor<int16_t>({2, 3, 6}, MATX_HOST_MALLOC_MEMORY);
+    for (index_t i = 0; i < 2; ++i) {
+      for (index_t j = 0; j < 3; ++j) {
+        matrix(i, j) = static_cast<float>(10 * i + j);
+        for (index_t k = 0; k < 6; ++k) {
+          storage(i, j, k) = static_cast<int16_t>(100 * i + 10 * j + k);
+        }
+      }
+    }
+    auto view = slice(storage, {0, 0, 1}, {2, 3, 6}, {1, 1, 2});
+
+    // example-begin write_mat-dictionary-add
+    io::add_mat_variable(variables, "matrix", matrix);
+    io::add_mat_variable(variables, "view", view);
+    // example-end write_mat-dictionary-add
+
+    matrix(0, 0) = -1.0f;
+    storage(0, 0, 1) = -1;
+  }
+
+  // example-begin write_mat-dictionary-save
+  io::write_mat(variables, filename);
+  // example-end write_mat-dictionary-save
+
+  const auto saved = LoadVariables(filename);
+  ASSERT_EQ(saved.size(), 2U);
+  ASSERT_TRUE(saved.contains("matrix"));
+  ASSERT_TRUE(saved.contains("view"));
+  const auto matrix = saved["matrix"].cast<pybind11::array>();
+  const auto view = saved["view"].cast<pybind11::array>();
+  ASSERT_EQ(matrix.ndim(), 2);
+  ASSERT_EQ(matrix.shape(0), 2);
+  ASSERT_EQ(matrix.shape(1), 3);
+  ASSERT_TRUE(matrix.dtype().equal(pybind11::dtype::of<float>()));
+  ASSERT_EQ(view.ndim(), 3);
+  ASSERT_EQ(view.shape(0), 2);
+  ASSERT_EQ(view.shape(1), 3);
+  ASSERT_EQ(view.shape(2), 3);
+  ASSERT_TRUE(view.dtype().equal(pybind11::dtype::of<int16_t>()));
+
+  const auto matrix_values = matrix.unchecked<float, 2>();
+  const auto view_values = view.unchecked<int16_t, 3>();
+  for (index_t i = 0; i < 2; ++i) {
+    for (index_t j = 0; j < 3; ++j) {
+      EXPECT_EQ(matrix_values(i, j), static_cast<float>(10 * i + j));
+      for (index_t k = 0; k < 3; ++k) {
+        EXPECT_EQ(view_values(i, j, k), static_cast<int16_t>(100 * i + 10 * j + 2 * k + 1));
+      }
+    }
+  }
+}
+
+TEST_F(FileIoMatHost, WriteDictionaryInvalidPath)
+{
+  detail::MatXPybind python;
+  pybind11::dict variables;
+  auto input = make_tensor<float>({1, 1}, MATX_HOST_MALLOC_MEMORY);
+  input(0, 0) = 1.0f;
+  io::add_mat_variable(variables, "samples", input);
+
+  const auto filename = (directory / "missing" / "output.mat").string();
+  EXPECT_THROW(io::write_mat(variables, filename), pybind11::error_already_set);
+}
+
+TEST_F(FileIoMatHost, WriteDictionaryRejectsInvalidNamesBeforeReplacingFile)
+{
+  auto input = make_tensor<float>({1, 1}, MATX_HOST_MALLOC_MEMORY);
+  input(0, 0) = 1.0f;
+  const auto filename = (directory / "existing.mat").string();
+  io::write_mat(input, filename, "original");
+
+  pybind11::dict variables;
+  io::add_mat_variable(variables, "replacement", input);
+  const auto replacement = variables["replacement"].cast<pybind11::array>();
+  variables["_hidden"] = replacement;
+  EXPECT_THROW(io::write_mat(variables, filename), pybind11::value_error);
+  variables.attr("pop")("_hidden");
+  variables[""] = replacement;
+  EXPECT_THROW(io::write_mat(variables, filename), pybind11::value_error);
+  variables.attr("pop")("");
+  variables[pybind11::int_(1)] = replacement;
+  EXPECT_THROW(io::write_mat(variables, filename), pybind11::type_error);
+
+  const auto saved = LoadVariables(filename);
+  ASSERT_EQ(saved.size(), 1U);
+  ASSERT_TRUE(saved.contains("original"));
+  const auto original = saved["original"].cast<pybind11::array>();
+  EXPECT_EQ((original.unchecked<float, 2>()(0, 0)), 1.0f);
+}
 
 template <typename T> class FileIoTests : public ::testing::Test {
 protected:

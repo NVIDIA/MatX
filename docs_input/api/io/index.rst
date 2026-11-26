@@ -34,8 +34,11 @@ argument.
 MAT
 ===
 
-MAT files can contain multiple named variables. ``read_mat`` and ``write_mat``
-therefore take a variable name in addition to the file name.
+MAT files can contain multiple named variables. Pass a variable name to
+``read_mat`` to select one variable or to the tensor overload of ``write_mat``
+to save one variable. To save several variables in one file, build a dictionary
+with ``add_mat_variable`` and pass it to the dictionary overload of
+:ref:`write_mat <write_mat_func>`.
 
 .. code-block:: cpp
 

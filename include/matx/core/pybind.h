@@ -322,28 +322,28 @@ public:
     return ften.at(std::forward<Ix>(index)...);
   }
 
-  template <typename T> inline T ConvertComplex(const T &in) { return in; }
+  template <typename T> static T ConvertComplex(const T &in) { return in; }
 
   template <typename T>
-  inline cuda::std::complex<T> ConvertComplex(const std::complex<T> in)
+  static cuda::std::complex<T> ConvertComplex(const std::complex<T> in)
   {
     return {in.real(), in.imag()};
   }
 
   template <typename T>
-  inline std::complex<T> ConvertComplex(const cuda::std::complex<T> in)
+  static std::complex<T> ConvertComplex(const cuda::std::complex<T> in)
   {
     return {in.real(), in.imag()};
   }
 
   template <typename T>
-  inline matxFp16Complex ConvertComplex(const matxFp16Complex in)
+  static matxFp16Complex ConvertComplex(const matxFp16Complex in)
   {
     return {in.real(), in.imag()};
   }
 
   template <typename T>
-  inline matxBf16Complex ConvertComplex(const matxBf16Complex in)
+  static matxBf16Complex ConvertComplex(const matxBf16Complex in)
   {
     return {in.real(), in.imag()};
   }
@@ -467,7 +467,7 @@ public:
   }
 
   template <typename TensorType>
-  auto TensorViewToNumpy(const TensorType &ten) {
+  static auto TensorViewToNumpy(const TensorType &ten) {
     using tensor_type = typename TensorType::value_type;
     using ntype = matx_convert_complex_type<tensor_type>;
     constexpr int RANK = TensorType::Rank();
