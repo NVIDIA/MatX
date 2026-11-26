@@ -120,6 +120,77 @@ TEST_F(FileIoMatHost, LegacyWriteReplacesFile)
   EXPECT_TRUE(variables.contains("second"));
 }
 
+TEST_F(FileIoMatHost, WriteDictionaryRoundTrip)
+{
+  detail::MatXPybind python;
+  const auto filename = (directory / "dictionary.mat").string();
+  pybind11::dict variables;
+  {
+    auto matrix = make_tensor<float>({2, 3}, MATX_HOST_MALLOC_MEMORY);
+    auto storage = make_tensor<int16_t>({2, 3, 6}, MATX_HOST_MALLOC_MEMORY);
+    for (index_t i = 0; i < 2; ++i) {
+      for (index_t j = 0; j < 3; ++j) {
+        matrix(i, j) = static_cast<float>(10 * i + j);
+        for (index_t k = 0; k < 6; ++k) {
+          storage(i, j, k) = static_cast<int16_t>(100 * i + 10 * j + k);
+        }
+      }
+    }
+    auto view = slice(storage, {0, 0, 1}, {2, 3, 6}, {1, 1, 2});
+
+    // example-begin write_mat-dictionary-add
+    io::add_mat_variable(variables, "matrix", matrix);
+    io::add_mat_variable(variables, "view", view);
+    // example-end write_mat-dictionary-add
+
+    matrix(0, 0) = -1.0f;
+    storage(0, 0, 1) = -1;
+  }
+
+  // example-begin write_mat-dictionary-save
+  io::write_mat(variables, filename);
+  // example-end write_mat-dictionary-save
+
+  const auto saved = LoadVariables(filename);
+  ASSERT_EQ(saved.size(), 2U);
+  ASSERT_TRUE(saved.contains("matrix"));
+  ASSERT_TRUE(saved.contains("view"));
+  const auto matrix = saved["matrix"].cast<pybind11::array>();
+  const auto view = saved["view"].cast<pybind11::array>();
+  ASSERT_EQ(matrix.ndim(), 2);
+  ASSERT_EQ(matrix.shape(0), 2);
+  ASSERT_EQ(matrix.shape(1), 3);
+  ASSERT_TRUE(matrix.dtype().equal(pybind11::dtype::of<float>()));
+  ASSERT_EQ(view.ndim(), 3);
+  ASSERT_EQ(view.shape(0), 2);
+  ASSERT_EQ(view.shape(1), 3);
+  ASSERT_EQ(view.shape(2), 3);
+  ASSERT_TRUE(view.dtype().equal(pybind11::dtype::of<int16_t>()));
+
+  const auto matrix_values = matrix.unchecked<float, 2>();
+  const auto view_values = view.unchecked<int16_t, 3>();
+  for (index_t i = 0; i < 2; ++i) {
+    for (index_t j = 0; j < 3; ++j) {
+      EXPECT_EQ(matrix_values(i, j), static_cast<float>(10 * i + j));
+      for (index_t k = 0; k < 3; ++k) {
+        EXPECT_EQ(view_values(i, j, k), static_cast<int16_t>(100 * i + 10 * j + 2 * k + 1));
+      }
+    }
+  }
+}
+
+TEST_F(FileIoMatHost, WriteDictionaryInvalidPath)
+{
+  detail::MatXPybind python;
+  pybind11::dict variables;
+  auto input = make_tensor<float>({1, 1}, MATX_HOST_MALLOC_MEMORY);
+  input(0, 0) = 1.0f;
+  io::add_mat_variable(variables, "samples", input);
+
+  const auto filename = (directory / "missing" / "output.mat").string();
+  EXPECT_THROW(io::write_mat(variables, filename), pybind11::error_already_set);
+}
+
 template <typename T> class FileIoTests : public ::testing::Test {
 protected:
   using GTestType = cuda::std::tuple_element_t<0, T>;
