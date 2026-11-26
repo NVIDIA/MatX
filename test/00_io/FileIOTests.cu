@@ -36,7 +36,89 @@
 #include "utilities.h"
 #include "gtest/gtest.h"
 
+#include <chrono>
+#include <cstdint>
+#include <filesystem>
+
 using namespace matx;
+
+class FileIoMatHost : public ::testing::Test {
+protected:
+  void SetUp() override
+  {
+    const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
+    const auto name = ::testing::UnitTest::GetInstance()->current_test_info()->name();
+    const auto path = std::filesystem::temp_directory_path() /
+                      (std::string("matx_") + name + "_" + std::to_string(stamp));
+    ASSERT_TRUE(std::filesystem::create_directory(path));
+    directory = path;
+  }
+
+  void TearDown() override
+  {
+    if (!directory.empty()) {
+      std::filesystem::remove_all(directory);
+    }
+  }
+
+  static pybind11::dict LoadVariables(const std::string &filename)
+  {
+    auto scipy = pybind11::module_::import("scipy.io");
+    auto variables = scipy.attr("loadmat")(filename).cast<pybind11::dict>();
+    variables.attr("pop")("__header__", pybind11::none());
+    variables.attr("pop")("__version__", pybind11::none());
+    variables.attr("pop")("__globals__", pybind11::none());
+    return variables;
+  }
+
+  std::filesystem::path directory;
+};
+
+TEST_F(FileIoMatHost, LegacyWriteRoundTrip)
+{
+  auto input = make_tensor<float>({2, 3}, MATX_HOST_MALLOC_MEMORY);
+  for (index_t row = 0; row < 2; ++row) {
+    for (index_t col = 0; col < 3; ++col) {
+      input(row, col) = static_cast<float>(10 * row + col);
+    }
+  }
+
+  const auto filename = (directory / "legacy.mat").string();
+  io::write_mat(input, filename, "samples");
+
+  const auto variables = LoadVariables(filename);
+  ASSERT_EQ(variables.size(), 1U);
+  ASSERT_TRUE(variables.contains("samples"));
+  const auto samples = variables["samples"].cast<pybind11::array>();
+  ASSERT_EQ(samples.ndim(), 2);
+  ASSERT_EQ(samples.shape(0), 2);
+  ASSERT_EQ(samples.shape(1), 3);
+  ASSERT_TRUE(samples.dtype().equal(pybind11::dtype::of<float>()));
+
+  const auto values = samples.unchecked<float, 2>();
+  auto readback = make_tensor<float>({2, 3}, MATX_HOST_MALLOC_MEMORY);
+  io::read_mat(readback, filename, "samples");
+  for (index_t row = 0; row < 2; ++row) {
+    for (index_t col = 0; col < 3; ++col) {
+      EXPECT_EQ(values(row, col), input(row, col));
+      EXPECT_EQ(readback(row, col), input(row, col));
+    }
+  }
+}
+
+TEST_F(FileIoMatHost, LegacyWriteReplacesFile)
+{
+  auto input = make_tensor<float>({1, 1}, MATX_HOST_MALLOC_MEMORY);
+  const auto filename = (directory / "replace.mat").string();
+  input(0, 0) = 1.0f;
+  io::write_mat(input, filename, "first");
+  input(0, 0) = 2.0f;
+  io::write_mat(input, filename, "second");
+
+  const auto variables = LoadVariables(filename);
+  ASSERT_EQ(variables.size(), 1U);
+  EXPECT_TRUE(variables.contains("second"));
+}
 
 template <typename T> class FileIoTests : public ::testing::Test {
 protected:
