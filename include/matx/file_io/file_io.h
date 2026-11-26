@@ -304,10 +304,22 @@ void add_mat_variable(pybind11::dict &variables, const std::string &name,
  * @param variables Dictionary of names and values to save
  * @param filename MAT file to write or replace
  * @pre Python is initialized and the caller holds the GIL
+ * @throws pybind11::type_error If a key is not a string
+ * @throws pybind11::value_error If a name is empty or starts with an underscore
  */
 inline void write_mat(const pybind11::dict &variables, const std::string &filename)
 {
   MATX_NVTX_START("", matx::MATX_NVTX_LOG_API)
+
+  for (const auto &variable : variables) {
+    if (!pybind11::isinstance<pybind11::str>(variable.first)) {
+      throw pybind11::type_error("MAT variable names must be strings");
+    }
+    const auto name = variable.first.cast<std::string>();
+    if (name.empty() || name.front() == '_') {
+      throw pybind11::value_error("MAT variable names must be nonempty and cannot start with '_'");
+    }
+  }
 
   detail::SaveMatDictionary(variables, filename);
 }

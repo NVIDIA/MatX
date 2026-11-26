@@ -9,8 +9,10 @@ Write one or more variables to a MAT file
    Enable file I/O with ``-DMATX_EN_FILEIO=ON`` and install NumPy and SciPy
 
 The tensor overload writes one variable under the name passed in ``var``.
-The dictionary overload writes all variables from a ``pybind11::dict``.
-Both overloads replace an existing file at the given path.
+The dictionary overload writes the named variables from a ``pybind11::dict``.
+It rejects non-string keys, empty names, and names starting with ``_`` before
+opening the output file. Both overloads replace an existing file at the given
+path when writing.
 
 
 .. versionadded:: 0.3.0
@@ -27,10 +29,11 @@ Examples
    :end-before: example-end write_mat-test-1
    :dedent:
 
-To save two tensors in one file, initialize Python before creating the
-dictionary and hold the GIL when creating, using, or destroying Python objects.
-For example, a C++ application that embeds Python can create a
-``pybind11::scoped_interpreter`` before the dictionary.
+To save two tensors in one file, hold the GIL when creating, using, or
+destroying Python objects. Reuse the active Python interpreter if your
+application or an earlier MatX file I/O call has already started it. Otherwise,
+create a ``pybind11::scoped_interpreter`` before the dictionary and keep it alive
+until the Python objects have been destroyed.
 
 .. code-block:: cpp
 

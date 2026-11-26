@@ -191,6 +191,32 @@ TEST_F(FileIoMatHost, WriteDictionaryInvalidPath)
   EXPECT_THROW(io::write_mat(variables, filename), pybind11::error_already_set);
 }
 
+TEST_F(FileIoMatHost, WriteDictionaryRejectsInvalidNamesBeforeReplacingFile)
+{
+  auto input = make_tensor<float>({1, 1}, MATX_HOST_MALLOC_MEMORY);
+  input(0, 0) = 1.0f;
+  const auto filename = (directory / "existing.mat").string();
+  io::write_mat(input, filename, "original");
+
+  pybind11::dict variables;
+  io::add_mat_variable(variables, "replacement", input);
+  const auto replacement = variables["replacement"].cast<pybind11::array>();
+  variables["_hidden"] = replacement;
+  EXPECT_THROW(io::write_mat(variables, filename), pybind11::value_error);
+  variables.attr("pop")("_hidden");
+  variables[""] = replacement;
+  EXPECT_THROW(io::write_mat(variables, filename), pybind11::value_error);
+  variables.attr("pop")("");
+  variables[pybind11::int_(1)] = replacement;
+  EXPECT_THROW(io::write_mat(variables, filename), pybind11::type_error);
+
+  const auto saved = LoadVariables(filename);
+  ASSERT_EQ(saved.size(), 1U);
+  ASSERT_TRUE(saved.contains("original"));
+  const auto original = saved["original"].cast<pybind11::array>();
+  EXPECT_EQ((original.unchecked<float, 2>()(0, 0)), 1.0f);
+}
+
 template <typename T> class FileIoTests : public ::testing::Test {
 protected:
   using GTestType = cuda::std::tuple_element_t<0, T>;
