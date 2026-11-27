@@ -84,9 +84,46 @@ struct SarBpBinAndWeight {
     int32_t bin_floor_int;
 };
 
+// a * b + c as a single fused multiply-add.
+template <typename T>
+__device__ __forceinline__ T SarBpFma(T a, T b, T c)
+{
+    if constexpr (cuda::std::is_same_v<T, float>) {
+        return __fmaf_rn(a, b, c);
+    } else {
+        return __fma_rn(a, b, c);
+    }
+}
+
+// Squared distance dx^2 + dy^2 + dz^2 as one multiply and two fused
+// multiply-adds, the minimum for three per-pixel offsets. The operation order
+// is explicit so that the rounding does not depend on how the compiler
+// contracts the expression. In particular, with two pixels per thread and a
+// uniform pixel z, the compiler would otherwise compute the shared dz * dz once
+// and add it to each pixel unfused, which costs an extra instruction per
+// pixel-pulse and rounds differently from one pixel per thread.
+template <typename T>
+__device__ __forceinline__ T SarBpRangeSquared(T dx, T dy, T dz)
+{
+    return SarBpFma(dz, dz, SarBpFma(dx, dx, dy * dy));
+}
+
+// Squared distance from a precomputed dz^2 as two fused multiply-adds. With a
+// zero or fixed pixel z, dz^2 is the same for every pixel of a pulse, so it is
+// computed once per pulse (or once per thread for all of its pixels) and each
+// pixel needs only these two instructions. The rounding differs from
+// SarBpRangeSquared.
+template <typename T>
+__device__ __forceinline__ T SarBpRangeSquaredFromDz2(T dx, T dy, T dz2)
+{
+    return SarBpFma(dx, dx, SarBpFma(dy, dy, dz2));
+}
+
 // pixel_coord_t is the kernel's pixel coordinate type (see SarBpPixelCoord), so
-// Mixed receives fp64 coordinates when the voxel locations are fp64.
-template <typename PlatPosAccessor, SarBpComputeType ComputeType, typename strict_compute_t, typename pixel_coord_t, typename IdxT>
+// Mixed receives fp64 coordinates when the voxel locations are fp64. With
+// SharedDz2, the caller guarantees that pz is the same for all of a thread's
+// pixels, so the compiler computes dz * dz once per pulse for all of them.
+template <typename PlatPosAccessor, SarBpComputeType ComputeType, typename strict_compute_t, typename pixel_coord_t, bool SharedDz2, typename IdxT>
 __device__ inline strict_compute_t ComputeRangeToPixel(const PlatPosAccessor &ant_pos, const IdxT pulse_idx, const pixel_coord_t px, const pixel_coord_t py, const pixel_coord_t pz) {
     using plat_pos_t = typename PlatPosAccessor::value_type;
     constexpr int Rank = PlatPosAccessor::Rank;
@@ -111,18 +148,24 @@ __device__ inline strict_compute_t ComputeRangeToPixel(const PlatPosAccessor &an
         dz = static_cast<strict_compute_t>(pz) - static_cast<strict_compute_t>(ant_pos(pulse_idx, 2));
     }
 
+    strict_compute_t r2;
+    if constexpr (SharedDz2) {
+        r2 = SarBpRangeSquaredFromDz2(dx, dy, dz * dz);
+    } else {
+        r2 = SarBpRangeSquared(dx, dy, dz);
+    }
     if constexpr (IsFloat) {
-        return ::sqrtf(dx*dx + dy*dy + dz*dz);
+        return ::sqrtf(r2);
     } else {
         if constexpr (IsMixed) {
 #if __CUDA_ARCH__ == 700 || __CUDA_ARCH__ == 800 || __CUDA_ARCH__ == 900 || __CUDA_ARCH__ == 1000
-            return ::sqrt(dx*dx + dy*dy + dz*dz);
+            return ::sqrt(r2);
 #else
             // Only use the Newton-Raphson approach on systems with reduced FP64 throughput
-            return NewtonRaphsonSqrt(dx*dx + dy*dy + dz*dz);
+            return NewtonRaphsonSqrt(r2);
 #endif
         } else {
-            return ::sqrt(dx*dx + dy*dy + dz*dz);
+            return ::sqrt(r2);
         }
     }
 }
@@ -709,7 +752,7 @@ __device__ inline SarBpBinAndWeight<float> ComputeBinWeightToPixelTaylorFast(
 
 // pixel_coord_t is the kernel's pixel coordinate type (see SarBpPixelCoord): fp64
 // for Mixed with fp64 voxel locations, otherwise loose_compute_t.
-template <SarBpComputeType ComputeType, bool PixelZIsZero, bool UseCachedDz2, bool PixelZIsUniform,
+template <SarBpComputeType ComputeType, bool UseCachedDz2, bool PixelZIsUniform,
           typename strict_compute_t, typename loose_compute_t, typename pixel_coord_t, typename IdxT>
 __device__ inline SarBpBinAndWeight<loose_compute_t> ComputeBinWeightToPixelPulseBlockCache(
     const SarBpPulseBlockCache<ComputeType, true, PixelZIsUniform> &sh_mem,
@@ -728,28 +771,25 @@ __device__ inline SarBpBinAndWeight<loose_compute_t> ComputeBinWeightToPixelPuls
     const strict_compute_t mcp_partial = sh_mem.ant_pos[ip][3];
     const strict_compute_t dx = static_cast<strict_compute_t>(px) - apx;
     const strict_compute_t dy = static_cast<strict_compute_t>(py) - apy;
-    // The z contribution to the squared distance. In Fixed mode with caching,
-    // slot [2] already holds the per-pulse dz^2 (uniform across pixels), so the
-    // per-pixel subtract+square is skipped. Otherwise slot [2] holds the antenna
-    // z and dz = pz - apz (or -apz when PixelZIsZero -- the explicit elision is
-    // kept here because, unlike the other helpers, the FP64 Mixed path does not
-    // fold the pz == 0 constant as tightly, costing a few registers).
-    strict_compute_t dz2;
+    // The z contribution to the squared distance. With a zero or fixed pixel z,
+    // slot [2] holds the per-pulse dz^2 (uniform across pixels), so each pixel
+    // needs only two fused multiply-adds. With variable z, slot [2] holds the
+    // antenna z.
+    strict_compute_t r2;
     if constexpr (UseCachedDz2) {
-        dz2 = sh_mem.ant_pos[ip][2];
+        r2 = SarBpRangeSquaredFromDz2(dx, dy, sh_mem.ant_pos[ip][2]);
     } else {
-        const strict_compute_t apz = sh_mem.ant_pos[ip][2];
-        const strict_compute_t dz = PixelZIsZero ? -apz : (static_cast<strict_compute_t>(pz) - apz);
-        dz2 = dz * dz;
+        const strict_compute_t dz = static_cast<strict_compute_t>(pz) - sh_mem.ant_pos[ip][2];
+        r2 = SarBpRangeSquared(dx, dy, dz);
     }
     strict_compute_t dist;
     if constexpr (IsFloat) {
-        dist = ::sqrtf(dx*dx + dy*dy + dz2);
+        dist = ::sqrtf(r2);
     } else {
 #if __CUDA_ARCH__ == 700 || __CUDA_ARCH__ == 800 || __CUDA_ARCH__ == 900 || __CUDA_ARCH__ == 1000
-        dist = ::sqrt(dx*dx + dy*dy + dz2);
+        dist = ::sqrt(r2);
 #else
-        dist = NewtonRaphsonSqrt(dx*dx + dy*dy + dz2);
+        dist = NewtonRaphsonSqrt(r2);
 #endif
     }
 
@@ -767,31 +807,147 @@ __device__ inline SarBpBinAndWeight<loose_compute_t> ComputeBinWeightToPixelPuls
     };
 }
 
-template <SarBpComputeType ComputeType, SarBpPixelZMode PixelZMode, bool TaylorFastAddThirdOrder>
-struct SarBpMinCtaCount { static constexpr int value = 5; };
+// Number of image pixels each thread accumulates. Each CTA covers a 16 x 16
+// pixel tile, 16 x (16 / pixels per thread) threads. Thus, pixels per thread
+// must evenly divide the 16 rows of the tile. Thread (x, y) owns the tile's rows y,
+// y + blockDim.y, and so on. A thread reads each pulse's values from shared
+// memory once for all of its pixels, which halves the shared-memory traffic
+// and loop overhead per pixel-pulse.
+template <SarBpComputeType ComputeType>
+inline constexpr int SarBpPixelsPerThread =
+    (ComputeType == SarBpComputeType::TaylorFast || ComputeType == SarBpComputeType::FloatFloat ||
+     ComputeType == SarBpComputeType::Mixed) ? 2 : 1;
 
-template <> struct SarBpMinCtaCount<SarBpComputeType::TaylorFast, SarBpPixelZMode::Variable, false> { static constexpr int value = 6; };
-template <> struct SarBpMinCtaCount<SarBpComputeType::TaylorFast, SarBpPixelZMode::Zero, false> { static constexpr int value = 6; };
-template <> struct SarBpMinCtaCount<SarBpComputeType::TaylorFast, SarBpPixelZMode::Fixed, false> { static constexpr int value = 6; };
-template <> struct SarBpMinCtaCount<SarBpComputeType::Float, SarBpPixelZMode::Zero, false> { static constexpr int value = 6; };
-template <> struct SarBpMinCtaCount<SarBpComputeType::Float, SarBpPixelZMode::Fixed, false> { static constexpr int value = 6; };
-template <> struct SarBpMinCtaCount<SarBpComputeType::Float, SarBpPixelZMode::Variable, false> { static constexpr int value = 6; };
+// Threads per CTA, 16 x 16 / SarBpPixelsPerThread. The tile's 16 rows must
+// split evenly among each thread's pixels.
+template <SarBpComputeType ComputeType>
+constexpr int SarBpThreadsPerCtaFor()
+{
+    static_assert(16 % SarBpPixelsPerThread<ComputeType> == 0,
+                  "SarBp: pixels per thread must evenly divide the 16 rows of a tile");
+    return 16 * 16 / SarBpPixelsPerThread<ComputeType>;
+}
+template <SarBpComputeType ComputeType>
+inline constexpr int SarBpThreadsPerCta = SarBpThreadsPerCtaFor<ComputeType>();
 
-// Cap the maximum CTA count to the architecture's limit. sm_75 caps at 1024 threads/SM
-// and all other supported architectures allow at least 1536 (6 CTAs). Pushing to 8
-// CTAS_PER_SM would greatly limit register allocation, so treat 6 as the common maximum.
-#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ == 750
-#define MATX_SARBP_MAX_CTAS_PER_SM 4
+// Kernel families with separate launch tuning: one per compute type, plus
+// TaylorFast with the third-order term and Mixed with direct sincos instead of
+// the phase LUT.
+enum class SarBpTunedKernel {
+    Double,
+    Mixed,                 // phase LUT
+    MixedDirect,           // direct sincos
+    FloatFloat,
+    TaylorFast,            // second order
+    TaylorFastThirdOrder,
+    Float
+};
+
+template <SarBpComputeType ComputeType, bool PhaseLUT, bool TaylorFastAddThirdOrder>
+inline constexpr SarBpTunedKernel SarBpTunedKernelFor =
+    ComputeType == SarBpComputeType::Mixed      ? (PhaseLUT ? SarBpTunedKernel::Mixed : SarBpTunedKernel::MixedDirect) :
+    ComputeType == SarBpComputeType::FloatFloat ? SarBpTunedKernel::FloatFloat :
+    ComputeType == SarBpComputeType::TaylorFast ? (TaylorFastAddThirdOrder ? SarBpTunedKernel::TaylorFastThirdOrder
+                                                                           : SarBpTunedKernel::TaylorFast) :
+    ComputeType == SarBpComputeType::Float      ? SarBpTunedKernel::Float :
+                                                  SarBpTunedKernel::Double;
+
+// Launch settings for one kernel family. CTA counts are the minimum resident
+// CTAs per SM requested through __launch_bounds__, in CTAs of
+// SarBpThreadsPerCta threads, so TaylorFast, FloatFloat and Mixed count
+// 128-thread CTAs and Double and Float 256-thread CTAs. Unroll factors apply to the pulse loop. The first CTA count
+// and unroll factor apply with zero or fixed pixel z, the VariableZ ones with
+// variable pixel z. Every entry states all four values, so an entry never
+// inherits one value while overriding another.
+template <int CtasV, int VariableZCtasV, int UnrollV, int VariableZUnrollV>
+struct SarBpLaunchTuning {
+    static constexpr int Ctas = CtasV;
+    static constexpr int VariableZCtas = VariableZCtasV;
+    static constexpr int Unroll = UnrollV;
+    static constexpr int VariableZUnroll = VariableZUnrollV;
+};
+
+// All settings below were tuned empirically by timing the sarbp example on
+// each GPU; to retune, re-run those benchmarks. SarBpTuningDefaults holds the
+// settings for architectures without their own entries (tuned on H100 and
+// RTX PRO 6000), and SarBpTuning<Arch, Kernel> overrides them when
+// __CUDA_ARCH__ == Arch.
+// SarBpLaunchTuning arguments: Ctas, VariableZCtas, Unroll, VariableZUnroll.
+template <SarBpTunedKernel Kernel>
+struct SarBpTuningDefaults;
+template <>
+struct SarBpTuningDefaults<SarBpTunedKernel::Double>               : SarBpLaunchTuning<5, 5, 4, 4> {};
+template <>
+struct SarBpTuningDefaults<SarBpTunedKernel::Mixed>                : SarBpLaunchTuning<9, 9, 2, 2> {};
+template <>
+struct SarBpTuningDefaults<SarBpTunedKernel::MixedDirect>          : SarBpLaunchTuning<9, 9, 4, 4> {};
+template <>
+struct SarBpTuningDefaults<SarBpTunedKernel::FloatFloat>           : SarBpLaunchTuning<8, 8, 2, 2> {};
+template <>
+struct SarBpTuningDefaults<SarBpTunedKernel::TaylorFast>           : SarBpLaunchTuning<8, 8, 4, 4> {};
+template <>
+struct SarBpTuningDefaults<SarBpTunedKernel::TaylorFastThirdOrder> : SarBpLaunchTuning<8, 8, 2, 2> {};
+template <>
+struct SarBpTuningDefaults<SarBpTunedKernel::Float>                : SarBpLaunchTuning<6, 6, 4, 4> {};
+
+template <int Arch, SarBpTunedKernel Kernel>
+struct SarBpTuning : SarBpTuningDefaults<Kernel> {};
+
+// L40S (sm_89)
+template <>
+struct SarBpTuning<890, SarBpTunedKernel::TaylorFast>            : SarBpLaunchTuning<8, 7, 4, 4> {};
+template <>
+struct SarBpTuning<890, SarBpTunedKernel::FloatFloat>            : SarBpLaunchTuning<7, 7, 2, 2> {};
+
+// B200 (sm_100)
+template <>
+struct SarBpTuning<1000, SarBpTunedKernel::TaylorFast>           : SarBpLaunchTuning<9, 8, 4, 4> {};
+template <>
+struct SarBpTuning<1000, SarBpTunedKernel::TaylorFastThirdOrder> : SarBpLaunchTuning<9, 8, 2, 4> {};
+template <>
+struct SarBpTuning<1000, SarBpTunedKernel::FloatFloat>           : SarBpLaunchTuning<7, 7, 4, 4> {};
+template <>
+struct SarBpTuning<1000, SarBpTunedKernel::Mixed>                : SarBpLaunchTuning<9, 9, 4, 2> {};
+template <>
+struct SarBpTuning<1000, SarBpTunedKernel::Double>               : SarBpLaunchTuning<5, 5, 16, 16> {};
+
+// B300 (sm_103)
+template <>
+struct SarBpTuning<1030, SarBpTunedKernel::TaylorFast>           : SarBpLaunchTuning<9, 9, 4, 4> {};
+template <>
+struct SarBpTuning<1030, SarBpTunedKernel::TaylorFastThirdOrder> : SarBpLaunchTuning<10, 9, 2, 2> {};
+template <>
+struct SarBpTuning<1030, SarBpTunedKernel::FloatFloat>           : SarBpLaunchTuning<6, 6, 4, 4> {};
+
+// Jetson Thor (sm_110) uses the B300 settings.
+template <SarBpTunedKernel Kernel>
+struct SarBpTuning<1100, Kernel> : SarBpTuning<1030, Kernel> {};
+
+// Resident threads per SM that the requested CTA count may cover; ptxas ignores
+// a __launch_bounds__ minimum CTA count above the architecture's limit. sm_75
+// and sm_107 allow 1024 resident threads per SM. The other architectures allow
+// 1536 or 2048, and no entry requests more than 1536.
+template <int Arch>
+inline constexpr int SarBpMaxThreadsPerSm = (Arch == 750 || Arch == 1070) ? 1024 : 1536;
+
+#if defined(__CUDA_ARCH__)
+inline constexpr int SarBpTargetArch = __CUDA_ARCH__;
 #else
-#define MATX_SARBP_MAX_CTAS_PER_SM 6
+inline constexpr int SarBpTargetArch = 0;
 #endif
 
-// The requested CTA count, clamped to what this architecture can honor.
-template <SarBpComputeType ComputeType, SarBpPixelZMode PixelZMode, bool TaylorFastAddThirdOrder>
-inline constexpr int SarBpMinCtas =
-    (SarBpMinCtaCount<ComputeType, PixelZMode, TaylorFastAddThirdOrder>::value < MATX_SARBP_MAX_CTAS_PER_SM)
-        ? SarBpMinCtaCount<ComputeType, PixelZMode, TaylorFastAddThirdOrder>::value
-        : MATX_SARBP_MAX_CTAS_PER_SM;
+// Launch settings for one kernel instantiation on the architecture being
+// compiled: the minimum CTA count for __launch_bounds__, clamped to what the
+// architecture can honor, and the pulse-loop unroll factor.
+template <SarBpComputeType ComputeType, SarBpPixelZMode PixelZMode, bool PhaseLUT, bool TaylorFastAddThirdOrder>
+struct SarBpLaunchSettings {
+    using Tuning = SarBpTuning<SarBpTargetArch, SarBpTunedKernelFor<ComputeType, PhaseLUT, TaylorFastAddThirdOrder>>;
+    static constexpr bool VariableZ = PixelZMode == SarBpPixelZMode::Variable;
+    static constexpr int RequestedCtas = VariableZ ? Tuning::VariableZCtas : Tuning::Ctas;
+    static constexpr int MaxCtas = SarBpMaxThreadsPerSm<SarBpTargetArch> / SarBpThreadsPerCta<ComputeType>;
+    static constexpr int MinCtas = RequestedCtas < MaxCtas ? RequestedCtas : MaxCtas;
+    static constexpr int PulseUnroll = VariableZ ? Tuning::VariableZUnroll : Tuning::Unroll;
+};
 
 // SarBp backprojection kernel. PixelZMode is a compile-time assumption about
 // the pixel z (height) coordinates, selected by the caller via the
@@ -812,7 +968,7 @@ template <SarBpComputeType ComputeType, typename OutImageType, typename InitialI
 // register spills is beneficial. For modes with reduced register pressure, we set
 // higher minimum CTA counts to avoid the occupancy loss associated with a fixed value
 // for all instantiations.
-__launch_bounds__(16*16, (SarBpMinCtas<ComputeType, PixelZMode, TaylorFastAddThirdOrder>))
+__launch_bounds__(SarBpThreadsPerCta<ComputeType>, (SarBpLaunchSettings<ComputeType, PixelZMode, PhaseLUT, TaylorFastAddThirdOrder>::MinCtas))
 __global__ void SarBp(OutImageType output, const InitialImageType initial_image, const __grid_constant__ RangeProfilesType range_profiles, const __grid_constant__ PlatPosType platform_positions, const __grid_constant__ VoxLocType voxel_locations, const __grid_constant__ RangeToMcpType range_to_mcp,
                       dr_inv_param_t<ComputeType> dr_inv,
                       phase_correction_param_t<ComputeType, PhaseLUT> phase_correction_partial,
@@ -852,17 +1008,19 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
     // contribution to the squared range is the same for every pixel, so it is
     // computed once per pulse in FillPulseBlockCache and stored in the
     // (otherwise unused) antenna-z cache slot -- no extra shared memory.
-    //   - UseCachedDz2: Float/Mixed pulse-block-cache path. Scalar dz^2. Fixed
-    //     only; Zero there keeps the bit-exact inline elision (dz = -apz).
+    //   - UseCachedDz2: Float/Mixed pulse-block-cache path. Scalar dz^2, so
+    //     each pixel forms its squared range with two fused multiply-adds
+    //     (SarBpRangeSquaredFromDz2).
     //   - UseCachedPz2FF: FloatFloat path. Fully-compensated fltflt dz^2,
     //     applied to both Zero and Fixed since the compensated-arithmetic z
     //     terms (dz two-sum, z two-prod, 2*dz.hi*dz.lo, dz.lo^2) are the most
     //     expensive part of the inner loop and collapse to a single fltflt add.
     // TaylorFast handles uniform z via its reference-relative offsets
-    // (ref_dz == 0, see PixelZIsUniform); the non-cache paths fall back to the
-    // per-pixel dz computation.
+    // (ref_dz == 0, see PixelZIsUniform). The non-cache paths compute dz per
+    // pulse in each thread; with more than one pixel per thread, the thread
+    // shares that dz^2 among its pixels (SharedDz2).
     constexpr bool UseCachedDz2 =
-        PixelZIsFixed && (IsFloat || IsMixed) && PhaseLUT;
+        PixelZIsUniform && (IsFloat || IsMixed) && PhaseLUT;
     constexpr bool UseCachedPz2FF =
         PixelZIsUniform && IsFloatFloat;
     // The cooperative cache fill needs the (non-zero) uniform pixel z in every
@@ -887,9 +1045,16 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
 
     const index_t image_height = output.Size(0);
     const index_t image_width = output.Size(1);
+    // This thread owns pixel rows iy + k * blockDim.y of column ix, for
+    // k < PPT. Its first row is the topmost, so if it lies outside the image
+    // so do the others: is_valid means the thread has at least one pixel.
+    constexpr int PPT = SarBpPixelsPerThread<ComputeType>;
     const index_t ix = static_cast<index_t>(blockIdx.x * blockDim.x + threadIdx.x);
-    const index_t iy = static_cast<index_t>(blockIdx.y * blockDim.y + threadIdx.y);
+    const index_t iy = static_cast<index_t>(blockIdx.y * (blockDim.y * PPT) + threadIdx.y);
     const bool is_valid = ix < image_width && iy < image_height;
+    [[maybe_unused]] const auto pixel_valid = [&](int k) {
+        return ix < image_width && iy + k * static_cast<index_t>(blockDim.y) < image_height;
+    };
 
     // IsUnitStride=true implies the hot inputs must be tensor views (they
     // use .Data()). The transform-level dispatch enforces this; the
@@ -934,13 +1099,13 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
     voxel_loc_t voxel_loc = is_valid ? voxel_locations(iy, ix) : voxel_loc_t{};
     // Fixed mode needs the uniform pixel z in every thread that fills the cache,
     // but out-of-image threads have a zeroed voxel_loc. They take z from the
-    // CTA-origin pixel (thread 0's, always in-image since the CTA origin lies
-    // within the image); in-image threads already have the correct z. Taken only
-    // by out-of-image threads on edge CTAs.
+    // pixel at the CTA's tile origin (thread 0's first pixel, always in-image
+    // since the tile origin lies within the image); in-image threads already
+    // have the correct z. Taken only by out-of-image threads on edge CTAs.
     if constexpr (NeedFixedPz) {
         if (!is_valid) {
             const index_t origin_x = static_cast<index_t>(blockIdx.x * blockDim.x);
-            const index_t origin_y = static_cast<index_t>(blockIdx.y * blockDim.y);
+            const index_t origin_y = static_cast<index_t>(blockIdx.y * (blockDim.y * PPT));
             voxel_loc.z = voxel_locations(origin_y, origin_x).z;
         }
     }
@@ -953,6 +1118,23 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
     // When PixelZIsZero is known, pz folds to a compile-time 0 so the z terms in
     // the range/bin helpers are dropped.
     const pixel_coord_t pz = PixelZIsZero ? static_cast<pixel_coord_t>(0.0f) : static_cast<pixel_coord_t>(voxel_loc.z);
+    // FloatFloat and Mixed pass each pixel's own coordinates to their range
+    // helpers, so with more than one pixel per thread they are kept per pixel k;
+    // pixel 0's are (px, py, pz). A uniform z (Zero or Fixed) is shared by every pixel.
+    pixel_coord_t px_k[PPT], py_k[PPT], pz_k[PPT];
+    px_k[0] = px;
+    py_k[0] = py;
+    pz_k[0] = pz;
+    #pragma unroll
+    for (int k = 1; k < PPT; ++k) {
+        if constexpr (!IsTaylorFast) {
+            const voxel_loc_t loc = pixel_valid(k) ?
+                voxel_locations(iy + k * static_cast<index_t>(blockDim.y), ix) : voxel_loc_t{};
+            px_k[k] = static_cast<pixel_coord_t>(loc.x);
+            py_k[k] = static_cast<pixel_coord_t>(loc.y);
+            pz_k[k] = PixelZIsUniform ? pz : static_cast<pixel_coord_t>(loc.z);
+        }
+    }
 
     // TensorAccessor wraps each hot tensor and picks the fast pointer path
     // when IsUnitStride && is_tensor_view_v<Op>, otherwise forwards to
@@ -1049,22 +1231,22 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
 
     [[maybe_unused]] const int tid = threadIdx.x + threadIdx.y * blockDim.x;
 
-    SarBpThreadState<ComputeType, PhaseLUT> thread_state{};
+    SarBpThreadState<ComputeType, PhaseLUT> thread_state[PPT]{};
     if constexpr (IsTaylorFast) {
         static_assert(PhaseLUT == true, "SarBp: TaylorFast is only instantiated with PhaseLUT=true");
         if constexpr (PhaseLUT) {
-            thread_state.dr_inv_f32 = dr_inv.f32;
             if (tid == 0) {
                 // Use the midpoint of the CTA's valid image footprint. For
                 // partial right/bottom edge CTAs, clamping the nominal CTA
                 // center to image_width-1/image_height-1 would choose an edge
                 // or corner reference and unnecessarily increase local offsets.
                 const index_t block_x0 = static_cast<index_t>(blockIdx.x * blockDim.x);
-                const index_t block_y0 = static_cast<index_t>(blockIdx.y * blockDim.y);
+                const index_t tile_height = static_cast<index_t>(blockDim.y * PPT);
+                const index_t block_y0 = static_cast<index_t>(blockIdx.y * (blockDim.y * PPT));
                 const index_t valid_width = ((image_width - block_x0) < static_cast<index_t>(blockDim.x)) ?
                     (image_width - block_x0) : static_cast<index_t>(blockDim.x);
-                const index_t valid_height = ((image_height - block_y0) < static_cast<index_t>(blockDim.y)) ?
-                    (image_height - block_y0) : static_cast<index_t>(blockDim.y);
+                const index_t valid_height = ((image_height - block_y0) < tile_height) ?
+                    (image_height - block_y0) : tile_height;
                 const index_t ax_c = block_x0 + valid_width / 2;
                 const index_t ay_c = block_y0 + valid_height / 2;
                 const voxel_loc_t ref_loc = voxel_locations(ay_c, ax_c);
@@ -1074,26 +1256,34 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
             }
             __syncthreads();
 
-            thread_state.ref_dx = is_valid ? static_cast<float>(static_cast<strict_compute_t>(voxel_loc.x) - sh_mem.ref_x) : 0.0f;
-            thread_state.ref_dy = is_valid ? static_cast<float>(static_cast<strict_compute_t>(voxel_loc.y) - sh_mem.ref_y) : 0.0f;
-            // When the pixel z is uniform across the CTA (Zero: z == 0, or
-            // Fixed: z == const), the per-block reference pixel shares that same
-            // z, so ref_dz is identically 0 and drops out of ref_dsq and the dot
-            // product in ComputeBinWeightToPixelTaylorFast.
-            if constexpr (PixelZIsUniform) {
-                thread_state.ref_dz = 0.0f;
-                thread_state.ref_dsq = fmaf(thread_state.ref_dx, thread_state.ref_dx,
-                                            thread_state.ref_dy * thread_state.ref_dy);
-            } else {
-                thread_state.ref_dz = is_valid ? static_cast<float>(static_cast<strict_compute_t>(voxel_loc.z) - sh_mem.ref_z) : 0.0f;
-                thread_state.ref_dsq = fmaf(thread_state.ref_dx, thread_state.ref_dx,
-                                            fmaf(thread_state.ref_dy, thread_state.ref_dy,
-                                                 thread_state.ref_dz * thread_state.ref_dz));
+            #pragma unroll
+            for (int k = 0; k < PPT; ++k) {
+                const bool valid_k = pixel_valid(k);
+                const voxel_loc_t loc = (k == 0) ? voxel_loc :
+                    (valid_k ? voxel_locations(iy + k * static_cast<index_t>(blockDim.y), ix) : voxel_loc_t{});
+                SarBpThreadState<ComputeType, PhaseLUT> &ts = thread_state[k];
+                ts.dr_inv_f32 = dr_inv.f32;
+                ts.ref_dx = valid_k ? static_cast<float>(static_cast<strict_compute_t>(loc.x) - sh_mem.ref_x) : 0.0f;
+                ts.ref_dy = valid_k ? static_cast<float>(static_cast<strict_compute_t>(loc.y) - sh_mem.ref_y) : 0.0f;
+                // When the pixel z is uniform across the CTA (Zero: z == 0, or
+                // Fixed: z == const), the per-block reference pixel shares that same
+                // z, so ref_dz is identically 0 and drops out of ref_dsq and the dot
+                // product in ComputeBinWeightToPixelTaylorFast.
+                if constexpr (PixelZIsUniform) {
+                    ts.ref_dz = 0.0f;
+                    ts.ref_dsq = fmaf(ts.ref_dx, ts.ref_dx,
+                                                ts.ref_dy * ts.ref_dy);
+                } else {
+                    ts.ref_dz = valid_k ? static_cast<float>(static_cast<strict_compute_t>(loc.z) - sh_mem.ref_z) : 0.0f;
+                    ts.ref_dsq = fmaf(ts.ref_dx, ts.ref_dx,
+                                                fmaf(ts.ref_dy, ts.ref_dy,
+                                                     ts.ref_dz * ts.ref_dz));
+                }
             }
         }
     }
 
-    loose_complex_compute_t accum{};
+    loose_complex_compute_t accum[PPT]{};
     // fftshift places zero differential range at floor(N/2). For even N,
     // this is index N/2, the higher-indexed of the two bins adjacent to
     // the array's geometric midpoint (N-1)/2.
@@ -1203,11 +1393,11 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
                     sh_mem.ant_pos[ip][1] = static_cast<strict_compute_t>(cuda::std::get<1>(xyz));
                     const strict_compute_t apz = static_cast<strict_compute_t>(cuda::std::get<2>(xyz));
                     if constexpr (UseCachedDz2) {
-                        // Fixed mode: the pixel z is uniform, so dz = pz - apz and
-                        // its square are per-pulse constants. Cache dz^2 in the
-                        // (otherwise unused after this) antenna-z slot so the inner
-                        // loop loads it directly instead of recomputing the
-                        // subtract+square for every pixel.
+                        // Zero or fixed pixel z: dz = pz - apz and its square are
+                        // per-pulse constants (pz is a compile-time 0 with zero z).
+                        // Cache dz^2 in the (otherwise unused after this) antenna-z
+                        // slot so the inner loop loads it directly instead of
+                        // recomputing the subtract+square for every pixel.
                         const strict_compute_t dz = static_cast<strict_compute_t>(pz) - apz;
                         sh_mem.ant_pos[ip][2] = dz * dz;
                     } else {
@@ -1252,133 +1442,145 @@ __global__ void SarBp(OutImageType output, const InitialImageType initial_image,
             row_offset = pulse_base * row_step;
         }
 
-        // The row offset advances in the loop header, once per pulse.
-        #pragma unroll 4
+        // The row offset advances in the loop header, once per pulse. The unroll
+        // factor comes from the per-architecture tuning (SarBpTuning).
+        constexpr int PulseUnrollFactor = SarBpLaunchSettings<ComputeType, PixelZMode, PhaseLUT, TaylorFastAddThirdOrder>::PulseUnroll;
+        #pragma unroll PulseUnrollFactor
         for (IdxT ip = 0; ip < num_pulses_in_block; ++ip, row_offset += row_step) {
             [[maybe_unused]] const IdxT p = pulse_base + ip;
 
-            // The following branches all compute at least the base range bin index and interpolation weight
-            // for the current pulse. Paths not using the PhaseLUT optimization will also populate the
-            // thread_state.range_delta member for use in get_reference_phase_direct().
-            SarBpBinAndWeight<loose_compute_t> bin_weight;
-            [[maybe_unused]] int32_t bin_floor_local = 0;
-            [[maybe_unused]] uint32_t ref_phase_ticks = 0;
-            if constexpr (IsFloatFloat) {
-                bin_weight = ComputeBinWeightToPixelFloatFloat<UseCachedPz2FF, PixelZIsUniform>(sh_mem, ip, px, py, pz, dr_inv);
-            } else if constexpr (IsTaylorFast) {
-                static_assert(PhaseLUT == true, "SarBp: TaylorFast is only instantiated with PhaseLUT=true");
-                // Zero and Fixed both make ref_dz == 0, so PixelZIsUniform drives the elision.
-                bin_weight = ComputeBinWeightToPixelTaylorFast<
-                    TaylorFastAddThirdOrder, PixelZIsUniform>(
-                        sh_mem, thread_state, ip, bin_floor_local, ref_phase_ticks);
-            } else if constexpr (UsePulseBlockCache) {
-                bin_weight = ComputeBinWeightToPixelPulseBlockCache<ComputeType, PixelZIsZero, UseCachedDz2, PixelZIsUniform,
-                                                                    strict_compute_t, loose_compute_t>(
-                    sh_mem, ip, px, py, pz, dr_inv);
-            } else {
-                // Below is the most direct / standard path for backprojection. We compute the distance
-                // from the antenna phase center to the pixel for this pulse and from that the differential range
-                // to the MCP. From that differential range, we compute the base range bin index and interpolation weight
-                // for range profile sampling. Finally, we use the differential range to compute the reference phase
-                // and accumulate the contribution to the pixel. All other paths implement similar logic using various
-                // optimizations.
-                const strict_compute_t range_delta =
-                    ComputeRangeToPixel<decltype(pp), ComputeType, strict_compute_t, pixel_coord_t>(
-                        pp, p, px, py, pz) - static_cast<strict_compute_t>(r_to_mcp(p));
-                if constexpr (!PhaseLUT) {
-                    thread_state.range_delta = range_delta;
-                }
-                const strict_compute_t bin = range_delta * dr_inv + bin_offset;
-                strict_compute_t bin_floor;
-                if constexpr (cuda::std::is_same_v<strict_compute_t, double>) {
-                    bin_floor = ::floor(bin);
+            // The pulse's values in shared memory are the same for each of this
+            // thread's pixels, so they are read once for all of them.
+            #pragma unroll
+            for (int k = 0; k < PPT; ++k) {
+                // The following branches all compute at least the base range bin index and interpolation weight
+                // for the current pulse. Paths not using the PhaseLUT optimization will also populate the
+                // thread_state[k].range_delta member for use in get_reference_phase_direct().
+                SarBpBinAndWeight<loose_compute_t> bin_weight;
+                [[maybe_unused]] int32_t bin_floor_local = 0;
+                [[maybe_unused]] uint32_t ref_phase_ticks = 0;
+                if constexpr (IsFloatFloat) {
+                    bin_weight = ComputeBinWeightToPixelFloatFloat<UseCachedPz2FF, PixelZIsUniform>(sh_mem, ip, px_k[k], py_k[k], pz_k[k], dr_inv);
+                } else if constexpr (IsTaylorFast) {
+                    static_assert(PhaseLUT == true, "SarBp: TaylorFast is only instantiated with PhaseLUT=true");
+                    // Zero and Fixed both make ref_dz == 0, so PixelZIsUniform drives the elision.
+                    bin_weight = ComputeBinWeightToPixelTaylorFast<
+                        TaylorFastAddThirdOrder, PixelZIsUniform>(
+                            sh_mem, thread_state[k], ip, bin_floor_local, ref_phase_ticks);
+                } else if constexpr (UsePulseBlockCache) {
+                    bin_weight = ComputeBinWeightToPixelPulseBlockCache<ComputeType, UseCachedDz2, PixelZIsUniform,
+                                                                        strict_compute_t, loose_compute_t>(
+                        sh_mem, ip, px_k[k], py_k[k], pz_k[k], dr_inv);
                 } else {
-                    bin_floor = ::floorf(bin);
+                    // Below is the most direct / standard path for backprojection. We compute the distance
+                    // from the antenna phase center to the pixel for this pulse and from that the differential range
+                    // to the MCP. From that differential range, we compute the base range bin index and interpolation weight
+                    // for range profile sampling. Finally, we use the differential range to compute the reference phase
+                    // and accumulate the contribution to the pixel. All other paths implement similar logic using various
+                    // optimizations.
+                    const strict_compute_t range_delta =
+                        ComputeRangeToPixel<decltype(pp), ComputeType, strict_compute_t, pixel_coord_t, PixelZIsUniform && (PPT > 1)>(
+                            pp, p, px_k[k], py_k[k], pz_k[k]) - static_cast<strict_compute_t>(r_to_mcp(p));
+                    if constexpr (!PhaseLUT) {
+                        thread_state[k].range_delta = range_delta;
+                    }
+                    const strict_compute_t bin = range_delta * dr_inv + bin_offset;
+                    strict_compute_t bin_floor;
+                    if constexpr (cuda::std::is_same_v<strict_compute_t, double>) {
+                        bin_floor = ::floor(bin);
+                    } else {
+                        bin_floor = ::floorf(bin);
+                    }
+                    bin_weight.w = static_cast<loose_compute_t>(bin - bin_floor);
+                    bin_weight.bin_floor_int = static_cast<int32_t>(bin_floor);
                 }
-                bin_weight.w = static_cast<loose_compute_t>(bin - bin_floor);
-                bin_weight.bin_floor_int = static_cast<int32_t>(bin_floor);
-            }
 
-            // One unsigned compare covers both bounds: a negative bin wraps to
-            // a value above any valid upper bound. sar_bp_impl verifies
-            // 2 <= num_range_bins <= INT32_MAX on the host, so num_range_bins - 1
-            // lies in [1, 2^31 - 2], below every negative bin read as uint32_t
-            // (at least 2^31).
-            //
-            // Out-of-range samples are read from bin 0 and their contribution
-            // is discarded below, rather than skipped with a branch. Without
-            // the branch, the loads of the unrolled pulses can be issued
-            // together and overlap their latency.
-            const bool in_range = static_cast<uint32_t>(bin_weight.bin_floor_int) <
-                static_cast<uint32_t>(num_range_bins - 1);
-            const int32_t read_bin = in_range ? bin_weight.bin_floor_int : 0;
+                // One unsigned compare covers both bounds: a negative bin wraps to
+                // a value above any valid upper bound. sar_bp_impl verifies
+                // 2 <= num_range_bins <= INT32_MAX on the host, so num_range_bins - 1
+                // lies in [1, 2^31 - 2], below every negative bin read as uint32_t
+                // (at least 2^31).
+                //
+                // Out-of-range samples are read from bin 0 and their contribution
+                // is discarded below, rather than skipped with a branch. Without
+                // the branch, the loads of the unrolled pulses can be issued
+                // together and overlap their latency.
+                const bool in_range = static_cast<uint32_t>(bin_weight.bin_floor_int) <
+                    static_cast<uint32_t>(num_range_bins - 1);
+                const int32_t read_bin = in_range ? bin_weight.bin_floor_int : 0;
 
-            // rp accessor picks the fast pointer path on IsUnitStride or
-            // falls through to operator().
-            range_profiles_t sample_lo, sample_hi;
-            if constexpr (UseRowOffset) {
-                const IdxT offset = row_offset + read_bin;
-                sample_lo = rp.at_offset(offset);
-                sample_hi = rp.at_offset(offset + 1);
-            } else {
-                sample_lo = rp(p, read_bin);
-                sample_hi = rp(p, read_bin + 1);
-            }
-
-            const loose_complex_compute_t sample = [&sample_lo, &sample_hi, &bin_weight]() -> loose_complex_compute_t {
-                const loose_complex_compute_t loose_sample_lo = static_cast<loose_complex_compute_t>(sample_lo);
-                const loose_complex_compute_t loose_sample_hi = static_cast<loose_complex_compute_t>(sample_hi);
-                const loose_compute_t w = bin_weight.w;
-                if constexpr (cuda::std::is_same_v<loose_compute_t, float>) {
-                    return loose_complex_compute_t{
-                        __fmaf_rn(w, loose_sample_hi.real(), __fmaf_rn(-w, loose_sample_lo.real(), loose_sample_lo.real())),
-                        __fmaf_rn(w, loose_sample_hi.imag(), __fmaf_rn(-w, loose_sample_lo.imag(), loose_sample_lo.imag()))
-                    };
+                // rp accessor picks the fast pointer path on IsUnitStride or
+                // falls through to operator().
+                range_profiles_t sample_lo, sample_hi;
+                if constexpr (UseRowOffset) {
+                    const IdxT offset = row_offset + read_bin;
+                    sample_lo = rp.at_offset(offset);
+                    sample_hi = rp.at_offset(offset + 1);
                 } else {
-                    return loose_complex_compute_t{
-                        fma(w, loose_sample_hi.real(), fma(-w, loose_sample_lo.real(), loose_sample_lo.real())),
-                        fma(w, loose_sample_hi.imag(), fma(-w, loose_sample_lo.imag(), loose_sample_lo.imag()))
-                    };
+                    sample_lo = rp(p, read_bin);
+                    sample_hi = rp(p, read_bin + 1);
                 }
-            }();
 
-            static_assert((!IsFloatFloat &&
-                            !IsTaylorFast) || PhaseLUT == true,
-                            "SarBp: FloatFloat and TaylorFast are only instantiated with PhaseLUT=true");
-            const loose_complex_compute_t ref_phase = [&]() {
-                if constexpr (SynthesizePhase) {
-                    return SarBpSynthesizePhase(phase_correction_partial, ref_phase_ticks, bin_floor_local, bin_weight.w);
-                } else if constexpr (PhaseLUT) {
-                    // read_bin keeps the LUT read in bounds; the result is
-                    // discarded when the sample is out of range.
-                    return get_reference_phase_lut(read_bin, bin_weight.w);
-                } else {
-                    return get_reference_phase_direct(thread_state.range_delta);
-                }
-            }();
+                const loose_complex_compute_t sample = [&sample_lo, &sample_hi, &bin_weight]() -> loose_complex_compute_t {
+                    const loose_complex_compute_t loose_sample_lo = static_cast<loose_complex_compute_t>(sample_lo);
+                    const loose_complex_compute_t loose_sample_hi = static_cast<loose_complex_compute_t>(sample_hi);
+                    const loose_compute_t w = bin_weight.w;
+                    if constexpr (cuda::std::is_same_v<loose_compute_t, float>) {
+                        return loose_complex_compute_t{
+                            __fmaf_rn(w, loose_sample_hi.real(), __fmaf_rn(-w, loose_sample_lo.real(), loose_sample_lo.real())),
+                            __fmaf_rn(w, loose_sample_hi.imag(), __fmaf_rn(-w, loose_sample_lo.imag(), loose_sample_lo.imag()))
+                        };
+                    } else {
+                        return loose_complex_compute_t{
+                            fma(w, loose_sample_hi.real(), fma(-w, loose_sample_lo.real(), loose_sample_lo.real())),
+                            fma(w, loose_sample_hi.imag(), fma(-w, loose_sample_lo.imag(), loose_sample_lo.imag()))
+                        };
+                    }
+                }();
 
-            // Select rather than multiply by zero, so that non-finite values in
-            // a discarded sample or phase cannot reach the accumulator.
-            const loose_complex_compute_t updated = accumulate_contribution(accum, sample, ref_phase);
-            accum = in_range ? updated : accum;
+                static_assert((!IsFloatFloat &&
+                                !IsTaylorFast) || PhaseLUT == true,
+                                "SarBp: FloatFloat and TaylorFast are only instantiated with PhaseLUT=true");
+                const loose_complex_compute_t ref_phase = [&]() {
+                    if constexpr (SynthesizePhase) {
+                        return SarBpSynthesizePhase(phase_correction_partial, ref_phase_ticks, bin_floor_local, bin_weight.w);
+                    } else if constexpr (PhaseLUT) {
+                        // read_bin keeps the LUT read in bounds; the result is
+                        // discarded when the sample is out of range.
+                        return get_reference_phase_lut(read_bin, bin_weight.w);
+                    } else {
+                        return get_reference_phase_direct(thread_state[k].range_delta);
+                    }
+                }();
+
+                // Select rather than multiply by zero, so that non-finite values in
+                // a discarded sample or phase cannot reach the accumulator.
+                const loose_complex_compute_t updated = accumulate_contribution(accum[k], sample, ref_phase);
+                accum[k] = in_range ? updated : accum[k];
+            } // pixel
         } // pulse
     } // pulse block
 
-    if (is_valid) {
-        // initial_image and output are each touched exactly once per thread,
+    #pragma unroll
+    for (int k = 0; k < PPT; ++k) {
+        if (!pixel_valid(k)) {
+            continue;
+        }
+        const index_t iy_k = iy + k * static_cast<index_t>(blockDim.y);
+        // initial_image and output are each touched exactly once per pixel,
         // so they are intentionally not included in the IsUnitStride fast-path
         // check in the transform layer. Direct operator() calls keep the
         // transform's fast-path eligibility as permissive as possible:
         // non-unit-stride or computed-op initial_image (e.g. ConstVal zeros)
         // and non-unit-stride output layouts do not disqualify the fast path
         // for the hot tensors (range_profiles, platform_positions, rtm).
-        const initial_image_t initial_image_voxel = initial_image.operator()(iy, ix);
+        const initial_image_t initial_image_voxel = initial_image.operator()(iy_k, ix);
         using out_value_t = typename OutImageType::value_type;
         using out_scalar_t = typename out_value_t::value_type;
 
-        output(iy, ix) = out_value_t{
-            static_cast<out_scalar_t>(initial_image_voxel.real() + accum.real()),
-            static_cast<out_scalar_t>(initial_image_voxel.imag() + accum.imag())
+        output(iy_k, ix) = out_value_t{
+            static_cast<out_scalar_t>(initial_image_voxel.real() + accum[k].real()),
+            static_cast<out_scalar_t>(initial_image_voxel.imag() + accum[k].imag())
         };
     }
 }

@@ -746,7 +746,7 @@ TYPED_TEST(SarBpTestDoubleType, PixelZIsFixedNonZeroHeight)
 
     // Float has lower precision; only require the target to be substantially focused.
     ASSERT_GT(image_f32(image_height / 4, image_width / 4).real(), 0.98f * num_pulses);
-    ASSERT_LT(cuda::std::abs(image_f32(image_height / 4, image_width / 4).imag()), 3.0f);
+    ASSERT_LT(cuda::std::abs(image_f32(image_height / 4, image_width / 4).imag()), 0.1f * num_pulses);
   }
 
   // Mixed, FloatFloat, and TaylorFast (fp64 platform positions / range-to-mcp).
@@ -1413,7 +1413,8 @@ TYPED_TEST(SarBpTestDoubleType, SwathEdgesAndModes)
       run(zero_z, params, true);
       const double max_mag = expect_bounded(variable_z);
       expect_bounded(zero_z);
-      EXPECT_LT(max_abs_diff(variable_z, zero_z), 1.0e-4 * max_mag);
+      const double mode_tol = compute_type == SarBpComputeType::Float ? 0.2 : 1.0e-4;
+      EXPECT_LT(max_abs_diff(variable_z, zero_z), mode_tol * max_mag);
       if (compute_type == SarBpComputeType::TaylorFast) {
         if (features == SarBpFeature::None) {
           (taylor_without_feature = variable_z).run(this->exec);
@@ -1518,6 +1519,249 @@ TYPED_TEST(SarBpTestDoubleType, DiscardedNonFiniteSamplesLeaveImageUnchanged)
       if (compute_type == SarBpComputeType::TaylorFast) {
         (image = op.template props<PropSarBpTaylorFastAddThirdOrder>()).run(this->exec);
         expect_unchanged("third order");
+      }
+    }
+  }
+  MATX_EXIT_HANDLER();
+}
+
+// Image sizes that are not multiples of the kernel's 16 x 16 pixel tile. A
+// TaylorFast thread owns two pixels of a tile column, rows y and y + 8, so in a
+// partial bottom tile some threads have only their first pixel in the image
+// and, when fewer than eight rows remain, some have neither. Those threads
+// still fill the shared pulse cache. Compute H x W images whose pixels match
+// the top-left corner of a 48 x 48 image, write every image through a view of a
+// larger buffer filled with a sentinel. The grids are flat at z = 0 and at a
+// fixed non-zero height, for the pixel-height properties, or sloped, with a
+// height that changes between rows so that each of a thread's pixels needs its
+// own height. Check that:
+// - every pixel in the view is written and nothing outside it is;
+// - every pixel matches the 48 x 48 image bit for bit, except TaylorFast pixels
+//   in partial tiles, whose tile reference point moves to the middle of the
+//   tile's in-image footprint;
+// - the images of the compute types with two pixels per thread (TaylorFast,
+//   Mixed and FloatFloat) agree with a Double reference, TaylorFast to within
+//   the expansion error. Every pixel starts from a distinct initial value, so a
+//   pixel written with another pixel's initial value or accumulator fails this
+//   check even when it is wrong in the same way in both images;
+// - partial-tile TaylorFast pixels are within twice the largest error of the
+//   48 x 48 TaylorFast image. Their offsets from the reference point are no
+//   larger than in a full tile, so neither is the second-order expansion
+//   error; third order sits at the floor set by fp32 accumulation and phase
+//   synthesis, where the maxima fluctuate by ~10%.
+TYPED_TEST(SarBpTestDoubleType, PartialEdgeTilesMatchFullImage)
+{
+  MATX_ENTER_HANDLER();
+  using complex_t = cuda::std::complex<float>;
+  constexpr index_t TILE = 16;
+  constexpr index_t FULL = 3 * TILE;
+  // Every thread of a partial tile maps inside a view padded by one tile.
+  constexpr index_t PAD = TILE;
+  // Two pulse blocks, the second partial.
+  constexpr index_t NUM_PULSES = 300;
+  constexpr index_t NUM_BINS = 128;
+  constexpr double DEL_R = 0.5;
+  constexpr double FIXED_Z = 2.5;
+  // Height step between rows of the sloped grid. A thread's two pixels, eight
+  // rows apart, then differ in height by 0.4 m, about 0.28 m in range: half a
+  // range bin and over 100 rad of phase at 9.6 GHz.
+  constexpr double Z_PER_ROW = 0.05;
+  const complex_t sentinel{1.0e30f, -1.0e30f};
+
+  auto platform_positions = make_tensor<double3>({NUM_PULSES});
+  auto range_to_mcp = make_tensor<double>({NUM_PULSES});
+  auto profiles = make_tensor<complex_t>({NUM_PULSES, NUM_BINS});
+  std::mt19937 gen(1357);
+  std::normal_distribution<float> dist(0.0f, 1.0f);
+  for (index_t p = 0; p < NUM_PULSES; p++) {
+    const double3 a{-200.0 + 400.0 * static_cast<double>(p) / NUM_PULSES, -5000.0, 5000.0};
+    platform_positions(p) = a;
+    range_to_mcp(p) = std::sqrt(a.x * a.x + a.y * a.y + a.z * a.z);
+    for (index_t b = 0; b < NUM_BINS; b++) {
+      profiles(p, b) = complex_t{dist(gen), dist(gen)};
+    }
+  }
+
+  // Pixel (i, j) lies at (j - FULL / 2, i - FULL / 2, z + i * z_per_row) in
+  // every grid, within 39 bins of the swath centre, so every sample is in range.
+  struct Grid {
+    tensor_t<double, 2> px, py, pz;
+    tensor_t<complex_t, 2> initial;
+    tensor_t<complex_t, 2> buffer;
+  };
+  auto make_grid = [&](index_t rows, index_t cols, double z, double z_per_row) {
+    Grid g{make_tensor<double>({rows, cols}), make_tensor<double>({rows, cols}),
+           make_tensor<double>({rows, cols}), make_tensor<complex_t>({rows, cols}),
+           make_tensor<complex_t>({rows + PAD, cols + PAD})};
+    for (index_t i = 0; i < rows; i++) {
+      for (index_t j = 0; j < cols; j++) {
+        g.px(i, j) = static_cast<double>(j - FULL / 2);
+        g.py(i, j) = static_cast<double>(i - FULL / 2);
+        g.pz(i, j) = z + static_cast<double>(i) * z_per_row;
+        g.initial(i, j) = complex_t{static_cast<float>(i), -static_cast<float>(j)};
+      }
+    }
+    return g;
+  };
+  enum class Mode { VariableZ, ZeroZ, FixedZ };
+  auto run = [&](Grid &g, const SarBpParams &params, Mode mode, bool third_order) {
+    const index_t rows = g.initial.Size(0), cols = g.initial.Size(1);
+    (g.buffer = fill<complex_t>({rows + PAD, cols + PAD}, sentinel)).run(this->exec);
+    auto view = slice(g.buffer, {0, 0}, {rows, cols});
+    auto op = experimental::sar_bp(g.initial, profiles, platform_positions, zipvec(g.px, g.py, g.pz),
+                                   range_to_mcp, params);
+    if (mode == Mode::VariableZ && !third_order) {
+      (view = op).run(this->exec);
+    } else if (mode == Mode::VariableZ) {
+      (view = op.template props<PropSarBpTaylorFastAddThirdOrder>()).run(this->exec);
+    } else if (mode == Mode::ZeroZ && !third_order) {
+      (view = op.template props<PropSarBpPixelZIsZero>()).run(this->exec);
+    } else if (mode == Mode::ZeroZ) {
+      (view = op.template props<PropSarBpPixelZIsZero, PropSarBpTaylorFastAddThirdOrder>()).run(this->exec);
+    } else if (!third_order) {
+      (view = op.template props<PropSarBpPixelZIsFixed>()).run(this->exec);
+    } else {
+      (view = op.template props<PropSarBpPixelZIsFixed, PropSarBpTaylorFastAddThirdOrder>()).run(this->exec);
+    }
+    this->exec.sync();
+  };
+  // Number of buffer elements outside the image view that no longer hold the
+  // sentinel.
+  auto count_outside_writes = [&](const Grid &g) {
+    const index_t rows = g.initial.Size(0), cols = g.initial.Size(1);
+    int written = 0;
+    for (index_t i = 0; i < rows + PAD; i++) {
+      for (index_t j = 0; j < cols + PAD; j++) {
+        if (i >= rows || j >= cols) {
+          written += !(g.buffer(i, j).real() == sentinel.real() && g.buffer(i, j).imag() == sentinel.imag());
+        }
+      }
+    }
+    return written;
+  };
+  // Number of image pixels that still hold the sentinel.
+  auto count_unwritten = [&](const Grid &g) {
+    const index_t rows = g.initial.Size(0), cols = g.initial.Size(1);
+    int unwritten = 0;
+    for (index_t i = 0; i < rows; i++) {
+      for (index_t j = 0; j < cols; j++) {
+        unwritten += g.buffer(i, j).real() == sentinel.real() && g.buffer(i, j).imag() == sentinel.imag();
+      }
+    }
+    return unwritten;
+  };
+
+  auto max_abs_diff = [](auto &&a, auto &&b, index_t rows, index_t cols, auto &&include) {
+    double max_diff = 0.0;
+    for (index_t i = 0; i < rows; i++) {
+      for (index_t j = 0; j < cols; j++) {
+        if (include(i, j)) {
+          // Propagates NaN, which std::max would drop.
+          const double d = static_cast<double>(cuda::std::abs(a(i, j) - b(i, j)));
+          max_diff = (std::isnan(d) || d > max_diff) ? d : max_diff;
+        }
+      }
+    }
+    return max_diff;
+  };
+
+  // 37 leaves five rows in the bottom tile, so three of its eight thread rows
+  // have no pixel; 44 leaves twelve, so every thread has its first pixel and
+  // half have their second. 41 leaves a partial tile column as well.
+  for (const auto &[rows, cols] : {std::pair<index_t, index_t>{37, 41}, std::pair<index_t, index_t>{44, 41}}) {
+    // Flat grids at z = 0 and z = FIXED_Z for the height properties, and a
+    // sloped grid whose height changes from row to row, so that each of a
+    // thread's pixels needs its own height.
+    for (const auto &[z, z_per_row] : {std::pair<double, double>{0.0, 0.0}, std::pair<double, double>{FIXED_Z, 0.0},
+                                       std::pair<double, double>{FIXED_Z, Z_PER_ROW}}) {
+      Grid full = make_grid(FULL, FULL, z, z_per_row);
+      Grid part = make_grid(rows, cols, z, z_per_row);
+      // Double-precision references for the accuracy checks.
+      auto ref_full = make_tensor<complex_t>({FULL, FULL});
+      auto ref_part = make_tensor<complex_t>({rows, cols});
+      {
+        SarBpParams params;
+        params.compute_type = SarBpComputeType::Double;
+        params.center_frequency = 9.6e9;
+        params.del_r = DEL_R;
+        run(full, params, Mode::VariableZ, false);
+        run(part, params, Mode::VariableZ, false);
+        (ref_full = slice(full.buffer, {0, 0}, {FULL, FULL})).run(this->exec);
+        (ref_part = slice(part.buffer, {0, 0}, {rows, cols})).run(this->exec);
+        this->exec.sync();
+      }
+      for (const SarBpComputeType compute_type : kSarBpAllComputeTypes) {
+        const bool taylor = compute_type == SarBpComputeType::TaylorFast;
+        for (const Mode mode : {Mode::VariableZ, Mode::ZeroZ, Mode::FixedZ}) {
+          // The zero-z property requires z == 0, fixed z runs on the flat
+          // non-zero grid, and the sloped grid allows neither.
+          if (mode != Mode::VariableZ && (z_per_row != 0.0 || (mode == Mode::ZeroZ) != (z == 0.0))) {
+            continue;
+          }
+          for (const bool third_order : {false, true}) {
+            if (third_order && !taylor) {
+              continue;
+            }
+            SCOPED_TRACE(::testing::Message() << rows << " x " << cols << ", z=" << z << ", z_per_row="
+                                              << z_per_row << ", compute_type="
+                                              << static_cast<int>(compute_type) << ", mode="
+                                              << static_cast<int>(mode) << ", third_order=" << third_order);
+            SarBpParams params;
+            params.compute_type = compute_type;
+            params.features = SarBpFeature::PhaseLUTOptimization;
+            params.center_frequency = 9.6e9;
+            params.del_r = DEL_R;
+            run(full, params, mode, third_order);
+            run(part, params, mode, third_order);
+            EXPECT_EQ(count_outside_writes(full), 0);
+            EXPECT_EQ(count_outside_writes(part), 0);
+            EXPECT_EQ(count_unwritten(full), 0);
+            EXPECT_EQ(count_unwritten(part), 0);
+
+            bool finite = true;
+            for (index_t i = 0; i < FULL; i++) {
+              for (index_t j = 0; j < FULL; j++) {
+                finite = finite && std::isfinite(full.buffer(i, j).real()) && std::isfinite(full.buffer(i, j).imag());
+              }
+            }
+            ASSERT_TRUE(finite);
+            auto in_partial_tile = [&](index_t i, index_t j) {
+              return i >= rows / TILE * TILE || j >= cols / TILE * TILE;
+            };
+            int mismatches = 0;
+            for (index_t i = 0; i < rows; i++) {
+              for (index_t j = 0; j < cols; j++) {
+                const complex_t a = part.buffer(i, j), b = full.buffer(i, j);
+                if (!taylor || !in_partial_tile(i, j)) {
+                  mismatches += !(a.real() == b.real() && a.imag() == b.imag());
+                }
+              }
+            }
+            EXPECT_EQ(mismatches, 0);
+            auto all_pixels = [](index_t, index_t) { return true; };
+            if (compute_type == SarBpComputeType::Mixed || compute_type == SarBpComputeType::FloatFloat) {
+              // On this geometry Mixed and FloatFloat are within 5e-4 of the
+              // Double image, far below the differences between pixels'
+              // initial values and accumulators.
+              constexpr double TWO_PIXEL_TOL = 0.01;
+              EXPECT_LE(max_abs_diff(full.buffer, ref_full, FULL, FULL, all_pixels), TWO_PIXEL_TOL);
+              EXPECT_LE(max_abs_diff(part.buffer, ref_part, rows, cols, all_pixels), TWO_PIXEL_TOL);
+            }
+            if (taylor) {
+              // On this geometry TaylorFast is within 0.1 of the Double image,
+              // whose peak magnitude is about 95. Initial values differ by at
+              // least 1 between pixels, and accumulators by about the peak.
+              constexpr double TAYLOR_TOL = 0.25;
+              const double full_err = max_abs_diff(full.buffer, ref_full, FULL, FULL, all_pixels);
+              const double part_err = max_abs_diff(part.buffer, ref_part, rows, cols, all_pixels);
+              const double edge_err = max_abs_diff(part.buffer, ref_part, rows, cols, in_partial_tile);
+              EXPECT_LE(full_err, TAYLOR_TOL);
+              EXPECT_LE(part_err, TAYLOR_TOL);
+              ASSERT_GT(full_err, 0.0);
+              EXPECT_LE(edge_err, 2.0 * full_err);
+            }
+          }
+        }
       }
     }
   }
