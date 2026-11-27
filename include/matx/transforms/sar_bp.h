@@ -225,17 +225,17 @@ inline void sar_bp_impl(OutImageType &out, const InitialImageType &initial_image
       } else if (params.compute_type == SarBpComputeType::Mixed) {
         cuda::std::complex<float> *phase_lut = static_cast<cuda::std::complex<float> *>(workspace);
         SarBpFillPhaseLUT<double, float><<<lut_grid, lut_block, 0, stream>>>(phase_lut, params.center_frequency, params.del_r, range_profiles.Size(1));
-        SarBp<SarBpComputeType::Mixed, OutImageType, InitialImageType, RangeProfilesType, PlatPosType, VoxLocType, RangeToMcpType, PhaseLUT, IsUnitStride, NoTaylorFastThirdOrder, PixelZMode, IdxT><<<grid, block, 0, stream>>>(
+        SarBp<SarBpComputeType::Mixed, OutImageType, InitialImageType, RangeProfilesType, PlatPosType, VoxLocType, RangeToMcpType, PhaseLUT, IsUnitStride, NoTaylorFastThirdOrder, PixelZMode, IdxT><<<grid, dim3(block.x, block.y / SarBpPixelsPerThread<SarBpComputeType::Mixed>), 0, stream>>>(
           out, initial_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, dr_inv, lut_phase_increment, phase_lut);
       } else if (params.compute_type == SarBpComputeType::FloatFloat) {
         cuda::std::complex<float> *phase_lut = static_cast<cuda::std::complex<float> *>(workspace);
         SarBpFillPhaseLUT<double, float><<<lut_grid, lut_block, 0, stream>>>(phase_lut, params.center_frequency, params.del_r, range_profiles.Size(1));
-        SarBp<SarBpComputeType::FloatFloat, OutImageType, InitialImageType, RangeProfilesType, PlatPosType, VoxLocType, RangeToMcpType, PhaseLUT, IsUnitStride, NoTaylorFastThirdOrder, PixelZMode, IdxT><<<grid, block, 0, stream>>>(
+        SarBp<SarBpComputeType::FloatFloat, OutImageType, InitialImageType, RangeProfilesType, PlatPosType, VoxLocType, RangeToMcpType, PhaseLUT, IsUnitStride, NoTaylorFastThirdOrder, PixelZMode, IdxT><<<grid, dim3(block.x, block.y / SarBpPixelsPerThread<SarBpComputeType::FloatFloat>), 0, stream>>>(
           out, initial_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, static_cast<fltflt>(dr_inv), lut_phase_increment, phase_lut);
       } else if (params.compute_type == SarBpComputeType::TaylorFast) {
         // TaylorFast synthesizes its phase and reads no LUT (detail::SarBpSynthesizesPhase).
         cuda::std::complex<float> *phase_lut = nullptr;
-        SarBp<SarBpComputeType::TaylorFast, OutImageType, InitialImageType, RangeProfilesType, PlatPosType, VoxLocType, RangeToMcpType, PhaseLUT, IsUnitStride, TaylorFastAddThirdOrder, PixelZMode, IdxT><<<grid, block, 0, stream>>>(
+        SarBp<SarBpComputeType::TaylorFast, OutImageType, InitialImageType, RangeProfilesType, PlatPosType, VoxLocType, RangeToMcpType, PhaseLUT, IsUnitStride, TaylorFastAddThirdOrder, PixelZMode, IdxT><<<grid, dim3(block.x, block.y / SarBpPixelsPerThread<SarBpComputeType::TaylorFast>), 0, stream>>>(
           out, initial_image, range_profiles, platform_positions, voxel_locations, range_to_mcp,
           SarBpTaylorFastDrInv{dr_inv, static_cast<float>(dr_inv)},
           SarBpTaylorFastPhaseCorrection::MakeFromRevolutions(rev_per_bin, phase_units_per_bin), phase_lut);
@@ -255,7 +255,7 @@ inline void sar_bp_impl(OutImageType &out, const InitialImageType &initial_image
         SarBp<SarBpComputeType::Double, OutImageType, InitialImageType, RangeProfilesType, PlatPosType, VoxLocType, RangeToMcpType, PhaseLUT, IsUnitStride, NoTaylorFastThirdOrder, PixelZMode, IdxT><<<grid, block, 0, stream>>>(
           out, initial_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, dr_inv, phase_correction_partial, nullptr);
       } else if (params.compute_type == SarBpComputeType::Mixed) {
-        SarBp<SarBpComputeType::Mixed, OutImageType, InitialImageType, RangeProfilesType, PlatPosType, VoxLocType, RangeToMcpType, PhaseLUT, IsUnitStride, NoTaylorFastThirdOrder, PixelZMode, IdxT><<<grid, block, 0, stream>>>(
+        SarBp<SarBpComputeType::Mixed, OutImageType, InitialImageType, RangeProfilesType, PlatPosType, VoxLocType, RangeToMcpType, PhaseLUT, IsUnitStride, NoTaylorFastThirdOrder, PixelZMode, IdxT><<<grid, dim3(block.x, block.y / SarBpPixelsPerThread<SarBpComputeType::Mixed>), 0, stream>>>(
           out, initial_image, range_profiles, platform_positions, voxel_locations, range_to_mcp, dr_inv, phase_correction_partial, nullptr);
       } else if (params.compute_type == SarBpComputeType::FloatFloat ||
                  params.compute_type == SarBpComputeType::TaylorFast) {
