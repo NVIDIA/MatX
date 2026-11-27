@@ -1531,7 +1531,10 @@ TYPED_TEST(SarBpTestDoubleType, DiscardedNonFiniteSamplesLeaveImageUnchanged)
 // and, when fewer than eight rows remain, some have neither. Those threads
 // still fill the shared pulse cache. Compute H x W images whose pixels match
 // the top-left corner of a 48 x 48 image, write every image through a view of a
-// larger buffer filled with a sentinel, and check that:
+// larger buffer filled with a sentinel. The grids are flat at z = 0 and at a
+// fixed non-zero height, for the pixel-height properties, or sloped, with a
+// height that changes between rows so that each of a thread's pixels needs its
+// own height. Check that:
 // - every pixel in the view is written and nothing outside it is;
 // - every pixel matches the 48 x 48 image bit for bit, except TaylorFast pixels
 //   in partial tiles, whose tile reference point moves to the middle of the
@@ -1559,6 +1562,10 @@ TYPED_TEST(SarBpTestDoubleType, PartialEdgeTilesMatchFullImage)
   constexpr index_t NUM_BINS = 128;
   constexpr double DEL_R = 0.5;
   constexpr double FIXED_Z = 2.5;
+  // Height step between rows of the sloped grid. A thread's two pixels, eight
+  // rows apart, then differ in height by 0.4 m, about 0.28 m in range: half a
+  // range bin and over 100 rad of phase at 9.6 GHz.
+  constexpr double Z_PER_ROW = 0.05;
   const complex_t sentinel{1.0e30f, -1.0e30f};
 
   auto platform_positions = make_tensor<double3>({NUM_PULSES});
@@ -1575,14 +1582,14 @@ TYPED_TEST(SarBpTestDoubleType, PartialEdgeTilesMatchFullImage)
     }
   }
 
-  // Pixel (i, j) lies at (j - FULL / 2, i - FULL / 2, z) in every grid, within
-  // 39 bins of the swath centre, so every sample is in range.
+  // Pixel (i, j) lies at (j - FULL / 2, i - FULL / 2, z + i * z_per_row) in
+  // every grid, within 39 bins of the swath centre, so every sample is in range.
   struct Grid {
     tensor_t<double, 2> px, py, pz;
     tensor_t<complex_t, 2> initial;
     tensor_t<complex_t, 2> buffer;
   };
-  auto make_grid = [&](index_t rows, index_t cols, double z) {
+  auto make_grid = [&](index_t rows, index_t cols, double z, double z_per_row) {
     Grid g{make_tensor<double>({rows, cols}), make_tensor<double>({rows, cols}),
            make_tensor<double>({rows, cols}), make_tensor<complex_t>({rows, cols}),
            make_tensor<complex_t>({rows + PAD, cols + PAD})};
@@ -1590,7 +1597,7 @@ TYPED_TEST(SarBpTestDoubleType, PartialEdgeTilesMatchFullImage)
       for (index_t j = 0; j < cols; j++) {
         g.px(i, j) = static_cast<double>(j - FULL / 2);
         g.py(i, j) = static_cast<double>(i - FULL / 2);
-        g.pz(i, j) = z;
+        g.pz(i, j) = z + static_cast<double>(i) * z_per_row;
         g.initial(i, j) = complex_t{static_cast<float>(i), -static_cast<float>(j)};
       }
     }
@@ -1662,10 +1669,14 @@ TYPED_TEST(SarBpTestDoubleType, PartialEdgeTilesMatchFullImage)
   // have no pixel; 44 leaves twelve, so every thread has its first pixel and
   // half have their second. 41 leaves a partial tile column as well.
   for (const auto &[rows, cols] : {std::pair<index_t, index_t>{37, 41}, std::pair<index_t, index_t>{44, 41}}) {
-    for (const double z : {0.0, FIXED_Z}) {
-      Grid full = make_grid(FULL, FULL, z);
-      Grid part = make_grid(rows, cols, z);
-      // Double-precision references for the TaylorFast accuracy check.
+    // Flat grids at z = 0 and z = FIXED_Z for the height properties, and a
+    // sloped grid whose height changes from row to row, so that each of a
+    // thread's pixels needs its own height.
+    for (const auto &[z, z_per_row] : {std::pair<double, double>{0.0, 0.0}, std::pair<double, double>{FIXED_Z, 0.0},
+                                       std::pair<double, double>{FIXED_Z, Z_PER_ROW}}) {
+      Grid full = make_grid(FULL, FULL, z, z_per_row);
+      Grid part = make_grid(rows, cols, z, z_per_row);
+      // Double-precision references for the accuracy checks.
       auto ref_full = make_tensor<complex_t>({FULL, FULL});
       auto ref_part = make_tensor<complex_t>({rows, cols});
       {
@@ -1682,15 +1693,17 @@ TYPED_TEST(SarBpTestDoubleType, PartialEdgeTilesMatchFullImage)
       for (const SarBpComputeType compute_type : kSarBpAllComputeTypes) {
         const bool taylor = compute_type == SarBpComputeType::TaylorFast;
         for (const Mode mode : {Mode::VariableZ, Mode::ZeroZ, Mode::FixedZ}) {
-          // The zero-z property requires z == 0; fixed z runs on the non-zero grid.
-          if ((mode == Mode::ZeroZ) != (z == 0.0) && mode != Mode::VariableZ) {
+          // The zero-z property requires z == 0, fixed z runs on the flat
+          // non-zero grid, and the sloped grid allows neither.
+          if (mode != Mode::VariableZ && (z_per_row != 0.0 || (mode == Mode::ZeroZ) != (z == 0.0))) {
             continue;
           }
           for (const bool third_order : {false, true}) {
             if (third_order && !taylor) {
               continue;
             }
-            SCOPED_TRACE(::testing::Message() << rows << " x " << cols << ", z=" << z << ", compute_type="
+            SCOPED_TRACE(::testing::Message() << rows << " x " << cols << ", z=" << z << ", z_per_row="
+                                              << z_per_row << ", compute_type="
                                               << static_cast<int>(compute_type) << ", mode="
                                               << static_cast<int>(mode) << ", third_order=" << third_order);
             SarBpParams params;
